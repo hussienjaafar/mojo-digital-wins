@@ -73,20 +73,30 @@ const Index = () => {
         {/* Dark Background Base */}
         <div className="absolute inset-0 z-0 bg-[#1a1f2e]" />
         
-        {/* Animated Circles */}
+        {/* Pulsing Glow Behind Text */}
+        <div className="absolute inset-0 z-0">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-secondary/20 blur-[120px] animate-pulse-subtle" />
+        </div>
+        
+        {/* Animated Circles - Now VERY Visible */}
         <div className="animated-circles z-0">
           <div className="circle-shape circle-1" />
           <div className="circle-shape circle-2" />
           <div className="circle-shape circle-3" />
+          <div className="circle-shape circle-4" />
+          <div className="circle-shape circle-5" />
         </div>
+        
+        {/* Subtle Texture Overlay */}
+        <div className="texture-grain z-[1]" />
         
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="max-w-6xl mx-auto text-center">
-            <h1 className="text-display text-white mb-8 md:mb-12 leading-[0.9] tracking-wider">
-              <span className="pop-word" style={{ animationDelay: '0.2s' }}>Outperforming</span>
+            <h1 className="text-display text-white mb-8 md:mb-12 leading-[1.1] tracking-wider">
+              <span className="pop-word inline-block hover:scale-105 transition-transform" style={{ animationDelay: '0.2s' }}>Outperforming</span>
               <br/>
-              <span className="pop-word" style={{ animationDelay: '0.5s' }}>the</span>{' '}
-              <span className="pop-word" style={{ animationDelay: '0.8s' }}>Establishment.</span>
+              <span className="pop-word inline-block hover:scale-105 transition-transform" style={{ animationDelay: '0.5s' }}>the</span>{' '}
+              <span className="pop-word inline-block hover:scale-105 transition-transform" style={{ animationDelay: '0.8s' }}>Establishment.</span>
             </h1>
             <p className="text-lg md:text-xl lg:text-2xl text-white/90 mb-10 md:mb-14 font-normal max-w-3xl mx-auto px-4 animate-fade-in-up" style={{ animationDelay: '1.1s' }}>
               Mojo Digital turns grassroots energy into <span className="text-accent font-semibold">unstoppable campaign wins</span>.

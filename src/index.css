@@ -164,11 +164,13 @@ All colors MUST be HSL.
 @layer utilities {
   /* Typography Utilities - Activist Poster Style with Mobile Responsiveness */
   .text-display {
-    font-size: clamp(2.5rem, 8vw, var(--font-size-7xl));
-    font-weight: 400;
-    line-height: 0.9;
+    font-size: clamp(3.5rem, 12vw, 7rem);
+    font-weight: 900;
+    line-height: 1.1;
     letter-spacing: 0.02em;
     text-transform: uppercase;
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 
+                 0 0 40px rgba(33, 150, 243, 0.3);
   }
 
   .text-headline {
@@ -401,7 +403,16 @@ All colors MUST be HSL.
   .pop-word {
     display: inline-block;
     opacity: 0;
-    animation: pop-in 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) both;
+    animation: pop-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  /* Subtle grain texture for depth */
+  .texture-grain {
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    pointer-events: none;
+    mix-blend-mode: overlay;
   }
 
   /* Animated Circles - Subtle Background Movement */
@@ -415,54 +426,55 @@ All colors MUST be HSL.
   .circle-shape {
     position: absolute;
     border-radius: 50%;
-    opacity: 0.18;
-    filter: blur(60px);
+    opacity: 0.4;
+    filter: blur(40px);
+    will-change: transform;
   }
 
   .circle-1 {
-    width: 600px;
-    height: 600px;
+    width: 800px;
+    height: 800px;
     background: hsl(var(--secondary));
-    top: -200px;
-    right: -200px;
-    animation: circle-float-1 20s ease-in-out infinite;
+    top: -300px;
+    right: -300px;
+    animation: circle-float-1 12s ease-in-out infinite;
   }
 
   .circle-2 {
-    width: 700px;
-    height: 700px;
+    width: 900px;
+    height: 900px;
     background: hsl(var(--destructive));
-    bottom: -250px;
-    left: -250px;
-    animation: circle-float-2 25s ease-in-out infinite;
+    bottom: -350px;
+    left: -350px;
+    animation: circle-float-2 15s ease-in-out infinite;
   }
 
   .circle-3 {
-    width: 500px;
-    height: 500px;
+    width: 700px;
+    height: 700px;
     background: hsl(var(--accent));
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    animation: circle-float-3 18s ease-in-out infinite;
+    animation: circle-float-3 14s ease-in-out infinite;
   }
 
   .circle-4 {
-    width: 550px;
-    height: 550px;
+    width: 650px;
+    height: 650px;
     background: hsl(var(--secondary));
     top: 10%;
     left: 5%;
-    animation: circle-float-1 22s ease-in-out infinite reverse;
+    animation: circle-float-1 13s ease-in-out infinite reverse;
   }
 
   .circle-5 {
-    width: 480px;
-    height: 480px;
+    width: 580px;
+    height: 580px;
     background: hsl(var(--destructive));
     bottom: 15%;
     right: 10%;
-    animation: circle-float-2 19s ease-in-out infinite reverse;
+    animation: circle-float-2 11s ease-in-out infinite reverse;
   }
 
   /* Reduced Motion Support */

@@ -224,14 +224,14 @@ export default {
         "pop-in": {
           "0%": {
             opacity: "0",
-            transform: "scale(0.5) translateY(20px)",
+            transform: "scale(0.3) translateY(40px) rotate(-5deg)",
           },
-          "60%": {
-            transform: "scale(1.1) translateY(0)",
+          "70%": {
+            transform: "scale(1.15) translateY(-5px) rotate(2deg)",
           },
           "100%": {
             opacity: "1",
-            transform: "scale(1) translateY(0)",
+            transform: "scale(1) translateY(0) rotate(0deg)",
           },
         },
         "gradient-shift": {
