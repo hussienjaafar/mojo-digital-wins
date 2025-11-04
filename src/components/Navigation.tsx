@@ -37,11 +37,13 @@ const Navigation = () => {
       }`}>
         <div className="flex items-center justify-between h-[72px] md:h-[80px]">
           {/* Logo */}
-          <Link to="/" className="flex items-center">
-            <div className={`text-2xl md:text-[2rem] font-black tracking-tight transition-colors ${
-              isScrolled ? "text-primary-foreground" : "text-foreground"
+          <Link to="/" className="flex items-center gap-2">
+            <div className={`transition-colors ${
+              isScrolled ? "text-primary-foreground" : "text-primary-foreground drop-shadow-[0_2px_8px_rgba(10,30,62,0.8)]"
             }`}>
-              MOJO<span className="text-secondary">.</span>
+              <div className="font-bebas text-[1.75rem] md:text-[2rem] leading-none tracking-wide">
+                MOJO<span className="text-secondary"> DIGITAL</span>
+              </div>
             </div>
           </Link>
 
@@ -53,8 +55,8 @@ const Navigation = () => {
                 to={link.path}
                 className={`text-[16px] md:text-[17px] font-bold tracking-tight transition-colors relative group ${
                   isActive(link.path)
-                    ? isScrolled ? "text-primary-foreground" : "text-foreground"
-                    : isScrolled ? "text-primary-foreground/80 hover:text-primary-foreground" : "text-foreground/70 hover:text-foreground"
+                    ? isScrolled ? "text-primary-foreground" : "text-primary-foreground drop-shadow-[0_2px_4px_rgba(10,30,62,0.6)]"
+                    : isScrolled ? "text-primary-foreground/80 hover:text-primary-foreground" : "text-primary-foreground/90 hover:text-primary-foreground drop-shadow-[0_2px_4px_rgba(10,30,62,0.6)]"
                 }`}
               >
                 {link.name}

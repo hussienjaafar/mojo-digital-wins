@@ -100,11 +100,11 @@ const Index = () => {
               >
                 Outperforming<br/>the Establishment.
               </h1>
-              {/* Red activist underline */}
+              {/* Red activist underline with swipe animation */}
               <div 
-                className="h-[3px] w-[180px] bg-destructive mt-4 rounded-full"
+                className="h-[3px] w-[180px] bg-destructive mt-4 rounded-full animate-swipe-right"
                 style={{ 
-                  animation: 'scale-in-x 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both'
+                  animationDelay: '0.6s'
                 }}
               />
             </div>
@@ -121,7 +121,7 @@ const Index = () => {
             
             {/* CTAs */}
             <div 
-              className="flex flex-col sm:flex-row gap-4 mb-12"
+              className="flex flex-col sm:flex-row gap-4 mb-8"
               style={{ 
                 animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 280ms both'
               }}
@@ -129,7 +129,7 @@ const Index = () => {
               <Button 
                 size="lg" 
                 asChild
-                className="hero-cta-glow bg-secondary hover:bg-secondary/90 hover:scale-[1.03] text-secondary-foreground font-semibold rounded-lg px-8 h-12 text-base transition-all duration-200 shadow-lg hover:shadow-xl"
+                className="hero-cta-premium bg-secondary hover:bg-secondary/90 hover:scale-[1.03] text-secondary-foreground font-semibold rounded-lg px-8 h-12 text-base transition-all duration-300 shadow-lg hover:shadow-xl"
               >
                 <Link to="/contact">Grow Your Donor Base</Link>
               </Button>
@@ -143,14 +143,14 @@ const Index = () => {
               </Button>
             </div>
             
-            {/* Metrics Strip - Elevated Cards */}
+            {/* Metrics Strip - Elevated Cards with Premium Spacing */}
             <div 
-              className="flex flex-wrap gap-4 mb-8"
+              className="flex flex-wrap gap-6 mb-8"
               style={{ 
                 animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 340ms both'
               }}
             >
-              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group">
+              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group kpi-card-pulse">
                 <div className="w-11 h-11 rounded-lg bg-secondary/30 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                   <TrendingUp className="w-5 h-5 text-secondary drop-shadow-glow" />
                 </div>
@@ -162,7 +162,7 @@ const Index = () => {
                 </div>
               </div>
               
-              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group">
+              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group kpi-card-pulse">
                 <div className="w-11 h-11 rounded-lg bg-destructive/30 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                   <Users className="w-5 h-5 text-destructive drop-shadow-glow" />
                 </div>
@@ -174,7 +174,7 @@ const Index = () => {
                 </div>
               </div>
               
-              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group">
+              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group kpi-card-pulse">
                 <div className="w-11 h-11 rounded-lg bg-accent/30 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                   <Target className="w-5 h-5 text-accent-foreground drop-shadow-glow" />
                 </div>
@@ -221,6 +221,120 @@ const Index = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How We Win Elections - Scroll Story Section */}
+      <section className="py-20 md:py-28 bg-background relative">
+        <div className="max-w-[1280px] mx-auto px-6">
+          <div className="text-center mb-12 md:mb-16">
+            <h2 className="font-bebas text-4xl md:text-5xl lg:text-6xl text-foreground mb-4 uppercase tracking-wide">
+              How We Win Elections in 3 Key Steps
+            </h2>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+              A proven system that turns grassroots movements into electoral victories
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 md:gap-10">
+            {[
+              {
+                step: '1',
+                icon: Target,
+                title: 'Rapid Acquisition',
+                description: 'Paid social that scales donor lists fast—reaching the right supporters at the right moment with laser-focused targeting.',
+              },
+              {
+                step: '2',
+                icon: MessageSquare,
+                title: 'Compelling Fundraising',
+                description: 'Conversion-optimized SMS & email campaigns that inspire action and drive revenue without burning out your base.',
+              },
+              {
+                step: '3',
+                icon: BarChart3,
+                title: 'Relentless Optimization',
+                description: 'Real-time data decisions that continuously grow ROI—every dollar tracked, every test measured, every win amplified.',
+              },
+            ].map((step, index) => (
+              <Card
+                key={index}
+                className="bg-gradient-to-br from-card to-muted border-2 border-secondary/20 hover:border-secondary/60 backdrop-blur-sm hover-lift overflow-hidden group scroll-reveal"
+                style={{ animationDelay: `${index * 150}ms` }}
+              >
+                <CardContent className="p-8 relative">
+                  <div className="absolute top-4 right-4 font-bebas text-6xl text-secondary/10 group-hover:text-secondary/20 transition-colors">
+                    {step.step}
+                  </div>
+                  <step.icon className="w-14 h-14 text-secondary mb-6 relative z-10 group-hover:scale-110 transition-transform duration-300" />
+                  <h3 className="font-bebas text-3xl mb-4 text-foreground uppercase tracking-wide relative z-10">
+                    {step.title}
+                  </h3>
+                  <p className="text-muted-foreground relative z-10 leading-relaxed">
+                    {step.description}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Work Preview - Featured Case Studies */}
+      <section className="py-20 md:py-28 bg-gradient-to-br from-muted via-background to-muted relative">
+        <div className="max-w-[1280px] mx-auto px-6">
+          <div className="text-center mb-12 md:mb-16">
+            <h2 className="font-bebas text-4xl md:text-5xl lg:text-6xl text-foreground mb-4 uppercase tracking-wide">
+              Proven Results That Win
+            </h2>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+              Real campaigns. Real metrics. Real victories.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              { roi: '947%', campaign: 'Unity & Justice Fund', stat: '+490 new donors', color: 'secondary' },
+              { roi: '415%', campaign: 'Rashid for Illinois', stat: '+875 new donors in 2 weeks', color: 'destructive' },
+              { roi: '325%', campaign: 'Nasser for Michigan', stat: '$129.56 avg donation', color: 'accent' },
+            ].map((item, index) => (
+              <Card
+                key={index}
+                className="bg-card border-2 border-border hover:border-secondary overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-2xl work-preview-card"
+                style={{ animationDelay: `${index * 150}ms` }}
+              >
+                <CardContent className="p-0">
+                  <div className={`bg-gradient-to-br from-${item.color} to-${item.color}/80 p-8 text-${item.color}-foreground relative overflow-hidden`}>
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300" />
+                    <div className="relative z-10">
+                      <div className="font-bebas text-6xl md:text-7xl mb-2 leading-none group-hover:scale-110 transition-transform duration-300 origin-left">
+                        {item.roi}
+                      </div>
+                      <div className="text-sm uppercase tracking-wider opacity-90">ROI</div>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <h3 className="font-bebas text-2xl mb-2 text-foreground uppercase tracking-wide">
+                      {item.campaign}
+                    </h3>
+                    <p className="text-muted-foreground mb-4">{item.stat}</p>
+                    <div className="flex items-center gap-2 text-secondary font-semibold opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                      View Case Study
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="text-center mt-12">
+            <Button variant="brutal" size="xl" asChild className="text-lg">
+              <Link to="/case-studies">View All Case Studies</Link>
+            </Button>
           </div>
         </div>
       </section>
