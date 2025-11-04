@@ -123,15 +123,15 @@ const Services = () => {
       <Navigation />
 
       {/* Hero */}
-      <section className="relative min-h-[70vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
+      <section className="relative min-h-[50vh] md:min-h-[70vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
         <div className="texture-overlay"></div>
         
-        <div className="container relative z-10 mx-auto px-4 text-center">
-          <h1 className="text-display text-white mb-6 leading-tight animate-fade-in">
+        <div className="container relative z-10 mx-auto px-4 sm:px-6 text-center">
+          <h1 className="text-display text-white mb-4 md:mb-6 leading-tight animate-fade-in">
             Performance That Moves{" "}
             <span className="text-accent energy-glow">Progressive Campaigns</span>
           </h1>
-          <p className="text-xl md:text-2xl text-white/90 mb-8 max-w-3xl mx-auto font-light animate-fade-in">
+          <p className="text-lg md:text-xl lg:text-2xl text-white/90 mb-6 md:mb-8 max-w-3xl mx-auto font-light animate-fade-in px-4">
             Data-driven digital strategies that turn grassroots energy into measurable wins
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">
@@ -154,11 +154,11 @@ const Services = () => {
         <section
           key={service.title}
           className={cn(
-            "py-20 relative",
+            "py-12 md:py-20 relative",
             index % 2 === 0 ? "bg-background diagonal-top" : "bg-muted/30 diagonal-both"
           )}
         >
-          <div className="container mx-auto px-4">
+          <div className="container mx-auto px-4 sm:px-6">
             <div
               className={cn(
                 "grid md:grid-cols-2 gap-12 items-center",
@@ -227,14 +227,14 @@ const Services = () => {
       <CompoundingImpactModel />
 
       {/* Supporting Services */}
-      <section className="py-20 bg-background diagonal-top relative">
+      <section className="py-12 md:py-20 bg-background diagonal-top relative">
         <div className="texture-overlay"></div>
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-16 animate-fade-in">
+        <div className="container mx-auto px-4 sm:px-6 relative z-10">
+          <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
             <h2 className="text-headline text-foreground mb-4">
               Everything You Need to Win
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Comprehensive digital services that work together seamlessly
             </p>
           </div>
@@ -258,14 +258,14 @@ const Services = () => {
       </section>
 
       {/* Ethical Promise */}
-      <section className="py-20 bg-gradient-to-br from-accent/10 via-background to-primary/5 diagonal-both relative">
+      <section className="py-12 md:py-20 bg-gradient-to-br from-accent/10 via-background to-primary/5 diagonal-both relative">
         <div className="texture-overlay"></div>
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-16 animate-fade-in">
+        <div className="container mx-auto px-4 sm:px-6 relative z-10">
+          <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
             <h2 className="text-display text-foreground mb-4">
               Our Ethical Promise
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Performance without compromise. Values first, always.
             </p>
           </div>
@@ -327,9 +327,9 @@ const Services = () => {
       </section>
 
       {/* Process */}
-      <section className="py-20 bg-background diagonal-top relative">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16 animate-fade-in">
+      <section className="py-12 md:py-20 bg-background diagonal-top relative">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
             <h2 className="text-headline text-foreground mb-4">
               How We Work With You
             </h2>
@@ -338,7 +338,7 @@ const Services = () => {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             {[
               { number: "01", title: "Discovery", desc: "Deep dive into your campaign goals, audience, and constraints" },
               { number: "02", title: "Strategy", desc: "Custom roadmap with channel mix, creative direction, and KPIs" },
@@ -356,13 +356,13 @@ const Services = () => {
       </section>
 
       {/* Final CTA */}
-      <section className="py-20 bg-gradient-to-br from-primary via-secondary to-accent text-white diagonal-both relative overflow-hidden">
+      <section className="py-12 md:py-20 bg-gradient-to-br from-primary via-secondary to-accent text-white diagonal-both relative overflow-hidden">
         <div className="texture-overlay"></div>
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <h2 className="text-display mb-6 animate-fade-in energy-glow">
+        <div className="container mx-auto px-4 sm:px-6 text-center relative z-10">
+          <h2 className="text-display mb-4 md:mb-6 animate-fade-in energy-glow px-4">
             Ready to Transform Your Campaign?
           </h2>
-          <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90 animate-fade-in">
+          <p className="text-lg md:text-xl mb-6 md:mb-8 max-w-2xl mx-auto opacity-90 animate-fade-in px-4">
             Let's build a winning digital strategy together
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">

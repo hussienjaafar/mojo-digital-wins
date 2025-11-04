@@ -69,7 +69,7 @@ const Index = () => {
       <Navigation />
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-24 overflow-hidden">
+      <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 min-h-[60vh] md:min-h-[70vh] overflow-hidden">
         <div
           className="absolute inset-0 z-0 animate-parallax-slow"
           style={{
@@ -81,15 +81,15 @@ const Index = () => {
         {/* Texture Overlay */}
         <div className="absolute inset-0 z-0 texture-overlay" />
         
-        <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="max-w-5xl mx-auto text-center animate-fade-in-up">
-            <h1 className="font-bebas text-7xl md:text-9xl text-primary-foreground mb-8 leading-none tracking-wider uppercase">
+            <h1 className="text-display text-primary-foreground mb-6 md:mb-8 leading-none tracking-wider">
               Outperforming<br/>the Establishment.
             </h1>
-            <p className="text-xl md:text-3xl text-primary-foreground/95 mb-10 font-medium max-w-3xl mx-auto">
+            <p className="text-lg md:text-2xl lg:text-3xl text-primary-foreground/95 mb-8 md:mb-10 font-medium max-w-3xl mx-auto px-4">
               Mojo Digital turns grassroots energy into <span className="text-accent font-bold">unstoppable campaign wins</span>.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
               <Button variant="brutal" size="xl" asChild className="text-lg">
                 <Link to="/contact">Join the Movement</Link>
               </Button>
@@ -105,25 +105,25 @@ const Index = () => {
       </section>
 
       {/* Metrics Section */}
-      <section className="py-20 bg-gradient-to-br from-muted via-background to-muted relative">
+      <section className="py-12 md:py-20 bg-gradient-to-br from-muted via-background to-muted relative">
         <div className="absolute inset-0 energy-glow" />
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-12 animate-fade-in">
-            <h2 className="font-bebas text-5xl md:text-6xl text-foreground mb-4 uppercase tracking-wide">
+        <div className="container mx-auto px-4 sm:px-6 relative z-10">
+          <div className="text-center mb-8 md:mb-12 animate-fade-in">
+            <h2 className="text-headline text-foreground mb-4 tracking-wide">
               Real Numbers.<br/>Real Impact.
             </h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             {metrics.map((metric, index) => (
               <div 
                 key={index} 
-                className="text-center animate-bounce-in bg-card border-2 border-secondary/20 p-8 rounded-lg hover-lift hover-glow" 
+                className="text-center animate-bounce-in bg-card border-2 border-secondary/20 p-6 md:p-8 rounded-lg hover-lift hover-glow" 
                 style={{ animationDelay: `${index * 0.15}s` }}
               >
-                <div className="font-bebas text-5xl md:text-7xl text-secondary mb-2 leading-none">
+                <div className="font-bebas text-4xl sm:text-5xl md:text-7xl text-secondary mb-2 leading-none">
                   <StatCounter end={metric.value} prefix={metric.prefix} suffix={metric.suffix} />
                 </div>
-                <div className="text-sm md:text-base text-muted-foreground font-bold uppercase tracking-wider">{metric.label}</div>
+                <div className="text-xs sm:text-sm md:text-base text-muted-foreground font-bold uppercase tracking-wider">{metric.label}</div>
               </div>
             ))}
           </div>
@@ -131,20 +131,20 @@ const Index = () => {
       </section>
 
       {/* Why Mojo Digital */}
-      <section className="py-24 diagonal-both bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden">
+      <section className="py-16 md:py-24 diagonal-both bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden">
         <div className="absolute inset-0 texture-overlay" />
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center mb-16 animate-fade-in">
-            <h2 className="font-bebas text-6xl md:text-7xl mb-6 uppercase tracking-wide">
+        <div className="container mx-auto px-4 sm:px-6 relative z-10">
+          <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16 animate-fade-in px-4">
+            <h2 className="text-headline mb-4 md:mb-6 tracking-wide">
               Progressive Values.<br/>Proven Performance.
             </h2>
-            <p className="text-xl text-primary-foreground/90 font-medium">
+            <p className="text-lg md:text-xl text-primary-foreground/90 font-medium">
               We combine the energy of political organizing with elite performance marketing expertise—data
               that wins elections.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-12 items-center">
+          <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
             <div className="space-y-6 animate-fade-in">
               <div className="flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-accent hover-lift">
                 <div className="bg-accent text-accent-foreground p-3 rounded-lg flex-shrink-0">
@@ -212,11 +212,11 @@ const Index = () => {
       </section>
 
       {/* Services Overview */}
-      <section className="py-24 bg-background relative">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16 animate-fade-in">
-            <h2 className="font-bebas text-6xl md:text-7xl text-foreground mb-6 uppercase tracking-wide">Our Arsenal</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
+      <section className="py-16 md:py-24 bg-background relative">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12 md:mb-16 animate-fade-in">
+            <h2 className="text-headline text-foreground mb-4 md:mb-6 tracking-wide">Our Arsenal</h2>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium px-4">
               Three core offerings designed to maximize your campaign's impact and ROI.
             </p>
           </div>
@@ -247,19 +247,19 @@ const Index = () => {
       </section>
 
       {/* Progressive Values */}
-      <section className="py-24 diagonal-top bg-gradient-to-br from-destructive/10 via-background to-secondary/10 relative">
-        <div className="container mx-auto px-4">
+      <section className="py-16 md:py-24 diagonal-top bg-gradient-to-br from-destructive/10 via-background to-secondary/10 relative">
+        <div className="container mx-auto px-4 sm:px-6">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-16 animate-fade-in">
-              <h2 className="font-bebas text-6xl md:text-7xl text-foreground mb-6 uppercase tracking-wide">
+            <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
+              <h2 className="text-headline text-foreground mb-4 md:mb-6 tracking-wide">
                 Fighting for a<br/>More Just Future
               </h2>
-              <p className="text-xl text-muted-foreground font-medium">
+              <p className="text-lg md:text-xl text-muted-foreground font-medium">
                 We only work with campaigns and causes aligned with our progressive values.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
               {values.map((value, index) => (
                 <div
                   key={index}
@@ -278,20 +278,20 @@ const Index = () => {
       </section>
 
       {/* Compounding Impact Model - Condensed */}
-      <section className="py-24 bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden diagonal-both">
+      <section className="py-16 md:py-24 bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden diagonal-both">
         <div className="absolute inset-0 texture-overlay" />
-        <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16 animate-fade-in">
-              <h2 className="font-bebas text-6xl md:text-7xl mb-4 uppercase tracking-wide">
-                The Compounding<br/>Impact Model<sup className="text-3xl text-accent">™</sup>
+            <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
+              <h2 className="text-headline mb-4 tracking-wide">
+                The Compounding<br/>Impact Model<sup className="text-2xl md:text-3xl text-accent">™</sup>
               </h2>
-              <p className="text-xl text-primary-foreground/90 font-medium">
+              <p className="text-lg md:text-xl text-primary-foreground/90 font-medium">
                 A self-sustaining fundraising engine that grows alongside grassroots support
               </p>
             </div>
 
-            <div className="grid md:grid-cols-4 gap-6 mb-12">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
               {[
                 { step: "01", value: "$5K", label: "Initial Investment", icon: "💰" },
                 { step: "02", value: "200-300%", label: "ROI in 30 Days", icon: "📈" },
@@ -321,13 +321,13 @@ const Index = () => {
       </section>
 
       {/* Quick Case Studies */}
-      <section className="py-24 bg-background relative">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16 animate-fade-in">
-            <h2 className="font-bebas text-6xl md:text-7xl text-foreground mb-6 uppercase tracking-wide">
+      <section className="py-16 md:py-24 bg-background relative">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
+            <h2 className="text-headline text-foreground mb-4 md:mb-6 tracking-wide">
               Real Campaigns.<br/>Real Results.
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
               Our track record speaks for itself—consistent performance that wins elections.
             </p>
           </div>

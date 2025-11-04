@@ -147,6 +147,11 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    overflow-x: hidden;
+  }
+
+  html {
+    overflow-x: hidden;
   }
 
   /* Activist Typography - Bebas Neue for headlines */
@@ -157,9 +162,9 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
-  /* Typography Utilities - Activist Poster Style */
+  /* Typography Utilities - Activist Poster Style with Mobile Responsiveness */
   .text-display {
-    font-size: var(--font-size-7xl);
+    font-size: clamp(2.5rem, 8vw, var(--font-size-7xl));
     font-weight: 400;
     line-height: 0.9;
     letter-spacing: 0.02em;
@@ -167,7 +172,7 @@ All colors MUST be HSL.
   }
 
   .text-headline {
-    font-size: var(--font-size-5xl);
+    font-size: clamp(2rem, 5vw, var(--font-size-5xl));
     font-weight: 400;
     line-height: 0.95;
     letter-spacing: 0.02em;
@@ -175,7 +180,7 @@ All colors MUST be HSL.
   }
 
   .text-subheadline {
-    font-size: var(--font-size-3xl);
+    font-size: clamp(1.5rem, 3vw, var(--font-size-3xl));
     font-weight: var(--font-weight-bold);
     line-height: var(--line-height-snug);
     letter-spacing: var(--letter-spacing-tight);
@@ -225,23 +230,43 @@ All colors MUST be HSL.
     box-shadow: var(--shadow-glow);
   }
 
-  /* Diagonal Section Dividers */
+  /* Diagonal Section Dividers - Mobile Optimized */
   .diagonal-top {
-    clip-path: polygon(0 5%, 100% 0%, 100% 100%, 0% 100%);
-    margin-top: -3rem;
-    padding-top: 6rem;
+    clip-path: polygon(0 3%, 100% 0%, 100% 100%, 0% 100%);
+    margin-top: -1.5rem;
+    padding-top: 4rem;
   }
 
   .diagonal-bottom {
-    clip-path: polygon(0 0, 100% 0, 100% 95%, 0% 100%);
-    padding-bottom: 6rem;
-    margin-bottom: -3rem;
+    clip-path: polygon(0 0, 100% 0, 100% 97%, 0% 100%);
+    padding-bottom: 4rem;
+    margin-bottom: -1.5rem;
   }
 
   .diagonal-both {
-    clip-path: polygon(0 5%, 100% 0%, 100% 95%, 0% 100%);
-    margin: -3rem 0;
-    padding: 6rem 0;
+    clip-path: polygon(0 3%, 100% 0%, 100% 97%, 0% 100%);
+    margin: -1.5rem 0;
+    padding: 4rem 0;
+  }
+
+  @media (min-width: 768px) {
+    .diagonal-top {
+      clip-path: polygon(0 5%, 100% 0%, 100% 100%, 0% 100%);
+      margin-top: -3rem;
+      padding-top: 6rem;
+    }
+
+    .diagonal-bottom {
+      clip-path: polygon(0 0, 100% 0, 100% 95%, 0% 100%);
+      padding-bottom: 6rem;
+      margin-bottom: -3rem;
+    }
+
+    .diagonal-both {
+      clip-path: polygon(0 5%, 100% 0%, 100% 95%, 0% 100%);
+      margin: -3rem 0;
+      padding: 6rem 0;
+    }
   }
 
   /* Torn Paper Effect */

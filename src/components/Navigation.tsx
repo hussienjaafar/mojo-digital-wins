@@ -64,7 +64,7 @@ const Navigation = () => {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden text-primary-foreground"
+            className="md:hidden text-primary-foreground p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-label="Toggle menu"
           >
@@ -74,22 +74,22 @@ const Navigation = () => {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden py-4 space-y-4 animate-fade-in">
+          <div className="md:hidden py-4 space-y-3 animate-fade-in">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`block text-sm font-medium transition-colors ${
+                className={`block py-3 px-4 rounded-md font-medium transition-colors min-h-[48px] flex items-center ${
                   isActive(link.path)
-                    ? "text-accent"
-                    : "text-primary-foreground/90 hover:text-primary-foreground"
+                    ? "text-accent bg-accent/10"
+                    : "text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary-foreground/10"
                 }`}
               >
                 {link.name}
               </Link>
             ))}
-            <Button variant="brutal" size="default" className="w-full" asChild>
+            <Button variant="brutal" size="lg" className="w-full" asChild>
               <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)}>
                 Get Started
               </Link>

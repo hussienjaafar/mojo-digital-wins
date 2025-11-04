@@ -52,22 +52,22 @@ const Contact = () => {
       <Navigation />
 
       {/* Hero */}
-      <section className="relative min-h-[50vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
+      <section className="relative min-h-[50vh] md:min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
         <div className="texture-overlay"></div>
-        <div className="container relative z-10 mx-auto px-4 text-center">
-          <h1 className="text-display text-white mb-6 leading-tight animate-fade-in energy-glow">
+        <div className="container relative z-10 mx-auto px-4 sm:px-6 text-center">
+          <h1 className="text-display text-white mb-4 md:mb-6 leading-tight animate-fade-in energy-glow">
             Let's Build Your Win
           </h1>
-          <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto font-light animate-fade-in">
+          <p className="text-lg md:text-xl lg:text-2xl text-white/90 max-w-3xl mx-auto font-light animate-fade-in px-4">
             Get in touch to start planning your campaign's digital strategy
           </p>
         </div>
       </section>
 
       {/* Content */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+      <section className="py-12 md:py-20">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="grid md:grid-cols-3 gap-8 md:gap-12 max-w-6xl mx-auto">
             {/* Contact Form */}
             <Card className="md:col-span-2 brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in">
               <CardHeader>
@@ -151,7 +151,7 @@ const Contact = () => {
                     />
                   </div>
 
-                  <Button type="submit" size="lg" className="w-full" disabled={isSubmitting} variant="brutal">
+                  <Button type="submit" size="lg" className="w-full min-h-[48px]" disabled={isSubmitting} variant="brutal">
                     {isSubmitting ? "Sending..." : "Send Message"}
                   </Button>
                 </form>

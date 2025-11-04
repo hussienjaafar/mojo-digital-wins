@@ -146,20 +146,20 @@ const CaseStudies = () => {
       <Navigation />
 
       {/* Hero */}
-      <section className="relative min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
+      <section className="relative min-h-[50vh] md:min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
         <div className="texture-overlay"></div>
-        <div className="container relative z-10 mx-auto px-4 text-center">
-          <h1 className="text-display text-white mb-6 leading-tight animate-fade-in energy-glow">Proven Wins</h1>
-          <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto font-light animate-fade-in">
+        <div className="container relative z-10 mx-auto px-4 sm:px-6 text-center">
+          <h1 className="text-display text-white mb-4 md:mb-6 leading-tight animate-fade-in energy-glow">Proven Wins</h1>
+          <p className="text-lg md:text-xl lg:text-2xl text-white/90 max-w-3xl mx-auto font-light animate-fade-in px-4">
             Real campaigns. Real results. Real impact for progressive causes.
           </p>
         </div>
       </section>
 
       {/* Filter Section */}
-      <section className="sticky top-16 z-20 bg-background/95 backdrop-blur-sm border-b border-border py-6 brutal-shadow">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-wrap gap-3 justify-center">
+      <section className="sticky top-16 z-20 bg-background/95 backdrop-blur-sm border-b border-border py-4 md:py-6 brutal-shadow">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="flex flex-wrap gap-2 md:gap-3 justify-center">
             {["all", "congressional", "senate", "statewide", "issue"].map((category) => (
               <Button
                 key={category}
@@ -175,11 +175,11 @@ const CaseStudies = () => {
       </section>
 
       {/* Case Studies */}
-      <section className="py-20">
-        <div className="container mx-auto px-4 space-y-16">
+      <section className="py-12 md:py-20">
+        <div className="container mx-auto px-4 sm:px-6 space-y-12 md:space-y-16">
           {filteredStudies.map((study, index) => (
             <Card key={index} className="overflow-hidden hover-lift brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-              <div className="grid md:grid-cols-5 gap-6 p-6">
+              <div className="grid md:grid-cols-5 gap-4 md:gap-6 p-4 md:p-6">
                 {/* Left: Metrics */}
                 <div className="md:col-span-2 space-y-6">
                   <div>
@@ -264,11 +264,11 @@ const CaseStudies = () => {
       </section>
 
       {/* Final CTA */}
-      <section className="py-20 bg-gradient-to-br from-primary via-secondary to-accent text-white diagonal-both relative overflow-hidden">
+      <section className="py-12 md:py-20 bg-gradient-to-br from-primary via-secondary to-accent text-white diagonal-both relative overflow-hidden">
         <div className="texture-overlay"></div>
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <h2 className="text-display mb-6 animate-fade-in energy-glow">Ready to Write Your Success Story?</h2>
-          <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90 animate-fade-in">
+        <div className="container mx-auto px-4 sm:px-6 text-center relative z-10">
+          <h2 className="text-display mb-4 md:mb-6 animate-fade-in energy-glow px-4">Ready to Write Your Success Story?</h2>
+          <p className="text-lg md:text-xl mb-6 md:mb-8 max-w-2xl mx-auto opacity-90 animate-fade-in px-4">
             Let's build a campaign that delivers results and stays true to progressive values
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">

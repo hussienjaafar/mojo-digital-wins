@@ -11,22 +11,22 @@ const About = () => {
       <Navigation />
 
       {/* Hero */}
-      <section className="relative min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
+      <section className="relative min-h-[50vh] md:min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
         <div className="texture-overlay"></div>
-        <div className="container relative z-10 mx-auto px-4 text-center">
-          <h1 className="text-display text-white mb-6 leading-tight animate-fade-in energy-glow">
+        <div className="container relative z-10 mx-auto px-4 sm:px-6 text-center">
+          <h1 className="text-display text-white mb-4 md:mb-6 leading-tight animate-fade-in energy-glow">
             Our Story
           </h1>
-          <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto font-light animate-fade-in">
+          <p className="text-lg md:text-xl lg:text-2xl text-white/90 max-w-3xl mx-auto font-light animate-fade-in px-4">
             Where grassroots organizing meets performance marketing
           </p>
         </div>
       </section>
 
       {/* Origin Story */}
-      <section className="py-20 bg-background relative">
+      <section className="py-12 md:py-20 bg-background relative">
         <div className="texture-overlay opacity-30"></div>
-        <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-headline text-foreground mb-8 animate-fade-in">
               Why We Exist
@@ -59,19 +59,19 @@ const About = () => {
       </section>
 
       {/* Progressive Principles */}
-      <section className="py-20 bg-gradient-to-br from-muted/30 to-background diagonal-both relative">
+      <section className="py-12 md:py-20 bg-gradient-to-br from-muted/30 to-background diagonal-both relative">
         <div className="texture-overlay"></div>
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-16 animate-fade-in">
+        <div className="container mx-auto px-4 sm:px-6 relative z-10">
+          <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
             <h2 className="text-headline text-foreground mb-4">
               Our Core Principles
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               The values that guide every campaign we run
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8">
             {[
               {
                 icon: Heart,
@@ -106,8 +106,8 @@ const About = () => {
       </section>
 
       {/* Leadership & Experience */}
-      <section className="py-20 bg-background diagonal-top relative">
-        <div className="container mx-auto px-4">
+      <section className="py-12 md:py-20 bg-background diagonal-top relative">
+        <div className="container mx-auto px-4 sm:px-6">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-headline text-foreground mb-8 text-center animate-fade-in">
               Built by Campaign Veterans
@@ -155,14 +155,14 @@ const About = () => {
       </section>
 
       {/* Ethical Commitments */}
-      <section className="py-20 bg-gradient-to-br from-accent/5 via-background to-primary/5 diagonal-both relative">
+      <section className="py-12 md:py-20 bg-gradient-to-br from-accent/5 via-background to-primary/5 diagonal-both relative">
         <div className="texture-overlay"></div>
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-16 animate-fade-in">
+        <div className="container mx-auto px-4 sm:px-6 relative z-10">
+          <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
             <h2 className="text-display text-foreground mb-4">
               Our Commitments to You
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Non-negotiable standards for every campaign
             </p>
           </div>
@@ -220,11 +220,11 @@ const About = () => {
       </section>
 
       {/* Final CTA */}
-      <section className="py-20 bg-gradient-to-br from-primary via-secondary to-accent text-white diagonal-both relative overflow-hidden">
+      <section className="py-12 md:py-20 bg-gradient-to-br from-primary via-secondary to-accent text-white diagonal-both relative overflow-hidden">
         <div className="texture-overlay"></div>
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <h2 className="text-display mb-6 animate-fade-in energy-glow">Let's Win Together</h2>
-          <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90 animate-fade-in">
+        <div className="container mx-auto px-4 sm:px-6 text-center relative z-10">
+          <h2 className="text-display mb-4 md:mb-6 animate-fade-in energy-glow px-4">Let's Win Together</h2>
+          <p className="text-lg md:text-xl mb-6 md:mb-8 max-w-2xl mx-auto opacity-90 animate-fade-in px-4">
             Ready to partner with a team that shares your values and delivers results?
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">
