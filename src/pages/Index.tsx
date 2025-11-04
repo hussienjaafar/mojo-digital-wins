@@ -70,26 +70,27 @@ const Index = () => {
 
       {/* Hero Section */}
       <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 min-h-[60vh] md:min-h-[70vh] overflow-hidden">
-        <div
-          className="absolute inset-0 z-0 animate-parallax-slow"
-          style={{
-            backgroundImage: `linear-gradient(135deg, rgba(10, 30, 62, 0.95) 0%, rgba(20, 100, 217, 0.85) 100%), url(${heroImage})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
+        {/* Animated Gradient Background */}
+        <div className="absolute inset-0 z-0 animated-gradient-bg" />
+        
+        {/* Darker overlay for readability */}
+        <div className="absolute inset-0 z-0 bg-gradient-to-br from-primary/60 via-transparent to-secondary/40" />
+        
         {/* Texture Overlay */}
         <div className="absolute inset-0 z-0 texture-overlay" />
         
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
-          <div className="max-w-5xl mx-auto text-center animate-fade-in-up">
+          <div className="max-w-5xl mx-auto text-center">
             <h1 className="text-display text-primary-foreground mb-6 md:mb-8 leading-none tracking-wider">
-              Outperforming<br/>the Establishment.
+              <span className="pop-word" style={{ animationDelay: '0.2s' }}>Outperforming</span>
+              <br/>
+              <span className="pop-word" style={{ animationDelay: '0.5s' }}>the</span>{' '}
+              <span className="pop-word" style={{ animationDelay: '0.8s' }}>Establishment.</span>
             </h1>
-            <p className="text-lg md:text-2xl lg:text-3xl text-primary-foreground/95 mb-8 md:mb-10 font-medium max-w-3xl mx-auto px-4">
+            <p className="text-lg md:text-2xl lg:text-3xl text-primary-foreground/95 mb-8 md:mb-10 font-medium max-w-3xl mx-auto px-4 animate-fade-in-up" style={{ animationDelay: '1.1s' }}>
               Mojo Digital turns grassroots energy into <span className="text-accent font-bold">unstoppable campaign wins</span>.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center px-4 animate-fade-in-up" style={{ animationDelay: '1.4s' }}>
               <Button variant="brutal" size="xl" asChild className="text-lg">
                 <Link to="/contact">Join the Movement</Link>
               </Button>

@@ -384,6 +384,26 @@ All colors MUST be HSL.
     }
   }
 
+  /* Animated Gradient Background */
+  .animated-gradient-bg {
+    background: linear-gradient(
+      135deg,
+      hsl(213 75% 15%),
+      hsl(213 83% 47%),
+      hsl(0 78% 53%),
+      hsl(213 75% 15%)
+    );
+    background-size: 300% 300%;
+    animation: gradient-shift 8s ease infinite;
+  }
+
+  /* Text Pop Animation Utilities */
+  .pop-word {
+    display: inline-block;
+    opacity: 0;
+    animation: pop-in 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) both;
+  }
+
   /* Reduced Motion Support */
   @media (prefers-reduced-motion: reduce) {
     *,
