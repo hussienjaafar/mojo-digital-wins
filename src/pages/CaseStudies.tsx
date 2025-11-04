@@ -4,7 +4,7 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { TrendingUp, Users, DollarSign, Target } from "lucide-react";
+import { TrendingUp, Users, DollarSign, Target, Shield, MessageSquare, Mail, Monitor } from "lucide-react";
 
 const CaseStudies = () => {
   const [filter, setFilter] = useState("All");
@@ -25,6 +25,10 @@ const CaseStudies = () => {
         "Multi-channel approach combining SMS blasts to activist networks, targeted Meta ads to progressive audiences, and email sequences to engaged supporters. Focused on storytelling around specific policy wins.",
       results:
         "Achieved 947% ROI with an average donation of $144.60, bringing in 490 new recurring donors. Established the PAC as a serious player in progressive fundraising.",
+      ethicalApproach:
+        "By respecting donor preferences and segmenting our messaging, we achieved an impressive 89% donor retention rate. We never used deceptive urgency or misleading tactics—just authentic storytelling about policy impact.",
+      creativeType: "SMS",
+      creativeExample: "/src/assets/sms-mockup.jpg",
     },
     {
       category: "State",
@@ -39,6 +43,10 @@ const CaseStudies = () => {
         "Aggressive SMS campaign targeting progressive voters in the district, combined with precision Facebook targeting. Emphasized grassroots momentum and underdog narrative.",
       results:
         "Generated 415% ROI and acquired 875 new donors in just 2 weeks, giving the campaign the momentum needed to compete.",
+      ethicalApproach:
+        "Despite the aggressive timeline, we maintained clear opt-out language and respected all unsubscribe requests immediately. This built trust that translated into higher conversion rates.",
+      creativeType: "Display Ad",
+      creativeExample: null,
     },
     {
       category: "State",
@@ -53,6 +61,10 @@ const CaseStudies = () => {
         "High-value donor acquisition through optimized Meta ads and sophisticated email nurture sequences. Focused on ROI over volume.",
       results:
         "Achieved 325% ROI with high average donation of $129.56, allowing the campaign to compete in expensive media markets.",
+      ethicalApproach:
+        "We prioritized quality over quantity, ensuring every donor received personalized follow-up and transparent impact reports. This ethical approach resulted in 67% of donors giving multiple times.",
+      creativeType: "Email",
+      creativeExample: null,
     },
     {
       category: "State",
@@ -67,6 +79,10 @@ const CaseStudies = () => {
         "Volume-focused SMS and email strategy combined with low-cost Meta acquisition campaigns. Emphasized accessible $20-30 donation asks.",
       results:
         "236% ROI while acquiring 2,349 new donors with an accessible average donation of $29.11, demonstrating broad grassroots support.",
+      ethicalApproach:
+        "We paced our outreach carefully to avoid donor fatigue, spacing messages appropriately and varying content. Lower volume but higher trust led to sustainable long-term support.",
+      creativeType: "SMS",
+      creativeExample: null,
     },
     {
       category: "Federal",
@@ -81,6 +97,10 @@ const CaseStudies = () => {
         "Integrated digital strategy combining national progressive networks via email, local SMS targeting, and statewide Meta campaigns. Built coalition across demographics.",
       results:
         "257% ROI with $55.98 average donation, raising enough to stay competitive in expensive statewide race.",
+      ethicalApproach:
+        "Every message was vetted for accuracy and FEC compliance. We built credibility by being truthful about the competitive landscape, which resonated with informed voters.",
+      creativeType: "Display Ad",
+      creativeExample: null,
     },
     {
       category: "Nonprofit",
@@ -95,6 +115,10 @@ const CaseStudies = () => {
         "Community-focused SMS and email campaigns emphasizing impact stories, combined with lookalike audience targeting on Meta. Culturally tailored messaging.",
       results:
         "304% ROI while acquiring 5,909 new donors, providing sustainable funding for ongoing programs.",
+      ethicalApproach:
+        "Culturally sensitive messaging and transparent use of funds built deep community trust. We ensured all content was authentic and represented the community accurately.",
+      creativeType: "Email",
+      creativeExample: null,
     },
     {
       category: "PAC",
@@ -109,6 +133,10 @@ const CaseStudies = () => {
         "Rapid SMS and email recruitment campaigns targeting policy-engaged progressives. Emphasized urgency around pending legislation.",
       results:
         "289% ROI and 502 new monthly donors in just 30 days, creating sustainable funding for ongoing advocacy.",
+      ethicalApproach:
+        "While urgency was real due to legislative deadlines, we never manufactured false emergencies. Honest, factual advocacy built credibility and long-term donor relationships.",
+      creativeType: "SMS",
+      creativeExample: null,
     },
   ];
 
@@ -227,6 +255,33 @@ const CaseStudies = () => {
                           <h3 className="text-xl font-bold text-foreground mb-3">The Results</h3>
                           <p className="text-muted-foreground leading-relaxed">{study.results}</p>
                         </div>
+
+                        <div className="border-t border-border pt-6">
+                          <div className="flex items-start gap-3 mb-3">
+                            <Shield className="w-5 h-5 text-secondary mt-1" />
+                            <h3 className="text-xl font-bold text-foreground">Ethical Approach</h3>
+                          </div>
+                          <p className="text-muted-foreground leading-relaxed">{study.ethicalApproach}</p>
+                        </div>
+
+                        {study.creativeExample && (
+                          <div className="border-t border-border pt-6">
+                            <div className="flex items-start gap-3 mb-3">
+                              {study.creativeType === "SMS" && <MessageSquare className="w-5 h-5 text-accent mt-1" />}
+                              {study.creativeType === "Email" && <Mail className="w-5 h-5 text-accent mt-1" />}
+                              {study.creativeType === "Display Ad" && <Monitor className="w-5 h-5 text-accent mt-1" />}
+                              <h3 className="text-xl font-bold text-foreground">Creative Used</h3>
+                            </div>
+                            <div className="bg-muted rounded-lg p-4">
+                              <img
+                                src={study.creativeExample}
+                                alt={`${study.name} - ${study.creativeType} creative example`}
+                                className="w-full rounded-lg"
+                                loading="lazy"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -252,9 +307,14 @@ const CaseStudies = () => {
           <p className="text-xl text-primary-foreground/90 mb-8 max-w-2xl mx-auto animate-fade-in">
             Let's create your winning campaign strategy. Book a call to discuss your goals and how we can help.
           </p>
-          <Button variant="cta" size="xl" asChild className="animate-pulse-subtle">
-            <Link to="/contact">Book Strategy Call</Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button variant="cta" size="xl" asChild className="animate-pulse-subtle">
+              <Link to="/contact">Book Strategy Call</Link>
+            </Button>
+            <Button variant="outline" size="xl" asChild className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/20">
+              <Link to="/creative-showcase">View Our Creative Work</Link>
+            </Button>
+          </div>
         </div>
       </section>
 
