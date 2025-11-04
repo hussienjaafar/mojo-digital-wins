@@ -69,50 +69,103 @@ const Index = () => {
       <Navigation />
 
       {/* Hero Section */}
-      <section className="relative pt-24 pb-20 md:pt-32 md:pb-32 min-h-[75vh] md:min-h-[85vh] overflow-hidden">
-        {/* Dark Background Base */}
-        <div className="absolute inset-0 z-0 bg-[#1a1f2e]" />
+      <section className="relative pt-32 md:pt-40 pb-20 md:pb-32 bg-background">
+        {/* Subtle texture overlay */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23000000" fill-opacity="1"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
+        }} />
         
-        {/* Pulsing Glow Behind Text */}
-        <div className="absolute inset-0 z-0">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-secondary/20 blur-[120px] animate-pulse-subtle" />
-        </div>
-        
-        {/* Animated Circles - Now VERY Visible */}
-        <div className="animated-circles z-0">
-          <div className="circle-shape circle-1" />
-          <div className="circle-shape circle-2" />
-          <div className="circle-shape circle-3" />
-          <div className="circle-shape circle-4" />
-          <div className="circle-shape circle-5" />
-        </div>
-        
-        {/* Subtle Texture Overlay */}
-        <div className="texture-grain z-[1]" />
-        
-        <div className="container mx-auto px-4 sm:px-6 relative z-10">
-          <div className="max-w-6xl mx-auto text-center">
-            <div className="hero-text-backdrop max-w-5xl mx-auto">
-              <h1 className="hero-headline mb-8 md:mb-12">
-                Outperforming<br/>the Establishment.
-              </h1>
-              <p className="text-lg md:text-xl lg:text-2xl text-white/95 mb-10 md:mb-14 font-medium max-w-3xl mx-auto px-4 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-                Mojo Digital turns grassroots energy into <span className="text-accent font-bold">unstoppable campaign wins</span>.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center px-4 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
-                <Button variant="brutal" size="xl" asChild className="text-lg">
-                  <Link to="/contact">Join the Movement</Link>
-                </Button>
-                <Button variant="movement" size="xl" asChild className="text-lg">
-                  <Link to="/case-studies">See Our Results</Link>
-                </Button>
+        <div className="max-w-[1280px] mx-auto px-6 relative">
+          <div className="max-w-[680px]">
+            {/* Headline */}
+            <h1 
+              className="font-bebas text-[2.5rem] leading-[1.1] md:text-[3.5rem] lg:text-[4rem] font-black text-foreground mb-6 tracking-tight"
+              style={{ 
+                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 150ms both'
+              }}
+            >
+              Outperforming the Establishment.
+            </h1>
+            
+            {/* Subhead */}
+            <p 
+              className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-8 max-w-[600px]"
+              style={{ 
+                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 220ms both'
+              }}
+            >
+              We turn grassroots energy into measurable wins with SMS, digital ads, and email built for ROI.
+            </p>
+            
+            {/* CTAs */}
+            <div 
+              className="flex flex-col sm:flex-row gap-4 mb-12"
+              style={{ 
+                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 280ms both'
+              }}
+            >
+              <Button 
+                size="lg" 
+                asChild
+                className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold rounded-lg px-8 h-12 text-base"
+              >
+                <Link to="/contact">Book a Strategy Call</Link>
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                asChild
+                className="border-2 border-foreground text-foreground hover:bg-foreground hover:text-background font-semibold rounded-lg px-8 h-12 text-base"
+              >
+                <Link to="/case-studies">See Our Results</Link>
+              </Button>
+            </div>
+            
+            {/* Metrics Strip */}
+            <div 
+              className="flex flex-wrap gap-6"
+              style={{ 
+                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 340ms both'
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-secondary" />
+                </div>
+                <div>
+                  <div className="font-bebas text-2xl text-foreground leading-none">
+                    <StatCounter end={947} suffix="%" />
+                  </div>
+                  <div className="text-xs text-muted-foreground font-medium">ROI</div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-destructive" />
+                </div>
+                <div>
+                  <div className="font-bebas text-2xl text-foreground leading-none">
+                    +<StatCounter end={5909} />
+                  </div>
+                  <div className="text-xs text-muted-foreground font-medium">Donors</div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-accent-foreground" />
+                </div>
+                <div>
+                  <div className="font-bebas text-2xl text-foreground leading-none">
+                    <StatCounter end={2} /> Weeks
+                  </div>
+                  <div className="text-xs text-muted-foreground font-medium">Turnaround</div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-        
-        {/* Diagonal bottom edge */}
-        <div className="absolute bottom-0 left-0 right-0 h-20 bg-muted" style={{ clipPath: 'polygon(0 100%, 100% 100%, 100% 0, 0 100%)' }} />
       </section>
 
       {/* Metrics Section */}
