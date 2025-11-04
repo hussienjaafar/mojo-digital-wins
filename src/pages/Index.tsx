@@ -73,6 +73,13 @@ const Index = () => {
         {/* Animated Gradient Background */}
         <div className="absolute inset-0 z-0 animated-gradient-bg" />
         
+        {/* Animated Circles */}
+        <div className="animated-circles z-0">
+          <div className="circle-shape circle-1" />
+          <div className="circle-shape circle-2" />
+          <div className="circle-shape circle-3" />
+        </div>
+        
         {/* Darker overlay for readability */}
         <div className="absolute inset-0 z-0 bg-gradient-to-br from-primary/60 via-transparent to-secondary/40" />
         
@@ -133,6 +140,12 @@ const Index = () => {
 
       {/* Why Mojo Digital */}
       <section className="py-16 md:py-24 diagonal-both bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden">
+        {/* Animated Circles */}
+        <div className="animated-circles z-0">
+          <div className="circle-shape circle-4" />
+          <div className="circle-shape circle-5" />
+        </div>
+        
         <div className="absolute inset-0 texture-overlay" />
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16 animate-fade-in px-4">
@@ -280,6 +293,12 @@ const Index = () => {
 
       {/* Compounding Impact Model - Condensed */}
       <section className="py-16 md:py-24 bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden diagonal-both">
+        {/* Animated Circles */}
+        <div className="animated-circles z-0">
+          <div className="circle-shape circle-1" />
+          <div className="circle-shape circle-3" />
+        </div>
+        
         <div className="absolute inset-0 texture-overlay" />
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="max-w-5xl mx-auto">
