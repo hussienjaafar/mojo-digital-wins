@@ -196,6 +196,16 @@ export default {
             opacity: "1",
           },
         },
+        "slide-up-in": {
+          "0%": {
+            transform: "translateY(40px)",
+            opacity: "0",
+          },
+          "100%": {
+            transform: "translateY(0)",
+            opacity: "1",
+          },
+        },
         "bounce-in": {
           "0%": {
             transform: "scale(0.8)",
@@ -288,6 +298,7 @@ export default {
         "parallax-slow": "parallax-slow 20s ease-in-out infinite alternate",
         "float": "float 3s ease-in-out infinite",
         "slide-up": "slide-up 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+        "slide-up-in": "slide-up-in 0.7s cubic-bezier(0.4, 0, 0.2, 1)",
         "bounce-in": "bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
         "shake": "shake 0.5s ease-in-out",
         "pop-in": "pop-in 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) both",

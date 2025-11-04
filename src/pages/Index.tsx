@@ -6,6 +6,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { TrendingUp, MessageSquare, Mail, Target, Users, BarChart3, Check, Shield } from "lucide-react";
 import heroImage from "@/assets/hero-movement.jpg";
+import heroRally from "@/assets/hero-movement-rally.jpg";
 import dataDashboard from "@/assets/data-dashboard.jpg";
 
 const Index = () => {
@@ -69,19 +70,32 @@ const Index = () => {
       <Navigation />
 
       {/* Hero Section */}
-      <section className="relative pt-32 md:pt-40 pb-20 md:pb-32 bg-background">
+      <section className="relative pt-32 md:pt-36 pb-16 md:pb-24 overflow-hidden">
+        {/* Background Image with Navy Overlay */}
+        <div className="absolute inset-0">
+          <div 
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage: `url(${heroRally})`,
+              transform: 'scale(1.1)',
+            }}
+          />
+          <div className="absolute inset-0 bg-primary/75" />
+        </div>
+        
         {/* Subtle texture overlay */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{
-          backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23000000" fill-opacity="1"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
+        <div className="absolute inset-0 opacity-[0.04]" style={{
+          backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="1"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
         }} />
         
-        <div className="max-w-[1280px] mx-auto px-6 relative">
-          <div className="max-w-[680px]">
+        <div className="max-w-[1280px] mx-auto px-6 relative z-10">
+          <div className="max-w-[720px]">
             {/* Headline */}
             <h1 
-              className="font-bebas text-[2.5rem] leading-[1.1] md:text-[3.5rem] lg:text-[4rem] font-black text-foreground mb-6 tracking-tight"
+              className="font-bebas text-[2.75rem] leading-[1.05] md:text-[4rem] lg:text-[5rem] font-black text-primary-foreground mb-6 tracking-wide uppercase hero-headline-impact"
               style={{ 
-                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 150ms both'
+                animation: 'slide-up-in 0.7s cubic-bezier(0.4, 0, 0.2, 1) 150ms both',
+                letterSpacing: '0.02em'
               }}
             >
               Outperforming the Establishment.
@@ -89,9 +103,9 @@ const Index = () => {
             
             {/* Subhead */}
             <p 
-              className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-8 max-w-[600px]"
+              className="text-lg md:text-xl text-primary-foreground/95 leading-relaxed mb-8 max-w-[620px] font-medium"
               style={{ 
-                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 220ms both'
+                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 250ms both'
               }}
             >
               We turn grassroots energy into measurable wins with SMS, digital ads, and email built for ROI.
@@ -101,68 +115,80 @@ const Index = () => {
             <div 
               className="flex flex-col sm:flex-row gap-4 mb-12"
               style={{ 
-                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 280ms both'
+                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 320ms both'
               }}
             >
               <Button 
                 size="lg" 
                 asChild
-                className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold rounded-lg px-8 h-12 text-base"
+                className="bg-secondary hover:bg-secondary/90 hover:scale-[1.02] text-secondary-foreground font-semibold rounded-lg px-8 h-12 text-base transition-all duration-200 shadow-lg hover:shadow-xl"
               >
-                <Link to="/contact">Book a Strategy Call</Link>
+                <Link to="/contact">Grow Your Donor Base</Link>
               </Button>
               <Button 
                 size="lg" 
                 variant="outline" 
                 asChild
-                className="border-2 border-foreground text-foreground hover:bg-foreground hover:text-background font-semibold rounded-lg px-8 h-12 text-base"
+                className="border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary hover:scale-[1.02] font-semibold rounded-lg px-8 h-12 text-base transition-all duration-200"
               >
-                <Link to="/case-studies">See Our Results</Link>
+                <Link to="/case-studies">See Results</Link>
               </Button>
             </div>
             
             {/* Metrics Strip */}
             <div 
-              className="flex flex-wrap gap-6"
+              className="flex flex-wrap gap-6 mb-8"
               style={{ 
-                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 340ms both'
+                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 380ms both'
               }}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+              <div className="flex items-center gap-3 group">
+                <div className="w-11 h-11 rounded-lg bg-secondary/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                   <TrendingUp className="w-5 h-5 text-secondary" />
                 </div>
                 <div>
-                  <div className="font-bebas text-2xl text-foreground leading-none">
-                    <StatCounter end={947} suffix="%" />
+                  <div className="font-bebas text-2xl md:text-3xl text-primary-foreground leading-none">
+                    <StatCounter end={947} suffix="%" duration={700} />
                   </div>
-                  <div className="text-xs text-muted-foreground font-medium">ROI</div>
+                  <div className="text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">ROI</div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+              <div className="flex items-center gap-3 group">
+                <div className="w-11 h-11 rounded-lg bg-destructive/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                   <Users className="w-5 h-5 text-destructive" />
                 </div>
                 <div>
-                  <div className="font-bebas text-2xl text-foreground leading-none">
-                    +<StatCounter end={5909} />
+                  <div className="font-bebas text-2xl md:text-3xl text-primary-foreground leading-none">
+                    +<StatCounter end={5909} duration={700} />
                   </div>
-                  <div className="text-xs text-muted-foreground font-medium">Donors</div>
+                  <div className="text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">Donors</div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+              <div className="flex items-center gap-3 group">
+                <div className="w-11 h-11 rounded-lg bg-accent/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                   <Target className="w-5 h-5 text-accent-foreground" />
                 </div>
                 <div>
-                  <div className="font-bebas text-2xl text-foreground leading-none">
-                    <StatCounter end={2} /> Weeks
+                  <div className="font-bebas text-2xl md:text-3xl text-primary-foreground leading-none">
+                    <StatCounter end={2} duration={700} /> Weeks
                   </div>
-                  <div className="text-xs text-muted-foreground font-medium">Turnaround</div>
+                  <div className="text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">Turnaround</div>
                 </div>
               </div>
+            </div>
+
+            {/* Credibility Strip */}
+            <div 
+              className="border-t border-primary-foreground/20 pt-6"
+              style={{ 
+                animation: 'fade-in 0.6s cubic-bezier(0.4, 0, 0.2, 1) 450ms both'
+              }}
+            >
+              <p className="text-sm text-primary-foreground/75 font-medium tracking-wide">
+                Trusted by campaigns in <span className="text-primary-foreground font-semibold">Michigan</span>, <span className="text-primary-foreground font-semibold">Illinois</span>, <span className="text-primary-foreground font-semibold">Pennsylvania</span>, and nationwide.
+              </p>
             </div>
           </div>
         </div>

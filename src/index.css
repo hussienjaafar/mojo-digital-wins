@@ -399,6 +399,13 @@ All colors MUST be HSL.
     animation: gradient-shift 8s ease infinite;
   }
 
+  /* Hero Headline Impact */
+  .hero-headline-impact {
+    text-shadow: 0 2px 8px rgba(10, 30, 62, 0.8),
+                 0 4px 16px rgba(10, 30, 62, 0.6),
+                 0 0 40px rgba(20, 100, 217, 0.3);
+  }
+
   /* Animated Circles - Subtle Background Movement */
   .animated-circles {
     position: absolute;
