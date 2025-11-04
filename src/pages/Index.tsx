@@ -92,22 +92,21 @@ const Index = () => {
         
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="max-w-6xl mx-auto text-center">
-            <h1 className="text-display text-white mb-8 md:mb-12 leading-[1.1] tracking-wider">
-              <span className="pop-word inline-block hover:scale-105 transition-transform" style={{ animationDelay: '0.2s' }}>Outperforming</span>
-              <br/>
-              <span className="pop-word inline-block hover:scale-105 transition-transform" style={{ animationDelay: '0.5s' }}>the</span>{' '}
-              <span className="pop-word inline-block hover:scale-105 transition-transform" style={{ animationDelay: '0.8s' }}>Establishment.</span>
-            </h1>
-            <p className="text-lg md:text-xl lg:text-2xl text-white/90 mb-10 md:mb-14 font-normal max-w-3xl mx-auto px-4 animate-fade-in-up" style={{ animationDelay: '1.1s' }}>
-              Mojo Digital turns grassroots energy into <span className="text-accent font-semibold">unstoppable campaign wins</span>.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center px-4 animate-fade-in-up" style={{ animationDelay: '1.4s' }}>
-              <Button variant="brutal" size="xl" asChild className="text-lg">
-                <Link to="/contact">Join the Movement</Link>
-              </Button>
-              <Button variant="movement" size="xl" asChild className="text-lg">
-                <Link to="/case-studies">See Our Results</Link>
-              </Button>
+            <div className="hero-text-backdrop max-w-5xl mx-auto">
+              <h1 className="hero-headline mb-8 md:mb-12">
+                Outperforming<br/>the Establishment.
+              </h1>
+              <p className="text-lg md:text-xl lg:text-2xl text-white/95 mb-10 md:mb-14 font-medium max-w-3xl mx-auto px-4 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+                Mojo Digital turns grassroots energy into <span className="text-accent font-bold">unstoppable campaign wins</span>.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center px-4 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+                <Button variant="brutal" size="xl" asChild className="text-lg">
+                  <Link to="/contact">Join the Movement</Link>
+                </Button>
+                <Button variant="movement" size="xl" asChild className="text-lg">
+                  <Link to="/case-studies">See Our Results</Link>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
