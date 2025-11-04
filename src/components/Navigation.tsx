@@ -57,7 +57,7 @@ const Navigation = () => {
                 {link.name}
               </Link>
             ))}
-            <Button variant="hero" size="default" asChild>
+            <Button variant="brutal" size="default" asChild>
               <Link to="/contact">Get Started</Link>
             </Button>
           </div>
@@ -89,7 +89,7 @@ const Navigation = () => {
                 {link.name}
               </Link>
             ))}
-            <Button variant="hero" size="default" className="w-full" asChild>
+            <Button variant="brutal" size="default" className="w-full" asChild>
               <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)}>
                 Get Started
               </Link>

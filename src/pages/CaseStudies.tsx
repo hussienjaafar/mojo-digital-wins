@@ -3,21 +3,20 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { TrendingUp, Users, DollarSign, Target, Shield, MessageSquare, Mail, Monitor } from "lucide-react";
 
 const CaseStudies = () => {
-  const [filter, setFilter] = useState("All");
-
-  const categories = ["All", "Federal", "State", "Local", "PAC", "Nonprofit"];
+  const [filter, setFilter] = useState("all");
 
   const studies = [
     {
-      category: "PAC",
-      name: "Unity & Justice Fund",
-      roi: 947,
-      avgDonation: 144.60,
-      newDonors: 490,
+      category: "issue",
+      title: "Unity & Justice Fund",
+      roi: "947%",
+      avgDonation: "$144.60",
+      newDonors: "490",
       timeframe: "2 months",
       challenge:
         "A new progressive PAC needed to rapidly build a donor base and establish credibility in the movement.",
@@ -31,11 +30,11 @@ const CaseStudies = () => {
       creativeExample: "/src/assets/sms-mockup.jpg",
     },
     {
-      category: "State",
-      name: "Rashid for Illinois",
-      roi: 415,
-      avgDonation: 0,
-      newDonors: 875,
+      category: "state",
+      title: "Rashid for Illinois",
+      roi: "415%",
+      avgDonation: "$0",
+      newDonors: "875",
       timeframe: "2 weeks",
       challenge:
         "A first-time candidate running in a competitive primary needed to quickly expand donor base to demonstrate viability.",
@@ -49,11 +48,11 @@ const CaseStudies = () => {
       creativeExample: null,
     },
     {
-      category: "State",
-      name: "Nasser for Michigan",
-      roi: 325,
-      avgDonation: 129.56,
-      newDonors: 0,
+      category: "state",
+      title: "Nasser for Michigan",
+      roi: "325%",
+      avgDonation: "$129.56",
+      newDonors: "0",
       timeframe: "3 months",
       challenge:
         "A State House candidate in a swing district needed to maximize fundraising efficiency to compete with establishment-backed opponent.",
@@ -67,11 +66,11 @@ const CaseStudies = () => {
       creativeExample: null,
     },
     {
-      category: "State",
-      name: "Preston for PA",
-      roi: 236,
-      avgDonation: 29.11,
-      newDonors: 2349,
+      category: "state",
+      title: "Preston for PA",
+      roi: "236%",
+      avgDonation: "$29.11",
+      newDonors: "2349",
       timeframe: "4 months",
       challenge:
         "A progressive challenger needed to build a small-dollar donor base to show grassroots support against an establishment incumbent.",
@@ -85,11 +84,11 @@ const CaseStudies = () => {
       creativeExample: null,
     },
     {
-      category: "Federal",
-      name: "Abdul for U.S. Senate",
-      roi: 257,
-      avgDonation: 55.98,
-      newDonors: 0,
+      category: "federal",
+      title: "Abdul for U.S. Senate",
+      roi: "257%",
+      avgDonation: "$55.98",
+      newDonors: "0",
       timeframe: "6 months",
       challenge:
         "A Senate campaign in a red-leaning state needed to prove it could compete financially with national resources.",
@@ -103,11 +102,11 @@ const CaseStudies = () => {
       creativeExample: null,
     },
     {
-      category: "Nonprofit",
-      name: "Arab-American Nonprofit",
-      roi: 304,
-      avgDonation: 0,
-      newDonors: 5909,
+      category: "nonprofit",
+      title: "Arab-American Nonprofit",
+      roi: "304%",
+      avgDonation: "$0",
+      newDonors: "5909",
       timeframe: "5 months",
       challenge:
         "A community organization needed to dramatically expand its donor base to fund advocacy and direct services.",
@@ -121,11 +120,11 @@ const CaseStudies = () => {
       creativeExample: null,
     },
     {
-      category: "PAC",
-      name: "A New Policy 501(c)(4)",
-      roi: 289,
-      avgDonation: 0,
-      newDonors: 502,
+      category: "issue",
+      title: "A New Policy 501(c)(4)",
+      roi: "289%",
+      avgDonation: "$0",
+      newDonors: "502",
       timeframe: "1 month",
       challenge:
         "A new advocacy organization needed to quickly build a membership base ahead of a key legislative push.",
@@ -140,36 +139,35 @@ const CaseStudies = () => {
     },
   ];
 
-  const filteredStudies = filter === "All" ? studies : studies.filter((study) => study.category === filter);
+  const filteredStudies = filter === "all" ? studies : studies.filter((study) => study.category === filter);
 
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
 
       {/* Hero */}
-      <section className="pt-32 pb-20 bg-gradient-to-br from-primary to-secondary text-primary-foreground">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center animate-fade-in">
-            <h1 className="text-5xl md:text-7xl font-black mb-6">Real Campaigns. Real Results.</h1>
-            <p className="text-xl md:text-2xl text-primary-foreground/90">
-              Our track record speaks for itself—consistent performance that wins elections and grows movements.
-            </p>
-          </div>
+      <section className="relative min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
+        <div className="texture-overlay"></div>
+        <div className="container relative z-10 mx-auto px-4 text-center">
+          <h1 className="text-display text-white mb-6 leading-tight animate-fade-in energy-glow">Proven Wins</h1>
+          <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto font-light animate-fade-in">
+            Real campaigns. Real results. Real impact for progressive causes.
+          </p>
         </div>
       </section>
 
-      {/* Filter */}
-      <section className="py-8 bg-muted sticky top-20 z-40 border-b">
+      {/* Filter Section */}
+      <section className="sticky top-16 z-20 bg-background/95 backdrop-blur-sm border-b border-border py-6 brutal-shadow">
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap gap-3 justify-center">
-            {categories.map((category) => (
+            {["all", "congressional", "senate", "statewide", "issue"].map((category) => (
               <Button
                 key={category}
-                variant={filter === category ? "secondary" : "outline"}
-                size="default"
                 onClick={() => setFilter(category)}
+                variant={filter === category ? "brutal" : "outline"}
+                className="capitalize"
               >
-                {category}
+                {category === "all" ? "All Campaigns" : category}
               </Button>
             ))}
           </div>
@@ -178,142 +176,112 @@ const CaseStudies = () => {
 
       {/* Case Studies */}
       <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="space-y-16">
-            {filteredStudies.map((study, index) => (
-              <Card key={index} className="overflow-hidden animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
-                <CardContent className="p-0">
-                  <div className="grid md:grid-cols-2">
-                    {/* Metrics */}
-                    <div className="bg-gradient-to-br from-secondary to-primary text-primary-foreground p-8 md:p-12">
-                      <div className="inline-block bg-accent text-accent-foreground px-3 py-1 rounded-full text-sm font-semibold mb-4">
-                        {study.category}
-                      </div>
-                      <h2 className="text-3xl md:text-4xl font-black mb-8">{study.name}</h2>
+        <div className="container mx-auto px-4 space-y-16">
+          {filteredStudies.map((study, index) => (
+            <Card key={index} className="overflow-hidden hover-lift brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+              <div className="grid md:grid-cols-5 gap-6 p-6">
+                {/* Left: Metrics */}
+                <div className="md:col-span-2 space-y-6">
+                  <div>
+                    <Badge className="mb-4" variant="outline">
+                      {study.category}
+                    </Badge>
+                    <h2 className="text-3xl font-black text-foreground mb-2">{study.title}</h2>
+                    <p className="text-muted-foreground">{study.timeframe}</p>
+                  </div>
 
-                      <div className="space-y-6">
-                        <div className="flex items-start gap-4">
-                          <div className="bg-primary-foreground/20 p-3 rounded-lg">
-                            <TrendingUp className="w-6 h-6" />
-                          </div>
-                          <div>
-                            <div className="text-4xl font-black">{study.roi}%</div>
-                            <div className="text-primary-foreground/80 text-sm">Return on Investment</div>
-                          </div>
-                        </div>
-
-                        {study.avgDonation > 0 && (
-                          <div className="flex items-start gap-4">
-                            <div className="bg-primary-foreground/20 p-3 rounded-lg">
-                              <DollarSign className="w-6 h-6" />
-                            </div>
-                            <div>
-                              <div className="text-3xl font-bold">${study.avgDonation}</div>
-                              <div className="text-primary-foreground/80 text-sm">Average Donation</div>
-                            </div>
-                          </div>
-                        )}
-
-                        {study.newDonors > 0 && (
-                          <div className="flex items-start gap-4">
-                            <div className="bg-primary-foreground/20 p-3 rounded-lg">
-                              <Users className="w-6 h-6" />
-                            </div>
-                            <div>
-                              <div className="text-3xl font-bold">+{study.newDonors.toLocaleString()}</div>
-                              <div className="text-primary-foreground/80 text-sm">New Donors</div>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-start gap-4">
-                          <div className="bg-primary-foreground/20 p-3 rounded-lg">
-                            <Target className="w-6 h-6" />
-                          </div>
-                          <div>
-                            <div className="text-2xl font-bold">{study.timeframe}</div>
-                            <div className="text-primary-foreground/80 text-sm">Campaign Duration</div>
-                          </div>
-                        </div>
-                      </div>
+                  {/* Key Metrics */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 brutal-shadow hover:energy-glow transition-all duration-300">
+                      <TrendingUp className="w-6 h-6 text-primary mb-2 energy-glow" />
+                      <div className="text-2xl font-bold text-foreground">{study.roi}</div>
+                      <div className="text-sm text-muted-foreground">ROI</div>
                     </div>
-
-                    {/* Details */}
-                    <div className="p-8 md:p-12 bg-background">
-                      <div className="space-y-6">
-                        <div>
-                          <h3 className="text-xl font-bold text-foreground mb-3">The Challenge</h3>
-                          <p className="text-muted-foreground leading-relaxed">{study.challenge}</p>
-                        </div>
-
-                        <div>
-                          <h3 className="text-xl font-bold text-foreground mb-3">Our Strategy</h3>
-                          <p className="text-muted-foreground leading-relaxed">{study.strategy}</p>
-                        </div>
-
-                        <div>
-                          <h3 className="text-xl font-bold text-foreground mb-3">The Results</h3>
-                          <p className="text-muted-foreground leading-relaxed">{study.results}</p>
-                        </div>
-
-                        <div className="border-t border-border pt-6">
-                          <div className="flex items-start gap-3 mb-3">
-                            <Shield className="w-5 h-5 text-secondary mt-1" />
-                            <h3 className="text-xl font-bold text-foreground">Ethical Approach</h3>
-                          </div>
-                          <p className="text-muted-foreground leading-relaxed">{study.ethicalApproach}</p>
-                        </div>
-
-                        {study.creativeExample && (
-                          <div className="border-t border-border pt-6">
-                            <div className="flex items-start gap-3 mb-3">
-                              {study.creativeType === "SMS" && <MessageSquare className="w-5 h-5 text-accent mt-1" />}
-                              {study.creativeType === "Email" && <Mail className="w-5 h-5 text-accent mt-1" />}
-                              {study.creativeType === "Display Ad" && <Monitor className="w-5 h-5 text-accent mt-1" />}
-                              <h3 className="text-xl font-bold text-foreground">Creative Used</h3>
-                            </div>
-                            <div className="bg-muted rounded-lg p-4">
-                              <img
-                                src={study.creativeExample}
-                                alt={`${study.name} - ${study.creativeType} creative example`}
-                                className="w-full rounded-lg"
-                                loading="lazy"
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                    <div className="bg-accent/5 p-4 rounded-lg border border-accent/20 brutal-shadow hover:energy-glow transition-all duration-300">
+                      <DollarSign className="w-6 h-6 text-accent mb-2 energy-glow" />
+                      <div className="text-2xl font-bold text-foreground">{study.avgDonation}</div>
+                      <div className="text-sm text-muted-foreground">Avg Donation</div>
+                    </div>
+                    <div className="bg-secondary/5 p-4 rounded-lg border border-secondary/20 col-span-2 brutal-shadow hover:energy-glow transition-all duration-300">
+                      <Users className="w-6 h-6 text-secondary mb-2 energy-glow" />
+                      <div className="text-2xl font-bold text-foreground">{study.newDonors}</div>
+                      <div className="text-sm text-muted-foreground">New Donors</div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
 
-          {filteredStudies.length === 0 && (
-            <div className="text-center py-20">
-              <p className="text-xl text-muted-foreground">No case studies found for this category.</p>
-            </div>
-          )}
+                {/* Right: Details */}
+                <div className="md:col-span-3 space-y-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-foreground mb-2 flex items-center gap-2">
+                      <Target className="w-5 h-5 text-primary energy-glow" />
+                      The Challenge
+                    </h3>
+                    <p className="text-muted-foreground leading-relaxed">{study.challenge}</p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-foreground mb-2">Our Strategy</h3>
+                    <p className="text-muted-foreground leading-relaxed">{study.strategy}</p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-foreground mb-2">The Results</h3>
+                    <p className="text-muted-foreground leading-relaxed">{study.results}</p>
+                  </div>
+
+                  <div className="border-t border-border pt-6">
+                    <div className="flex items-start gap-3 mb-3">
+                      <Shield className="w-5 h-5 text-secondary mt-1 energy-glow" />
+                      <h3 className="text-xl font-bold text-foreground">Ethical Approach</h3>
+                    </div>
+                    <p className="text-muted-foreground leading-relaxed">{study.ethicalApproach}</p>
+                  </div>
+
+                  {study.creativeExample && (
+                    <div className="border-t border-border pt-6">
+                      <div className="flex items-start gap-3 mb-3">
+                        {study.creativeType === "SMS" && <MessageSquare className="w-5 h-5 text-accent mt-1 energy-glow" />}
+                        {study.creativeType === "Email" && <Mail className="w-5 h-5 text-accent mt-1 energy-glow" />}
+                        {study.creativeType === "Display Ad" && <Monitor className="w-5 h-5 text-accent mt-1 energy-glow" />}
+                        <h3 className="text-xl font-bold text-foreground">Creative Used</h3>
+                      </div>
+                      <div className="bg-muted rounded-lg p-4 brutal-shadow">
+                        <img
+                          src={study.creativeExample}
+                          alt={`${study.title} - ${study.creativeType} creative example`}
+                          className="w-full rounded-lg"
+                          loading="lazy"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 bg-primary text-primary-foreground">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-4xl md:text-5xl font-black mb-6 animate-fade-in">
-            Ready to Join Our Success Stories?
-          </h2>
-          <p className="text-xl text-primary-foreground/90 mb-8 max-w-2xl mx-auto animate-fade-in">
-            Let's create your winning campaign strategy. Book a call to discuss your goals and how we can help.
+      {/* Final CTA */}
+      <section className="py-20 bg-gradient-to-br from-primary via-secondary to-accent text-white diagonal-both relative overflow-hidden">
+        <div className="texture-overlay"></div>
+        <div className="container mx-auto px-4 text-center relative z-10">
+          <h2 className="text-display mb-6 animate-fade-in energy-glow">Ready to Write Your Success Story?</h2>
+          <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90 animate-fade-in">
+            Let's build a campaign that delivers results and stays true to progressive values
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button variant="cta" size="xl" asChild className="animate-pulse-subtle">
-              <Link to="/contact">Book Strategy Call</Link>
-            </Button>
-            <Button variant="outline" size="xl" asChild className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/20">
-              <Link to="/creative-showcase">View Our Creative Work</Link>
-            </Button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">
+            <Link to="/contact">
+              <Button size="lg" variant="brutal">
+                Start Your Campaign
+              </Button>
+            </Link>
+            <Link to="/creative-showcase">
+              <Button size="lg" variant="movement">
+                View Our Creative Work
+              </Button>
+            </Link>
           </div>
         </div>
       </section>

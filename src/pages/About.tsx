@@ -1,76 +1,54 @@
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { Heart, Shield, Users, TrendingUp, Target, Zap, CheckCircle2, Lock } from "lucide-react";
+import { Heart, Shield, Users, TrendingUp, Target, Zap, CheckCircle2, Sparkles } from "lucide-react";
 
 const About = () => {
-  const principles = [
-    {
-      icon: Heart,
-      title: "Progressive Values First",
-      description:
-        "We only work with campaigns and causes fighting for racial justice, climate action, economic equity, immigrant rights, and human dignity.",
-    },
-    {
-      icon: Shield,
-      title: "Ethical Fundraising",
-      description:
-        "Donor trust is sacred. We build relationships that last beyond Election Day. We never use deceptive tactics, respect unsubscribe requests immediately, and maintain complete FEC compliance.",
-    },
-    {
-      icon: Users,
-      title: "People-Powered Movements",
-      description:
-        "Real change comes from grassroots organizing. We amplify voices, expand bases, and build coalitions that win.",
-    },
-    {
-      icon: TrendingUp,
-      title: "Performance Excellence",
-      description:
-        "We combine organizing energy with elite marketing rigor—every dollar counts, every strategy is tested, every campaign optimized to win.",
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
 
       {/* Hero */}
-      <section className="pt-32 pb-20 bg-gradient-to-br from-primary to-secondary text-primary-foreground">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center animate-fade-in">
-            <h1 className="text-5xl md:text-7xl font-black mb-6">Our Story</h1>
-            <p className="text-xl md:text-2xl text-primary-foreground/90">
-              From grassroots activists to performance marketing leaders—built to win for progressive causes.
-            </p>
-          </div>
+      <section className="relative min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
+        <div className="texture-overlay"></div>
+        <div className="container relative z-10 mx-auto px-4 text-center">
+          <h1 className="text-display text-white mb-6 leading-tight animate-fade-in energy-glow">
+            Our Story
+          </h1>
+          <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto font-light animate-fade-in">
+            Where grassroots organizing meets performance marketing
+          </p>
         </div>
       </section>
 
       {/* Origin Story */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
+      <section className="py-20 bg-background relative">
+        <div className="texture-overlay opacity-30"></div>
+        <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto">
-            <div className="prose prose-lg max-w-none animate-fade-in">
-              <h2 className="text-4xl font-black text-foreground mb-6">Why We Exist</h2>
-              <p className="text-lg text-muted-foreground leading-relaxed mb-6">
+            <h2 className="text-headline text-foreground mb-8 animate-fade-in">
+              Why We Exist
+            </h2>
+            
+            <div className="space-y-6 text-lg text-muted-foreground leading-relaxed animate-fade-in">
+              <p>
                 Mojo Digital was born from frustration and urgency. We watched progressive candidates and causes
                 get outspent and outmaneuvered by establishment machines with outdated strategies and stale tactics.
                 We knew there had to be a better way.
               </p>
-              <p className="text-lg text-muted-foreground leading-relaxed mb-6">
+              <p>
                 Our founders came from the trenches of grassroots organizing—knocking doors, making calls, and
                 mobilizing communities. But they also brought expertise from elite performance marketing, where
                 every click, every message, and every dollar is optimized for maximum impact.
               </p>
-              <p className="text-lg text-muted-foreground leading-relaxed mb-6">
+              <p>
                 We built Mojo Digital to merge these worlds: the passion and energy of organizing with the
                 precision and scale of data-driven marketing. The result? Campaigns that consistently outperform
                 the establishment, turning grassroots support into electoral power.
               </p>
-              <p className="text-lg text-muted-foreground leading-relaxed">
+              <p className="font-semibold text-foreground">
                 Today, we've helped dozens of progressive candidates and causes raise millions, acquire thousands
                 of new donors, and win races that the pundits said were unwinnable. Our average ROI exceeds 300%.
                 Our win rate speaks for itself. And we're just getting started.
@@ -81,184 +59,185 @@ const About = () => {
       </section>
 
       {/* Progressive Principles */}
-      <section className="py-20 bg-muted">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-16 animate-fade-in">
-              <h2 className="text-4xl md:text-5xl font-black text-foreground mb-6">Our Principles</h2>
-              <p className="text-xl text-muted-foreground">
-                These aren't just values on a website—they guide every strategy, every campaign, every decision.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-8">
-              {principles.map((principle, index) => (
-                <div
-                  key={index}
-                  className="bg-background p-8 rounded-lg shadow-sm animate-scale-in"
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
-                  <principle.icon className="w-12 h-12 text-secondary mb-4" />
-                  <h3 className="text-2xl font-bold text-foreground mb-4">{principle.title}</h3>
-                  <p className="text-muted-foreground">{principle.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Leadership */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-16 animate-fade-in">
-              <h2 className="text-4xl md:text-5xl font-black text-foreground mb-6">Leadership & Experience</h2>
-              <p className="text-xl text-muted-foreground">
-                Our team brings decades of combined experience from presidential campaigns, Senate races,
-                grassroots organizing, and elite digital agencies.
-              </p>
-            </div>
-
-            <div className="bg-muted p-8 rounded-lg animate-fade-in">
-              <h3 className="text-2xl font-bold text-foreground mb-4">Our Expertise Includes:</h3>
-              <ul className="space-y-3 text-lg text-muted-foreground">
-                <li className="flex items-start">
-                  <span className="text-secondary mr-3 font-bold">•</span>
-                  <span>
-                    Senior digital strategists from presidential and Senate campaigns
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-secondary mr-3 font-bold">•</span>
-                  <span>
-                    Former organizers who've mobilized thousands in battleground states
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-secondary mr-3 font-bold">•</span>
-                  <span>
-                    Performance marketers from top agencies managing 8-figure budgets
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-secondary mr-3 font-bold">•</span>
-                  <span>
-                    Data scientists and analysts who optimize every campaign touchpoint
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-secondary mr-3 font-bold">•</span>
-                  <span>
-                    Veteran fundraisers who've raised millions for progressive causes
-                  </span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Ethical Commitments - Expanded */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16 animate-fade-in">
-              <h2 className="text-4xl md:text-5xl font-black text-foreground mb-6">
-                Our Ethical Commitments
-              </h2>
-              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                Performance with principles. These are the standards we hold ourselves to in every campaign.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6 mb-12">
-              {[
-                {
-                  icon: Shield,
-                  title: "No Misleading Tactics",
-                  description:
-                    "We never use dark patterns, deceptive subject lines, or manipulative messaging. Every communication is honest and transparent.",
-                },
-                {
-                  icon: Heart,
-                  title: "Long-Term Relationships",
-                  description:
-                    "We prioritize donor lifetime value over quick cash grabs. We build sustainable support that lasts beyond Election Day.",
-                },
-                {
-                  icon: CheckCircle2,
-                  title: "FEC Compliance Guarantee",
-                  description:
-                    "We maintain strict adherence to all FEC regulations and fundraising best practices. Compliance is non-negotiable.",
-                },
-                {
-                  icon: Users,
-                  title: "Immediate Opt-Out Respect",
-                  description:
-                    "We honor unsubscribe requests instantly—no delays, no re-adds, no workarounds. Donor preferences are sacred.",
-                },
-                {
-                  icon: TrendingUp,
-                  title: "Sustainable List Growth",
-                  description:
-                    "We segment messages and pace outreach to prevent donor fatigue. We grow lists without burning out supporters.",
-                },
-                {
-                  icon: Lock,
-                  title: "Data Privacy Protection",
-                  description:
-                    "Donor data is encrypted, protected, and never shared without explicit consent. Privacy is a fundamental right.",
-                },
-              ].map((commitment, index) => (
-                <Card
-                  key={index}
-                  className="hover-lift animate-fade-in"
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-4">
-                      <div className="bg-accent/10 text-accent p-3 rounded-lg flex-shrink-0">
-                        <commitment.icon className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-foreground mb-2">{commitment.title}</h3>
-                        <p className="text-muted-foreground">{commitment.description}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            <div className="bg-primary text-primary-foreground rounded-lg p-8 md:p-12 text-center animate-fade-in">
-              <h3 className="text-2xl md:text-3xl font-bold mb-4">
-                If Values Don't Align, We'll Tell You
-              </h3>
-              <p className="text-lg text-primary-foreground/90 mb-6">
-                We only grow campaigns we believe in. If we're not aligned on values or ethics, we'll be honest
-                about it upfront. Your mission matters—and so does how you achieve it.
-              </p>
-              <Button variant="cta" size="lg" asChild>
-                <Link to="/contact">Start a Conversation</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Commitment */}
-      <section className="py-20 bg-primary text-primary-foreground">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center animate-fade-in">
-            <h2 className="text-4xl md:text-5xl font-black mb-6">Our Commitment</h2>
-            <p className="text-xl text-primary-foreground/90 mb-8 leading-relaxed">
-              We only take on campaigns we believe in. Every client is a partner in building a more just,
-              equitable, and sustainable future. When you win, we win—and more importantly, our communities win.
+      <section className="py-20 bg-gradient-to-br from-muted/30 to-background diagonal-both relative">
+        <div className="texture-overlay"></div>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="text-center mb-16 animate-fade-in">
+            <h2 className="text-headline text-foreground mb-4">
+              Our Core Principles
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              The values that guide every campaign we run
             </p>
-            <Button variant="cta" size="xl" asChild>
-              <Link to="/contact">Partner With Us</Link>
-            </Button>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                icon: Heart,
+                title: "Progressive Values First",
+                desc: "We only work with candidates and causes aligned with our values. No exceptions.",
+              },
+              {
+                icon: Users,
+                title: "Grassroots Power",
+                desc: "Small-dollar donors can compete with billionaires when mobilized effectively.",
+              },
+              {
+                icon: Shield,
+                title: "Ethical Fundraising",
+                desc: "Honest messaging, transparent practices, and respect for every supporter.",
+              },
+            ].map((principle, index) => (
+              <Card key={index} className="text-center hover-lift brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+                <CardHeader>
+                  <div className="bg-primary/10 text-primary p-4 rounded-full w-fit mx-auto mb-4 energy-glow">
+                    <principle.icon className="w-8 h-8" />
+                  </div>
+                  <CardTitle className="text-xl font-bold">{principle.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">{principle.desc}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Leadership & Experience */}
+      <section className="py-20 bg-background diagonal-top relative">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-headline text-foreground mb-8 text-center animate-fade-in">
+              Built by Campaign Veterans
+            </h2>
+
+            <Card className="mb-12 brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in">
+              <CardContent className="p-8">
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div>
+                    <h3 className="text-2xl font-bold text-foreground mb-4">Our Team's Background</h3>
+                    <ul className="space-y-3 text-muted-foreground">
+                      <li className="flex items-start gap-2">
+                        <Target className="w-5 h-5 text-primary mt-1 flex-shrink-0 energy-glow" />
+                        <span>10+ years in progressive political campaigns</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Zap className="w-5 h-5 text-primary mt-1 flex-shrink-0 energy-glow" />
+                        <span>Alumni of top-tier Presidential and Senate races</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <TrendingUp className="w-5 h-5 text-primary mt-1 flex-shrink-0 energy-glow" />
+                        <span>Managed $50M+ in digital ad spend</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Users className="w-5 h-5 text-primary mt-1 flex-shrink-0 energy-glow" />
+                        <span>Mobilized millions of grassroots supporters</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-foreground mb-4">What Sets Us Apart</h3>
+                    <p className="text-muted-foreground mb-4">
+                      We've been on the ground during crunch time. We understand the pressure of quarterly FEC deadlines, the
+                      chaos of rapid response, and the stakes of every dollar raised.
+                    </p>
+                    <p className="text-muted-foreground">
+                      That frontline experience shapes everything we do—from creative strategy to compliance protocols.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Ethical Commitments */}
+      <section className="py-20 bg-gradient-to-br from-accent/5 via-background to-primary/5 diagonal-both relative">
+        <div className="texture-overlay"></div>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="text-center mb-16 animate-fade-in">
+            <h2 className="text-display text-foreground mb-4">
+              Our Commitments to You
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Non-negotiable standards for every campaign
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-12">
+            {[
+              {
+                icon: CheckCircle2,
+                title: "No Misleading Tactics",
+                desc: "Clear, honest messaging. We never pretend to be someone we're not or use deceptive subject lines.",
+              },
+              {
+                icon: Shield,
+                title: "FEC Compliance Guarantee",
+                desc: "Every campaign is structured to meet federal regulations. Built-in compliance checks at every stage.",
+              },
+              {
+                icon: Heart,
+                title: "Donor Privacy Protected",
+                desc: "Your supporter data is sacred. We never share, sell, or misuse contact information.",
+              },
+              {
+                icon: TrendingUp,
+                title: "Transparent Reporting",
+                desc: "Real-time dashboards showing exactly where money goes and what results you're getting.",
+              },
+            ].map((commitment, index) => (
+              <Card key={index} className="hover-lift brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+                <CardHeader>
+                  <div className="flex items-start gap-4">
+                    <div className="bg-accent/10 text-accent p-3 rounded-lg flex-shrink-0 energy-glow">
+                      <commitment.icon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg mb-2 font-bold">{commitment.title}</CardTitle>
+                      <p className="text-muted-foreground text-sm">{commitment.desc}</p>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+
+          <Card className="bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20 brutal-shadow energy-glow animate-fade-in">
+            <CardContent className="p-8 text-center">
+              <Sparkles className="w-12 h-12 text-primary mx-auto mb-4 energy-glow" />
+              <h3 className="text-2xl font-bold text-foreground mb-3">Performance AND Principles</h3>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
+                We prove every day that you don't have to sacrifice ethics for results. The best campaigns are built on trust,
+                transparency, and authentic connection with supporters.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="py-20 bg-gradient-to-br from-primary via-secondary to-accent text-white diagonal-both relative overflow-hidden">
+        <div className="texture-overlay"></div>
+        <div className="container mx-auto px-4 text-center relative z-10">
+          <h2 className="text-display mb-6 animate-fade-in energy-glow">Let's Win Together</h2>
+          <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90 animate-fade-in">
+            Ready to partner with a team that shares your values and delivers results?
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">
+            <Link to="/contact">
+              <Button size="lg" variant="brutal">
+                Start a Conversation
+              </Button>
+            </Link>
+            <Link to="/services">
+              <Button size="lg" variant="movement">
+                Explore Our Services
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
