@@ -89,13 +89,13 @@ const Index = () => {
         
         <div className="max-w-[1280px] mx-auto px-6 relative z-10">
           <div className="max-w-[720px]">
-            {/* Headline */}
+            {/* Headline - Slightly larger with tighter letter spacing */}
             <div className="mb-6">
               <h1 
-                className="font-bebas text-[2.75rem] leading-[1.05] md:text-[4rem] lg:text-[5rem] font-black text-primary-foreground tracking-wide uppercase hero-headline-impact max-w-[10ch]"
+                className="font-bebas text-[3rem] leading-[1.05] md:text-[4.5rem] lg:text-[5.5rem] font-black text-primary-foreground uppercase hero-headline-impact max-w-[10ch]"
                 style={{ 
                   animation: 'slide-up-in 0.7s cubic-bezier(0.4, 0, 0.2, 1) 150ms both',
-                  letterSpacing: '0.04em'
+                  letterSpacing: '0.02em'
                 }}
               >
                 Outperforming<br/>the Establishment.
@@ -109,19 +109,19 @@ const Index = () => {
               />
             </div>
             
-            {/* Subhead */}
+            {/* Subhead - Variant B (shorter) */}
             <p 
               className="text-lg md:text-xl text-primary-foreground/95 leading-relaxed mb-8 max-w-[620px] font-medium"
               style={{ 
                 animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 250ms both'
               }}
             >
-              We turn grassroots energy into measurable wins with SMS, digital ads, and email built for ROI.
+              We convert grassroots energy into measurable growth with SMS, digital ads, and high-ROI email.
             </p>
             
-            {/* CTAs */}
+            {/* CTAs - Enhanced with micro-interactions */}
             <div 
-              className="flex flex-col sm:flex-row gap-4 mb-8"
+              className="flex flex-col sm:flex-row gap-4 mb-6"
               style={{ 
                 animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 280ms both'
               }}
@@ -129,7 +129,7 @@ const Index = () => {
               <Button 
                 size="lg" 
                 asChild
-                className="hero-cta-premium bg-secondary hover:bg-secondary/90 hover:scale-[1.03] text-secondary-foreground font-semibold rounded-lg px-8 h-12 text-base transition-all duration-300 shadow-lg hover:shadow-xl"
+                className="hero-cta-premium bg-secondary hover:bg-secondary/90 hover:scale-[1.03] text-secondary-foreground font-bold rounded-lg px-8 h-12 text-base transition-all duration-300 shadow-[0_4px_20px_rgba(20,100,217,0.4)] hover:shadow-[0_6px_30px_rgba(20,100,217,0.7)]"
               >
                 <Link to="/contact">Grow Your Donor Base</Link>
               </Button>
@@ -137,21 +137,21 @@ const Index = () => {
                 size="lg" 
                 variant="outline" 
                 asChild
-                className="border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary hover:scale-[1.03] font-semibold rounded-lg px-8 h-12 text-base transition-all duration-200"
+                className="border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary hover:scale-[1.03] font-semibold rounded-lg px-8 h-12 text-base transition-all duration-300 hover:shadow-[0_4px_20px_rgba(255,255,255,0.3)]"
               >
                 <Link to="/case-studies">See Results</Link>
               </Button>
             </div>
             
-            {/* Metrics Strip - Elevated Cards with Premium Spacing */}
+            {/* Metrics Strip - Elevated Cards moved up to group with CTAs */}
             <div 
-              className="flex flex-wrap gap-6 mb-8"
+              className="flex flex-wrap gap-6 mb-12"
               style={{ 
                 animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 340ms both'
               }}
             >
-              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group kpi-card-pulse">
-                <div className="w-11 h-11 rounded-lg bg-secondary/30 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+              <div className="flex items-center gap-3 bg-primary-foreground/12 backdrop-blur-md rounded-[10px] p-4 pr-6 shadow-[0_6px_20px_rgba(0,0,0,0.3)] border border-primary-foreground/25 hover:scale-[1.03] hover:shadow-[0_8px_30px_rgba(20,100,217,0.4)] transition-all duration-300 group kpi-card-pulse kpi-glow-ring">
+                <div className="w-11 h-11 rounded-lg bg-secondary/35 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                   <TrendingUp className="w-5 h-5 text-secondary drop-shadow-glow" />
                 </div>
                 <div>
@@ -162,8 +162,8 @@ const Index = () => {
                 </div>
               </div>
               
-              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group kpi-card-pulse">
-                <div className="w-11 h-11 rounded-lg bg-destructive/30 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+              <div className="flex items-center gap-3 bg-primary-foreground/12 backdrop-blur-md rounded-[10px] p-4 pr-6 shadow-[0_6px_20px_rgba(0,0,0,0.3)] border border-primary-foreground/25 hover:scale-[1.03] hover:shadow-[0_8px_30px_rgba(224,45,45,0.4)] transition-all duration-300 group kpi-card-pulse kpi-glow-ring">
+                <div className="w-11 h-11 rounded-lg bg-destructive/35 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                   <Users className="w-5 h-5 text-destructive drop-shadow-glow" />
                 </div>
                 <div>
@@ -174,8 +174,8 @@ const Index = () => {
                 </div>
               </div>
               
-              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group kpi-card-pulse">
-                <div className="w-11 h-11 rounded-lg bg-accent/30 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+              <div className="flex items-center gap-3 bg-primary-foreground/12 backdrop-blur-md rounded-[10px] p-4 pr-6 shadow-[0_6px_20px_rgba(0,0,0,0.3)] border border-primary-foreground/25 hover:scale-[1.03] hover:shadow-[0_8px_30px_rgba(244,196,48,0.4)] transition-all duration-300 group kpi-card-pulse kpi-glow-ring">
+                <div className="w-11 h-11 rounded-lg bg-accent/35 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                   <Target className="w-5 h-5 text-accent-foreground drop-shadow-glow" />
                 </div>
                 <div>
@@ -221,57 +221,83 @@ const Index = () => {
                 </div>
               </div>
             </div>
+            
+            {/* Scroll Arrow Prompt */}
+            <div 
+              className="flex justify-center mt-8 animate-bounce"
+              style={{ 
+                animation: 'bounce 2s ease-in-out infinite, fade-in 0.6s cubic-bezier(0.4, 0, 0.2, 1) 500ms both'
+              }}
+            >
+              <svg 
+                className="w-6 h-6 text-primary-foreground/60" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2.5} 
+                  d="M19 14l-7 7m0 0l-7-7m7 7V3" 
+                />
+              </svg>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* How We Win Elections - Scroll Story Section */}
-      <section className="py-20 md:py-28 bg-background relative">
+      {/* How We Win for Progressives - Scroll Story Section */}
+      <section className="py-24 md:py-32 bg-background relative">
         <div className="max-w-[1280px] mx-auto px-6">
-          <div className="text-center mb-12 md:mb-16">
+          <div className="text-center mb-16 md:mb-20">
             <h2 className="font-bebas text-4xl md:text-5xl lg:text-6xl text-foreground mb-4 uppercase tracking-wide">
-              How We Win Elections in 3 Key Steps
+              How We Win for Progressives
             </h2>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               A proven system that turns grassroots movements into electoral victories
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 md:gap-10">
+          <div className="grid md:grid-cols-3 gap-10 md:gap-12">
             {[
               {
                 step: '1',
                 icon: Target,
                 title: 'Rapid Acquisition',
-                description: 'Paid social that scales donor lists fast—reaching the right supporters at the right moment with laser-focused targeting.',
+                description: 'Donor growth through precision targeting—reaching progressive supporters at scale with data-driven paid social.',
               },
               {
                 step: '2',
                 icon: MessageSquare,
                 title: 'Compelling Fundraising',
-                description: 'Conversion-optimized SMS & email campaigns that inspire action and drive revenue without burning out your base.',
+                description: 'SMS + email built to convert—high-velocity campaigns that inspire action and drive measurable revenue.',
               },
               {
                 step: '3',
                 icon: BarChart3,
                 title: 'Relentless Optimization',
-                description: 'Real-time data decisions that continuously grow ROI—every dollar tracked, every test measured, every win amplified.',
+                description: 'Data decisions that scale ROI—real-time testing, continuous improvement, and compounding performance gains.',
               },
             ].map((step, index) => (
               <Card
                 key={index}
-                className="bg-gradient-to-br from-card to-muted border-2 border-secondary/20 hover:border-secondary/60 backdrop-blur-sm hover-lift overflow-hidden group scroll-reveal"
-                style={{ animationDelay: `${index * 150}ms` }}
+                className="bg-gradient-to-br from-card to-muted border-2 border-secondary/20 hover:border-secondary/60 backdrop-blur-sm overflow-hidden group scroll-reveal hover:shadow-[0_12px_40px_rgba(20,100,217,0.2)] transition-all duration-500"
+                style={{ 
+                  animationDelay: `${200 + index * 150}ms`,
+                  transform: 'translateY(20px)',
+                  opacity: 0
+                }}
               >
-                <CardContent className="p-8 relative">
-                  <div className="absolute top-4 right-4 font-bebas text-6xl text-secondary/10 group-hover:text-secondary/20 transition-colors">
+                <CardContent className="p-10 relative">
+                  <div className="absolute top-4 right-4 font-bebas text-7xl text-secondary/8 group-hover:text-secondary/15 transition-colors duration-500">
                     {step.step}
                   </div>
-                  <step.icon className="w-14 h-14 text-secondary mb-6 relative z-10 group-hover:scale-110 transition-transform duration-300" />
+                  <step.icon className="w-16 h-16 text-secondary mb-6 relative z-10 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
                   <h3 className="font-bebas text-3xl mb-4 text-foreground uppercase tracking-wide relative z-10">
                     {step.title}
                   </h3>
-                  <p className="text-muted-foreground relative z-10 leading-relaxed">
+                  <p className="text-muted-foreground relative z-10 leading-relaxed text-base">
                     {step.description}
                   </p>
                 </CardContent>
