@@ -257,6 +257,47 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Compounding Impact Model - Condensed */}
+      <section className="py-20 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12 animate-fade-in">
+              <h2 className="text-4xl md:text-5xl font-black text-foreground mb-4">
+                The Compounding Impact Model<sup className="text-2xl text-secondary">™</sup>
+              </h2>
+              <p className="text-xl text-muted-foreground">
+                A self-sustaining fundraising engine that grows alongside grassroots support
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-4 gap-6 mb-8">
+              {[
+                { step: "01", value: "$5K", label: "Initial Investment" },
+                { step: "02", value: "200-300%", label: "ROI in 30 Days" },
+                { step: "03", value: "20%", label: "Reinvestment Rate" },
+                { step: "04", value: "$500-1K", label: "Daily Scale" },
+              ].map((item, index) => (
+                <div
+                  key={index}
+                  className="text-center bg-card border border-border rounded-lg p-6 hover-lift animate-scale-in"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <div className="text-sm font-bold text-secondary mb-2">STEP {item.step}</div>
+                  <div className="text-3xl font-black text-foreground mb-2">{item.value}</div>
+                  <div className="text-sm text-muted-foreground font-medium">{item.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center">
+              <Button variant="secondary" size="lg" asChild>
+                <Link to="/services">Learn More About Our Process</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Quick Case Studies */}
       <section className="py-20 bg-muted">
         <div className="container mx-auto px-4">

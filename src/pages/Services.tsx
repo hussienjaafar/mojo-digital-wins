@@ -126,6 +126,19 @@ const Services = () => {
       {/* Main Services */}
       <section className="py-20">
         <div className="container mx-auto px-4">
+          <div className="text-center mb-16 animate-fade-in">
+            <h2 className="text-4xl md:text-5xl font-black text-foreground mb-6">
+              The Creative Advantage
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
+              Every campaign is powered by high-converting creative—tested, refined, and optimized for maximum ROI.
+              See examples of the messaging that drives results.
+            </p>
+            <Button variant="secondary" size="lg" asChild>
+              <Link to="/creative-showcase">View Creative Showcase →</Link>
+            </Button>
+          </div>
+
           <div className="space-y-20">
             {mainServices.map((service, index) => (
               <div

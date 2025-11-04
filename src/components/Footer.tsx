@@ -83,6 +83,14 @@ const Footer = () => {
               </li>
               <li>
                 <Link
+                  to="/creative-showcase"
+                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                >
+                  Creative Showcase
+                </Link>
+              </li>
+              <li>
+                <Link
                   to="/contact"
                   className="text-primary-foreground/80 hover:text-accent transition-colors"
                 >
@@ -125,6 +133,10 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-primary-foreground/20 mt-12 pt-8 text-center text-primary-foreground/60 text-sm">
+          <p className="mb-2 text-primary-foreground/80">
+            <span className="font-semibold">Ethical Fundraising Commitment:</span> Performance with principles. We
+            prioritize long-term donor relationships and never compromise values for ROI.
+          </p>
           <p>© {new Date().getFullYear()} Mojo Digital. All rights reserved.</p>
           <p className="mt-2">
             Paid for by Mojo Digital. Not authorized by any candidate or candidate's committee.

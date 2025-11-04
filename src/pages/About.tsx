@@ -1,8 +1,9 @@
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { Heart, Shield, Users, TrendingUp } from "lucide-react";
+import { Heart, Shield, Users, TrendingUp, Target, Zap, CheckCircle2, Lock } from "lucide-react";
 
 const About = () => {
   const principles = [
@@ -16,7 +17,7 @@ const About = () => {
       icon: Shield,
       title: "Ethical Fundraising",
       description:
-        "Donor trust is sacred. We build relationships that last beyond Election Day, respecting supporters and their contributions.",
+        "Donor trust is sacred. We build relationships that last beyond Election Day. We never use deceptive tactics, respect unsubscribe requests immediately, and maintain complete FEC compliance.",
     },
     {
       icon: Users,
@@ -153,6 +154,94 @@ const About = () => {
                   </span>
                 </li>
               </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Ethical Commitments - Expanded */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-16 animate-fade-in">
+              <h2 className="text-4xl md:text-5xl font-black text-foreground mb-6">
+                Our Ethical Commitments
+              </h2>
+              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+                Performance with principles. These are the standards we hold ourselves to in every campaign.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6 mb-12">
+              {[
+                {
+                  icon: Shield,
+                  title: "No Misleading Tactics",
+                  description:
+                    "We never use dark patterns, deceptive subject lines, or manipulative messaging. Every communication is honest and transparent.",
+                },
+                {
+                  icon: Heart,
+                  title: "Long-Term Relationships",
+                  description:
+                    "We prioritize donor lifetime value over quick cash grabs. We build sustainable support that lasts beyond Election Day.",
+                },
+                {
+                  icon: CheckCircle2,
+                  title: "FEC Compliance Guarantee",
+                  description:
+                    "We maintain strict adherence to all FEC regulations and fundraising best practices. Compliance is non-negotiable.",
+                },
+                {
+                  icon: Users,
+                  title: "Immediate Opt-Out Respect",
+                  description:
+                    "We honor unsubscribe requests instantly—no delays, no re-adds, no workarounds. Donor preferences are sacred.",
+                },
+                {
+                  icon: TrendingUp,
+                  title: "Sustainable List Growth",
+                  description:
+                    "We segment messages and pace outreach to prevent donor fatigue. We grow lists without burning out supporters.",
+                },
+                {
+                  icon: Lock,
+                  title: "Data Privacy Protection",
+                  description:
+                    "Donor data is encrypted, protected, and never shared without explicit consent. Privacy is a fundamental right.",
+                },
+              ].map((commitment, index) => (
+                <Card
+                  key={index}
+                  className="hover-lift animate-fade-in"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="bg-accent/10 text-accent p-3 rounded-lg flex-shrink-0">
+                        <commitment.icon className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-foreground mb-2">{commitment.title}</h3>
+                        <p className="text-muted-foreground">{commitment.description}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="bg-primary text-primary-foreground rounded-lg p-8 md:p-12 text-center animate-fade-in">
+              <h3 className="text-2xl md:text-3xl font-bold mb-4">
+                If Values Don't Align, We'll Tell You
+              </h3>
+              <p className="text-lg text-primary-foreground/90 mb-6">
+                We only grow campaigns we believe in. If we're not aligned on values or ethics, we'll be honest
+                about it upfront. Your mission matters—and so does how you achieve it.
+              </p>
+              <Button variant="cta" size="lg" asChild>
+                <Link to="/contact">Start a Conversation</Link>
+              </Button>
             </div>
           </div>
         </div>
