@@ -29,14 +29,16 @@ const Navigation = () => {
   return (
     <nav
       className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-        isScrolled ? "bg-primary shadow-sm" : "bg-transparent"
+        isScrolled ? "bg-primary shadow-sm" : ""
       }`}
     >
-      <div className="max-w-[1280px] mx-auto px-6">
+      <div className={`max-w-[1280px] mx-auto px-6 ${
+        !isScrolled ? "backdrop-blur-md bg-primary/10 rounded-b-xl mt-0" : ""
+      }`}>
         <div className="flex items-center justify-between h-[72px] md:h-[80px]">
           {/* Logo */}
           <Link to="/" className="flex items-center">
-            <div className={`text-xl md:text-2xl font-black tracking-tight transition-colors ${
+            <div className={`text-2xl md:text-[2rem] font-black tracking-tight transition-colors ${
               isScrolled ? "text-primary-foreground" : "text-foreground"
             }`}>
               MOJO<span className="text-secondary">.</span>
@@ -49,7 +51,7 @@ const Navigation = () => {
               <Link
                 key={link.path}
                 to={link.path}
-                className={`text-[15px] md:text-base font-semibold tracking-tight transition-colors relative group ${
+                className={`text-[16px] md:text-[17px] font-bold tracking-tight transition-colors relative group ${
                   isActive(link.path)
                     ? isScrolled ? "text-primary-foreground" : "text-foreground"
                     : isScrolled ? "text-primary-foreground/80 hover:text-primary-foreground" : "text-foreground/70 hover:text-foreground"
@@ -69,7 +71,7 @@ const Navigation = () => {
               variant="default" 
               size="default" 
               asChild
-              className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-medium rounded-lg px-6"
+              className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-medium rounded-lg px-6 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all"
             >
               <Link to="/contact">Work With Us</Link>
             </Button>

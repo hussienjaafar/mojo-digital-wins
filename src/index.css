@@ -399,11 +399,47 @@ All colors MUST be HSL.
     animation: gradient-shift 8s ease infinite;
   }
 
-  /* Hero Headline Impact */
+  /* Hero Effects */
   .hero-headline-impact {
     text-shadow: 0 2px 8px rgba(10, 30, 62, 0.8),
                  0 4px 16px rgba(10, 30, 62, 0.6),
                  0 0 40px rgba(20, 100, 217, 0.3);
+  }
+
+  .hero-parallax-bg {
+    animation: parallax-drift 20s ease-in-out infinite;
+    transform-origin: center center;
+  }
+
+  @keyframes parallax-drift {
+    0%, 100% { transform: scale(1.1) translateY(0); }
+    50% { transform: scale(1.15) translateY(-10px); }
+  }
+
+  @keyframes scale-in-x {
+    0% { transform: scaleX(0); opacity: 0; }
+    100% { transform: scaleX(1); opacity: 1; }
+  }
+
+  @keyframes scroll-left {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  .animate-scroll-left {
+    animation: scroll-left 30s linear infinite;
+  }
+
+  .drop-shadow-glow {
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+
+  .hero-cta-glow {
+    box-shadow: 0 0 25px rgba(20, 100, 217, 0.5);
+  }
+
+  .hero-cta-glow:hover {
+    box-shadow: 0 0 35px rgba(20, 100, 217, 0.7);
   }
 
   /* Animated Circles - Subtle Background Movement */

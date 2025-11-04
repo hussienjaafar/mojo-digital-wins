@@ -70,36 +70,44 @@ const Index = () => {
       <Navigation />
 
       {/* Hero Section */}
-      <section className="relative pt-32 md:pt-36 pb-16 md:pb-24 overflow-hidden">
-        {/* Background Image with Navy Overlay */}
+      <section className="relative pt-28 md:pt-32 pb-16 md:pb-24 overflow-hidden">
+        {/* Background Image with Parallax and Navy Overlay */}
         <div className="absolute inset-0">
           <div 
-            className="absolute inset-0 bg-cover bg-center"
+            className="hero-parallax-bg absolute inset-0 bg-cover bg-center"
             style={{
               backgroundImage: `url(${heroRally})`,
-              transform: 'scale(1.1)',
             }}
           />
           <div className="absolute inset-0 bg-primary/75" />
         </div>
         
-        {/* Subtle texture overlay */}
-        <div className="absolute inset-0 opacity-[0.04]" style={{
+        {/* Gritty grain texture overlay */}
+        <div className="absolute inset-0 opacity-[0.06] mix-blend-overlay" style={{
           backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="1"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
         }} />
         
         <div className="max-w-[1280px] mx-auto px-6 relative z-10">
           <div className="max-w-[720px]">
             {/* Headline */}
-            <h1 
-              className="font-bebas text-[2.75rem] leading-[1.05] md:text-[4rem] lg:text-[5rem] font-black text-primary-foreground mb-6 tracking-wide uppercase hero-headline-impact"
-              style={{ 
-                animation: 'slide-up-in 0.7s cubic-bezier(0.4, 0, 0.2, 1) 150ms both',
-                letterSpacing: '0.02em'
-              }}
-            >
-              Outperforming the Establishment.
-            </h1>
+            <div className="mb-6">
+              <h1 
+                className="font-bebas text-[2.75rem] leading-[1.05] md:text-[4rem] lg:text-[5rem] font-black text-primary-foreground tracking-wide uppercase hero-headline-impact max-w-[10ch]"
+                style={{ 
+                  animation: 'slide-up-in 0.7s cubic-bezier(0.4, 0, 0.2, 1) 150ms both',
+                  letterSpacing: '0.04em'
+                }}
+              >
+                Outperforming<br/>the Establishment.
+              </h1>
+              {/* Red activist underline */}
+              <div 
+                className="h-[3px] w-[180px] bg-destructive mt-4 rounded-full"
+                style={{ 
+                  animation: 'scale-in-x 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both'
+                }}
+              />
+            </div>
             
             {/* Subhead */}
             <p 
@@ -115,13 +123,13 @@ const Index = () => {
             <div 
               className="flex flex-col sm:flex-row gap-4 mb-12"
               style={{ 
-                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 320ms both'
+                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 280ms both'
               }}
             >
               <Button 
                 size="lg" 
                 asChild
-                className="bg-secondary hover:bg-secondary/90 hover:scale-[1.02] text-secondary-foreground font-semibold rounded-lg px-8 h-12 text-base transition-all duration-200 shadow-lg hover:shadow-xl"
+                className="hero-cta-glow bg-secondary hover:bg-secondary/90 hover:scale-[1.03] text-secondary-foreground font-semibold rounded-lg px-8 h-12 text-base transition-all duration-200 shadow-lg hover:shadow-xl"
               >
                 <Link to="/contact">Grow Your Donor Base</Link>
               </Button>
@@ -129,22 +137,22 @@ const Index = () => {
                 size="lg" 
                 variant="outline" 
                 asChild
-                className="border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary hover:scale-[1.02] font-semibold rounded-lg px-8 h-12 text-base transition-all duration-200"
+                className="border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary hover:scale-[1.03] font-semibold rounded-lg px-8 h-12 text-base transition-all duration-200"
               >
                 <Link to="/case-studies">See Results</Link>
               </Button>
             </div>
             
-            {/* Metrics Strip */}
+            {/* Metrics Strip - Elevated Cards */}
             <div 
-              className="flex flex-wrap gap-6 mb-8"
+              className="flex flex-wrap gap-4 mb-8"
               style={{ 
-                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 380ms both'
+                animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 340ms both'
               }}
             >
-              <div className="flex items-center gap-3 group">
-                <div className="w-11 h-11 rounded-lg bg-secondary/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                  <TrendingUp className="w-5 h-5 text-secondary" />
+              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group">
+                <div className="w-11 h-11 rounded-lg bg-secondary/30 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                  <TrendingUp className="w-5 h-5 text-secondary drop-shadow-glow" />
                 </div>
                 <div>
                   <div className="font-bebas text-2xl md:text-3xl text-primary-foreground leading-none">
@@ -154,9 +162,9 @@ const Index = () => {
                 </div>
               </div>
               
-              <div className="flex items-center gap-3 group">
-                <div className="w-11 h-11 rounded-lg bg-destructive/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                  <Users className="w-5 h-5 text-destructive" />
+              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group">
+                <div className="w-11 h-11 rounded-lg bg-destructive/30 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                  <Users className="w-5 h-5 text-destructive drop-shadow-glow" />
                 </div>
                 <div>
                   <div className="font-bebas text-2xl md:text-3xl text-primary-foreground leading-none">
@@ -166,9 +174,9 @@ const Index = () => {
                 </div>
               </div>
               
-              <div className="flex items-center gap-3 group">
-                <div className="w-11 h-11 rounded-lg bg-accent/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                  <Target className="w-5 h-5 text-accent-foreground" />
+              <div className="flex items-center gap-3 bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4 pr-6 shadow-lg border border-primary-foreground/20 hover:scale-105 hover:shadow-xl transition-all duration-200 group">
+                <div className="w-11 h-11 rounded-lg bg-accent/30 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                  <Target className="w-5 h-5 text-accent-foreground drop-shadow-glow" />
                 </div>
                 <div>
                   <div className="font-bebas text-2xl md:text-3xl text-primary-foreground leading-none">
@@ -181,14 +189,37 @@ const Index = () => {
 
             {/* Credibility Strip */}
             <div 
-              className="border-t border-primary-foreground/20 pt-6"
+              className="border-t border-primary-foreground/20 pt-6 pb-4"
               style={{ 
-                animation: 'fade-in 0.6s cubic-bezier(0.4, 0, 0.2, 1) 450ms both'
+                animation: 'fade-in 0.6s cubic-bezier(0.4, 0, 0.2, 1) 420ms both'
               }}
             >
-              <p className="text-sm text-primary-foreground/75 font-medium tracking-wide">
+              <p className="text-sm text-primary-foreground/75 font-medium tracking-wide mb-6">
                 Trusted by campaigns in <span className="text-primary-foreground font-semibold">Michigan</span>, <span className="text-primary-foreground font-semibold">Illinois</span>, <span className="text-primary-foreground font-semibold">Pennsylvania</span>, and nationwide.
               </p>
+              
+              {/* Campaign Logo Carousel */}
+              <div className="overflow-hidden relative mt-4">
+                <div className="flex gap-4 animate-scroll-left">
+                  {['Unity & Justice Fund', 'Rashid for Illinois', 'Nasser for Michigan', 'Progressive Victory', 'Movement Forward', 'People Power PAC'].map((campaign, i) => (
+                    <div 
+                      key={i} 
+                      className="flex-shrink-0 bg-primary-foreground/5 backdrop-blur-sm px-6 py-3 rounded-lg border border-primary-foreground/10 text-primary-foreground/60 text-sm font-semibold uppercase tracking-wide whitespace-nowrap"
+                    >
+                      {campaign}
+                    </div>
+                  ))}
+                  {/* Duplicate for seamless loop */}
+                  {['Unity & Justice Fund', 'Rashid for Illinois', 'Nasser for Michigan', 'Progressive Victory', 'Movement Forward', 'People Power PAC'].map((campaign, i) => (
+                    <div 
+                      key={`dup-${i}`} 
+                      className="flex-shrink-0 bg-primary-foreground/5 backdrop-blur-sm px-6 py-3 rounded-lg border border-primary-foreground/10 text-primary-foreground/60 text-sm font-semibold uppercase tracking-wide whitespace-nowrap"
+                    >
+                      {campaign}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
