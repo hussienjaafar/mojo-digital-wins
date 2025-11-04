@@ -1,255 +1,161 @@
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CompoundingImpactModel } from "@/components/CompoundingImpactModel";
-import { EthicsBadge } from "@/components/EthicsBadge";
-import { Link } from "react-router-dom";
-import {
-  MessageSquare,
+import { 
+  Megaphone, 
+  MessageSquare, 
+  Mail, 
+  BarChart3, 
+  Palette, 
   Target,
-  Mail,
-  Users,
-  BarChart3,
-  Zap,
-  TrendingUp,
-  Share2,
-  TestTube,
-  Database,
-  Shield,
-  Heart,
-  CheckCircle2,
+  Zap
 } from "lucide-react";
-import smsImage from "@/assets/sms-mockup.jpg";
-import dataImage from "@/assets/data-dashboard.jpg";
-import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
+import heroImage from "@/assets/data-dashboard.jpg";
 
 const Services = () => {
-  const mainServices = [
-    {
-      icon: MessageSquare,
-      tag: "CORE SERVICE",
-      title: "SMS Fundraising",
-      description:
-        "Text messaging is the most direct path to supporter action. Our SMS strategy converts grassroots passion into instant donations through authentic, urgent messaging.",
-      features: [
-        "High-converting fundraising messages tested across dozens of campaigns",
-        "Peer-to-peer SMS campaigns for maximum authenticity",
-        "Real-time A/B testing on messaging, timing, and audiences",
-        "FEC-compliant opt-in management and compliance protocols",
-        "Automated donor follow-up sequences that nurture relationships",
-      ],
-      results: [
-        { stat: "5-7%", label: "Conversion Rate" },
-        { stat: "3-5x", label: "ROI in 48hrs" },
-      ],
-      image: smsImage,
-    },
-    {
-      icon: Target,
-      tag: "CORE SERVICE",
-      title: "Digital Advertising",
-      description:
-        "Every dollar is tracked. Every creative is tested. Every campaign is optimized for maximum ROI across Meta, Google, and programmatic networks.",
-      features: [
-        "Meta (Facebook/Instagram) ads optimized for persuasion",
-        "Google Search and Display campaigns targeting high-intent voters",
-        "Programmatic display and video for scalable reach",
-        "Advanced audience targeting using lookalikes and custom segments",
-        "Continuous creative testing and iteration based on performance",
-      ],
-      results: [
-        { stat: "250-400%", label: "Average ROI" },
-        { stat: "Below Benchmark", label: "Cost Per Acquisition" },
-      ],
-      image: dataImage,
-    },
-    {
-      icon: Mail,
-      tag: "CORE SERVICE",
-      title: "Email Fundraising",
-      description:
-        "Email remains one of the highest-ROI channels when done right. We craft compelling narratives, optimize send times, and build automated sequences that convert.",
-      features: [
-        "List growth strategies that expand your donor base",
-        "Storytelling-driven copy that connects emotionally",
-        "A/B testing on subject lines, messaging, and CTAs",
-        "Automated drip campaigns that nurture new supporters",
-        "Re-engagement sequences that win back lapsed donors",
-      ],
-      results: [
-        { stat: "300-500%", label: "Average ROI" },
-        { stat: "Month-over-Month", label: "Consistent Growth" },
-      ],
-      image: smsImage,
-    },
-  ];
-
-  const supportingServices = [
-    {
-      icon: Users,
-      title: "Audience Targeting",
-      description: "Precision targeting to reach persuadable voters and ideal donors.",
-    },
-    {
-      icon: BarChart3,
-      title: "Performance Analytics",
-      description: "Real-time dashboards and actionable insights to optimize campaigns.",
-    },
-    {
-      icon: TestTube,
-      title: "Creative Testing",
-      description: "Continuous A/B testing on messaging, design, and calls-to-action.",
-    },
-    {
-      icon: Database,
-      title: "Data Management",
-      description: "Clean, organized donor data integrated with your CRM and tools.",
-    },
-    {
-      icon: TrendingUp,
-      title: "Growth Strategy",
-      description: "Long-term funnel optimization to expand your donor base sustainably.",
-    },
-    {
-      icon: Share2,
-      title: "Multi-Channel Coordination",
-      description: "Seamless integration across SMS, email, ads, and social media.",
-    },
-  ];
-
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-
-      {/* Hero */}
-      <section className="relative min-h-[50vh] md:min-h-[70vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
-        <div className="texture-overlay"></div>
+    <div className="min-h-screen">
+      {/* Hero Section */}
+      <section className="relative pt-28 md:pt-32 pb-20 md:pb-32 overflow-hidden">
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroImage})` }} />
+        <div className="absolute inset-0 bg-primary/75" />
         
-        <div className="container relative z-10 mx-auto px-4 sm:px-6 text-center">
-          <h1 className="text-display text-white mb-4 md:mb-6 leading-tight animate-fade-in">
-            Performance That Moves{" "}
-            <span className="text-accent energy-glow">Progressive Campaigns</span>
-          </h1>
-          <p className="text-lg md:text-xl lg:text-2xl text-white/90 mb-6 md:mb-8 max-w-3xl mx-auto font-light animate-fade-in px-4">
-            Data-driven digital strategies that turn grassroots energy into measurable wins
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">
-            <Link to="/contact">
-              <Button size="lg" variant="brutal">
-                Start Your Campaign
-              </Button>
-            </Link>
-            <Link to="/case-studies">
-              <Button size="lg" variant="movement">
-                See Our Impact
-              </Button>
-            </Link>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-[680px] space-y-6">
+            <h1 className="font-bebas text-primary-foreground leading-[0.95]" style={{ fontSize: 'clamp(2.5rem, 6vw, 5.5rem)', letterSpacing: '0.02em' }}>
+              Services That Win Elections
+            </h1>
+            <p className="text-primary-foreground/90 leading-relaxed" style={{ fontSize: 'clamp(1.125rem, 2vw, 1.25rem)' }}>
+              From digital ads to SMS outreach, we offer the full stack of campaign services—all optimized for one thing: winning.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Main Services */}
-      {mainServices.map((service, index) => (
-        <section
-          key={service.title}
-          className={cn(
-            "py-12 md:py-20 relative",
-            index % 2 === 0 ? "bg-background diagonal-top" : "bg-muted/30 diagonal-both"
-          )}
-        >
-          <div className="container mx-auto px-4 sm:px-6">
-            <div
-              className={cn(
-                "grid md:grid-cols-2 gap-12 items-center",
-                index % 2 === 1 && "md:grid-flow-dense"
-              )}
-            >
-              {/* Text Content */}
-              <div className={cn(index % 2 === 1 && "md:col-start-2")}>
-                <div className="flex items-center gap-3 mb-4 animate-fade-in">
-                  <div className="bg-primary/10 text-primary p-3 rounded-lg energy-glow">
-                    <service.icon className="w-8 h-8" />
+      {/* Core Services */}
+      <section className="py-20 md:py-32 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto space-y-20">
+            {/* Service 1 */}
+            <div className="grid md:grid-cols-2 gap-12 items-center">
+              <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 order-2 md:order-1 border border-border/50 bg-card backdrop-blur-sm">
+                <CardContent className="p-8 space-y-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-secondary to-accent rounded-full flex items-center justify-center shadow-md">
+                    <Megaphone className="h-8 w-8 text-white drop-shadow-sm" />
                   </div>
-                  <span className="text-sm font-semibold text-primary uppercase tracking-wider">
-                    {service.tag}
-                  </span>
-                </div>
-                
-                <h2 className="text-headline text-foreground mb-4 animate-fade-in">
-                  {service.title}
-                </h2>
-                
-                <p className="text-xl text-muted-foreground mb-8 leading-relaxed animate-fade-in">
-                  {service.description}
-                </p>
-
-                {/* Features */}
-                <div className="space-y-4 mb-8 animate-fade-in">
-                  {service.features.map((feature, idx) => (
-                    <div key={idx} className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
-                      <p className="text-muted-foreground">{feature}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Results */}
-                <div className="bg-accent/5 border border-accent/20 rounded-lg p-6 brutal-shadow energy-glow animate-fade-in">
-                  <h3 className="text-sm font-bold text-accent uppercase tracking-wider mb-3">
-                    Typical Results
+                  <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.75rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
+                    Digital Advertising
                   </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    {service.results.map((result, idx) => (
-                      <div key={idx}>
-                        <div className="text-2xl font-bold text-foreground">{result.stat}</div>
-                        <div className="text-sm text-muted-foreground">{result.label}</div>
-                      </div>
+                  <p className="text-lg text-muted-foreground leading-relaxed">
+                    Precision-targeted Facebook, Instagram, and Google ads that reach the right voters at the right time. We handle everything from creative development to audience targeting to continuous optimization.
+                  </p>
+                  <ul className="space-y-3">
+                    {[
+                      "Voter file integration & custom audiences",
+                      "A/B testing every element for maximum performance",
+                      "Daily optimization based on real-time data",
+                      "Transparent reporting on spend and results"
+                    ].map((item, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <Zap className="h-5 w-5 text-accent mt-1 flex-shrink-0 drop-shadow-sm" />
+                        <span className="text-foreground/80">{item}</span>
+                      </li>
                     ))}
-                  </div>
-                </div>
+                  </ul>
+                </CardContent>
+              </Card>
+              <div className="order-1 md:order-2">
+                <div className="aspect-square rounded-xl bg-gradient-to-br from-secondary/20 to-accent/20 shadow-lg" />
               </div>
+            </div>
 
-              {/* Image */}
-              <div className={cn("relative animate-fade-in", index % 2 === 1 && "md:col-start-1 md:row-start-1")}>
-                <img
-                  src={service.image}
-                  alt={service.title}
-                  className="rounded-lg brutal-shadow w-full hover-lift"
-                />
+            {/* Service 2 */}
+            <div className="grid md:grid-cols-2 gap-12 items-center">
+              <div className="aspect-square rounded-xl bg-gradient-to-br from-destructive/20 to-secondary/20 shadow-lg" />
+              <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
+                <CardContent className="p-8 space-y-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-destructive to-secondary rounded-full flex items-center justify-center shadow-md">
+                    <MessageSquare className="h-8 w-8 text-white drop-shadow-sm" />
+                  </div>
+                  <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.75rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
+                    SMS & Peer-to-Peer Texting
+                  </h3>
+                  <p className="text-lg text-muted-foreground leading-relaxed">
+                    Text messaging is the most direct line to your supporters. We craft compelling SMS campaigns that drive donations, volunteer signups, and voter turnout.
+                  </p>
+                  <ul className="space-y-3">
+                    {[
+                      "Compliance-first approach to protect your campaign",
+                      "Personalized messaging that feels authentic",
+                      "Real-time response handling and list management",
+                      "Integration with your CRM and voter file"
+                    ].map((item, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <Zap className="h-5 w-5 text-accent mt-1 flex-shrink-0 drop-shadow-sm" />
+                        <span className="text-foreground/80">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Service 3 */}
+            <div className="grid md:grid-cols-2 gap-12 items-center">
+              <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 order-2 md:order-1 border border-border/50 bg-card backdrop-blur-sm">
+                <CardContent className="p-8 space-y-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-accent to-secondary rounded-full flex items-center justify-center shadow-md">
+                    <Mail className="h-8 w-8 text-white drop-shadow-sm" />
+                  </div>
+                  <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.75rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
+                    Email Fundraising
+                  </h3>
+                  <p className="text-lg text-muted-foreground leading-relaxed">
+                    Email remains one of the highest-ROI channels for campaigns. We write, design, and optimize email programs that raise serious money.
+                  </p>
+                  <ul className="space-y-3">
+                    {[
+                      "High-converting subject lines and copy",
+                      "Multi-variate testing on every send",
+                      "List segmentation for maximum relevance",
+                      "Automated welcome series and recurring donor programs"
+                    ].map((item, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <Zap className="h-5 w-5 text-accent mt-1 flex-shrink-0 drop-shadow-sm" />
+                        <span className="text-foreground/80">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+              <div className="order-1 md:order-2">
+                <div className="aspect-square rounded-xl bg-gradient-to-br from-accent/20 to-primary/20 shadow-lg" />
               </div>
             </div>
           </div>
-        </section>
-      ))}
+        </div>
+      </section>
 
-      {/* The Compounding Impact Model */}
-      <CompoundingImpactModel />
-
-      {/* Supporting Services */}
-      <section className="py-12 md:py-20 bg-background diagonal-top relative">
-        <div className="texture-overlay"></div>
-        <div className="container mx-auto px-4 sm:px-6 relative z-10">
-          <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
-            <h2 className="text-headline text-foreground mb-4">
-              Everything You Need to Win
-            </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Comprehensive digital services that work together seamlessly
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {supportingServices.map((service, index) => (
-              <Card key={index} className="hover-lift brutal-shadow hover:energy-glow transition-all duration-300" style={{ animationDelay: `${index * 100}ms` }}>
-                <CardHeader>
-                  <div className="bg-primary/10 text-primary p-3 rounded-lg w-fit mb-4 energy-glow">
-                    <service.icon className="w-6 h-6" />
+      {/* Additional Services */}
+      <section className="py-20 md:py-32 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <h2 className="font-bebas text-primary text-center mb-16 leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+            Plus Everything Else You Need
+          </h2>
+          
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {[
+              { icon: Palette, title: "Creative Production", description: "Eye-catching graphics, videos, and ad creative that stops the scroll and drives action." },
+              { icon: BarChart3, title: "Analytics & Reporting", description: "Clear, actionable insights on what's working, what's not, and where to invest next." },
+              { icon: Target, title: "Strategic Consulting", description: "Not sure where to start? We'll audit your program and build a winning strategy." }
+            ].map((service, index) => (
+              <Card key={index} className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
+                <CardContent className="p-8 text-center space-y-4">
+                  <div className="w-16 h-16 mx-auto bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center shadow-md">
+                    <service.icon className="h-8 w-8 text-white drop-shadow-sm" />
                   </div>
-                  <CardTitle className="text-xl font-bold">{service.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">{service.description}</p>
+                  <h3 className="text-2xl font-bold text-foreground">{service.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed">{service.description}</p>
                 </CardContent>
               </Card>
             ))}
@@ -257,130 +163,56 @@ const Services = () => {
         </div>
       </section>
 
-      {/* Ethical Promise */}
-      <section className="py-12 md:py-20 bg-gradient-to-br from-accent/10 via-background to-primary/5 diagonal-both relative">
-        <div className="texture-overlay"></div>
-        <div className="container mx-auto px-4 sm:px-6 relative z-10">
-          <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
-            <h2 className="text-display text-foreground mb-4">
-              Our Ethical Promise
-            </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Performance without compromise. Values first, always.
-            </p>
-          </div>
+      {/* Process Section */}
+      <section className="py-20 md:py-32 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto space-y-12">
+            <div className="text-center space-y-4">
+              <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+                How We Work
+              </h2>
+              <p className="text-lg md:text-xl text-muted-foreground">
+                A proven process that delivers results, fast
+              </p>
+            </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <Card className="brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in">
-              <CardHeader>
-                <Shield className="w-12 h-12 text-accent mb-4 energy-glow" />
-                <CardTitle className="text-xl font-bold">Transparent Practices</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Full visibility into where dollars go, how lists are built, and what tactics drive results. No black boxes.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in" style={{ animationDelay: "100ms" }}>
-              <CardHeader>
-                <Heart className="w-12 h-12 text-accent mb-4 energy-glow" />
-                <CardTitle className="text-xl font-bold">Donor Respect</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  We treat every supporter like they're funding their own future—because they are. No manipulation, just authentic appeals.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in" style={{ animationDelay: "200ms" }}>
-              <CardHeader>
-                <CheckCircle2 className="w-12 h-12 text-accent mb-4 energy-glow" />
-                <CardTitle className="text-xl font-bold">FEC Compliant</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Every campaign follows the rules. We build compliance into our process, not as an afterthought.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in" style={{ animationDelay: "300ms" }}>
-              <CardHeader>
-                <Target className="w-12 h-12 text-accent mb-4 energy-glow" />
-                <CardTitle className="text-xl font-bold">Real Impact Focus</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  We measure success by wins achieved, not just dollars raised. Performance tied to progressive outcomes.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="mt-12 max-w-3xl mx-auto animate-fade-in" style={{ animationDelay: "400ms" }}>
-            <EthicsBadge variant="detailed" />
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                { step: "01", title: "Discovery & Strategy", description: "We learn your campaign inside and out, then build a data-driven plan to win." },
+                { step: "02", title: "Launch & Test", description: "Quick deployment of campaigns with rigorous A/B testing from day one." },
+                { step: "03", title: "Optimize & Scale", description: "Continuous improvement based on real-time data. We double down on what works." }
+              ].map((process, index) => (
+                <div key={index} className="space-y-4">
+                  <div className="text-6xl font-bold text-accent/20">{process.step}</div>
+                  <h3 className="text-2xl font-bold text-foreground">{process.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed">{process.description}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Process */}
-      <section className="py-12 md:py-20 bg-background diagonal-top relative">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
-            <h2 className="text-headline text-foreground mb-4">
-              How We Work With You
+      {/* CTA Section */}
+      <section className="py-20 md:py-32 bg-gradient-to-br from-secondary via-primary to-accent relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-3xl mx-auto text-center space-y-8 text-white">
+            <h2 className="font-bebas leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+              Ready to Build Your Winning Campaign?
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              A proven process from strategy to scale
+            <p className="text-lg md:text-xl leading-relaxed">
+              Let's talk about your goals and how we can help you achieve them.
             </p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-            {[
-              { number: "01", title: "Discovery", desc: "Deep dive into your campaign goals, audience, and constraints" },
-              { number: "02", title: "Strategy", desc: "Custom roadmap with channel mix, creative direction, and KPIs" },
-              { number: "03", title: "Launch", desc: "Rapid deployment with real-time optimization from day one" },
-              { number: "04", title: "Scale", desc: "Continuous improvement and expansion of what's working" },
-            ].map((step, index) => (
-              <div key={index} className="text-center animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-                <div className="text-6xl font-black text-primary/20 mb-4 hover:text-primary/40 transition-colors duration-300 brutal-shadow">{step.number}</div>
-                <h3 className="text-2xl font-bold text-foreground mb-2">{step.title}</h3>
-                <p className="text-muted-foreground">{step.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-12 md:py-20 bg-gradient-to-br from-primary via-secondary to-accent text-white diagonal-both relative overflow-hidden">
-        <div className="texture-overlay"></div>
-        <div className="container mx-auto px-4 sm:px-6 text-center relative z-10">
-          <h2 className="text-display mb-4 md:mb-6 animate-fade-in energy-glow px-4">
-            Ready to Transform Your Campaign?
-          </h2>
-          <p className="text-lg md:text-xl mb-6 md:mb-8 max-w-2xl mx-auto opacity-90 animate-fade-in px-4">
-            Let's build a winning digital strategy together
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in">
             <Link to="/contact">
-              <Button size="lg" variant="brutal">
-                Get Started
-              </Button>
-            </Link>
-            <Link to="/case-studies">
-              <Button size="lg" variant="movement">
-                View Case Studies
+              <Button size="lg" variant="secondary" className="text-lg px-8 shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all duration-300">
+                Get Started Today
               </Button>
             </Link>
           </div>
         </div>
       </section>
-
-      <Footer />
     </div>
   );
 };

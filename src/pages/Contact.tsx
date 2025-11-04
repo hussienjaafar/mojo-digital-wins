@@ -1,232 +1,137 @@
-import { useState } from "react";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { Mail, Phone, MapPin, Shield, Clock } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Mail, MessageSquare, Phone } from "lucide-react";
+import heroImage from "@/assets/hero-movement.jpg";
 
 const Contact = () => {
-  const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    organization: "",
-    campaignType: "",
-    message: "",
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-
-    // Simulate form submission
-    setTimeout(() => {
-      toast({
-        title: "Message Received!",
-        description: "We'll get back to you within 24 hours to discuss your campaign strategy.",
-      });
-      setFormData({
-        name: "",
-        email: "",
-        organization: "",
-        campaignType: "",
-        message: "",
-      });
-      setIsSubmitting(false);
-    }, 1000);
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    console.log("Form submitted");
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-
-      {/* Hero */}
-      <section className="relative min-h-[50vh] md:min-h-[60vh] flex items-center justify-center bg-gradient-to-br from-primary via-secondary to-accent overflow-hidden diagonal-bottom">
-        <div className="texture-overlay"></div>
-        <div className="container relative z-10 mx-auto px-4 sm:px-6 text-center">
-          <h1 className="text-display text-white mb-4 md:mb-6 leading-tight animate-fade-in energy-glow">
-            Let's Build Your Win
-          </h1>
-          <p className="text-lg md:text-xl lg:text-2xl text-white/90 max-w-3xl mx-auto font-light animate-fade-in px-4">
-            Get in touch to start planning your campaign's digital strategy
-          </p>
-        </div>
-      </section>
-
-      {/* Content */}
-      <section className="py-12 md:py-20">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="grid md:grid-cols-3 gap-8 md:gap-12 max-w-6xl mx-auto">
-            {/* Contact Form */}
-            <Card className="md:col-span-2 brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in">
-              <CardHeader>
-                <CardTitle className="text-headline">Send Us a Message</CardTitle>
-                <CardDescription>Fill out the form below and we'll get back to you within 24 hours</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-semibold text-foreground mb-2">
-                      Your Name *
-                    </label>
-                    <Input
-                      id="name"
-                      name="name"
-                      type="text"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required
-                      placeholder="Jane Smith"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-semibold text-foreground mb-2">
-                      Email Address *
-                    </label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      required
-                      placeholder="jane@campaign.org"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="organization" className="block text-sm font-semibold text-foreground mb-2">
-                      Campaign/Organization Name *
-                    </label>
-                    <Input
-                      id="organization"
-                      name="organization"
-                      type="text"
-                      value={formData.organization}
-                      onChange={handleChange}
-                      required
-                      placeholder="Smith for Senate"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="campaignType" className="block text-sm font-semibold text-foreground mb-2">
-                      Campaign Type *
-                    </label>
-                    <Input
-                      id="campaignType"
-                      name="campaignType"
-                      type="text"
-                      value={formData.campaignType}
-                      onChange={handleChange}
-                      required
-                      placeholder="Federal, State, Local, PAC, or Nonprofit"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="message" className="block text-sm font-semibold text-foreground mb-2">
-                      Tell Us About Your Campaign *
-                    </label>
-                    <Textarea
-                      id="message"
-                      name="message"
-                      value={formData.message}
-                      onChange={handleChange}
-                      required
-                      placeholder="What are your fundraising goals? What challenges are you facing? How can we help?"
-                      rows={5}
-                    />
-                  </div>
-
-                  <Button type="submit" size="lg" className="w-full min-h-[48px]" disabled={isSubmitting} variant="brutal">
-                    {isSubmitting ? "Sending..." : "Send Message"}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            {/* Contact Info & Credibility */}
-            <div className="space-y-6">
-              {/* Contact Details */}
-              <Card className="brutal-shadow hover:energy-glow transition-all duration-300 animate-fade-in">
-                <CardHeader>
-                  <CardTitle className="text-2xl font-bold">Get In Touch</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <Mail className="w-5 h-5 text-primary mt-1 energy-glow" />
-                    <div>
-                      <div className="font-semibold text-foreground">Email</div>
-                      <a href="mailto:hello@mojodigital.com" className="text-primary hover:underline">
-                        hello@mojodigital.com
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <Phone className="w-5 h-5 text-primary mt-1 energy-glow" />
-                    <div>
-                      <div className="font-semibold text-foreground">Phone</div>
-                      <a href="tel:+15551234567" className="text-primary hover:underline">
-                        (555) 123-4567
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-primary mt-1 energy-glow" />
-                    <div>
-                      <div className="font-semibold text-foreground">Location</div>
-                      <p className="text-muted-foreground">Remote-first team based in the US</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Credibility Message */}
-              <Card className="bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 brutal-shadow diagonal-top relative overflow-hidden animate-fade-in" style={{ animationDelay: "100ms" }}>
-                <CardContent className="p-6 relative z-10">
-                  <Shield className="w-10 h-10 text-primary mb-4 energy-glow" />
-                  <h3 className="text-xl font-bold text-foreground mb-2">Your Campaign's Success Matters</h3>
-                  <p className="text-muted-foreground mb-4">
-                    We're selective about the campaigns we work with because we're invested in your win. When you reach out,
-                    we'll have an honest conversation about fit, strategy, and goals.
-                  </p>
-                  <p className="text-muted-foreground text-sm">
-                    We work exclusively with progressive candidates and causes. If that's you, let's talk.
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* Response Time */}
-              <Card className="bg-gradient-to-r from-accent/10 to-primary/10 brutal-shadow energy-glow animate-fade-in" style={{ animationDelay: "200ms" }}>
-                <CardContent className="p-6">
-                  <Clock className="w-10 h-10 text-accent mb-4 energy-glow" />
-                  <h3 className="text-xl font-bold text-foreground mb-2">Fast Response Time</h3>
-                  <p className="text-muted-foreground">
-                    In politics, timing is everything. We respond to all inquiries within 24 hours, often much faster.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
+    <div className="min-h-screen">
+      {/* Hero Section */}
+      <section className="relative pt-28 md:pt-32 pb-20 md:pb-32 overflow-hidden">
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroImage})` }} />
+        <div className="absolute inset-0 bg-primary/75" />
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-[680px] space-y-6">
+            <h1 className="font-bebas text-primary-foreground leading-[0.95]" style={{ fontSize: 'clamp(2.5rem, 6vw, 5.5rem)', letterSpacing: '0.02em' }}>
+              Let's Win Together
+            </h1>
+            <p className="text-primary-foreground/90 leading-relaxed" style={{ fontSize: 'clamp(1.125rem, 2vw, 1.25rem)' }}>
+              Ready to build a winning campaign? Tell us about your race, and we'll show you how we can help.
+            </p>
           </div>
         </div>
       </section>
 
-      <Footer />
+      {/* Contact Form Section */}
+      <section className="py-20 md:py-32 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12">
+            {/* Contact Info */}
+            <div className="space-y-8">
+              <div>
+                <h2 className="font-bebas text-primary mb-4 leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+                  Get in Touch
+                </h2>
+                <p className="text-lg text-foreground/80 leading-relaxed">
+                  Whether you're launching a campaign or looking to scale your existing program, we're here to help. Fill out the form and we'll get back to you within 24 hours.
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {[
+                  { icon: Mail, title: "Email Us", value: "hello@mojodigital.com" },
+                  { icon: Phone, title: "Call Us", value: "(555) 123-4567" },
+                  { icon: MessageSquare, title: "Quick Questions", value: "Use the form for fastest response" }
+                ].map((contact, index) => (
+                  <Card key={index} className="shadow-md hover:shadow-lg transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
+                    <CardContent className="p-6 flex items-start gap-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-secondary to-accent rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <contact.icon className="h-6 w-6 text-white drop-shadow-sm" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-foreground mb-1">{contact.title}</h3>
+                        <p className="text-muted-foreground">{contact.value}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* Contact Form */}
+            <Card className="shadow-lg hover:shadow-xl transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
+              <CardContent className="p-8">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name *</Label>
+                    <Input id="name" placeholder="Your name" required className="border-border/50 focus:border-secondary transition-colors" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email *</Label>
+                    <Input id="email" type="email" placeholder="your@email.com" required className="border-border/50 focus:border-secondary transition-colors" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="campaign">Campaign/Organization *</Label>
+                    <Input id="campaign" placeholder="Smith for Senate" required className="border-border/50 focus:border-secondary transition-colors" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="race-type">Race Type</Label>
+                    <Input id="race-type" placeholder="Federal, State, Local, etc." className="border-border/50 focus:border-secondary transition-colors" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="message">Tell Us About Your Campaign *</Label>
+                    <Textarea id="message" placeholder="What are your goals? What help do you need?" required rows={5} className="border-border/50 focus:border-secondary transition-colors resize-none" />
+                  </div>
+
+                  <Button type="submit" size="lg" className="w-full shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
+                    Send Message
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="py-20 md:py-32 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="font-bebas text-primary text-center mb-12 leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+              Common Questions
+            </h2>
+            
+            <div className="space-y-6">
+              {[
+                { question: "What size campaigns do you work with?", answer: "We work with campaigns at every level—from city council to federal races. If you're committed to progressive values and ready to win, we want to work with you." },
+                { question: "How quickly can we get started?", answer: "Most campaigns can launch within 1-2 weeks. We move fast because we know campaigns can't wait." },
+                { question: "What's your pricing model?", answer: "We offer flexible pricing based on campaign size and scope. We'll discuss options on our first call to find what works for your budget." },
+                { question: "Do you only work with Democrats?", answer: "We work exclusively with progressive candidates and causes aligned with our values—racial justice, economic equality, climate action, and democracy reform." }
+              ].map((faq, index) => (
+                <Card key={index} className="shadow-md hover:shadow-lg transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
+                  <CardContent className="p-6 space-y-3">
+                    <h3 className="text-xl font-bold text-foreground">{faq.question}</h3>
+                    <p className="text-foreground/80 leading-relaxed">{faq.answer}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };

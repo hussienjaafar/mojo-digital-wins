@@ -1,87 +1,63 @@
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { CreativeGallery } from "@/components/CreativeGallery";
+import { Card, CardContent } from "@/components/ui/card";
+import { Target, TrendingUp, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Sparkles, Target, TrendingUp, Zap } from "lucide-react";
+import { CreativeGallery } from "@/components/CreativeGallery";
+import heroImage from "@/assets/hero-movement.jpg";
 
 const CreativeShowcase = () => {
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-
-      {/* Hero */}
-      <section className="pt-32 pb-24 bg-gradient-to-br from-primary via-secondary to-destructive text-primary-foreground relative overflow-hidden">
-        <div className="absolute inset-0 texture-overlay" />
+    <div className="min-h-screen">
+      {/* Hero Section */}
+      <section className="relative pt-28 md:pt-32 pb-20 md:pb-32 overflow-hidden">
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroImage})` }} />
+        <div className="absolute inset-0 bg-primary/75" />
+        
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl mx-auto text-center animate-fade-in-up">
-            <div className="inline-flex items-center gap-2 bg-accent/20 text-accent px-6 py-3 rounded-full mb-8 border-2 border-accent/40">
-              <Sparkles className="w-6 h-6" />
-              <span className="font-bold uppercase tracking-wider">The Creative Advantage</span>
-            </div>
-            <h1 className="font-bebas text-7xl md:text-9xl mb-8 leading-none uppercase tracking-wider">
-              Creative That<br/>Converts
+          <div className="max-w-[680px] space-y-6">
+            <h1 className="font-bebas text-primary-foreground leading-[0.95]" style={{ fontSize: 'clamp(2.5rem, 6vw, 5.5rem)', letterSpacing: '0.02em' }}>
+              Creative That Converts
             </h1>
-            <p className="text-xl md:text-2xl text-primary-foreground/95 mb-10 font-medium max-w-3xl mx-auto">
-              Every message, every ad, every email is crafted to inspire action. See the creative work behind our
-              winning campaigns.
+            <p className="text-primary-foreground/90 leading-relaxed" style={{ fontSize: 'clamp(1.125rem, 2vw, 1.25rem)' }}>
+              Beautiful creative is great. Creative that drives donations, sign-ups, and wins is what we deliver.
             </p>
-            <Button variant="brutal" size="xl" asChild className="text-lg">
-              <Link to="/contact">Let's Create Together</Link>
-            </Button>
+            <Link to="/contact">
+              <Button size="lg" className="shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all duration-300">
+                Let's Create Something Winning
+              </Button>
+            </Link>
           </div>
         </div>
-        
-        {/* Diagonal bottom edge */}
-        <div className="absolute bottom-0 left-0 right-0 h-20 bg-background" style={{ clipPath: 'polygon(0 100%, 100% 100%, 100% 0, 0 100%)' }} />
       </section>
 
-      {/* Creative Philosophy */}
-      <section className="py-24 bg-background">
+      {/* Philosophy Section */}
+      <section className="py-20 md:py-32 bg-background">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-16 animate-fade-in">
-              <h2 className="font-bebas text-6xl md:text-7xl text-foreground mb-6 uppercase tracking-wide">
-                Creative That<br/>Drives Results
+          <div className="max-w-4xl mx-auto space-y-12">
+            <div className="text-center space-y-4">
+              <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+                Our Creative Philosophy
               </h2>
-              <p className="text-xl text-muted-foreground font-medium">
-                Our creative isn't just beautiful—it's optimized for performance. Every element is tested,
-                refined, and designed to maximize ROI.
+              <p className="text-lg md:text-xl text-muted-foreground">
+                Every ad, email, and piece of content is built with one goal: results.
               </p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
               {[
-                {
-                  icon: Target,
-                  title: "Message-Market Fit",
-                  description:
-                    "We craft messages that resonate with your specific audience, speaking their language and addressing their values.",
-                },
-                {
-                  icon: TrendingUp,
-                  title: "Continuous Testing",
-                  description:
-                    "Every creative is A/B tested across subject lines, copy, visuals, and CTAs to identify top performers.",
-                },
-                {
-                  icon: Zap,
-                  title: "Urgency & Emotion",
-                  description:
-                    "We balance emotional storytelling with clear calls-to-action that inspire immediate donor response.",
-                },
-              ].map((item, index) => (
-                <div
-                  key={index}
-                  className="text-center animate-bounce-in bg-gradient-to-br from-card to-muted border-2 border-secondary/20 p-8 rounded-lg brutal-shadow hover-lift"
-                  style={{ animationDelay: `${index * 0.15}s` }}
-                >
-                  <div className="bg-secondary/20 text-secondary w-20 h-20 rounded-lg flex items-center justify-center mb-6 mx-auto border-2 border-secondary/40">
-                    <item.icon className="w-10 h-10" />
-                  </div>
-                  <h3 className="font-bebas text-2xl text-foreground mb-4 uppercase tracking-wide">{item.title}</h3>
-                  <p className="text-muted-foreground">{item.description}</p>
-                </div>
+                { icon: Target, title: "Message-Market Fit", description: "We don't guess. We test messaging with your audience until we find what resonates and drives action." },
+                { icon: TrendingUp, title: "Continuous Testing", description: "Every creative piece is A/B tested. We optimize relentlessly to improve performance week over week." },
+                { icon: Zap, title: "Urgency & Emotion", description: "Great political creative taps into urgency and emotion. We create work that moves people to act—now." }
+              ].map((principle, index) => (
+                <Card key={index} className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
+                  <CardContent className="p-8 text-center space-y-4">
+                    <div className="w-16 h-16 mx-auto bg-gradient-to-br from-secondary to-accent rounded-full flex items-center justify-center shadow-md">
+                      <principle.icon className="h-8 w-8 text-white drop-shadow-sm" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-foreground">{principle.title}</h3>
+                    <p className="text-muted-foreground leading-relaxed">{principle.description}</p>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>
@@ -89,40 +65,43 @@ const CreativeShowcase = () => {
       </section>
 
       {/* Creative Gallery */}
-      <section className="py-24 bg-gradient-to-br from-muted via-background to-muted diagonal-both relative">
-        <div className="absolute inset-0 texture-overlay" />
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-16 animate-fade-in">
-            <h2 className="font-bebas text-6xl md:text-7xl text-foreground mb-6 uppercase tracking-wide">
-              Featured Creative Work
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto font-medium">
-              Explore real campaigns, real creative, and real results. Filter by channel to see what works.
-            </p>
+      <section className="py-20 md:py-32 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto space-y-12">
+            <div className="text-center space-y-4">
+              <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+                Featured Creative Work
+              </h2>
+              <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
+                From digital ads to email headers to SMS creative—here's a look at work that helped campaigns break through and win.
+              </p>
+            </div>
+
+            <CreativeGallery />
           </div>
-
-          <CreativeGallery />
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-28 bg-gradient-to-br from-primary via-destructive to-secondary text-primary-foreground relative overflow-hidden">
-        <div className="absolute inset-0 texture-overlay" />
-        <div className="absolute inset-0 energy-glow" />
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <h2 className="font-bebas text-6xl md:text-8xl mb-8 animate-fade-in uppercase tracking-wide leading-none">
-            Ready for Creative<br/>That Wins?
-          </h2>
-          <p className="text-xl md:text-2xl text-primary-foreground/95 mb-12 max-w-2xl mx-auto animate-fade-in font-medium">
-            Let's craft messaging that moves your audience and drives real results for your campaign.
-          </p>
-          <Button variant="brutal" size="xl" asChild className="animate-glow-pulse text-lg">
-            <Link to="/contact">Start Your Campaign</Link>
-          </Button>
+      {/* CTA Section */}
+      <section className="py-20 md:py-32 bg-gradient-to-br from-accent via-destructive to-secondary relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-3xl mx-auto text-center space-y-8 text-white">
+            <h2 className="font-bebas leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+              Ready for Creative That Wins?
+            </h2>
+            <p className="text-lg md:text-xl leading-relaxed">
+              Let's build a campaign that stands out, raises more, and delivers results.
+            </p>
+            <Link to="/contact">
+              <Button size="lg" variant="secondary" className="text-lg px-8 shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all duration-300">
+                Start Your Campaign
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
-
-      <Footer />
     </div>
   );
 };
