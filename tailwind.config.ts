@@ -63,6 +63,10 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        'bebas': ['Bebas Neue', 'sans-serif'],
+        'inter': ['Inter', 'sans-serif'],
+      },
       keyframes: {
         "accordion-down": {
           from: {
@@ -166,6 +170,57 @@ export default {
             transform: "scale(1.02)",
           },
         },
+        "parallax-slow": {
+          "0%": {
+            transform: "translateY(0)",
+          },
+          "100%": {
+            transform: "translateY(-20px)",
+          },
+        },
+        "float": {
+          "0%, 100%": {
+            transform: "translateY(0px)",
+          },
+          "50%": {
+            transform: "translateY(-20px)",
+          },
+        },
+        "slide-up": {
+          "0%": {
+            transform: "translateY(100px)",
+            opacity: "0",
+          },
+          "100%": {
+            transform: "translateY(0)",
+            opacity: "1",
+          },
+        },
+        "bounce-in": {
+          "0%": {
+            transform: "scale(0.8)",
+            opacity: "0",
+          },
+          "50%": {
+            transform: "scale(1.05)",
+            opacity: "1",
+          },
+          "100%": {
+            transform: "scale(1)",
+            opacity: "1",
+          },
+        },
+        "shake": {
+          "0%, 100%": {
+            transform: "translateX(0)",
+          },
+          "25%": {
+            transform: "translateX(-5px)",
+          },
+          "75%": {
+            transform: "translateX(5px)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -179,6 +234,11 @@ export default {
         "pulse-subtle": "pulse-subtle 2s ease-in-out infinite",
         "glow-pulse": "glow-pulse 2s ease-in-out infinite",
         "smooth-scale": "smooth-scale 0.3s ease-out",
+        "parallax-slow": "parallax-slow 20s ease-in-out infinite alternate",
+        "float": "float 3s ease-in-out infinite",
+        "slide-up": "slide-up 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+        "bounce-in": "bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
+        "shake": "shake 0.5s ease-in-out",
       },
     },
   },

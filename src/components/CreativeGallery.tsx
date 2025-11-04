@@ -44,16 +44,16 @@ export const CreativeGallery = () => {
   return (
     <>
       {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-3 justify-center mb-12">
+      <div className="flex flex-wrap gap-4 justify-center mb-16">
         {categories.map((category) => (
           <Button
             key={category.name}
-            variant={filter === category.name ? "secondary" : "outline"}
+            variant={filter === category.name ? "movement" : "outline"}
             size="lg"
             onClick={() => setFilter(category.name)}
-            className="gap-2"
+            className="gap-2 font-bold uppercase tracking-wider"
           >
-            {category.icon && <category.icon className="w-4 h-4" />}
+            {category.icon && <category.icon className="w-5 h-5" />}
             {category.name}
           </Button>
         ))}
@@ -64,25 +64,26 @@ export const CreativeGallery = () => {
         {filteredCreatives.map((creative, index) => (
           <Card
             key={creative.id}
-            className="overflow-hidden hover-lift cursor-pointer animate-scale-in"
+            className="overflow-hidden hover-lift cursor-pointer animate-bounce-in border-2 border-secondary/20 hover:border-secondary brutal-shadow group"
             style={{ animationDelay: `${index * 0.1}s` }}
             onClick={() => setSelectedCreative(creative)}
           >
             <CardContent className="p-0">
-              <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
+              <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
                 <img
                   src={creative.image}
                   alt={`${creative.campaign} - ${creative.type}`}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   loading="lazy"
                 />
               </div>
-              <div className="p-6">
-                <div className="inline-block bg-secondary/10 text-secondary px-3 py-1 rounded-full text-sm font-semibold mb-3">
+              <div className="p-6 bg-gradient-to-br from-card to-muted">
+                <div className="inline-block bg-secondary/20 text-secondary border-2 border-secondary/40 px-4 py-2 rounded-full text-sm font-bold mb-4 uppercase tracking-wider">
                   {creative.type}
                 </div>
-                <h3 className="text-xl font-bold text-foreground mb-2">{creative.campaign}</h3>
-                <p className="text-accent font-semibold mb-2">{creative.result}</p>
+                <h3 className="font-bebas text-2xl text-foreground mb-2 uppercase tracking-wide">{creative.campaign}</h3>
+                <p className="text-accent font-bold mb-2 text-lg">{creative.result}</p>
                 <p className="text-sm text-muted-foreground">{creative.description}</p>
               </div>
             </CardContent>

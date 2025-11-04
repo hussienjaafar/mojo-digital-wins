@@ -44,17 +44,25 @@ All colors MUST be HSL.
     --red: 0 78% 53%;
     --yellow: 45 89% 57%;
 
-    /* Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(213 75% 15%) 0%, hsl(213 83% 47%) 100%);
+    /* Gradients - Movement Power */
+    --gradient-hero: linear-gradient(135deg, hsl(213 75% 15%) 0%, hsl(213 83% 47%) 50%, hsl(0 78% 53%) 100%);
+    --gradient-power: linear-gradient(120deg, hsl(213 75% 12%) 0%, hsl(213 83% 47%) 50%, hsl(213 75% 15%) 100%);
     --gradient-accent: linear-gradient(90deg, hsl(213 83% 47%) 0%, hsl(0 78% 53%) 100%);
+    --gradient-urgent: linear-gradient(135deg, hsl(0 78% 53%) 0%, hsl(0 85% 45%) 100%);
     --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(213 20% 98%) 100%);
+    --gradient-diagonal: linear-gradient(135deg, hsl(213 75% 15%) 0%, hsl(213 83% 47%) 100%);
+    --gradient-overlay: linear-gradient(180deg, hsl(213 75% 15% / 0.9) 0%, hsl(213 75% 15% / 0.7) 100%);
 
-    /* Shadows */
+    /* Shadows - Bold Impact */
     --shadow-sm: 0 2px 8px hsl(213 75% 15% / 0.1);
     --shadow-md: 0 4px 16px hsl(213 75% 15% / 0.15);
     --shadow-lg: 0 8px 32px hsl(213 75% 15% / 0.2);
+    --shadow-xl: 0 12px 48px hsl(213 75% 15% / 0.25);
     --shadow-elegant: 0 10px 40px hsl(213 75% 15% / 0.12);
     --shadow-glow: 0 0 30px hsl(213 83% 47% / 0.3);
+    --shadow-glow-red: 0 0 40px hsl(0 78% 53% / 0.4);
+    --shadow-brutal: 8px 8px 0px hsl(0 78% 53%);
+    --shadow-inset: inset 0 2px 8px hsl(213 75% 15% / 0.1);
     
     /* Transitions */
     --transition-base: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -140,22 +148,30 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
+
+  /* Activist Typography - Bebas Neue for headlines */
+  h1, h2, .text-display, .text-headline {
+    font-family: 'Bebas Neue', 'Inter', sans-serif;
+    letter-spacing: 0.02em;
+  }
 }
 
 @layer utilities {
-  /* Typography Utilities */
+  /* Typography Utilities - Activist Poster Style */
   .text-display {
     font-size: var(--font-size-7xl);
-    font-weight: var(--font-weight-black);
-    line-height: var(--line-height-tight);
-    letter-spacing: var(--letter-spacing-tighter);
+    font-weight: 400;
+    line-height: 0.9;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
   }
 
   .text-headline {
     font-size: var(--font-size-5xl);
-    font-weight: var(--font-weight-extrabold);
-    line-height: var(--line-height-tight);
-    letter-spacing: var(--letter-spacing-tight);
+    font-weight: 400;
+    line-height: 0.95;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
   }
 
   .text-subheadline {
@@ -207,6 +223,133 @@ All colors MUST be HSL.
 
   .hover-glow:hover {
     box-shadow: var(--shadow-glow);
+  }
+
+  /* Diagonal Section Dividers */
+  .diagonal-top {
+    clip-path: polygon(0 5%, 100% 0%, 100% 100%, 0% 100%);
+    margin-top: -3rem;
+    padding-top: 6rem;
+  }
+
+  .diagonal-bottom {
+    clip-path: polygon(0 0, 100% 0, 100% 95%, 0% 100%);
+    padding-bottom: 6rem;
+    margin-bottom: -3rem;
+  }
+
+  .diagonal-both {
+    clip-path: polygon(0 5%, 100% 0%, 100% 95%, 0% 100%);
+    margin: -3rem 0;
+    padding: 6rem 0;
+  }
+
+  /* Torn Paper Effect */
+  .torn-edge {
+    position: relative;
+  }
+
+  .torn-edge::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(to right, transparent 0%, currentColor 2%, transparent 4%, currentColor 6%, transparent 8%, currentColor 10%, transparent 12%, currentColor 14%, transparent 16%, currentColor 18%, transparent 20%, currentColor 22%, transparent 24%, currentColor 26%, transparent 28%, currentColor 30%, transparent 32%, currentColor 34%, transparent 36%, currentColor 38%, transparent 40%, currentColor 42%, transparent 44%, currentColor 46%, transparent 48%, currentColor 50%, transparent 52%, currentColor 54%, transparent 56%, currentColor 58%, transparent 60%, currentColor 62%, transparent 64%, currentColor 66%, transparent 68%, currentColor 70%, transparent 72%, currentColor 74%, transparent 76%, currentColor 78%, transparent 80%, currentColor 82%, transparent 84%, currentColor 86%, transparent 88%, currentColor 90%, transparent 92%, currentColor 94%, transparent 96%, currentColor 98%, transparent 100%);
+  }
+
+  /* Brutal Box Shadow */
+  .brutal-shadow {
+    box-shadow: var(--shadow-brutal);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .brutal-shadow:hover {
+    transform: translate(4px, 4px);
+    box-shadow: 4px 4px 0px hsl(0 78% 53%);
+  }
+
+  /* Textured Background */
+  .texture-overlay {
+    position: relative;
+  }
+
+  .texture-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: 
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        hsl(213 75% 15% / 0.02) 10px,
+        hsl(213 75% 15% / 0.02) 20px
+      );
+    pointer-events: none;
+  }
+
+  /* Movement Energy Glow */
+  .energy-glow {
+    position: relative;
+  }
+
+  .energy-glow::before {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    background: radial-gradient(circle, hsl(213 83% 47% / 0.2) 0%, transparent 70%);
+    animation: pulse-energy 3s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes pulse-energy {
+    0%, 100% { opacity: 0.5; transform: scale(0.95); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+
+  /* Glitch Effect */
+  .glitch {
+    position: relative;
+  }
+
+  .glitch:hover::before,
+  .glitch:hover::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .glitch:hover::before {
+    animation: glitch-1 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
+    color: hsl(0 78% 53%);
+    z-index: -1;
+  }
+
+  .glitch:hover::after {
+    animation: glitch-2 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) reverse both infinite;
+    color: hsl(213 83% 47%);
+    z-index: -1;
+  }
+
+  @keyframes glitch-1 {
+    0%, 100% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(-2px, -2px); }
+    60% { transform: translate(2px, 2px); }
+    80% { transform: translate(2px, -2px); }
+  }
+
+  @keyframes glitch-2 {
+    0%, 100% { transform: translate(0); }
+    20% { transform: translate(2px, -2px); }
+    40% { transform: translate(2px, 2px); }
+    60% { transform: translate(-2px, -2px); }
+    80% { transform: translate(-2px, 2px); }
   }
 
   /* Smooth Scrolling */

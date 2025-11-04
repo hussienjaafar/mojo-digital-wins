@@ -11,12 +11,14 @@ const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        outline: "border-2 border-primary bg-transparent text-primary hover:bg-primary hover:text-primary-foreground font-bold transition-all duration-300",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        hero: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold",
-        cta: "bg-accent text-accent-foreground hover:bg-accent/90 shadow-md hover:shadow-lg font-semibold",
+        hero: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold border-2 border-destructive hover:border-primary-foreground",
+        cta: "bg-accent text-accent-foreground hover:bg-primary hover:text-primary-foreground shadow-md hover:shadow-xl font-bold border-2 border-accent hover:border-primary-foreground transition-all duration-300 transform hover:scale-105",
+        brutal: "bg-primary text-primary-foreground font-black border-4 border-destructive shadow-[4px_4px_0px_hsl(var(--destructive))] hover:shadow-[6px_6px_0px_hsl(var(--destructive))] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-all",
+        movement: "bg-gradient-to-r from-secondary to-primary text-primary-foreground font-bold shadow-lg hover:shadow-glow-red transform hover:scale-105 border-2 border-primary-foreground/20",
       },
       size: {
         default: "h-10 px-4 py-2",
