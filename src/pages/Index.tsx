@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import StatCounter from "@/components/StatCounter";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
-import { TrendingUp, MessageSquare, Mail, Target, Users, BarChart3, Check } from "lucide-react";
+import { TrendingUp, MessageSquare, Mail, Target, Users, BarChart3, Check, Shield } from "lucide-react";
 import heroImage from "@/assets/hero-movement.jpg";
 import dataDashboard from "@/assets/data-dashboard.jpg";
 
@@ -162,6 +162,23 @@ const Index = () => {
                   <p className="text-muted-foreground">
                     Every campaign decision backed by rigorous testing, analytics, and continuous optimization.
                   </p>
+                </div>
+              </div>
+
+              <div className="mt-8 pt-8 border-t border-border">
+                <div className="bg-accent/10 border border-accent/20 rounded-lg p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="bg-accent/20 text-accent-foreground p-3 rounded-lg flex-shrink-0">
+                      <Shield size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold mb-2 text-foreground">Ethical Fundraising</h3>
+                      <p className="text-muted-foreground">
+                        Donor trust is sacred. We build relationships that last beyond Election Day, never using
+                        deceptive tactics or burning out supporters for short-term gains.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

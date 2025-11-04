@@ -2,6 +2,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CompoundingImpactModel } from "@/components/CompoundingImpactModel";
 import { Link } from "react-router-dom";
 import {
   MessageSquare,
@@ -14,6 +15,10 @@ import {
   Share2,
   TestTube,
   Database,
+  Shield,
+  Heart,
+  CheckCircle2,
+  Lock,
 } from "lucide-react";
 import smsImage from "@/assets/sms-mockup.jpg";
 
@@ -176,6 +181,9 @@ const Services = () => {
         </div>
       </section>
 
+      {/* The Compounding Impact Model */}
+      <CompoundingImpactModel />
+
       {/* Supporting Services */}
       <section className="py-20 bg-primary text-primary-foreground">
         <div className="container mx-auto px-4">
@@ -200,6 +208,76 @@ const Services = () => {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Ethical Promise */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-16 animate-fade-in">
+              <h2 className="text-4xl md:text-5xl font-black text-foreground mb-6">
+                Our Ethical Promise
+              </h2>
+              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+                Performance with principles. We never compromise values for ROI. Donor trust is sacred—we build
+                relationships that last beyond Election Day.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {[
+                {
+                  icon: Shield,
+                  title: "Transparent Practices",
+                  description: "No hidden fees, no misleading tactics. Complete transparency in pricing and strategy.",
+                },
+                {
+                  icon: Heart,
+                  title: "Donor Respect",
+                  description: "We honor unsubscribe requests immediately and segment messages to prevent donor fatigue.",
+                },
+                {
+                  icon: CheckCircle2,
+                  title: "FEC Compliance",
+                  description: "Guaranteed compliance with all FEC regulations and fundraising best practices.",
+                },
+                {
+                  icon: Lock,
+                  title: "Privacy First",
+                  description: "Donor data is protected and never shared without explicit consent.",
+                },
+                {
+                  icon: TrendingUp,
+                  title: "Sustainable Growth",
+                  description: "Building long-term donor relationships, not burning out supporters for quick gains.",
+                },
+                {
+                  icon: Users,
+                  title: "Values Alignment",
+                  description: "We only grow campaigns we believe in. If values don't align, we'll be honest about it.",
+                },
+              ].map((item, index) => (
+                <Card
+                  key={index}
+                  className="hover-lift animate-fade-in"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="bg-accent/10 text-accent p-3 rounded-lg flex-shrink-0">
+                        <item.icon className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-foreground mb-2">{item.title}</h3>
+                        <p className="text-muted-foreground">{item.description}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         </div>
       </section>
