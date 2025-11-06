@@ -11,7 +11,7 @@ import dataDashboard from "@/assets/data-dashboard.jpg";
 
 const Index = () => {
   const metrics = [
-    { value: 947, label: "Average ROI %", prefix: "", suffix: "%" },
+    { value: 400, label: "Average ROI %", prefix: "", suffix: "%" },
     { value: 12000, label: "Donors Acquired", prefix: "", suffix: "+" },
     { value: 89, label: "Campaign Win Rate", prefix: "", suffix: "%" },
     { value: 3.2, label: "Million Raised", prefix: "$", suffix: "M" },
