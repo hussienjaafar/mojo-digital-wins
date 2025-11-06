@@ -3,81 +3,52 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Users, DollarSign, Target } from "lucide-react";
 import { Link } from "react-router-dom";
+import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
 import heroImage from "@/assets/sms-mockup.jpg";
+import unityJusticeImage from "@/assets/unity-justice-fund.png";
 
 const CaseStudies = () => {
   const [activeFilter, setActiveFilter] = useState("All");
 
   const caseStudies = [
     {
-      title: "Rashid for Congress",
+      title: "Unity & Justice Fund",
+      category: "Organization",
+      stat: "947% ROI",
+      description: "Generated $45K in 48 hours with high-urgency fundraising message and personal storytelling. Achieved exceptional ROI through targeted SMS campaigns.",
+      metrics: [
+        { icon: TrendingUp, label: "947% ROI", value: "947%" },
+        { icon: Users, label: "490 New Donors", value: "490" },
+        { icon: DollarSign, label: "$144.60 Avg", value: "$144.60" },
+      ],
+      image: unityJusticeImage,
+    },
+    {
+      title: "Rashid for Illinois",
       category: "Federal",
       stat: "415% ROI",
-      description: "Scaled a grassroots campaign from 5K donors to 180K+ through targeted digital acquisition and conversion-optimized email program.",
+      description: "Scaled grassroots campaign through targeted digital acquisition and conversion-optimized email program, adding 875 new donors in just 2 weeks.",
       metrics: [
-        { icon: DollarSign, label: "$2.3M Raised", value: "2.3M" },
-        { icon: Users, label: "180K Donors", value: "180K" },
         { icon: TrendingUp, label: "415% ROI", value: "415%" },
+        { icon: Users, label: "875 New Donors", value: "875" },
+        { icon: Target, label: "2 Week Sprint", value: "2 weeks" },
       ],
     },
     {
-      title: "State Senate District 14",
+      title: "Nasser for Michigan",
       category: "State",
-      stat: "87% Open Rate",
-      description: "Built and executed an SMS-first strategy that mobilized volunteers and drove day-of turnout in a competitive swing district.",
+      stat: "325% ROI",
+      description: "Delivered strong ROI with high average donation through compelling narrative-driven email strategy and targeted digital advertising.",
       metrics: [
-        { icon: Target, label: "87% Open Rate", value: "87%" },
-        { icon: Users, label: "12K Volunteers", value: "12K" },
-        { icon: TrendingUp, label: "14pt Margin", value: "+14pts" },
-      ],
-    },
-    {
-      title: "Ballot Initiative - Prop 22",
-      category: "Issue Campaign",
-      stat: "$4.2M Raised",
-      description: "Led digital strategy for progressive ballot measure, building coalition support and driving small-dollar fundraising at scale.",
-      metrics: [
-        { icon: DollarSign, label: "$4.2M Raised", value: "4.2M" },
-        { icon: Users, label: "320K Supporters", value: "320K" },
-        { icon: TrendingUp, label: "62% Yes Vote", value: "62%" },
-      ],
-    },
-    {
-      title: "City Council At-Large",
-      category: "Local",
-      stat: "2,400% Audience Growth",
-      description: "Helped first-time candidate break through with compelling social content and targeted digital advertising.",
-      metrics: [
-        { icon: Target, label: "2.4M Impressions", value: "2.4M" },
-        { icon: Users, label: "24x Audience", value: "2400%" },
-        { icon: TrendingUp, label: "Won by 8pts", value: "+8pts" },
-      ],
-    },
-    {
-      title: "Progressive PAC - 2024 Cycle",
-      category: "Organization",
-      stat: "$12M+ Raised",
-      description: "Full-stack digital program across email, SMS, and paid media supporting 40+ progressive candidates nationwide.",
-      metrics: [
-        { icon: DollarSign, label: "$12M+ Raised", value: "12M" },
-        { icon: Target, label: "40+ Campaigns", value: "40+" },
-        { icon: TrendingUp, label: "78% Win Rate", value: "78%" },
-      ],
-    },
-    {
-      title: "County Commissioner Race",
-      category: "Local",
-      stat: "340% Email Revenue Growth",
-      description: "Transformed underperforming email program with message testing, segmentation, and conversion optimization.",
-      metrics: [
-        { icon: DollarSign, label: "$480K Raised", value: "480K" },
-        { icon: TrendingUp, label: "340% Growth", value: "340%" },
-        { icon: Users, label: "35K Supporters", value: "35K" },
+        { icon: TrendingUp, label: "325% ROI", value: "325%" },
+        { icon: DollarSign, label: "$129.56 Avg", value: "$129.56" },
+        { icon: Users, label: "Sustained Growth", value: "Growth" },
       ],
     },
   ];
 
-  const filters = ["All", "Federal", "State", "Local", "Issue Campaign", "Organization"];
+  const filters = ["All", "Federal", "State", "Organization"];
 
   const filteredCaseStudies = activeFilter === "All" 
     ? caseStudies 
@@ -85,6 +56,7 @@ const CaseStudies = () => {
 
   return (
     <div className="min-h-screen">
+      <Navigation />
       {/* Hero Section */}
       <section className="relative pt-28 md:pt-32 pb-20 md:pb-32 overflow-hidden">
         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroImage})` }} />
@@ -125,7 +97,16 @@ const CaseStudies = () => {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
             {filteredCaseStudies.map((study, index) => (
-              <Card key={index} className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
+              <Card key={index} className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm overflow-hidden">
+                {study.image && (
+                  <div className="aspect-video w-full overflow-hidden">
+                    <img 
+                      src={study.image} 
+                      alt={`${study.title} campaign visual`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
                 <CardContent className="p-8 space-y-6">
                   <div className="space-y-2">
                     <div className="text-sm font-medium text-accent">{study.category}</div>
@@ -171,6 +152,7 @@ const CaseStudies = () => {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 };

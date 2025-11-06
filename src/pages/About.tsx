@@ -2,11 +2,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Target, Users, TrendingUp, Award, Lightbulb, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
 import heroImage from "@/assets/hero-movement-rally.jpg";
 
 const About = () => {
   return (
     <div className="min-h-screen">
+      <Navigation />
       {/* Hero Section */}
       <section className="relative pt-28 md:pt-32 pb-20 md:pb-32 overflow-hidden">
         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroImage})` }} />
@@ -109,6 +112,7 @@ const About = () => {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 };

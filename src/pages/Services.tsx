@@ -10,11 +10,14 @@ import {
   Zap
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
 import heroImage from "@/assets/data-dashboard.jpg";
 
 const Services = () => {
   return (
     <div className="min-h-screen">
+      <Navigation />
       {/* Hero Section */}
       <section className="relative pt-28 md:pt-32 pb-20 md:pb-32 overflow-hidden">
         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroImage})` }} />
@@ -213,6 +216,7 @@ const Services = () => {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 };
