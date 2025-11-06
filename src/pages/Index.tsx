@@ -557,7 +557,7 @@ const Index = () => {
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
               <h2 className="text-headline mb-4 tracking-wide">
-                The Compounding<br/>Impact Model<sup className="text-2xl md:text-3xl text-accent">™</sup>
+                The Compounding<br/>Impact Model
               </h2>
               <p className="text-lg md:text-xl text-primary-foreground/90 font-medium">
                 A self-sustaining fundraising engine that grows alongside grassroots support
@@ -566,20 +566,19 @@ const Index = () => {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
               {[
-                { step: "01", value: "$5K", label: "Initial Investment", icon: "💰" },
-                { step: "02", value: "200-300%", label: "ROI in 30 Days", icon: "📈" },
-                { step: "03", value: "20%", label: "Reinvestment Rate", icon: "🔄" },
-                { step: "04", value: "$500-1K", label: "Daily Scale", icon: "🚀" },
+                { step: "01", value: "$5K", label: "Initial Investment" },
+                { step: "02", value: "200-300%", label: "ROI in 30 Days" },
+                { step: "03", value: "20%", label: "Reinvestment Rate" },
+                { step: "04", value: "$500-1K", label: "Daily Scale" },
               ].map((item, index) => (
                 <div
                   key={index}
                   className="text-center bg-primary-foreground/10 border-2 border-accent/30 rounded-lg p-8 hover-lift animate-bounce-in backdrop-blur-sm"
                   style={{ animationDelay: `${index * 0.15}s` }}
                 >
-                  <div className="text-4xl mb-3">{item.icon}</div>
-                  <div className="text-sm font-bold text-accent mb-3 uppercase tracking-wider">STEP {item.step}</div>
-                  <div className="font-bebas text-4xl text-primary-foreground mb-2 leading-none">{item.value}</div>
-                  <div className="text-sm text-primary-foreground/80 font-medium uppercase">{item.label}</div>
+                  <div className="text-sm font-bold text-accent mb-4 uppercase tracking-wider">STEP {item.step}</div>
+                  <div className="font-bebas text-5xl text-primary-foreground mb-2 leading-none">{item.value}</div>
+                  <div className="text-sm text-primary-foreground/80 font-medium uppercase tracking-wide">{item.label}</div>
                 </div>
               ))}
             </div>
