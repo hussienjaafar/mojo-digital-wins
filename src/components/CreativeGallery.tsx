@@ -13,13 +13,15 @@ interface Creative {
   description: string;
 }
 
+import unityJusticeImage from "@/assets/unity-justice-fund.png";
+
 // Placeholder data - replace with actual creatives
 const placeholderCreatives: Creative[] = [
   {
     id: "1",
     type: "SMS",
     campaign: "Unity & Justice Fund",
-    image: "/src/assets/sms-mockup.jpg",
+    image: unityJusticeImage,
     result: "Generated $45K in 48 hours",
     description: "High-urgency fundraising message with personal storytelling",
   },

@@ -8,6 +8,7 @@ import { TrendingUp, MessageSquare, Mail, Target, Users, BarChart3, Check, Shiel
 import heroImage from "@/assets/hero-movement.jpg";
 import heroRally from "@/assets/hero-movement-rally.jpg";
 import dataDashboard from "@/assets/data-dashboard.jpg";
+import unityJusticeImage from "@/assets/unity-justice-fund.png";
 
 const Index = () => {
   const metrics = [
@@ -41,6 +42,7 @@ const Index = () => {
       roi: 947,
       avgDonation: 144.60,
       newDonors: 490,
+      image: unityJusticeImage,
     },
     {
       name: "Rashid for Illinois",
@@ -321,7 +323,7 @@ const Index = () => {
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { roi: '947%', campaign: 'Unity & Justice Fund', stat: '+490 new donors', color: 'secondary' },
+              { roi: '947%', campaign: 'Unity & Justice Fund', stat: '+490 new donors', color: 'secondary', image: unityJusticeImage },
               { roi: '415%', campaign: 'Rashid for Illinois', stat: '+875 new donors in 2 weeks', color: 'destructive' },
               { roi: '325%', campaign: 'Nasser for Michigan', stat: '$129.56 avg donation', color: 'accent' },
             ].map((item, index) => (
