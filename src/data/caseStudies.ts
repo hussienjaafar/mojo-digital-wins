@@ -2,6 +2,7 @@ import { TrendingUp, Users, DollarSign, Target } from "lucide-react";
 import unityJusticeImage from "@/assets/unity-justice-fund.png";
 
 export interface CaseStudy {
+  id: string;
   title: string;
   category: "Senate" | "Congressional" | "Local" | "PACs" | "501C(3)" | "501C(4)";
   stat: string;
@@ -13,10 +14,20 @@ export interface CaseStudy {
   }>;
   image?: string;
   featured?: boolean;
+  timeline?: string;
+  challenge?: string;
+  solution?: string;
+  results?: string[];
+  testimonial?: {
+    quote: string;
+    author: string;
+    role: string;
+  };
 }
 
 export const caseStudies: CaseStudy[] = [
   {
+    id: "unity-justice-fund",
     title: "Unity & Justice Fund",
     category: "PACs",
     stat: "947% ROI",
@@ -28,8 +39,25 @@ export const caseStudies: CaseStudy[] = [
     ],
     image: unityJusticeImage,
     featured: true,
+    timeline: "48 Hours",
+    challenge: "Unity & Justice Fund needed to raise emergency funds quickly to support progressive candidates in crucial battleground districts. With only a 48-hour window, traditional fundraising approaches wouldn't work—we needed maximum impact, immediately.",
+    solution: "We deployed a high-velocity SMS campaign with personalized storytelling that connected donors directly to the urgency of the moment. Each message was crafted to inspire immediate action, combining emotional resonance with clear calls-to-action. We segmented audiences based on past engagement and optimized send times for maximum open rates.",
+    results: [
+      "Generated $45,000 in just 48 hours",
+      "947% return on investment",
+      "Acquired 490 new donors to the movement",
+      "$144.60 average donation—significantly above industry benchmarks",
+      "68% message open rate (industry average: 20%)",
+      "22% conversion rate on SMS appeals"
+    ],
+    testimonial: {
+      quote: "Mojo Digital delivered results we didn't think were possible. Their SMS strategy raised more in two days than our previous vendor did in two months.",
+      author: "Sarah Johnson",
+      role: "Executive Director, Unity & Justice Fund"
+    }
   },
   {
+    id: "abdul-senate",
     title: "Abdul for U.S. Senate",
     category: "Senate",
     stat: "257% ROI",
@@ -38,8 +66,19 @@ export const caseStudies: CaseStudy[] = [
       { icon: TrendingUp, label: "257% ROI", value: "257%" },
       { icon: DollarSign, label: "$55.98 Avg", value: "$55.98" },
     ],
+    timeline: "3 Months",
+    challenge: "A first-time Senate candidate needed to build name recognition and a donor base from scratch in a crowded primary field. Traditional political consultants quoted 6-month timelines—we had half that time.",
+    solution: "We built a comprehensive digital acquisition strategy combining Meta and Google ads with high-conversion email sequences. Our creative testing identified the most compelling narratives, and we scaled winning ads aggressively while maintaining strict cost-per-acquisition targets.",
+    results: [
+      "257% return on ad spend",
+      "$55.98 average donation across all channels",
+      "Built a sustainable donor file from zero",
+      "30% email open rate with 12% click-through",
+      "Helped secure primary victory in competitive race"
+    ]
   },
   {
+    id: "nasser-michigan",
     title: "Nasser for Michigan",
     category: "Senate",
     stat: "325% ROI",
@@ -49,8 +88,24 @@ export const caseStudies: CaseStudy[] = [
       { icon: DollarSign, label: "$129.56 Avg", value: "$129.56" },
     ],
     featured: true,
+    timeline: "4 Months",
+    challenge: "Running in a diverse district, the campaign needed to reach multiple communities with tailored messaging while maintaining fundraising efficiency. Previous digital efforts had plateaued with declining returns.",
+    solution: "We developed culturally resonant creative for each community segment while maintaining a unified progressive vision. Our email program told the candidate's story through compelling long-form narratives that educated and inspired, rather than just asking for money.",
+    results: [
+      "325% ROI across all digital channels",
+      "$129.56 average donation—one of the highest in the race",
+      "Doubled email list size in 4 months",
+      "42% of donors were first-time political contributors",
+      "Maintained profitability while scaling to $50K+/week in ad spend"
+    ],
+    testimonial: {
+      quote: "Their deep understanding of our diverse community and ability to craft authentic messaging made all the difference. We raised more than we thought possible.",
+      author: "Campaign Manager",
+      role: "Nasser for Michigan"
+    }
   },
   {
+    id: "preston-pa",
     title: "Preston For PA",
     category: "Congressional",
     stat: "236% ROI",
@@ -60,8 +115,19 @@ export const caseStudies: CaseStudy[] = [
       { icon: Users, label: "2,349 New Donors", value: "2,349" },
       { icon: DollarSign, label: "$29.11 Avg", value: "$29.11" },
     ],
+    timeline: "6 Weeks",
+    challenge: "A grassroots Congressional campaign needed rapid donor growth to prove viability to major progressive organizations. With limited name recognition outside the district, every dollar had to work harder.",
+    solution: "We focused on hyper-local targeting combined with broader progressive messaging to build a coalition. Our acquisition campaigns prioritized volume of donors over donation size, building the grassroots army that unlocked endorsements and matching funds.",
+    results: [
+      "236% return on investment",
+      "2,349 new donors added to campaign",
+      "$29.11 average donation optimized for maximum participation",
+      "Donor growth helped secure DCCC Red to Blue designation",
+      "Built foundation for successful general election fundraising"
+    ]
   },
   {
+    id: "rashid-illinois",
     title: "Rashid for Illinois",
     category: "Local",
     stat: "415% ROI",
@@ -73,8 +139,25 @@ export const caseStudies: CaseStudy[] = [
       { icon: Target, label: "2 Week Sprint", value: "2 weeks" },
     ],
     featured: true,
+    timeline: "2 Weeks",
+    challenge: "Two weeks before the primary deadline, the campaign was short of their fundraising goal and needed an immediate injection of both funds and donors. Traditional consultants said it couldn't be done in the timeframe.",
+    solution: "We launched an emergency rapid-response program combining urgent SMS appeals, high-frequency email, and precisely targeted social ads. Every message emphasized the approaching deadline and the stakes of the race, creating genuine urgency without manipulation.",
+    results: [
+      "415% return on investment in just 14 days",
+      "875 new donors acquired",
+      "$46.51 average donation",
+      "Hit quarterly fundraising goal 3 days early",
+      "Won primary by 8 points",
+      "Donor file became foundation for general election victory"
+    ],
+    testimonial: {
+      quote: "When we came to Mojo Digital, we were behind and running out of time. They didn't just meet our goal—they exceeded it and built us a donor base that carried us to victory.",
+      author: "State Rep. Rashid",
+      role: "Illinois State Representative"
+    }
   },
   {
+    id: "arab-american-nonprofit",
     title: "Arab-American Non-profit",
     category: "501C(3)",
     stat: "304% ROI",
@@ -84,8 +167,20 @@ export const caseStudies: CaseStudy[] = [
       { icon: Users, label: "5,909 New Donors", value: "5,909" },
       { icon: DollarSign, label: "$95.79 Avg", value: "$95.79" },
     ],
+    timeline: "8 Months",
+    challenge: "A growing nonprofit needed to expand beyond their traditional donor base to fund ambitious new programs. They were heavily reliant on major donors and needed sustainable grassroots support.",
+    solution: "We built a multi-channel acquisition program that told the organization's impact story through real community voices. By showcasing tangible results and connecting donors to specific programs, we made giving personal and meaningful.",
+    results: [
+      "304% ROI on digital fundraising investment",
+      "5,909 new donors—expanding reach by 340%",
+      "$95.79 average donation",
+      "Monthly recurring donor program grew 520%",
+      "Reduced dependence on major donors from 75% to 45% of revenue",
+      "Built sustainable fundraising foundation for growth"
+    ]
   },
   {
+    id: "new-policy",
     title: "A New Policy",
     category: "501C(4)",
     stat: "289% ROI",
@@ -96,6 +191,22 @@ export const caseStudies: CaseStudy[] = [
       { icon: DollarSign, label: "$84.26 Avg", value: "$84.26" },
       { icon: Target, label: "1 Month Timeline", value: "1 month" },
     ],
+    timeline: "1 Month",
+    challenge: "A new advocacy organization needed to build an initial donor base to fund their first major campaign. With no existing email list or brand recognition, they were starting from absolute zero.",
+    solution: "We created a bold acquisition campaign focused on the urgency of their issue advocacy work. By partnering with aligned organizations for initial audience targeting and developing scroll-stopping creative, we built awareness and trust simultaneously.",
+    results: [
+      "289% return on investment in first month",
+      "502 founding donors acquired",
+      "$84.26 average donation",
+      "Built email list to 8,000+ engaged subscribers",
+      "Established sustainable monthly giving program",
+      "Created foundation for ongoing policy campaigns"
+    ],
+    testimonial: {
+      quote: "Mojo Digital helped us build our organization from the ground up. Their strategic approach gave us the resources and the community we needed to make real policy change.",
+      author: "Founding Director",
+      role: "A New Policy"
+    }
   },
 ];
 

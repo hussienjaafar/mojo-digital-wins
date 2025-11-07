@@ -300,11 +300,11 @@ const Index = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {featuredCaseStudies.map((study, index) => (
+            {featuredCaseStudies.map((study) => (
+              <Link key={study.id} to={`/case-studies/${study.id}`} className="block">
               <Card
-                key={index}
-                className="bg-card border-2 border-border hover:border-secondary overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-2xl work-preview-card"
-                style={{ animationDelay: `${index * 150}ms` }}
+                className="bg-card border-2 border-border hover:border-secondary overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-2xl work-preview-card h-full"
+                style={{ animationDelay: `${featuredCaseStudies.indexOf(study) * 150}ms` }}
               >
                 <CardContent className="p-0">
                   {study.image && (
@@ -339,6 +339,7 @@ const Index = () => {
                   </div>
                 </CardContent>
               </Card>
+              </Link>
             ))}
           </div>
 

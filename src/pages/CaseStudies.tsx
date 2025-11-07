@@ -58,8 +58,9 @@ const CaseStudies = () => {
       <section className="py-20 md:py-32 bg-background">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-            {filteredCaseStudies.map((study, index) => (
-              <Card key={index} className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm overflow-hidden">
+            {filteredCaseStudies.map((study) => (
+              <Link key={study.id} to={`/case-studies/${study.id}`} className="block">
+                <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm overflow-hidden h-full">
                 {study.image && (
                   <div className="aspect-video w-full overflow-hidden">
                     <img 
@@ -91,6 +92,7 @@ const CaseStudies = () => {
                   </div>
                 </CardContent>
               </Card>
+              </Link>
             ))}
           </div>
         </div>
