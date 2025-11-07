@@ -181,7 +181,7 @@ const Index = () => {
               {/* Campaign Logo Carousel */}
               <div className="overflow-hidden relative mt-4">
                 <div className="flex gap-4 animate-scroll-left">
-                  {['Unity & Justice Fund', 'Rashid for Illinois', 'Nasser for Michigan', 'Progressive Victory', 'Movement Forward', 'People Power PAC'].map((campaign, i) => (
+                  {['Unity & Justice Fund', 'Abdul for U.S. Senate', 'Nasser for Michigan', 'Preston For PA', 'Rashid for Illinois', 'Arab-American Non-profit', 'A New Policy'].map((campaign, i) => (
                     <div 
                       key={i} 
                       className="flex-shrink-0 bg-primary-foreground/5 backdrop-blur-sm px-6 py-3 rounded-lg border border-primary-foreground/10 text-primary-foreground/60 text-sm font-semibold uppercase tracking-wide whitespace-nowrap"
@@ -190,7 +190,7 @@ const Index = () => {
                     </div>
                   ))}
                   {/* Duplicate for seamless loop */}
-                  {['Unity & Justice Fund', 'Rashid for Illinois', 'Nasser for Michigan', 'Progressive Victory', 'Movement Forward', 'People Power PAC'].map((campaign, i) => (
+                  {['Unity & Justice Fund', 'Abdul for U.S. Senate', 'Nasser for Michigan', 'Preston For PA', 'Rashid for Illinois', 'Arab-American Non-profit', 'A New Policy'].map((campaign, i) => (
                     <div 
                       key={`dup-${i}`} 
                       className="flex-shrink-0 bg-primary-foreground/5 backdrop-blur-sm px-6 py-3 rounded-lg border border-primary-foreground/10 text-primary-foreground/60 text-sm font-semibold uppercase tracking-wide whitespace-nowrap"
