@@ -175,7 +175,7 @@ const Index = () => {
               }}
             >
               <p className="text-sm text-primary-foreground/75 font-medium tracking-wide mb-6">
-                Trusted by campaigns in <span className="text-primary-foreground font-semibold">Michigan</span>, <span className="text-primary-foreground font-semibold">Illinois</span>, <span className="text-primary-foreground font-semibold">Pennsylvania</span>, and nationwide.
+                Trusted by progressive organizations in <span className="text-primary-foreground font-semibold">Michigan</span>, <span className="text-primary-foreground font-semibold">Illinois</span>, <span className="text-primary-foreground font-semibold">Pennsylvania</span>, and nationwide.
               </p>
               
               {/* Campaign Logo Carousel */}
@@ -232,10 +232,10 @@ const Index = () => {
         <div className="max-w-[1280px] mx-auto px-6">
           <div className="text-center mb-16 md:mb-20">
             <h2 className="font-bebas text-4xl md:text-5xl lg:text-6xl text-foreground mb-4 uppercase tracking-wide">
-              How We Win for Progressives
+              How We Drive Progressive Impact
             </h2>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              A proven system that turns grassroots movements into electoral victories
+              A proven system that turns grassroots movements into victories for progressive causes
             </p>
           </div>
 
@@ -295,7 +295,7 @@ const Index = () => {
               Proven Results That Win
             </h2>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Real campaigns. Real metrics. Real victories.
+              Real organizations. Real metrics. Real victories.
             </p>
           </div>
 

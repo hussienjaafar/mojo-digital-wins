@@ -28,7 +28,7 @@ const Contact = () => {
               Let's Win Together
             </h1>
             <p className="text-primary-foreground/90 leading-relaxed" style={{ fontSize: 'clamp(1.125rem, 2vw, 1.25rem)' }}>
-              Ready to build a winning campaign? Tell us about your race, and we'll show you how we can help.
+              Ready to make progressive impact? Tell us about your organization and goals, and we'll show you how we can help.
             </p>
           </div>
         </div>
@@ -45,7 +45,7 @@ const Contact = () => {
                   Get in Touch
                 </h2>
                 <p className="text-lg text-foreground/80 leading-relaxed">
-                  Whether you're launching a campaign or looking to scale your existing program, we're here to help. Fill out the form and we'll get back to you within 24 hours.
+                  Whether you're launching an initiative or looking to scale your existing program, we're here to help. Fill out the form and we'll get back to you within 24 hours.
                 </p>
               </div>
 
@@ -90,12 +90,12 @@ const Contact = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="race-type">Race Type</Label>
-                    <Input id="race-type" placeholder="Federal, State, Local, etc." className="border-border/50 focus:border-secondary transition-colors" />
+                    <Label htmlFor="race-type">Organization Type</Label>
+                    <Input id="race-type" placeholder="Campaign, PAC, 501(c)(3), 501(c)(4), etc." className="border-border/50 focus:border-secondary transition-colors" />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="message">Tell Us About Your Campaign *</Label>
+                    <Label htmlFor="message">Tell Us About Your Organization *</Label>
                     <Textarea id="message" placeholder="What are your goals? What help do you need?" required rows={5} className="border-border/50 focus:border-secondary transition-colors resize-none" />
                   </div>
 
@@ -119,9 +119,9 @@ const Contact = () => {
             
             <div className="space-y-6">
               {[
-                { question: "What size campaigns do you work with?", answer: "We work with campaigns at every level—from city council to federal races. If you're committed to progressive values and ready to win, we want to work with you." },
-                { question: "How quickly can we get started?", answer: "Most campaigns can launch within 1-2 weeks. We move fast because we know campaigns can't wait." },
-                { question: "What's your pricing model?", answer: "We offer flexible pricing based on campaign size and scope. We'll discuss options on our first call to find what works for your budget." },
+                { question: "What types of organizations do you work with?", answer: "We work with progressive organizations of all types and sizes—political campaigns, PACs, 501(c)(3)s, and 501(c)(4)s. From local races to national advocacy movements, if you're committed to progressive values and ready to make impact, we want to work with you." },
+                { question: "How quickly can we get started?", answer: "Most projects can launch within 1-2 weeks. We move fast because we know you can't wait." },
+                { question: "What's your pricing model?", answer: "We offer flexible pricing based on your organization's size and scope. We'll discuss options on our first call to find what works for your budget." },
                 { question: "Do you only work with Democrats?", answer: "We work exclusively with progressive candidates and causes aligned with our values—racial justice, economic equality, climate action, and democracy reform." }
               ].map((faq, index) => (
                 <Card key={index} className="shadow-md hover:shadow-lg transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">

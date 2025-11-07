@@ -35,9 +35,9 @@ const About = () => {
               <div className="space-y-6">
                 <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>Our Story</h2>
                 <div className="space-y-4 text-lg text-foreground/80 leading-relaxed">
-                  <p>Mojo Digital was born from the 2016 campaign trail, where we saw firsthand how grassroots movements could be amplified through smart digital strategy.</p>
-                  <p>Since then, we've worked with dozens of progressive campaigns and causes, helping them raise millions in small-dollar donations and mobilize thousands of volunteers.</p>
-                  <p>We understand that every campaign dollar matters, every volunteer is precious, and every message needs to break through the noise to inspire action.</p>
+                  <p>Mojo Digital was born in the fires of 2016, working with campaigns and movements where we saw firsthand how grassroots energy could be amplified through smart digital strategy.</p>
+                  <p>Since then, we've worked with dozens of progressive campaigns and causes, helping them raise millions in small-dollar donations and mobilize thousands of supporters.</p>
+                  <p>We understand that every dollar matters, every volunteer is precious, and every message needs to break through the noise to inspire action.</p>
                 </div>
               </div>
               <div className="aspect-square rounded-xl bg-gradient-to-br from-secondary to-accent shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]" />
@@ -52,7 +52,7 @@ const About = () => {
           <h2 className="font-bebas text-primary text-center mb-16 leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>What Drives Us</h2>
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {[
-              { icon: Target, title: "Results First", description: "We measure success in donations raised, volunteers recruited, and votes earned—not vanity metrics." },
+              { icon: Target, title: "Results First", description: "We measure success in funds raised, supporters mobilized, and battles won—not vanity metrics." },
               { icon: Users, title: "Movement Minded", description: "We understand progressive politics because we live it. Your values are our values." },
               { icon: TrendingUp, title: "Data Obsessed", description: "Every decision is backed by data. We test, optimize, and iterate to maximize your impact." }
             ].map((value, index) => (
@@ -106,9 +106,9 @@ const About = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center space-y-8 text-white">
-            <h2 className="font-bebas leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>Ready to Win Together?</h2>
-            <p className="text-lg md:text-xl leading-relaxed">Let's build a campaign that breaks through, raises more, and wins.</p>
-            <Link to="/contact"><Button size="lg" variant="secondary" className="text-lg px-8 shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all duration-300">Start Your Campaign</Button></Link>
+            <h2 className="font-bebas leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>Ready to Make Impact Together?</h2>
+            <p className="text-lg md:text-xl leading-relaxed">Let's build a movement that breaks through, raises more, and wins.</p>
+            <Link to="/contact"><Button size="lg" variant="secondary" className="text-lg px-8 shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all duration-300">Start Your Project</Button></Link>
           </div>
         </div>
       </section>

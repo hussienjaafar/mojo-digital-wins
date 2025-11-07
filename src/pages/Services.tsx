@@ -26,10 +26,10 @@ const Services = () => {
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-[680px] space-y-6">
             <h1 className="font-bebas text-primary-foreground leading-[0.95]" style={{ fontSize: 'clamp(2.5rem, 6vw, 5.5rem)', letterSpacing: '0.02em' }}>
-              Services That Win Elections
+              Services That Drive Progressive Wins
             </h1>
             <p className="text-primary-foreground/90 leading-relaxed" style={{ fontSize: 'clamp(1.125rem, 2vw, 1.25rem)' }}>
-              From digital ads to SMS outreach, we offer the full stack of campaign services—all optimized for one thing: winning.
+              From digital ads to SMS outreach, we offer the full stack of services for campaigns, PACs, and nonprofits—all optimized for achieving your goals.
             </p>
           </div>
         </div>
@@ -50,11 +50,11 @@ const Services = () => {
                     Digital Advertising
                   </h3>
                   <p className="text-lg text-muted-foreground leading-relaxed">
-                    Precision-targeted Facebook, Instagram, and Google ads that reach the right voters at the right time. We handle everything from creative development to audience targeting to continuous optimization.
+                    Precision-targeted Facebook, Instagram, and Google ads that reach the right people at the right time. We handle everything from creative development to audience targeting to continuous optimization.
                   </p>
                   <ul className="space-y-3">
                     {[
-                      "Voter file integration & custom audiences",
+                      "Target audience integration & voter file matching",
                       "A/B testing every element for maximum performance",
                       "Daily optimization based on real-time data",
                       "Transparent reporting on spend and results"
@@ -181,7 +181,7 @@ const Services = () => {
 
             <div className="grid md:grid-cols-3 gap-8">
               {[
-                { step: "01", title: "Discovery & Strategy", description: "We learn your campaign inside and out, then build a data-driven plan to win." },
+                { step: "01", title: "Discovery & Strategy", description: "We learn your organization inside and out, then build a data-driven plan to win." },
                 { step: "02", title: "Launch & Test", description: "Quick deployment of campaigns with rigorous A/B testing from day one." },
                 { step: "03", title: "Optimize & Scale", description: "Continuous improvement based on real-time data. We double down on what works." }
               ].map((process, index) => (
@@ -203,7 +203,7 @@ const Services = () => {
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center space-y-8 text-white">
             <h2 className="font-bebas leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
-              Ready to Build Your Winning Campaign?
+              Ready to Build Your Winning Strategy?
             </h2>
             <p className="text-lg md:text-xl leading-relaxed">
               Let's talk about your goals and how we can help you achieve them.

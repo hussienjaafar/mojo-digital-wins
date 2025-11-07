@@ -27,10 +27,10 @@ const CaseStudies = () => {
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-[680px] space-y-6">
             <h1 className="font-bebas text-primary-foreground leading-[0.95]" style={{ fontSize: 'clamp(2.5rem, 6vw, 5.5rem)', letterSpacing: '0.02em' }}>
-              Campaigns That Won
+              Progressive Wins
             </h1>
             <p className="text-primary-foreground/90 leading-relaxed" style={{ fontSize: 'clamp(1.125rem, 2vw, 1.25rem)' }}>
-              Real results from real campaigns. See how we've helped progressive candidates and causes break through, raise millions, and win.
+              Real results from real organizations. See how we've helped progressive campaigns, PACs, and causes break through, raise millions, and win.
             </p>
           </div>
         </div>
@@ -107,10 +107,10 @@ const CaseStudies = () => {
             <h2 className="font-bebas leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
               Ready to Be Our Next Success Story?
             </h2>
-            <p className="text-lg md:text-xl leading-relaxed">Let's build a winning campaign together.</p>
+            <p className="text-lg md:text-xl leading-relaxed">Let's build a winning strategy together.</p>
             <Link to="/contact">
               <Button size="lg" variant="secondary" className="text-lg px-8 shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all duration-300">
-                Start Your Campaign
+                Get Started
               </Button>
             </Link>
           </div>

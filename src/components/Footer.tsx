@@ -19,7 +19,7 @@ const Footer = () => {
               MOJO<span className="text-accent">.</span>
             </h3>
             <p className="text-primary-foreground/80 mb-6">
-              Turning grassroots energy into unstoppable campaign wins.
+              Turning grassroots energy into unstoppable progressive wins.
             </p>
             <div className="flex space-x-4">
               <a
