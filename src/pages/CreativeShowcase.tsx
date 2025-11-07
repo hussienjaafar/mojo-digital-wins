@@ -33,50 +33,16 @@ const CreativeShowcase = () => {
         </div>
       </section>
 
-      {/* Philosophy Section */}
+      {/* Video Gallery */}
       <section className="py-20 md:py-32 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto space-y-12">
-            <div className="text-center space-y-4">
-              <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
-                Our Creative Philosophy
-              </h2>
-              <p className="text-lg md:text-xl text-muted-foreground">
-                Every ad, email, and piece of content is built with one goal: results.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-8">
-              {[
-                { icon: Target, title: "Message-Market Fit", description: "We don't guess. We test messaging with your audience until we find what resonates and drives action." },
-                { icon: TrendingUp, title: "Continuous Testing", description: "Every creative piece is A/B tested. We optimize relentlessly to improve performance week over week." },
-                { icon: Zap, title: "Urgency & Emotion", description: "Great political creative taps into urgency and emotion. We create work that moves people to act—now." }
-              ].map((principle, index) => (
-                <Card key={index} className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
-                  <CardContent className="p-8 text-center space-y-4">
-                    <div className="w-16 h-16 mx-auto bg-gradient-to-br from-secondary to-accent rounded-full flex items-center justify-center shadow-md">
-                      <principle.icon className="h-8 w-8 text-white drop-shadow-sm" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-foreground">{principle.title}</h3>
-                    <p className="text-muted-foreground leading-relaxed">{principle.description}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Creative Gallery */}
-      <section className="py-20 md:py-32 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto space-y-12">
             <div className="text-center space-y-4">
               <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
-                Featured Creative Work
+                Our Work
               </h2>
               <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
-                From digital ads to email headers to SMS creative—here's a look at work that helped campaigns break through and win.
+                Creative that moves people to act and drives real results.
               </p>
             </div>
 
