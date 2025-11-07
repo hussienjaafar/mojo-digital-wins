@@ -136,9 +136,9 @@ const Index = () => {
                 </div>
                 <div>
                   <div className="font-bebas text-2xl md:text-3xl text-primary-foreground leading-none">
-                    <StatCounter end={947} suffix="%" duration={700} />
+                    <StatCounter end={425} suffix="%" duration={700} />
                   </div>
-                  <div className="text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">ROI</div>
+                  <div className="text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">Average ROI</div>
                 </div>
               </div>
               
@@ -148,9 +148,9 @@ const Index = () => {
                 </div>
                 <div>
                   <div className="font-bebas text-2xl md:text-3xl text-primary-foreground leading-none">
-                    +<StatCounter end={5909} duration={700} />
+                    $<StatCounter end={10} duration={700} />M+
                   </div>
-                  <div className="text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">Donors</div>
+                  <div className="text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">Raised</div>
                 </div>
               </div>
               
@@ -160,9 +160,9 @@ const Index = () => {
                 </div>
                 <div>
                   <div className="font-bebas text-2xl md:text-3xl text-primary-foreground leading-none">
-                    <StatCounter end={2} duration={700} /> Weeks
+                    Proprietary
                   </div>
-                  <div className="text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">Turnaround</div>
+                  <div className="text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">Donor Data</div>
                 </div>
               </div>
             </div>
