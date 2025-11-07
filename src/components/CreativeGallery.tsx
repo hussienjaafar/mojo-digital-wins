@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { caseStudies } from "@/data/caseStudies";
 
 interface Video {
   id: string;
@@ -7,20 +8,23 @@ interface Video {
   description: string;
 }
 
-// Placeholder data - will be updated with actual Vimeo links
-const videos: Video[] = [
-  {
-    id: "1",
-    title: "Campaign Video 1",
-    vimeoUrl: "https://vimeo.com/YOUR_VIDEO_ID_HERE",
-    description: "Replace with actual Vimeo link",
-  },
-  // Add more videos here once you have the Vimeo links
-];
+// Filter case studies that have videos and transform them for the gallery
+const videos: Video[] = caseStudies
+  .filter((study) => study.video)
+  .map((study) => ({
+    id: study.id,
+    title: study.title,
+    vimeoUrl: study.video!,
+    description: study.description,
+  }));
 
 const getVimeoId = (url: string) => {
-  const match = url.match(/vimeo\.com\/(\d+)/);
-  return match ? match[1] : null;
+  // Handle both player.vimeo.com and vimeo.com formats
+  const playerMatch = url.match(/player\.vimeo\.com\/video\/(\d+)/);
+  if (playerMatch) return playerMatch[1];
+  
+  const directMatch = url.match(/vimeo\.com\/(\d+)/);
+  return directMatch ? directMatch[1] : null;
 };
 
 export const CreativeGallery = () => {
