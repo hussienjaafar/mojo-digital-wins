@@ -594,58 +594,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Quick Case Studies */}
-      <section className="py-16 md:py-24 bg-background relative">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
-            <h2 className="text-headline text-foreground mb-4 md:mb-6 tracking-wide">
-              Real Campaigns.<br/>Real Results.
-            </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
-              Our track record speaks for itself—consistent performance that wins elections.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
-            {caseStudies.map((study, index) => (
-              <Card 
-                key={index} 
-                className="bg-gradient-to-br from-card to-muted border-2 border-secondary/20 hover:border-secondary brutal-shadow animate-slide-up group overflow-hidden" 
-                style={{ animationDelay: `${index * 0.15}s` }}
-              >
-                <CardContent className="p-8 relative">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-destructive/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
-                  <h3 className="font-bebas text-3xl mb-6 text-foreground uppercase tracking-wide relative z-10">{study.name}</h3>
-                  <div className="space-y-4 relative z-10">
-                    <div className="bg-secondary/10 p-4 rounded-lg border-l-4 border-secondary">
-                      <div className="font-bebas text-5xl text-secondary leading-none">{study.roi}%</div>
-                      <div className="text-sm text-muted-foreground font-bold uppercase tracking-wide mt-1">Return on Investment</div>
-                    </div>
-                    {study.avgDonation > 0 && (
-                      <div className="bg-accent/10 p-4 rounded-lg">
-                        <div className="font-bebas text-3xl text-foreground leading-none">${study.avgDonation}</div>
-                        <div className="text-sm text-muted-foreground font-bold uppercase tracking-wide mt-1">Average Donation</div>
-                      </div>
-                    )}
-                    {study.newDonors > 0 && (
-                      <div className="bg-destructive/10 p-4 rounded-lg">
-                        <div className="font-bebas text-3xl text-foreground leading-none">+{study.newDonors}</div>
-                        <div className="text-sm text-muted-foreground font-bold uppercase tracking-wide mt-1">New Donors</div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="text-center">
-            <Button variant="movement" size="xl" asChild className="text-lg">
-              <Link to="/case-studies">View All Case Studies</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
 
       {/* Final CTA */}
       <section className="py-28 bg-gradient-to-br from-primary via-destructive to-secondary text-primary-foreground relative overflow-hidden diagonal-top">
