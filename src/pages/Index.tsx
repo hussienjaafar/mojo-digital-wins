@@ -12,10 +12,10 @@ import { featuredCaseStudies } from "@/data/caseStudies";
 
 const Index = () => {
   const metrics = [
-    { value: 400, label: "Average ROI %", prefix: "", suffix: "%" },
+    { value: 425, label: "Average ROI %", prefix: "", suffix: "%" },
     { value: 12000, label: "Donors Acquired", prefix: "", suffix: "+" },
-    { value: 89, label: "Campaign Win Rate", prefix: "", suffix: "%" },
-    { value: 3.2, label: "Million Raised", prefix: "$", suffix: "M" },
+    { value: 500, label: "Avg New Donors (First Month)", prefix: "", suffix: "+" },
+    { value: 10, label: "Million Raised", prefix: "$", suffix: "M+" },
   ];
 
   const services = [
