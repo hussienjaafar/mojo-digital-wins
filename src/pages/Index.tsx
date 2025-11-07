@@ -8,7 +8,7 @@ import { TrendingUp, MessageSquare, Mail, Target, Users, BarChart3, Check, Shiel
 import heroImage from "@/assets/hero-movement.jpg";
 import heroRally from "@/assets/hero-movement-rally.jpg";
 import dataDashboard from "@/assets/data-dashboard.jpg";
-import unityJusticeImage from "@/assets/unity-justice-fund.png";
+import { featuredCaseStudies } from "@/data/caseStudies";
 
 const Index = () => {
   const metrics = [
@@ -33,28 +33,6 @@ const Index = () => {
       icon: Mail,
       title: "Email Campaigns",
       description: "Narrative-driven email strategy that grows your donor base at scale.",
-    },
-  ];
-
-  const caseStudies = [
-    {
-      name: "Unity & Justice Fund",
-      roi: 947,
-      avgDonation: 144.60,
-      newDonors: 490,
-      image: unityJusticeImage,
-    },
-    {
-      name: "Rashid for Illinois",
-      roi: 415,
-      avgDonation: 0,
-      newDonors: 875,
-    },
-    {
-      name: "Nasser for Michigan",
-      roi: 325,
-      avgDonation: 129.56,
-      newDonors: 0,
     },
   ];
 
@@ -322,31 +300,36 @@ const Index = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { roi: '947%', campaign: 'Unity & Justice Fund', stat: '+490 new donors', color: 'secondary', image: unityJusticeImage },
-              { roi: '415%', campaign: 'Rashid for Illinois', stat: '+875 new donors in 2 weeks', color: 'destructive' },
-              { roi: '325%', campaign: 'Nasser for Michigan', stat: '$129.56 avg donation', color: 'accent' },
-            ].map((item, index) => (
+            {featuredCaseStudies.map((study, index) => (
               <Card
                 key={index}
                 className="bg-card border-2 border-border hover:border-secondary overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-2xl work-preview-card"
                 style={{ animationDelay: `${index * 150}ms` }}
               >
                 <CardContent className="p-0">
-                  <div className={`bg-gradient-to-br from-${item.color} to-${item.color}/80 p-8 text-${item.color}-foreground relative overflow-hidden`}>
+                  {study.image && (
+                    <div className="aspect-video w-full overflow-hidden">
+                      <img 
+                        src={study.image} 
+                        alt={`${study.title} campaign visual`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
+                  )}
+                  <div className={`bg-gradient-to-br from-secondary to-secondary/80 p-8 text-secondary-foreground relative overflow-hidden`}>
                     <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300" />
                     <div className="relative z-10">
                       <div className="font-bebas text-6xl md:text-7xl mb-2 leading-none group-hover:scale-110 transition-transform duration-300 origin-left">
-                        {item.roi}
+                        {study.stat.replace(' ROI', '')}
                       </div>
                       <div className="text-sm uppercase tracking-wider opacity-90">ROI</div>
                     </div>
                   </div>
                   <div className="p-6">
                     <h3 className="font-bebas text-2xl mb-2 text-foreground uppercase tracking-wide">
-                      {item.campaign}
+                      {study.title}
                     </h3>
-                    <p className="text-muted-foreground mb-4">{item.stat}</p>
+                    <p className="text-muted-foreground mb-4 line-clamp-2">{study.description}</p>
                     <div className="flex items-center gap-2 text-secondary font-semibold opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
                       View Case Study
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
