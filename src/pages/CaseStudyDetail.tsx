@@ -60,6 +60,26 @@ const CaseStudyDetail = () => {
         </div>
       </section>
 
+      {/* Video Section */}
+      {caseStudy.video && (
+        <section className="py-16 md:py-20 bg-background">
+          <div className="container mx-auto px-4">
+            <div className="max-w-5xl mx-auto">
+              <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                <iframe
+                  src={caseStudy.video}
+                  className="absolute top-0 left-0 w-full h-full rounded-lg shadow-2xl"
+                  frameBorder="0"
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  title={`${caseStudy.title} Video`}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Key Metrics */}
       <section className="py-12 md:py-16 bg-gradient-to-br from-muted via-background to-muted">
         <div className="container mx-auto px-4">

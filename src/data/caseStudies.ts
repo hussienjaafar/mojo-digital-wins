@@ -18,6 +18,7 @@ export interface CaseStudy {
   challenge?: string;
   solution?: string;
   results?: string[];
+  video?: string;
   testimonial?: {
     quote: string;
     author: string;
@@ -40,6 +41,7 @@ export const caseStudies: CaseStudy[] = [
     image: unityJusticeImage,
     featured: true,
     timeline: "48 Hours",
+    video: "https://player.vimeo.com/video/1134692415",
     challenge: "Unity & Justice Fund needed to raise emergency funds quickly to support progressive candidates in crucial battleground districts. With only a 48-hour window, traditional fundraising approaches wouldn't work—we needed maximum impact, immediately.",
     solution: "We deployed a high-velocity SMS campaign with personalized storytelling that connected donors directly to the urgency of the moment. Each message was crafted to inspire immediate action, combining emotional resonance with clear calls-to-action. We segmented audiences based on past engagement and optimized send times for maximum open rates.",
     results: [
