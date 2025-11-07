@@ -30,32 +30,34 @@ export const caseStudies: CaseStudy[] = [
   {
     id: "unity-justice-fund",
     title: "Unity & Justice Fund",
-    category: "PACs",
-    stat: "947% ROI",
-    description: "Generated $45K in 48 hours with high-urgency fundraising message and personal storytelling. Achieved exceptional ROI through targeted SMS campaigns.",
+    category: "501C(4)",
+    stat: "$270K Raised",
+    description: "Six-month strategic partnership supporting Zohran Mamdani's NYC mayoral campaign through comprehensive digital organizing, fundraising, and paid media. Leveraging a database of hundreds of thousands of Muslim donors for targeted outreach.",
     metrics: [
-      { icon: TrendingUp, label: "947% ROI", value: "947%" },
-      { icon: Users, label: "490 New Donors", value: "490" },
-      { icon: DollarSign, label: "$144.60 Avg", value: "$144.60" },
+      { icon: DollarSign, label: "$270K Raised", value: "$270K" },
+      { icon: TrendingUp, label: "$45K/Month Avg", value: "$45K" },
+      { icon: Users, label: "6 Month Campaign", value: "6 mo" },
     ],
     image: unityJusticeImage,
     featured: true,
-    timeline: "48 Hours",
-    video: "https://player.vimeo.com/video/1134692415",
-    challenge: "Unity & Justice Fund needed to raise emergency funds quickly to support progressive candidates in crucial battleground districts. With only a 48-hour window, traditional fundraising approaches wouldn't work—we needed maximum impact, immediately.",
-    solution: "We deployed a high-velocity SMS campaign with personalized storytelling that connected donors directly to the urgency of the moment. Each message was crafted to inspire immediate action, combining emotional resonance with clear calls-to-action. We segmented audiences based on past engagement and optimized send times for maximum open rates.",
+    timeline: "6 Months (Ongoing)",
+    video: "https://player.vimeo.com/video/1134692415?title=0&byline=0&portrait=0",
+    challenge: "Unity & Justice Fund, a 501(c)(4) organization, needed a comprehensive digital strategy to elevate Zohran Mamdani's NYC mayoral candidacy in a crowded field. They required sustained fundraising, voter outreach, and persuasion campaigns while building name recognition across diverse communities. Traditional political consultants couldn't deliver the culturally competent targeting and sustained grassroots engagement needed.",
+    solution: "We became Unity & Justice Fund's full-service digital partner, executing an integrated 6-month campaign combining fundraising, advocacy, and paid persuasion. Our strategy included: high-velocity SMS and email campaigns averaging $45K/month in fundraising; Meta advertising promoting Zohran and running contrast ads against his main opponent; strategic billboard placements in key NYC neighborhoods; and sophisticated audience targeting leveraging our proprietary database of hundreds of thousands of Muslim donors nationwide for precise demographic and psychographic segmentation.",
     results: [
-      "Generated $45,000 in just 48 hours",
-      "947% return on investment",
-      "Acquired 490 new donors to the movement",
-      "$144.60 average donation—significantly above industry benchmarks",
-      "68% message open rate (industry average: 20%)",
-      "22% conversion rate on SMS appeals"
+      "Raised over $270,000 across 6 months ($45K monthly average)",
+      "Executed integrated paid media strategy across digital and outdoor channels",
+      "Deployed targeted SMS, email, and Meta ad campaigns",
+      "Leveraged database of hundreds of thousands of Muslim donors for precision targeting",
+      "Ran pro-Mamdani promotional content and strategic contrast advertising",
+      "Placed high-visibility billboards supporting Zohran's candidacy",
+      "Built sustained grassroots momentum throughout the campaign",
+      "Significantly increased name recognition and favorability in key demographics"
     ],
     testimonial: {
-      quote: "Mojo Digital delivered results we didn't think were possible. Their SMS strategy raised more in two days than our previous vendor did in two months.",
-      author: "Sarah Johnson",
-      role: "Executive Director, Unity & Justice Fund"
+      quote: "Mojo Digital became an essential part of our campaign infrastructure. Their ability to reach and mobilize our community while consistently delivering fundraising results has been transformative for our efforts to elect Zohran.",
+      author: "Campaign Leadership",
+      role: "Unity & Justice Fund"
     }
   },
   {
