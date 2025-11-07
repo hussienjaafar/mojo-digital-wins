@@ -1,6 +1,7 @@
 import { TrendingUp, Users, DollarSign, Target } from "lucide-react";
 import unityJusticeImage from "@/assets/unity-justice-fund.png";
 import abdulSenateImage from "@/assets/abdul-senate.png";
+import nasserMichiganImage from "@/assets/nasser-michigan.webp";
 
 export interface CaseStudy {
   id: string;
@@ -98,6 +99,7 @@ export const caseStudies: CaseStudy[] = [
     featured: true,
     timeline: "4 Months",
     video: "https://player.vimeo.com/video/1134749340?title=0&byline=0&portrait=0",
+    image: nasserMichiganImage,
     challenge: "Running in a diverse district, the campaign needed to reach multiple communities with tailored messaging while maintaining fundraising efficiency. Previous digital efforts had plateaued with declining returns.",
     solution: "We developed culturally resonant creative for each community segment while maintaining a unified progressive vision. Our email program told the candidate's story through compelling long-form narratives that educated and inspired, rather than just asking for money.",
     results: [
