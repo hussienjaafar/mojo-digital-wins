@@ -10,6 +10,13 @@ const CaseStudyDetail = () => {
   const { id } = useParams<{ id: string }>();
   const caseStudy = caseStudies.find(study => study.id === id);
 
+  // Get related case studies from the same category
+  const relatedCaseStudies = caseStudy 
+    ? caseStudies.filter(
+        study => study.category === caseStudy.category && study.id !== caseStudy.id
+      ).slice(0, 3) // Show up to 3 related case studies
+    : [];
+
   if (!caseStudy) {
     return <Navigate to="/case-studies" replace />;
   }
@@ -169,6 +176,59 @@ const CaseStudyDetail = () => {
               <div className="border-t border-primary-foreground/20 pt-6">
                 <p className="font-bold text-lg">{caseStudy.testimonial.author}</p>
                 <p className="text-primary-foreground/80">{caseStudy.testimonial.role}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Related Case Studies Section */}
+      {relatedCaseStudies.length > 0 && (
+        <section className="py-16 md:py-20 bg-gradient-to-br from-muted via-background to-muted">
+          <div className="container mx-auto px-4">
+            <div className="max-w-6xl mx-auto">
+              <h2 className="font-bebas text-3xl md:text-4xl text-foreground mb-4 uppercase tracking-wide text-center">
+                Related Case Studies
+              </h2>
+              <p className="text-muted-foreground text-center mb-12 text-lg">
+                More {caseStudy.category} campaigns with proven results
+              </p>
+              
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {relatedCaseStudies.map((study) => (
+                  <Link 
+                    key={study.id} 
+                    to={`/case-studies/${study.id}`}
+                    className="group"
+                  >
+                    <Card className="h-full bg-card border-2 border-secondary/20 hover:border-secondary transition-all duration-300 hover:shadow-xl overflow-hidden">
+                      {study.image && (
+                        <div className="relative h-48 overflow-hidden">
+                          <img 
+                            src={study.image} 
+                            alt={study.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />
+                        </div>
+                      )}
+                      <CardContent className="p-6 space-y-4">
+                        <div className="inline-block bg-accent/20 text-accent px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider border border-accent/30">
+                          {study.category}
+                        </div>
+                        <h3 className="font-bebas text-2xl text-foreground uppercase tracking-wide group-hover:text-secondary transition-colors">
+                          {study.title}
+                        </h3>
+                        <p className="text-muted-foreground text-sm line-clamp-2">
+                          {study.description}
+                        </p>
+                        <div className="pt-4 border-t border-border">
+                          <div className="text-3xl font-bebas text-secondary">{study.stat}</div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
               </div>
             </div>
           </div>
