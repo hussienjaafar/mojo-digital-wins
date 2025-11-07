@@ -1,5 +1,6 @@
 import { TrendingUp, Users, DollarSign, Target } from "lucide-react";
 import unityJusticeImage from "@/assets/unity-justice-fund.png";
+import abdulSenateImage from "@/assets/abdul-senate.png";
 
 export interface CaseStudy {
   id: string;
@@ -71,6 +72,7 @@ export const caseStudies: CaseStudy[] = [
       { icon: TrendingUp, label: "257% ROI", value: "257%" },
       { icon: DollarSign, label: "$55.98 Avg", value: "$55.98" },
     ],
+    image: abdulSenateImage,
     timeline: "3 Months",
     challenge: "A first-time Senate candidate needed to build name recognition and a donor base from scratch in a crowded primary field. Traditional political consultants quoted 6-month timelines—we had half that time.",
     solution: "We built a comprehensive digital acquisition strategy combining Meta and Google ads with high-conversion email sequences. Our creative testing identified the most compelling narratives, and we scaled winning ads aggressively while maintaining strict cost-per-acquisition targets.",
