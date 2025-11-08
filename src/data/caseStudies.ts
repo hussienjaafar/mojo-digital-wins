@@ -38,8 +38,8 @@ export const caseStudies: CaseStudy[] = [
     stat: "947% ROI",
     description: "Six-month strategic partnership supporting Zohran Mamdani's NYC mayoral campaign through comprehensive digital organizing, fundraising, and paid media. Leveraging a database of hundreds of thousands of Muslim donors for targeted outreach.",
     metrics: [
-      { icon: TrendingUp, label: "947% ROI", value: "947%" },
       { icon: DollarSign, label: "$270K Raised", value: "$270K" },
+      { icon: TrendingUp, label: "947% ROI", value: "947%" },
       { icon: DollarSign, label: "$45K/Month Avg", value: "$45K" },
       { icon: Users, label: "6 Month Campaign", value: "6 mo" },
     ],
@@ -95,6 +95,7 @@ export const caseStudies: CaseStudy[] = [
     stat: "325% ROI",
     description: "Raised over $1M for Senate campaign while delivering 325% ROI and $129.56 average donation through compelling narrative-driven email strategy and targeted digital advertising.",
     metrics: [
+      { icon: DollarSign, label: "$1M+ Raised", value: "$1M+" },
       { icon: TrendingUp, label: "325% ROI", value: "325%" },
       { icon: DollarSign, label: "$129.56 Avg", value: "$129.56" },
     ],
