@@ -37,7 +37,7 @@ const CaseStudies = () => {
       </section>
 
       {/* Filter Bar */}
-      <section className="py-8 bg-background border-b border-border sticky top-16 z-40 backdrop-blur-lg">
+      <section className="py-8 bg-background border-b border-border sticky top-[72px] md:top-[80px] z-40 backdrop-blur-lg">
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap gap-3 justify-center">
             {filters.map((filter) => (
