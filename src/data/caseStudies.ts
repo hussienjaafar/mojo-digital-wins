@@ -146,7 +146,7 @@ export const caseStudies: CaseStudy[] = [
     description: "Ongoing digital fundraising partnership managing SMS and paid advertising campaigns. Maintaining consistent high-performance results with 415% ROI and strong grassroots donor growth over 3 months.",
     metrics: [
       { icon: TrendingUp, label: "415% ROI", value: "415%" },
-      { icon: Users, label: "5,250+ New Donors", value: "5,250+" },
+      { icon: Users, label: "3,250 New Donors", value: "3,250" },
       { icon: DollarSign, label: "$46.51 Avg", value: "$46.51" },
       { icon: Target, label: "3 Month Campaign", value: "3 months" },
     ],
@@ -158,7 +158,7 @@ export const caseStudies: CaseStudy[] = [
     solution: "We became the campaign's full-service digital fundraising partner, executing an integrated SMS and paid advertising strategy. Our approach combines targeted Meta and Google ads for donor acquisition with high-conversion SMS sequences for engagement and re-solicitation. We maintain strict ROI targets while continuously testing and optimizing creative, audiences, and messaging.",
     results: [
       "Sustained 415% return on investment over 3 months",
-      "Acquired 5,250+ new donors and counting",
+      "Acquired 3,250 new donors and counting",
       "$46.51 average donation maintained across all channels",
       "Consistent monthly donor growth through optimized acquisition",
       "High-performance SMS program driving repeat contributions",
