@@ -143,7 +143,7 @@ export const caseStudies: CaseStudy[] = [
     title: "Rashid for Illinois",
     category: "Local",
     stat: "415% ROI",
-    description: "Ongoing digital fundraising partnership managing SMS and paid advertising campaigns. Maintaining consistent high-performance results with 415% ROI and strong grassroots donor growth over 3 months.",
+    description: "Ongoing digital fundraising partnership managing SMS and paid advertising campaigns. Acquired 3,250 new donors while maintaining 415% ROI over 3 months through integrated digital strategy.",
     metrics: [
       { icon: TrendingUp, label: "415% ROI", value: "415%" },
       { icon: Users, label: "3,250 New Donors", value: "3,250" },
