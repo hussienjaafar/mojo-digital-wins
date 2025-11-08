@@ -211,7 +211,7 @@ export const caseStudies: CaseStudy[] = [
     description: "Ongoing advocacy campaign delivering strong returns through targeted issue-based messaging and strategic donor outreach. Managing SMS and digital ads while consulting on messaging, communications and digital strategy.",
     metrics: [
       { icon: TrendingUp, label: "289% ROI", value: "289%" },
-      { icon: Users, label: "502 New Donors", value: "502" },
+      { icon: Users, label: "2,008 New Donors", value: "2,008" },
       { icon: DollarSign, label: "$84.26 Avg", value: "$84.26" },
       { icon: Target, label: "3 Month Campaign", value: "3 months" },
     ],
@@ -222,7 +222,7 @@ export const caseStudies: CaseStudy[] = [
     solution: "We became A New Policy's full-service digital partner, executing an integrated SMS and paid advertising strategy while providing strategic consulting on messaging, communications and digital strategy. Our bold acquisition campaign focused on the urgency of their issue advocacy work. By partnering with aligned organizations for initial audience targeting and developing scroll-stopping creative, we built awareness and trust simultaneously while maintaining consistent performance month over month.",
     results: [
       "Sustained 289% return on investment over 3 months",
-      "502 founding donors acquired and growing",
+      "2,008 donors acquired and growing—quadrupled initial acquisition",
       "$84.26 average donation maintained across all channels",
       "Built email list to 8,000+ engaged subscribers",
       "Established sustainable monthly giving program",
