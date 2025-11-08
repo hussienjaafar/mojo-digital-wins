@@ -3,6 +3,7 @@ import unityJusticeImage from "@/assets/unity-justice-fund.png";
 import abdulSenateImage from "@/assets/abdul-senate.png";
 import nasserMichiganImage from "@/assets/nasser-michigan.webp";
 import rashidIllinoisImage from "@/assets/rashid-illinois.jpg";
+import prestonPaImage from "@/assets/preston-pa.png";
 
 export interface CaseStudy {
   id: string;
@@ -121,21 +122,26 @@ export const caseStudies: CaseStudy[] = [
     title: "Preston For PA",
     category: "Congressional",
     stat: "236% ROI",
-    description: "Scaled Congressional campaign through strategic digital programs, adding over 2,300 new grassroots supporters.",
+    description: "With just 4 months left in the campaign, we took over SMS, email, and digital ads—helping triple cash on hand and funding critical GOTV and persuasion TV slots.",
     metrics: [
       { icon: TrendingUp, label: "236% ROI", value: "236%" },
       { icon: Users, label: "2,349 New Donors", value: "2,349" },
       { icon: DollarSign, label: "$29.11 Avg", value: "$29.11" },
     ],
-    timeline: "6 Weeks",
-    challenge: "A grassroots Congressional campaign needed rapid donor growth to prove viability to major progressive organizations. With limited name recognition outside the district, every dollar had to work harder.",
-    solution: "We focused on hyper-local targeting combined with broader progressive messaging to build a coalition. Our acquisition campaigns prioritized volume of donors over donation size, building the grassroots army that unlocked endorsements and matching funds.",
+    image: prestonPaImage,
+    timeline: "4 Months",
+    video: "https://player.vimeo.com/video/1134933495?title=0&byline=0&portrait=0",
+    challenge: "Preston's Congressional campaign was in a critical phase with only 4 months remaining. They needed to rapidly scale fundraising to compete in a highly competitive race, fund essential TV advertising for GOTV and persuasion, and build the cash reserves needed for a strong finish. The campaign required not just fundraising support but strategic guidance on messaging and digital strategy.",
+    solution: "We became Preston's comprehensive digital partner, taking over SMS, email, and paid digital advertising while providing strategic consulting on communications and digital strategy. Our integrated approach combined aggressive donor acquisition with messaging refinement, ensuring every touchpoint reinforced the campaign's core narrative while driving contributions. We optimized all channels for maximum efficiency and coordinated efforts to build momentum.",
     results: [
-      "236% return on investment",
+      "236% return on investment across all digital channels",
+      "Tripled campaign cash on hand in 4 months",
       "2,349 new donors added to campaign",
       "$29.11 average donation optimized for maximum participation",
-      "Donor growth helped secure DCCC Red to Blue designation",
-      "Built foundation for successful general election fundraising"
+      "Raised sufficient funds to purchase GOTV and persuasion TV slots",
+      "Executed integrated SMS, email, and digital advertising strategy",
+      "Provided strategic consulting on messaging and communications",
+      "Helped secure resources needed for competitive general election campaign"
     ]
   },
   {
