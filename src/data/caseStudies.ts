@@ -93,7 +93,7 @@ export const caseStudies: CaseStudy[] = [
     title: "Nasser for Michigan",
     category: "Senate",
     stat: "325% ROI",
-    description: "Delivered strong ROI with high average donation through compelling narrative-driven email strategy and targeted digital advertising.",
+    description: "Raised over $1M for Senate campaign while delivering 325% ROI and $129.56 average donation through compelling narrative-driven email strategy and targeted digital advertising.",
     metrics: [
       { icon: TrendingUp, label: "325% ROI", value: "325%" },
       { icon: DollarSign, label: "$129.56 Avg", value: "$129.56" },
@@ -105,6 +105,7 @@ export const caseStudies: CaseStudy[] = [
     challenge: "Running in a diverse district, the campaign needed to reach multiple communities with tailored messaging while maintaining fundraising efficiency. Previous digital efforts had plateaued with declining returns.",
     solution: "We developed culturally resonant creative for each community segment while maintaining a unified progressive vision. Our email program told the candidate's story through compelling long-form narratives that educated and inspired, rather than just asking for money.",
     results: [
+      "Raised over $1M for the Senate campaign",
       "325% ROI across all digital channels",
       "$129.56 average donation—one of the highest in the race",
       "Doubled email list size in 4 months",
