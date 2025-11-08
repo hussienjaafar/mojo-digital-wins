@@ -4,6 +4,7 @@ import abdulSenateImage from "@/assets/abdul-senate.png";
 import nasserMichiganImage from "@/assets/nasser-michigan.webp";
 import rashidIllinoisImage from "@/assets/rashid-illinois.jpg";
 import prestonPaImage from "@/assets/preston-pa.png";
+import aNewPolicyImage from "@/assets/a-new-policy.png";
 
 export interface CaseStudy {
   id: string;
@@ -207,23 +208,27 @@ export const caseStudies: CaseStudy[] = [
     title: "A New Policy",
     category: "501C(4)",
     stat: "289% ROI",
-    description: "One-month advocacy campaign delivering strong returns through targeted issue-based messaging and strategic donor outreach.",
+    description: "Ongoing advocacy campaign delivering strong returns through targeted issue-based messaging and strategic donor outreach. Managing SMS and digital ads while consulting on messaging, communications and digital strategy.",
     metrics: [
       { icon: TrendingUp, label: "289% ROI", value: "289%" },
       { icon: Users, label: "502 New Donors", value: "502" },
       { icon: DollarSign, label: "$84.26 Avg", value: "$84.26" },
-      { icon: Target, label: "1 Month Timeline", value: "1 month" },
+      { icon: Target, label: "3 Month Campaign", value: "3 months" },
     ],
-    timeline: "1 Month",
+    image: aNewPolicyImage,
+    timeline: "3 Months (Ongoing)",
+    video: "https://player.vimeo.com/video/1134945499?title=0&byline=0&portrait=0",
     challenge: "A new advocacy organization needed to build an initial donor base to fund their first major campaign. With no existing email list or brand recognition, they were starting from absolute zero.",
-    solution: "We created a bold acquisition campaign focused on the urgency of their issue advocacy work. By partnering with aligned organizations for initial audience targeting and developing scroll-stopping creative, we built awareness and trust simultaneously.",
+    solution: "We became A New Policy's full-service digital partner, executing an integrated SMS and paid advertising strategy while providing strategic consulting on messaging, communications and digital strategy. Our bold acquisition campaign focused on the urgency of their issue advocacy work. By partnering with aligned organizations for initial audience targeting and developing scroll-stopping creative, we built awareness and trust simultaneously while maintaining consistent performance month over month.",
     results: [
-      "289% return on investment in first month",
-      "502 founding donors acquired",
-      "$84.26 average donation",
+      "Sustained 289% return on investment over 3 months",
+      "502 founding donors acquired and growing",
+      "$84.26 average donation maintained across all channels",
       "Built email list to 8,000+ engaged subscribers",
       "Established sustainable monthly giving program",
-      "Created foundation for ongoing policy campaigns"
+      "Created foundation for ongoing policy campaigns",
+      "Executed integrated SMS and paid media strategy",
+      "Provided strategic consulting on messaging and communications"
     ],
     testimonial: {
       quote: "Mojo Digital helped us build our organization from the ground up. Their strategic approach gave us the resources and the community we needed to make real policy change.",
