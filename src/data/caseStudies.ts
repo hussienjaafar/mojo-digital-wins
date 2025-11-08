@@ -2,6 +2,7 @@ import { TrendingUp, Users, DollarSign, Target } from "lucide-react";
 import unityJusticeImage from "@/assets/unity-justice-fund.png";
 import abdulSenateImage from "@/assets/abdul-senate.png";
 import nasserMichiganImage from "@/assets/nasser-michigan.webp";
+import rashidIllinoisImage from "@/assets/rashid-illinois.jpg";
 
 export interface CaseStudy {
   id: string;
@@ -149,6 +150,7 @@ export const caseStudies: CaseStudy[] = [
       { icon: DollarSign, label: "$46.51 Avg", value: "$46.51" },
       { icon: Target, label: "2 Week Sprint", value: "2 weeks" },
     ],
+    image: rashidIllinoisImage,
     featured: true,
     timeline: "2 Weeks",
     challenge: "Two weeks before the primary deadline, the campaign was short of their fundraising goal and needed an immediate injection of both funds and donors. Traditional consultants said it couldn't be done in the timeframe.",
