@@ -86,7 +86,8 @@ const Navigation = () => {
               isScrolled ? "text-primary-foreground" : "text-foreground"
             }`}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle menu"
+            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isMobileMenuOpen}
           >
             {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
@@ -94,9 +95,12 @@ const Navigation = () => {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className={`md:hidden py-4 space-y-2 animate-fade-in-down border-t ${
-            isScrolled ? "border-primary-foreground/10" : "border-foreground/10"
-          }`}>
+          <nav 
+            className={`md:hidden py-4 space-y-2 animate-fade-in-down border-t ${
+              isScrolled ? "border-primary-foreground/10" : "border-foreground/10"
+            }`}
+            aria-label="Mobile navigation"
+          >
             {navLinks.map((link) => (
               <Link
                 key={link.path}
@@ -127,7 +131,7 @@ const Navigation = () => {
                 </Link>
               </Button>
             </div>
-          </div>
+          </nav>
         )}
       </div>
     </nav>

@@ -208,12 +208,14 @@ const Index = () => {
               style={{ 
                 animation: 'bounce 2s ease-in-out infinite, fade-in 0.6s cubic-bezier(0.4, 0, 0.2, 1) 500ms both'
               }}
+              aria-hidden="true"
             >
               <svg 
                 className="w-6 h-6 text-primary-foreground/60" 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path 
                   strokeLinecap="round" 
@@ -330,9 +332,9 @@ const Index = () => {
                       {study.title}
                     </h3>
                     <p className="text-muted-foreground mb-4 line-clamp-2">{study.description}</p>
-                    <div className="flex items-center gap-2 text-secondary font-semibold opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                    <div className="flex items-center gap-2 text-secondary font-semibold opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300" aria-hidden="true">
                       View Case Study
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </div>

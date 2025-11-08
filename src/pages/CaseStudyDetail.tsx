@@ -221,10 +221,10 @@ const CaseStudyDetail = () => {
                         <div className="relative h-48 overflow-hidden">
                           <img 
                             src={study.image} 
-                            alt={study.title}
+                            alt={`${study.title} campaign visual`}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" aria-hidden="true" />
                         </div>
                       )}
                       <CardContent className="p-6 space-y-4">

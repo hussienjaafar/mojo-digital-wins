@@ -24,6 +24,7 @@ const Footer = () => {
             <div className="flex space-x-4">
               <a
                 href="#"
+                onClick={(e) => e.preventDefault()}
                 className="text-primary-foreground/80 hover:text-accent transition-colors"
                 aria-label="Facebook"
               >
@@ -31,6 +32,7 @@ const Footer = () => {
               </a>
               <a
                 href="#"
+                onClick={(e) => e.preventDefault()}
                 className="text-primary-foreground/80 hover:text-accent transition-colors"
                 aria-label="Twitter"
               >
@@ -38,6 +40,7 @@ const Footer = () => {
               </a>
               <a
                 href="#"
+                onClick={(e) => e.preventDefault()}
                 className="text-primary-foreground/80 hover:text-accent transition-colors"
                 aria-label="LinkedIn"
               >
@@ -45,6 +48,7 @@ const Footer = () => {
               </a>
               <a
                 href="#"
+                onClick={(e) => e.preventDefault()}
                 className="text-primary-foreground/80 hover:text-accent transition-colors"
                 aria-label="Instagram"
               >
