@@ -13,6 +13,7 @@ import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedPatternHero from "@/components/AnimatedPatternHero";
+import AnimatedServiceGraphic from "@/components/AnimatedServiceGraphic";
 
 const Services = () => {
   return (
@@ -56,13 +57,13 @@ const Services = () => {
                 </CardContent>
               </Card>
               <div className="order-1 md:order-2">
-                <div className="aspect-square rounded-xl bg-gradient-to-br from-secondary/20 to-accent/20 shadow-lg" />
+                <AnimatedServiceGraphic variant="hexagons" />
               </div>
             </div>
 
             {/* Service 2 */}
             <div className="grid md:grid-cols-2 gap-12 items-center">
-              <div className="aspect-square rounded-xl bg-gradient-to-br from-destructive/20 to-secondary/20 shadow-lg" />
+              <AnimatedServiceGraphic variant="network" />
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
                 <CardContent className="p-8 space-y-6">
                   <div className="w-16 h-16 bg-gradient-to-br from-destructive to-secondary rounded-full flex items-center justify-center shadow-md">
@@ -120,7 +121,7 @@ const Services = () => {
                 </CardContent>
               </Card>
               <div className="order-1 md:order-2">
-                <div className="aspect-square rounded-xl bg-gradient-to-br from-accent/20 to-primary/20 shadow-lg" />
+                <AnimatedServiceGraphic variant="triangles" />
               </div>
             </div>
           </div>
