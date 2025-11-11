@@ -6,6 +6,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedPatternHero from "@/components/AnimatedPatternHero";
 import { caseStudies } from "@/data/caseStudies";
+import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 
 const CaseStudies = () => {
   const [activeFilter, setActiveFilter] = useState("All");
@@ -18,6 +19,7 @@ const CaseStudies = () => {
 
   return (
     <div className="min-h-screen">
+      <ScrollProgressIndicator />
       <Navigation />
       <AnimatedPatternHero
         title="Progressive Wins"

@@ -7,6 +7,7 @@ import { Mail, MessageSquare, Phone } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedPatternHero from "@/components/AnimatedPatternHero";
+import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 
 const Contact = () => {
   const handleSubmit = (e: React.FormEvent) => {
@@ -16,6 +17,7 @@ const Contact = () => {
 
   return (
     <div className="min-h-screen">
+      <ScrollProgressIndicator />
       <Navigation />
       <AnimatedPatternHero
         title="Let's Win Together"

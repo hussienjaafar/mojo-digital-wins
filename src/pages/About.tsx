@@ -5,10 +5,12 @@ import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedPatternHero from "@/components/AnimatedPatternHero";
+import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 
 const About = () => {
   return (
     <div className="min-h-screen">
+      <ScrollProgressIndicator />
       <Navigation />
       <AnimatedPatternHero
         title="Built for the Movement"
