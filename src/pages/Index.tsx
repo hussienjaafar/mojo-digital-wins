@@ -9,6 +9,7 @@ import heroImage from "@/assets/hero-movement.jpg";
 import heroRally from "@/assets/hero-movement-rally.jpg";
 import dataDashboard from "@/assets/data-dashboard.jpg";
 import { featuredCaseStudies } from "@/data/caseStudies";
+import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 
 const Index = () => {
   const metrics = [
@@ -47,6 +48,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <ScrollProgressIndicator />
       <Navigation />
 
       {/* Hero Section */}

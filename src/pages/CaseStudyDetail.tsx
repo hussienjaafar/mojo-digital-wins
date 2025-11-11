@@ -5,6 +5,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { caseStudies } from "@/data/caseStudies";
 import { ArrowLeft, Clock, CheckCircle2, Quote } from "lucide-react";
+import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 
 const CaseStudyDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +24,7 @@ const CaseStudyDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <ScrollProgressIndicator />
       <Navigation />
 
       {/* Hero Section */}
