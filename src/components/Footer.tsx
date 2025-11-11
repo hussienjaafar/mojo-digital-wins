@@ -16,7 +16,7 @@ const Footer = () => {
           {/* Brand */}
           <div>
             <h3 className="text-2xl font-black mb-4">
-              MOJO<span className="text-accent">.</span>
+              MOLITICO<span className="text-accent">.</span>
             </h3>
             <p className="text-primary-foreground/80 mb-6">
               Turning grassroots energy into unstoppable progressive wins.
@@ -141,9 +141,9 @@ const Footer = () => {
             <span className="font-semibold">Ethical Fundraising Commitment:</span> Performance with principles. We
             prioritize long-term donor relationships and never compromise values for ROI.
           </p>
-          <p>© {new Date().getFullYear()} Mojo Digital. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Molitico. All rights reserved.</p>
           <p className="mt-2">
-            Paid for by Mojo Digital. Not authorized by any candidate or candidate's committee.
+            Paid for by Molitico. Not authorized by any candidate or candidate's committee.
           </p>
         </div>
       </div>

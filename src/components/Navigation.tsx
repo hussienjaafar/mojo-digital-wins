@@ -42,7 +42,7 @@ const Navigation = () => {
               isScrolled ? "text-primary-foreground" : "text-primary-foreground drop-shadow-[0_2px_12px_rgba(10,30,62,0.9)]"
             }`}>
               <div className="font-bebas text-[2.1rem] md:text-[2.4rem] leading-none tracking-wide">
-                MOJO<span className="text-secondary"> DIGITAL</span>
+                MOLITICO
               </div>
             </div>
           </Link>
