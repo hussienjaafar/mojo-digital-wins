@@ -1,5 +1,5 @@
 type AnimatedServiceGraphicProps = {
-  variant: "megaphone" | "messageBubbles" | "envelope";
+  variant: "megaphone" | "messageBubbles" | "envelope" | "growth" | "team";
 };
 
 const AnimatedServiceGraphic = ({ variant }: AnimatedServiceGraphicProps) => {
@@ -246,6 +246,257 @@ const AnimatedServiceGraphic = ({ variant }: AnimatedServiceGraphicProps) => {
             strokeWidth="1.5"
             opacity="0.4"
             className="animate-[ping_3s_ease-out_infinite_1s]"
+          />
+        </svg>
+      </div>
+    );
+  }
+
+  if (variant === "growth") {
+    return (
+      <div className="aspect-square rounded-xl overflow-hidden relative bg-gradient-to-br from-primary/10 to-secondary/10 shadow-lg">
+        <svg
+          viewBox="0 0 200 200"
+          className="w-full h-full"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* Background gradient */}
+          <defs>
+            <linearGradient id="growthGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" className="[stop-color:hsl(var(--primary))]" stopOpacity="0.2" />
+              <stop offset="100%" className="[stop-color:hsl(var(--secondary))]" stopOpacity="0.2" />
+            </linearGradient>
+          </defs>
+
+          {/* Chart axes */}
+          <line
+            x1="40"
+            y1="150"
+            x2="160"
+            y2="150"
+            stroke="hsl(var(--primary))"
+            strokeWidth="2"
+            className="[stroke-dasharray:120] [stroke-dashoffset:120] animate-[draw-path_1.5s_ease-out_forwards]"
+          />
+          <line
+            x1="40"
+            y1="150"
+            x2="40"
+            y2="40"
+            stroke="hsl(var(--primary))"
+            strokeWidth="2"
+            className="[stroke-dasharray:110] [stroke-dashoffset:110] animate-[draw-path_1.5s_ease-out_forwards_0.2s]"
+          />
+
+          {/* Growing bars */}
+          <rect
+            x="55"
+            y="130"
+            width="20"
+            height="20"
+            fill="hsl(var(--secondary))"
+            opacity="0.6"
+            className="animate-[scale-in_1s_ease-out_forwards_0.5s] origin-bottom"
+            style={{ transformOrigin: '65px 150px' }}
+          />
+          <rect
+            x="85"
+            y="110"
+            width="20"
+            height="40"
+            fill="hsl(var(--accent))"
+            opacity="0.7"
+            className="animate-[scale-in_1s_ease-out_forwards_0.8s] origin-bottom"
+            style={{ transformOrigin: '95px 150px' }}
+          />
+          <rect
+            x="115"
+            y="80"
+            width="20"
+            height="70"
+            fill="hsl(var(--primary))"
+            opacity="0.8"
+            className="animate-[scale-in_1s_ease-out_forwards_1.1s] origin-bottom"
+            style={{ transformOrigin: '125px 150px' }}
+          />
+
+          {/* Upward trending line */}
+          <path
+            d="M 65 135 L 95 115 L 125 75"
+            fill="none"
+            stroke="hsl(var(--accent))"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="[stroke-dasharray:100] [stroke-dashoffset:100] animate-[draw-path_2s_ease-out_forwards_1.5s]"
+          />
+
+          {/* Data points */}
+          <circle
+            cx="65"
+            cy="135"
+            r="4"
+            fill="hsl(var(--accent))"
+            className="animate-[scale-in_0.5s_ease-out_forwards_2s]"
+          />
+          <circle
+            cx="95"
+            cy="115"
+            r="4"
+            fill="hsl(var(--accent))"
+            className="animate-[scale-in_0.5s_ease-out_forwards_2.2s]"
+          />
+          <circle
+            cx="125"
+            cy="75"
+            r="4"
+            fill="hsl(var(--accent))"
+            className="animate-[scale-in_0.5s_ease-out_forwards_2.4s]"
+          />
+
+          {/* Rising arrow */}
+          <g className="animate-[fade-in_1.5s_ease-in-out_infinite_alternate_2.5s]">
+            <path
+              d="M 150 90 L 150 50 M 150 50 L 145 57 M 150 50 L 155 57"
+              stroke="hsl(var(--primary))"
+              strokeWidth="3"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </g>
+
+          {/* Sparkle effects */}
+          <circle
+            cx="125"
+            cy="65"
+            r="3"
+            fill="hsl(var(--accent))"
+            opacity="0.6"
+            className="animate-[ping_2s_ease-in-out_infinite_3s]"
+          />
+          <circle
+            cx="140"
+            cy="45"
+            r="2.5"
+            fill="hsl(var(--primary))"
+            opacity="0.5"
+            className="animate-[ping_2s_ease-in-out_infinite_3.5s]"
+          />
+        </svg>
+      </div>
+    );
+  }
+
+  if (variant === "team") {
+    return (
+      <div className="aspect-square rounded-xl overflow-hidden relative bg-gradient-to-br from-secondary/10 to-accent/10 shadow-lg">
+        <svg
+          viewBox="0 0 200 200"
+          className="w-full h-full"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* Background gradient */}
+          <defs>
+            <linearGradient id="teamGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" className="[stop-color:hsl(var(--secondary))]" stopOpacity="0.2" />
+              <stop offset="100%" className="[stop-color:hsl(var(--accent))]" stopOpacity="0.2" />
+            </linearGradient>
+          </defs>
+
+          {/* Central connection node */}
+          <circle
+            cx="100"
+            cy="100"
+            r="15"
+            fill="url(#teamGrad)"
+            stroke="hsl(var(--primary))"
+            strokeWidth="2.5"
+            className="animate-[scale-in_1s_ease-out_forwards]"
+          />
+
+          {/* Team member circles - positioned around center */}
+          {/* Top person */}
+          <g className="animate-[scale-in_0.8s_ease-out_forwards_0.3s]" style={{ transformOrigin: '100px 50px' }}>
+            <circle cx="100" cy="50" r="12" fill="hsl(var(--secondary))" opacity="0.7" />
+            <circle cx="100" cy="45" r="5" fill="hsl(var(--background))" opacity="0.9" />
+            <line
+              x1="100"
+              y1="62"
+              x2="100"
+              y2="88"
+              stroke="hsl(var(--accent))"
+              strokeWidth="2"
+              className="[stroke-dasharray:26] [stroke-dashoffset:26] animate-[draw-path_0.8s_ease-out_forwards_0.8s]"
+            />
+          </g>
+
+          {/* Right person */}
+          <g className="animate-[scale-in_0.8s_ease-out_forwards_0.5s]" style={{ transformOrigin: '150px 100px' }}>
+            <circle cx="150" cy="100" r="12" fill="hsl(var(--accent))" opacity="0.7" />
+            <circle cx="150" cy="95" r="5" fill="hsl(var(--background))" opacity="0.9" />
+            <line
+              x1="138"
+              y1="100"
+              x2="115"
+              y2="100"
+              stroke="hsl(var(--secondary))"
+              strokeWidth="2"
+              className="[stroke-dasharray:23] [stroke-dashoffset:23] animate-[draw-path_0.8s_ease-out_forwards_1s]"
+            />
+          </g>
+
+          {/* Bottom left person */}
+          <g className="animate-[scale-in_0.8s_ease-out_forwards_0.7s]" style={{ transformOrigin: '65px 140px' }}>
+            <circle cx="65" cy="140" r="12" fill="hsl(var(--primary))" opacity="0.7" />
+            <circle cx="65" cy="135" r="5" fill="hsl(var(--background))" opacity="0.9" />
+            <line
+              x1="75"
+              y1="130"
+              x2="90"
+              y2="110"
+              stroke="hsl(var(--accent))"
+              strokeWidth="2"
+              className="[stroke-dasharray:25] [stroke-dashoffset:25] animate-[draw-path_0.8s_ease-out_forwards_1.2s]"
+            />
+          </g>
+
+          {/* Bottom right person */}
+          <g className="animate-[scale-in_0.8s_ease-out_forwards_0.9s]" style={{ transformOrigin: '135px 140px' }}>
+            <circle cx="135" cy="140" r="12" fill="hsl(var(--destructive))" opacity="0.7" />
+            <circle cx="135" cy="135" r="5" fill="hsl(var(--background))" opacity="0.9" />
+            <line
+              x1="125"
+              y1="130"
+              x2="110"
+              y2="110"
+              stroke="hsl(var(--primary))"
+              strokeWidth="2"
+              className="[stroke-dasharray:25] [stroke-dashoffset:25] animate-[draw-path_0.8s_ease-out_forwards_1.4s]"
+            />
+          </g>
+
+          {/* Collaboration sparkles */}
+          <g className="animate-[fade-in_2s_ease-in-out_infinite_alternate_2s]">
+            <path
+              d="M 100 95 L 102 100 L 100 105 L 98 100 Z"
+              fill="hsl(var(--accent))"
+              opacity="0.8"
+            />
+            <circle cx="90" cy="100" r="2" fill="hsl(var(--secondary))" opacity="0.6" />
+            <circle cx="110" cy="100" r="2" fill="hsl(var(--primary))" opacity="0.6" />
+          </g>
+
+          {/* Connecting pulse effect */}
+          <circle
+            cx="100"
+            cy="100"
+            r="15"
+            fill="none"
+            stroke="hsl(var(--accent))"
+            strokeWidth="2"
+            opacity="0"
+            className="animate-[ping_3s_ease-out_infinite_2.5s]"
           />
         </svg>
       </div>

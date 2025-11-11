@@ -48,7 +48,7 @@ const About = () => {
                   graphic1.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
                 }`}
               >
-                <AnimatedServiceGraphic variant="messageBubbles" />
+                <AnimatedServiceGraphic variant="team" />
               </div>
             </div>
           </div>
@@ -96,7 +96,7 @@ const About = () => {
                   graphic2.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
                 }`}
               >
-                <AnimatedServiceGraphic variant="megaphone" />
+                <AnimatedServiceGraphic variant="growth" />
               </div>
               <div className="space-y-6">
                 <h3 className="text-3xl font-bold text-foreground">We're more than just marketers.</h3>
