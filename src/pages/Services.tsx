@@ -20,6 +20,9 @@ const Services = () => {
   const service1 = useScrollAnimation({ threshold: 0.2 });
   const service2 = useScrollAnimation({ threshold: 0.2 });
   const service3 = useScrollAnimation({ threshold: 0.2 });
+  const graphic1 = useScrollAnimation({ threshold: 0.2 });
+  const graphic2 = useScrollAnimation({ threshold: 0.2 });
+  const graphic3 = useScrollAnimation({ threshold: 0.2 });
   const additionalServices = useScrollAnimation({ threshold: 0.2 });
   const processSection = useScrollAnimation({ threshold: 0.2 });
 
@@ -68,7 +71,12 @@ const Services = () => {
                   </ul>
                 </CardContent>
               </Card>
-              <div className="order-1 md:order-2">
+              <div 
+                ref={graphic1.ref}
+                className={`order-1 md:order-2 transition-all duration-1000 delay-300 ${
+                  graphic1.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+                }`}
+              >
                 <AnimatedServiceGraphic variant="megaphone" />
               </div>
             </div>
@@ -80,7 +88,14 @@ const Services = () => {
                 service2.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
             >
-              <AnimatedServiceGraphic variant="messageBubbles" />
+              <div 
+                ref={graphic2.ref}
+                className={`transition-all duration-1000 delay-300 ${
+                  graphic2.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+                }`}
+              >
+                <AnimatedServiceGraphic variant="messageBubbles" />
+              </div>
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
                 <CardContent className="p-8 space-y-6">
                   <div className="w-16 h-16 bg-gradient-to-br from-destructive to-secondary rounded-full flex items-center justify-center shadow-md">
@@ -142,7 +157,12 @@ const Services = () => {
                   </ul>
                 </CardContent>
               </Card>
-              <div className="order-1 md:order-2">
+              <div 
+                ref={graphic3.ref}
+                className={`order-1 md:order-2 transition-all duration-1000 delay-300 ${
+                  graphic3.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+                }`}
+              >
                 <AnimatedServiceGraphic variant="envelope" />
               </div>
             </div>
