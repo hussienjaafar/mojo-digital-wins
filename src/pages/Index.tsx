@@ -10,8 +10,15 @@ import heroRally from "@/assets/hero-movement-rally.jpg";
 import dataDashboard from "@/assets/data-dashboard.jpg";
 import { featuredCaseStudies } from "@/data/caseStudies";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
+import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 const Index = () => {
+  const howWeWin = useScrollAnimation({ threshold: 0.2 });
+  const caseStudiesSection = useScrollAnimation({ threshold: 0.2 });
+  const servicesSection = useScrollAnimation({ threshold: 0.2 });
+  const valuesSection = useScrollAnimation({ threshold: 0.2 });
+  const dataSection = useScrollAnimation({ threshold: 0.2 });
+
   const metrics = [
     { value: 425, label: "Average ROI %", prefix: "", suffix: "%" },
     { value: 200, label: "Donors Acquired", prefix: "", suffix: "K+" },
@@ -233,7 +240,7 @@ const Index = () => {
 
       {/* How We Win for Progressives - Scroll Story Section */}
       <section className="py-24 md:py-32 bg-background relative">
-        <div className="max-w-[1280px] mx-auto px-6">
+        <div ref={howWeWin.ref} className="max-w-[1280px] mx-auto px-6">
           <div className="text-center mb-16 md:mb-20">
             <h2 className="font-bebas text-4xl md:text-5xl lg:text-6xl text-foreground mb-4 uppercase tracking-wide">
               How We Drive Progressive Impact
@@ -266,11 +273,11 @@ const Index = () => {
             ].map((step, index) => (
               <Card
                 key={index}
-                className="bg-gradient-to-br from-card to-muted border-2 border-secondary/20 hover:border-secondary/60 backdrop-blur-sm overflow-hidden group scroll-reveal hover:shadow-[0_12px_40px_rgba(20,100,217,0.2)] transition-all duration-500"
+                className={`bg-gradient-to-br from-card to-muted border-2 border-secondary/20 hover:border-secondary/60 backdrop-blur-sm overflow-hidden group hover:shadow-[0_12px_40px_rgba(20,100,217,0.2)] transition-all duration-700 ${
+                  howWeWin.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
                 style={{ 
-                  animationDelay: `${200 + index * 150}ms`,
-                  transform: 'translateY(20px)',
-                  opacity: 0
+                  transitionDelay: `${index * 150}ms`
                 }}
               >
                 <CardContent className="p-10 relative">
@@ -293,7 +300,7 @@ const Index = () => {
 
       {/* Work Preview - Featured Case Studies */}
       <section className="py-20 md:py-28 bg-gradient-to-br from-muted via-background to-muted relative">
-        <div className="max-w-[1280px] mx-auto px-6">
+        <div ref={caseStudiesSection.ref} className="max-w-[1280px] mx-auto px-6">
           <div className="text-center mb-12 md:mb-16">
             <h2 className="font-bebas text-4xl md:text-5xl lg:text-6xl text-foreground mb-4 uppercase tracking-wide">
               Proven Results That Win
@@ -304,11 +311,13 @@ const Index = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {featuredCaseStudies.map((study) => (
+            {featuredCaseStudies.map((study, index) => (
               <Link key={study.id} to={`/case-studies/${study.id}`} className="block">
               <Card
-                className="bg-card border-2 border-border hover:border-secondary overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-2xl work-preview-card h-full"
-                style={{ animationDelay: `${featuredCaseStudies.indexOf(study) * 150}ms` }}
+                className={`bg-card border-2 border-border hover:border-secondary overflow-hidden group cursor-pointer transition-all duration-700 hover:shadow-2xl h-full ${
+                  caseStudiesSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
+                style={{ transitionDelay: `${index * 150}ms` }}
               >
                 <CardContent className="p-0">
                   {study.image && (
@@ -514,7 +523,7 @@ const Index = () => {
 
       {/* Services Overview */}
       <section className="py-16 md:py-24 bg-background relative">
-        <div className="container mx-auto px-4 sm:px-6">
+        <div ref={servicesSection.ref} className="container mx-auto px-4 sm:px-6">
           <div className="text-center mb-12 md:mb-16 animate-fade-in">
             <h2 className="text-headline text-foreground mb-4 md:mb-6 tracking-wide">Our Arsenal</h2>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium px-4">
@@ -526,8 +535,10 @@ const Index = () => {
             {services.map((service, index) => (
               <Card
                 key={index}
-                className="bg-gradient-to-br from-card to-muted border-2 border-secondary/20 hover:border-secondary/60 backdrop-blur-sm animate-slide-up brutal-shadow overflow-hidden group"
-                style={{ animationDelay: `${index * 0.15}s` }}
+                className={`bg-gradient-to-br from-card to-muted border-2 border-secondary/20 hover:border-secondary/60 backdrop-blur-sm brutal-shadow overflow-hidden group transition-all duration-700 ${
+                  servicesSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
+                style={{ transitionDelay: `${index * 150}ms` }}
               >
                 <CardContent className="p-8 relative">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
@@ -549,7 +560,7 @@ const Index = () => {
 
       {/* Progressive Values */}
       <section className="py-16 md:py-24 diagonal-top bg-gradient-to-br from-destructive/10 via-background to-secondary/10 relative">
-        <div className="container mx-auto px-4 sm:px-6">
+        <div ref={valuesSection.ref} className="container mx-auto px-4 sm:px-6">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
               <h2 className="text-headline text-foreground mb-4 md:mb-6 tracking-wide">
@@ -564,8 +575,10 @@ const Index = () => {
               {values.map((value, index) => (
                 <div
                   key={index}
-                  className="flex items-center space-x-3 bg-card border-l-4 border-secondary p-6 rounded-lg animate-bounce-in hover-lift"
-                  style={{ animationDelay: `${index * 0.08}s` }}
+                  className={`flex items-center space-x-3 bg-card border-l-4 border-secondary p-6 rounded-lg hover-lift transition-all duration-700 ${
+                    valuesSection.isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
+                  }`}
+                  style={{ transitionDelay: `${index * 80}ms` }}
                 >
                   <div className="bg-secondary/20 p-2 rounded-full">
                     <Check className="text-secondary w-5 h-5 flex-shrink-0" />
