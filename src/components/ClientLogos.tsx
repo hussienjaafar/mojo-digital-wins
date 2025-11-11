@@ -1,4 +1,4 @@
-import abdulLogo from "@/assets/abdul-senate.png";
+import abdulLogo from "@/assets/abdul-senate-logo.svg";
 import unityJusticeLogo from "@/assets/unity-justice-fund-logo.webp";
 import nasserMichiganLogo from "@/assets/nasser-michigan-logo.webp";
 import prestonPaLogo from "@/assets/preston-pa-logo.png";
