@@ -5,6 +5,7 @@ import nasserMichiganImage from "@/assets/nasser-michigan.webp";
 import rashidIllinoisImage from "@/assets/rashid-illinois.jpg";
 import prestonPaImage from "@/assets/preston-pa.png";
 import aNewPolicyImage from "@/assets/a-new-policy.png";
+import abourezkImage from "@/assets/abourezk.png";
 
 export interface CaseStudy {
   id: string;
@@ -184,24 +185,35 @@ export const caseStudies: CaseStudy[] = [
     id: "arab-american-nonprofit",
     title: "Arab-American Non-profit",
     category: "501C(3)",
-    stat: "304% ROI",
-    description: "Exceptional donor acquisition for nonprofit organization, bringing in nearly 6,000 new supporters with compelling community-focused messaging.",
+    stat: "50,000+ Donors",
+    description: "4-year strategic partnership growing a leading Arab-American nonprofit from a few hundred donors to over 50,000 supporters. Raised $1.5M+ in the last 12 months alone through comprehensive digital organizing and strategic campaigns.",
     metrics: [
-      { icon: TrendingUp, label: "304% ROI", value: "304%" },
-      { icon: Users, label: "5,909 New Donors", value: "5,909" },
-      { icon: DollarSign, label: "$95.79 Avg", value: "$95.79" },
+      { icon: Users, label: "50,000+ Donors", value: "50,000+" },
+      { icon: DollarSign, label: "$1.5M Raised", value: "$1.5M" },
+      { icon: TrendingUp, label: "1000% Email Growth", value: "1000%" },
+      { icon: Users, label: "4,000+ Monthly Donors", value: "4,000+" },
     ],
-    timeline: "8 Months",
-    challenge: "A growing nonprofit needed to expand beyond their traditional donor base to fund ambitious new programs. They were heavily reliant on major donors and needed sustainable grassroots support.",
-    solution: "We built a multi-channel acquisition program that told the organization's impact story through real community voices. By showcasing tangible results and connecting donors to specific programs, we made giving personal and meaningful.",
+    image: abourezkImage,
+    featured: true,
+    timeline: "4+ Years (Ongoing)",
+    video: "https://player.vimeo.com/video/1135907389?title=0&byline=0&portrait=0",
+    challenge: "A vital Arab-American nonprofit organization had a small donor base of just a few hundred supporters and limited digital infrastructure. They needed to scale rapidly to meet growing community needs and expand their advocacy impact. Previous fundraising efforts were inconsistent and relied heavily on a handful of major donors, making long-term sustainability uncertain.",
+    solution: "We became the organization's comprehensive digital partner, managing all aspects of their online fundraising, advocacy, and engagement over 4+ years. Our integrated strategy included building and executing sophisticated petition campaigns, engagement initiatives, and GOTV efforts; developing strategic campaign frameworks aligned with community priorities; implementing high-conversion email and SMS fundraising programs; and creating a sustainable monthly donor program that grew from a few hundred to over 4,000 recurring supporters. We grew their email list by 1000% through targeted acquisition and engagement campaigns.",
     results: [
-      "304% ROI on digital fundraising investment",
-      "5,909 new donors—expanding reach by 340%",
-      "$95.79 average donation",
-      "Monthly recurring donor program grew 520%",
-      "Reduced dependence on major donors from 75% to 45% of revenue",
-      "Built sustainable fundraising foundation for growth"
-    ]
+      "Grew total donor base from a few hundred to over 50,000 supporters",
+      "Raised over $1.5 million in the last 12 months alone",
+      "Expanded monthly donor program from a few hundred to 4,000+ recurring supporters",
+      "Increased email list by 1000% through strategic acquisition campaigns",
+      "Executed successful petition campaigns, engagement initiatives, and GOTV programs",
+      "Developed strategic campaign frameworks aligned with community priorities",
+      "Built sustainable fundraising infrastructure supporting long-term organizational growth",
+      "Established organization as leading voice for Arab-American advocacy"
+    ],
+    testimonial: {
+      quote: "Mojo Digital transformed our organization. They've been our trusted partner for over 4 years, helping us grow from a small nonprofit to a movement with tens of thousands of supporters and the resources to create real change for our community.",
+      author: "Executive Director",
+      role: "Arab-American Non-profit"
+    }
   },
   {
     id: "new-policy",
