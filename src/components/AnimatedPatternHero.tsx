@@ -41,14 +41,16 @@ const AnimatedPatternHero = ({ title, description, children }: AnimatedPatternHe
       </div>
       
       <div className="container mx-auto px-4 relative z-10">
-        <div className="max-w-[680px] space-y-6">
-          <h1 className="font-bebas text-white drop-shadow-lg leading-[0.95]" style={{ fontSize: 'clamp(2.5rem, 6vw, 5.5rem)', letterSpacing: '0.02em' }}>
-            {title}
-          </h1>
-          <p className="text-white/90 drop-shadow-md leading-relaxed" style={{ fontSize: 'clamp(1.125rem, 2vw, 1.25rem)' }}>
-            {description}
-          </p>
-          {children}
+        <div className="max-w-[680px] backdrop-blur-md bg-black/20 border border-white/10 rounded-2xl p-8 md:p-10 shadow-2xl">
+          <div className="space-y-6">
+            <h1 className="font-bebas text-white drop-shadow-lg leading-[0.95]" style={{ fontSize: 'clamp(2.5rem, 6vw, 5.5rem)', letterSpacing: '0.02em' }}>
+              {title}
+            </h1>
+            <p className="text-white/90 drop-shadow-md leading-relaxed" style={{ fontSize: 'clamp(1.125rem, 2vw, 1.25rem)' }}>
+              {description}
+            </p>
+            {children}
+          </div>
         </div>
       </div>
     </section>
