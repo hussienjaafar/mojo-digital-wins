@@ -116,35 +116,86 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Newsletter */}
+          {/* Legal */}
           <div>
-            <h4 className="font-bold mb-4">Stay Updated</h4>
-            <p className="text-primary-foreground/80 mb-4 text-sm">
-              Join our newsletter for progressive strategy insights.
-            </p>
-            <form onSubmit={handleNewsletterSubmit} className="space-y-2">
-              <Input
-                type="email"
-                placeholder="Your email"
-                className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/50"
-                required
-              />
-              <Button variant="cta" size="default" className="w-full" type="submit">
-                Subscribe
-              </Button>
-            </form>
+            <h4 className="font-bold mb-4">Legal</h4>
+            <ul className="space-y-2">
+              <li>
+                <Link
+                  to="/privacy-policy"
+                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                >
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/terms-of-service"
+                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                >
+                  Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/cookie-policy"
+                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                >
+                  Cookie Policy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/disclaimer"
+                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                >
+                  Disclaimer
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/accessibility"
+                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                >
+                  Accessibility
+                </Link>
+              </li>
+            </ul>
           </div>
         </div>
 
-        <div className="border-t border-primary-foreground/20 mt-12 pt-8 text-center text-primary-foreground/60 text-sm">
-          <p className="mb-2 text-primary-foreground/80">
-            <span className="font-semibold">Ethical Fundraising Commitment:</span> Performance with principles. We
-            prioritize long-term donor relationships and never compromise values for ROI.
-          </p>
-          <p>© {new Date().getFullYear()} Molitico. All rights reserved.</p>
-          <p className="mt-2">
-            Paid for by Molitico. Not authorized by any candidate or candidate's committee.
-          </p>
+        <div className="border-t border-primary-foreground/20 mt-12 pt-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            {/* Newsletter */}
+            <div>
+              <h4 className="font-bold mb-4">Stay Updated</h4>
+              <p className="text-primary-foreground/80 mb-4 text-sm">
+                Join our newsletter for progressive strategy insights.
+              </p>
+              <form onSubmit={handleNewsletterSubmit} className="space-y-2">
+                <Input
+                  type="email"
+                  placeholder="Your email"
+                  className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/50"
+                  required
+                />
+                <Button variant="cta" size="default" className="w-full" type="submit">
+                  Subscribe
+                </Button>
+              </form>
+            </div>
+          </div>
+
+          <div className="text-center text-primary-foreground/60 text-sm">
+            <p className="mb-2 text-primary-foreground/80">
+              <span className="font-semibold">Ethical Fundraising Commitment:</span> Performance with principles. We
+              prioritize long-term donor relationships and never compromise values for ROI.
+            </p>
+            <p>© {new Date().getFullYear()} Molitico. All rights reserved.</p>
+            <p className="mt-2">
+              Paid for by Molitico. Not authorized by any candidate or candidate's committee.
+            </p>
+          </div>
         </div>
       </div>
     </footer>
