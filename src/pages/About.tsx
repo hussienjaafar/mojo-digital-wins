@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Target, Users, TrendingUp, Award, Lightbulb, Zap, DollarSign, Rocket } from "lucide-react";
+import { ClientLogo } from "@/components/ClientLogos";
+import { Target, Users, TrendingUp, Award, Lightbulb, Zap, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
@@ -137,12 +138,8 @@ const About = () => {
                   className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] border border-border/50 bg-card/50 backdrop-blur-sm animate-fade-in"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <CardContent className="p-6 flex items-center justify-center min-h-[120px]">
-                    <div className="text-center">
-                      <p className="font-bebas text-lg md:text-xl text-foreground uppercase tracking-wide leading-tight group-hover:text-primary transition-colors duration-300">
-                        {client}
-                      </p>
-                    </div>
+                  <CardContent className="p-8 flex items-center justify-center min-h-[140px]">
+                    <ClientLogo name={client} className="text-foreground group-hover:text-primary transition-colors duration-300" />
                   </CardContent>
                 </Card>
               ))}
