@@ -14,8 +14,15 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedPatternHero from "@/components/AnimatedPatternHero";
 import AnimatedServiceGraphic from "@/components/AnimatedServiceGraphic";
+import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 const Services = () => {
+  const service1 = useScrollAnimation({ threshold: 0.2 });
+  const service2 = useScrollAnimation({ threshold: 0.2 });
+  const service3 = useScrollAnimation({ threshold: 0.2 });
+  const additionalServices = useScrollAnimation({ threshold: 0.2 });
+  const processSection = useScrollAnimation({ threshold: 0.2 });
+
   return (
     <div className="min-h-screen">
       <Navigation />
@@ -29,7 +36,12 @@ const Services = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto space-y-20">
             {/* Service 1 */}
-            <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div 
+              ref={service1.ref}
+              className={`grid md:grid-cols-2 gap-12 items-center transition-all duration-1000 ${
+                service1.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+            >
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 order-2 md:order-1 border border-border/50 bg-card backdrop-blur-sm">
                 <CardContent className="p-8 space-y-6">
                   <div className="w-16 h-16 bg-gradient-to-br from-secondary to-accent rounded-full flex items-center justify-center shadow-md">
@@ -62,7 +74,12 @@ const Services = () => {
             </div>
 
             {/* Service 2 */}
-            <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div 
+              ref={service2.ref}
+              className={`grid md:grid-cols-2 gap-12 items-center transition-all duration-1000 ${
+                service2.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+            >
               <AnimatedServiceGraphic variant="messageBubbles" />
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
                 <CardContent className="p-8 space-y-6">
@@ -93,7 +110,12 @@ const Services = () => {
             </div>
 
             {/* Service 3 */}
-            <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div 
+              ref={service3.ref}
+              className={`grid md:grid-cols-2 gap-12 items-center transition-all duration-1000 ${
+                service3.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+            >
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 order-2 md:order-1 border border-border/50 bg-card backdrop-blur-sm">
                 <CardContent className="p-8 space-y-6">
                   <div className="w-16 h-16 bg-gradient-to-br from-accent to-secondary rounded-full flex items-center justify-center shadow-md">
@@ -135,7 +157,12 @@ const Services = () => {
             Plus Everything Else You Need
           </h2>
           
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div 
+            ref={additionalServices.ref}
+            className={`grid md:grid-cols-3 gap-8 max-w-6xl mx-auto transition-all duration-1000 ${
+              additionalServices.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            }`}
+          >
             {[
               { icon: Palette, title: "Creative Production", description: "Eye-catching graphics, videos, and ad creative that stops the scroll and drives action." },
               { icon: BarChart3, title: "Analytics & Reporting", description: "Clear, actionable insights on what's working, what's not, and where to invest next." },
@@ -168,7 +195,12 @@ const Services = () => {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
+            <div 
+              ref={processSection.ref}
+              className={`grid md:grid-cols-3 gap-8 transition-all duration-1000 ${
+                processSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+            >
               {[
                 { step: "01", title: "Discovery & Strategy", description: "We learn your organization inside and out, then build a data-driven plan to win." },
                 { step: "02", title: "Launch & Test", description: "Quick deployment of campaigns with rigorous A/B testing from day one." },
