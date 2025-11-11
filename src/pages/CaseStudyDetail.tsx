@@ -1,10 +1,18 @@
 import { useParams, Link, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { caseStudies } from "@/data/caseStudies";
-import { ArrowLeft, Clock, CheckCircle2, Quote } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, Quote, Home } from "lucide-react";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 
 const CaseStudyDetail = () => {
@@ -40,6 +48,34 @@ const CaseStudyDetail = () => {
         
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto">
+            {/* Breadcrumb Navigation */}
+            <Breadcrumb className="mb-6">
+              <BreadcrumbList className="text-primary-foreground/90">
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link to="/" className="flex items-center gap-1 hover:text-primary-foreground transition-colors">
+                      <Home className="w-4 h-4" />
+                      <span>Home</span>
+                    </Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="text-primary-foreground/60" />
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link to="/case-studies" className="hover:text-primary-foreground transition-colors">
+                      Case Studies
+                    </Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="text-primary-foreground/60" />
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="text-primary-foreground font-semibold">
+                    {caseStudy.title}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+            
             <Link to="/case-studies">
               <Button variant="outline" className="mb-6 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary">
                 <ArrowLeft className="w-4 h-4 mr-2" />
