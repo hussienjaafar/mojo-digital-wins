@@ -79,9 +79,9 @@ const About = () => {
               }`}
             >
               {[
-                { icon: Rocket, label: "Campaigns Won", value: 50, suffix: "+" },
-                { icon: DollarSign, label: "Raised", value: 25, prefix: "$", suffix: "M+" },
-                { icon: Users, label: "Supporters Mobilized", value: 500, suffix: "K+" }
+                { icon: TrendingUp, label: "Average ROI", value: 425, suffix: "%" },
+                { icon: DollarSign, label: "Raised", value: 10, prefix: "$", suffix: "M+" },
+                { icon: Users, label: "Donors Acquired", value: 200, suffix: "K+" }
               ].map((stat, index) => (
                 <div
                   key={index}
