@@ -30,8 +30,76 @@ const CaseStudyDetail = () => {
     return <Navigate to="/case-studies" replace />;
   }
 
+  // Structured Data for SEO
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "A New Policy",
+    "url": window.location.origin,
+    "logo": `${window.location.origin}/logo.png`,
+    "description": "Full-service political consulting and campaign management firm specializing in progressive campaigns and social justice movements"
+  };
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": window.location.origin
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Case Studies",
+        "item": `${window.location.origin}/case-studies`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": caseStudy.title,
+        "item": window.location.href
+      }
+    ]
+  };
+
+  const articleSchema = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": caseStudy.title,
+    "description": caseStudy.description,
+    "image": caseStudy.image ? `${window.location.origin}${caseStudy.image}` : undefined,
+    "author": {
+      "@type": "Organization",
+      "name": "A New Policy"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "A New Policy",
+      "logo": {
+        "@type": "ImageObject",
+        "url": `${window.location.origin}/logo.png`
+      }
+    },
+    "articleSection": caseStudy.category,
+    "keywords": `${caseStudy.category}, political campaign, case study, ${caseStudy.title}`
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Structured Data for SEO */}
+      <script type="application/ld+json">
+        {JSON.stringify(organizationSchema)}
+      </script>
+      <script type="application/ld+json">
+        {JSON.stringify(breadcrumbSchema)}
+      </script>
+      <script type="application/ld+json">
+        {JSON.stringify(articleSchema)}
+      </script>
+      
       <ScrollProgressIndicator />
       <Navigation />
 
