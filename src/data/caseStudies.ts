@@ -185,7 +185,7 @@ export const caseStudies: CaseStudy[] = [
     id: "arab-american-nonprofit",
     title: "Arab-American Non-profit",
     category: "501C(3)",
-    stat: "$1.5M Raised",
+    stat: "304% ROI",
     description: "4-year strategic partnership growing a leading Arab-American nonprofit from a few hundred donors to over 50,000 supporters. Raised $1.5M+ in the last 12 months alone through comprehensive digital organizing and strategic campaigns.",
     metrics: [
       { icon: Users, label: "5,909 New Donors", value: "5,909" },
