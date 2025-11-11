@@ -230,6 +230,42 @@ All colors MUST be HSL.
     }
   }
 
+  /* SVG Path Drawing Animations */
+  @keyframes draw-path {
+    0% {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.3;
+    }
+    100% {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 0;
+      opacity: 0.3;
+    }
+  }
+
+  .animate-draw-path {
+    animation: draw-path 8s ease-in-out infinite;
+  }
+
+  .animate-draw-path-delayed-1 {
+    animation: draw-path 8s ease-in-out infinite;
+    animation-delay: 2s;
+  }
+
+  .animate-draw-path-delayed-2 {
+    animation: draw-path 8s ease-in-out infinite;
+    animation-delay: 4s;
+  }
+
+  .animate-draw-path-delayed-3 {
+    animation: draw-path 8s ease-in-out infinite;
+    animation-delay: 6s;
+  }
+
   .text-caption {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-normal);

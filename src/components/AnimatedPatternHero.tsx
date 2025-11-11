@@ -16,6 +16,65 @@ const AnimatedPatternHero = ({ title, description, children }: AnimatedPatternHe
         <div className="absolute bottom-10 left-20 w-[500px] h-[500px] bg-destructive/25 rounded-full blur-3xl animate-pulse-subtle" style={{ animationDelay: '1s' }} />
         <div className="absolute top-1/3 right-1/3 w-80 h-80 bg-secondary/20 rounded-full blur-3xl animate-pulse-subtle" style={{ animationDelay: '2s' }} />
         
+        {/* Animated SVG Path Drawings */}
+        <svg className="absolute inset-0 w-full h-full opacity-30" xmlns="http://www.w3.org/2000/svg">
+          {/* Abstract Geometric Path 1 */}
+          <path
+            d="M 50 100 Q 150 50, 250 100 T 450 100 L 500 200 Q 450 250, 400 200 T 200 200 Z"
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            className="animate-draw-path"
+          />
+          
+          {/* Abstract Geometric Path 2 */}
+          <path
+            d="M 600 300 L 700 250 L 750 350 L 650 400 Z M 680 300 L 720 320 L 700 360 L 660 340 Z"
+            fill="none"
+            stroke="white"
+            strokeWidth="2.5"
+            className="animate-draw-path-delayed-1"
+          />
+          
+          {/* Flowing Curve Path */}
+          <path
+            d="M 100 400 Q 200 350, 300 450 Q 400 550, 500 450 Q 600 350, 700 400"
+            fill="none"
+            stroke="white"
+            strokeWidth="3"
+            className="animate-draw-path-delayed-2"
+            opacity="0.7"
+          />
+          
+          {/* Complex Angular Pattern */}
+          <path
+            d="M 800 100 L 900 150 L 850 200 L 950 250 L 900 300 L 800 250 L 850 200 L 750 150 Z"
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            className="animate-draw-path-delayed-3"
+          />
+          
+          {/* Spiral-like Pattern */}
+          <path
+            d="M 200 600 Q 250 550, 300 600 Q 350 650, 400 600 Q 450 550, 500 600"
+            fill="none"
+            stroke="white"
+            strokeWidth="2.5"
+            className="animate-draw-path"
+            opacity="0.6"
+          />
+          
+          {/* Interconnected Triangles */}
+          <path
+            d="M 1000 400 L 1100 450 L 1050 550 Z M 1100 450 L 1150 400 L 1200 500 L 1050 550 Z"
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            className="animate-draw-path-delayed-1"
+          />
+        </svg>
+        
         {/* Grid Pattern Overlay */}
         <svg className="absolute inset-0 w-full h-full opacity-10" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -32,12 +91,6 @@ const AnimatedPatternHero = ({ title, description, children }: AnimatedPatternHe
         <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-accent/20 rotate-12 animate-float" style={{ animationDelay: '0.5s' }} />
         <div className="absolute bottom-1/3 right-1/4 w-32 h-32 border-4 border-destructive/30 animate-float" style={{ animationDelay: '2.5s' }} />
         <div className="absolute top-1/4 left-1/3 w-28 h-28 border-4 border-secondary/40 rounded-full animate-float" style={{ animationDelay: '3s' }} />
-        
-        {/* Diagonal Lines */}
-        <div className="absolute top-0 left-0 w-full h-full opacity-5">
-          <div className="absolute top-0 left-1/4 w-1 h-full bg-primary-foreground rotate-12" />
-          <div className="absolute top-0 right-1/3 w-1 h-full bg-primary-foreground -rotate-12" />
-        </div>
       </div>
       
       <div className="container mx-auto px-4 relative z-10">
