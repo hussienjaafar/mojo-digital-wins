@@ -15,6 +15,7 @@ import Footer from "@/components/Footer";
 import AnimatedPatternHero from "@/components/AnimatedPatternHero";
 import AnimatedServiceGraphic from "@/components/AnimatedServiceGraphic";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
+import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 
 const Services = () => {
   const service1 = useScrollAnimation({ threshold: 0.2 });
@@ -28,6 +29,7 @@ const Services = () => {
 
   return (
     <div className="min-h-screen">
+      <ScrollProgressIndicator />
       <Navigation />
       <AnimatedPatternHero
         title="Services That Drive Progressive Wins"
