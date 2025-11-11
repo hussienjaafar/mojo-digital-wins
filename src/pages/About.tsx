@@ -109,6 +109,55 @@ const About = () => {
         </div>
       </section>
 
+      {/* Clients Section */}
+      <section className="py-20 md:py-32 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto space-y-12">
+            <div className="text-center space-y-4">
+              <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+                Trusted By Progressive Leaders
+              </h2>
+              <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
+                From Senate campaigns to grassroots nonprofits, we partner with organizations fighting for real change
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {[
+                "Unity & Justice Fund",
+                "Abdul for U.S. Senate",
+                "Nasser for Michigan",
+                "Preston For PA",
+                "Rashid for Illinois",
+                "Arab-American Non-profit",
+                "A New Policy",
+                "Progressive PACs"
+              ].map((client, index) => (
+                <Card
+                  key={index}
+                  className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] border border-border/50 bg-card/50 backdrop-blur-sm animate-fade-in"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <CardContent className="p-6 flex items-center justify-center min-h-[120px]">
+                    <div className="text-center">
+                      <p className="font-bebas text-lg md:text-xl text-foreground uppercase tracking-wide leading-tight group-hover:text-primary transition-colors duration-300">
+                        {client}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="text-center pt-8">
+              <p className="text-muted-foreground text-lg">
+                And many more progressive campaigns across the country
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Our Values */}
       <section className="py-20 md:py-32 bg-muted/30">
         <div className="container mx-auto px-4">
