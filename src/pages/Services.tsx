@@ -63,7 +63,13 @@ const Services = () => {
                       "Daily optimization based on real-time data",
                       "Transparent reporting on spend and results"
                     ].map((item, index) => (
-                      <li key={index} className="flex items-start gap-3">
+                      <li 
+                        key={index} 
+                        className={`flex items-start gap-3 transition-all duration-700 ${
+                          service1.isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
+                        }`}
+                        style={{ transitionDelay: `${400 + index * 100}ms` }}
+                      >
                         <Zap className="h-5 w-5 text-accent mt-1 flex-shrink-0 drop-shadow-sm" />
                         <span className="text-foreground/80">{item}</span>
                       </li>
@@ -114,7 +120,13 @@ const Services = () => {
                       "Real-time response handling and list management",
                       "Integration with your CRM and voter file"
                     ].map((item, index) => (
-                      <li key={index} className="flex items-start gap-3">
+                      <li 
+                        key={index} 
+                        className={`flex items-start gap-3 transition-all duration-700 ${
+                          service2.isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
+                        }`}
+                        style={{ transitionDelay: `${400 + index * 100}ms` }}
+                      >
                         <Zap className="h-5 w-5 text-accent mt-1 flex-shrink-0 drop-shadow-sm" />
                         <span className="text-foreground/80">{item}</span>
                       </li>
@@ -149,7 +161,13 @@ const Services = () => {
                       "List segmentation for maximum relevance",
                       "Automated welcome series and recurring donor programs"
                     ].map((item, index) => (
-                      <li key={index} className="flex items-start gap-3">
+                      <li 
+                        key={index} 
+                        className={`flex items-start gap-3 transition-all duration-700 ${
+                          service3.isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
+                        }`}
+                        style={{ transitionDelay: `${400 + index * 100}ms` }}
+                      >
                         <Zap className="h-5 w-5 text-accent mt-1 flex-shrink-0 drop-shadow-sm" />
                         <span className="text-foreground/80">{item}</span>
                       </li>
@@ -188,7 +206,13 @@ const Services = () => {
               { icon: BarChart3, title: "Analytics & Reporting", description: "Clear, actionable insights on what's working, what's not, and where to invest next." },
               { icon: Target, title: "Strategic Consulting", description: "Not sure where to start? We'll audit your program and build a winning strategy." }
             ].map((service, index) => (
-              <Card key={index} className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
+              <Card 
+                key={index} 
+                className={`shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-700 border border-border/50 bg-card backdrop-blur-sm ${
+                  additionalServices.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
+                style={{ transitionDelay: `${index * 150}ms` }}
+              >
                 <CardContent className="p-8 text-center space-y-4">
                   <div className="w-16 h-16 mx-auto bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center shadow-md">
                     <service.icon className="h-8 w-8 text-white drop-shadow-sm" />
@@ -226,7 +250,13 @@ const Services = () => {
                 { step: "02", title: "Launch & Test", description: "Quick deployment of campaigns with rigorous A/B testing from day one." },
                 { step: "03", title: "Optimize & Scale", description: "Continuous improvement based on real-time data. We double down on what works." }
               ].map((process, index) => (
-                <div key={index} className="space-y-4">
+                <div 
+                  key={index} 
+                  className={`space-y-4 transition-all duration-700 ${
+                    processSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                  }`}
+                  style={{ transitionDelay: `${index * 200}ms` }}
+                >
                   <div className="text-6xl font-bold text-accent/20">{process.step}</div>
                   <h3 className="text-2xl font-bold text-foreground">{process.title}</h3>
                   <p className="text-muted-foreground leading-relaxed">{process.description}</p>
