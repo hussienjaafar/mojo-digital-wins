@@ -25,7 +25,7 @@ const About = () => {
               <div className="space-y-6">
                 <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>Our Story</h2>
                 <div className="space-y-4 text-lg text-foreground/80 leading-relaxed">
-                  <p>Mojo Digital was born in the fires of 2016, working with campaigns and movements where we saw firsthand how grassroots energy could be amplified through smart digital strategy.</p>
+                  <p>Molitico was born in the fires of 2016, working with campaigns and movements where we saw firsthand how grassroots energy could be amplified through smart digital strategy.</p>
                   <p>Since then, we've worked with dozens of progressive campaigns and causes, helping them raise millions in small-dollar donations and mobilize thousands of supporters.</p>
                   <p>We understand that every dollar matters, every volunteer is precious, and every message needs to break through the noise to inspire action.</p>
                 </div>

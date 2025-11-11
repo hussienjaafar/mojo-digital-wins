@@ -434,7 +434,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Why Mojo Digital */}
+      {/* Why Molitico */}
       <section className="py-16 md:py-24 diagonal-both bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden">
         {/* Animated Circles */}
         <div className="animated-circles z-0">

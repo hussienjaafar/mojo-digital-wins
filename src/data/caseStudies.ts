@@ -62,7 +62,7 @@ export const caseStudies: CaseStudy[] = [
       "Significantly increased name recognition and favorability in key demographics"
     ],
     testimonial: {
-      quote: "Mojo Digital became an essential part of our campaign infrastructure. Their ability to reach and mobilize our community while consistently delivering fundraising results has been transformative for our efforts to elect Zohran.",
+      quote: "Molitico became an essential part of our campaign infrastructure. Their ability to reach and mobilize our community while consistently delivering fundraising results has been transformative for our efforts to elect Zohran.",
       author: "Campaign Leadership",
       role: "Unity & Justice Fund"
     }
@@ -176,7 +176,7 @@ export const caseStudies: CaseStudy[] = [
       "Built sustainable fundraising infrastructure for long-term success"
     ],
     testimonial: {
-      quote: "When we came to Mojo Digital, we were behind and running out of time. They didn't just meet our goal—they exceeded it and built us a donor base that carried us to victory.",
+      quote: "When we came to Molitico, we were behind and running out of time. They didn't just meet our goal—they exceeded it and built us a donor base that carried us to victory.",
       author: "State Rep. Rashid",
       role: "Illinois State Representative"
     }
@@ -210,7 +210,7 @@ export const caseStudies: CaseStudy[] = [
       "Established organization as leading voice for Arab-American advocacy"
     ],
     testimonial: {
-      quote: "Mojo Digital transformed our organization. They've been our trusted partner for over 4 years, helping us grow from a small nonprofit to a movement with tens of thousands of supporters and the resources to create real change for our community.",
+      quote: "Molitico transformed our organization. They've been our trusted partner for over 4 years, helping us grow from a small nonprofit to a movement with tens of thousands of supporters and the resources to create real change for our community.",
       author: "Executive Director",
       role: "Arab-American Non-profit"
     }
@@ -243,7 +243,7 @@ export const caseStudies: CaseStudy[] = [
       "Provided strategic consulting on messaging and communications"
     ],
     testimonial: {
-      quote: "Mojo Digital helped us build our organization from the ground up. Their strategic approach gave us the resources and the community we needed to make real policy change.",
+      quote: "Molitico helped us build our organization from the ground up. Their strategic approach gave us the resources and the community we needed to make real policy change.",
       author: "Founding Director",
       role: "A New Policy"
     }
