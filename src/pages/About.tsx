@@ -130,8 +130,7 @@ const About = () => {
                 "Preston For PA",
                 "Rashid for Illinois",
                 "Arab-American Non-profit",
-                "A New Policy",
-                "Progressive PACs"
+                "A New Policy"
               ].map((client, index) => (
                 <Card
                   key={index}
