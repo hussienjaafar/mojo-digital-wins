@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ClientLogo } from "@/components/ClientLogos";
 import StatCounter from "@/components/StatCounter";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -638,6 +639,45 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* Client Logos Section */}
+      <section className="py-20 md:py-28 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto space-y-12">
+            <div className="text-center space-y-4">
+              <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+                Trusted By Progressive Leaders
+              </h2>
+              <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
+                Partnering with campaigns and organizations fighting for real change
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {[
+                "Abdul for U.S. Senate",
+                "Unity & Justice Fund",
+                "Nasser for Michigan",
+                "Preston For PA",
+                "Rashid for Illinois",
+                "Arab-American Non-profit",
+                "A New Policy"
+              ].map((client, index) => (
+                <Card
+                  key={index}
+                  className={`group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] border border-border/50 bg-card/50 backdrop-blur-sm animate-fade-in ${index === 6 ? 'md:col-start-2' : ''}`}
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <CardContent className="p-8 flex items-center justify-center min-h-[140px]">
+                    <ClientLogo name={client} className="text-foreground group-hover:text-primary transition-colors duration-300" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
 
 
       {/* Final CTA */}
