@@ -23,6 +23,7 @@ const logoMap: Record<string, string> = {
 
 export const ClientLogo = ({ name, className = "" }: ClientLogoProps) => {
   const logoSrc = logoMap[name];
+  const isPrestonLogo = name === "Preston For PA";
 
   if (logoSrc) {
     return (
@@ -30,6 +31,9 @@ export const ClientLogo = ({ name, className = "" }: ClientLogoProps) => {
         src={logoSrc} 
         alt={`${name} logo`}
         className={`w-full h-auto max-h-24 object-contain ${className}`}
+        style={isPrestonLogo ? { 
+          filter: 'brightness(0) saturate(100%) invert(27%) sepia(91%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)'
+        } : undefined}
       />
     );
   }
