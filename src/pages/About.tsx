@@ -5,9 +5,16 @@ import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedPatternHero from "@/components/AnimatedPatternHero";
+import AnimatedServiceGraphic from "@/components/AnimatedServiceGraphic";
+import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 
 const About = () => {
+  const storySection = useScrollAnimation({ threshold: 0.2 });
+  const whySection = useScrollAnimation({ threshold: 0.2 });
+  const graphic1 = useScrollAnimation({ threshold: 0.2 });
+  const graphic2 = useScrollAnimation({ threshold: 0.2 });
+
   return (
     <div className="min-h-screen">
       <ScrollProgressIndicator />
@@ -20,8 +27,13 @@ const About = () => {
       {/* Our Story */}
       <section className="py-20 md:py-32 bg-background">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
+          <div className="max-w-6xl mx-auto">
+            <div 
+              ref={storySection.ref}
+              className={`grid md:grid-cols-2 gap-12 items-center transition-all duration-1000 ${
+                storySection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+            >
               <div className="space-y-6">
                 <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>Our Story</h2>
                 <div className="space-y-4 text-lg text-foreground/80 leading-relaxed">
@@ -30,7 +42,14 @@ const About = () => {
                   <p>We understand that every dollar matters, every volunteer is precious, and every message needs to break through the noise to inspire action.</p>
                 </div>
               </div>
-              <div className="aspect-square rounded-xl bg-gradient-to-br from-secondary to-accent shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]" />
+              <div 
+                ref={graphic1.ref}
+                className={`transition-all duration-1000 delay-300 ${
+                  graphic1.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+                }`}
+              >
+                <AnimatedServiceGraphic variant="messageBubbles" />
+              </div>
             </div>
           </div>
         </div>
@@ -64,29 +83,43 @@ const About = () => {
       <section className="py-20 md:py-32 bg-background">
         <div className="container mx-auto px-4">
           <h2 className="font-bebas text-primary text-center mb-16 leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>Why Choose Us</h2>
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6">
-              <h3 className="text-3xl font-bold text-foreground">We're more than just marketers.</h3>
-              <div className="space-y-4 text-lg text-foreground/80 leading-relaxed">
-                <p>We're a team of former campaign staffers, organizers, and technologists who are passionate about progressive change.</p>
-                <p>We bring a unique blend of political savvy and digital expertise to every project.</p>
+          <div className="max-w-6xl mx-auto">
+            <div 
+              ref={whySection.ref}
+              className={`grid md:grid-cols-2 gap-12 items-center transition-all duration-1000 ${
+                whySection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+            >
+              <div 
+                ref={graphic2.ref}
+                className={`transition-all duration-1000 delay-300 ${
+                  graphic2.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+                }`}
+              >
+                <AnimatedServiceGraphic variant="megaphone" />
               </div>
-              <ul className="space-y-3">
-                <li className="flex items-center space-x-3">
-                  <Zap className="h-5 w-5 text-secondary" />
-                  <span>Proven track record of success</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <Lightbulb className="h-5 w-5 text-secondary" />
-                  <span>Deep understanding of progressive politics</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <Award className="h-5 w-5 text-secondary" />
-                  <span>Data-driven approach to maximize impact</span>
-                </li>
-              </ul>
+              <div className="space-y-6">
+                <h3 className="text-3xl font-bold text-foreground">We're more than just marketers.</h3>
+                <div className="space-y-4 text-lg text-foreground/80 leading-relaxed">
+                  <p>We're a team of former campaign staffers, organizers, and technologists who are passionate about progressive change.</p>
+                  <p>We bring a unique blend of political savvy and digital expertise to every project.</p>
+                </div>
+                <ul className="space-y-3">
+                  <li className="flex items-center space-x-3">
+                    <Zap className="h-5 w-5 text-secondary" />
+                    <span>Proven track record of success</span>
+                  </li>
+                  <li className="flex items-center space-x-3">
+                    <Lightbulb className="h-5 w-5 text-secondary" />
+                    <span>Deep understanding of progressive politics</span>
+                  </li>
+                  <li className="flex items-center space-x-3">
+                    <Award className="h-5 w-5 text-secondary" />
+                    <span>Data-driven approach to maximize impact</span>
+                  </li>
+                </ul>
+              </div>
             </div>
-            <div className="aspect-square rounded-xl bg-gradient-to-br from-accent to-destructive shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]" />
           </div>
         </div>
       </section>
