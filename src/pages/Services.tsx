@@ -57,13 +57,13 @@ const Services = () => {
                 </CardContent>
               </Card>
               <div className="order-1 md:order-2">
-                <AnimatedServiceGraphic variant="hexagons" />
+                <AnimatedServiceGraphic variant="megaphone" />
               </div>
             </div>
 
             {/* Service 2 */}
             <div className="grid md:grid-cols-2 gap-12 items-center">
-              <AnimatedServiceGraphic variant="network" />
+              <AnimatedServiceGraphic variant="messageBubbles" />
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
                 <CardContent className="p-8 space-y-6">
                   <div className="w-16 h-16 bg-gradient-to-br from-destructive to-secondary rounded-full flex items-center justify-center shadow-md">
@@ -121,7 +121,7 @@ const Services = () => {
                 </CardContent>
               </Card>
               <div className="order-1 md:order-2">
-                <AnimatedServiceGraphic variant="triangles" />
+                <AnimatedServiceGraphic variant="envelope" />
               </div>
             </div>
           </div>
