@@ -1,16 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Target, Users, TrendingUp, Award, Lightbulb, Zap } from "lucide-react";
+import { Target, Users, TrendingUp, Award, Lightbulb, Zap, DollarSign, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedPatternHero from "@/components/AnimatedPatternHero";
 import AnimatedServiceGraphic from "@/components/AnimatedServiceGraphic";
+import StatCounter from "@/components/StatCounter";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 
 const About = () => {
   const storySection = useScrollAnimation({ threshold: 0.2 });
+  const statsSection = useScrollAnimation({ threshold: 0.2 });
   const whySection = useScrollAnimation({ threshold: 0.2 });
   const graphic1 = useScrollAnimation({ threshold: 0.2 });
   const graphic2 = useScrollAnimation({ threshold: 0.2 });
@@ -50,6 +52,58 @@ const About = () => {
               >
                 <AnimatedServiceGraphic variant="team" />
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Impact Stats */}
+      <section className="py-20 md:py-32 bg-gradient-to-br from-primary via-secondary to-accent relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-4xl mx-auto text-center space-y-12">
+            <div className="space-y-4">
+              <h2 className="font-bebas text-white leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+                Our Impact By The Numbers
+              </h2>
+              <p className="text-lg md:text-xl text-white/90 leading-relaxed">
+                Since 2016, we've helped progressive campaigns and causes achieve remarkable results
+              </p>
+            </div>
+
+            <div 
+              ref={statsSection.ref}
+              className={`grid md:grid-cols-3 gap-8 transition-all duration-1000 ${
+                statsSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+            >
+              {[
+                { icon: Rocket, label: "Campaigns Won", value: 50, suffix: "+" },
+                { icon: DollarSign, label: "Raised", value: 25, prefix: "$", suffix: "M+" },
+                { icon: Users, label: "Supporters Mobilized", value: 500, suffix: "K+" }
+              ].map((stat, index) => (
+                <div
+                  key={index}
+                  className={`space-y-4 transition-all duration-700 ${
+                    statsSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                  }`}
+                  style={{ transitionDelay: `${index * 150}ms` }}
+                >
+                  <div className="w-20 h-20 mx-auto bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
+                    <stat.icon className="h-10 w-10 text-white drop-shadow-lg" />
+                  </div>
+                  <div className="text-5xl md:text-6xl font-bold text-white font-bebas tracking-wider">
+                    <StatCounter 
+                      end={stat.value} 
+                      prefix={stat.prefix} 
+                      suffix={stat.suffix}
+                      duration={2500}
+                    />
+                  </div>
+                  <p className="text-lg text-white/90 font-medium">{stat.label}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
