@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Mail, MessageSquare, Phone } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
-import heroImage from "@/assets/hero-movement.jpg";
+import AnimatedPatternHero from "@/components/AnimatedPatternHero";
 
 const Contact = () => {
   const handleSubmit = (e: React.FormEvent) => {
@@ -17,22 +17,10 @@ const Contact = () => {
   return (
     <div className="min-h-screen">
       <Navigation />
-      {/* Hero Section */}
-      <section className="relative pt-28 md:pt-32 pb-20 md:pb-32 overflow-hidden">
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${heroImage})` }} />
-        <div className="absolute inset-0 bg-primary/75" />
-        
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-[680px] space-y-6">
-            <h1 className="font-bebas text-primary-foreground leading-[0.95]" style={{ fontSize: 'clamp(2.5rem, 6vw, 5.5rem)', letterSpacing: '0.02em' }}>
-              Let's Win Together
-            </h1>
-            <p className="text-primary-foreground/90 leading-relaxed" style={{ fontSize: 'clamp(1.125rem, 2vw, 1.25rem)' }}>
-              Ready to make progressive impact? Tell us about your organization and goals, and we'll show you how we can help.
-            </p>
-          </div>
-        </div>
-      </section>
+      <AnimatedPatternHero
+        title="Let's Win Together"
+        description="Ready to make progressive impact? Tell us about your organization and goals, and we'll show you how we can help."
+      />
 
       {/* Contact Form Section */}
       <section className="py-20 md:py-32 bg-background">
