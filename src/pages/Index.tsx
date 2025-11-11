@@ -353,28 +353,72 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Metrics Section */}
-      <section className="py-12 md:py-20 bg-gradient-to-br from-muted via-background to-muted relative">
+      {/* Metrics Section - Enhanced Visual Emphasis */}
+      <section className="py-16 md:py-28 bg-gradient-to-br from-muted via-background to-muted relative overflow-hidden">
+        {/* Animated Background Glow Effects */}
         <div className="absolute inset-0 energy-glow" />
+        <div className="absolute inset-0">
+          <div className="absolute top-1/2 left-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-[120px] animate-pulse" />
+          <div className="absolute top-1/2 right-1/4 w-96 h-96 bg-destructive/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
+        </div>
+        
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
-          <div className="text-center mb-8 md:mb-12 animate-fade-in">
+          <div className="text-center mb-12 md:mb-16 animate-fade-in">
+            <div className="inline-block mb-4 px-6 py-2 bg-secondary/10 border border-secondary/30 rounded-full">
+              <span className="text-sm font-bold text-secondary uppercase tracking-wider">Proven Track Record</span>
+            </div>
             <h2 className="text-headline text-foreground mb-4 tracking-wide">
               Real Numbers.<br/>Real Impact.
             </h2>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+              These aren't projections—they're results from actual progressive campaigns
+            </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-6xl mx-auto">
             {metrics.map((metric, index) => (
               <div 
                 key={index} 
-                className="text-center animate-bounce-in bg-card border-2 border-secondary/20 p-6 md:p-8 rounded-lg hover-lift hover-glow" 
-                style={{ animationDelay: `${index * 0.15}s` }}
+                className="group relative text-center animate-bounce-in bg-gradient-to-br from-card via-card to-muted border-2 border-secondary/20 p-8 md:p-10 rounded-2xl hover:border-secondary hover:scale-105 transition-all duration-500 shadow-lg hover:shadow-2xl" 
+                style={{ 
+                  animationDelay: `${index * 0.15}s`,
+                  boxShadow: '0 10px 40px rgba(20, 100, 217, 0.1)'
+                }}
               >
-                <div className="font-bebas text-4xl sm:text-5xl md:text-7xl text-secondary mb-2 leading-none">
-                  <StatCounter end={metric.value} prefix={metric.prefix} suffix={metric.suffix} />
+                {/* Glow Effect on Hover */}
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-secondary/5 to-destructive/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                
+                {/* Animated Border Gradient */}
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-secondary via-destructive to-accent opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-500" />
+                
+                {/* Content */}
+                <div className="relative z-10">
+                  {/* Metric Number with Pulsing Animation */}
+                  <div className="font-bebas text-5xl sm:text-6xl md:text-7xl lg:text-8xl mb-3 leading-none bg-gradient-to-br from-secondary via-secondary to-destructive bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(20,100,217,0.3)] group-hover:drop-shadow-[0_0_30px_rgba(20,100,217,0.6)] transition-all duration-500 animate-pulse-subtle">
+                    <StatCounter end={metric.value} prefix={metric.prefix} suffix={metric.suffix} duration={2500} />
+                  </div>
+                  
+                  {/* Label */}
+                  <div className="text-xs sm:text-sm md:text-base text-muted-foreground font-bold uppercase tracking-wider group-hover:text-foreground transition-colors duration-300">
+                    {metric.label}
+                  </div>
+                  
+                  {/* Icon Accent */}
+                  <div className="absolute -top-3 -right-3 w-8 h-8 bg-gradient-to-br from-secondary to-destructive rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                    <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                  </div>
                 </div>
-                <div className="text-xs sm:text-sm md:text-base text-muted-foreground font-bold uppercase tracking-wider">{metric.label}</div>
               </div>
             ))}
+          </div>
+          
+          {/* Bottom Emphasis Text */}
+          <div className="text-center mt-12 animate-fade-in" style={{ animationDelay: '0.8s' }}>
+            <p className="text-sm md:text-base text-muted-foreground font-medium">
+              <span className="text-secondary font-bold">200,000+ donors</span> acquired • 
+              <span className="text-destructive font-bold"> $10M+ raised</span> • 
+              <span className="text-accent-foreground font-bold"> 425% average ROI</span>
+            </p>
           </div>
         </div>
       </section>
