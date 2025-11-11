@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import abdulLogo from "@/assets/abdul-senate-logo.svg";
 import unityJusticeLogo from "@/assets/unity-justice-fund-logo.webp";
 import nasserMichiganLogo from "@/assets/nasser-michigan-logo.webp";
@@ -9,6 +10,7 @@ import aNewPolicyLogo from "@/assets/a-new-policy-logo.png";
 interface ClientLogoProps {
   name: string;
   className?: string;
+  linkable?: boolean;
 }
 
 const logoMap: Record<string, string> = {
@@ -21,29 +23,51 @@ const logoMap: Record<string, string> = {
   "A New Policy": aNewPolicyLogo,
 };
 
-export const ClientLogo = ({ name, className = "" }: ClientLogoProps) => {
+// Map client names to case study IDs
+const clientToCaseStudy: Record<string, string> = {
+  "Abdul for U.S. Senate": "abdul-senate",
+  "Unity & Justice Fund": "unity-justice-fund",
+  "Nasser for Michigan": "nasser-michigan",
+  "Preston For PA": "preston-pa",
+  "Rashid for Illinois": "rashid-illinois",
+  "Arab-American Non-profit": "arab-american-nonprofit",
+  "A New Policy": "new-policy",
+};
+
+export const ClientLogo = ({ name, className = "", linkable = true }: ClientLogoProps) => {
   const logoSrc = logoMap[name];
+  const caseStudyId = clientToCaseStudy[name];
   const isPrestonLogo = name === "Preston For PA";
 
-  if (logoSrc) {
-    return (
-      <img 
-        src={logoSrc} 
-        alt={`${name} logo`}
-        className={`w-full h-auto max-h-24 object-contain ${className}`}
-        style={isPrestonLogo ? { 
-          filter: 'brightness(0) saturate(100%) invert(27%) sepia(91%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)'
-        } : undefined}
-      />
-    );
-  }
-
-  // Fallback to text-based logo if no image available
-  return (
+  const logoImage = logoSrc ? (
+    <img 
+      src={logoSrc} 
+      alt={`${name} logo`}
+      className={`w-full h-auto max-h-24 object-contain ${className}`}
+      style={isPrestonLogo ? { 
+        filter: 'brightness(0) saturate(100%) invert(27%) sepia(91%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)'
+      } : undefined}
+    />
+  ) : (
+    // Fallback to text-based logo if no image available
     <div className={`font-bebas text-center ${className}`}>
       <div className="text-2xl md:text-3xl uppercase tracking-wide leading-tight">
         {name}
       </div>
     </div>
   );
+
+  // If linkable and has a case study, wrap in Link
+  if (linkable && caseStudyId) {
+    return (
+      <Link 
+        to={`/case-studies/${caseStudyId}`}
+        className="block w-full h-full group-hover:scale-105 transition-transform duration-300"
+      >
+        {logoImage}
+      </Link>
+    );
+  }
+
+  return logoImage;
 };

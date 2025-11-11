@@ -665,7 +665,7 @@ const Index = () => {
               ].map((client, index) => (
                 <Card
                   key={index}
-                  className={`group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] border border-border/50 bg-card/50 backdrop-blur-sm animate-fade-in ${index === 6 ? 'md:col-start-2' : ''}`}
+                  className={`group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] border border-border/50 bg-card/50 backdrop-blur-sm animate-fade-in cursor-pointer ${index === 6 ? 'md:col-start-2' : ''}`}
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <CardContent className="p-8 flex items-center justify-center min-h-[140px]">
