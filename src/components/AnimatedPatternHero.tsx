@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 
 interface AnimatedPatternHeroProps {
   title: string;
@@ -7,6 +7,28 @@ interface AnimatedPatternHeroProps {
 }
 
 const AnimatedPatternHero = ({ title, description, children }: AnimatedPatternHeroProps) => {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const shapesRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrolled = window.scrollY;
+      
+      if (svgRef.current) {
+        // Parallax effect on SVG paths - slower movement
+        svgRef.current.style.transform = `translateY(${scrolled * 0.3}px)`;
+      }
+      
+      if (shapesRef.current) {
+        // Parallax effect on floating shapes - medium speed
+        shapesRef.current.style.transform = `translateY(${scrolled * 0.5}px)`;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
     <section className="relative pt-28 md:pt-32 pb-20 md:pb-32 overflow-hidden">
       {/* Animated Pattern Background */}
@@ -17,7 +39,7 @@ const AnimatedPatternHero = ({ title, description, children }: AnimatedPatternHe
         <div className="absolute top-1/3 right-1/3 w-80 h-80 bg-secondary/20 rounded-full blur-3xl animate-pulse-subtle" style={{ animationDelay: '2s' }} />
         
         {/* Animated SVG Path Drawings */}
-        <svg className="absolute inset-0 w-full h-full opacity-30" xmlns="http://www.w3.org/2000/svg">
+        <svg ref={svgRef} className="absolute inset-0 w-full h-full opacity-30 transition-transform duration-100 ease-out" xmlns="http://www.w3.org/2000/svg">
           {/* Abstract Geometric Path 1 */}
           <path
             d="M 50 100 Q 150 50, 250 100 T 450 100 L 500 200 Q 450 250, 400 200 T 200 200 Z"
@@ -86,11 +108,13 @@ const AnimatedPatternHero = ({ title, description, children }: AnimatedPatternHe
         </svg>
         
         {/* Floating Geometric Shapes */}
-        <div className="absolute top-32 right-1/4 w-20 h-20 border-4 border-accent/40 rotate-45 animate-float" />
-        <div className="absolute bottom-32 left-1/4 w-24 h-24 border-4 border-primary-foreground/30 rounded-full animate-float" style={{ animationDelay: '1.5s' }} />
-        <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-accent/20 rotate-12 animate-float" style={{ animationDelay: '0.5s' }} />
-        <div className="absolute bottom-1/3 right-1/4 w-32 h-32 border-4 border-destructive/30 animate-float" style={{ animationDelay: '2.5s' }} />
-        <div className="absolute top-1/4 left-1/3 w-28 h-28 border-4 border-secondary/40 rounded-full animate-float" style={{ animationDelay: '3s' }} />
+        <div ref={shapesRef} className="absolute inset-0 transition-transform duration-100 ease-out">
+          <div className="absolute top-32 right-1/4 w-20 h-20 border-4 border-accent/40 rotate-45 animate-float" />
+          <div className="absolute bottom-32 left-1/4 w-24 h-24 border-4 border-primary-foreground/30 rounded-full animate-float" style={{ animationDelay: '1.5s' }} />
+          <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-accent/20 rotate-12 animate-float" style={{ animationDelay: '0.5s' }} />
+          <div className="absolute bottom-1/3 right-1/4 w-32 h-32 border-4 border-destructive/30 animate-float" style={{ animationDelay: '2.5s' }} />
+          <div className="absolute top-1/4 left-1/3 w-28 h-28 border-4 border-secondary/40 rounded-full animate-float" style={{ animationDelay: '3s' }} />
+        </div>
       </div>
       
       <div className="container mx-auto px-4 relative z-10">
