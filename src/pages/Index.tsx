@@ -15,6 +15,7 @@ import { featuredCaseStudies } from "@/data/caseStudies";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { useIsMobile } from "@/hooks/use-mobile";
+import PullToRefresh from "@/components/PullToRefresh";
 
 const Index = () => {
   const heroBackgroundRef = useRef<HTMLDivElement>(null);
@@ -80,9 +81,10 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <ScrollProgressIndicator />
-      <Navigation />
+    <PullToRefresh>
+      <div className="min-h-screen bg-background">
+        <ScrollProgressIndicator />
+        <Navigation />
 
       {/* Hero Section */}
       <section className="relative pt-28 md:pt-32 pb-16 md:pb-24 overflow-hidden">
@@ -772,7 +774,8 @@ const Index = () => {
       </section>
 
       <Footer />
-    </div>
+      </div>
+    </PullToRefresh>
   );
 };
 
