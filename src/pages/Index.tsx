@@ -19,7 +19,11 @@ const Index = () => {
   const caseStudiesSection = useScrollAnimation({ threshold: 0.2 });
   const servicesSection = useScrollAnimation({ threshold: 0.2 });
   const valuesSection = useScrollAnimation({ threshold: 0.2 });
-  const dataSection = useScrollAnimation({ threshold: 0.2 });
+  const metricsSection = useScrollAnimation({ threshold: 0.2 });
+  const whyMolitico = useScrollAnimation({ threshold: 0.2 });
+  const compoundingImpact = useScrollAnimation({ threshold: 0.2 });
+  const clientLogos = useScrollAnimation({ threshold: 0.2 });
+  const finalCTA = useScrollAnimation({ threshold: 0.2 });
 
   const metrics = [
     { value: 425, label: "Average ROI %", prefix: "", suffix: "%" },
@@ -371,7 +375,7 @@ const Index = () => {
       </section>
 
       {/* Metrics Section - Enhanced Visual Emphasis */}
-      <section className="py-16 md:py-28 bg-gradient-to-br from-muted via-background to-muted relative overflow-hidden">
+      <section ref={metricsSection.ref} className="py-16 md:py-28 bg-gradient-to-br from-muted via-background to-muted relative overflow-hidden">
         {/* Animated Background Glow Effects */}
         <div className="absolute inset-0 energy-glow" />
         <div className="absolute inset-0">
@@ -380,7 +384,9 @@ const Index = () => {
         </div>
         
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
-          <div className="text-center mb-12 md:mb-16 animate-fade-in">
+          <div className={`text-center mb-12 md:mb-16 transition-all duration-700 ${
+            metricsSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          }`}>
             <div className="inline-block mb-4 px-6 py-2 bg-secondary/10 border border-secondary/30 rounded-full">
               <span className="text-sm font-bold text-secondary uppercase tracking-wider">Proven Track Record</span>
             </div>
@@ -396,9 +402,11 @@ const Index = () => {
             {metrics.map((metric, index) => (
               <div 
                 key={index} 
-                className="group relative text-center animate-bounce-in bg-gradient-to-br from-card via-card to-muted border-2 border-secondary/20 p-8 md:p-10 rounded-2xl hover:border-secondary hover:scale-105 transition-all duration-500 shadow-lg hover:shadow-2xl" 
+                className={`group relative text-center bg-gradient-to-br from-card via-card to-muted border-2 border-secondary/20 p-8 md:p-10 rounded-2xl hover:border-secondary hover:scale-105 transition-all duration-700 shadow-lg hover:shadow-2xl ${
+                  metricsSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
                 style={{ 
-                  animationDelay: `${index * 0.15}s`,
+                  transitionDelay: `${index * 150}ms`,
                   boxShadow: '0 10px 40px rgba(20, 100, 217, 0.1)'
                 }}
               >
@@ -430,7 +438,9 @@ const Index = () => {
           </div>
           
           {/* Bottom Emphasis Text */}
-          <div className="text-center mt-12 animate-fade-in" style={{ animationDelay: '0.8s' }}>
+          <div className={`text-center mt-12 transition-all duration-700 ${
+            metricsSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          }`} style={{ transitionDelay: '600ms' }}>
             <p className="text-sm md:text-base text-muted-foreground font-medium">
               <span className="text-secondary font-bold">200,000+ donors</span> acquired • 
               <span className="text-destructive font-bold"> $10M+ raised</span> • 
@@ -441,14 +451,16 @@ const Index = () => {
       </section>
 
       {/* Why Molitico */}
-      <section className="py-16 md:py-24 diagonal-both bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden">
+      <section ref={whyMolitico.ref} className="py-16 md:py-24 diagonal-both bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden">
         {/* Animated Geometric Background */}
         <AnimatedGeometricBackground />
         
         <div className="absolute inset-0 texture-overlay z-[1]" />
         
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
-          <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16 animate-fade-in px-4">
+          <div className={`max-w-3xl mx-auto text-center mb-12 md:mb-16 px-4 transition-all duration-700 ${
+            whyMolitico.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          }`}>
             <h2 className="text-headline mb-4 md:mb-6 tracking-wide">
               Progressive Values.<br/>Proven Performance.
             </h2>
@@ -461,8 +473,10 @@ const Index = () => {
           <div className="max-w-5xl mx-auto">
             <div className="grid md:grid-cols-2 gap-6 md:gap-8">
               <div 
-                className="flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-accent hover-lift animate-fade-in"
-                style={{ animationDelay: '0.1s' }}
+                className={`flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-accent hover-lift transition-all duration-700 ${
+                  whyMolitico.isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'
+                }`}
+                style={{ transitionDelay: '100ms' }}
               >
                 <div className="bg-accent text-accent-foreground p-3 rounded-lg flex-shrink-0">
                   <TrendingUp size={28} />
@@ -476,8 +490,10 @@ const Index = () => {
               </div>
 
               <div 
-                className="flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-destructive hover-lift animate-fade-in"
-                style={{ animationDelay: '0.2s' }}
+                className={`flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-destructive hover-lift transition-all duration-700 ${
+                  whyMolitico.isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10'
+                }`}
+                style={{ transitionDelay: '200ms' }}
               >
                 <div className="bg-destructive text-destructive-foreground p-3 rounded-lg flex-shrink-0">
                   <Users size={28} />
@@ -491,8 +507,10 @@ const Index = () => {
               </div>
 
               <div 
-                className="flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-secondary hover-lift animate-fade-in"
-                style={{ animationDelay: '0.3s' }}
+                className={`flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-secondary hover-lift transition-all duration-700 ${
+                  whyMolitico.isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'
+                }`}
+                style={{ transitionDelay: '300ms' }}
               >
                 <div className="bg-secondary text-secondary-foreground p-3 rounded-lg flex-shrink-0">
                   <BarChart3 size={28} />
@@ -506,8 +524,10 @@ const Index = () => {
               </div>
 
               <div 
-                className="bg-accent/20 border-2 border-accent rounded-lg p-6 hover-glow animate-fade-in"
-                style={{ animationDelay: '0.4s' }}
+                className={`bg-accent/20 border-2 border-accent rounded-lg p-6 hover-glow transition-all duration-700 ${
+                  whyMolitico.isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10'
+                }`}
+                style={{ transitionDelay: '400ms' }}
               >
                 <div className="flex items-start gap-4">
                   <div className="bg-accent text-accent-foreground p-3 rounded-lg flex-shrink-0">
@@ -598,7 +618,7 @@ const Index = () => {
       </section>
 
       {/* Compounding Impact Model - Condensed */}
-      <section className="py-16 md:py-24 bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden diagonal-both">
+      <section ref={compoundingImpact.ref} className="py-16 md:py-24 bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden diagonal-both">
         {/* Animated Circles */}
         <div className="animated-circles z-0">
           <div className="circle-shape circle-1" />
@@ -608,7 +628,9 @@ const Index = () => {
         <div className="absolute inset-0 texture-overlay" />
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12 md:mb-16 animate-fade-in px-4">
+            <div className={`text-center mb-12 md:mb-16 px-4 transition-all duration-700 ${
+              compoundingImpact.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            }`}>
               <h2 className="text-headline mb-4 tracking-wide">
                 The Compounding<br/>Impact Model
               </h2>
@@ -626,8 +648,10 @@ const Index = () => {
               ].map((item, index) => (
                 <div
                   key={index}
-                  className="text-center bg-primary-foreground/10 border-2 border-accent/30 rounded-lg p-8 hover-lift animate-bounce-in backdrop-blur-sm"
-                  style={{ animationDelay: `${index * 0.15}s` }}
+                  className={`text-center bg-primary-foreground/10 border-2 border-accent/30 rounded-lg p-8 hover-lift backdrop-blur-sm transition-all duration-700 ${
+                    compoundingImpact.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+                  }`}
+                  style={{ transitionDelay: `${index * 150}ms` }}
                 >
                   <div className="text-sm font-bold text-accent mb-4 uppercase tracking-wider">STEP {item.step}</div>
                   <div className="font-bebas text-5xl text-primary-foreground mb-2 leading-none">{item.value}</div>
@@ -636,7 +660,9 @@ const Index = () => {
               ))}
             </div>
 
-            <div className="text-center">
+            <div className={`text-center transition-all duration-700 ${
+              compoundingImpact.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            }`} style={{ transitionDelay: '600ms' }}>
               <Button variant="brutal" size="xl" asChild className="text-lg">
                 <Link to="/services">Learn Our Process</Link>
               </Button>
@@ -646,10 +672,12 @@ const Index = () => {
       </section>
 
       {/* Client Logos Section */}
-      <section className="py-20 md:py-28 bg-background">
+      <section ref={clientLogos.ref} className="py-20 md:py-28 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto space-y-12">
-            <div className="text-center space-y-4">
+            <div className={`text-center space-y-4 transition-all duration-700 ${
+              clientLogos.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            }`}>
               <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
                 Trusted By Progressive Leaders
               </h2>
@@ -670,8 +698,10 @@ const Index = () => {
               ].map((client, index) => (
                 <Card
                   key={index}
-                  className={`group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] border border-border/50 bg-card/50 backdrop-blur-sm animate-fade-in cursor-pointer ${index === 6 ? 'md:col-start-2' : ''}`}
-                  style={{ animationDelay: `${index * 100}ms` }}
+                  className={`group hover:shadow-lg transition-all duration-700 hover:scale-[1.03] border border-border/50 bg-card/50 backdrop-blur-sm cursor-pointer ${
+                    clientLogos.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                  } ${index === 6 ? 'md:col-start-2' : ''}`}
+                  style={{ transitionDelay: `${index * 100}ms` }}
                 >
                   <CardContent className="p-8 flex items-center justify-center min-h-[140px]">
                     <ClientLogo name={client} className="text-foreground group-hover:text-primary transition-colors duration-300" />
@@ -686,19 +716,27 @@ const Index = () => {
 
 
       {/* Final CTA */}
-      <section className="py-28 bg-gradient-to-br from-primary via-destructive to-secondary text-primary-foreground relative overflow-hidden diagonal-top">
+      <section ref={finalCTA.ref} className="py-28 bg-gradient-to-br from-primary via-destructive to-secondary text-primary-foreground relative overflow-hidden diagonal-top">
         <div className="absolute inset-0 texture-overlay" />
         <div className="absolute inset-0 energy-glow" />
         <div className="container mx-auto px-4 text-center relative z-10">
-          <h2 className="font-bebas text-6xl md:text-8xl mb-8 animate-fade-in uppercase tracking-wide leading-none">
+          <h2 className={`font-bebas text-6xl md:text-8xl mb-8 uppercase tracking-wide leading-none transition-all duration-700 ${
+            finalCTA.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          }`}>
             Let's Win More.<br/>Together.
           </h2>
-          <p className="text-xl md:text-2xl text-primary-foreground/95 mb-12 max-w-2xl mx-auto animate-fade-in font-medium">
+          <p className={`text-xl md:text-2xl text-primary-foreground/95 mb-12 max-w-2xl mx-auto font-medium transition-all duration-700 ${
+            finalCTA.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          }`} style={{ transitionDelay: '200ms' }}>
             Book a strategy call to discover how we can grow your campaign and maximize your impact.
           </p>
-          <Button variant="brutal" size="xl" asChild className="animate-glow-pulse text-lg">
-            <Link to="/contact">Book Strategy Call</Link>
-          </Button>
+          <div className={`transition-all duration-700 ${
+            finalCTA.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          }`} style={{ transitionDelay: '400ms' }}>
+            <Button variant="brutal" size="xl" asChild className="animate-glow-pulse text-lg">
+              <Link to="/contact">Book Strategy Call</Link>
+            </Button>
+          </div>
         </div>
       </section>
 
