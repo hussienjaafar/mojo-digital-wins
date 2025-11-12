@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 const Index = () => {
+  const heroBackgroundRef = useRef<HTMLDivElement>(null);
   const howWeWin = useScrollAnimation({ threshold: 0.2 });
   const caseStudiesSection = useScrollAnimation({ threshold: 0.2 });
   const servicesSection = useScrollAnimation({ threshold: 0.2 });
@@ -24,6 +26,20 @@ const Index = () => {
   const compoundingImpact = useScrollAnimation({ threshold: 0.2 });
   const clientLogos = useScrollAnimation({ threshold: 0.2 });
   const finalCTA = useScrollAnimation({ threshold: 0.2 });
+
+  // Parallax effect for hero background
+  useEffect(() => {
+    const handleScroll = () => {
+      if (heroBackgroundRef.current) {
+        const scrolled = window.scrollY;
+        const parallaxSpeed = 0.5; // Adjust this value to control parallax intensity (0.5 = half speed)
+        heroBackgroundRef.current.style.transform = `translateY(${scrolled * parallaxSpeed}px)`;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const metrics = [
     { value: 425, label: "Average ROI %", prefix: "", suffix: "%" },
@@ -69,9 +85,12 @@ const Index = () => {
         {/* Background Image with Parallax and Navy Overlay */}
         <div className="absolute inset-0">
           <div 
-            className="hero-parallax-bg absolute inset-0 bg-cover bg-center"
+            ref={heroBackgroundRef}
+            className="absolute inset-0 bg-cover bg-center will-change-transform"
             style={{
               backgroundImage: `url(${heroRally})`,
+              top: '-20%',
+              bottom: '-20%',
             }}
           />
           <div className="absolute inset-0 bg-primary/75" />
