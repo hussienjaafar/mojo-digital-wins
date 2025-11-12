@@ -1,0 +1,312 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { Session } from "@supabase/supabase-js";
+import { Download, LogOut, Search, Filter } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type ContactSubmission = {
+  id: string;
+  created_at: string;
+  name: string;
+  email: string;
+  campaign: string | null;
+  organization_type: string | null;
+  message: string;
+};
+
+const Admin = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [session, setSession] = useState<Session | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
+  const [filteredSubmissions, setFilteredSubmissions] = useState<ContactSubmission[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  useEffect(() => {
+    if (session?.user) {
+      checkAdminStatus();
+    }
+  }, [session]);
+
+  const checkAdminStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session?.user?.id)
+        .eq('role', 'admin')
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (data) {
+        setIsAdmin(true);
+        fetchSubmissions();
+      } else {
+        toast({
+          title: "Access Denied",
+          description: "You need admin privileges to access this page.",
+          variant: "destructive",
+        });
+        navigate("/");
+      }
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      navigate("/");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchSubmissions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contact_submissions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setSubmissions(data || []);
+      setFilteredSubmissions(data || []);
+    } catch (error) {
+      console.error('Error fetching submissions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load submissions",
+        variant: "destructive",
+      });
+    }
+  };
+
+  useEffect(() => {
+    let filtered = submissions;
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(sub =>
+        sub.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sub.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sub.campaign?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sub.message.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply type filter
+    if (typeFilter !== "all") {
+      if (typeFilter === "newsletter") {
+        filtered = filtered.filter(sub => sub.message === "Newsletter subscription");
+      } else if (typeFilter === "contact") {
+        filtered = filtered.filter(sub => sub.message !== "Newsletter subscription");
+      }
+    }
+
+    setFilteredSubmissions(filtered);
+  }, [searchTerm, typeFilter, submissions]);
+
+  const exportToCSV = () => {
+    const headers = ["Date", "Name", "Email", "Campaign", "Type", "Message"];
+    const csvData = filteredSubmissions.map(sub => [
+      new Date(sub.created_at).toLocaleDateString(),
+      sub.name,
+      sub.email,
+      sub.campaign || "N/A",
+      sub.organization_type || "N/A",
+      sub.message.replace(/,/g, ";") // Replace commas to avoid CSV issues
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map(row => row.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `contact-submissions-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "Success",
+      description: "Data exported to CSV",
+    });
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate("/");
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-lg">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
+
+  const newsletterCount = submissions.filter(s => s.message === "Newsletter subscription").length;
+  const contactCount = submissions.filter(s => s.message !== "Newsletter subscription").length;
+
+  return (
+    <div className="min-h-screen bg-muted/30">
+      {/* Header */}
+      <header className="bg-primary text-primary-foreground shadow-md">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+          <Button variant="outline" onClick={handleSignOut} className="bg-primary-foreground/10 hover:bg-primary-foreground/20 border-primary-foreground/20">
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Total Submissions</CardDescription>
+              <CardTitle className="text-4xl">{submissions.length}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Newsletter Subscribers</CardDescription>
+              <CardTitle className="text-4xl">{newsletterCount}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Contact Forms</CardDescription>
+              <CardTitle className="text-4xl">{contactCount}</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+
+        {/* Filters and Export */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Contact Submissions & Subscribers</CardTitle>
+            <CardDescription>View and export all contact form submissions and newsletter subscribers</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, email, campaign, or message..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <Filter className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="newsletter">Newsletter Only</SelectItem>
+                  <SelectItem value="contact">Contact Forms Only</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={exportToCSV} variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </Button>
+            </div>
+
+            {/* Table */}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Campaign</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Message</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredSubmissions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        No submissions found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredSubmissions.map((submission) => (
+                      <TableRow key={submission.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {new Date(submission.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="font-medium">{submission.name}</TableCell>
+                        <TableCell>{submission.email}</TableCell>
+                        <TableCell>{submission.campaign || "N/A"}</TableCell>
+                        <TableCell>
+                          {submission.message === "Newsletter subscription" ? (
+                            <Badge variant="secondary">Newsletter</Badge>
+                          ) : (
+                            <Badge>Contact Form</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {submission.message}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
+    </div>
+  );
+};
+
+export default Admin;
