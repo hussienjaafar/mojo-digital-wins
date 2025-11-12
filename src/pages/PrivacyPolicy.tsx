@@ -267,7 +267,7 @@ const PrivacyPolicy = () => {
             </p>
             <div className="bg-muted p-6 rounded-lg text-foreground/80">
               <p className="font-semibold mb-2">Molitico</p>
-              <p>Email: privacy@molitico.com</p>
+              <p>Email: info@molitico.com</p>
               <p>Address: [Your Business Address]</p>
               <p>Phone: [Your Contact Number]</p>
             </div>

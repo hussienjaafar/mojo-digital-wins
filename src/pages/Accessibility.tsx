@@ -200,7 +200,7 @@ const Accessibility = () => {
               We welcome your feedback on the accessibility of our website. If you encounter accessibility barriers or need assistance:
             </p>
             <ul className="list-disc pl-6 mb-4 text-foreground/80 space-y-2">
-              <li>Email us at: accessibility@molitico.com</li>
+              <li>Email us at: info@molitico.com</li>
               <li>Call us at: [Your Contact Number]</li>
               <li>Contact us via our <Link to="/contact" className="text-primary hover:underline">contact form</Link></li>
             </ul>
@@ -273,7 +273,7 @@ const Accessibility = () => {
             </p>
             <div className="bg-muted p-6 rounded-lg text-foreground/80">
               <p className="font-semibold mb-2">Molitico Accessibility Team</p>
-              <p>Email: accessibility@molitico.com</p>
+              <p>Email: info@molitico.com</p>
               <p>Address: [Your Business Address]</p>
               <p>Phone: [Your Contact Number]</p>
               <p className="mt-4 text-sm">TTY/TDD: [Your TTY Number] (if available)</p>

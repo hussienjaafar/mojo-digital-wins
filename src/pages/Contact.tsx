@@ -41,7 +41,7 @@ const Contact = () => {
 
               <div className="space-y-6">
                 {[
-                  { icon: Mail, title: "Email Us", value: "hello@mojodigital.com" },
+                  { icon: Mail, title: "Email Us", value: "info@molitico.com" },
                   { icon: Phone, title: "Call Us", value: "(555) 123-4567" },
                   { icon: MessageSquare, title: "Quick Questions", value: "Use the form for fastest response" }
                 ].map((contact, index) => (
