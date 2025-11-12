@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 const PIXEL_ID = "1344961220416600";
 
@@ -59,6 +60,28 @@ export const trackEvent = (eventName: string, params?: Record<string, any>) => {
 export const trackCustomEvent = (eventName: string, params?: Record<string, any>) => {
   if (window.fbq) {
     window.fbq('trackCustom', eventName, params);
+  }
+};
+
+// Server-side conversion tracking
+export const trackConversion = async (
+  eventName: string,
+  customData?: Record<string, any>
+) => {
+  try {
+    const { error } = await supabase.functions.invoke('meta-conversions', {
+      body: {
+        event_name: eventName,
+        event_source_url: window.location.href,
+        custom_data: customData,
+      },
+    });
+
+    if (error) {
+      console.error('Error tracking conversion:', error);
+    }
+  } catch (error) {
+    console.error('Error tracking conversion:', error);
   }
 };
 
