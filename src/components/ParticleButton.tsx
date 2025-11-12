@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 interface Particle {
@@ -13,27 +13,37 @@ interface Particle {
   color: string;
 }
 
-interface ParticleButtonProps extends React.ComponentProps<typeof Button> {
+interface ParticleButtonProps {
   children: React.ReactNode;
+  to?: string;
+  href?: string;
+  onClick?: () => void;
+  className?: string;
   particleColor?: string;
   particleCount?: number;
+  variant?: "default" | "outline";
+  size?: "default" | "sm" | "lg" | "xl";
 }
 
 export const ParticleButton = ({ 
   children, 
+  to,
+  href,
+  onClick,
   className,
   particleColor = "hsl(var(--accent))",
   particleCount = 15,
-  ...props 
+  variant = "default",
+  size = "default",
 }: ParticleButtonProps) => {
   const [particles, setParticles] = useState<Particle[]>([]);
   const [isHovered, setIsHovered] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const buttonRef = useRef<HTMLAnchorElement | HTMLButtonElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();
   const particleIdRef = useRef(0);
 
-  const createParticles = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const createParticles = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     if (!buttonRef.current) return;
     
     const rect = buttonRef.current.getBoundingClientRect();
@@ -125,38 +135,80 @@ export const ParticleButton = ({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  return (
-    <div className="relative inline-block">
+  const baseClasses = cn(
+    "relative overflow-hidden transition-all duration-300 inline-flex items-center justify-center font-medium rounded-lg",
+    isHovered && "shadow-lg scale-105",
+    // Size variants
+    size === "sm" && "px-4 h-9 text-sm",
+    size === "default" && "px-6 h-10 text-base",
+    size === "lg" && "px-8 h-12 text-base",
+    size === "xl" && "px-10 h-14 text-lg",
+    // Variant styles
+    variant === "default" && "bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-[0_4px_20px_rgba(20,100,217,0.4)] hover:shadow-[0_6px_30px_rgba(20,100,217,0.7)]",
+    variant === "outline" && "border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary hover:shadow-[0_4px_20px_rgba(255,255,255,0.3)]",
+    className
+  );
+
+  const content = (
+    <>
       <canvas
         ref={canvasRef}
         className="absolute inset-0 pointer-events-none z-20"
         style={{ width: "100%", height: "100%" }}
       />
-      <Button
-        ref={buttonRef}
-        className={cn(
-          "relative overflow-hidden transition-all duration-300",
-          isHovered && "shadow-lg scale-105",
-          className
-        )}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onMouseMove={createParticles}
-        {...props}
+      <span className="relative z-10">{children}</span>
+      {isHovered && (
+        <span 
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"
+          style={{
+            backgroundSize: "200% 100%",
+            animation: "shimmer 2s infinite",
+          }}
+        />
+      )}
+    </>
+  );
+
+  const handlers = {
+    onMouseEnter: () => setIsHovered(true),
+    onMouseLeave: () => setIsHovered(false),
+    onMouseMove: createParticles,
+  };
+
+  if (to) {
+    return (
+      <Link
+        ref={buttonRef as React.RefObject<HTMLAnchorElement>}
+        to={to}
+        className={baseClasses}
+        {...handlers}
       >
-        <span className="relative z-10">{children}</span>
-        
-        {/* Ripple effect background */}
-        {isHovered && (
-          <span 
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"
-            style={{
-              backgroundSize: "200% 100%",
-              animation: "shimmer 2s infinite",
-            }}
-          />
-        )}
-      </Button>
-    </div>
+        {content}
+      </Link>
+    );
+  }
+
+  if (href) {
+    return (
+      <a
+        ref={buttonRef as React.RefObject<HTMLAnchorElement>}
+        href={href}
+        className={baseClasses}
+        {...handlers}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <button
+      ref={buttonRef as React.RefObject<HTMLButtonElement>}
+      onClick={onClick}
+      className={baseClasses}
+      {...handlers}
+    >
+      {content}
+    </button>
   );
 };

@@ -118,23 +118,23 @@ const Index = () => {
               }}
             >
               <ParticleButton 
-                size="lg" 
-                asChild
+                to="/contact"
+                size="lg"
                 particleColor="hsl(var(--secondary))"
                 particleCount={20}
-                className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold rounded-lg px-8 h-12 text-base shadow-[0_4px_20px_rgba(20,100,217,0.4)] hover:shadow-[0_6px_30px_rgba(20,100,217,0.7)]"
+                className="font-bold"
               >
-                <Link to="/contact">Grow Your Donor Base</Link>
+                Grow Your Donor Base
               </ParticleButton>
               <ParticleButton 
-                size="lg" 
-                variant="outline" 
-                asChild
+                to="/case-studies"
+                size="lg"
+                variant="outline"
                 particleColor="hsl(var(--accent))"
                 particleCount={18}
-                className="border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary font-semibold rounded-lg px-8 h-12 text-base hover:shadow-[0_4px_20px_rgba(255,255,255,0.3)]"
+                className="font-semibold"
               >
-                <Link to="/case-studies">See Results</Link>
+                See Results
               </ParticleButton>
             </div>
             
