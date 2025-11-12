@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ParticleButton } from "./ParticleButton";
-import { X, Clock, Users, Star } from "lucide-react";
+import { X, Clock, Users } from "lucide-react";
 
 export const ExitIntentPopup = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -121,20 +121,6 @@ export const ExitIntentPopup = () => {
             </ul>
           </div>
 
-          {/* Testimonial */}
-          <div className="p-5 bg-muted/50 rounded-lg border border-border space-y-3">
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Star key={i} className="w-4 h-4 fill-accent text-accent" />
-              ))}
-            </div>
-            <p className="text-foreground/80 italic leading-relaxed">
-              "Honestly wasn't sure what to expect, but the call was super helpful. They gave me specific advice for our campaign and didn't try to oversell anything. Ended up working together and raised $47K in the first month."
-            </p>
-            <p className="text-sm font-semibold text-foreground">
-              — Sarah M., Field Director
-            </p>
-          </div>
 
           <div className="space-y-4 pt-2">
             <ParticleButton
