@@ -7,6 +7,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 import BackToTop from "@/components/BackToTop";
 import CookieConsent from "@/components/CookieConsent";
+import { ExitIntentPopup } from "@/components/ExitIntentPopup";
 import Index from "./pages/Index";
 import About from "./pages/About";
 import Services from "./pages/Services";
@@ -29,6 +30,7 @@ const App = () => (
         <ScrollToTop />
         <BackToTop />
         <CookieConsent />
+        <ExitIntentPopup />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/about" element={<About />} />
