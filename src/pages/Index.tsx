@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -80,9 +81,58 @@ const Index = () => {
     "LGBTQ+ Equality",
   ];
 
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Molitico",
+    "url": "https://molitico.com",
+    "logo": "https://molitico.com/logo.png",
+    "description": "Progressive political campaign marketing and fundraising experts. We specialize in SMS fundraising, digital advertising, and email campaigns for progressive causes.",
+    "address": {
+      "@type": "PostalAddress",
+      "addressCountry": "US"
+    },
+    "sameAs": [
+      "https://facebook.com/molitico",
+      "https://twitter.com/molitico",
+      "https://linkedin.com/company/molitico",
+      "https://instagram.com/molitico"
+    ],
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "contactType": "Sales",
+      "url": "https://molitico.com/contact"
+    }
+  };
+
+  const servicesSchema = services.map(service => ({
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "serviceType": service.title,
+    "description": service.description,
+    "provider": {
+      "@type": "Organization",
+      "name": "Molitico",
+      "url": "https://molitico.com"
+    },
+    "areaServed": "US",
+    "audience": {
+      "@type": "Audience",
+      "audienceType": "Progressive Political Campaigns"
+    }
+  }));
+
   return (
     <PullToRefresh>
       <div className="min-h-screen bg-background">
+        <Helmet>
+          <script type="application/ld+json">
+            {JSON.stringify(organizationSchema)}
+          </script>
+          <script type="application/ld+json">
+            {JSON.stringify(servicesSchema)}
+          </script>
+        </Helmet>
         <ScrollProgressIndicator />
         <Navigation />
 
