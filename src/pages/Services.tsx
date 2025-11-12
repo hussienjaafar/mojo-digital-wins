@@ -6,11 +6,16 @@ import {
   Megaphone, 
   MessageSquare, 
   Mail, 
+  Monitor,
+  PieChart,
   BarChart3, 
   Palette, 
   Target,
   Zap
 } from "lucide-react";
+import billboardMamdani from "@/assets/billboard-mamdani-bus.webp";
+import billboardTimesSquareWide from "@/assets/billboard-times-square-wide.jpg";
+import billboardTimesSquareMedium from "@/assets/billboard-times-square-medium.jpg";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -23,9 +28,14 @@ const Services = () => {
   const service1 = useScrollAnimation({ threshold: 0.2 });
   const service2 = useScrollAnimation({ threshold: 0.2 });
   const service3 = useScrollAnimation({ threshold: 0.2 });
+  const service4 = useScrollAnimation({ threshold: 0.2 });
+  const service5 = useScrollAnimation({ threshold: 0.2 });
   const graphic1 = useScrollAnimation({ threshold: 0.2 });
   const graphic2 = useScrollAnimation({ threshold: 0.2 });
   const graphic3 = useScrollAnimation({ threshold: 0.2 });
+  const graphic4 = useScrollAnimation({ threshold: 0.2 });
+  const graphic5 = useScrollAnimation({ threshold: 0.2 });
+  const billboardGallery = useScrollAnimation({ threshold: 0.2 });
   const additionalServices = useScrollAnimation({ threshold: 0.2 });
   const processSection = useScrollAnimation({ threshold: 0.2 });
 
@@ -59,7 +69,7 @@ const Services = () => {
       <Navigation />
       <AnimatedPatternHero
         title="Services That Drive Progressive Wins"
-        description="From digital ads to SMS outreach, we offer the full stack of services for campaigns, PACs, and nonprofits—all optimized for achieving your goals."
+        description="From digital ads and billboard placements to voter polling and SMS outreach, we offer the full stack of services for campaigns, PACs, and nonprofits—all optimized for achieving your goals."
       />
 
       {/* Core Services */}
@@ -211,6 +221,147 @@ const Services = () => {
               >
                 <AnimatedServiceGraphic variant="envelope" />
               </div>
+            </div>
+
+            {/* Service 4 - Billboard Advertising */}
+            <div 
+              ref={service4.ref}
+              className={`grid md:grid-cols-2 gap-12 items-center transition-all duration-1000 ${
+                service4.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+            >
+              <div 
+                ref={graphic4.ref}
+                className={`transition-all duration-1000 delay-300 ${
+                  graphic4.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+                }`}
+              >
+                <AnimatedServiceGraphic variant="growth" />
+              </div>
+              <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
+                <CardContent className="p-6 sm:p-7 md:p-8 space-y-6">
+                  <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 bg-gradient-to-br from-primary to-destructive rounded-full flex items-center justify-center shadow-md">
+                    <Monitor className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
+                  </div>
+                  <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
+                    Billboard & Out-of-Home Advertising
+                  </h3>
+                  <p className="text-lg text-muted-foreground leading-relaxed">
+                    Make a statement where it matters most. From Times Square to local markets, we place billboards across the country for progressive campaigns and nonprofits.
+                  </p>
+                  <ul className="space-y-3">
+                    {[
+                      "National placement network from Times Square to local markets",
+                      "Strategic location targeting for maximum voter exposure",
+                      "Digital and traditional billboard options",
+                      "Campaign messaging that drives awareness and action"
+                    ].map((item, index) => (
+                      <li 
+                        key={index} 
+                        className={`flex items-start gap-3 transition-all duration-700 ${
+                          service4.isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
+                        }`}
+                        style={{ transitionDelay: `${400 + index * 100}ms` }}
+                      >
+                        <Zap className="h-5 w-5 text-accent mt-1 flex-shrink-0 drop-shadow-sm" />
+                        <span className="text-foreground/80">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Service 5 - Polling */}
+            <div 
+              ref={service5.ref}
+              className={`grid md:grid-cols-2 gap-12 items-center transition-all duration-1000 ${
+                service5.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+            >
+              <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 order-2 md:order-1 border border-border/50 bg-card backdrop-blur-sm">
+                <CardContent className="p-6 sm:p-7 md:p-8 space-y-6">
+                  <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 bg-gradient-to-br from-accent to-primary rounded-full flex items-center justify-center shadow-md">
+                    <PieChart className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
+                  </div>
+                  <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
+                    Voter Polling & Research
+                  </h3>
+                  <p className="text-lg text-muted-foreground leading-relaxed">
+                    Deep expertise in Arab American and Muslim American voter polling. We've conducted research nationwide for campaigns and major organizations like CAIR.
+                  </p>
+                  <ul className="space-y-3">
+                    {[
+                      "Specialized polling of Arab American and Muslim American communities",
+                      "Local, state, and national election research",
+                      "Partnership with major organizations like CAIR",
+                      "Data-driven insights for campaign strategy"
+                    ].map((item, index) => (
+                      <li 
+                        key={index} 
+                        className={`flex items-start gap-3 transition-all duration-700 ${
+                          service5.isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
+                        }`}
+                        style={{ transitionDelay: `${400 + index * 100}ms` }}
+                      >
+                        <Zap className="h-5 w-5 text-accent mt-1 flex-shrink-0 drop-shadow-sm" />
+                        <span className="text-foreground/80">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+              <div 
+                ref={graphic5.ref}
+                className={`order-1 md:order-2 transition-all duration-1000 delay-300 ${
+                  graphic5.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+                }`}
+              >
+                <AnimatedServiceGraphic variant="team" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Billboard Gallery Section */}
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto space-y-12">
+            <div className="text-center space-y-4">
+              <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+                Our Billboard Placements in Action
+              </h2>
+              <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
+                From Times Square to nationwide campaigns, we place billboards where they make the biggest impact—including recent placements supporting Zohran Mamdani's mayoral campaign.
+              </p>
+            </div>
+            
+            <div 
+              ref={billboardGallery.ref}
+              className={`grid md:grid-cols-3 gap-6 transition-all duration-1000 ${
+                billboardGallery.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+            >
+              {[
+                { src: billboardTimesSquareWide, alt: "Times Square billboard placement" },
+                { src: billboardTimesSquareMedium, alt: "Times Square digital billboard" },
+                { src: billboardMamdani, alt: "Zohran Mamdani campaign billboard on bus" }
+              ].map((billboard, index) => (
+                <div 
+                  key={index}
+                  className={`overflow-hidden rounded-lg shadow-lg hover:shadow-xl transition-all duration-700 hover:scale-[1.02] ${
+                    billboardGallery.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                  }`}
+                  style={{ transitionDelay: `${index * 150}ms` }}
+                >
+                  <img 
+                    src={billboard.src} 
+                    alt={billboard.alt}
+                    className="w-full h-64 object-cover"
+                  />
+                </div>
+              ))}
             </div>
           </div>
         </div>
