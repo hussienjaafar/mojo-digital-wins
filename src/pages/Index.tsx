@@ -6,6 +6,7 @@ import StatCounter from "@/components/StatCounter";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { TrendingUp, MessageSquare, Mail, Target, Users, BarChart3, Check, Shield } from "lucide-react";
+import { ParticleButton } from "@/components/ParticleButton";
 import heroImage from "@/assets/hero-movement.jpg";
 import heroRally from "@/assets/hero-movement-rally.jpg";
 import { AnimatedGeometricBackground } from "@/components/AnimatedGeometricBackground";
@@ -109,28 +110,32 @@ const Index = () => {
               We convert grassroots energy into measurable growth with SMS, digital ads, and high-ROI email.
             </p>
             
-            {/* CTAs - Enhanced with micro-interactions */}
+            {/* CTAs - Enhanced with particle effects */}
             <div 
               className="flex flex-col sm:flex-row gap-4 mb-6"
               style={{ 
                 animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 280ms both'
               }}
             >
-              <Button 
+              <ParticleButton 
                 size="lg" 
                 asChild
-                className="hero-cta-premium bg-secondary hover:bg-secondary/90 hover:scale-[1.03] text-secondary-foreground font-bold rounded-lg px-8 h-12 text-base transition-all duration-300 shadow-[0_4px_20px_rgba(20,100,217,0.4)] hover:shadow-[0_6px_30px_rgba(20,100,217,0.7)]"
+                particleColor="hsl(var(--secondary))"
+                particleCount={20}
+                className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold rounded-lg px-8 h-12 text-base shadow-[0_4px_20px_rgba(20,100,217,0.4)] hover:shadow-[0_6px_30px_rgba(20,100,217,0.7)]"
               >
                 <Link to="/contact">Grow Your Donor Base</Link>
-              </Button>
-              <Button 
+              </ParticleButton>
+              <ParticleButton 
                 size="lg" 
                 variant="outline" 
                 asChild
-                className="border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary hover:scale-[1.03] font-semibold rounded-lg px-8 h-12 text-base transition-all duration-300 hover:shadow-[0_4px_20px_rgba(255,255,255,0.3)]"
+                particleColor="hsl(var(--accent))"
+                particleCount={18}
+                className="border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary font-semibold rounded-lg px-8 h-12 text-base hover:shadow-[0_4px_20px_rgba(255,255,255,0.3)]"
               >
                 <Link to="/case-studies">See Results</Link>
-              </Button>
+              </ParticleButton>
             </div>
             
             {/* Metrics Strip - Elevated Cards moved up to group with CTAs */}

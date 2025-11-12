@@ -266,6 +266,24 @@ All colors MUST be HSL.
     animation-delay: 6s;
   }
 
+  .animate-draw-path-slow {
+    animation: draw-path 10s ease-in-out infinite;
+  }
+
+  /* Shimmer Animation for Particle Button */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s linear infinite;
+  }
+
   .text-caption {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-normal);
