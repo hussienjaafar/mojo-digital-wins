@@ -141,7 +141,7 @@ const Index = () => {
               }}
             >
               <ParticleButton 
-                href="https://calendly.com/mo-molitico/30min"
+                href="https://calendly.com/molitico/30min"
                 size="lg"
                 particleColor="hsl(var(--secondary))"
                 particleCount={20}
@@ -753,7 +753,7 @@ const Index = () => {
             finalCTA.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`} style={{ transitionDelay: '400ms' }}>
             <ParticleButton
-              href="https://calendly.com/mo-molitico/30min"
+              href="https://calendly.com/molitico/30min"
               size="xl"
               particleColor="hsl(var(--destructive))"
               particleCount={25}

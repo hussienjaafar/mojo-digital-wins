@@ -232,7 +232,7 @@ const About = () => {
             <h2 className="font-bebas leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>Ready to Make Impact Together?</h2>
             <p className="text-lg md:text-xl leading-relaxed">Let's build a movement that breaks through, raises more, and wins.</p>
             <ParticleButton
-              href="https://calendly.com/mo-molitico/30min"
+              href="https://calendly.com/molitico/30min"
               size="xl"
               particleColor="hsl(var(--destructive))"
               particleCount={25}

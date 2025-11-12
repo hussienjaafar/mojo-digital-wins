@@ -100,7 +100,7 @@ const CaseStudies = () => {
             </h2>
             <p className="text-lg md:text-xl leading-relaxed">Let's build a winning strategy together.</p>
             <ParticleButton
-              href="https://calendly.com/mo-molitico/30min"
+              href="https://calendly.com/molitico/30min"
               size="xl"
               particleColor="hsl(var(--accent))"
               particleCount={25}

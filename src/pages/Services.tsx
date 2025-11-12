@@ -283,7 +283,7 @@ const Services = () => {
               Let's talk about your goals and how we can help you achieve them.
             </p>
             <ParticleButton
-              href="https://calendly.com/mo-molitico/30min"
+              href="https://calendly.com/molitico/30min"
               size="xl"
               particleColor="hsl(var(--accent))"
               particleCount={25}

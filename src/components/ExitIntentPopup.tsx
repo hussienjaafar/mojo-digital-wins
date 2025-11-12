@@ -138,7 +138,7 @@ export const ExitIntentPopup = () => {
 
           <div className="space-y-4 pt-2">
             <ParticleButton
-              href="https://calendly.com/mo-molitico/30min"
+              href="https://calendly.com/molitico/30min"
               size="lg"
               particleColor="hsl(var(--secondary))"
               particleCount={25}
