@@ -131,7 +131,8 @@ const About = () => {
                 "Nasser for Michigan",
                 "Preston For PA",
                 "Rashid for Illinois",
-                "Arab-American Non-profit",
+                "CAIR Action",
+                "MPAC",
                 "A New Policy"
               ].map((client, index) => (
                 <Card

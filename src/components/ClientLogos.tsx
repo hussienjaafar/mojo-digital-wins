@@ -4,7 +4,8 @@ import unityJusticeLogo from "@/assets/unity-justice-fund-logo.webp";
 import nasserMichiganLogo from "@/assets/nasser-michigan-logo.webp";
 import prestonPaLogo from "@/assets/preston-pa-logo.png";
 import rashidIllinoisLogo from "@/assets/rashid-illinois-logo.webp";
-import arabAmericanLogo from "@/assets/arab-american-nonprofit-logo.webp";
+import cairActionLogo from "@/assets/cair-action-logo.png";
+import mpacLogo from "@/assets/mpac-logo.webp";
 import aNewPolicyLogo from "@/assets/a-new-policy-logo.png";
 
 interface ClientLogoProps {
@@ -19,7 +20,8 @@ const logoMap: Record<string, string> = {
   "Nasser for Michigan": nasserMichiganLogo,
   "Preston For PA": prestonPaLogo,
   "Rashid for Illinois": rashidIllinoisLogo,
-  "Arab-American Non-profit": arabAmericanLogo,
+  "CAIR Action": cairActionLogo,
+  "MPAC": mpacLogo,
   "A New Policy": aNewPolicyLogo,
 };
 
@@ -45,7 +47,7 @@ export const ClientLogo = ({ name, className = "", linkable = true }: ClientLogo
       alt={`${name} logo`}
       className={`w-full h-auto max-h-24 object-contain ${className}`}
       style={isPrestonLogo ? { 
-        filter: 'brightness(0) saturate(100%) invert(27%) sepia(91%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)'
+        filter: 'brightness(0) saturate(100%) invert(38%) sepia(65%) saturate(1167%) hue-rotate(186deg) brightness(95%) contrast(94%)'
       } : undefined}
     />
   ) : (
