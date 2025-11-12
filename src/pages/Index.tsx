@@ -141,13 +141,13 @@ const Index = () => {
               }}
             >
               <ParticleButton 
-                to="/contact"
+                href="https://calendly.com/mo-molitico/30min"
                 size="lg"
                 particleColor="hsl(var(--secondary))"
                 particleCount={20}
                 className="font-bold"
               >
-                Grow Your Donor Base
+                Book Free Strategy Call
               </ParticleButton>
               <ParticleButton 
                 to="/case-studies"
@@ -752,9 +752,15 @@ const Index = () => {
           <div className={`transition-all duration-700 ${
             finalCTA.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`} style={{ transitionDelay: '400ms' }}>
-            <Button variant="brutal" size="xl" asChild className="animate-glow-pulse text-lg">
-              <Link to="/contact">Book Strategy Call</Link>
-            </Button>
+            <ParticleButton
+              href="https://calendly.com/mo-molitico/30min"
+              size="xl"
+              particleColor="hsl(var(--destructive))"
+              particleCount={25}
+              className="text-lg font-bold bg-background text-foreground hover:bg-background/90 border-4 border-background shadow-[8px_8px_0px_hsl(var(--destructive))] hover:shadow-[4px_4px_0px_hsl(var(--destructive))] hover:translate-x-1 hover:translate-y-1 transition-all"
+            >
+              Book Strategy Call Now
+            </ParticleButton>
           </div>
         </div>
       </section>

@@ -193,6 +193,8 @@ export const ParticleButton = ({
       <a
         ref={buttonRef as React.RefObject<HTMLAnchorElement>}
         href={href}
+        target="_blank"
+        rel="noopener noreferrer"
         className={baseClasses}
         {...handlers}
       >
