@@ -10,13 +10,63 @@ import Footer from "@/components/Footer";
 import { ParticleButton } from "@/components/ParticleButton";
 import AnimatedPatternHero from "@/components/AnimatedPatternHero";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Contact = () => {
+  const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    campaign: "",
+    organizationType: "",
+    message: ""
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted");
+    setIsSubmitting(true);
+
+    try {
+      const { error } = await supabase
+        .from('contact_submissions')
+        .insert([
+          {
+            name: formData.name,
+            email: formData.email,
+            campaign: formData.campaign || null,
+            organization_type: formData.organizationType || null,
+            message: formData.message
+          }
+        ]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Message sent!",
+        description: "We'll get back to you within 24 hours.",
+      });
+      
+      setFormData({
+        name: "",
+        email: "",
+        campaign: "",
+        organizationType: "",
+        message: ""
+      });
+      setShowForm(false);
+    } catch (error) {
+      console.error('Form submission error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -101,31 +151,77 @@ const Contact = () => {
                     <form onSubmit={handleSubmit} className="space-y-6">
                       <div className="space-y-2">
                         <Label htmlFor="name">Name *</Label>
-                        <Input id="name" placeholder="Your name" required className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11" />
+                        <Input 
+                          id="name" 
+                          placeholder="Your name" 
+                          required 
+                          className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11"
+                          value={formData.name}
+                          onChange={(e) => setFormData({...formData, name: e.target.value})}
+                          disabled={isSubmitting}
+                        />
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="email">Email *</Label>
-                        <Input id="email" type="email" placeholder="your@email.com" required className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11" />
+                        <Input 
+                          id="email" 
+                          type="email" 
+                          placeholder="your@email.com" 
+                          required 
+                          className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11"
+                          value={formData.email}
+                          onChange={(e) => setFormData({...formData, email: e.target.value})}
+                          disabled={isSubmitting}
+                        />
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="campaign">Campaign/Organization *</Label>
-                        <Input id="campaign" placeholder="Smith for Senate" required className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11" />
+                        <Input 
+                          id="campaign" 
+                          placeholder="Smith for Senate" 
+                          required 
+                          className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11"
+                          value={formData.campaign}
+                          onChange={(e) => setFormData({...formData, campaign: e.target.value})}
+                          disabled={isSubmitting}
+                        />
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="race-type">Organization Type</Label>
-                        <Input id="race-type" placeholder="Campaign, PAC, 501(c)(3), 501(c)(4), etc." className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11" />
+                        <Input 
+                          id="race-type" 
+                          placeholder="Campaign, PAC, 501(c)(3), 501(c)(4), etc." 
+                          className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11"
+                          value={formData.organizationType}
+                          onChange={(e) => setFormData({...formData, organizationType: e.target.value})}
+                          disabled={isSubmitting}
+                        />
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="message">Tell Us About Your Organization *</Label>
-                        <Textarea id="message" placeholder="What are your goals? What help do you need?" required rows={5} className="border-border/50 focus:border-secondary transition-colors resize-none" />
+                        <Textarea 
+                          id="message" 
+                          placeholder="What are your goals? What help do you need?" 
+                          required 
+                          rows={5} 
+                          className="border-border/50 focus:border-secondary transition-colors resize-none"
+                          value={formData.message}
+                          onChange={(e) => setFormData({...formData, message: e.target.value})}
+                          disabled={isSubmitting}
+                        />
                       </div>
 
-                      <Button type="submit" size="lg" className="w-full shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-300 min-h-12">
-                        Send Message
+                      <Button 
+                        type="submit" 
+                        size="lg" 
+                        className="w-full shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-300 min-h-12"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? "Sending..." : "Send Message"}
                       </Button>
                     </form>
                   </CardContent>
