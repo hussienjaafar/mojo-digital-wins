@@ -8,6 +8,7 @@ import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 import BackToTop from "@/components/BackToTop";
 import CookieConsent from "@/components/CookieConsent";
 import { ExitIntentPopup } from "@/components/ExitIntentPopup";
+import { useSmoothScroll } from "@/hooks/useSmoothScroll";
 import Index from "./pages/Index";
 import About from "./pages/About";
 import Services from "./pages/Services";
@@ -20,29 +21,39 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const AppContent = () => {
+  useSmoothScroll();
+  
+  return (
+    <>
+      <ScrollProgressIndicator />
+      <ScrollToTop />
+      <BackToTop />
+      <CookieConsent />
+      <ExitIntentPopup />
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/services" element={<Services />} />
+        <Route path="/case-studies" element={<CaseStudies />} />
+        <Route path="/case-studies/:id" element={<CaseStudyDetail />} />
+        <Route path="/creative-showcase" element={<CreativeShowcase />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <ScrollProgressIndicator />
-        <ScrollToTop />
-        <BackToTop />
-        <CookieConsent />
-        <ExitIntentPopup />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/case-studies" element={<CaseStudies />} />
-          <Route path="/case-studies/:id" element={<CaseStudyDetail />} />
-          <Route path="/creative-showcase" element={<CreativeShowcase />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AppContent />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
