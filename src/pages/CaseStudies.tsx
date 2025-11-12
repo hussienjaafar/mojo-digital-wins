@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { ParticleButton } from "@/components/ParticleButton";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
@@ -98,11 +99,15 @@ const CaseStudies = () => {
               Ready to Be Our Next Success Story?
             </h2>
             <p className="text-lg md:text-xl leading-relaxed">Let's build a winning strategy together.</p>
-            <Link to="/contact">
-              <Button size="lg" variant="secondary" className="text-lg px-8 shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all duration-300">
-                Get Started
-              </Button>
-            </Link>
+            <ParticleButton
+              href="https://calendly.com/mo-molitico/30min"
+              size="xl"
+              particleColor="hsl(var(--accent))"
+              particleCount={25}
+              className="text-lg font-bold bg-white text-primary hover:bg-white/90"
+            >
+              Book Your Strategy Call
+            </ParticleButton>
           </div>
         </div>
       </section>

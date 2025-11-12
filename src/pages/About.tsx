@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { ParticleButton } from "@/components/ParticleButton";
 import { ClientLogo } from "@/components/ClientLogos";
 import { Target, Users, TrendingUp, Award, Lightbulb, Zap, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -230,7 +231,15 @@ const About = () => {
           <div className="max-w-3xl mx-auto text-center space-y-8 text-white">
             <h2 className="font-bebas leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>Ready to Make Impact Together?</h2>
             <p className="text-lg md:text-xl leading-relaxed">Let's build a movement that breaks through, raises more, and wins.</p>
-            <Link to="/contact"><Button size="lg" variant="secondary" className="text-lg px-8 shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all duration-300">Start Your Project</Button></Link>
+            <ParticleButton
+              href="https://calendly.com/mo-molitico/30min"
+              size="xl"
+              particleColor="hsl(var(--destructive))"
+              particleCount={25}
+              className="text-lg font-bold bg-white text-primary hover:bg-white/90"
+            >
+              Schedule Your Free Call
+            </ParticleButton>
           </div>
         </div>
       </section>

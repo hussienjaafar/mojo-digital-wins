@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { ParticleButton } from "@/components/ParticleButton";
 import { Button } from "@/components/ui/button";
 import { 
   Megaphone, 
@@ -281,11 +282,15 @@ const Services = () => {
             <p className="text-lg md:text-xl leading-relaxed">
               Let's talk about your goals and how we can help you achieve them.
             </p>
-            <Link to="/contact">
-              <Button size="lg" variant="secondary" className="text-lg px-8 shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all duration-300">
-                Get Started Today
-              </Button>
-            </Link>
+            <ParticleButton
+              href="https://calendly.com/mo-molitico/30min"
+              size="xl"
+              particleColor="hsl(var(--accent))"
+              particleCount={25}
+              className="text-lg font-bold bg-white text-primary hover:bg-white/90"
+            >
+              Book Your Free Strategy Call
+            </ParticleButton>
           </div>
         </div>
       </section>
