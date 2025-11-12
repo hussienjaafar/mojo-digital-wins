@@ -64,17 +64,23 @@ const CookieConsent = () => {
       // Example: window.gtag('consent', 'update', { analytics_storage: 'granted' });
     } else {
       console.log("Analytics cookies disabled");
-      // Example: window.gtag('consent', 'update', { analytics_storage: 'denied' });
+      // Example: window.gtag('consent', 'update', { ad_storage: 'denied' });
     }
 
-    // Advertising
+    // Advertising - Meta Pixel
     if (prefs.advertising) {
-      // Enable Facebook Pixel and other advertising cookies
       console.log("Advertising cookies enabled");
-      // Example: window.gtag('consent', 'update', { ad_storage: 'granted' });
+      // Dynamically load Meta Pixel
+      import("@/components/MetaPixel").then(({ initMetaPixel }) => {
+        initMetaPixel();
+      });
     } else {
       console.log("Advertising cookies disabled");
-      // Example: window.gtag('consent', 'update', { ad_storage: 'denied' });
+      // Remove Meta Pixel if it exists
+      if (window.fbq) {
+        delete window.fbq;
+        delete window._fbq;
+      }
     }
 
     // Functional

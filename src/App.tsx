@@ -7,6 +7,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 import BackToTop from "@/components/BackToTop";
 import CookieConsent from "@/components/CookieConsent";
+import MetaPixel from "@/components/MetaPixel";
 import { ExitIntentPopup } from "@/components/ExitIntentPopup";
 import { useSmoothScroll } from "@/hooks/useSmoothScroll";
 import Index from "./pages/Index";
@@ -30,6 +31,7 @@ const AppContent = () => {
       <ScrollToTop />
       <BackToTop />
       <CookieConsent />
+      <MetaPixel />
       <ExitIntentPopup />
       <Routes>
         <Route path="/" element={<Index />} />
