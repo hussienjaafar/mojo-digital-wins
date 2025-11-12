@@ -247,21 +247,86 @@ const PrivacyPolicy = () => {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4">11. Children's Privacy</h2>
+            <h2 className="text-2xl font-bold mb-4">11. GDPR Compliance (European Union Users)</h2>
+            <p className="text-foreground/80 mb-4">
+              If you are located in the European Economic Area (EEA), United Kingdom, or Switzerland, you have additional rights under the General Data Protection Regulation (GDPR).
+            </p>
+
+            <h3 className="text-xl font-semibold mb-3">11.1 Legal Basis for Processing</h3>
+            <p className="text-foreground/80 mb-4">We process your personal data under the following legal bases:</p>
+            <ul className="list-disc pl-6 mb-4 text-foreground/80 space-y-2">
+              <li><strong>Consent:</strong> When you provide explicit consent for specific processing activities</li>
+              <li><strong>Contract Performance:</strong> Processing necessary to fulfill our services to you</li>
+              <li><strong>Legitimate Interests:</strong> For our business operations, fraud prevention, and security</li>
+              <li><strong>Legal Obligation:</strong> To comply with applicable laws and regulations</li>
+            </ul>
+
+            <h3 className="text-xl font-semibold mb-3">11.2 Your GDPR Rights</h3>
+            <p className="text-foreground/80 mb-4">Under GDPR, you have the following rights:</p>
+            <ul className="list-disc pl-6 mb-4 text-foreground/80 space-y-2">
+              <li><strong>Right of Access:</strong> Request copies of your personal data</li>
+              <li><strong>Right to Rectification:</strong> Request correction of inaccurate or incomplete data</li>
+              <li><strong>Right to Erasure:</strong> Request deletion of your personal data ("right to be forgotten")</li>
+              <li><strong>Right to Restrict Processing:</strong> Request limitation of how we use your data</li>
+              <li><strong>Right to Data Portability:</strong> Receive your data in a structured, machine-readable format</li>
+              <li><strong>Right to Object:</strong> Object to processing based on legitimate interests or direct marketing</li>
+              <li><strong>Right to Withdraw Consent:</strong> Withdraw consent at any time where processing is based on consent</li>
+              <li><strong>Right to Lodge a Complaint:</strong> File a complaint with your local data protection authority</li>
+            </ul>
+
+            <h3 className="text-xl font-semibold mb-3">11.3 Data Transfers</h3>
+            <p className="text-foreground/80 mb-4">
+              Your information may be transferred to and processed in the United States or other countries outside the EEA. We ensure adequate safeguards are in place, including:
+            </p>
+            <ul className="list-disc pl-6 mb-4 text-foreground/80 space-y-2">
+              <li>Standard Contractual Clauses approved by the European Commission</li>
+              <li>Adequacy decisions recognizing equivalent data protection standards</li>
+              <li>Appropriate technical and organizational security measures</li>
+            </ul>
+
+            <h3 className="text-xl font-semibold mb-3">11.4 Data Retention</h3>
+            <p className="text-foreground/80 mb-4">
+              We retain personal data only for as long as necessary to fulfill the purposes outlined in this policy, comply with legal obligations, and resolve disputes. Specific retention periods include:
+            </p>
+            <ul className="list-disc pl-6 mb-4 text-foreground/80 space-y-2">
+              <li>Marketing communications: Until you unsubscribe or request deletion</li>
+              <li>Donor records: Minimum 3 years for regulatory compliance</li>
+              <li>Website analytics: Up to 26 months</li>
+              <li>Customer service records: Up to 6 years after last interaction</li>
+            </ul>
+
+            <h3 className="text-xl font-semibold mb-3">11.5 Automated Decision-Making</h3>
+            <p className="text-foreground/80 mb-4">
+              We may use automated decision-making for audience targeting and campaign optimization. You have the right to:
+            </p>
+            <ul className="list-disc pl-6 mb-4 text-foreground/80 space-y-2">
+              <li>Request human intervention in automated decisions</li>
+              <li>Express your point of view regarding automated decisions</li>
+              <li>Contest decisions made solely by automated processing</li>
+            </ul>
+
+            <h3 className="text-xl font-semibold mb-3">11.6 Exercising Your GDPR Rights</h3>
+            <p className="text-foreground/80 mb-4">
+              To exercise any of your GDPR rights, please contact us at info@molitico.com with "GDPR Request" in the subject line. We will respond to your request within 30 days. You may also contact your local data protection authority if you have concerns about our data practices.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold mb-4">12. Children's Privacy</h2>
             <p className="text-foreground/80">
               Our services are not directed to children under 13. We do not knowingly collect information from children under 13. If you believe we have collected information from a child under 13, please contact us immediately.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4">12. Changes to This Privacy Policy</h2>
+            <h2 className="text-2xl font-bold mb-4">13. Changes to This Privacy Policy</h2>
             <p className="text-foreground/80">
               We may update this Privacy Policy from time to time. We will notify you of material changes by posting the new policy on this page with an updated "Last Updated" date.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4">13. Contact Us</h2>
+            <h2 className="text-2xl font-bold mb-4">14. Contact Us</h2>
             <p className="text-foreground/80 mb-4">
               If you have questions about this Privacy Policy or wish to exercise your privacy rights, contact us at:
             </p>
