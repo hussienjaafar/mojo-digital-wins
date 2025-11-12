@@ -38,7 +38,7 @@ const Services = () => {
       />
 
       {/* Core Services */}
-      <section className="py-20 md:py-32 bg-background">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto space-y-20">
             {/* Service 1 */}
@@ -49,11 +49,11 @@ const Services = () => {
               }`}
             >
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 order-2 md:order-1 border border-border/50 bg-card backdrop-blur-sm">
-                <CardContent className="p-8 space-y-6">
-                  <div className="w-16 h-16 bg-gradient-to-br from-secondary to-accent rounded-full flex items-center justify-center shadow-md">
-                    <Megaphone className="h-8 w-8 text-white drop-shadow-sm" />
+                <CardContent className="p-6 sm:p-7 md:p-8 space-y-6">
+                  <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 bg-gradient-to-br from-secondary to-accent rounded-full flex items-center justify-center shadow-md">
+                    <Megaphone className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
                   </div>
-                  <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.75rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
+                  <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
                     Digital Advertising
                   </h3>
                   <p className="text-lg text-muted-foreground leading-relaxed">
@@ -106,11 +106,11 @@ const Services = () => {
                 <AnimatedServiceGraphic variant="messageBubbles" />
               </div>
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
-                <CardContent className="p-8 space-y-6">
-                  <div className="w-16 h-16 bg-gradient-to-br from-destructive to-secondary rounded-full flex items-center justify-center shadow-md">
-                    <MessageSquare className="h-8 w-8 text-white drop-shadow-sm" />
+                <CardContent className="p-6 sm:p-7 md:p-8 space-y-6">
+                  <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 bg-gradient-to-br from-destructive to-secondary rounded-full flex items-center justify-center shadow-md">
+                    <MessageSquare className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
                   </div>
-                  <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.75rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
+                  <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
                     SMS & Peer-to-Peer Texting
                   </h3>
                   <p className="text-lg text-muted-foreground leading-relaxed">
@@ -147,11 +147,11 @@ const Services = () => {
               }`}
             >
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 order-2 md:order-1 border border-border/50 bg-card backdrop-blur-sm">
-                <CardContent className="p-8 space-y-6">
-                  <div className="w-16 h-16 bg-gradient-to-br from-accent to-secondary rounded-full flex items-center justify-center shadow-md">
-                    <Mail className="h-8 w-8 text-white drop-shadow-sm" />
+                <CardContent className="p-6 sm:p-7 md:p-8 space-y-6">
+                  <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 bg-gradient-to-br from-accent to-secondary rounded-full flex items-center justify-center shadow-md">
+                    <Mail className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
                   </div>
-                  <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.75rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
+                  <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
                     Email Fundraising
                   </h3>
                   <p className="text-lg text-muted-foreground leading-relaxed">
@@ -192,7 +192,7 @@ const Services = () => {
       </section>
 
       {/* Additional Services */}
-      <section className="py-20 md:py-32 bg-muted/30">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-muted/30">
         <div className="container mx-auto px-4">
           <h2 className="font-bebas text-primary text-center mb-16 leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
             Plus Everything Else You Need
@@ -216,9 +216,9 @@ const Services = () => {
                 }`}
                 style={{ transitionDelay: `${index * 150}ms` }}
               >
-                <CardContent className="p-8 text-center space-y-4">
-                  <div className="w-16 h-16 mx-auto bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center shadow-md">
-                    <service.icon className="h-8 w-8 text-white drop-shadow-sm" />
+                <CardContent className="p-6 sm:p-7 md:p-8 text-center space-y-4">
+                  <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 mx-auto bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center shadow-md">
+                    <service.icon className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
                   </div>
                   <h3 className="text-2xl font-bold text-foreground">{service.title}</h3>
                   <p className="text-muted-foreground leading-relaxed">{service.description}</p>
@@ -230,7 +230,7 @@ const Services = () => {
       </section>
 
       {/* Process Section */}
-      <section className="py-20 md:py-32 bg-background">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto space-y-12">
             <div className="text-center space-y-4">
@@ -271,7 +271,7 @@ const Services = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 md:py-32 bg-gradient-to-br from-secondary via-primary to-accent relative overflow-hidden">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-gradient-to-br from-secondary via-primary to-accent relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
         
         <div className="container mx-auto px-4 relative z-10">

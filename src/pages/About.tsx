@@ -29,8 +29,8 @@ const About = () => {
       />
 
       {/* Our Story */}
-      <section className="py-20 md:py-32 bg-background">
-        <div className="container mx-auto px-4">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-background">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-6xl mx-auto">
             <div 
               ref={storySection.ref}
@@ -60,7 +60,7 @@ const About = () => {
       </section>
 
       {/* Impact Stats */}
-      <section className="py-20 md:py-32 bg-gradient-to-br from-primary via-secondary to-accent relative overflow-hidden">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-gradient-to-br from-primary via-secondary to-accent relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
         
         <div className="container mx-auto px-4 relative z-10">
@@ -92,10 +92,10 @@ const About = () => {
                   }`}
                   style={{ transitionDelay: `${index * 150}ms` }}
                 >
-                  <div className="w-20 h-20 mx-auto bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
-                    <stat.icon className="h-10 w-10 text-white drop-shadow-lg" />
+                  <div className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 mx-auto bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
+                    <stat.icon className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 text-white drop-shadow-lg" />
                   </div>
-                  <div className="text-5xl md:text-6xl font-bold text-white font-bebas tracking-wider">
+                  <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white font-bebas tracking-wider">
                     <StatCounter 
                       end={stat.value} 
                       prefix={stat.prefix} 
@@ -112,7 +112,7 @@ const About = () => {
       </section>
 
       {/* Clients Section */}
-      <section className="py-20 md:py-32 bg-background">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto space-y-12">
             <div className="text-center space-y-4">
@@ -124,7 +124,7 @@ const About = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5 md:gap-6 max-w-5xl mx-auto">
               {[
                 "Abdul for U.S. Senate",
                 "Unity & Justice Fund",
@@ -141,7 +141,7 @@ const About = () => {
                   className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] border border-border/50 bg-card/50 backdrop-blur-sm animate-fade-in cursor-pointer"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <CardContent className="p-6 flex items-center justify-center min-h-[140px]">
+                  <CardContent className="p-4 sm:p-5 md:p-6 flex items-center justify-center min-h-[100px] sm:min-h-[120px] md:min-h-[140px]">
                     <ClientLogo name={client} className="text-foreground group-hover:text-primary transition-colors duration-300" />
                   </CardContent>
                 </Card>
@@ -158,7 +158,7 @@ const About = () => {
       </section>
 
       {/* Our Values */}
-      <section className="py-20 md:py-32 bg-muted/30">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-muted/30">
         <div className="container mx-auto px-4">
           <h2 className="font-bebas text-primary text-center mb-16 leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>What Drives Us</h2>
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -167,10 +167,10 @@ const About = () => {
               { icon: Users, title: "Movement Minded", description: "We understand progressive politics because we live it. Your values are our values." },
               { icon: TrendingUp, title: "Data Obsessed", description: "Every decision is backed by data. We test, optimize, and iterate to maximize your impact." }
             ].map((value, index) => (
-              <Card key={index} className="bg-card backdrop-blur-sm shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50">
-                <CardContent className="p-8 text-center space-y-4">
-                  <div className="w-16 h-16 mx-auto bg-gradient-to-br from-secondary to-accent rounded-full flex items-center justify-center shadow-md">
-                    <value.icon className="h-8 w-8 text-white drop-shadow-sm" />
+                <Card key={index} className="bg-card backdrop-blur-sm shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50">
+                <CardContent className="p-6 sm:p-7 md:p-8 text-center space-y-4">
+                  <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 mx-auto bg-gradient-to-br from-secondary to-accent rounded-full flex items-center justify-center shadow-md">
+                    <value.icon className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
                   </div>
                   <h3 className="text-2xl font-bold text-foreground">{value.title}</h3>
                   <p className="text-muted-foreground leading-relaxed">{value.description}</p>
@@ -182,7 +182,7 @@ const About = () => {
       </section>
 
       {/* Why Choose Us section */}
-      <section className="py-20 md:py-32 bg-background">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-background">
         <div className="container mx-auto px-4">
           <h2 className="font-bebas text-primary text-center mb-16 leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>Why Choose Us</h2>
           <div className="max-w-6xl mx-auto">
@@ -227,7 +227,7 @@ const About = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 md:py-32 bg-gradient-to-br from-primary via-secondary to-destructive relative overflow-hidden">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-gradient-to-br from-primary via-secondary to-destructive relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center space-y-8 text-white">

@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface AnimatedPatternHeroProps {
   title: string;
@@ -9,8 +10,11 @@ interface AnimatedPatternHeroProps {
 const AnimatedPatternHero = ({ title, description, children }: AnimatedPatternHeroProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const shapesRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
+    if (isMobile) return; // Disable parallax on mobile for better performance
+    
     const handleScroll = () => {
       const scrolled = window.scrollY;
       
@@ -27,10 +31,10 @@ const AnimatedPatternHero = ({ title, description, children }: AnimatedPatternHe
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [isMobile]);
 
   return (
-    <section className="relative pt-28 md:pt-32 pb-20 md:pb-32 overflow-hidden">
+    <section className="relative pt-20 sm:pt-24 md:pt-28 lg:pt-32 pb-12 sm:pb-16 md:pb-20 lg:pb-32 overflow-hidden">
       {/* Animated Pattern Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/95 to-secondary">
         {/* Vibrant Animated Circles */}
@@ -117,13 +121,13 @@ const AnimatedPatternHero = ({ title, description, children }: AnimatedPatternHe
         </div>
       </div>
       
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="max-w-[680px] backdrop-blur-md bg-black/20 border border-white/10 rounded-2xl p-8 md:p-10 shadow-2xl">
-          <div className="space-y-6">
-            <h1 className="font-bebas text-white drop-shadow-lg leading-[0.95]" style={{ fontSize: 'clamp(2.5rem, 6vw, 5.5rem)', letterSpacing: '0.02em' }}>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="max-w-[680px] backdrop-blur-md bg-black/20 border border-white/10 rounded-2xl p-6 sm:p-8 md:p-10 shadow-2xl">
+          <div className="space-y-4 sm:space-y-5 md:space-y-6">
+            <h1 className="font-bebas text-white drop-shadow-lg leading-[0.95]" style={{ fontSize: 'clamp(2rem, 8vw, 5.5rem)', letterSpacing: '0.02em' }}>
               {title}
             </h1>
-            <p className="text-white/90 drop-shadow-md leading-relaxed" style={{ fontSize: 'clamp(1.125rem, 2vw, 1.25rem)' }}>
+            <p className="text-white/90 drop-shadow-md leading-relaxed" style={{ fontSize: 'clamp(1rem, 2.5vw, 1.25rem)' }}>
               {description}
             </p>
             {children}

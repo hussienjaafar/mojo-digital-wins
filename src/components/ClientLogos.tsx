@@ -47,7 +47,7 @@ export const ClientLogo = ({ name, className = "", linkable = true }: ClientLogo
     <img 
       src={logoSrc} 
       alt={`${name} logo`}
-      className={`w-auto h-auto max-h-20 max-w-[180px] object-contain mx-auto ${className}`}
+      className={`w-auto h-auto max-h-12 sm:max-h-16 md:max-h-20 max-w-[120px] sm:max-w-[150px] md:max-w-[180px] object-contain mx-auto ${className}`}
       style={isPrestonLogo ? { 
         filter: 'brightness(0) saturate(100%) invert(38%) sepia(65%) saturate(1167%) hue-rotate(186deg) brightness(95%) contrast(94%)'
       } : undefined}
@@ -55,7 +55,7 @@ export const ClientLogo = ({ name, className = "", linkable = true }: ClientLogo
   ) : (
     // Fallback to text-based logo if no image available
     <div className={`font-bebas text-center ${className}`}>
-      <div className="text-2xl md:text-3xl uppercase tracking-wide leading-tight">
+      <div className="text-xl sm:text-2xl md:text-3xl uppercase tracking-wide leading-tight">
         {name}
       </div>
     </div>

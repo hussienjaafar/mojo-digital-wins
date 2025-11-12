@@ -35,13 +35,13 @@ const Navigation = () => {
       <div className={`max-w-[1280px] mx-auto px-6 ${
         !isScrolled ? "backdrop-blur-lg bg-primary/45 rounded-b-xl mt-0 shadow-md" : ""
       }`}>
-        <div className="flex items-center justify-between h-[72px] md:h-[80px]">
+        <div className="flex items-center justify-between h-16 sm:h-18 md:h-20">
           {/* Logo - 20% larger */}
           <Link to="/" className="flex items-center gap-2">
             <div className={`transition-colors ${
               isScrolled ? "text-primary-foreground" : "text-primary-foreground drop-shadow-[0_2px_12px_rgba(10,30,62,0.9)]"
             }`}>
-              <div className="font-bebas text-[2.1rem] md:text-[2.4rem] leading-none tracking-wide">
+              <div className="font-bebas text-[1.8rem] sm:text-[2rem] md:text-[2.4rem] leading-none tracking-wide">
                 MOLITICO
               </div>
             </div>
@@ -106,7 +106,7 @@ const Navigation = () => {
                 key={link.path}
                 to={link.path}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`block py-3 px-4 rounded-lg font-semibold text-[15px] transition-colors ${
+                className={`block py-3.5 px-4 rounded-lg font-semibold text-[15px] transition-colors min-h-[48px] flex items-center ${
                   isActive(link.path)
                     ? isScrolled 
                       ? "text-primary-foreground bg-secondary/20" 

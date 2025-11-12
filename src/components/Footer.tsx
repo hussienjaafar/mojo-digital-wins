@@ -11,11 +11,11 @@ const Footer = () => {
 
   return (
     <footer className="bg-primary text-primary-foreground">
-      <div className="container mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-14 md:py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 md:gap-12">
           {/* Brand */}
           <div>
-            <h3 className="text-2xl font-black mb-4">
+            <h3 className="text-xl sm:text-2xl font-black mb-4">
               MOLITICO<span className="text-accent">.</span>
             </h3>
             <p className="text-primary-foreground/80 mb-6">

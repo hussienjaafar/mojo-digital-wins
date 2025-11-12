@@ -29,7 +29,7 @@ const Contact = () => {
       />
 
       {/* Contact Section */}
-      <section className="py-20 md:py-32 bg-background">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
             {/* Primary CTA - Book a Call */}
@@ -101,22 +101,22 @@ const Contact = () => {
                     <form onSubmit={handleSubmit} className="space-y-6">
                       <div className="space-y-2">
                         <Label htmlFor="name">Name *</Label>
-                        <Input id="name" placeholder="Your name" required className="border-border/50 focus:border-secondary transition-colors" />
+                        <Input id="name" placeholder="Your name" required className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11" />
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="email">Email *</Label>
-                        <Input id="email" type="email" placeholder="your@email.com" required className="border-border/50 focus:border-secondary transition-colors" />
+                        <Input id="email" type="email" placeholder="your@email.com" required className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11" />
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="campaign">Campaign/Organization *</Label>
-                        <Input id="campaign" placeholder="Smith for Senate" required className="border-border/50 focus:border-secondary transition-colors" />
+                        <Input id="campaign" placeholder="Smith for Senate" required className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11" />
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="race-type">Organization Type</Label>
-                        <Input id="race-type" placeholder="Campaign, PAC, 501(c)(3), 501(c)(4), etc." className="border-border/50 focus:border-secondary transition-colors" />
+                        <Input id="race-type" placeholder="Campaign, PAC, 501(c)(3), 501(c)(4), etc." className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11" />
                       </div>
 
                       <div className="space-y-2">
@@ -124,7 +124,7 @@ const Contact = () => {
                         <Textarea id="message" placeholder="What are your goals? What help do you need?" required rows={5} className="border-border/50 focus:border-secondary transition-colors resize-none" />
                       </div>
 
-                      <Button type="submit" size="lg" className="w-full shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
+                      <Button type="submit" size="lg" className="w-full shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-300 min-h-12">
                         Send Message
                       </Button>
                     </form>
@@ -137,7 +137,7 @@ const Contact = () => {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-20 md:py-32 bg-muted/30">
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
             <h2 className="font-bebas text-primary text-center mb-12 leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
