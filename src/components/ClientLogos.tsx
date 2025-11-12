@@ -47,7 +47,7 @@ export const ClientLogo = ({ name, className = "", linkable = true }: ClientLogo
     <img 
       src={logoSrc} 
       alt={`${name} logo`}
-      className={`w-full h-auto max-h-24 object-contain ${className}`}
+      className={`w-auto h-auto max-h-20 max-w-[180px] object-contain mx-auto ${className}`}
       style={isPrestonLogo ? { 
         filter: 'brightness(0) saturate(100%) invert(38%) sepia(65%) saturate(1167%) hue-rotate(186deg) brightness(95%) contrast(94%)'
       } : undefined}

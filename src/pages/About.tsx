@@ -124,7 +124,7 @@ const About = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
               {[
                 "Abdul for U.S. Senate",
                 "Unity & Justice Fund",
@@ -138,10 +138,10 @@ const About = () => {
               ].map((client, index) => (
                 <Card
                   key={index}
-                  className={`group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] border border-border/50 bg-card/50 backdrop-blur-sm animate-fade-in cursor-pointer ${index === 6 ? 'md:col-start-2' : ''}`}
+                  className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] border border-border/50 bg-card/50 backdrop-blur-sm animate-fade-in cursor-pointer"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <CardContent className="p-8 flex items-center justify-center min-h-[140px]">
+                  <CardContent className="p-6 flex items-center justify-center min-h-[140px]">
                     <ClientLogo name={client} className="text-foreground group-hover:text-primary transition-colors duration-300" />
                   </CardContent>
                 </Card>
