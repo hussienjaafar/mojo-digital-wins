@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Helmet } from "react-helmet";
 import { Card, CardContent } from "@/components/ui/card";
 import { ParticleButton } from "@/components/ParticleButton";
 import { Button } from "@/components/ui/button";
@@ -18,8 +19,32 @@ const CaseStudies = () => {
     ? caseStudies 
     : caseStudies.filter(study => study.category === activeFilter);
 
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://molitico.com"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Case Studies",
+        "item": "https://molitico.com/case-studies"
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen">
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbSchema)}
+        </script>
+      </Helmet>
       <ScrollProgressIndicator />
       <Navigation />
       <AnimatedPatternHero

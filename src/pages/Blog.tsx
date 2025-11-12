@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
 import { Calendar, Clock, ArrowRight } from "lucide-react";
 import Navigation from "@/components/Navigation";
@@ -69,13 +70,14 @@ const Blog = () => {
 
   return (
     <div className="min-h-screen">
-      {/* SEO Structured Data */}
-      <script type="application/ld+json">
-        {JSON.stringify(blogSchema)}
-      </script>
-      <script type="application/ld+json">
-        {JSON.stringify(breadcrumbSchema)}
-      </script>
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify(blogSchema)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbSchema)}
+        </script>
+      </Helmet>
 
       <ScrollProgressIndicator />
       <Navigation />

@@ -1,3 +1,4 @@
+import { Helmet } from "react-helmet";
 import { Card, CardContent } from "@/components/ui/card";
 import { ParticleButton } from "@/components/ParticleButton";
 import { Button } from "@/components/ui/button";
@@ -28,8 +29,32 @@ const Services = () => {
   const additionalServices = useScrollAnimation({ threshold: 0.2 });
   const processSection = useScrollAnimation({ threshold: 0.2 });
 
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://molitico.com"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Services",
+        "item": "https://molitico.com/services"
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen">
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbSchema)}
+        </script>
+      </Helmet>
       <ScrollProgressIndicator />
       <Navigation />
       <AnimatedPatternHero

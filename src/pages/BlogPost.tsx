@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Helmet } from "react-helmet";
 import { useParams, Link, Navigate } from "react-router-dom";
 import { Calendar, Clock, ArrowLeft, Tag } from "lucide-react";
 import Navigation from "@/components/Navigation";
@@ -83,27 +84,27 @@ const BlogPost = () => {
 
   return (
     <div className="min-h-screen">
-      {/* SEO Structured Data */}
-      <script type="application/ld+json">
-        {JSON.stringify(articleSchema)}
-      </script>
-      <script type="application/ld+json">
-        {JSON.stringify(breadcrumbSchema)}
-      </script>
-
-      {/* Meta Tags */}
-      <title>{post.title} | Molitico</title>
-      <meta name="description" content={post.metaDescription} />
-      <meta name="keywords" content={post.tags.join(", ")} />
-      <meta property="og:title" content={post.title} />
-      <meta property="og:description" content={post.metaDescription} />
-      <meta property="og:type" content="article" />
-      <meta property="article:published_time" content={post.publishDate} />
-      <meta property="article:author" content={post.author} />
-      <meta property="article:section" content={post.category} />
-      {post.tags.map(tag => (
-        <meta key={tag} property="article:tag" content={tag} />
-      ))}
+      <Helmet>
+        <title>{post.title} | Molitico</title>
+        <meta name="description" content={post.metaDescription} />
+        <meta name="keywords" content={post.tags.join(", ")} />
+        <meta property="og:title" content={post.title} />
+        <meta property="og:description" content={post.metaDescription} />
+        <meta property="og:type" content="article" />
+        <meta property="article:published_time" content={post.publishDate} />
+        <meta property="article:author" content={post.author} />
+        <meta property="article:section" content={post.category} />
+        {post.tags.map(tag => (
+          <meta key={tag} property="article:tag" content={tag} />
+        ))}
+        
+        <script type="application/ld+json">
+          {JSON.stringify(articleSchema)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbSchema)}
+        </script>
+      </Helmet>
 
       <ScrollProgressIndicator />
       <Navigation />

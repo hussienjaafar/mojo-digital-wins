@@ -1,3 +1,4 @@
+import { Helmet } from "react-helmet";
 import { useParams, Link, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,19 +49,19 @@ const CaseStudyDetail = () => {
         "@type": "ListItem",
         "position": 1,
         "name": "Home",
-        "item": window.location.origin
+        "item": "https://molitico.com"
       },
       {
         "@type": "ListItem",
         "position": 2,
         "name": "Case Studies",
-        "item": `${window.location.origin}/case-studies`
+        "item": "https://molitico.com/case-studies"
       },
       {
         "@type": "ListItem",
         "position": 3,
         "name": caseStudy.title,
-        "item": window.location.href
+        "item": `https://molitico.com/case-studies/${caseStudy.id}`
       }
     ]
   };
@@ -89,16 +90,17 @@ const CaseStudyDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Structured Data for SEO */}
-      <script type="application/ld+json">
-        {JSON.stringify(organizationSchema)}
-      </script>
-      <script type="application/ld+json">
-        {JSON.stringify(breadcrumbSchema)}
-      </script>
-      <script type="application/ld+json">
-        {JSON.stringify(articleSchema)}
-      </script>
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify(organizationSchema)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbSchema)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(articleSchema)}
+        </script>
+      </Helmet>
       
       <ScrollProgressIndicator />
       <Navigation />
