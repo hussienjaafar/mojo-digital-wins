@@ -120,7 +120,7 @@ const PrivacyPolicy = () => {
 
             <h3 className="text-xl font-semibold mb-3">2.3 Cookies and Tracking Technologies</h3>
             <p className="text-foreground/80 mb-4">
-              We use cookies, web beacons, and similar tracking technologies to enhance your experience and analyze website traffic. See our <Link to="/cookie-policy" className="text-primary hover:underline">Cookie Policy</Link> for more details.
+              We use cookies, web beacons, and similar tracking technologies to enhance your experience and analyze website traffic.
             </p>
           </section>
 
@@ -268,19 +268,9 @@ const PrivacyPolicy = () => {
             <div className="bg-muted p-6 rounded-lg text-foreground/80">
               <p className="font-semibold mb-2">Molitico</p>
               <p>Email: info@molitico.com</p>
-              <p>Address: [Your Business Address]</p>
-              <p>Phone: [Your Contact Number]</p>
             </div>
           </section>
 
-          <section className="mt-12 pt-8 border-t">
-            <h3 className="text-lg font-semibold mb-4">Related Policies</h3>
-            <ul className="space-y-2">
-              <li><Link to="/terms-of-service" className="text-primary hover:underline">Terms of Service</Link></li>
-              <li><Link to="/cookie-policy" className="text-primary hover:underline">Cookie Policy</Link></li>
-              <li><Link to="/disclaimer" className="text-primary hover:underline">Disclaimer</Link></li>
-            </ul>
-          </section>
         </div>
       </div>
 

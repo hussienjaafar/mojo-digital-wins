@@ -128,38 +128,6 @@ const Footer = () => {
                   Privacy Policy
                 </Link>
               </li>
-              <li>
-                <Link
-                  to="/terms-of-service"
-                  className="text-primary-foreground/80 hover:text-accent transition-colors"
-                >
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/cookie-policy"
-                  className="text-primary-foreground/80 hover:text-accent transition-colors"
-                >
-                  Cookie Policy
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/disclaimer"
-                  className="text-primary-foreground/80 hover:text-accent transition-colors"
-                >
-                  Disclaimer
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/accessibility"
-                  className="text-primary-foreground/80 hover:text-accent transition-colors"
-                >
-                  Accessibility
-                </Link>
-              </li>
             </ul>
           </div>
         </div>
