@@ -6,6 +6,7 @@ import prestonPaLogo from "@/assets/preston-pa-logo.png";
 import rashidIllinoisLogo from "@/assets/rashid-illinois-logo.webp";
 import cairActionLogo from "@/assets/cair-action-logo.png";
 import mpacLogo from "@/assets/mpac-logo.webp";
+import truthProjectLogo from "@/assets/truth-project-logo.png";
 import aNewPolicyLogo from "@/assets/a-new-policy-logo.png";
 
 interface ClientLogoProps {
@@ -22,6 +23,7 @@ const logoMap: Record<string, string> = {
   "Rashid for Illinois": rashidIllinoisLogo,
   "CAIR Action": cairActionLogo,
   "MPAC": mpacLogo,
+  "The Truth Project": truthProjectLogo,
   "A New Policy": aNewPolicyLogo,
 };
 

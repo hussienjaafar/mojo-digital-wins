@@ -133,6 +133,7 @@ const About = () => {
                 "Rashid for Illinois",
                 "CAIR Action",
                 "MPAC",
+                "The Truth Project",
                 "A New Policy"
               ].map((client, index) => (
                 <Card
