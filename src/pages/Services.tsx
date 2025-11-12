@@ -2,6 +2,7 @@ import { Helmet } from "react-helmet";
 import { Card, CardContent } from "@/components/ui/card";
 import { ParticleButton } from "@/components/ParticleButton";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { 
   Megaphone, 
   MessageSquare, 
@@ -23,8 +24,11 @@ import AnimatedPatternHero from "@/components/AnimatedPatternHero";
 import AnimatedServiceGraphic from "@/components/AnimatedServiceGraphic";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
+import { useState } from "react";
 
 const Services = () => {
+  const [selectedBillboard, setSelectedBillboard] = useState<{ src: string; alt: string; caption: string } | null>(null);
+  
   const service1 = useScrollAnimation({ threshold: 0.2 });
   const service2 = useScrollAnimation({ threshold: 0.2 });
   const service3 = useScrollAnimation({ threshold: 0.2 });
@@ -344,22 +348,28 @@ const Services = () => {
               }`}
             >
               {[
-                { src: billboardTimesSquareWide, alt: "Times Square billboard placement" },
-                { src: billboardTimesSquareMedium, alt: "Times Square digital billboard" },
-                { src: billboardMamdani, alt: "Zohran Mamdani campaign billboard on bus" }
+                { src: billboardTimesSquareWide, alt: "Times Square billboard placement", caption: "Times Square" },
+                { src: billboardTimesSquareMedium, alt: "Times Square digital billboard", caption: "Times Square Digital" },
+                { src: billboardMamdani, alt: "Zohran Mamdani campaign billboard on bus", caption: "Mamdani Campaign" }
               ].map((billboard, index) => (
                 <div 
                   key={index}
-                  className={`overflow-hidden rounded-lg shadow-lg hover:shadow-xl transition-all duration-700 hover:scale-[1.02] ${
+                  className={`group cursor-pointer transition-all duration-700 ${
                     billboardGallery.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
                   }`}
                   style={{ transitionDelay: `${index * 150}ms` }}
+                  onClick={() => setSelectedBillboard(billboard)}
                 >
-                  <img 
-                    src={billboard.src} 
-                    alt={billboard.alt}
-                    className="w-full h-64 object-cover"
-                  />
+                  <div className="overflow-hidden rounded-lg shadow-lg group-hover:shadow-2xl transition-all duration-700 bg-muted/50 h-96 flex items-center justify-center group-hover:scale-[1.02]">
+                    <img 
+                      src={billboard.src} 
+                      alt={billboard.alt}
+                      className="w-full h-full object-contain p-2"
+                    />
+                  </div>
+                  <p className="text-center mt-3 text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                    {billboard.caption}
+                  </p>
                 </div>
               ))}
             </div>
@@ -471,6 +481,21 @@ const Services = () => {
         </div>
       </section>
       <Footer />
+      
+      {/* Billboard Lightbox Dialog */}
+      <Dialog open={!!selectedBillboard} onOpenChange={() => setSelectedBillboard(null)}>
+        <DialogContent className="max-w-7xl w-[95vw] h-[90vh] p-0 bg-background/95 backdrop-blur-md">
+          {selectedBillboard && (
+            <div className="w-full h-full flex items-center justify-center p-4">
+              <img 
+                src={selectedBillboard.src} 
+                alt={selectedBillboard.alt}
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
