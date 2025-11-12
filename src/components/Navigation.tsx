@@ -83,7 +83,7 @@ const Navigation = () => {
           {/* Mobile Menu Button */}
           <button
             className={`md:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${
-              isScrolled ? "text-primary-foreground" : "text-foreground"
+              isScrolled ? "text-primary-foreground" : "text-primary-foreground"
             }`}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
@@ -110,10 +110,10 @@ const Navigation = () => {
                   isActive(link.path)
                     ? isScrolled 
                       ? "text-primary-foreground bg-secondary/20" 
-                      : "text-foreground bg-secondary/20"
+                      : "text-primary-foreground bg-secondary/20"
                     : isScrolled
                       ? "text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/5"
-                      : "text-foreground/80 hover:text-foreground hover:bg-foreground/5"
+                      : "text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/5"
                 }`}
               >
                 {link.name}
