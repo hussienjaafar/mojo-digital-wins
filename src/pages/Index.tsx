@@ -8,7 +8,7 @@ import Footer from "@/components/Footer";
 import { TrendingUp, MessageSquare, Mail, Target, Users, BarChart3, Check, Shield } from "lucide-react";
 import heroImage from "@/assets/hero-movement.jpg";
 import heroRally from "@/assets/hero-movement-rally.jpg";
-import dataDashboard from "@/assets/data-dashboard.jpg";
+import { AnimatedGeometricBackground } from "@/components/AnimatedGeometricBackground";
 import { featuredCaseStudies } from "@/data/caseStudies";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
@@ -437,13 +437,11 @@ const Index = () => {
 
       {/* Why Molitico */}
       <section className="py-16 md:py-24 diagonal-both bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground relative overflow-hidden">
-        {/* Animated Circles */}
-        <div className="animated-circles z-0">
-          <div className="circle-shape circle-4" />
-          <div className="circle-shape circle-5" />
-        </div>
+        {/* Animated Geometric Background */}
+        <AnimatedGeometricBackground />
         
-        <div className="absolute inset-0 texture-overlay" />
+        <div className="absolute inset-0 texture-overlay z-[1]" />
+        
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16 animate-fade-in px-4">
             <h2 className="text-headline mb-4 md:mb-6 tracking-wide">
@@ -455,9 +453,12 @@ const Index = () => {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-            <div className="space-y-6 animate-fade-in">
-              <div className="flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-accent hover-lift">
+          <div className="max-w-5xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-6 md:gap-8">
+              <div 
+                className="flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-accent hover-lift animate-fade-in"
+                style={{ animationDelay: '0.1s' }}
+              >
                 <div className="bg-accent text-accent-foreground p-3 rounded-lg flex-shrink-0">
                   <TrendingUp size={28} />
                 </div>
@@ -469,7 +470,10 @@ const Index = () => {
                 </div>
               </div>
 
-              <div className="flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-destructive hover-lift">
+              <div 
+                className="flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-destructive hover-lift animate-fade-in"
+                style={{ animationDelay: '0.2s' }}
+              >
                 <div className="bg-destructive text-destructive-foreground p-3 rounded-lg flex-shrink-0">
                   <Users size={28} />
                 </div>
@@ -481,7 +485,10 @@ const Index = () => {
                 </div>
               </div>
 
-              <div className="flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-secondary hover-lift">
+              <div 
+                className="flex items-start space-x-4 bg-primary-foreground/10 p-6 rounded-lg border-l-4 border-secondary hover-lift animate-fade-in"
+                style={{ animationDelay: '0.3s' }}
+              >
                 <div className="bg-secondary text-secondary-foreground p-3 rounded-lg flex-shrink-0">
                   <BarChart3 size={28} />
                 </div>
@@ -493,30 +500,23 @@ const Index = () => {
                 </div>
               </div>
 
-              <div className="mt-8 pt-8 border-t border-primary-foreground/20">
-                <div className="bg-accent/20 border-2 border-accent rounded-lg p-6 hover-glow">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-accent text-accent-foreground p-3 rounded-lg flex-shrink-0">
-                      <Shield size={28} />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold mb-2 uppercase font-bebas tracking-wide">Ethical Fundraising</h3>
-                      <p className="text-primary-foreground/90">
-                        Donor trust is sacred. We build relationships that last beyond Election Day, never using
-                        deceptive tactics or burning out supporters for short-term gains.
-                      </p>
-                    </div>
+              <div 
+                className="bg-accent/20 border-2 border-accent rounded-lg p-6 hover-glow animate-fade-in"
+                style={{ animationDelay: '0.4s' }}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="bg-accent text-accent-foreground p-3 rounded-lg flex-shrink-0">
+                    <Shield size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold mb-2 uppercase font-bebas tracking-wide">Ethical Fundraising</h3>
+                    <p className="text-primary-foreground/90">
+                      Donor trust is sacred. We build relationships that last beyond Election Day, never using
+                      deceptive tactics or burning out supporters for short-term gains.
+                    </p>
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="animate-slide-in-right">
-              <img
-                src={dataDashboard}
-                alt="Campaign performance dashboard"
-                className="rounded-lg shadow-2xl border-4 border-primary-foreground/20 hover-scale"
-              />
             </div>
           </div>
         </div>
