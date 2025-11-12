@@ -312,7 +312,7 @@ const Index = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {featuredCaseStudies.map((study, index) => (
+            {featuredCaseStudies.slice(0, 3).map((study, index) => (
               <Link key={study.id} to={`/case-studies/${study.id}`} className="block">
               <Card
                 className={`bg-card border-2 border-border hover:border-secondary overflow-hidden group cursor-pointer transition-all duration-700 hover:shadow-2xl h-full ${
