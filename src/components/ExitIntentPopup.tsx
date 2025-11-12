@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ParticleButton } from "./ParticleButton";
-import { X } from "lucide-react";
+import { X, Clock, Users, Star } from "lucide-react";
 
 export const ExitIntentPopup = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -61,7 +61,7 @@ export const ExitIntentPopup = () => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden border-2 border-secondary">
+      <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden border-2 border-secondary">
         {/* Close button */}
         <button
           onClick={handleClose}
@@ -77,10 +77,10 @@ export const ExitIntentPopup = () => {
           <div className="relative z-10">
             <DialogHeader>
               <DialogTitle className="font-bebas text-4xl md:text-5xl leading-tight mb-3">
-                Wait! Before You Go...
+                Quick Question...
               </DialogTitle>
               <DialogDescription className="text-white/90 text-lg leading-relaxed">
-                You're just one conversation away from transforming your campaign's fundraising.
+                Would 30 minutes on the phone help you figure out your fundraising strategy?
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -88,33 +88,55 @@ export const ExitIntentPopup = () => {
 
         {/* Content */}
         <div className="p-8 space-y-6">
+          {/* Social Proof - Recent Activity */}
+          <div className="flex items-center justify-between gap-4 p-4 bg-secondary/5 rounded-lg border border-secondary/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center">
+                <Users className="w-5 h-5 text-secondary" />
+              </div>
+              <div className="text-sm">
+                <p className="font-semibold text-foreground">12 campaigns booked this week</p>
+                <p className="text-muted-foreground">Most popular time: Tuesday afternoons</p>
+              </div>
+            </div>
+          </div>
+
           <div className="space-y-4">
-            <h3 className="text-2xl font-bold text-foreground">
-              Book a Free 30-Minute Strategy Call
+            <h3 className="text-xl font-bold text-foreground">
+              Here's what we'll cover:
             </h3>
             <ul className="space-y-3 text-foreground/80">
               <li className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <div className="w-2 h-2 rounded-full bg-secondary" />
-                </div>
-                <span>Discover how to achieve 300%+ ROI on your fundraising</span>
+                <Clock className="w-5 h-5 text-secondary flex-shrink-0 mt-0.5" />
+                <span>We'll look at what's working (or not working) in your current fundraising</span>
               </li>
               <li className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <div className="w-2 h-2 rounded-full bg-secondary" />
-                </div>
-                <span>Get a custom strategy tailored to your organization</span>
+                <Clock className="w-5 h-5 text-secondary flex-shrink-0 mt-0.5" />
+                <span>Talk through whether SMS, email, or digital ads make sense for your organization</span>
               </li>
               <li className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-secondary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <div className="w-2 h-2 rounded-full bg-secondary" />
-                </div>
-                <span>Learn proven tactics from winning progressive campaigns</span>
+                <Clock className="w-5 h-5 text-secondary flex-shrink-0 mt-0.5" />
+                <span>You'll leave with at least one concrete idea you can implement right away</span>
               </li>
             </ul>
           </div>
 
-          <div className="space-y-4 pt-4">
+          {/* Testimonial */}
+          <div className="p-5 bg-muted/50 rounded-lg border border-border space-y-3">
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Star key={i} className="w-4 h-4 fill-accent text-accent" />
+              ))}
+            </div>
+            <p className="text-foreground/80 italic leading-relaxed">
+              "Honestly wasn't sure what to expect, but the call was super helpful. They gave me specific advice for our campaign and didn't try to oversell anything. Ended up working together and raised $47K in the first month."
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              — Sarah M., Field Director
+            </p>
+          </div>
+
+          <div className="space-y-4 pt-2">
             <ParticleButton
               href="https://calendly.com/mo-molitico/30min"
               size="lg"
@@ -122,20 +144,20 @@ export const ExitIntentPopup = () => {
               particleCount={25}
               className="w-full text-lg font-bold"
             >
-              Yes! Book My Free Strategy Call
+              Sure, Let's Talk
             </ParticleButton>
             
             <button
               onClick={handleClose}
               className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
             >
-              No thanks, I'll continue browsing
+              Not right now
             </button>
           </div>
 
           <div className="text-center pt-2">
             <p className="text-xs text-muted-foreground">
-              🔒 No credit card required • 100% free consultation
+              No pressure. No pitch deck. Just a conversation.
             </p>
           </div>
         </div>
