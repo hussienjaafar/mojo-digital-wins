@@ -5,3 +5,15 @@ verify_jwt = true
 
 [functions.meta-conversions]
 verify_jwt = true
+
+[functions.sync-meta-ads]
+verify_jwt = true
+
+[functions.sync-switchboard-sms]
+verify_jwt = true
+
+[functions.actblue-webhook]
+verify_jwt = false
+
+[functions.calculate-roi]
+verify_jwt = true

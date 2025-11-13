@@ -13,6 +13,7 @@ import ClientMetricsOverview from "@/components/client/ClientMetricsOverview";
 import MetaAdsMetrics from "@/components/client/MetaAdsMetrics";
 import SMSMetrics from "@/components/client/SMSMetrics";
 import DonationMetrics from "@/components/client/DonationMetrics";
+import SyncControls from "@/components/client/SyncControls";
 
 type Organization = {
   id: string;
@@ -174,6 +175,9 @@ const ClientDashboard = () => {
             </div>
           )}
         </div>
+
+        {/* Sync Controls */}
+        <SyncControls organizationId={organization.id} />
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
