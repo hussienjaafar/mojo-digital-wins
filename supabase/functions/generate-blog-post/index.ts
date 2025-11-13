@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,8 +13,31 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, keywords, tone, length } = await req.json();
-    console.log('Generating blog post for:', { topic, keywords, tone, length });
+    // Input validation schema
+    const blogRequestSchema = z.object({
+      topic: z.string().trim().min(1, 'Topic is required').max(500, 'Topic must be less than 500 characters'),
+      keywords: z.union([
+        z.array(z.string().max(100)).max(10, 'Maximum 10 keywords allowed'),
+        z.string().max(500, 'Keywords string must be less than 500 characters')
+      ]).optional(),
+      tone: z.enum(['professional', 'conversational', 'urgent', 'inspirational', 'educational']).optional(),
+      length: z.enum(['short', 'medium', 'long']).optional()
+    });
+
+    const body = await req.json();
+    const validationResult = blogRequestSchema.safeParse(body);
+    
+    if (!validationResult.success) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid input parameters',
+        details: validationResult.error.issues 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { topic, keywords, tone, length } = validationResult.data;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -70,15 +94,11 @@ Format the content in Markdown. Include the title as an H1 at the start.`;
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
       throw new Error('Failed to generate content');
     }
 
     const data = await response.json();
     const generatedContent = data.choices[0].message.content;
-    
-    console.log('Successfully generated blog post');
 
     // Extract title and content
     const lines = generatedContent.split('\n');
@@ -96,14 +116,13 @@ Format the content in Markdown. Include the title as an H1 at the start.`;
       title,
       excerpt,
       content: generatedContent,
-      keywords: Array.isArray(keywords) ? keywords : keywords.split(',').map((k: string) => k.trim())
+      keywords: keywords ? (Array.isArray(keywords) ? keywords : keywords.split(',').map((k: string) => k.trim())) : []
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('Error in generate-blog-post function:', error);
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      error: 'An error occurred while generating the blog post' 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

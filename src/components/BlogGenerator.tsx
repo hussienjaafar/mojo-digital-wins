@@ -74,10 +74,9 @@ export const BlogGenerator = () => {
         description: "Review and edit the content below",
       });
     } catch (error) {
-      console.error('Error generating blog post:', error);
       toast({
         title: "Generation failed",
-        description: error instanceof Error ? error.message : "Failed to generate blog post",
+        description: "Failed to generate blog post. Please try again.",
         variant: "destructive",
       });
     } finally {

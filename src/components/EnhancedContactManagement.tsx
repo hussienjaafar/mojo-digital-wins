@@ -113,7 +113,6 @@ export const EnhancedContactManagement = () => {
       if (error) throw error;
       setSubmissions(data || []);
     } catch (error) {
-      console.error('Error fetching submissions:', error);
       toast({
         title: "Error",
         description: "Failed to load submissions.",

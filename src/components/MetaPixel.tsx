@@ -13,7 +13,9 @@ export const initMetaPixel = () => {
     const preferences = JSON.parse(cookieConsent);
     if (!preferences.advertising) return;
   } catch (error) {
-    console.error("Error parsing cookie preferences:", error);
+    if (import.meta.env.DEV) {
+      console.error("Error parsing cookie preferences:", error);
+    }
     return;
   }
 
@@ -74,7 +76,6 @@ export const trackConversion = async (
     
     // If no session, skip server-side tracking (client-side pixel still tracks)
     if (!session) {
-      console.warn('No session available for server-side conversion tracking');
       return;
     }
 
@@ -89,11 +90,13 @@ export const trackConversion = async (
       },
     });
 
-    if (error) {
+    if (error && import.meta.env.DEV) {
       console.error('Error tracking conversion:', error);
     }
   } catch (error) {
-    console.error('Error tracking conversion:', error);
+    if (import.meta.env.DEV) {
+      console.error('Error tracking conversion:', error);
+    }
   }
 };
 

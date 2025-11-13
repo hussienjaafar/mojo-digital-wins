@@ -67,30 +67,23 @@ const Admin = () => {
   }, [session]);
 
   const checkAdminStatus = async () => {
+    if (!session?.user?.id) {
+      navigate('/auth');
+      return;
+    }
+
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session?.user?.id)
-        .eq('role', 'admin')
-        .single();
+      const { data, error } = await supabase.rpc('is_admin');
 
-      if (error && error.code !== 'PGRST116') throw error;
-
-      if (data) {
-        setIsAdmin(true);
-        fetchSubmissions();
-      } else {
-        toast({
-          title: "Access Denied",
-          description: "You need admin privileges to access this page.",
-          variant: "destructive",
-        });
-        navigate("/");
+      if (error || !data) {
+        navigate('/');
+        return;
       }
+
+      setIsAdmin(true);
+      fetchSubmissions();
     } catch (error) {
-      console.error('Error checking admin status:', error);
-      navigate("/");
+      navigate('/');
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +101,6 @@ const Admin = () => {
       setSubmissions(data || []);
       setFilteredSubmissions(data || []);
     } catch (error) {
-      console.error('Error fetching submissions:', error);
       toast({
         title: "Error",
         description: "Failed to load submissions",
