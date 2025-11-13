@@ -32,12 +32,12 @@ export const AdminInviteCodes = () => {
   const fetchInviteCodes = async () => {
     try {
       const { data, error } = await supabase
-        .from('admin_invite_codes')
+        .from('admin_invite_codes' as any)
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setInviteCodes(data || []);
+      setInviteCodes((data as any) || []);
     } catch (error) {
       console.error('Error fetching invite codes:', error);
       toast({
@@ -64,12 +64,12 @@ export const AdminInviteCodes = () => {
       expiresAt.setDate(expiresAt.getDate() + 7);
       
       const { error } = await supabase
-        .from('admin_invite_codes')
+        .from('admin_invite_codes' as any)
         .insert({
           code,
           created_by: session.session?.user?.id,
           expires_at: expiresAt.toISOString(),
-        });
+        } as any);
 
       if (error) throw error;
 
@@ -92,7 +92,7 @@ export const AdminInviteCodes = () => {
   const deleteInviteCode = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('admin_invite_codes')
+        .from('admin_invite_codes' as any)
         .delete()
         .eq('id', id);
 
