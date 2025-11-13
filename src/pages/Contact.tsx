@@ -86,6 +86,24 @@ const Contact = () => {
 
       if (error) throw error;
 
+      // Send email notification (don't block on failure)
+      try {
+        await supabase.functions.invoke('send-contact-notification', {
+          body: {
+            name: validatedData.name,
+            email: validatedData.email,
+            campaign: validatedData.campaign || undefined,
+            organization_type: validatedData.organizationType || undefined,
+            message: validatedData.message,
+            created_at: new Date().toISOString(),
+          }
+        });
+        console.log("Email notification sent");
+      } catch (emailError) {
+        console.error("Failed to send email notification:", emailError);
+        // Don't fail the form submission if email fails
+      }
+
       toast({
         title: "Message sent!",
         description: "We'll get back to you within 24 hours.",
