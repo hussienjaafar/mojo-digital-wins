@@ -10,7 +10,7 @@ import Footer from "@/components/Footer";
 import { ParticleButton } from "@/components/ParticleButton";
 import AnimatedPatternHero from "@/components/AnimatedPatternHero";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/fixed-client";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
