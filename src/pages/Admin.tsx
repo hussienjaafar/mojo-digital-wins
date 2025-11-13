@@ -21,6 +21,8 @@ import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 import ClientOrganizationManager from "@/components/admin/ClientOrganizationManager";
 import ClientUserManager from "@/components/admin/ClientUserManager";
 import APICredentialsManager from "@/components/admin/APICredentialsManager";
+import CampaignAttributionManager from "@/components/admin/CampaignAttributionManager";
+import SyncScheduler from "@/components/admin/SyncScheduler";
 
 type ContactSubmission = {
   id: string;
@@ -228,7 +230,7 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="analytics" className="w-full">
-          <TabsList className="grid w-full grid-cols-11">
+          <TabsList className="grid w-full grid-cols-13">
             <TabsTrigger value="analytics">
               <BarChart3 className="h-4 w-4 mr-2" />
               Analytics
@@ -244,6 +246,14 @@ const Admin = () => {
             <TabsTrigger value="api-creds">
               <Key className="h-4 w-4 mr-2" />
               API Creds
+            </TabsTrigger>
+            <TabsTrigger value="attribution">
+              <Activity className="h-4 w-4 mr-2" />
+              Attribution
+            </TabsTrigger>
+            <TabsTrigger value="scheduler">
+              <Activity className="h-4 w-4 mr-2" />
+              Scheduler
             </TabsTrigger>
             <TabsTrigger value="users">
               <Users className="h-4 w-4 mr-2" />
@@ -289,6 +299,14 @@ const Admin = () => {
 
           <TabsContent value="api-creds">
             <APICredentialsManager />
+          </TabsContent>
+
+          <TabsContent value="attribution">
+            <CampaignAttributionManager />
+          </TabsContent>
+
+          <TabsContent value="scheduler">
+            <SyncScheduler />
           </TabsContent>
 
           <TabsContent value="users">
