@@ -18,6 +18,9 @@ import { SessionManagement } from "@/components/SessionManagement";
 import { UserManagement } from "@/components/UserManagement";
 import { EnhancedContactManagement } from "@/components/EnhancedContactManagement";
 import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
+import ClientOrganizationManager from "@/components/admin/ClientOrganizationManager";
+import ClientUserManager from "@/components/admin/ClientUserManager";
+import APICredentialsManager from "@/components/admin/APICredentialsManager";
 
 type ContactSubmission = {
   id: string;
@@ -225,10 +228,22 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="analytics" className="w-full">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-11">
             <TabsTrigger value="analytics">
               <BarChart3 className="h-4 w-4 mr-2" />
               Analytics
+            </TabsTrigger>
+            <TabsTrigger value="clients">
+              <Users className="h-4 w-4 mr-2" />
+              Clients
+            </TabsTrigger>
+            <TabsTrigger value="client-users">
+              <Users className="h-4 w-4 mr-2" />
+              Client Users
+            </TabsTrigger>
+            <TabsTrigger value="api-creds">
+              <Key className="h-4 w-4 mr-2" />
+              API Creds
             </TabsTrigger>
             <TabsTrigger value="users">
               <Users className="h-4 w-4 mr-2" />
@@ -262,6 +277,18 @@ const Admin = () => {
 
           <TabsContent value="analytics">
             <AnalyticsDashboard />
+          </TabsContent>
+
+          <TabsContent value="clients">
+            <ClientOrganizationManager />
+          </TabsContent>
+
+          <TabsContent value="client-users">
+            <ClientUserManager />
+          </TabsContent>
+
+          <TabsContent value="api-creds">
+            <APICredentialsManager />
           </TabsContent>
 
           <TabsContent value="users">
