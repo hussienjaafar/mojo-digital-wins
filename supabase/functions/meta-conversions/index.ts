@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,6 +8,18 @@ const corsHeaders = {
 
 const PIXEL_ID = "1344961220416600";
 const API_VERSION = "v22.0";
+
+const metaEventSchema = z.object({
+  event_name: z.string().trim().min(1, { message: "Event name is required" }).max(100, { message: "Event name must be less than 100 characters" }),
+  event_source_url: z.string().url({ message: "Invalid URL format" }).max(500, { message: "URL must be less than 500 characters" }).optional(),
+  user_data: z.object({
+    em: z.string().optional(),
+    ph: z.string().optional(),
+    fn: z.string().optional(),
+    ln: z.string().optional(),
+  }).optional(),
+  custom_data: z.record(z.string(), z.any()).optional()
+});
 
 interface ConversionEvent {
   event_name: string;
@@ -44,12 +57,29 @@ serve(async (req) => {
       );
     }
 
+    // Validate input with Zod schema
+    const requestBody = await req.json();
+    const validationResult = metaEventSchema.safeParse(requestBody);
+    
+    if (!validationResult.success) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input parameters',
+          details: validationResult.error.errors 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     const { 
       event_name, 
       event_source_url, 
       user_data = {},
       custom_data = {} 
-    } = await req.json();
+    } = validationResult.data;
 
     // Get client IP and user agent from request headers
     const clientIp = req.headers.get('x-forwarded-for') || 
