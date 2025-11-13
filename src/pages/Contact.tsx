@@ -12,33 +12,75 @@ import AnimatedPatternHero from "@/components/AnimatedPatternHero";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+// Comprehensive validation schema with sanitization
+const contactFormSchema = z.object({
+  name: z.string()
+    .trim()
+    .min(1, { message: "Name is required" })
+    .max(100, { message: "Name must be less than 100 characters" })
+    .regex(/^[a-zA-Z\s'-]+$/, { message: "Name contains invalid characters" }),
+  
+  email: z.string()
+    .trim()
+    .min(1, { message: "Email is required" })
+    .email({ message: "Invalid email address" })
+    .max(255, { message: "Email must be less than 255 characters" })
+    .toLowerCase(),
+  
+  campaign: z.string()
+    .trim()
+    .max(200, { message: "Campaign description must be less than 200 characters" })
+    .optional()
+    .transform(val => val || ""),
+  
+  organizationType: z.string()
+    .trim()
+    .max(100, { message: "Organization type must be less than 100 characters" })
+    .optional()
+    .transform(val => val || ""),
+  
+  message: z.string()
+    .trim()
+    .min(1, { message: "Message is required" })
+    .max(2000, { message: "Message must be less than 2000 characters" })
+});
+
+type ContactFormData = z.infer<typeof contactFormSchema>;
 
 const Contact = () => {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ContactFormData>({
     name: "",
     email: "",
     campaign: "",
     organizationType: "",
     message: ""
   });
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setValidationErrors({});
 
     try {
+      // Validate and sanitize input data
+      const validatedData = contactFormSchema.parse(formData);
+
+      // Insert validated and sanitized data
       const { error } = await supabase
         .from('contact_submissions')
         .insert([
           {
-            name: formData.name,
-            email: formData.email,
-            campaign: formData.campaign || null,
-            organization_type: formData.organizationType || null,
-            message: formData.message
+            name: validatedData.name,
+            email: validatedData.email,
+            campaign: validatedData.campaign || null,
+            organization_type: validatedData.organizationType || null,
+            message: validatedData.message
           }
         ]);
 
@@ -58,12 +100,27 @@ const Contact = () => {
       });
       setShowForm(false);
     } catch (error) {
-      console.error('Form submission error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive",
-      });
+      if (error instanceof z.ZodError) {
+        // Handle validation errors
+        const errors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            errors[err.path[0].toString()] = err.message;
+          }
+        });
+        setValidationErrors(errors);
+        toast({
+          title: "Validation Error",
+          description: "Please check the form for errors.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -157,9 +214,20 @@ const Contact = () => {
                           required 
                           className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11"
                           value={formData.name}
-                          onChange={(e) => setFormData({...formData, name: e.target.value})}
+                          onChange={(e) => {
+                            setFormData({...formData, name: e.target.value});
+                            if (validationErrors.name) {
+                              const newErrors = {...validationErrors};
+                              delete newErrors.name;
+                              setValidationErrors(newErrors);
+                            }
+                          }}
                           disabled={isSubmitting}
+                          maxLength={100}
                         />
+                        {validationErrors.name && (
+                          <p className="text-sm text-destructive">{validationErrors.name}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -171,22 +239,43 @@ const Contact = () => {
                           required 
                           className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11"
                           value={formData.email}
-                          onChange={(e) => setFormData({...formData, email: e.target.value})}
+                          onChange={(e) => {
+                            setFormData({...formData, email: e.target.value});
+                            if (validationErrors.email) {
+                              const newErrors = {...validationErrors};
+                              delete newErrors.email;
+                              setValidationErrors(newErrors);
+                            }
+                          }}
                           disabled={isSubmitting}
+                          maxLength={255}
                         />
+                        {validationErrors.email && (
+                          <p className="text-sm text-destructive">{validationErrors.email}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="campaign">Campaign/Organization *</Label>
+                        <Label htmlFor="campaign">Campaign/Organization</Label>
                         <Input 
                           id="campaign" 
                           placeholder="Smith for Senate" 
-                          required 
                           className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11"
                           value={formData.campaign}
-                          onChange={(e) => setFormData({...formData, campaign: e.target.value})}
+                          onChange={(e) => {
+                            setFormData({...formData, campaign: e.target.value});
+                            if (validationErrors.campaign) {
+                              const newErrors = {...validationErrors};
+                              delete newErrors.campaign;
+                              setValidationErrors(newErrors);
+                            }
+                          }}
                           disabled={isSubmitting}
+                          maxLength={200}
                         />
+                        {validationErrors.campaign && (
+                          <p className="text-sm text-destructive">{validationErrors.campaign}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -196,9 +285,20 @@ const Contact = () => {
                           placeholder="Campaign, PAC, 501(c)(3), 501(c)(4), etc." 
                           className="border-border/50 focus:border-secondary transition-colors h-12 md:h-11"
                           value={formData.organizationType}
-                          onChange={(e) => setFormData({...formData, organizationType: e.target.value})}
+                          onChange={(e) => {
+                            setFormData({...formData, organizationType: e.target.value});
+                            if (validationErrors.organizationType) {
+                              const newErrors = {...validationErrors};
+                              delete newErrors.organizationType;
+                              setValidationErrors(newErrors);
+                            }
+                          }}
                           disabled={isSubmitting}
+                          maxLength={100}
                         />
+                        {validationErrors.organizationType && (
+                          <p className="text-sm text-destructive">{validationErrors.organizationType}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -210,9 +310,20 @@ const Contact = () => {
                           rows={5} 
                           className="border-border/50 focus:border-secondary transition-colors resize-none"
                           value={formData.message}
-                          onChange={(e) => setFormData({...formData, message: e.target.value})}
+                          onChange={(e) => {
+                            setFormData({...formData, message: e.target.value});
+                            if (validationErrors.message) {
+                              const newErrors = {...validationErrors};
+                              delete newErrors.message;
+                              setValidationErrors(newErrors);
+                            }
+                          }}
                           disabled={isSubmitting}
+                          maxLength={2000}
                         />
+                        {validationErrors.message && (
+                          <p className="text-sm text-destructive">{validationErrors.message}</p>
+                        )}
                       </div>
 
                       <Button 
