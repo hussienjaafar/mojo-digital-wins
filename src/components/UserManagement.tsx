@@ -69,7 +69,6 @@ export const UserManagement = () => {
       if (error) throw error;
       setUsers(data || []);
     } catch (error) {
-      console.error('Error fetching users:', error);
       toast({
         title: "Error",
         description: "Failed to load users.",
