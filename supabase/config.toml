@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.calculate-roi]
 verify_jwt = true
+
+[functions.send-email-report]
+verify_jwt = true

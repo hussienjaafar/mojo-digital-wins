@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
-import { Download, LogOut, Search, Filter, MessageSquare, Mail, Sparkles, Key, Shield, Activity, Users, BarChart3 } from "lucide-react";
+import { Download, LogOut, Search, Filter, MessageSquare, Mail, Sparkles, Key, Shield, Activity, Users, BarChart3, Send } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BlogGenerator } from "@/components/BlogGenerator";
 import { AdminInviteCodes } from "@/components/AdminInviteCodes";
@@ -23,6 +23,7 @@ import ClientUserManager from "@/components/admin/ClientUserManager";
 import APICredentialsManager from "@/components/admin/APICredentialsManager";
 import CampaignAttributionManager from "@/components/admin/CampaignAttributionManager";
 import SyncScheduler from "@/components/admin/SyncScheduler";
+import EmailReportManager from "@/components/admin/EmailReportManager";
 
 type ContactSubmission = {
   id: string;
@@ -230,7 +231,7 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="analytics" className="w-full">
-          <TabsList className="grid w-full grid-cols-13">
+          <TabsList className="grid w-full grid-cols-14">
             <TabsTrigger value="analytics">
               <BarChart3 className="h-4 w-4 mr-2" />
               Analytics
@@ -282,6 +283,10 @@ const Admin = () => {
             <TabsTrigger value="sessions">
               <Activity className="h-4 w-4 mr-2" />
               Sessions
+            </TabsTrigger>
+            <TabsTrigger value="email-reports">
+              <Send className="h-4 w-4 mr-2" />
+              Email Reports
             </TabsTrigger>
           </TabsList>
 
@@ -391,6 +396,10 @@ const Admin = () => {
 
           <TabsContent value="sessions">
             <SessionManagement />
+          </TabsContent>
+
+          <TabsContent value="email-reports">
+            <EmailReportManager />
           </TabsContent>
         </Tabs>
       </main>
