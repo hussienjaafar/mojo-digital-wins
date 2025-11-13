@@ -155,7 +155,7 @@ export const AdminInviteCodes = () => {
       <CardContent>
         <Alert className="mb-4">
           <AlertDescription>
-            Share these codes with trusted users during signup to automatically grant them admin privileges.
+            Share these codes with trusted users during signup to automatically grant them admin privileges. Codes expire after 7 days.
           </AlertDescription>
         </Alert>
 
@@ -189,7 +189,7 @@ export const AdminInviteCodes = () => {
                         {code.used_at ? (
                           <Badge variant="secondary">Used</Badge>
                         ) : isExpired ? (
-                          <Badge variant="outline">Expired</Badge>
+                          <Badge variant="destructive">Expired</Badge>
                         ) : code.is_active ? (
                           <Badge variant="default">Active</Badge>
                         ) : (
@@ -200,7 +200,13 @@ export const AdminInviteCodes = () => {
                         {new Date(code.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        {code.expires_at ? new Date(code.expires_at).toLocaleDateString() : 'Never'}
+                        {code.expires_at ? (
+                          <span className={isExpired ? "text-destructive" : ""}>
+                            {new Date(code.expires_at).toLocaleDateString()}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">Never</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {code.used_at ? new Date(code.used_at).toLocaleDateString() : '-'}
