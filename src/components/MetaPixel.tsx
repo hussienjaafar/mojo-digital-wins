@@ -69,7 +69,19 @@ export const trackConversion = async (
   customData?: Record<string, any>
 ) => {
   try {
+    // Get the current session for authentication
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // If no session, skip server-side tracking (client-side pixel still tracks)
+    if (!session) {
+      console.warn('No session available for server-side conversion tracking');
+      return;
+    }
+
     const { error } = await supabase.functions.invoke('meta-conversions', {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
       body: {
         event_name: eventName,
         event_source_url: window.location.href,
