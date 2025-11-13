@@ -12,8 +12,10 @@ import { Session } from "@supabase/supabase-js";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Mail, Lock, Eye, EyeOff, Check, X } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Check, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 // Password strength calculation
 const calculatePasswordStrength = (password: string): { score: number; label: string; color: string } => {
@@ -86,6 +88,9 @@ const Auth = () => {
     number: false,
     special: false,
   });
+  const [isEmailVerified, setIsEmailVerified] = useState<boolean | null>(null);
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
 
   const signInForm = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
@@ -108,14 +113,20 @@ const Auth = () => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      if (session) {
+      setIsEmailVerified(session?.user?.email_confirmed_at ? true : false);
+      setUserEmail(session?.user?.email || "");
+      
+      if (session && session.user.email_confirmed_at) {
         navigate("/admin");
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) {
+      setIsEmailVerified(session?.user?.email_confirmed_at ? true : false);
+      setUserEmail(session?.user?.email || "");
+      
+      if (session && session.user.email_confirmed_at) {
         navigate("/admin");
       }
     });
@@ -166,9 +177,10 @@ const Auth = () => {
 
       toast({
         title: "Account created!",
-        description: "You can now sign in with your credentials.",
+        description: "Please check your email to verify your account.",
       });
       
+      setUserEmail(data.email);
       signUpForm.reset();
     } catch (error: any) {
       toast({
@@ -176,6 +188,43 @@ const Auth = () => {
         description: error.message || "Failed to create account. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!userEmail) {
+      toast({
+        title: "Error",
+        description: "No email address found. Please sign up first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsResendingVerification(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: userEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}/admin`,
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Verification email sent!",
+        description: "Please check your inbox for the verification link.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to resend email",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResendingVerification(false);
     }
   };
 
@@ -189,6 +238,45 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {session && isEmailVerified === false && (
+            <Alert className="mb-4 border-yellow-500/50 bg-yellow-500/10">
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Email not verified</span>
+                  <Badge variant="outline" className="border-yellow-500 text-yellow-600">
+                    <X className="h-3 w-3 mr-1" />
+                    Unverified
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Please check your email and click the verification link to access the admin dashboard.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResendVerification}
+                  disabled={isResendingVerification}
+                  className="w-full mt-2"
+                >
+                  {isResendingVerification ? "Sending..." : "Resend Verification Email"}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {session && isEmailVerified === true && (
+            <Alert className="mb-4 border-green-500/50 bg-green-500/10">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="flex items-center justify-between">
+                <span className="text-sm">Email verified</span>
+                <Badge variant="outline" className="border-green-500 text-green-600">
+                  <Check className="h-3 w-3 mr-1" />
+                  Verified
+                </Badge>
+              </AlertDescription>
+            </Alert>
+          )}
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
