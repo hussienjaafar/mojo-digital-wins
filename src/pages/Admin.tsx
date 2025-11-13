@@ -73,7 +73,10 @@ const Admin = () => {
     }
 
     try {
-      const { data, error } = await supabase.rpc('is_admin');
+      const { data, error } = await supabase.rpc('has_role', {
+        _user_id: session.user.id,
+        _role: 'admin'
+      });
 
       if (error || !data) {
         navigate('/');
