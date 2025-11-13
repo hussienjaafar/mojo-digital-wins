@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Plus, Trash2, Send, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Mail, Plus, Trash2, Send, Clock, CheckCircle, XCircle, Settings } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import ReportCustomizationDialog from "./ReportCustomizationDialog";
 
 type Organization = {
   id: string;
@@ -48,6 +49,7 @@ const EmailReportManager = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [customizeScheduleId, setCustomizeScheduleId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     organization_id: "",
     recipient_emails: "",
@@ -435,6 +437,14 @@ const EmailReportManager = () => {
                           <Button
                             size="sm"
                             variant="outline"
+                            onClick={() => setCustomizeScheduleId(schedule.id)}
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Customize
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => sendTestReport(schedule)}
                             disabled={isSending}
                           >
@@ -518,6 +528,13 @@ const EmailReportManager = () => {
           </div>
         </CardContent>
       </Card>
+
+      <ReportCustomizationDialog
+        scheduleId={customizeScheduleId}
+        open={customizeScheduleId !== null}
+        onOpenChange={(open) => !open && setCustomizeScheduleId(null)}
+        onSave={loadData}
+      />
     </div>
   );
 };
