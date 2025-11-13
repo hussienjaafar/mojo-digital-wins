@@ -31,6 +31,25 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Generating report for organization:", organizationId);
 
+    // Get schedule configuration if provided
+    let reportConfig: any = null;
+    let templateStyle = "professional";
+    let customBranding: any = null;
+
+    if (scheduleId) {
+      const { data: schedule } = await supabase
+        .from("email_report_schedules")
+        .select("report_config, template_style, custom_branding")
+        .eq("id", scheduleId)
+        .single();
+      
+      if (schedule) {
+        reportConfig = schedule.report_config;
+        templateStyle = schedule.template_style || "professional";
+        customBranding = schedule.custom_branding;
+      }
+    }
+
     // Get organization details
     const { data: org, error: orgError } = await supabase
       .from("client_organizations")
@@ -40,11 +59,17 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (orgError) throw orgError;
 
-    // Calculate date range (default to last 7 days for weekly, 30 for monthly)
+    // Calculate date range based on config
     const end = endDate ? new Date(endDate) : new Date();
+    let daysBack = 7;
+    
+    if (reportConfig?.dateRangeType === "custom") {
+      daysBack = reportConfig.customDays || 30;
+    }
+    
     const start = startDate 
       ? new Date(startDate) 
-      : new Date(end.getTime() - (7 * 24 * 60 * 60 * 1000));
+      : new Date(end.getTime() - (daysBack * 24 * 60 * 60 * 1000));
 
     const startDateStr = start.toISOString().split('T')[0];
     const endDateStr = end.toISOString().split('T')[0];
@@ -95,98 +120,139 @@ const handler = async (req: Request): Promise<Response> => {
       ? (totals.totalRaised / totals.totalDonations).toFixed(2)
       : "0.00";
 
-    // Generate HTML email
-    const html = `
-<!DOCTYPE html>
+    // Get configured metrics or use all by default
+    const selectedMetrics = reportConfig?.metrics || [
+      "funds_raised", "total_spend", "roi", "donations", "meta_ads", "sms"
+    ];
+
+    // Get branding
+    const primaryColor = customBranding?.primaryColor || "#667eea";
+    const showLogo = customBranding?.includeLogo !== false;
+    const footerText = customBranding?.footerText || 
+      "This is an automated report. For more details, please log into your dashboard.";
+
+    // Build HTML sections
+    let metricsHtml = "";
+    
+    if (selectedMetrics.includes("funds_raised")) {
+      metricsHtml += `
+        <div class="metric-card">
+          <div class="metric-label">Total Funds Raised</div>
+          <div class="metric-value">$${totals.totalRaised.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        </div>
+      `;
+    }
+
+    if (selectedMetrics.includes("total_spend") || selectedMetrics.includes("roi")) {
+      metricsHtml += '<div class="metric-grid">';
+      
+      if (selectedMetrics.includes("total_spend")) {
+        metricsHtml += `
+          <div class="metric-card">
+            <div class="metric-label">Total Spend</div>
+            <div class="metric-value">$${totals.totalSpent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          </div>
+        `;
+      }
+
+      if (selectedMetrics.includes("roi")) {
+        metricsHtml += `
+          <div class="metric-card">
+            <div class="metric-label">ROI</div>
+            <div class="metric-value ${Number(roi) > 0 ? 'positive' : 'negative'}">${roi}%</div>
+          </div>
+        `;
+      }
+      
+      metricsHtml += '</div>';
+    }
+
+    if (selectedMetrics.includes("donations")) {
+      metricsHtml += `
+        <div class="metric-grid">
+          <div class="metric-card">
+            <div class="metric-label">Total Donations</div>
+            <div class="metric-value">${totals.totalDonations}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Avg Donation</div>
+            <div class="metric-value">$${avgDonation}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    let campaignHtml = "";
+    if (selectedMetrics.includes("meta_ads") || selectedMetrics.includes("sms")) {
+      campaignHtml = '<h2 style="margin-top: 30px;">Campaign Performance</h2><div class="metric-grid">';
+      
+      if (selectedMetrics.includes("meta_ads")) {
+        campaignHtml += `
+          <div class="metric-card">
+            <div class="metric-label">Meta Ads Impressions</div>
+            <div class="metric-value">${totals.metaImpressions.toLocaleString()}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Meta Ads Clicks</div>
+            <div class="metric-value">${totals.metaClicks.toLocaleString()}</div>
+          </div>
+        `;
+      }
+
+      if (selectedMetrics.includes("sms")) {
+        campaignHtml += `
+          <div class="metric-card">
+            <div class="metric-label">SMS Messages Sent</div>
+            <div class="metric-value">${totals.smsSent.toLocaleString()}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">SMS Conversions</div>
+            <div class="metric-value">${totals.smsConversions.toLocaleString()}</div>
+          </div>
+        `;
+      }
+
+      campaignHtml += '</div>';
+    }
+
+    const html = `<!DOCTYPE html>
 <html>
 <head>
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+    .header { background: ${primaryColor}; color: white; padding: 30px; text-align: center; }
     .header h1 { margin: 0; font-size: 24px; }
+    .header img { max-height: 40px; margin-bottom: 10px; }
     .content { padding: 30px; background: #f9fafb; }
     .metric-card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     .metric-label { color: #6b7280; font-size: 14px; text-transform: uppercase; margin-bottom: 5px; }
-    .metric-value { font-size: 32px; font-weight: bold; color: #1f2937; }
+    .metric-value { font-size: ${templateStyle === 'detailed' ? '28px' : '32px'}; font-weight: bold; color: #1f2937; }
     .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
     .footer { background: #1f2937; color: white; padding: 20px; text-align: center; font-size: 12px; }
     .positive { color: #10b981; }
     .negative { color: #ef4444; }
+    ${templateStyle === 'minimal' ? '.metric-label { font-size: 12px; }' : ''}
+    ${templateStyle === 'minimal' ? 'h2 { font-size: 18px; }' : ''}
   </style>
 </head>
 <body>
   <div class="header">
+    ${showLogo && org.logo_url ? `<img src="${org.logo_url}" alt="${org.name}" />` : ''}
     <h1>📊 Performance Report</h1>
     <p>${org.name}</p>
     <p style="font-size: 14px; opacity: 0.9;">${start.toLocaleDateString()} - ${end.toLocaleDateString()}</p>
   </div>
-  
   <div class="content">
-    <h2>Key Metrics</h2>
-    
-    <div class="metric-card">
-      <div class="metric-label">Total Funds Raised</div>
-      <div class="metric-value">$${totals.totalRaised.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-    </div>
-    
-    <div class="metric-grid">
-      <div class="metric-card">
-        <div class="metric-label">Total Spend</div>
-        <div class="metric-value">$${totals.totalSpent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-      </div>
-      
-      <div class="metric-card">
-        <div class="metric-label">ROI</div>
-        <div class="metric-value ${Number(roi) > 0 ? 'positive' : 'negative'}">${roi}%</div>
-      </div>
-    </div>
-    
-    <div class="metric-grid">
-      <div class="metric-card">
-        <div class="metric-label">Total Donations</div>
-        <div class="metric-value">${totals.totalDonations}</div>
-      </div>
-      
-      <div class="metric-card">
-        <div class="metric-label">Avg Donation</div>
-        <div class="metric-value">$${avgDonation}</div>
-      </div>
-    </div>
-    
-    <h2 style="margin-top: 30px;">Campaign Performance</h2>
-    
-    <div class="metric-grid">
-      <div class="metric-card">
-        <div class="metric-label">Meta Ads Impressions</div>
-        <div class="metric-value">${totals.metaImpressions.toLocaleString()}</div>
-      </div>
-      
-      <div class="metric-card">
-        <div class="metric-label">Meta Ads Clicks</div>
-        <div class="metric-value">${totals.metaClicks.toLocaleString()}</div>
-      </div>
-    </div>
-    
-    <div class="metric-grid">
-      <div class="metric-card">
-        <div class="metric-label">SMS Messages Sent</div>
-        <div class="metric-value">${totals.smsSent.toLocaleString()}</div>
-      </div>
-      
-      <div class="metric-card">
-        <div class="metric-label">SMS Conversions</div>
-        <div class="metric-value">${totals.smsConversions.toLocaleString()}</div>
-      </div>
-    </div>
+    ${templateStyle !== 'minimal' ? '<h2>Key Metrics</h2>' : ''}
+    ${metricsHtml}
+    ${campaignHtml}
   </div>
-  
   <div class="footer">
-    <p>This is an automated report. For more details, please log into your dashboard.</p>
+    <p>${footerText}</p>
     <p>&copy; ${new Date().getFullYear()} ${org.name}. All rights reserved.</p>
   </div>
 </body>
-</html>
-    `;
+</html>`;
 
     // Send email
     const emailResponse = await resend.emails.send({
@@ -209,7 +275,6 @@ const handler = async (req: Request): Promise<Response> => {
           status: "sent",
         });
 
-      // Update last sent timestamp
       await supabase
         .from("email_report_schedules")
         .update({ last_sent_at: new Date().toISOString() })
@@ -225,24 +290,6 @@ const handler = async (req: Request): Promise<Response> => {
     );
   } catch (error: any) {
     console.error("Error sending email report:", error);
-
-    // Log the error if we have a schedule ID
-    const body = await req.json().catch(() => ({}));
-    if (body.scheduleId) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
-
-      await supabase
-        .from("email_report_logs")
-        .insert({
-          schedule_id: body.scheduleId,
-          organization_id: body.organizationId,
-          recipients: body.recipients || [],
-          status: "failed",
-          error_message: error.message,
-        });
-    }
 
     return new Response(
       JSON.stringify({ error: error.message }),
