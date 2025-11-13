@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
-import { Download, LogOut, Search, Filter, MessageSquare, Mail, Sparkles } from "lucide-react";
+import { Download, LogOut, Search, Filter, MessageSquare, Mail, Sparkles, Key } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BlogGenerator } from "@/components/BlogGenerator";
+import { AdminInviteCodes } from "@/components/AdminInviteCodes";
 
 type ContactSubmission = {
   id: string;
@@ -224,7 +225,7 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="contacts" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="contacts">
               <MessageSquare className="h-4 w-4 mr-2" />
               Submissions
@@ -232,6 +233,10 @@ const Admin = () => {
             <TabsTrigger value="newsletter">
               <Mail className="h-4 w-4 mr-2" />
               Newsletter
+            </TabsTrigger>
+            <TabsTrigger value="invite-codes">
+              <Key className="h-4 w-4 mr-2" />
+              Invite Codes
             </TabsTrigger>
             <TabsTrigger value="blog-generator">
               <Sparkles className="h-4 w-4 mr-2" />
@@ -367,6 +372,10 @@ const Admin = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="invite-codes">
+            <AdminInviteCodes />
           </TabsContent>
 
           <TabsContent value="blog-generator">

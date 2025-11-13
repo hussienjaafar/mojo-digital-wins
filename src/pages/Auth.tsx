@@ -107,6 +107,7 @@ const Auth = () => {
       email: "",
       password: "",
       confirmPassword: "",
+      adminCode: "",
       acceptTerms: false,
     },
   });
