@@ -180,7 +180,7 @@ const Auth = () => {
       // If admin code was provided, verify it
       if (data.adminCode && authData.user) {
         const { data: result, error: rpcError } = await supabase
-          .rpc('verify_admin_invite_code', {
+          .rpc('verify_admin_invite_code' as any, {
             invite_code: data.adminCode,
             user_id: authData.user.id
           });
