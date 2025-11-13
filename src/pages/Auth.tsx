@@ -63,6 +63,7 @@ const signUpSchema = z.object({
     .regex(/[0-9]/, { message: "Password must contain at least one number" })
     .regex(/[^a-zA-Z0-9]/, { message: "Password must contain at least one special character" }),
   confirmPassword: z.string().min(1, { message: "Please confirm your password" }),
+  adminCode: z.string().optional(),
   acceptTerms: z.boolean().refine((val) => val === true, {
     message: "You must accept the terms and conditions",
   }),
@@ -165,7 +166,7 @@ const Auth = () => {
     try {
       const redirectUrl = `${window.location.origin}/admin`;
       
-      const { error } = await supabase.auth.signUp({
+      const { data: authData, error } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
@@ -175,17 +176,46 @@ const Auth = () => {
 
       if (error) throw error;
 
+      // If admin code was provided, verify it
+      if (data.adminCode && authData.user) {
+        const { data: result, error: rpcError } = await supabase
+          .rpc('verify_admin_invite_code', {
+            invite_code: data.adminCode,
+            user_id: authData.user.id
+          });
+
+        if (rpcError) {
+          console.error('Admin code verification error:', rpcError);
+          toast({
+            title: "Invalid admin code",
+            description: "The admin code you provided is invalid or has already been used.",
+            variant: "destructive",
+          });
+        } else if (result) {
+          toast({
+            title: "Admin account created!",
+            description: "Your account has been created with admin privileges.",
+          });
+          return;
+        }
+      }
+
       toast({
         title: "Account created!",
         description: "Please check your email to verify your account.",
       });
-      
-      setUserEmail(data.email);
-      signUpForm.reset();
     } catch (error: any) {
+      let errorMessage = "An error occurred during sign up. Please try again.";
+      
+      if (error.message?.includes("already registered")) {
+        errorMessage = "This email is already registered. Please sign in instead.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         title: "Sign up failed",
-        description: error.message || "Failed to create account. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -519,6 +549,29 @@ const Auth = () => {
                       </FormItem>
                     )}
                   />
+                  
+                  <FormField
+                    control={signUpForm.control}
+                    name="adminCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Admin Invite Code (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="text"
+                            placeholder="Enter admin code if you have one"
+                            disabled={signUpForm.formState.isSubmitting}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          If you have an admin invite code, enter it here to get admin access.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
                   
                   <FormField
                     control={signUpForm.control}
