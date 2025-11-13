@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
-import { Download, LogOut, Search, Filter, MessageSquare, Mail, Sparkles, Key, Shield, Activity, Users } from "lucide-react";
+import { Download, LogOut, Search, Filter, MessageSquare, Mail, Sparkles, Key, Shield, Activity, Users, BarChart3 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BlogGenerator } from "@/components/BlogGenerator";
 import { AdminInviteCodes } from "@/components/AdminInviteCodes";
@@ -17,6 +17,7 @@ import { AuditLogs } from "@/components/AuditLogs";
 import { SessionManagement } from "@/components/SessionManagement";
 import { UserManagement } from "@/components/UserManagement";
 import { EnhancedContactManagement } from "@/components/EnhancedContactManagement";
+import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 
 type ContactSubmission = {
   id: string;
@@ -228,8 +229,12 @@ const Admin = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-7">
+        <Tabs defaultValue="analytics" className="w-full">
+          <TabsList className="grid w-full grid-cols-8">
+            <TabsTrigger value="analytics">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analytics
+            </TabsTrigger>
             <TabsTrigger value="users">
               <Users className="h-4 w-4 mr-2" />
               Users
@@ -259,6 +264,10 @@ const Admin = () => {
               Sessions
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="analytics">
+            <AnalyticsDashboard />
+          </TabsContent>
 
           <TabsContent value="users">
             <UserManagement />
