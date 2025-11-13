@@ -1,4 +1,7 @@
 project_id = "nuclmzoasgydubdshtab"
 
 [functions.generate-blog-post]
-verify_jwt = false
+verify_jwt = true
+
+[functions.meta-conversions]
+verify_jwt = true

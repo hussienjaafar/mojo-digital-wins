@@ -35,7 +35,23 @@ export const BlogGenerator = () => {
 
     setIsGenerating(true);
     try {
+      // Get the current session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to generate blog posts",
+          variant: "destructive",
+        });
+        setIsGenerating(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('generate-blog-post', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: {
           topic: topic.trim(),
           keywords: keywords.split(',').map(k => k.trim()).filter(k => k),
