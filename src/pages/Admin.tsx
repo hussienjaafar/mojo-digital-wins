@@ -16,6 +16,7 @@ import { AdminInviteCodes } from "@/components/AdminInviteCodes";
 import { AuditLogs } from "@/components/AuditLogs";
 import { SessionManagement } from "@/components/SessionManagement";
 import { UserManagement } from "@/components/UserManagement";
+import { EnhancedContactManagement } from "@/components/EnhancedContactManagement";
 
 type ContactSubmission = {
   id: string;
@@ -264,83 +265,7 @@ const Admin = () => {
           </TabsContent>
 
           <TabsContent value="contacts">
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact Submissions</CardTitle>
-                <CardDescription>View and export all contact form submissions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col md:flex-row gap-4 mb-6">
-                  <div className="flex-1">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search by name, email, campaign, or message..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-                  <div className="w-full md:w-48">
-                    <Select value={typeFilter} onValueChange={setTypeFilter}>
-                      <SelectTrigger>
-                        <Filter className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Filter by type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="contact">Contact Forms</SelectItem>
-                        <SelectItem value="newsletter">Newsletter</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button onClick={exportToCSV} variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export CSV
-                  </Button>
-                </div>
-
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Campaign</TableHead>
-                        <TableHead>Message</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredSubmissions.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                            No contact submissions found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredSubmissions
-                          .filter(sub => sub.message !== "Newsletter subscription")
-                          .map((submission) => (
-                            <TableRow key={submission.id}>
-                              <TableCell className="whitespace-nowrap">
-                                {new Date(submission.created_at).toLocaleDateString()}
-                              </TableCell>
-                              <TableCell className="font-medium">{submission.name}</TableCell>
-                              <TableCell>{submission.email}</TableCell>
-                              <TableCell>{submission.campaign || "N/A"}</TableCell>
-                              <TableCell className="max-w-xs truncate">
-                                {submission.message}
-                              </TableCell>
-                            </TableRow>
-                          ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+            <EnhancedContactManagement />
           </TabsContent>
 
           <TabsContent value="newsletter">
