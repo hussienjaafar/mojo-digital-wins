@@ -6,10 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
-import { Download, LogOut, Search, Filter } from "lucide-react";
+import { Download, LogOut, Search, Filter, MessageSquare, Mail, Sparkles } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BlogGenerator } from "@/components/BlogGenerator";
 
 type ContactSubmission = {
   id: string;
@@ -221,89 +223,166 @@ const Admin = () => {
           </Card>
         </div>
 
-        {/* Filters and Export */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Contact Submissions & Subscribers</CardTitle>
-            <CardDescription>View and export all contact form submissions and newsletter subscribers</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name, email, campaign, or message..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-full md:w-[200px]">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Filter by type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="newsletter">Newsletter Only</SelectItem>
-                  <SelectItem value="contact">Contact Forms Only</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button onClick={exportToCSV} variant="outline">
-                <Download className="mr-2 h-4 w-4" />
-                Export CSV
-              </Button>
-            </div>
+        <Tabs defaultValue="contacts" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="contacts">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Submissions
+            </TabsTrigger>
+            <TabsTrigger value="newsletter">
+              <Mail className="h-4 w-4 mr-2" />
+              Newsletter
+            </TabsTrigger>
+            <TabsTrigger value="blog-generator">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Blog Generator
+            </TabsTrigger>
+          </TabsList>
 
-            {/* Table */}
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Campaign</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Message</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSubmissions.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        No submissions found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredSubmissions.map((submission) => (
-                      <TableRow key={submission.id}>
-                        <TableCell className="whitespace-nowrap">
-                          {new Date(submission.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="font-medium">{submission.name}</TableCell>
-                        <TableCell>{submission.email}</TableCell>
-                        <TableCell>{submission.campaign || "N/A"}</TableCell>
-                        <TableCell>
-                          {submission.message === "Newsletter subscription" ? (
-                            <Badge variant="secondary">Newsletter</Badge>
-                          ) : (
-                            <Badge>Contact Form</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {submission.message}
-                        </TableCell>
+          <TabsContent value="contacts">
+            <Card>
+              <CardHeader>
+                <CardTitle>Contact Submissions</CardTitle>
+                <CardDescription>View and export all contact form submissions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col md:flex-row gap-4 mb-6">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by name, email, campaign, or message..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="w-full md:w-48">
+                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                      <SelectTrigger>
+                        <Filter className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="Filter by type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="contact">Contact Forms</SelectItem>
+                        <SelectItem value="newsletter">Newsletter</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={exportToCSV} variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </Button>
+                </div>
+
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Campaign</TableHead>
+                        <TableHead>Message</TableHead>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSubmissions.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            No contact submissions found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredSubmissions
+                          .filter(sub => sub.message !== "Newsletter subscription")
+                          .map((submission) => (
+                            <TableRow key={submission.id}>
+                              <TableCell className="whitespace-nowrap">
+                                {new Date(submission.created_at).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell className="font-medium">{submission.name}</TableCell>
+                              <TableCell>{submission.email}</TableCell>
+                              <TableCell>{submission.campaign || "N/A"}</TableCell>
+                              <TableCell className="max-w-xs truncate">
+                                {submission.message}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="newsletter">
+            <Card>
+              <CardHeader>
+                <CardTitle>Newsletter Subscribers</CardTitle>
+                <CardDescription>View and export newsletter subscribers</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col md:flex-row gap-4 mb-6 justify-end">
+                  <Button onClick={exportToCSV} variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </Button>
+                </div>
+
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {submissions.filter(sub => sub.message === "Newsletter subscription").length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                            No newsletter subscribers found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        submissions
+                          .filter(sub => sub.message === "Newsletter subscription")
+                          .map((submission) => (
+                            <TableRow key={submission.id}>
+                              <TableCell className="whitespace-nowrap">
+                                {new Date(submission.created_at).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell className="font-medium">{submission.name}</TableCell>
+                              <TableCell>{submission.email}</TableCell>
+                            </TableRow>
+                          ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="blog-generator">
+            <Card>
+              <CardHeader>
+                <CardTitle>AI Blog Post Generator</CardTitle>
+                <CardDescription>
+                  Generate SEO-optimized blog posts for your political campaign using AI
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <BlogGenerator />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
