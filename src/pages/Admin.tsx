@@ -2,28 +2,27 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { UserManagement } from "@/components/UserManagement";
+import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
+import { EnhancedContactManagement } from "@/components/EnhancedContactManagement";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { Session } from "@supabase/supabase-js";
-import { Download, LogOut, Search, Filter, MessageSquare, Mail, Sparkles, Key, Shield, Activity, Users, BarChart3, Send } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BlogGenerator } from "@/components/BlogGenerator";
+import { toast } from "sonner";
 import { AdminInviteCodes } from "@/components/AdminInviteCodes";
+import { BlogGenerator } from "@/components/BlogGenerator";
 import { AuditLogs } from "@/components/AuditLogs";
 import { SessionManagement } from "@/components/SessionManagement";
-import { UserManagement } from "@/components/UserManagement";
-import { EnhancedContactManagement } from "@/components/EnhancedContactManagement";
-import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 import ClientOrganizationManager from "@/components/admin/ClientOrganizationManager";
 import ClientUserManager from "@/components/admin/ClientUserManager";
 import APICredentialsManager from "@/components/admin/APICredentialsManager";
 import CampaignAttributionManager from "@/components/admin/CampaignAttributionManager";
 import SyncScheduler from "@/components/admin/SyncScheduler";
 import EmailReportManager from "@/components/admin/EmailReportManager";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AdminSidebar } from "@/components/AdminSidebar";
+import { LogOut } from "lucide-react";
+import { Session } from "@supabase/supabase-js";
 
 type ContactSubmission = {
   id: string;
@@ -37,7 +36,6 @@ type ContactSubmission = {
 
 const Admin = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +43,7 @@ const Admin = () => {
   const [filteredSubmissions, setFilteredSubmissions] = useState<ContactSubmission[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState("analytics");
 
   useEffect(() => {
     // Set up auth state listener
@@ -110,11 +109,7 @@ const Admin = () => {
       setSubmissions(data || []);
       setFilteredSubmissions(data || []);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load submissions",
-        variant: "destructive",
-      });
+      toast.error("Failed to load submissions");
     }
   };
 
@@ -167,10 +162,7 @@ const Admin = () => {
     a.click();
     window.URL.revokeObjectURL(url);
 
-    toast({
-      title: "Success",
-      description: "Data exported to CSV",
-    });
+    toast.success("Data exported to CSV");
   };
 
   const handleSignOut = async () => {
@@ -193,247 +185,130 @@ const Admin = () => {
   const newsletterCount = submissions.filter(s => s.message === "Newsletter subscription").length;
   const contactCount = submissions.filter(s => s.message !== "Newsletter subscription").length;
 
-  return (
-    <div className="min-h-screen bg-muted/30">
-      {/* Header */}
-      <header className="bg-primary text-primary-foreground shadow-md">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-          <Button variant="outline" onClick={handleSignOut} className="bg-primary-foreground/10 hover:bg-primary-foreground/20 border-primary-foreground/20">
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign Out
-          </Button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Total Submissions</CardDescription>
-              <CardTitle className="text-4xl">{submissions.length}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Newsletter Subscribers</CardDescription>
-              <CardTitle className="text-4xl">{newsletterCount}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Contact Forms</CardDescription>
-              <CardTitle className="text-4xl">{contactCount}</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
-
-        <Tabs defaultValue="analytics" className="w-full">
-          <TabsList className="flex flex-wrap gap-2 h-auto p-2 bg-background/50 backdrop-blur-sm border">
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span>Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger value="clients" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span>Clients</span>
-            </TabsTrigger>
-            <TabsTrigger value="client-users" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span>Client Users</span>
-            </TabsTrigger>
-            <TabsTrigger value="api-creds" className="flex items-center gap-2">
-              <Key className="h-4 w-4" />
-              <span>API Credentials</span>
-            </TabsTrigger>
-            <TabsTrigger value="attribution" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              <span>Attribution</span>
-            </TabsTrigger>
-            <TabsTrigger value="scheduler" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              <span>Scheduler</span>
-            </TabsTrigger>
-            <TabsTrigger value="email-reports" className="flex items-center gap-2">
-              <Send className="h-4 w-4" />
-              <span>Email Reports</span>
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span>Users</span>
-            </TabsTrigger>
-            <TabsTrigger value="contacts" className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              <span>Submissions</span>
-            </TabsTrigger>
-            <TabsTrigger value="newsletter" className="flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              <span>Newsletter</span>
-            </TabsTrigger>
-            <TabsTrigger value="invite-codes" className="flex items-center gap-2">
-              <Key className="h-4 w-4" />
-              <span>Invite Codes</span>
-            </TabsTrigger>
-            <TabsTrigger value="blog-generator" className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              <span>Blog Generator</span>
-            </TabsTrigger>
-            <TabsTrigger value="audit-logs" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              <span>Audit Logs</span>
-            </TabsTrigger>
-            <TabsTrigger value="sessions" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              <span>Sessions</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="analytics" className="space-y-6">
-            {/* Demo Data Quick Access */}
-            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+  const renderContent = () => {
+    switch (activeTab) {
+      case "analytics":
+        return (
+          <div className="space-y-6">
+            <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  Demo Organization
+                <CardTitle className="text-2xl flex items-center gap-2">
+                  🎯 Demo Organization
                 </CardTitle>
                 <CardDescription>
-                  Test the client dashboard with sample data
+                  Explore sample data with the Progressive Victory Fund organization
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="font-semibold text-lg">Progressive Victory Fund</p>
-                    <p className="text-sm text-muted-foreground">
-                      Sample data includes donations, Meta ads, and SMS campaigns
-                    </p>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-background rounded-lg border">
+                    <div className="text-sm text-muted-foreground">Total Funds Raised</div>
+                    <div className="text-2xl font-bold text-primary">$245,750</div>
                   </div>
-                  <Button 
-                    onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')}
-                    className="bg-primary hover:bg-primary/90"
-                  >
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    View Dashboard
-                  </Button>
+                  <div className="p-4 bg-background rounded-lg border">
+                    <div className="text-sm text-muted-foreground">Ad Spend</div>
+                    <div className="text-2xl font-bold text-primary">$18,500</div>
+                  </div>
+                  <div className="p-4 bg-background rounded-lg border">
+                    <div className="text-sm text-muted-foreground">ROI</div>
+                    <div className="text-2xl font-bold text-primary">1,228%</div>
+                  </div>
                 </div>
+                <Button 
+                  onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')}
+                  className="w-full"
+                >
+                  View Full Dashboard →
+                </Button>
               </CardContent>
             </Card>
-
             <AnalyticsDashboard />
-          </TabsContent>
-
-          <TabsContent value="clients">
-            <ClientOrganizationManager />
-          </TabsContent>
-
-          <TabsContent value="client-users">
-            <ClientUserManager />
-          </TabsContent>
-
-          <TabsContent value="api-creds">
-            <APICredentialsManager />
-          </TabsContent>
-
-          <TabsContent value="attribution">
-            <CampaignAttributionManager />
-          </TabsContent>
-
-          <TabsContent value="scheduler">
-            <SyncScheduler />
-          </TabsContent>
-
-          <TabsContent value="users">
-            <UserManagement />
-          </TabsContent>
-
-          <TabsContent value="contacts">
-            <EnhancedContactManagement />
-          </TabsContent>
-
-          <TabsContent value="newsletter">
+          </div>
+        );
+      case "clients":
+        return <ClientOrganizationManager />;
+      case "client-users":
+        return <ClientUserManager />;
+      case "api-credentials":
+        return <APICredentialsManager />;
+      case "attribution":
+        return <CampaignAttributionManager />;
+      case "scheduler":
+        return <SyncScheduler />;
+      case "users":
+        return <UserManagement />;
+      case "contacts":
+        return <EnhancedContactManagement />;
+      case "newsletter":
+        return (
+          <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Newsletter Subscribers</CardTitle>
-                <CardDescription>View and export newsletter subscribers</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col md:flex-row gap-4 mb-6 justify-end">
-                  <Button onClick={exportToCSV} variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export CSV
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Newsletter Subscribers</CardTitle>
+                    <CardDescription>
+                      Manage email newsletter subscriptions
+                    </CardDescription>
+                  </div>
+                  <Button onClick={exportToCSV}>
+                    Export to CSV
                   </Button>
                 </div>
-
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {submissions.filter(sub => sub.message === "Newsletter subscription").length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                            No newsletter subscribers found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        submissions
-                          .filter(sub => sub.message === "Newsletter subscription")
-                          .map((submission) => (
-                            <TableRow key={submission.id}>
-                              <TableCell className="whitespace-nowrap">
-                                {new Date(submission.created_at).toLocaleDateString()}
-                              </TableCell>
-                              <TableCell className="font-medium">{submission.name}</TableCell>
-                              <TableCell>{submission.email}</TableCell>
-                            </TableRow>
-                          ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="invite-codes">
-            <AdminInviteCodes />
-          </TabsContent>
-
-          <TabsContent value="blog-generator">
-            <Card>
-              <CardHeader>
-                <CardTitle>AI Blog Post Generator</CardTitle>
-                <CardDescription>
-                  Generate SEO-optimized blog posts for your political campaign using AI
-                </CardDescription>
               </CardHeader>
               <CardContent>
-                <BlogGenerator />
+                <p className="text-muted-foreground">
+                  Newsletter subscriber management coming soon...
+                </p>
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        );
+      case "invite-codes":
+        return <AdminInviteCodes />;
+      case "blog-generator":
+        return <BlogGenerator />;
+      case "audit-logs":
+        return <AuditLogs />;
+      case "sessions":
+        return <SessionManagement />;
+      case "email-reports":
+        return <EmailReportManager />;
+      default:
+        return <AnalyticsDashboard />;
+    }
+  };
 
-          <TabsContent value="audit-logs">
-            <AuditLogs />
-          </TabsContent>
+  return (
+    <SidebarProvider defaultOpen>
+      <div className="min-h-screen flex w-full bg-background">
+        <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        
+        <div className="flex-1 flex flex-col">
+          <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex h-16 items-center gap-4 px-6">
+              <SidebarTrigger className="-ml-2" />
+              <div className="flex-1">
+                <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+                <p className="text-sm text-muted-foreground">
+                  Manage your application, users, and content
+                </p>
+              </div>
+              <Button variant="outline" onClick={handleSignOut} className="gap-2">
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </Button>
+            </div>
+          </header>
 
-          <TabsContent value="sessions">
-            <SessionManagement />
-          </TabsContent>
-
-          <TabsContent value="email-reports">
-            <EmailReportManager />
-          </TabsContent>
-        </Tabs>
-      </main>
-    </div>
+          <main className="flex-1 overflow-auto">
+            <div className="container mx-auto py-8 px-6">
+              {renderContent()}
+            </div>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 };
 
