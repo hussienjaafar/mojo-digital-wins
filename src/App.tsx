@@ -23,6 +23,7 @@ import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import AdminClientView from "./pages/AdminClientView";
 import ClientLogin from "./pages/ClientLogin";
 import ClientDashboard from "./pages/ClientDashboard";
 
@@ -52,6 +53,7 @@ const AppContent = () => {
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />
         <Route path="/client-login" element={<ClientLogin />} />
         <Route path="/client/dashboard" element={<ClientDashboard />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

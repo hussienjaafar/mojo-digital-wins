@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, Settings, Users } from "lucide-react";
+import { Building2, Plus, Settings, Users, Eye } from "lucide-react";
 
 type Organization = {
   id: string;
@@ -21,6 +22,7 @@ type Organization = {
 };
 
 const ClientOrganizationManager = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -261,6 +263,14 @@ const ClientOrganizationManager = () => {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => navigate(`/admin/client-view/${org.id}`)}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={org.is_active ? "destructive" : "default"}
                         onClick={() => toggleActive(org.id, org.is_active)}
                       >
                         {org.is_active ? "Deactivate" : "Activate"}
