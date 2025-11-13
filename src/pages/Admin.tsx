@@ -231,66 +231,96 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="analytics" className="w-full">
-          <TabsList className="grid w-full grid-cols-14">
-            <TabsTrigger value="analytics">
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Analytics
+          <TabsList className="flex flex-wrap gap-2 h-auto p-2 bg-background/50 backdrop-blur-sm border">
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span>Analytics</span>
             </TabsTrigger>
-            <TabsTrigger value="clients">
-              <Users className="h-4 w-4 mr-2" />
-              Clients
+            <TabsTrigger value="clients" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span>Clients</span>
             </TabsTrigger>
-            <TabsTrigger value="client-users">
-              <Users className="h-4 w-4 mr-2" />
-              Client Users
+            <TabsTrigger value="client-users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span>Client Users</span>
             </TabsTrigger>
-            <TabsTrigger value="api-creds">
-              <Key className="h-4 w-4 mr-2" />
-              API Creds
+            <TabsTrigger value="api-creds" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              <span>API Credentials</span>
             </TabsTrigger>
-            <TabsTrigger value="attribution">
-              <Activity className="h-4 w-4 mr-2" />
-              Attribution
+            <TabsTrigger value="attribution" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              <span>Attribution</span>
             </TabsTrigger>
-            <TabsTrigger value="scheduler">
-              <Activity className="h-4 w-4 mr-2" />
-              Scheduler
+            <TabsTrigger value="scheduler" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              <span>Scheduler</span>
             </TabsTrigger>
-            <TabsTrigger value="users">
-              <Users className="h-4 w-4 mr-2" />
-              Users
+            <TabsTrigger value="email-reports" className="flex items-center gap-2">
+              <Send className="h-4 w-4" />
+              <span>Email Reports</span>
             </TabsTrigger>
-            <TabsTrigger value="contacts">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Submissions
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span>Users</span>
             </TabsTrigger>
-            <TabsTrigger value="newsletter">
-              <Mail className="h-4 w-4 mr-2" />
-              Newsletter
+            <TabsTrigger value="contacts" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              <span>Submissions</span>
             </TabsTrigger>
-            <TabsTrigger value="invite-codes">
-              <Key className="h-4 w-4 mr-2" />
-              Invite Codes
+            <TabsTrigger value="newsletter" className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              <span>Newsletter</span>
             </TabsTrigger>
-            <TabsTrigger value="blog-generator">
-              <Sparkles className="h-4 w-4 mr-2" />
-              Blog Generator
+            <TabsTrigger value="invite-codes" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              <span>Invite Codes</span>
             </TabsTrigger>
-            <TabsTrigger value="audit-logs">
-              <Shield className="h-4 w-4 mr-2" />
-              Audit Logs
+            <TabsTrigger value="blog-generator" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              <span>Blog Generator</span>
             </TabsTrigger>
-            <TabsTrigger value="sessions">
-              <Activity className="h-4 w-4 mr-2" />
-              Sessions
+            <TabsTrigger value="audit-logs" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              <span>Audit Logs</span>
             </TabsTrigger>
-            <TabsTrigger value="email-reports">
-              <Send className="h-4 w-4 mr-2" />
-              Email Reports
+            <TabsTrigger value="sessions" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              <span>Sessions</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="analytics">
+          <TabsContent value="analytics" className="space-y-6">
+            {/* Demo Data Quick Access */}
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Demo Organization
+                </CardTitle>
+                <CardDescription>
+                  Test the client dashboard with sample data
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="font-semibold text-lg">Progressive Victory Fund</p>
+                    <p className="text-sm text-muted-foreground">
+                      Sample data includes donations, Meta ads, and SMS campaigns
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')}
+                    className="bg-primary hover:bg-primary/90"
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    View Dashboard
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             <AnalyticsDashboard />
           </TabsContent>
 
