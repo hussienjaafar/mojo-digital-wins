@@ -16,6 +16,7 @@ type InviteCode = {
   used_at: string | null;
   used_by: string | null;
   is_active: boolean;
+  expires_at: string | null;
 };
 
 export const AdminInviteCodes = () => {
@@ -58,18 +59,23 @@ export const AdminInviteCodes = () => {
 
       const { data: session } = await supabase.auth.getSession();
       
+      // Set expiration to 7 days from now
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+      
       const { error } = await supabase
         .from('admin_invite_codes')
         .insert({
           code,
           created_by: session.session?.user?.id,
+          expires_at: expiresAt.toISOString(),
         });
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: "New admin invite code created!",
+        description: "New admin invite code created (expires in 7 days)!",
       });
 
       fetchInviteCodes();
@@ -165,55 +171,65 @@ export const AdminInviteCodes = () => {
                   <TableHead>Code</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead>Expires</TableHead>
                   <TableHead>Used</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inviteCodes.map((code) => (
-                  <TableRow key={code.id}>
-                    <TableCell className="font-mono font-semibold">
-                      {code.code}
-                    </TableCell>
-                    <TableCell>
-                      {code.used_at ? (
-                        <Badge variant="secondary">Used</Badge>
-                      ) : code.is_active ? (
-                        <Badge variant="default">Active</Badge>
-                      ) : (
-                        <Badge variant="outline">Inactive</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(code.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {code.used_at ? new Date(code.used_at).toLocaleDateString() : '-'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(code.code)}
-                        >
-                          {copiedCode === code.code ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteInviteCode(code.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {inviteCodes.map((code) => {
+                  const isExpired = code.expires_at && new Date(code.expires_at) < new Date();
+                  
+                  return (
+                    <TableRow key={code.id}>
+                      <TableCell className="font-mono font-semibold">
+                        {code.code}
+                      </TableCell>
+                      <TableCell>
+                        {code.used_at ? (
+                          <Badge variant="secondary">Used</Badge>
+                        ) : isExpired ? (
+                          <Badge variant="outline">Expired</Badge>
+                        ) : code.is_active ? (
+                          <Badge variant="default">Active</Badge>
+                        ) : (
+                          <Badge variant="outline">Inactive</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {new Date(code.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        {code.expires_at ? new Date(code.expires_at).toLocaleDateString() : 'Never'}
+                      </TableCell>
+                      <TableCell>
+                        {code.used_at ? new Date(code.used_at).toLocaleDateString() : '-'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard(code.code)}
+                          >
+                            {copiedCode === code.code ? (
+                              <Check className="h-4 w-4" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteInviteCode(code.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
