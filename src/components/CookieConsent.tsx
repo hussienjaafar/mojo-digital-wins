@@ -137,7 +137,7 @@ const CookieConsent = () => {
                   We use cookies to enhance your browsing experience, serve personalized political ads, and analyze our traffic. 
                   By clicking "Accept All", you consent to our use of cookies.{" "}
                   <Link to="/cookie-policy" className="text-primary hover:underline">
-                    Learn more
+                    Learn more about our cookie policy
                   </Link>
                 </p>
               </div>
