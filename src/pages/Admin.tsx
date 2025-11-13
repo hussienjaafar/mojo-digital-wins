@@ -9,10 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
-import { Download, LogOut, Search, Filter, MessageSquare, Mail, Sparkles, Key } from "lucide-react";
+import { Download, LogOut, Search, Filter, MessageSquare, Mail, Sparkles, Key, Shield, Activity } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BlogGenerator } from "@/components/BlogGenerator";
 import { AdminInviteCodes } from "@/components/AdminInviteCodes";
+import { AuditLogs } from "@/components/AuditLogs";
+import { SessionManagement } from "@/components/SessionManagement";
 
 type ContactSubmission = {
   id: string;
@@ -225,7 +227,7 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="contacts" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="contacts">
               <MessageSquare className="h-4 w-4 mr-2" />
               Submissions
@@ -241,6 +243,14 @@ const Admin = () => {
             <TabsTrigger value="blog-generator">
               <Sparkles className="h-4 w-4 mr-2" />
               Blog Generator
+            </TabsTrigger>
+            <TabsTrigger value="audit-logs">
+              <Shield className="h-4 w-4 mr-2" />
+              Audit Logs
+            </TabsTrigger>
+            <TabsTrigger value="sessions">
+              <Activity className="h-4 w-4 mr-2" />
+              Sessions
             </TabsTrigger>
           </TabsList>
 
@@ -390,6 +400,14 @@ const Admin = () => {
                 <BlogGenerator />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="audit-logs">
+            <AuditLogs />
+          </TabsContent>
+
+          <TabsContent value="sessions">
+            <SessionManagement />
           </TabsContent>
         </Tabs>
       </main>
