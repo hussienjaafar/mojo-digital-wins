@@ -431,7 +431,7 @@ const Index = () => {
                       {study.title}
                     </h3>
                     <p className="text-muted-foreground mb-4 line-clamp-2">{study.description}</p>
-                    <div className="flex items-center gap-2 text-secondary font-semibold opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300" aria-hidden="true">
+                    <div className="flex items-center gap-2 text-secondary dark:text-primary-foreground font-semibold opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300" aria-hidden="true">
                       View Case Study
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -465,8 +465,8 @@ const Index = () => {
           <div className={`text-center mb-12 md:mb-16 transition-all duration-700 ${
             metricsSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`}>
-            <div className="inline-block mb-4 px-6 py-2 bg-secondary/10 border border-secondary/30 rounded-full">
-              <span className="text-sm font-bold text-secondary uppercase tracking-wider">Proven Track Record</span>
+            <div className="inline-block mb-4 px-6 py-2 bg-secondary/10 dark:bg-primary-foreground/10 border border-secondary/30 dark:border-primary-foreground/30 rounded-full">
+              <span className="text-sm font-bold text-secondary dark:text-primary-foreground uppercase tracking-wider">Proven Track Record</span>
             </div>
             <h2 className="text-headline text-foreground mb-4 tracking-wide">
               Real Numbers.<br/>Real Impact.
@@ -497,7 +497,7 @@ const Index = () => {
                 {/* Content */}
                 <div className="relative z-10">
                   {/* Metric Number with Pulsing Animation */}
-                  <div className="font-bebas text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl mb-3 leading-none bg-gradient-to-br from-secondary via-secondary to-destructive bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(20,100,217,0.3)] group-hover:drop-shadow-[0_0_30px_rgba(20,100,217,0.6)] transition-all duration-500 animate-pulse-subtle">
+                  <div className="font-bebas text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl mb-3 leading-none bg-gradient-to-br from-secondary via-secondary to-destructive dark:from-primary-foreground dark:via-primary-foreground dark:to-primary-foreground bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(20,100,217,0.3)] dark:drop-shadow-[0_0_20px_rgba(255,255,255,0.2)] group-hover:drop-shadow-[0_0_30px_rgba(20,100,217,0.6)] dark:group-hover:drop-shadow-[0_0_30px_rgba(255,255,255,0.4)] transition-all duration-500 animate-pulse-subtle">
                     <StatCounter end={metric.value} prefix={metric.prefix} suffix={metric.suffix} duration={2500} />
                   </div>
                   
@@ -519,10 +519,10 @@ const Index = () => {
           <div className={`text-center mt-12 transition-all duration-700 ${
             metricsSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`} style={{ transitionDelay: '600ms' }}>
-            <p className="text-sm md:text-base text-muted-foreground font-medium">
-              <span className="text-secondary font-bold">200,000+ donors</span> acquired • 
-              <span className="text-destructive font-bold"> $10M+ raised</span> • 
-              <span className="text-accent-foreground font-bold"> 425% average ROI</span>
+            <p className="text-sm md:text-base text-muted-foreground dark:text-foreground/80 font-medium">
+              <span className="text-secondary dark:text-primary-foreground font-bold">200,000+ donors</span> acquired • 
+              <span className="text-destructive dark:text-primary-foreground font-bold"> $10M+ raised</span> • 
+              <span className="text-accent-foreground dark:text-primary-foreground font-bold"> 425% average ROI</span>
             </p>
           </div>
         </div>

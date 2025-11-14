@@ -207,15 +207,15 @@ const About = () => {
                   <p>We bring a unique blend of political savvy and digital expertise to every project.</p>
                 </div>
                 <ul className="space-y-3">
-                  <li className="flex items-center space-x-3">
+                  <li className="flex items-center space-x-3 text-foreground">
                     <Zap className="h-5 w-5 text-secondary" />
                     <span>Proven track record of success</span>
                   </li>
-                  <li className="flex items-center space-x-3">
+                  <li className="flex items-center space-x-3 text-foreground">
                     <Lightbulb className="h-5 w-5 text-secondary" />
                     <span>Deep understanding of progressive politics</span>
                   </li>
-                  <li className="flex items-center space-x-3">
+                  <li className="flex items-center space-x-3 text-foreground">
                     <Award className="h-5 w-5 text-secondary" />
                     <span>Data-driven approach to maximize impact</span>
                   </li>
