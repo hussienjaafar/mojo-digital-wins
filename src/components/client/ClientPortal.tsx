@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 const ExecutiveDashboard = lazy(() => import("@/components/client/ExecutiveDashboard"));
 const EnhancedSMSMetrics = lazy(() => import("@/components/client/EnhancedSMSMetrics"));
 const EnhancedMetaAdsMetrics = lazy(() => import("@/components/client/EnhancedMetaAdsMetrics"));
+const AdvancedAnalytics = lazy(() => import("@/components/analytics/AdvancedAnalytics"));
 
 const LoadingSkeleton = () => (
   <div className="space-y-4">
@@ -353,24 +354,29 @@ const ClientPortalContent = () => {
         )}
 
         {/* Tabbed Analytics */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={cn(
-            "grid w-full",
-            isMobile ? "grid-cols-3 sticky bottom-4 z-30 shadow-lg" : "grid-cols-3 mb-6"
-          )}>
-            <TabsTrigger value="overview" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              {!isMobile && "Overview"}
-            </TabsTrigger>
-            <TabsTrigger value="meta-ads" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              {!isMobile && "Meta Ads"}
-            </TabsTrigger>
-            <TabsTrigger value="sms" className="gap-2">
-              <MessageSquare className="h-4 w-4" />
-              {!isMobile && "SMS"}
-            </TabsTrigger>
-          </TabsList>
+        {organizationId && (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className={cn(
+              "grid w-full",
+              isMobile ? "grid-cols-4 sticky bottom-4 z-30 shadow-lg" : "grid-cols-4 mb-6"
+            )}>
+              <TabsTrigger value="overview" className="gap-2">
+                <TrendingUp className="h-4 w-4" />
+                {!isMobile && "Overview"}
+              </TabsTrigger>
+              <TabsTrigger value="meta-ads" className="gap-2">
+                <BarChart3 className="h-4 w-4" />
+                {!isMobile && "Meta Ads"}
+              </TabsTrigger>
+              <TabsTrigger value="sms" className="gap-2">
+                <MessageSquare className="h-4 w-4" />
+                {!isMobile && "SMS"}
+              </TabsTrigger>
+              <TabsTrigger value="advanced" className="gap-2">
+                <Target className="h-4 w-4" />
+                {!isMobile && "Advanced"}
+              </TabsTrigger>
+            </TabsList>
 
           <TabsContent value="overview" className="mt-6">
             <Suspense fallback={<LoadingSkeleton />}>
@@ -431,7 +437,28 @@ const ClientPortalContent = () => {
               )}
             </Suspense>
           </TabsContent>
+
+          <TabsContent value="advanced" className="mt-6">
+            <Suspense fallback={<LoadingSkeleton />}>
+              {organizationId ? (
+                <AdvancedAnalytics
+                  organizationId={organizationId}
+                  startDate={startDate}
+                  endDate={endDate}
+                />
+              ) : (
+                <Card>
+                  <CardContent className="flex items-center justify-center min-h-[400px]">
+                    <div className="text-center">
+                      <p className="text-muted-foreground">Please select an organization to view advanced analytics</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </Suspense>
+          </TabsContent>
         </Tabs>
+        )}
       </div>
     </div>
   );
