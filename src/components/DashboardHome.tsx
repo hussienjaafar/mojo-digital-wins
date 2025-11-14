@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { format, subDays } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { 
   TrendingUp, 
@@ -12,7 +16,8 @@ import {
   Activity,
   ArrowUpRight,
   ArrowDownRight,
-  Plus
+  Plus,
+  CalendarIcon
 } from "lucide-react";
 import {
   LineChart,
@@ -60,6 +65,13 @@ interface CampaignPerformance {
 
 const COLORS = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b'];
 
+type DateRangePreset = '7' | '30' | '90' | 'custom';
+
+interface DateRange {
+  from: Date;
+  to: Date;
+}
+
 export function DashboardHome() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
@@ -75,12 +87,20 @@ export function DashboardHome() {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [campaignData, setCampaignData] = useState<CampaignPerformance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('30');
+  const [customDateRange, setCustomDateRange] = useState<DateRange>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
 
   useEffect(() => {
     fetchDashboardStats();
+  }, []);
+
+  useEffect(() => {
     fetchChartData();
     fetchCampaignPerformance();
-  }, []);
+  }, [dateRangePreset, customDateRange]);
 
   const fetchDashboardStats = async () => {
     try {
@@ -118,16 +138,29 @@ export function DashboardHome() {
     }
   };
 
+  const getDateRange = (): DateRange => {
+    const today = new Date();
+    if (dateRangePreset === 'custom') {
+      return customDateRange;
+    }
+    const daysAgo = parseInt(dateRangePreset);
+    return {
+      from: subDays(today, daysAgo),
+      to: today,
+    };
+  };
+
   const fetchChartData = async () => {
     try {
-      // Fetch last 30 days of metrics
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const dateRange = getDateRange();
+      const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+      const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
       const { data: metrics } = await (supabase as any)
         .from('daily_aggregated_metrics')
         .select('date, total_funds_raised, total_ad_spend, total_sms_cost, roi_percentage, total_donations')
-        .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+        .gte('date', fromDate)
+        .lte('date', toDate)
         .order('date', { ascending: true });
 
       if (metrics) {
@@ -147,6 +180,10 @@ export function DashboardHome() {
 
   const fetchCampaignPerformance = async () => {
     try {
+      const dateRange = getDateRange();
+      const fromDate = format(dateRange.from, 'yyyy-MM-dd');
+      const toDate = format(dateRange.to, 'yyyy-MM-dd');
+
       // Fetch top campaigns by revenue
       const { data: campaigns } = await (supabase as any)
         .from('meta_campaigns')
@@ -160,7 +197,9 @@ export function DashboardHome() {
             const { data: metrics } = await (supabase as any)
               .from('meta_ad_metrics')
               .select('spend, conversions, conversion_value')
-              .eq('campaign_id', campaign.campaign_id);
+              .eq('campaign_id', campaign.campaign_id)
+              .gte('date', fromDate)
+              .lte('date', toDate);
 
             const totalSpend = metrics?.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0) || 0;
             const totalRevenue = metrics?.reduce((sum: number, m: any) => sum + Number(m.conversion_value || 0), 0) || 0;
@@ -195,6 +234,18 @@ export function DashboardHome() {
     return new Intl.NumberFormat('en-US').format(value);
   };
 
+  const handleDateRangeChange = (value: DateRangePreset) => {
+    setDateRangePreset(value);
+  };
+
+  const handleCustomDateChange = (type: 'from' | 'to', date: Date | undefined) => {
+    if (!date) return;
+    setCustomDateRange(prev => ({
+      ...prev,
+      [type]: date,
+    }));
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -205,18 +256,74 @@ export function DashboardHome() {
 
   return (
     <div className="space-y-8">
-      {/* Welcome Section */}
-      <div className="flex items-center justify-between">
+      {/* Welcome Section with Date Filter */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Dashboard Overview</h2>
           <p className="text-muted-foreground mt-2">
             Monitor your organization's performance and key metrics
           </p>
         </div>
-        <Button onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')}>
-          <Plus className="h-4 w-4 mr-2" />
-          View Demo
-        </Button>
+        <div className="flex items-center gap-3">
+          <Select value={dateRangePreset} onValueChange={handleDateRangeChange}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="90">Last 90 days</SelectItem>
+              <SelectItem value="custom">Custom range</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          {dateRangePreset === 'custom' && (
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[140px] justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(customDateRange.from, 'MMM dd, yyyy')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={customDateRange.from}
+                    onSelect={(date) => handleCustomDateChange('from', date)}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              
+              <span className="text-muted-foreground">to</span>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[140px] justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(customDateRange.to, 'MMM dd, yyyy')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={customDateRange.to}
+                    onSelect={(date) => handleCustomDateChange('to', date)}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+          
+          <Button onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')} variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            View Demo
+          </Button>
+        </div>
       </div>
 
       {/* Key Metrics Grid */}
@@ -376,7 +483,12 @@ export function DashboardHome() {
         <Card>
           <CardHeader>
             <CardTitle>Revenue & Spend Trends</CardTitle>
-            <CardDescription>Last 30 days performance</CardDescription>
+            <CardDescription>
+              {dateRangePreset === 'custom' 
+                ? `${format(customDateRange.from, 'MMM dd, yyyy')} - ${format(customDateRange.to, 'MMM dd, yyyy')}`
+                : `Last ${dateRangePreset} days performance`
+              }
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -436,7 +548,12 @@ export function DashboardHome() {
         <Card>
           <CardHeader>
             <CardTitle>ROI Trend</CardTitle>
-            <CardDescription>Return on investment over time</CardDescription>
+            <CardDescription>
+              {dateRangePreset === 'custom' 
+                ? `ROI: ${format(customDateRange.from, 'MMM dd')} - ${format(customDateRange.to, 'MMM dd')}`
+                : `Return on investment (${dateRangePreset} days)`
+              }
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -478,7 +595,12 @@ export function DashboardHome() {
         <Card>
           <CardHeader>
             <CardTitle>Top Campaigns</CardTitle>
-            <CardDescription>Revenue by campaign</CardDescription>
+            <CardDescription>
+              {dateRangePreset === 'custom' 
+                ? `Performance in selected period`
+                : `Top performers (${dateRangePreset} days)`
+              }
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -517,7 +639,12 @@ export function DashboardHome() {
         <Card>
           <CardHeader>
             <CardTitle>Donations Trend</CardTitle>
-            <CardDescription>Number of donations over time</CardDescription>
+            <CardDescription>
+              {dateRangePreset === 'custom' 
+                ? `Donations: ${format(customDateRange.from, 'MMM dd')} - ${format(customDateRange.to, 'MMM dd')}`
+                : `Number of donations (${dateRangePreset} days)`
+              }
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
