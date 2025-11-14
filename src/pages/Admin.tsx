@@ -19,6 +19,7 @@ import APICredentialsManager from "@/components/admin/APICredentialsManager";
 import CampaignAttributionManager from "@/components/admin/CampaignAttributionManager";
 import SyncScheduler from "@/components/admin/SyncScheduler";
 import EmailReportManager from "@/components/admin/EmailReportManager";
+import { DashboardHome } from "@/components/DashboardHome";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/AdminSidebar";
 import { LogOut } from "lucide-react";
@@ -188,43 +189,7 @@ const Admin = () => {
   const renderContent = () => {
     switch (activeTab) {
       case "analytics":
-        return (
-          <div className="space-y-6">
-            <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-2xl flex items-center gap-2">
-                  🎯 Demo Organization
-                </CardTitle>
-                <CardDescription>
-                  Explore sample data with the Progressive Victory Fund organization
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-background rounded-lg border">
-                    <div className="text-sm text-muted-foreground">Total Funds Raised</div>
-                    <div className="text-2xl font-bold text-primary">$245,750</div>
-                  </div>
-                  <div className="p-4 bg-background rounded-lg border">
-                    <div className="text-sm text-muted-foreground">Ad Spend</div>
-                    <div className="text-2xl font-bold text-primary">$18,500</div>
-                  </div>
-                  <div className="p-4 bg-background rounded-lg border">
-                    <div className="text-sm text-muted-foreground">ROI</div>
-                    <div className="text-2xl font-bold text-primary">1,228%</div>
-                  </div>
-                </div>
-                <Button 
-                  onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')}
-                  className="w-full"
-                >
-                  View Full Dashboard →
-                </Button>
-              </CardContent>
-            </Card>
-            <AnalyticsDashboard />
-          </div>
-        );
+        return <DashboardHome />;
       case "clients":
         return <ClientOrganizationManager />;
       case "client-users":

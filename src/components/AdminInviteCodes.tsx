@@ -2,12 +2,15 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Plus, Trash2, Check } from "lucide-react";
+import { Copy, Plus, Trash2, Check, Mail } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast as sonnerToast } from "sonner";
 
 type InviteCode = {
   id: string;
@@ -24,6 +27,8 @@ export const AdminInviteCodes = () => {
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     fetchInviteCodes();
@@ -132,6 +137,52 @@ export const AdminInviteCodes = () => {
     }
   };
 
+  const sendInviteEmail = async () => {
+    if (!inviteEmail) return;
+    
+    setIsSending(true);
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Generate a new invite code
+      const code = `ADMIN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      // Insert the invite code
+      const { error: insertError } = await supabase
+        .from('admin_invite_codes')
+        .insert({
+          code,
+          created_by: user?.id,
+          expires_at: expiresAt.toISOString(),
+        });
+
+      if (insertError) throw insertError;
+
+      // Send the email
+      const { error: emailError } = await supabase.functions.invoke('send-admin-invite', {
+        body: {
+          email: inviteEmail,
+          inviteCode: code,
+          inviterName: user?.email,
+        }
+      });
+
+      if (emailError) throw emailError;
+
+      sonnerToast.success("Invitation sent successfully!");
+      setInviteEmail("");
+      fetchInviteCodes();
+    } catch (error) {
+      console.error('Error sending invite:', error);
+      sonnerToast.error("Failed to send invitation");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   if (isLoading) {
     return <div className="flex justify-center p-8">Loading...</div>;
   }
@@ -146,10 +197,45 @@ export const AdminInviteCodes = () => {
               Create and manage invite codes to grant admin access to new users
             </CardDescription>
           </div>
-          <Button onClick={generateInviteCode} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Generate Code
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={generateInviteCode} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Generate Code
+            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Invite
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Send Admin Invitation</DialogTitle>
+                  <DialogDescription>
+                    Send an email invitation to a new admin. They'll receive a unique invite code.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="email">Email Address</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="admin@example.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={sendInviteEmail} disabled={!inviteEmail || isSending}>
+                    {isSending ? "Sending..." : "Send Invitation"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

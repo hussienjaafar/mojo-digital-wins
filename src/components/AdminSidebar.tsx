@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard,
   Building2,
@@ -30,6 +32,7 @@ interface NavigationItem {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   value: string;
+  requiredRole?: 'admin' | 'manager';
 }
 
 interface NavigationGroup {
@@ -55,18 +58,18 @@ const navigationGroups: NavigationGroup[] = [
   {
     label: "Platform Integration",
     items: [
-      { title: "API Credentials", icon: Key, value: "api-credentials" },
+      { title: "API Credentials", icon: Key, value: "api-credentials", requiredRole: 'admin' },
       { title: "Campaign Attribution", icon: GitBranch, value: "attribution" },
-      { title: "Sync Scheduler", icon: Calendar, value: "scheduler" },
+      { title: "Sync Scheduler", icon: Calendar, value: "scheduler", requiredRole: 'admin' },
     ],
   },
   {
     label: "System Administration",
     items: [
-      { title: "User Management", icon: UserCog, value: "users" },
-      { title: "Admin Invite Codes", icon: Shield, value: "invite-codes" },
-      { title: "Session Management", icon: Activity, value: "sessions" },
-      { title: "Audit Logs", icon: FileText, value: "audit-logs" },
+      { title: "User Management", icon: UserCog, value: "users", requiredRole: 'admin' },
+      { title: "Admin Invite Codes", icon: Shield, value: "invite-codes", requiredRole: 'admin' },
+      { title: "Session Management", icon: Activity, value: "sessions", requiredRole: 'admin' },
+      { title: "Audit Logs", icon: FileText, value: "audit-logs", requiredRole: 'admin' },
     ],
   },
   {
@@ -89,6 +92,32 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchUserRoles();
+  }, []);
+
+  const fetchUserRoles = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      setUserRoles(data?.map((r: any) => r.role) || []);
+    } catch (error) {
+      console.error('Error fetching user roles:', error);
+    }
+  };
+
+  const hasAccess = (item: NavigationItem) => {
+    if (!item.requiredRole) return true;
+    return userRoles.includes(item.requiredRole);
+  };
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-64"} collapsible="icon">
@@ -98,7 +127,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
             {!collapsed && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
             <SidebarGroupContent>
               <SidebarMenu>
-                {group.items.map((item) => (
+                {group.items.filter(hasAccess).map((item) => (
                   <SidebarMenuItem key={item.value}>
                     <SidebarMenuButton
                       onClick={() => onTabChange(item.value)}
