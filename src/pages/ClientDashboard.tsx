@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, TrendingUp, DollarSign, Users, Target, Calendar, LayoutGrid } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -15,6 +14,7 @@ import MetaAdsMetrics from "@/components/client/MetaAdsMetrics";
 import SMSMetrics from "@/components/client/SMSMetrics";
 import DonationMetrics from "@/components/client/DonationMetrics";
 import SyncControls from "@/components/client/SyncControls";
+import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 
 type Organization = {
   id: string;
@@ -22,15 +22,12 @@ type Organization = {
   logo_url: string | null;
 };
 
-type DateRange = '7' | '30' | '90' | 'custom';
-
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [session, setSession] = useState<Session | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<DateRange>('30');
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
@@ -58,13 +55,10 @@ const ClientDashboard = () => {
     }
   }, [session]);
 
-  useEffect(() => {
-    if (dateRange !== 'custom') {
-      const days = parseInt(dateRange);
-      setStartDate(format(subDays(new Date(), days), 'yyyy-MM-dd'));
-      setEndDate(format(new Date(), 'yyyy-MM-dd'));
-    }
-  }, [dateRange]);
+  const handleDateChange = (start: string, end: string) => {
+    setStartDate(start);
+    setEndDate(end);
+  };
 
   const loadUserOrganization = async () => {
     try {
@@ -189,33 +183,11 @@ const ClientDashboard = () => {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3 items-center">
-                  <Select value={dateRange} onValueChange={(value: DateRange) => setDateRange(value)}>
-                    <SelectTrigger className="w-[180px] border-border/50">
-                      <SelectValue placeholder="Select date range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7">Last 7 days</SelectItem>
-                      <SelectItem value="30">Last 30 days</SelectItem>
-                      <SelectItem value="90">Last 90 days</SelectItem>
-                      <SelectItem value="custom">Custom range</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {dateRange === 'custom' && (
-                    <div className="flex gap-2">
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="px-4 py-2 border border-border/50 rounded-lg text-sm bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                      />
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="px-4 py-2 border border-border/50 rounded-lg text-sm bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                      />
-                    </div>
-                  )}
+                  <DateRangeSelector
+                    startDate={startDate}
+                    endDate={endDate}
+                    onDateChange={handleDateChange}
+                  />
                 </div>
               </div>
             </CardContent>
