@@ -111,34 +111,58 @@ All colors MUST be HSL.
 
   .dark {
     --background: 213 75% 8%;
-    --foreground: 0 0% 100%;
+    --foreground: 0 0% 98%;
 
-    --card: 213 75% 12%;
-    --card-foreground: 0 0% 100%;
+    --card: 213 50% 12%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 213 75% 12%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 213 50% 10%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 0 0% 100%;
-    --primary-foreground: 213 75% 15%;
+    --primary: 213 83% 65%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 213 83% 47%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 213 50% 25%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 213 20% 20%;
-    --muted-foreground: 213 20% 70%;
+    --muted: 213 30% 18%;
+    --muted-foreground: 213 15% 75%;
 
-    --accent: 45 89% 57%;
-    --accent-foreground: 213 75% 15%;
+    --accent: 45 89% 60%;
+    --accent-foreground: 213 75% 10%;
 
-    --destructive: 0 78% 53%;
+    --destructive: 0 78% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 213 20% 25%;
-    --input: 213 20% 25%;
-    --ring: 213 83% 47%;
+    --border: 213 30% 22%;
+    --input: 213 30% 20%;
+    --ring: 213 83% 65%;
 
-    --gradient-subtle: linear-gradient(180deg, hsl(213 75% 8%) 0%, hsl(213 75% 12%) 100%);
+    /* Progressive brand colors - dark mode adjusted */
+    --navy: 213 83% 65%;
+    --blue: 213 83% 55%;
+    --red: 0 78% 60%;
+    --yellow: 45 89% 65%;
+
+    /* Gradients - Dark Mode Optimized */
+    --gradient-hero: linear-gradient(135deg, hsl(213 75% 15%) 0%, hsl(213 83% 40%) 50%, hsl(0 78% 50%) 100%);
+    --gradient-power: linear-gradient(120deg, hsl(213 75% 10%) 0%, hsl(213 83% 35%) 50%, hsl(213 75% 15%) 100%);
+    --gradient-accent: linear-gradient(90deg, hsl(213 83% 55%) 0%, hsl(0 78% 60%) 100%);
+    --gradient-urgent: linear-gradient(135deg, hsl(0 78% 60%) 0%, hsl(0 85% 50%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(213 75% 8%) 0%, hsl(213 50% 12%) 100%);
+    --gradient-diagonal: linear-gradient(135deg, hsl(213 75% 15%) 0%, hsl(213 83% 45%) 100%);
+    --gradient-overlay: linear-gradient(180deg, hsl(213 75% 8% / 0.95) 0%, hsl(213 75% 8% / 0.85) 100%);
+
+    /* Shadows - Dark Mode Optimized */
+    --shadow-sm: 0 2px 8px hsl(0 0% 0% / 0.3);
+    --shadow-md: 0 4px 16px hsl(0 0% 0% / 0.4);
+    --shadow-lg: 0 8px 32px hsl(0 0% 0% / 0.5);
+    --shadow-xl: 0 12px 48px hsl(0 0% 0% / 0.6);
+    --shadow-elegant: 0 10px 40px hsl(0 0% 0% / 0.4);
+    --shadow-glow: 0 0 30px hsl(213 83% 65% / 0.4);
+    --shadow-glow-red: 0 0 40px hsl(0 78% 60% / 0.5);
+    --shadow-brutal: 8px 8px 0px hsl(0 78% 45%);
+    --shadow-inset: inset 0 2px 8px hsl(0 0% 0% / 0.3);
   }
 }
 
