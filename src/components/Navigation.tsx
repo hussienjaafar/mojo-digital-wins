@@ -48,7 +48,7 @@ const Navigation = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-6">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
@@ -66,11 +66,11 @@ const Navigation = () => {
                 }`} />
               </Link>
             ))}
-            <ThemeToggle />
           </div>
 
-          {/* CTA Button with Enhanced Shadow */}
-          <div className="hidden md:block">
+          {/* CTA Button with Theme Toggle */}
+          <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
             <Button 
               variant="default" 
               size="default" 
