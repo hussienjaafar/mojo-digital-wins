@@ -163,7 +163,7 @@ const Contact = () => {
                 <h2 className="font-bebas text-primary mb-4 leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
                   Book Your Free Strategy Call
                 </h2>
-                <p className="text-lg text-foreground/80 leading-relaxed max-w-2xl mx-auto">
+                <p className="text-lg text-foreground/90 leading-relaxed max-w-2xl mx-auto">
                   Let's discuss your organization's goals and how we can help you win. Choose a time that works for you.
                 </p>
               </div>
@@ -195,7 +195,7 @@ const Contact = () => {
                 <div className="space-y-8">
                   <div>
                     <h3 className="text-2xl font-bold text-foreground mb-4">Get in Touch</h3>
-                    <p className="text-lg text-foreground/80 leading-relaxed">
+                    <p className="text-lg text-foreground/90 leading-relaxed">
                       Fill out the form and we'll get back to you within 24 hours.
                     </p>
                   </div>
@@ -379,7 +379,7 @@ const Contact = () => {
                 <Card key={index} className="shadow-md hover:shadow-lg transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
                   <CardContent className="p-6 space-y-3">
                     <h3 className="text-xl font-bold text-foreground">{faq.question}</h3>
-                    <p className="text-foreground/80 leading-relaxed">{faq.answer}</p>
+                    <p className="text-foreground/90 leading-relaxed">{faq.answer}</p>
                   </CardContent>
                 </Card>
               ))}

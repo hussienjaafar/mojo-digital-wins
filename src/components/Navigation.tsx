@@ -56,7 +56,7 @@ const Navigation = () => {
                 className={`text-[16px] md:text-[17px] font-bold tracking-tight transition-all relative group ${
                   isActive(link.path)
                     ? isScrolled ? "text-primary-foreground" : "text-primary-foreground drop-shadow-[0_2px_8px_rgba(10,30,62,0.9)]"
-                    : isScrolled ? "text-primary-foreground/80 hover:text-primary-foreground" : "text-primary-foreground hover:text-primary-foreground drop-shadow-[0_2px_8px_rgba(10,30,62,0.9)]"
+                    : isScrolled ? "text-primary-foreground/90 hover:text-primary-foreground" : "text-primary-foreground hover:text-primary-foreground drop-shadow-[0_2px_8px_rgba(10,30,62,0.9)]"
                 }`}
                 style={{ textShadow: !isScrolled ? '0 0 2px rgba(10,30,62,0.5), 0 1px 3px rgba(10,30,62,0.8)' : 'none' }}
               >
