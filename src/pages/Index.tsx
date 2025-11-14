@@ -183,7 +183,7 @@ const Index = () => {
             
             {/* Subhead - Variant B (shorter) */}
             <p 
-              className="text-base sm:text-lg md:text-xl text-primary-foreground/95 leading-relaxed mb-6 sm:mb-7 md:mb-8 max-w-[620px] font-medium"
+              className="text-base sm:text-lg md:text-xl text-primary-foreground leading-relaxed mb-6 sm:mb-7 md:mb-8 max-w-[620px] font-medium"
               style={{ 
                 animation: 'fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) 250ms both'
               }}
@@ -234,7 +234,7 @@ const Index = () => {
                   <div className="font-bebas text-xl sm:text-2xl md:text-3xl text-primary-foreground leading-none">
                     <StatCounter end={425} suffix="%" duration={700} />
                   </div>
-                  <div className="text-[10px] sm:text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">Average ROI</div>
+                  <div className="text-[10px] sm:text-xs text-primary-foreground/95 font-medium uppercase tracking-wide">Average ROI</div>
                 </div>
               </div>
               
@@ -246,7 +246,7 @@ const Index = () => {
                   <div className="font-bebas text-xl sm:text-2xl md:text-3xl text-primary-foreground leading-none">
                     $<StatCounter end={10} duration={700} />M+
                   </div>
-                  <div className="text-[10px] sm:text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">Raised</div>
+                  <div className="text-[10px] sm:text-xs text-primary-foreground/95 font-medium uppercase tracking-wide">Raised</div>
                 </div>
               </div>
               
@@ -258,7 +258,7 @@ const Index = () => {
                   <div className="font-bebas text-lg sm:text-xl md:text-2xl lg:text-3xl text-primary-foreground leading-none">
                     Proprietary
                   </div>
-                  <div className="text-[10px] sm:text-xs text-primary-foreground/80 font-medium uppercase tracking-wide">Donor Data</div>
+                  <div className="text-[10px] sm:text-xs text-primary-foreground/95 font-medium uppercase tracking-wide">Donor Data</div>
                 </div>
               </div>
             </div>
@@ -519,7 +519,7 @@ const Index = () => {
           <div className={`text-center mt-12 transition-all duration-700 ${
             metricsSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`} style={{ transitionDelay: '600ms' }}>
-            <p className="text-sm md:text-base text-muted-foreground dark:text-foreground/80 font-medium">
+            <p className="text-sm md:text-base text-muted-foreground font-medium">
               <span className="text-secondary dark:text-primary-foreground font-bold">200,000+ donors</span> acquired • 
               <span className="text-destructive dark:text-primary-foreground font-bold"> $10M+ raised</span> • 
               <span className="text-accent-foreground dark:text-primary-foreground font-bold"> 425% average ROI</span>
@@ -542,7 +542,7 @@ const Index = () => {
             <h2 className="text-headline mb-4 md:mb-6 tracking-wide">
               Progressive Values.<br/>Proven Performance.
             </h2>
-            <p className="text-lg md:text-xl text-primary-foreground/90 font-medium">
+            <p className="text-lg md:text-xl text-primary-foreground font-medium">
               We combine the energy of political organizing with elite performance marketing expertise—data
               that wins elections.
             </p>
@@ -561,7 +561,7 @@ const Index = () => {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold mb-2 uppercase font-bebas tracking-wide">Elite Performance</h3>
-                  <p className="text-primary-foreground/80">
+                  <p className="text-primary-foreground/95">
                     Average ROI exceeding 300%—we consistently outperform traditional political consultants.
                   </p>
                 </div>
@@ -578,7 +578,7 @@ const Index = () => {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold mb-2 uppercase font-bebas tracking-wide">Grassroots Power</h3>
-                  <p className="text-primary-foreground/80">
+                  <p className="text-primary-foreground/95">
                     Building people-powered movements that expand donor bases and create lasting change.
                   </p>
                 </div>
@@ -595,7 +595,7 @@ const Index = () => {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold mb-2 uppercase font-bebas tracking-wide">Data-Driven Strategy</h3>
-                  <p className="text-primary-foreground/80">
+                  <p className="text-primary-foreground/95">
                     Every campaign decision backed by rigorous testing, analytics, and continuous optimization.
                   </p>
                 </div>
@@ -613,7 +613,7 @@ const Index = () => {
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold mb-2 uppercase font-bebas tracking-wide">Ethical Fundraising</h3>
-                    <p className="text-primary-foreground/90">
+                    <p className="text-primary-foreground">
                       Donor trust is sacred. We build relationships that last beyond Election Day, never using
                       deceptive tactics or burning out supporters for short-term gains.
                     </p>
@@ -712,7 +712,7 @@ const Index = () => {
               <h2 className="text-headline mb-4 tracking-wide">
                 The Compounding<br/>Impact Model
               </h2>
-              <p className="text-lg md:text-xl text-primary-foreground/90 font-medium">
+              <p className="text-lg md:text-xl text-primary-foreground font-medium">
                 A self-sustaining fundraising engine that grows alongside grassroots support
               </p>
             </div>
@@ -733,7 +733,7 @@ const Index = () => {
                 >
                   <div className="text-sm font-bold text-accent mb-4 uppercase tracking-wider">STEP {item.step}</div>
                   <div className="font-bebas text-5xl text-primary-foreground mb-2 leading-none">{item.value}</div>
-                  <div className="text-sm text-primary-foreground/80 font-medium uppercase tracking-wide">{item.label}</div>
+                  <div className="text-sm text-primary-foreground/95 font-medium uppercase tracking-wide">{item.label}</div>
                 </div>
               ))}
             </div>

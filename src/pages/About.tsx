@@ -40,7 +40,7 @@ const About = () => {
             >
               <div className="space-y-6">
                 <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>Our Story</h2>
-                <div className="space-y-4 text-lg text-foreground/80 leading-relaxed">
+                <div className="space-y-4 text-lg text-foreground/90 leading-relaxed">
                   <p>Molitico was born in the fires of 2016, working with campaigns and movements where we saw firsthand how grassroots energy could be amplified through smart digital strategy.</p>
                   <p>Since then, we've worked with dozens of progressive campaigns and causes, helping them raise millions in small-dollar donations and mobilize thousands of supporters.</p>
                   <p>We understand that every dollar matters, every volunteer is precious, and every message needs to break through the noise to inspire action.</p>
@@ -69,7 +69,7 @@ const About = () => {
               <h2 className="font-bebas text-primary-foreground leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
                 Our Impact By The Numbers
               </h2>
-              <p className="text-lg md:text-xl text-primary-foreground/90 leading-relaxed">
+              <p className="text-lg md:text-xl text-primary-foreground leading-relaxed">
                 Since 2016, we've helped progressive campaigns and causes achieve remarkable results
               </p>
             </div>
@@ -103,7 +103,7 @@ const About = () => {
                       duration={2500}
                     />
                   </div>
-                  <p className="text-lg text-primary-foreground/90 font-medium">{stat.label}</p>
+                  <p className="text-lg text-primary-foreground font-medium">{stat.label}</p>
                 </div>
               ))}
             </div>
@@ -202,7 +202,7 @@ const About = () => {
               </div>
               <div className="space-y-6">
                 <h3 className="text-3xl font-bold text-foreground">We're more than just marketers.</h3>
-                <div className="space-y-4 text-lg text-foreground/80 leading-relaxed">
+                <div className="space-y-4 text-lg text-foreground/90 leading-relaxed">
                   <p>We're a team of former campaign staffers, organizers, and technologists who are passionate about progressive change.</p>
                   <p>We bring a unique blend of political savvy and digital expertise to every project.</p>
                 </div>

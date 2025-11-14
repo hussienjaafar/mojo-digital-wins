@@ -55,7 +55,7 @@ const Footer = () => {
             <h3 className="text-xl sm:text-2xl font-black mb-4">
               MOLITICO<span className="text-accent">.</span>
             </h3>
-            <p className="text-primary-foreground/80 mb-6">
+            <p className="text-primary-foreground/90 mb-6">
               Turning grassroots energy into unstoppable progressive wins.
             </p>
             {/* Social links removed - update with real URLs when available */}
@@ -68,7 +68,7 @@ const Footer = () => {
               <li>
                 <Link
                   to="/about"
-                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors"
                 >
                   About Us
                 </Link>
@@ -76,7 +76,7 @@ const Footer = () => {
               <li>
                 <Link
                   to="/blog"
-                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors"
                 >
                   Blog
                 </Link>
@@ -84,7 +84,7 @@ const Footer = () => {
               <li>
                 <Link
                   to="/services"
-                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors"
                 >
                   Services
                 </Link>
@@ -92,7 +92,7 @@ const Footer = () => {
               <li>
                 <Link
                   to="/case-studies"
-                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors"
                 >
                   Case Studies
                 </Link>
@@ -100,7 +100,7 @@ const Footer = () => {
               <li>
                 <Link
                   to="/creative-showcase"
-                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors"
                 >
                   Creative Showcase
                 </Link>
@@ -108,7 +108,7 @@ const Footer = () => {
               <li>
                 <Link
                   to="/contact"
-                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors"
                 >
                   Contact
                 </Link>
@@ -119,7 +119,7 @@ const Footer = () => {
           {/* Services */}
           <div>
             <h4 className="font-bold mb-4">Services</h4>
-            <ul className="space-y-2 text-primary-foreground/80">
+            <ul className="space-y-2 text-primary-foreground/90">
               <li>SMS Fundraising</li>
               <li>Digital Advertising</li>
               <li>Email Campaigns</li>
@@ -135,7 +135,7 @@ const Footer = () => {
               <li>
                 <Link
                   to="/privacy-policy"
-                  className="text-primary-foreground/80 hover:text-accent transition-colors"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors"
                 >
                   Privacy Policy
                 </Link>
@@ -149,7 +149,7 @@ const Footer = () => {
             {/* Newsletter */}
             <div>
               <h4 className="font-bold mb-4">Stay Updated</h4>
-              <p className="text-primary-foreground/80 mb-4 text-sm">
+              <p className="text-primary-foreground/90 mb-4 text-sm">
                 Join our newsletter for progressive strategy insights.
               </p>
               <form onSubmit={handleNewsletterSubmit} className="space-y-2">
@@ -170,7 +170,7 @@ const Footer = () => {
           </div>
 
           <div className="text-center text-primary-foreground/60 text-sm">
-            <p className="mb-2 text-primary-foreground/80">
+            <p className="mb-2 text-primary-foreground/90">
               <span className="font-semibold">Ethical Fundraising Commitment:</span> Performance with principles. We
               prioritize long-term donor relationships and never compromise values for ROI.
             </p>

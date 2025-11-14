@@ -95,7 +95,7 @@ const CaseStudies = () => {
                     <div className="text-3xl font-bold text-secondary">{study.stat}</div>
                   </div>
                   
-                  <p className="text-foreground/80 leading-relaxed">{study.description}</p>
+                  <p className="text-foreground/90 leading-relaxed">{study.description}</p>
                   
                   <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
                     {study.metrics.map((metric, idx) => (
