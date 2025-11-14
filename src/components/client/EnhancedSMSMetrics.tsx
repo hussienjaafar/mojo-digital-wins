@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { 
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
   ComposedChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -12,14 +13,17 @@ import {
 import { 
   TrendingUp, TrendingDown, MessageSquare, Users, 
   DollarSign, AlertCircle, Clock, Target, ChevronDown,
-  ChevronUp, Download, Filter
+  ChevronUp, Download, Filter, RefreshCw, Wifi, WifiOff
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+import { useRealtimeMetrics } from "@/hooks/useRealtimeMetrics";
+import PullToRefresh from "@/components/PullToRefresh";
+import { toast } from "sonner";
 
 type Props = {
-  smsMetrics: any[];
-  isLoading: boolean;
-  lastUpdate: Date | null;
+  organizationId: string;
+  startDate: string;
+  endDate: string;
 };
 
 type AggregatedMetric = {
@@ -52,10 +56,32 @@ const CHART_COLORS = {
   muted: "hsl(var(--muted-foreground))",
 };
 
-export default function EnhancedSMSMetrics({ smsMetrics, isLoading, lastUpdate }: Props) {
+export default function EnhancedSMSMetrics({ organizationId, startDate, endDate }: Props) {
+  const { smsMetrics, isConnected, lastUpdate, isLoading } = useRealtimeMetrics(organizationId, startDate, endDate);
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [sortField, setSortField] = useState<keyof AggregatedMetric>("messages_sent");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [filterType, setFilterType] = useState<"all" | "high-performers" | "needs-attention" | "ab-tests">("all");
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
+  const [showMobileDetails, setShowMobileDetails] = useState(false);
+  const [mobileDetailsCampaign, setMobileDetailsCampaign] = useState<AggregatedMetric | null>(null);
+  const [chartsPanelOpen, setChartsPanelOpen] = useState(true);
+
+  // Auto-collapse charts on mobile
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setChartsPanelOpen(false);
+      } else {
+        setChartsPanelOpen(true);
+      }
+    };
+    
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Aggregate metrics by campaign
   const aggregatedMetrics = useMemo(() => {
