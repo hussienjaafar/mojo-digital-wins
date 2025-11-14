@@ -125,45 +125,48 @@ const CookieConsent = () => {
 
   return (
     <>
-      {/* Cookie Consent Banner */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border shadow-lg">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1">
-              <Cookie className="w-6 h-6 text-primary flex-shrink-0 mt-1" />
-              <div>
-                <h3 className="font-bold text-lg mb-1">We Value Your Privacy</h3>
-                <p className="text-sm text-muted-foreground">
-                  We use cookies to enhance your browsing experience, serve personalized political ads, and analyze our traffic. 
-                  By clicking "Accept All", you consent to our use of cookies.{" "}
-                  <Link to="/cookie-policy" className="text-primary hover:underline">
-                    Learn more about our cookie policy
+      {/* Cookie Consent Banner - Bottom banner style */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-lg border-t border-border shadow-xl">
+        <div className="container mx-auto px-4 py-4 max-w-screen-xl">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div className="flex items-start gap-2 flex-1">
+              <Cookie className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm text-foreground font-medium">
+                  We use cookies to enhance your experience.{" "}
+                  <Link
+                    to="/privacy-policy"
+                    className="text-primary hover:underline inline"
+                  >
+                    Learn more
                   </Link>
                 </p>
               </div>
             </div>
-            
-            <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            <div className="flex gap-2 w-full md:w-auto">
               <Button
-                variant="outline"
                 onClick={handleRejectAll}
-                className="flex-1 md:flex-initial"
+                variant="outline"
+                size="sm"
+                className="flex-1 md:flex-none min-h-[44px]"
               >
-                Reject All
+                Reject
               </Button>
               <Button
-                variant="secondary"
                 onClick={handleCustomize}
-                className="flex-1 md:flex-initial"
+                variant="outline"
+                size="sm"
+                className="flex-1 md:flex-none min-h-[44px]"
               >
-                Customize
+                Settings
               </Button>
               <Button
-                variant="default"
                 onClick={handleAcceptAll}
-                className="flex-1 md:flex-initial"
+                variant="default"
+                size="sm"
+                className="flex-1 md:flex-none min-h-[44px]"
               >
-                Accept All
+                Accept
               </Button>
             </div>
           </div>
