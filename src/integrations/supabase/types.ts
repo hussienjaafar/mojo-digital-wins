@@ -1035,6 +1035,27 @@ export type Database = {
       }
     }
     Functions: {
+      get_daily_metrics_summary: {
+        Args: {
+          _end_date: string
+          _organization_id: string
+          _start_date: string
+        }
+        Returns: {
+          avg_roi_percentage: number
+          date: string
+          days_count: number
+          total_ad_spend: number
+          total_donations: number
+          total_funds_raised: number
+          total_meta_clicks: number
+          total_meta_impressions: number
+          total_new_donors: number
+          total_sms_conversions: number
+          total_sms_cost: number
+          total_sms_sent: number
+        }[]
+      }
       get_submissions_with_details: {
         Args: never
         Returns: {
