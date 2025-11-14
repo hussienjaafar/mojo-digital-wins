@@ -15,6 +15,7 @@ import {
   ArrowDownRight,
   Plus
 } from "lucide-react";
+import { logger } from "@/lib/logger";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 import {
   LineChart,
@@ -124,7 +125,7 @@ export function DashboardHome() {
         clientChange: 8.2,
       });
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      logger.error('Failed to fetch dashboard stats', error);
     } finally {
       setIsLoading(false);
     }
@@ -152,7 +153,7 @@ export function DashboardHome() {
         setChartData(formattedData);
       }
     } catch (error) {
-      console.error('Error fetching chart data:', error);
+      logger.error('Failed to fetch chart data', error);
     }
   };
 
@@ -192,7 +193,7 @@ export function DashboardHome() {
         setCampaignData(performanceData.sort((a, b) => b.revenue - a.revenue));
       }
     } catch (error) {
-      console.error('Error fetching campaign performance:', error);
+      logger.error('Failed to fetch campaign performance', error);
     }
   };
 

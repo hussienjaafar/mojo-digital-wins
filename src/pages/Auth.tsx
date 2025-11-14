@@ -16,6 +16,7 @@ import { Mail, Lock, Eye, EyeOff, Check, X, AlertCircle, CheckCircle2 } from "lu
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { logger } from "@/lib/logger";
 
 // Password strength calculation
 const calculatePasswordStrength = (password: string): { score: number; label: string; color: string } => {
@@ -186,7 +187,7 @@ const Auth = () => {
           });
 
         if (rpcError) {
-          console.error('Admin code verification error:', rpcError);
+          logger.error('Admin code verification failed', rpcError);
           toast({
             title: "Invalid admin code",
             description: "The admin code you provided is invalid or has already been used.",

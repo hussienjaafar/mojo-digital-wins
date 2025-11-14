@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast as sonnerToast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { logger } from "@/lib/logger";
 
 type InviteCode = {
   id: string;
@@ -77,7 +78,7 @@ export const AdminInviteCodes = () => {
       if (error) throw error;
       setInviteCodes((data as any) || []);
     } catch (error) {
-      console.error('Error fetching invite codes:', error);
+      logger.error('Failed to fetch invite codes', error);
       toast({
         title: "Error",
         description: "Failed to load invite codes.",
@@ -104,7 +105,7 @@ export const AdminInviteCodes = () => {
         setSelectedTemplateId(defaultTemplate.id);
       }
     } catch (error) {
-      console.error('Error fetching templates:', error);
+      logger.error('Failed to fetch templates', error);
     }
   };
 
@@ -146,7 +147,7 @@ export const AdminInviteCodes = () => {
         is_default: false
       });
     } catch (error) {
-      console.error('Error saving template:', error);
+      logger.error('Failed to save template', error);
       toast({
         title: "Error",
         description: "Failed to save template.",
@@ -185,7 +186,7 @@ export const AdminInviteCodes = () => {
 
       fetchInviteCodes();
     } catch (error) {
-      console.error('Error generating invite code:', error);
+      logger.error('Failed to generate invite code', error);
       toast({
         title: "Error",
         description: "Failed to create invite code.",
@@ -210,7 +211,7 @@ export const AdminInviteCodes = () => {
 
       fetchInviteCodes();
     } catch (error) {
-      console.error('Error deleting invite code:', error);
+      logger.error('Failed to delete invite code', error);
       toast({
         title: "Error",
         description: "Failed to delete invite code.",
@@ -276,7 +277,7 @@ export const AdminInviteCodes = () => {
       setInviteEmail("");
       fetchInviteCodes();
     } catch (error) {
-      console.error('Error sending invite:', error);
+      logger.error('Failed to send invite', error);
       sonnerToast.error("Failed to send invitation");
     } finally {
       setIsSending(false);

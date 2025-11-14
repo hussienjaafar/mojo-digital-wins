@@ -11,6 +11,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Cookie } from "lucide-react";
+import { logger } from "@/lib/logger";
 
 interface CookiePreferences {
   essential: boolean;
@@ -41,7 +42,7 @@ const CookieConsent = () => {
         const savedPreferences = JSON.parse(consentGiven);
         setPreferences(savedPreferences);
       } catch (error) {
-        console.error("Error parsing cookie preferences:", error);
+        logger.error('Error parsing cookie preferences', error);
       }
     }
   }, []);
@@ -59,23 +60,22 @@ const CookieConsent = () => {
   const applyPreferences = (prefs: CookiePreferences) => {
     // Analytics
     if (prefs.analytics) {
-      // Enable Google Analytics or other analytics tools
-      console.log("Analytics cookies enabled");
+      logger.info("Analytics cookies enabled");
       // Example: window.gtag('consent', 'update', { analytics_storage: 'granted' });
     } else {
-      console.log("Analytics cookies disabled");
+      logger.info("Analytics cookies disabled");
       // Example: window.gtag('consent', 'update', { ad_storage: 'denied' });
     }
 
     // Advertising - Meta Pixel
     if (prefs.advertising) {
-      console.log("Advertising cookies enabled");
+      logger.info("Advertising cookies enabled");
       // Dynamically load Meta Pixel
       import("@/components/MetaPixel").then(({ initMetaPixel }) => {
         initMetaPixel();
       });
     } else {
-      console.log("Advertising cookies disabled");
+      logger.info("Advertising cookies disabled");
       // Remove Meta Pixel if it exists
       if (window.fbq) {
         delete window.fbq;
@@ -85,9 +85,9 @@ const CookieConsent = () => {
 
     // Functional
     if (prefs.functional) {
-      console.log("Functional cookies enabled");
+      logger.info("Functional cookies enabled");
     } else {
-      console.log("Functional cookies disabled");
+      logger.info("Functional cookies disabled");
     }
   };
 

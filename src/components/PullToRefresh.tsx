@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, ReactNode } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { logger } from '@/lib/logger';
 
 interface PullToRefreshProps {
   children: ReactNode;
@@ -67,7 +68,7 @@ const PullToRefresh = ({ children, onRefresh }: PullToRefreshProps) => {
             window.location.reload();
           }
         } catch (error) {
-          console.error('Refresh failed:', error);
+          logger.error('Refresh failed', error);
         } finally {
           setIsRefreshing(false);
           setPullDistance(0);

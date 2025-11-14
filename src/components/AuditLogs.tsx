@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Eye } from "lucide-react";
+import { logger } from "@/lib/logger";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -51,7 +52,7 @@ export const AuditLogs = () => {
       if (error) throw error;
       setLogs(data || []);
     } catch (error) {
-      console.error('Error fetching audit logs:', error);
+      logger.error('Failed to fetch audit logs', error);
       toast({
         title: "Error",
         description: "Failed to load audit logs.",

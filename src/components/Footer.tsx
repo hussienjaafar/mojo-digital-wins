@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { logger } from "@/lib/logger";
 
 const Footer = () => {
   const { toast } = useToast();
@@ -35,7 +36,7 @@ const Footer = () => {
       });
       setEmail("");
     } catch (error) {
-      console.error('Newsletter submission error:', error);
+      logger.error('Newsletter submission failed', error);
       toast({
         title: "Error",
         description: "Failed to subscribe. Please try again.",
