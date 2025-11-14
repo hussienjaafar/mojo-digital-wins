@@ -16,6 +16,7 @@ import {
   Mail,
   PenTool,
 } from "lucide-react";
+import { logger } from "@/lib/logger";
 import {
   Sidebar,
   SidebarContent,
@@ -110,7 +111,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
 
       setUserRoles(data?.map((r: any) => r.role) || []);
     } catch (error) {
-      console.error('Error fetching user roles:', error);
+      logger.error('Failed to fetch user roles', error);
     }
   };
 

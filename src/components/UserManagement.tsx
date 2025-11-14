@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { logger } from "@/lib/logger";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -153,7 +154,7 @@ export const UserManagement = () => {
 
       fetchUsers();
     } catch (error) {
-      console.error('Error toggling user role:', error);
+      logger.error('Failed to toggle user role', error);
       toast({
         title: "Error",
         description: "Failed to update user role.",
@@ -189,7 +190,7 @@ export const UserManagement = () => {
 
       fetchUsers();
     } catch (error) {
-      console.error('Error toggling user status:', error);
+      logger.error('Failed to toggle user status', error);
       toast({
         title: "Error",
         description: "Failed to update user status.",

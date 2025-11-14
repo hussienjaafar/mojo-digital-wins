@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Link2, Plus, Trash2 } from "lucide-react";
+import { logger } from "@/lib/logger";
 
 type Organization = {
   id: string;
@@ -39,6 +41,8 @@ const CampaignAttributionManager = () => {
   const [metaCampaigns, setMetaCampaigns] = useState<MetaCampaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [attributionToDelete, setAttributionToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     organization_id: "",
     utm_source: "",
@@ -84,6 +88,7 @@ const CampaignAttributionManager = () => {
       if (campaignsError) throw campaignsError;
       setMetaCampaigns(campaignsData || []);
     } catch (error: any) {
+      logger.error('Failed to load attribution data', error);
       toast({
         title: "Error",
         description: error.message || "Failed to load data",
@@ -129,6 +134,7 @@ const CampaignAttributionManager = () => {
       });
       loadData();
     } catch (error: any) {
+      logger.error('Failed to create attribution', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create attribution",
@@ -137,16 +143,19 @@ const CampaignAttributionManager = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this attribution mapping?')) {
-      return;
-    }
+  const handleDeleteClick = (id: string) => {
+    setAttributionToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!attributionToDelete) return;
 
     try {
       const { error } = await (supabase as any)
         .from('campaign_attribution')
         .delete()
-        .eq('id', id);
+        .eq('id', attributionToDelete);
 
       if (error) throw error;
 
@@ -157,6 +166,7 @@ const CampaignAttributionManager = () => {
 
       loadData();
     } catch (error: any) {
+      logger.error('Failed to delete attribution', error);
       toast({
         title: "Error",
         description: error.message || "Failed to delete attribution",
@@ -353,7 +363,7 @@ const CampaignAttributionManager = () => {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => handleDelete(attr.id)}
+                      onClick={() => handleDeleteClick(attr.id)}
                     >
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
@@ -364,6 +374,21 @@ const CampaignAttributionManager = () => {
           </TableBody>
         </Table>
       </CardContent>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Attribution Mapping</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this attribution mapping? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };

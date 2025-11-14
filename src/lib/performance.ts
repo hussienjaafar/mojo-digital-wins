@@ -107,7 +107,8 @@ export async function measurePerformance<T>(
   const start = performance.now();
   const result = await fn();
   const end = performance.now();
-  console.log(`[Performance] ${name}: ${(end - start).toFixed(2)}ms`);
+  const { logger } = await import('./logger');
+  logger.performance(name, end - start);
   return result;
 }
 

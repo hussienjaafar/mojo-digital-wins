@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { logger } from "@/lib/logger";
 
 type LoginHistory = {
   id: string;
@@ -56,7 +57,7 @@ export const SessionManagement = () => {
         failedLogins: failed,
       });
     } catch (error) {
-      console.error('Error fetching login history:', error);
+      logger.error('Failed to fetch login history', error);
       toast({
         title: "Error",
         description: "Failed to load login history.",

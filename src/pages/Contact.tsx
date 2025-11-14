@@ -13,6 +13,7 @@ import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 // Comprehensive validation schema with sanitization
 const contactFormSchema = z.object({
@@ -98,9 +99,9 @@ const Contact = () => {
             created_at: new Date().toISOString(),
           }
         });
-        console.log("Email notification sent");
+        logger.info("Email notification sent");
       } catch (emailError) {
-        console.error("Failed to send email notification:", emailError);
+        logger.error("Failed to send email notification", emailError);
         // Don't fail the form submission if email fails
       }
 

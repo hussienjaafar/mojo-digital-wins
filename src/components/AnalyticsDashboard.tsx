@@ -5,6 +5,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import { format, subDays, startOfDay } from "date-fns";
+import { logger } from "@/lib/logger";
 
 type ContactSubmission = {
   id: string;
@@ -66,7 +67,7 @@ export const AnalyticsDashboard = () => {
       setSubmissions(data || []);
       processAnalytics(data || []);
     } catch (error) {
-      console.error('Error fetching submissions:', error);
+      logger.error('Failed to fetch submissions', error);
       toast({
         title: "Error",
         description: "Failed to load analytics data",

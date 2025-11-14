@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Flag
 } from "lucide-react";
+import { logger } from "@/lib/logger";
 import { format } from "date-fns";
 import {
   Select,
@@ -142,7 +143,7 @@ export const EnhancedContactManagement = () => {
       if (profileError) throw profileError;
       setAdmins(profiles || []);
     } catch (error) {
-      console.error('Error fetching admins:', error);
+      logger.error('Failed to fetch admins', error);
     }
   };
 
@@ -166,7 +167,7 @@ export const EnhancedContactManagement = () => {
       
       setNotes(notesWithEmail);
     } catch (error) {
-      console.error('Error fetching notes:', error);
+      logger.error('Failed to fetch notes', error);
       toast({
         title: "Error",
         description: "Failed to load notes.",
@@ -225,7 +226,7 @@ export const EnhancedContactManagement = () => {
 
       fetchSubmissions();
     } catch (error) {
-      console.error(`Error updating ${field}:`, error);
+      logger.error(`Failed to update ${field}`, error);
       toast({
         title: "Error",
         description: `Failed to update ${field}.`,
@@ -258,7 +259,7 @@ export const EnhancedContactManagement = () => {
       setNewNote("");
       fetchNotes(selectedSubmission.id);
     } catch (error) {
-      console.error('Error adding note:', error);
+      logger.error('Failed to add note', error);
       toast({
         title: "Error",
         description: "Failed to add note.",
@@ -285,7 +286,7 @@ export const EnhancedContactManagement = () => {
         fetchNotes(selectedSubmission.id);
       }
     } catch (error) {
-      console.error('Error deleting note:', error);
+      logger.error('Failed to delete note', error);
       toast({
         title: "Error",
         description: "Failed to delete note.",
@@ -337,7 +338,7 @@ export const EnhancedContactManagement = () => {
       setSelectedSubmissions(new Set());
       fetchSubmissions();
     } catch (error) {
-      console.error('Error bulk updating:', error);
+      logger.error('Failed to bulk update', error);
       toast({
         title: "Error",
         description: "Failed to bulk update submissions.",
@@ -372,7 +373,7 @@ export const EnhancedContactManagement = () => {
       setShowBulkDeleteDialog(false);
       fetchSubmissions();
     } catch (error) {
-      console.error('Error bulk deleting:', error);
+      logger.error('Failed to bulk delete', error);
       toast({
         title: "Error",
         description: "Failed to bulk delete submissions.",
@@ -744,7 +745,7 @@ export const EnhancedContactManagement = () => {
 
                                   fetchSubmissions();
                                 } catch (error) {
-                                  console.error('Error deleting:', error);
+                                  logger.error('Failed to delete submission', error);
                                   toast({
                                     title: "Error",
                                     description: "Failed to delete submission.",

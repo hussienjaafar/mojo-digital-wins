@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 const PIXEL_ID = "1344961220416600";
 
@@ -13,9 +14,7 @@ export const initMetaPixel = () => {
     const preferences = JSON.parse(cookieConsent);
     if (!preferences.advertising) return;
   } catch (error) {
-    if (import.meta.env.DEV) {
-      console.error("Error parsing cookie preferences:", error);
-    }
+    logger.error('Error parsing cookie preferences', error);
     return;
   }
 
@@ -90,13 +89,11 @@ export const trackConversion = async (
       },
     });
 
-    if (error && import.meta.env.DEV) {
-      console.error('Error tracking conversion:', error);
+    if (error) {
+      logger.error('Error tracking conversion', error);
     }
   } catch (error) {
-    if (import.meta.env.DEV) {
-      console.error('Error tracking conversion:', error);
-    }
+    logger.error('Error tracking conversion', error);
   }
 };
 

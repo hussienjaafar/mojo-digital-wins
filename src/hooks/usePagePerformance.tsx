@@ -73,22 +73,24 @@ export function usePagePerformance() {
 // Log performance metrics to console in development
 export function logPerformanceMetrics(metrics: PageLoadMetrics) {
   if (process.env.NODE_ENV === 'development') {
-    console.group('📊 Page Performance Metrics');
-    if (metrics.ttfb !== undefined) {
-      console.log(`⚡ TTFB: ${metrics.ttfb.toFixed(2)}ms ${metrics.ttfb < 600 ? '✅' : '⚠️'}`);
-    }
-    if (metrics.fcp !== undefined) {
-      console.log(`🎨 FCP: ${metrics.fcp.toFixed(2)}ms ${metrics.fcp < 1800 ? '✅' : '⚠️'}`);
-    }
-    if (metrics.lcp !== undefined) {
-      console.log(`🖼️ LCP: ${metrics.lcp.toFixed(2)}ms ${metrics.lcp < 2500 ? '✅' : '⚠️'}`);
-    }
-    if (metrics.fid !== undefined) {
-      console.log(`👆 FID: ${metrics.fid.toFixed(2)}ms ${metrics.fid < 100 ? '✅' : '⚠️'}`);
-    }
-    if (metrics.cls !== undefined) {
-      console.log(`📐 CLS: ${metrics.cls.toFixed(3)} ${metrics.cls < 0.1 ? '✅' : '⚠️'}`);
-    }
-    console.groupEnd();
+    import('@/lib/logger').then(({ logger }) => {
+      logger.group('📊 Page Performance Metrics');
+      if (metrics.ttfb !== undefined) {
+        logger.performance('TTFB', metrics.ttfb);
+      }
+      if (metrics.fcp !== undefined) {
+        logger.performance('FCP', metrics.fcp);
+      }
+      if (metrics.lcp !== undefined) {
+        logger.performance('LCP', metrics.lcp);
+      }
+      if (metrics.fid !== undefined) {
+        logger.performance('FID', metrics.fid);
+      }
+      if (metrics.cls !== undefined) {
+        logger.info(`CLS: ${metrics.cls.toFixed(3)} ${metrics.cls < 0.1 ? '✅' : '⚠️'}`);
+      }
+      logger.groupEnd();
+    });
   }
 }
