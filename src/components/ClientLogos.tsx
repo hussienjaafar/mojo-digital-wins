@@ -44,17 +44,38 @@ export const ClientLogo = ({ name, className = "", linkable = true }: ClientLogo
   const isPrestonLogo = name === "Preston For PA";
 
   const logoImage = logoSrc ? (
-    <img 
-      src={logoSrc} 
-      alt={`${name} logo`}
-      width="180"
-      height="80"
-      className={`w-auto h-auto max-h-12 sm:max-h-16 md:max-h-20 max-w-[120px] sm:max-w-[150px] md:max-w-[180px] object-contain mx-auto ${
-        isPrestonLogo
-          ? "[filter:brightness(0)_saturate(100%)_invert(38%)_sepia(65%)_saturate(1167%)_hue-rotate(186deg)_brightness(95%)_contrast(94%)] dark:[filter:invert(1)]"
-          : "dark:brightness-0 dark:invert"
-      } ${className}`}
-    />
+    isPrestonLogo ? (
+      <div className="w-full">
+        {/* Light mode: blue filter */}
+        <img
+          src={logoSrc}
+          alt={`${name} logo`}
+          width="180"
+          height="80"
+          className={`block dark:hidden w-auto h-auto max-h-12 sm:max-h-16 md:max-h-20 max-w-[120px] sm:max-w-[150px] md:max-w-[180px] object-contain mx-auto ${className}`}
+          style={{
+            filter:
+              'brightness(0) saturate(100%) invert(38%) sepia(65%) saturate(1167%) hue-rotate(186deg) brightness(95%) contrast(94%)',
+          }}
+        />
+        {/* Dark mode: pure white */}
+        <img
+          src={logoSrc}
+          alt={`${name} logo`}
+          width="180"
+          height="80"
+          className={`hidden dark:block w-auto h-auto max-h-12 sm:max-h-16 md:max-h-20 max-w-[120px] sm:max-w-[150px] md:max-w-[180px] object-contain mx-auto brightness-0 invert ${className}`}
+        />
+      </div>
+    ) : (
+      <img 
+        src={logoSrc} 
+        alt={`${name} logo`}
+        width="180"
+        height="80"
+        className={`w-auto h-auto max-h-12 sm:max-h-16 md:max-h-20 max-w-[120px] sm:max-w-[150px] md:max-w-[180px] object-contain mx-auto dark:brightness-0 dark:invert ${className}`}
+      />
+    )
   ) : (
     // Fallback to text-based logo if no image available
     <div className={`font-bebas text-center ${className}`}>
