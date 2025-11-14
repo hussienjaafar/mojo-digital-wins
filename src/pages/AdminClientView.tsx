@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, TrendingUp, DollarSign, Users, Target, Calendar } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, subDays } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import ClientMetricsOverview from "@/components/client/ClientMetricsOverview";
@@ -14,14 +13,13 @@ import MetaAdsMetrics from "@/components/client/MetaAdsMetrics";
 import SMSMetrics from "@/components/client/SMSMetrics";
 import DonationMetrics from "@/components/client/DonationMetrics";
 import SyncControls from "@/components/client/SyncControls";
+import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 
 type Organization = {
   id: string;
   name: string;
   logo_url: string | null;
 };
-
-type DateRange = '7' | '30' | '90' | 'custom';
 
 const AdminClientView = () => {
   const navigate = useNavigate();
@@ -31,7 +29,6 @@ const AdminClientView = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<DateRange>('30');
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
@@ -59,13 +56,10 @@ const AdminClientView = () => {
     }
   }, [session, organizationId]);
 
-  useEffect(() => {
-    if (dateRange !== 'custom') {
-      const days = parseInt(dateRange);
-      setStartDate(format(subDays(new Date(), days), 'yyyy-MM-dd'));
-      setEndDate(format(new Date(), 'yyyy-MM-dd'));
-    }
-  }, [dateRange]);
+  const handleDateChange = (start: string, end: string) => {
+    setStartDate(start);
+    setEndDate(end);
+  };
 
   const checkAdminAndLoadOrganization = async () => {
     if (!session?.user?.id) {
@@ -158,29 +152,13 @@ const AdminClientView = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {/* Date Range Selector */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Date Range
-                </CardTitle>
-                <CardDescription>Select a time period to view metrics</CardDescription>
-              </div>
-              <Select value={dateRange} onValueChange={(value) => setDateRange(value as DateRange)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">Last 7 Days</SelectItem>
-                  <SelectItem value="30">Last 30 Days</SelectItem>
-                  <SelectItem value="90">Last 90 Days</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-        </Card>
+        <div className="mb-6">
+          <DateRangeSelector
+            startDate={startDate}
+            endDate={endDate}
+            onDateChange={handleDateChange}
+          />
+        </div>
 
         {/* Sync Controls */}
         <SyncControls organizationId={organization.id} />
