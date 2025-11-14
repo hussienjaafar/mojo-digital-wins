@@ -154,6 +154,11 @@ const handler = async (req: Request): Promise<Response> => {
       </html>
     `;
 
+    if (!RESEND_API_KEY) {
+      console.error("RESEND_API_KEY is not configured");
+      throw new Error("Email service is not properly configured");
+    }
+
     const emailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -161,7 +166,7 @@ const handler = async (req: Request): Promise<Response> => {
         "Authorization": `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "Admin Invitations <onboarding@resend.dev>",
+        from: "Admin Invitations <admin@molitico.com>",
         to: [email],
         subject: "🎯 You've been invited to join as an Administrator",
         html: htmlContent,
@@ -169,8 +174,18 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (!emailResponse.ok) {
-      const errorData = await emailResponse.text();
-      throw new Error(`Resend API error: ${errorData}`);
+      const errorText = await emailResponse.text();
+      console.error("Resend API error response:", errorText);
+      let errorMessage = "Failed to send invitation email";
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.message || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      
+      throw new Error(`Resend API error: ${errorMessage}`);
     }
 
     const emailData = await emailResponse.json();
@@ -192,10 +207,16 @@ const handler = async (req: Request): Promise<Response> => {
     );
   } catch (error: any) {
     console.error("Error in send-admin-invite function:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+    });
+    
     return new Response(
       JSON.stringify({ 
-        error: error.message,
-        success: false 
+        error: error.message || "An unexpected error occurred",
+        success: false,
+        details: error.stack ? "Check server logs for more information" : undefined
       }),
       {
         status: 500,
