@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +15,7 @@ interface AdminInviteRequest {
   email: string;
   inviteCode: string;
   inviterName?: string;
+  templateId?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -20,9 +24,44 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, inviteCode, inviterName }: AdminInviteRequest = await req.json();
+    const { email, inviteCode, inviterName, templateId }: AdminInviteRequest = await req.json();
     
     console.log("Sending admin invite to:", email);
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Fetch template if specified, otherwise use default
+    let template: any = {
+      subject: "🎯 You've been invited to join as an Administrator",
+      primary_color: "#667eea",
+      header_text: "Admin Invitation",
+      footer_text: "This is an automated message from your admin dashboard.",
+      logo_url: null,
+      custom_message: null
+    };
+
+    if (templateId) {
+      const { data: customTemplate } = await supabase
+        .from('admin_invite_templates')
+        .select('*')
+        .eq('id', templateId)
+        .single();
+      
+      if (customTemplate) {
+        template = customTemplate;
+      }
+    } else {
+      // Fetch default template
+      const { data: defaultTemplate } = await supabase
+        .from('admin_invite_templates')
+        .select('*')
+        .eq('is_default', true)
+        .single();
+      
+      if (defaultTemplate) {
+        template = defaultTemplate;
+      }
+    }
 
     const inviteUrl = `${req.headers.get("origin") || "https://your-app.com"}/auth?invite=${inviteCode}`;
 
@@ -55,7 +94,7 @@ const handler = async (req: Request): Promise<Response> => {
             .logo {
               width: 60px;
               height: 60px;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              background: linear-gradient(135deg, ${template.primary_color} 0%, ${adjustColorBrightness(template.primary_color, -20)} 100%);
               border-radius: 12px;
               margin: 0 auto 20px;
               display: flex;
@@ -64,7 +103,7 @@ const handler = async (req: Request): Promise<Response> => {
               font-size: 28px;
             }
             h1 {
-              color: #667eea;
+              color: ${template.primary_color};
               margin: 0;
               font-size: 24px;
             }
@@ -74,7 +113,7 @@ const handler = async (req: Request): Promise<Response> => {
             .invite-button {
               display: inline-block;
               padding: 14px 32px;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              background: linear-gradient(135deg, ${template.primary_color} 0%, ${adjustColorBrightness(template.primary_color, -20)} 100%);
               color: white;
               text-decoration: none;
               border-radius: 6px;
@@ -84,7 +123,7 @@ const handler = async (req: Request): Promise<Response> => {
             }
             .code-box {
               background-color: #f8f9fa;
-              border: 1px dashed #667eea;
+              border: 1px dashed ${template.primary_color};
               border-radius: 6px;
               padding: 15px;
               margin: 20px 0;
@@ -113,14 +152,16 @@ const handler = async (req: Request): Promise<Response> => {
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">🎯</div>
-              <h1>Admin Invitation</h1>
+              ${template.logo_url ? `<img src="${template.logo_url}" alt="Logo" style="width: 120px; margin-bottom: 20px;" />` : '<div class="logo">🎯</div>'}
+              <h1>${template.header_text}</h1>
             </div>
             
             <div class="content">
               <p>Hello,</p>
               
               <p>${inviterName ? `<strong>${inviterName}</strong> has invited you` : 'You have been invited'} to join as an administrator.</p>
+              
+              ${template.custom_message ? `<p style="background-color: #f0f7ff; padding: 15px; border-left: 3px solid ${template.primary_color}; margin: 20px 0;">${template.custom_message}</p>` : ''}
               
               <p>Click the button below to accept your invitation and create your admin account:</p>
               
@@ -146,13 +187,28 @@ const handler = async (req: Request): Promise<Response> => {
             </div>
             
             <div class="footer">
-              <p>This is an automated message from your admin dashboard.</p>
+              <p>${template.footer_text}</p>
               <p>For security reasons, please do not share this invitation code with anyone.</p>
             </div>
           </div>
         </body>
       </html>
     `;
+
+    // Helper function to adjust color brightness
+    function adjustColorBrightness(color: string, percent: number): string {
+      const num = parseInt(color.replace("#", ""), 16);
+      const amt = Math.round(2.55 * percent);
+      const R = (num >> 16) + amt;
+      const G = (num >> 8 & 0x00FF) + amt;
+      const B = (num & 0x0000FF) + amt;
+      return "#" + (
+        0x1000000 +
+        (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+        (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+        (B < 255 ? (B < 1 ? 0 : B) : 255)
+      ).toString(16).slice(1);
+    }
 
     if (!RESEND_API_KEY) {
       console.error("RESEND_API_KEY is not configured");
@@ -168,7 +224,7 @@ const handler = async (req: Request): Promise<Response> => {
       body: JSON.stringify({
         from: "Admin Invitations <admin@molitico.com>",
         to: [email],
-        subject: "🎯 You've been invited to join as an Administrator",
+        subject: template.subject,
         html: htmlContent,
       }),
     });
@@ -191,6 +247,17 @@ const handler = async (req: Request): Promise<Response> => {
     const emailData = await emailResponse.json();
     console.log("Admin invite email sent successfully:", emailData);
 
+    // Update invite code with email status
+    await supabase
+      .from('admin_invite_codes')
+      .update({
+        email_sent_to: email,
+        email_status: 'sent',
+        email_sent_at: new Date().toISOString(),
+        resend_count: templateId ? 1 : 0
+      })
+      .eq('code', inviteCode);
+
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -211,6 +278,22 @@ const handler = async (req: Request): Promise<Response> => {
       message: error.message,
       stack: error.stack,
     });
+
+    // Update invite code with error status if possible
+    if (error.inviteCode) {
+      try {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        await supabase
+          .from('admin_invite_codes')
+          .update({
+            email_status: 'failed',
+            email_error: error.message
+          })
+          .eq('code', error.inviteCode);
+      } catch (updateError) {
+        console.error("Failed to update error status:", updateError);
+      }
+    }
     
     return new Response(
       JSON.stringify({ 
