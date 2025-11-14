@@ -14,6 +14,23 @@ import {
   ArrowDownRight,
   Plus
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Area,
+  AreaChart
+} from "recharts";
 
 interface DashboardStats {
   totalClients: number;
@@ -25,6 +42,23 @@ interface DashboardStats {
   revenueChange: number;
   clientChange: number;
 }
+
+interface ChartDataPoint {
+  date: string;
+  revenue: number;
+  spend: number;
+  roi: number;
+  donations: number;
+}
+
+interface CampaignPerformance {
+  name: string;
+  revenue: number;
+  spend: number;
+  roi: number;
+}
+
+const COLORS = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b'];
 
 export function DashboardHome() {
   const navigate = useNavigate();
@@ -38,10 +72,14 @@ export function DashboardHome() {
     revenueChange: 0,
     clientChange: 0,
   });
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [campaignData, setCampaignData] = useState<CampaignPerformance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardStats();
+    fetchChartData();
+    fetchCampaignPerformance();
   }, []);
 
   const fetchDashboardStats = async () => {
@@ -77,6 +115,70 @@ export function DashboardHome() {
       console.error('Error fetching dashboard stats:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchChartData = async () => {
+    try {
+      // Fetch last 30 days of metrics
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const { data: metrics } = await (supabase as any)
+        .from('daily_aggregated_metrics')
+        .select('date, total_funds_raised, total_ad_spend, total_sms_cost, roi_percentage, total_donations')
+        .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+        .order('date', { ascending: true });
+
+      if (metrics) {
+        const formattedData: ChartDataPoint[] = metrics.map((m: any) => ({
+          date: new Date(m.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          revenue: Number(m.total_funds_raised) || 0,
+          spend: Number(m.total_ad_spend) + Number(m.total_sms_cost) || 0,
+          roi: Number(m.roi_percentage) || 0,
+          donations: Number(m.total_donations) || 0,
+        }));
+        setChartData(formattedData);
+      }
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
+    }
+  };
+
+  const fetchCampaignPerformance = async () => {
+    try {
+      // Fetch top campaigns by revenue
+      const { data: campaigns } = await (supabase as any)
+        .from('meta_campaigns')
+        .select('campaign_name, campaign_id')
+        .eq('status', 'ACTIVE')
+        .limit(5);
+
+      if (campaigns) {
+        const performanceData: CampaignPerformance[] = await Promise.all(
+          campaigns.map(async (campaign: any) => {
+            const { data: metrics } = await (supabase as any)
+              .from('meta_ad_metrics')
+              .select('spend, conversions, conversion_value')
+              .eq('campaign_id', campaign.campaign_id);
+
+            const totalSpend = metrics?.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0) || 0;
+            const totalRevenue = metrics?.reduce((sum: number, m: any) => sum + Number(m.conversion_value || 0), 0) || 0;
+            const roi = totalSpend > 0 ? ((totalRevenue - totalSpend) / totalSpend) * 100 : 0;
+
+            return {
+              name: campaign.campaign_name || 'Unknown Campaign',
+              revenue: totalRevenue,
+              spend: totalSpend,
+              roi: roi,
+            };
+          })
+        );
+
+        setCampaignData(performanceData.sort((a, b) => b.revenue - a.revenue));
+      }
+    } catch (error) {
+      console.error('Error fetching campaign performance:', error);
     }
   };
 
@@ -264,6 +366,197 @@ export function DashboardHome() {
             <p className="text-sm text-muted-foreground">
               Track active campaigns and their real-time metrics
             </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Revenue Trends Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Revenue & Spend Trends</CardTitle>
+            <CardDescription>Last 30 days performance</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#667eea" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#667eea" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f093fb" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#f093fb" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis 
+                  dataKey="date" 
+                  className="text-xs"
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis 
+                  className="text-xs"
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value: any) => `$${Number(value).toLocaleString()}`}
+                />
+                <Legend />
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="#667eea" 
+                  fillOpacity={1} 
+                  fill="url(#colorRevenue)"
+                  name="Revenue"
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="spend" 
+                  stroke="#f093fb" 
+                  fillOpacity={1} 
+                  fill="url(#colorSpend)"
+                  name="Spend"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* ROI Over Time Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>ROI Trend</CardTitle>
+            <CardDescription>Return on investment over time</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis 
+                  dataKey="date" 
+                  className="text-xs"
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis 
+                  className="text-xs"
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  tickFormatter={(value) => `${value}%`}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value: any) => `${Number(value).toFixed(1)}%`}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="roi" 
+                  stroke="#43e97b" 
+                  strokeWidth={3}
+                  dot={{ fill: '#43e97b', r: 4 }}
+                  name="ROI %"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Campaign Performance Bar Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Campaigns</CardTitle>
+            <CardDescription>Revenue by campaign</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={campaignData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis 
+                  dataKey="name" 
+                  className="text-xs"
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis 
+                  className="text-xs"
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value: any) => `$${Number(value).toLocaleString()}`}
+                />
+                <Legend />
+                <Bar dataKey="revenue" fill="#667eea" name="Revenue" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="spend" fill="#764ba2" name="Spend" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Donations Trend Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Donations Trend</CardTitle>
+            <CardDescription>Number of donations over time</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="colorDonations" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4facfe" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#4facfe" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis 
+                  dataKey="date" 
+                  className="text-xs"
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis 
+                  className="text-xs"
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value: any) => `${Number(value).toLocaleString()} donations`}
+                />
+                <Legend />
+                <Area 
+                  type="monotone" 
+                  dataKey="donations" 
+                  stroke="#4facfe" 
+                  fillOpacity={1} 
+                  fill="url(#colorDonations)"
+                  name="Donations"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
