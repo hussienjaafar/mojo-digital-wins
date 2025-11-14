@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Facebook, Twitter, Linkedin, Instagram } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -59,40 +58,7 @@ const Footer = () => {
             <p className="text-primary-foreground/80 mb-6">
               Turning grassroots energy into unstoppable progressive wins.
             </p>
-            <div className="flex space-x-4">
-              <a
-                href="#"
-                onClick={(e) => e.preventDefault()}
-                className="text-primary-foreground/80 hover:text-accent transition-colors"
-                aria-label="Facebook"
-              >
-                <Facebook size={20} />
-              </a>
-              <a
-                href="#"
-                onClick={(e) => e.preventDefault()}
-                className="text-primary-foreground/80 hover:text-accent transition-colors"
-                aria-label="Twitter"
-              >
-                <Twitter size={20} />
-              </a>
-              <a
-                href="#"
-                onClick={(e) => e.preventDefault()}
-                className="text-primary-foreground/80 hover:text-accent transition-colors"
-                aria-label="LinkedIn"
-              >
-                <Linkedin size={20} />
-              </a>
-              <a
-                href="#"
-                onClick={(e) => e.preventDefault()}
-                className="text-primary-foreground/80 hover:text-accent transition-colors"
-                aria-label="Instagram"
-              >
-                <Instagram size={20} />
-              </a>
-            </div>
+            {/* Social links removed - update with real URLs when available */}
           </div>
 
           {/* Quick Links */}
