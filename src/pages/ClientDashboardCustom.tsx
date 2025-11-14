@@ -1,15 +1,19 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/fixed-client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, TrendingUp, DollarSign, Users, Target, Calendar, LayoutGrid } from "lucide-react";
+import { LogOut, TrendingUp, DollarSign, Users, Target, Calendar, Mail, BarChart3, FileText } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { format, subDays } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { CustomizableDashboard, WidgetConfig } from "@/components/dashboard/CustomizableDashboard";
+import { DashboardWidget } from "@/components/dashboard/DashboardWidget";
+import { MetricsWidget } from "@/components/dashboard/widgets/MetricsWidget";
+import { QuickActionsWidget } from "@/components/dashboard/widgets/QuickActionsWidget";
+import { ActivityWidget } from "@/components/dashboard/widgets/ActivityWidget";
 import ClientMetricsOverview from "@/components/client/ClientMetricsOverview";
 import MetaAdsMetrics from "@/components/client/MetaAdsMetrics";
 import SMSMetrics from "@/components/client/SMSMetrics";
@@ -33,6 +37,7 @@ const ClientDashboard = () => {
   const [dateRange, setDateRange] = useState<DateRange>('30');
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [useCustomLayout, setUseCustomLayout] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -121,6 +126,170 @@ const ClientDashboard = () => {
     );
   }
 
+  // Define dashboard widgets
+  const dashboardWidgets: WidgetConfig[] = [
+    {
+      id: "total-revenue",
+      title: "Total Revenue",
+      defaultLayout: { x: 0, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+      component: (
+        <MetricsWidget
+          title="Total Revenue"
+          value={125000}
+          change={12.5}
+          prefix="$"
+          icon={<DollarSign className="h-5 w-5 text-primary" />}
+        />
+      ),
+    },
+    {
+      id: "total-donors",
+      title: "Total Donors",
+      defaultLayout: { x: 3, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+      component: (
+        <MetricsWidget
+          title="Total Donors"
+          value={2450}
+          change={8.3}
+          icon={<Users className="h-5 w-5 text-primary" />}
+        />
+      ),
+    },
+    {
+      id: "campaign-roi",
+      title: "Campaign ROI",
+      defaultLayout: { x: 6, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+      component: (
+        <MetricsWidget
+          title="Campaign ROI"
+          value={425}
+          change={15.2}
+          suffix="%"
+          icon={<TrendingUp className="h-5 w-5 text-primary" />}
+        />
+      ),
+    },
+    {
+      id: "active-campaigns",
+      title: "Active Campaigns",
+      defaultLayout: { x: 9, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+      component: (
+        <MetricsWidget
+          title="Active Campaigns"
+          value={12}
+          icon={<Target className="h-5 w-5 text-primary" />}
+        />
+      ),
+    },
+    {
+      id: "quick-actions",
+      title: "Quick Actions",
+      defaultLayout: { x: 0, y: 2, w: 4, h: 3, minW: 3, minH: 2 },
+      component: (
+        <QuickActionsWidget
+          actions={[
+            {
+              label: "View Full Analytics",
+              icon: <BarChart3 className="h-4 w-4" />,
+              onClick: () => toast({ title: "Opening analytics..." }),
+              variant: "default",
+            },
+            {
+              label: "Download Report",
+              icon: <FileText className="h-4 w-4" />,
+              onClick: () => toast({ title: "Generating report..." }),
+              variant: "outline",
+            },
+            {
+              label: "Contact Support",
+              icon: <Mail className="h-4 w-4" />,
+              onClick: () => navigate("/contact"),
+              variant: "outline",
+            },
+          ]}
+        />
+      ),
+    },
+    {
+      id: "recent-activity",
+      title: "Recent Activity",
+      defaultLayout: { x: 4, y: 2, w: 8, h: 3, minW: 4, minH: 2 },
+      component: (
+        <ActivityWidget
+          activities={[
+            {
+              id: "1",
+              title: "New donation received",
+              description: "$500 from John Doe",
+              timestamp: "2 hours ago",
+              icon: <DollarSign className="h-4 w-4 text-green-600" />,
+            },
+            {
+              id: "2",
+              title: "Campaign updated",
+              description: "Meta Ads campaign budget increased",
+              timestamp: "5 hours ago",
+              icon: <Target className="h-4 w-4 text-blue-600" />,
+            },
+            {
+              id: "3",
+              title: "SMS campaign sent",
+              description: "5,000 messages delivered successfully",
+              timestamp: "1 day ago",
+              icon: <Mail className="h-4 w-4 text-purple-600" />,
+            },
+          ]}
+        />
+      ),
+    },
+    {
+      id: "meta-ads-overview",
+      title: "Meta Ads Overview",
+      defaultLayout: { x: 0, y: 5, w: 12, h: 4, minW: 6, minH: 3 },
+      component: (
+        <DashboardWidget title="Meta Ads Performance" icon={<Target className="h-5 w-5 text-primary" />}>
+          <MetaAdsMetrics 
+            organizationId={organization.id} 
+            startDate={startDate} 
+            endDate={endDate} 
+          />
+        </DashboardWidget>
+      ),
+    },
+  ];
+
+  // Available widgets that can be added
+  const availableWidgets: WidgetConfig[] = [
+    {
+      id: "sms-metrics",
+      title: "SMS Campaign Metrics",
+      defaultLayout: { x: 0, y: 9, w: 12, h: 4, minW: 6, minH: 3 },
+      component: (
+        <DashboardWidget title="SMS Campaigns" icon={<Mail className="h-5 w-5 text-primary" />}>
+          <SMSMetrics 
+            organizationId={organization.id} 
+            startDate={startDate} 
+            endDate={endDate} 
+          />
+        </DashboardWidget>
+      ),
+    },
+    {
+      id: "donation-metrics",
+      title: "Donation Metrics",
+      defaultLayout: { x: 0, y: 13, w: 12, h: 4, minW: 6, minH: 3 },
+      component: (
+        <DashboardWidget title="Donations" icon={<DollarSign className="h-5 w-5 text-primary" />}>
+          <DonationMetrics 
+            organizationId={organization.id} 
+            startDate={startDate} 
+            endDate={endDate} 
+          />
+        </DashboardWidget>
+      ),
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
       {/* Modern Header with Glassmorphism */}
@@ -149,14 +318,6 @@ const ClientDashboard = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => navigate('/client/dashboard/custom')}
-                className="gap-2"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                Customize Dashboard
-              </Button>
               <ThemeToggle />
               <Button 
                 variant="outline" 
@@ -225,71 +386,12 @@ const ClientDashboard = () => {
         {/* Sync Controls */}
         <SyncControls organizationId={organization.id} />
 
-        {/* Modern Tabs with Better Styling */}
-        <Tabs defaultValue="overview" className="space-y-8">
-          <TabsList className="bg-card/50 backdrop-blur border border-border/50 p-1.5 h-auto gap-2">
-            <TabsTrigger 
-              value="overview" 
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-6 py-3 rounded-lg font-medium"
-            >
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger 
-              value="meta"
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-6 py-3 rounded-lg font-medium"
-            >
-              <Target className="h-4 w-4 mr-2" />
-              Meta Ads
-            </TabsTrigger>
-            <TabsTrigger 
-              value="sms"
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-6 py-3 rounded-lg font-medium"
-            >
-              <Users className="h-4 w-4 mr-2" />
-              SMS Campaigns
-            </TabsTrigger>
-            <TabsTrigger 
-              value="donations"
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-6 py-3 rounded-lg font-medium"
-            >
-              <DollarSign className="h-4 w-4 mr-2" />
-              Donations
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview">
-            <ClientMetricsOverview 
-              organizationId={organization.id} 
-              startDate={startDate} 
-              endDate={endDate} 
-            />
-          </TabsContent>
-
-          <TabsContent value="meta">
-            <MetaAdsMetrics 
-              organizationId={organization.id} 
-              startDate={startDate} 
-              endDate={endDate} 
-            />
-          </TabsContent>
-
-          <TabsContent value="sms">
-            <SMSMetrics 
-              organizationId={organization.id} 
-              startDate={startDate} 
-              endDate={endDate} 
-            />
-          </TabsContent>
-
-          <TabsContent value="donations">
-            <DonationMetrics 
-              organizationId={organization.id} 
-              startDate={startDate} 
-              endDate={endDate} 
-            />
-          </TabsContent>
-        </Tabs>
+        {/* Customizable Dashboard */}
+        <CustomizableDashboard
+          storageKey={`client-dashboard-${organization.id}`}
+          widgets={dashboardWidgets}
+          availableWidgets={availableWidgets}
+        />
       </main>
     </div>
   );
