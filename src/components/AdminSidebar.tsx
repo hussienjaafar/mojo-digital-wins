@@ -120,11 +120,18 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
   };
 
   return (
-    <Sidebar className={collapsed ? "w-14" : "w-64"} collapsible="icon">
-      <SidebarContent>
+    <Sidebar 
+      className={`${collapsed ? "w-14" : "w-64"} border-r border-border/50 bg-card/50 backdrop-blur`} 
+      collapsible="icon"
+    >
+      <SidebarContent className="py-4">
         {navigationGroups.map((group) => (
-          <SidebarGroup key={group.label}>
-            {!collapsed && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
+          <SidebarGroup key={group.label} className="mb-2">
+            {!collapsed && (
+              <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 mb-2">
+                {group.label}
+              </SidebarGroupLabel>
+            )}
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.filter(hasAccess).map((item) => (
@@ -133,9 +140,16 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                       onClick={() => onTabChange(item.value)}
                       isActive={activeTab === item.value}
                       tooltip={collapsed ? item.title : undefined}
+                      className={`
+                        w-full transition-all duration-200 mx-2 rounded-lg
+                        ${activeTab === item.value 
+                          ? 'bg-primary text-primary-foreground shadow-md' 
+                          : 'hover:bg-muted/50'
+                        }
+                      `}
                     >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      <item.icon className={`h-4 w-4 ${activeTab === item.value ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
+                      {!collapsed && <span className="font-medium">{item.title}</span>}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}

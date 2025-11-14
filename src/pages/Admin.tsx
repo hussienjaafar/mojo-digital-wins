@@ -173,8 +173,11 @@ const Admin = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground font-medium">Loading your dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -246,29 +249,45 @@ const Admin = () => {
 
   return (
     <SidebarProvider defaultOpen>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-muted/10">
         <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
         
         <div className="flex-1 flex flex-col">
-          <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-16 items-center gap-4 px-6">
-              <SidebarTrigger className="-ml-2" />
+          <header className="sticky top-0 z-10 border-b border-border/50 bg-card/80 backdrop-blur-xl shadow-sm">
+            <div className="flex h-20 items-center gap-6 px-8">
+              <SidebarTrigger />
               <div className="flex-1">
-                <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-                <p className="text-sm text-muted-foreground">
-                  Manage your application, users, and content
+                <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
+                  Admin Dashboard
+                </h1>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Manage your platform and clients
                 </p>
               </div>
-              <Button variant="outline" onClick={handleSignOut} className="gap-2">
-                <LogOut className="h-4 w-4" />
-                Sign Out
-              </Button>
+              <div className="flex items-center gap-4">
+                <div className="hidden md:flex flex-col items-end">
+                  <span className="text-sm font-medium text-foreground">
+                    {session?.user?.email}
+                  </span>
+                  <span className="text-xs text-muted-foreground">Administrator</span>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={handleSignOut} 
+                  className="border-border/50 hover:border-destructive/50 hover:text-destructive transition-colors gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </Button>
+              </div>
             </div>
           </header>
 
           <main className="flex-1 overflow-auto">
-            <div className="container mx-auto py-8 px-6">
-              {renderContent()}
+            <div className="container mx-auto py-8 px-6 max-w-[1800px]">
+              <div className="space-y-8">
+                {renderContent()}
+              </div>
             </div>
           </main>
         </div>
