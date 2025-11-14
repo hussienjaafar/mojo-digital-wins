@@ -9,6 +9,8 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { TrendingUp, MessageSquare, Mail, Target, Users, BarChart3, Check, Shield } from "lucide-react";
 import { ParticleButton } from "@/components/ParticleButton";
+import { LazyImage } from "@/components/LazyImage";
+import { AnimateOnScroll } from "@/hooks/useIntersectionObserver";
 import heroImage from "@/assets/hero-movement.jpg";
 import heroRally from "@/assets/hero-movement-rally.jpg";
 import { AnimatedGeometricBackground } from "@/components/AnimatedGeometricBackground";
@@ -406,13 +408,14 @@ const Index = () => {
               >
                 <CardContent className="p-0">
                   {study.image && (
-                    <div className="aspect-video w-full overflow-hidden">
-                      <img 
+                    <AnimateOnScroll animation="scale" delay={index * 100}>
+                      <LazyImage
                         src={study.image} 
                         alt={`${study.title} campaign visual`}
+                        aspectRatio="video"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
-                    </div>
+                    </AnimateOnScroll>
                   )}
                   <div className={`bg-gradient-to-br from-secondary to-secondary/80 p-8 text-secondary-foreground relative overflow-hidden`}>
                     <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300" />
