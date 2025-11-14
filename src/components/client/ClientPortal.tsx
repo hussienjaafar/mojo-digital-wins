@@ -1,10 +1,12 @@
 import { lazy, Suspense, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   BarChart3, 
   MessageSquare, 
@@ -15,14 +17,19 @@ import {
   DollarSign,
   Target,
   Activity,
-  Calendar
+  Calendar,
+  AlertCircle
 } from "lucide-react";
 import { FilterProvider, useFilters } from "@/contexts/FilterContext";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 import { useRealtimeMetrics } from "@/hooks/useRealtimeMetrics";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/hooks/useAuth";
+import { OrganizationSelector } from "./OrganizationSelector";
+import { UserProfileMenu } from "./UserProfileMenu";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 // Lazy load analytics components
 const ExecutiveDashboard = lazy(() => import("@/components/client/ExecutiveDashboard"));
@@ -133,10 +140,71 @@ const SummaryCards = () => {
 };
 
 const ClientPortalContent = () => {
-  const { organizationId, startDate, endDate, updateDateRange } = useFilters();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user, organizations, loading: authLoading, logout, isAuthenticated, updateLastLogin } = useAuth();
+  const { organizationId, setOrganizationId, startDate, endDate, updateDateRange, resetFilters } = useFilters();
   const [activeTab, setActiveTab] = useState("overview");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const isMobile = useIsMobile();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/client-login');
+    }
+  }, [authLoading, isAuthenticated, navigate]);
+
+  // Auto-select organization
+  useEffect(() => {
+    if (!authLoading && organizations.length > 0) {
+      // If no organization selected, auto-select
+      if (!organizationId) {
+        // Try to use saved organization
+        const savedOrgId = localStorage.getItem('selectedOrganizationId');
+        const validSavedOrg = organizations.find(org => org.id === savedOrgId);
+        
+        if (validSavedOrg) {
+          setOrganizationId(savedOrgId!);
+        } else {
+          // Auto-select first organization
+          setOrganizationId(organizations[0].id);
+        }
+      } else {
+        // Verify current organization is valid
+        const isValid = organizations.some(org => org.id === organizationId);
+        if (!isValid && organizations.length > 0) {
+          setOrganizationId(organizations[0].id);
+        }
+      }
+    }
+  }, [authLoading, organizations, organizationId, setOrganizationId]);
+
+  // Update last login on mount
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      updateLastLogin();
+    }
+  }, [isAuthenticated, user]);
+
+  const handleOrganizationChange = (newOrgId: string) => {
+    // Clear filters when switching organizations
+    resetFilters();
+    setOrganizationId(newOrgId);
+    
+    toast({
+      title: "Organization switched",
+      description: "Data has been updated for the selected organization.",
+    });
+  };
+
+  const handleLogout = () => {
+    logout();
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out.",
+    });
+  };
 
   const handleExport = () => {
     // TODO: Implement unified export
@@ -167,20 +235,57 @@ const ClientPortalContent = () => {
     </div>
   );
 
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Skeleton className="h-12 w-12 rounded-full mx-auto mb-4" />
+          <Skeleton className="h-4 w-32 mx-auto" />
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  const selectedOrg = organizations.find(org => org.id === organizationId);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b bg-card sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold">Analytics Dashboard</h1>
-              <p className="text-sm text-muted-foreground">
-                Unified performance insights
-              </p>
+            <div className="flex items-center gap-4">
+              <div>
+                <h1 className="text-2xl font-bold">Analytics Dashboard</h1>
+                <p className="text-sm text-muted-foreground">
+                  Unified performance insights
+                </p>
+              </div>
+              
+              {!isMobile && organizations.length > 0 && (
+                <OrganizationSelector
+                  organizations={organizations}
+                  selectedId={organizationId}
+                  onSelect={handleOrganizationChange}
+                />
+              )}
             </div>
             
             <div className="flex items-center gap-2">
+              {isMobile && organizations.length > 1 && (
+                <OrganizationSelector
+                  organizations={organizations}
+                  selectedId={organizationId}
+                  onSelect={handleOrganizationChange}
+                />
+              )}
+              
               {!isMobile && <FilterControls />}
               
               <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
@@ -208,6 +313,12 @@ const ClientPortalContent = () => {
                 <Download className="h-4 w-4" />
                 {!isMobile && <span className="ml-2">Export</span>}
               </Button>
+
+              <UserProfileMenu
+                userEmail={user?.email || ''}
+                organizationName={selectedOrg?.name}
+                onLogout={handleLogout}
+              />
             </div>
           </div>
         </div>
@@ -215,10 +326,31 @@ const ClientPortalContent = () => {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-6">
+        {/* Organization Warning */}
+        {organizations.length === 0 && (
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No organizations found. Please contact your administrator to get access.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {organizations.length > 0 && !organizationId && (
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Please select an organization to view analytics.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Summary Cards */}
-        <div className="mb-6">
-          <SummaryCards />
-        </div>
+        {organizationId && (
+          <div className="mb-6">
+            <SummaryCards />
+          </div>
+        )}
 
         {/* Tabbed Analytics */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
