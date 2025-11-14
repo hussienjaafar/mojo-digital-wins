@@ -9,6 +9,7 @@ import { LogOut, TrendingUp, DollarSign, Users, Target, Calendar } from "lucide-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Session } from "@supabase/supabase-js";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import ClientMetricsOverview from "@/components/client/ClientMetricsOverview";
 import MetaAdsMetrics from "@/components/client/MetaAdsMetrics";
 import SMSMetrics from "@/components/client/SMSMetrics";
@@ -147,14 +148,17 @@ const ClientDashboard = () => {
                 </p>
               </div>
             </div>
-            <Button 
-              variant="outline" 
-              onClick={handleLogout}
-              className="border-border/50 hover:border-destructive/50 hover:text-destructive transition-colors"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+              <Button 
+                variant="outline" 
+                onClick={handleLogout}
+                className="border-border/50 hover:border-destructive/50 hover:text-destructive transition-colors"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </header>
