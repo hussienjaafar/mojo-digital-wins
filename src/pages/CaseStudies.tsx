@@ -119,7 +119,7 @@ const CaseStudies = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
         
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center space-y-8 text-white">
+          <div className="max-w-3xl mx-auto text-center space-y-8 text-primary-foreground">
             <h2 className="font-bebas leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
               Ready to Be Our Next Success Story?
             </h2>
@@ -129,7 +129,7 @@ const CaseStudies = () => {
               size="xl"
               particleColor="hsl(var(--accent))"
               particleCount={25}
-              className="text-lg font-bold bg-white text-primary hover:bg-white/90"
+              className="text-lg font-bold bg-card text-card-foreground hover:bg-card/90"
             >
               Book Your Strategy Call
             </ParticleButton>

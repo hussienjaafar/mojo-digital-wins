@@ -418,7 +418,7 @@ const Index = () => {
                     </AnimateOnScroll>
                   )}
                   <div className={`bg-gradient-to-br from-secondary to-secondary/80 p-8 text-secondary-foreground relative overflow-hidden`}>
-                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-300" />
+                    <div className="absolute inset-0 bg-background/10 group-hover:bg-background/0 transition-colors duration-300" />
                     <div className="relative z-10">
                       <div className="font-bebas text-6xl md:text-7xl mb-2 leading-none group-hover:scale-110 transition-transform duration-300 origin-left">
                         {study.stat.replace(' ROI', '')}
@@ -508,7 +508,7 @@ const Index = () => {
                   
                   {/* Icon Accent */}
                   <div className="absolute -top-3 -right-3 w-8 h-8 bg-gradient-to-br from-secondary to-destructive rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                    <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                    <div className="w-2 h-2 bg-primary-foreground rounded-full animate-ping" />
                   </div>
                 </div>
               </div>
