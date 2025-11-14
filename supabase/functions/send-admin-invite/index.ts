@@ -222,7 +222,7 @@ const handler = async (req: Request): Promise<Response> => {
         "Authorization": `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "Admin Invitations <admin@molitico.com>",
+        from: "Admin Invitations <onboarding@resend.dev>",
         to: [email],
         subject: template.subject,
         html: htmlContent,
