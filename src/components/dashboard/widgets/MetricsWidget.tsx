@@ -9,13 +9,14 @@ interface MetricsWidgetProps {
   suffix?: string;
   prefix?: string;
   icon?: React.ReactNode;
+  isLoading?: boolean;
 }
 
-export function MetricsWidget({ title, value, change, suffix, prefix, icon }: MetricsWidgetProps) {
+export function MetricsWidget({ title, value, change, suffix, prefix, icon, isLoading = false }: MetricsWidgetProps) {
   const isPositive = change !== undefined && change >= 0;
   
   return (
-    <DashboardWidget title={title} icon={icon}>
+    <DashboardWidget title={title} icon={icon} isLoading={isLoading} isEmpty={!isLoading && value === 0}>
       <div className="flex flex-col justify-center h-full">
         <div className="text-4xl font-bold text-foreground">
           <StatCounter end={value} prefix={prefix} suffix={suffix} />
