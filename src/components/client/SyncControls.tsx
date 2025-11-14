@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, DollarSign, MessageSquare, TrendingUp } from "lucide-react";
+import { logger } from "@/lib/logger";
 
 type Props = {
   organizationId: string;
@@ -81,7 +82,7 @@ const SyncControls = ({ organizationId }: Props) => {
         description: "ROI calculation completed",
       });
     } catch (error: any) {
-      console.error('ROI calculation error:', error);
+      logger.error('ROI calculation failed', error);
       // Don't show error to user as this is a background task
     } finally {
       setSyncing({ ...syncing, roi: false });

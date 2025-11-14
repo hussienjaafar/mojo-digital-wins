@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/fixed-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, DollarSign, Users, Target } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { logger } from "@/lib/logger";
 
 type Props = {
   organizationId: string;
@@ -43,7 +44,7 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
       if (error) throw error;
       setMetrics(data || []);
     } catch (error) {
-      console.error('Error loading metrics:', error);
+      logger.error('Failed to load metrics', error);
     } finally {
       setIsLoading(false);
     }
