@@ -12,11 +12,18 @@ interface ActivityItem {
 
 interface ActivityWidgetProps {
   activities: ActivityItem[];
+  isLoading?: boolean;
 }
 
-export function ActivityWidget({ activities }: ActivityWidgetProps) {
+export function ActivityWidget({ activities, isLoading = false }: ActivityWidgetProps) {
   return (
-    <DashboardWidget title="Recent Activity" icon={<Activity className="h-5 w-5 text-primary" />}>
+    <DashboardWidget 
+      title="Recent Activity" 
+      icon={<Activity className="h-5 w-5 text-primary" />}
+      isLoading={isLoading}
+      isEmpty={!isLoading && activities.length === 0}
+      emptyMessage="No recent activity"
+    >
       <ScrollArea className="h-full">
         <div className="space-y-4">
           {activities.map((activity) => (

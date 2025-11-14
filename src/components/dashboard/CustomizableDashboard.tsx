@@ -126,13 +126,20 @@ export function CustomizableDashboard({
   return (
     <div className="space-y-4">
       {/* Control Bar */}
-      <div className="flex items-center justify-between p-4 bg-card/50 backdrop-blur border border-border/50 rounded-lg">
+      <div className="flex items-center justify-between p-4 bg-card/50 backdrop-blur border border-border/50 rounded-lg shadow-sm">
         <div className="flex items-center gap-3">
           <LayoutGrid className="h-5 w-5 text-primary" />
           <div>
             <h3 className="font-semibold text-foreground">Customize Dashboard</h3>
             <p className="text-sm text-muted-foreground">
-              {isEditMode ? "Drag widgets to rearrange" : "Click edit to customize layout"}
+              {isEditMode ? (
+                <span className="flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
+                  Drag widgets to rearrange
+                </span>
+              ) : (
+                "Click edit to customize layout"
+              )}
             </p>
           </div>
         </div>
@@ -167,7 +174,7 @@ export function CustomizableDashboard({
                 variant="outline"
                 size="sm"
                 onClick={resetLayout}
-                className="gap-2"
+                className="gap-2 hover:border-destructive/50 hover:text-destructive transition-colors"
               >
                 <RotateCcw className="h-4 w-4" />
                 Reset
@@ -176,7 +183,7 @@ export function CustomizableDashboard({
                 variant="default"
                 size="sm"
                 onClick={saveLayout}
-                className="gap-2"
+                className="gap-2 shadow-md hover:shadow-lg transition-all"
               >
                 <Save className="h-4 w-4" />
                 Save Layout
@@ -196,28 +203,30 @@ export function CustomizableDashboard({
         </div>
       </div>
 
-      {/* Dashboard Grid */}
-      <ResponsiveGridLayout
-        className="layout"
-        layouts={layouts}
-        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-        cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
-        rowHeight={100}
-        onLayoutChange={handleLayoutChange}
-        isDraggable={isEditMode}
-        isResizable={isEditMode}
-        draggableHandle=".cursor-move"
-        margin={[16, 16]}
-      >
+      {/* Dashboard Grid with edit mode indicator */}
+      <div className={`relative ${isEditMode ? 'ring-2 ring-primary/20 ring-offset-2 rounded-lg p-1' : ''}`}>
+        <ResponsiveGridLayout
+          className="layout"
+          layouts={layouts}
+          breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+          cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+          rowHeight={100}
+          onLayoutChange={handleLayoutChange}
+          isDraggable={isEditMode}
+          isResizable={isEditMode}
+          draggableHandle=".cursor-move"
+          margin={[16, 16]}
+        >
         {widgets.map((widget) => (
-          <div key={widget.id} className="transition-all">
+          <div key={widget.id} className="transition-all hover:scale-[1.01]">
             <div className="h-full relative group">
               {widget.component}
               {isEditMode && (
                 <Button
                   variant="destructive"
                   size="icon"
-                  className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
+                  aria-label={`Remove ${widget.title}`}
                   onClick={() => removeWidget(widget.id)}
                 >
                   <span className="sr-only">Remove widget</span>
@@ -228,6 +237,7 @@ export function CustomizableDashboard({
           </div>
         ))}
       </ResponsiveGridLayout>
+      </div>
     </div>
   );
 }
