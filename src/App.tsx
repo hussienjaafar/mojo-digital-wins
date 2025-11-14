@@ -27,6 +27,7 @@ import Admin from "./pages/Admin";
 import AdminClientView from "./pages/AdminClientView";
 import ClientLogin from "./pages/ClientLogin";
 import ClientDashboard from "./pages/ClientDashboard";
+import ClientDashboardCustom from "./pages/ClientDashboardCustom";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,7 @@ const AppContent = () => {
         <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />
         <Route path="/client-login" element={<ClientLogin />} />
         <Route path="/client/dashboard" element={<ClientDashboard />} />
+        <Route path="/client/dashboard/custom" element={<ClientDashboardCustom />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
