@@ -614,58 +614,91 @@ export type Database = {
       }
       meta_ad_metrics: {
         Row: {
+          ad_creative_id: string | null
+          ad_creative_name: string | null
           ad_id: string | null
           ad_set_id: string | null
+          attribution_window: string | null
+          audience_demographics: Json | null
           campaign_id: string
           clicks: number | null
+          conversion_funnel_data: Json | null
           conversion_value: number | null
           conversions: number | null
+          cost_per_result: number | null
           cpc: number | null
           cpm: number | null
+          creative_type: Database["public"]["Enums"]["creative_type"] | null
           ctr: number | null
           date: string
+          device_platform: string | null
+          frequency: number | null
           id: string
           impressions: number | null
           organization_id: string
+          placement: string | null
           reach: number | null
+          relevance_score: number | null
           roas: number | null
           spend: number | null
           synced_at: string | null
         }
         Insert: {
+          ad_creative_id?: string | null
+          ad_creative_name?: string | null
           ad_id?: string | null
           ad_set_id?: string | null
+          attribution_window?: string | null
+          audience_demographics?: Json | null
           campaign_id: string
           clicks?: number | null
+          conversion_funnel_data?: Json | null
           conversion_value?: number | null
           conversions?: number | null
+          cost_per_result?: number | null
           cpc?: number | null
           cpm?: number | null
+          creative_type?: Database["public"]["Enums"]["creative_type"] | null
           ctr?: number | null
           date: string
+          device_platform?: string | null
+          frequency?: number | null
           id?: string
           impressions?: number | null
           organization_id: string
+          placement?: string | null
           reach?: number | null
+          relevance_score?: number | null
           roas?: number | null
           spend?: number | null
           synced_at?: string | null
         }
         Update: {
+          ad_creative_id?: string | null
+          ad_creative_name?: string | null
           ad_id?: string | null
           ad_set_id?: string | null
+          attribution_window?: string | null
+          audience_demographics?: Json | null
           campaign_id?: string
           clicks?: number | null
+          conversion_funnel_data?: Json | null
           conversion_value?: number | null
           conversions?: number | null
+          cost_per_result?: number | null
           cpc?: number | null
           cpm?: number | null
+          creative_type?: Database["public"]["Enums"]["creative_type"] | null
           ctr?: number | null
           date?: string
+          device_platform?: string | null
+          frequency?: number | null
           id?: string
           impressions?: number | null
           organization_id?: string
+          placement?: string | null
           reach?: number | null
+          relevance_score?: number | null
           roas?: number | null
           spend?: number | null
           synced_at?: string | null
@@ -757,54 +790,149 @@ export type Database = {
         }
         Relationships: []
       }
+      roi_analytics: {
+        Row: {
+          campaign_id: string
+          campaign_roas: number | null
+          created_at: string | null
+          date: string
+          first_touch_attribution: number | null
+          id: string
+          last_touch_attribution: number | null
+          linear_attribution: number | null
+          ltv_roi: number | null
+          organization_id: string
+          platform: string
+          position_based_attribution: number | null
+          time_decay_attribution: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_id: string
+          campaign_roas?: number | null
+          created_at?: string | null
+          date: string
+          first_touch_attribution?: number | null
+          id?: string
+          last_touch_attribution?: number | null
+          linear_attribution?: number | null
+          ltv_roi?: number | null
+          organization_id: string
+          platform: string
+          position_based_attribution?: number | null
+          time_decay_attribution?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          campaign_roas?: number | null
+          created_at?: string | null
+          date?: string
+          first_touch_attribution?: number | null
+          id?: string
+          last_touch_attribution?: number | null
+          linear_attribution?: number | null
+          ltv_roi?: number | null
+          organization_id?: string
+          platform?: string
+          position_based_attribution?: number | null
+          time_decay_attribution?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roi_analytics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_campaign_metrics: {
         Row: {
+          a_b_test_variant: string | null
           amount_raised: number | null
+          audience_segment: string | null
+          bounce_rate: number | null
           campaign_id: string
           campaign_name: string | null
+          click_through_rate: number | null
           clicks: number | null
+          conversion_rate: number | null
           conversions: number | null
           cost: number | null
+          cost_per_conversion: number | null
           date: string
+          delivery_rate: number | null
+          delivery_time: string | null
           id: string
+          message_content: string | null
           messages_delivered: number | null
           messages_failed: number | null
           messages_sent: number | null
+          opt_out_rate: number | null
           opt_outs: number | null
           organization_id: string
+          send_time: string | null
           synced_at: string | null
+          time_to_conversion: number | null
         }
         Insert: {
+          a_b_test_variant?: string | null
           amount_raised?: number | null
+          audience_segment?: string | null
+          bounce_rate?: number | null
           campaign_id: string
           campaign_name?: string | null
+          click_through_rate?: number | null
           clicks?: number | null
+          conversion_rate?: number | null
           conversions?: number | null
           cost?: number | null
+          cost_per_conversion?: number | null
           date: string
+          delivery_rate?: number | null
+          delivery_time?: string | null
           id?: string
+          message_content?: string | null
           messages_delivered?: number | null
           messages_failed?: number | null
           messages_sent?: number | null
+          opt_out_rate?: number | null
           opt_outs?: number | null
           organization_id: string
+          send_time?: string | null
           synced_at?: string | null
+          time_to_conversion?: number | null
         }
         Update: {
+          a_b_test_variant?: string | null
           amount_raised?: number | null
+          audience_segment?: string | null
+          bounce_rate?: number | null
           campaign_id?: string
           campaign_name?: string | null
+          click_through_rate?: number | null
           clicks?: number | null
+          conversion_rate?: number | null
           conversions?: number | null
           cost?: number | null
+          cost_per_conversion?: number | null
           date?: string
+          delivery_rate?: number | null
+          delivery_time?: string | null
           id?: string
+          message_content?: string | null
           messages_delivered?: number | null
           messages_failed?: number | null
           messages_sent?: number | null
+          opt_out_rate?: number | null
           opt_outs?: number | null
           organization_id?: string
+          send_time?: string | null
           synced_at?: string | null
+          time_to_conversion?: number | null
         }
         Relationships: [
           {
@@ -878,7 +1006,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      mv_daily_metrics_summary: {
+        Row: {
+          avg_roi_percentage: number | null
+          date: string | null
+          days_count: number | null
+          last_calculated: string | null
+          organization_id: string | null
+          total_ad_spend: number | null
+          total_donations: number | null
+          total_funds_raised: number | null
+          total_meta_clicks: number | null
+          total_meta_impressions: number | null
+          total_new_donors: number | null
+          total_sms_conversions: number | null
+          total_sms_cost: number | null
+          total_sms_sent: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_aggregated_metrics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       get_submissions_with_details: {
@@ -939,6 +1093,7 @@ export type Database = {
         }
         Returns: string
       }
+      refresh_daily_metrics_summary: { Args: never; Returns: undefined }
       verify_admin_invite_code: {
         Args: { invite_code: string; user_id: string }
         Returns: boolean
@@ -946,6 +1101,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      creative_type: "image" | "video" | "carousel" | "collection" | "slideshow"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1074,6 +1230,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      creative_type: ["image", "video", "carousel", "collection", "slideshow"],
     },
   },
 } as const
