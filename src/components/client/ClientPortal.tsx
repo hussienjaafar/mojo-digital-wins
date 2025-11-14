@@ -30,6 +30,7 @@ import { UserProfileMenu } from "./UserProfileMenu";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 // Lazy load analytics components
 const ExecutiveDashboard = lazy(() => import("@/components/client/ExecutiveDashboard"));
@@ -209,7 +210,7 @@ const ClientPortalContent = () => {
 
   const handleExport = () => {
     // TODO: Implement unified export
-    console.log("Exporting data...");
+    logger.info("Exporting data...");
   };
 
   const handleRefresh = () => {
