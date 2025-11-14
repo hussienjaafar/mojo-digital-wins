@@ -208,7 +208,7 @@ const Contact = () => {
                       <Card key={index} className="shadow-md hover:shadow-lg transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
                         <CardContent className="p-6 flex items-start gap-4">
                           <div className="w-12 h-12 bg-gradient-to-br from-secondary to-accent rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                            <contact.icon className="h-6 w-6 text-white drop-shadow-sm" />
+                            <contact.icon className="h-6 w-6 text-primary-foreground drop-shadow-sm" />
                           </div>
                           <div>
                             <h4 className="font-bold text-foreground mb-1">{contact.title}</h4>

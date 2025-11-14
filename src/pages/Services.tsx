@@ -90,7 +90,7 @@ const Services = () => {
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 order-2 md:order-1 border border-border/50 bg-card backdrop-blur-sm">
                 <CardContent className="p-6 sm:p-7 md:p-8 space-y-6">
                   <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 bg-gradient-to-br from-secondary to-accent rounded-full flex items-center justify-center shadow-md">
-                    <Megaphone className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
+                    <Megaphone className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-primary-foreground drop-shadow-sm" />
                   </div>
                   <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
                     Digital Advertising
@@ -147,7 +147,7 @@ const Services = () => {
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
                 <CardContent className="p-6 sm:p-7 md:p-8 space-y-6">
                   <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 bg-gradient-to-br from-destructive to-secondary rounded-full flex items-center justify-center shadow-md">
-                    <MessageSquare className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
+                    <MessageSquare className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-primary-foreground drop-shadow-sm" />
                   </div>
                   <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
                     SMS & Peer-to-Peer Texting
@@ -188,7 +188,7 @@ const Services = () => {
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 order-2 md:order-1 border border-border/50 bg-card backdrop-blur-sm">
                 <CardContent className="p-6 sm:p-7 md:p-8 space-y-6">
                   <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 bg-gradient-to-br from-accent to-secondary rounded-full flex items-center justify-center shadow-md">
-                    <Mail className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
+                    <Mail className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-primary-foreground drop-shadow-sm" />
                   </div>
                   <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
                     Email Fundraising
@@ -245,7 +245,7 @@ const Services = () => {
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50 bg-card backdrop-blur-sm">
                 <CardContent className="p-6 sm:p-7 md:p-8 space-y-6">
                   <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 bg-gradient-to-br from-primary to-destructive rounded-full flex items-center justify-center shadow-md">
-                    <Monitor className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
+                    <Monitor className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-primary-foreground drop-shadow-sm" />
                   </div>
                   <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
                     Billboard & Out-of-Home Advertising
@@ -286,7 +286,7 @@ const Services = () => {
               <Card className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 order-2 md:order-1 border border-border/50 bg-card backdrop-blur-sm">
                 <CardContent className="p-6 sm:p-7 md:p-8 space-y-6">
                   <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 bg-gradient-to-br from-accent to-primary rounded-full flex items-center justify-center shadow-md">
-                    <PieChart className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
+                    <PieChart className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-primary-foreground drop-shadow-sm" />
                   </div>
                   <h3 className="font-bebas text-foreground leading-tight" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', letterSpacing: '0.02em' }}>
                     Voter Polling & Research
@@ -404,7 +404,7 @@ const Services = () => {
               >
                 <CardContent className="p-6 sm:p-7 md:p-8 text-center space-y-4">
                   <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 mx-auto bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center shadow-md">
-                    <service.icon className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
+                    <service.icon className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-primary-foreground drop-shadow-sm" />
                   </div>
                   <h3 className="text-2xl font-bold text-foreground">{service.title}</h3>
                   <p className="text-muted-foreground leading-relaxed">{service.description}</p>
@@ -461,7 +461,7 @@ const Services = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
         
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center space-y-8 text-white">
+          <div className="max-w-3xl mx-auto text-center space-y-8 text-primary-foreground">
             <h2 className="font-bebas leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
               Ready to Build Your Winning Strategy?
             </h2>
@@ -473,7 +473,7 @@ const Services = () => {
               size="xl"
               particleColor="hsl(var(--accent))"
               particleCount={25}
-              className="text-lg font-bold bg-white text-primary hover:bg-white/90"
+              className="text-lg font-bold bg-card text-card-foreground hover:bg-card/90"
             >
               Book Your Free Strategy Call
             </ParticleButton>

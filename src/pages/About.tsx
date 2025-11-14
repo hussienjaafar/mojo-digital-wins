@@ -66,10 +66,10 @@ const About = () => {
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center space-y-12">
             <div className="space-y-4">
-              <h2 className="font-bebas text-white leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+              <h2 className="font-bebas text-primary-foreground leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
                 Our Impact By The Numbers
               </h2>
-              <p className="text-lg md:text-xl text-white/90 leading-relaxed">
+              <p className="text-lg md:text-xl text-primary-foreground/90 leading-relaxed">
                 Since 2016, we've helped progressive campaigns and causes achieve remarkable results
               </p>
             </div>
@@ -92,10 +92,10 @@ const About = () => {
                   }`}
                   style={{ transitionDelay: `${index * 150}ms` }}
                 >
-                  <div className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 mx-auto bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
-                    <stat.icon className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 text-white drop-shadow-lg" />
+                  <div className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 mx-auto bg-primary-foreground/10 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
+                    <stat.icon className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 text-primary-foreground drop-shadow-lg" />
                   </div>
-                  <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white font-bebas tracking-wider">
+                  <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-primary-foreground font-bebas tracking-wider">
                     <StatCounter 
                       end={stat.value} 
                       prefix={stat.prefix} 
@@ -103,7 +103,7 @@ const About = () => {
                       duration={2500}
                     />
                   </div>
-                  <p className="text-lg text-white/90 font-medium">{stat.label}</p>
+                  <p className="text-lg text-primary-foreground/90 font-medium">{stat.label}</p>
                 </div>
               ))}
             </div>
@@ -170,7 +170,7 @@ const About = () => {
                 <Card key={index} className="bg-card backdrop-blur-sm shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-border/50">
                 <CardContent className="p-6 sm:p-7 md:p-8 text-center space-y-4">
                   <div className="w-14 h-14 sm:w-15 sm:h-15 md:w-16 md:h-16 mx-auto bg-gradient-to-br from-secondary to-accent rounded-full flex items-center justify-center shadow-md">
-                    <value.icon className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-white drop-shadow-sm" />
+                    <value.icon className="h-7 w-7 sm:h-7.5 sm:w-7.5 md:h-8 md:w-8 text-primary-foreground drop-shadow-sm" />
                   </div>
                   <h3 className="text-2xl font-bold text-foreground">{value.title}</h3>
                   <p className="text-muted-foreground leading-relaxed">{value.description}</p>
@@ -230,7 +230,7 @@ const About = () => {
       <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-gradient-to-br from-primary via-secondary to-destructive relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center space-y-8 text-white">
+          <div className="max-w-3xl mx-auto text-center space-y-8 text-primary-foreground">
             <h2 className="font-bebas leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>Ready to Make Impact Together?</h2>
             <p className="text-lg md:text-xl leading-relaxed">Let's build a movement that breaks through, raises more, and wins.</p>
             <ParticleButton
@@ -238,7 +238,7 @@ const About = () => {
               size="xl"
               particleColor="hsl(var(--destructive))"
               particleCount={25}
-              className="text-lg font-bold bg-white text-primary hover:bg-white/90"
+              className="text-lg font-bold bg-card text-card-foreground hover:bg-card/90"
             >
               Schedule Your Free Call
             </ParticleButton>
