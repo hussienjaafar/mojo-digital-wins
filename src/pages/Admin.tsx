@@ -22,6 +22,7 @@ import EmailReportManager from "@/components/admin/EmailReportManager";
 import { DashboardHome } from "@/components/DashboardHome";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/AdminSidebar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogOut } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
 
@@ -264,7 +265,8 @@ const Admin = () => {
                   Manage your platform and clients
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <ThemeToggle />
                 <div className="hidden md:flex flex-col items-end">
                   <span className="text-sm font-medium text-foreground">
                     {session?.user?.email}
