@@ -75,7 +75,7 @@ export const AdminInviteCodes = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setInviteCodes(data || []);
+      setInviteCodes((data as any) || []);
     } catch (error) {
       console.error('Error fetching invite codes:', error);
       toast({
@@ -90,16 +90,16 @@ export const AdminInviteCodes = () => {
 
   const fetchTemplates = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('admin_invite_templates')
         .select('*')
         .order('is_default', { ascending: false });
 
       if (error) throw error;
-      setTemplates((data as EmailTemplate[]) || []);
+      setTemplates((data as any) || []);
       
       // Set default template as selected
-      const defaultTemplate = (data as EmailTemplate[])?.find(t => t.is_default);
+      const defaultTemplate = (data as any)?.find((t: any) => t.is_default);
       if (defaultTemplate) {
         setSelectedTemplateId(defaultTemplate.id);
       }
@@ -112,7 +112,7 @@ export const AdminInviteCodes = () => {
     try {
       const { data: session } = await supabase.auth.getSession();
       
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('admin_invite_templates')
         .insert({
           name: templateForm.name || "",
