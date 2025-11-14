@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/fixed-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { logger } from "@/lib/logger";
 
 type Props = {
   organizationId: string;
@@ -94,7 +95,7 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
       setMetrics(aggregated);
     } catch (error) {
-      console.error('Error loading Meta Ads data:', error);
+      logger.error('Failed to load Meta Ads data', error);
     } finally {
       setIsLoading(false);
     }

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { format } from "date-fns";
+import { logger } from "@/lib/logger";
 
 type Props = {
   organizationId: string;
@@ -64,7 +65,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
       setTransactions(data || []);
       setFilteredTransactions(data || []);
     } catch (error) {
-      console.error('Error loading transactions:', error);
+      logger.error('Failed to load transactions', error);
     } finally {
       setIsLoading(false);
     }

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { logger } from "@/lib/logger";
 
 type Props = {
   organizationId: string;
@@ -71,7 +72,7 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
       setMetrics(aggregated);
     } catch (error) {
-      console.error('Error loading SMS data:', error);
+      logger.error('Failed to load SMS data', error);
     } finally {
       setIsLoading(false);
     }
