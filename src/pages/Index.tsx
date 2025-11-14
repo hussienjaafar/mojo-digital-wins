@@ -151,7 +151,7 @@ const Index = () => {
               bottom: '-20%',
             }}
           />
-          <div className="absolute inset-0 bg-primary/75" />
+          <div className="absolute inset-0 bg-primary/75 dark:bg-background/95" />
         </div>
         
         {/* Gritty grain texture overlay */}
