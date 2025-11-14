@@ -8,9 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Plus, Trash2, Check, Mail } from "lucide-react";
+import { Copy, Plus, Trash2, Check, Mail, RefreshCw, Settings } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast as sonnerToast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type InviteCode = {
   id: string;
@@ -20,6 +22,23 @@ type InviteCode = {
   used_by: string | null;
   is_active: boolean;
   expires_at: string | null;
+  email_sent_to: string | null;
+  email_status: string | null;
+  email_sent_at: string | null;
+  email_error: string | null;
+  resend_count: number;
+};
+
+type EmailTemplate = {
+  id: string;
+  name: string;
+  subject: string;
+  logo_url: string | null;
+  primary_color: string;
+  header_text: string;
+  footer_text: string;
+  custom_message: string | null;
+  is_default: boolean;
 };
 
 export const AdminInviteCodes = () => {
@@ -29,9 +48,23 @@ export const AdminInviteCodes = () => {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [templateForm, setTemplateForm] = useState<Partial<EmailTemplate>>({
+    name: "",
+    subject: "🎯 You've been invited to join as an Administrator",
+    primary_color: "#667eea",
+    header_text: "Admin Invitation",
+    footer_text: "This is an automated message from your admin dashboard.",
+    custom_message: "",
+    logo_url: "",
+    is_default: false
+  });
 
   useEffect(() => {
     fetchInviteCodes();
+    fetchTemplates();
   }, []);
 
   const fetchInviteCodes = async () => {
@@ -52,6 +85,73 @@ export const AdminInviteCodes = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_invite_templates')
+        .select('*')
+        .order('is_default', { ascending: false });
+
+      if (error) throw error;
+      setTemplates((data as EmailTemplate[]) || []);
+      
+      // Set default template as selected
+      const defaultTemplate = (data as EmailTemplate[])?.find(t => t.is_default);
+      if (defaultTemplate) {
+        setSelectedTemplateId(defaultTemplate.id);
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+    }
+  };
+
+  const saveTemplate = async () => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      
+      const { error } = await supabase
+        .from('admin_invite_templates')
+        .insert({
+          name: templateForm.name || "",
+          subject: templateForm.subject || "",
+          logo_url: templateForm.logo_url,
+          primary_color: templateForm.primary_color || "#667eea",
+          header_text: templateForm.header_text || "",
+          footer_text: templateForm.footer_text || "",
+          custom_message: templateForm.custom_message,
+          is_default: templateForm.is_default || false,
+          created_by: session.session?.user?.id
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Email template saved!",
+      });
+
+      setShowTemplateDialog(false);
+      fetchTemplates();
+      setTemplateForm({
+        name: "",
+        subject: "🎯 You've been invited to join as an Administrator",
+        primary_color: "#667eea",
+        header_text: "Admin Invitation",
+        footer_text: "This is an automated message from your admin dashboard.",
+        custom_message: "",
+        logo_url: "",
+        is_default: false
+      });
+    } catch (error) {
+      console.error('Error saving template:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save template.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -254,12 +354,14 @@ export const AdminInviteCodes = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead>Used</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+              <TableHead>Code</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Delivery</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Expires</TableHead>
+              <TableHead>Used</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
