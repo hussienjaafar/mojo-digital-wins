@@ -54,6 +54,9 @@ export const ClientLogo = ({ name, className = "", linkable = true }: ClientLogo
           ? "dark:brightness-0 dark:invert" 
           : "dark:brightness-0 dark:invert"
       } ${className}`}
+      style={isPrestonLogo ? { 
+        filter: 'brightness(0) saturate(100%) invert(38%) sepia(65%) saturate(1167%) hue-rotate(186deg) brightness(95%) contrast(94%)'
+      } : undefined}
     />
   ) : (
     // Fallback to text-based logo if no image available
