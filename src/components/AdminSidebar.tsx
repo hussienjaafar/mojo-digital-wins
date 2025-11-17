@@ -16,6 +16,7 @@ import {
   Mail,
   PenTool,
   ChevronDown,
+  Star,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import {
@@ -30,8 +31,10 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SidebarSearch } from "@/components/admin/SidebarSearch";
-import { RecentItems } from "@/components/admin/RecentItems";
+import { QuickAccess } from "@/components/admin/QuickAccess";
+import { FlatSearchResults } from "@/components/admin/FlatSearchResults";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { cn } from "@/lib/utils";
 
@@ -109,6 +112,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
   const navigate = useNavigate();
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchSelectedIndex, setSearchSelectedIndex] = useState(0);
   
   // localStorage for collapsed groups state
   const [collapsedGroups, setCollapsedGroups] = useLocalStorage<Record<string, boolean>>(
@@ -116,25 +120,29 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     {}
   );
   
-  // localStorage for recent items
-  const [recentItemValues, setRecentItemValues] = useLocalStorage<string[]>(
-    'admin-sidebar-recent-items',
+  // localStorage for pinned items
+  const [pinnedItemValues, setPinnedItemValues] = useLocalStorage<string[]>(
+    'admin-sidebar-pinned-items',
     []
   );
 
   const handleTabChange = (value: string) => {
     onTabChange(value);
-    
-    // Add to recent items (max 5)
-    setRecentItemValues((prev) => {
-      const filtered = prev.filter(v => v !== value);
-      return [value, ...filtered].slice(0, 5);
-    });
+    setSearchTerm(""); // Clear search when navigating
+    setSearchSelectedIndex(0);
     
     // Close mobile menu when item is selected
     if (isMobile && setOpenMobile) {
       setOpenMobile(false);
     }
+  };
+
+  const togglePin = (value: string) => {
+    setPinnedItemValues((prev) => 
+      prev.includes(value) 
+        ? prev.filter(v => v !== value)
+        : [...prev, value].slice(0, 4) // Max 4 pinned items
+    );
   };
 
   useEffect(() => {
@@ -169,8 +177,8 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     }));
   };
 
-  // Get recent items with full data
-  const recentItems = recentItemValues
+  // Get pinned items with full data
+  const pinnedItems = pinnedItemValues
     .map(value => {
       for (const group of navigationGroups) {
         const item = group.items.find(i => i.value === value);
@@ -193,16 +201,44 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     }))
     .filter(group => group.items.length > 0);
 
-  // Auto-expand group containing active item or search results
-  const shouldGroupBeExpanded = (group: NavigationGroup) => {
-    // If searching, expand groups with matches
-    if (searchTerm) {
-      return group.items.some(item => 
-        hasAccess(item) && 
-        item.title.toLowerCase().includes(searchTerm.toLowerCase())
+  // Get flat search results (all matching items across groups)
+  const searchResults = searchTerm
+    ? navigationGroups
+        .flatMap(group => group.items)
+        .filter(item => 
+          hasAccess(item) && 
+          item.title.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+    : [];
+
+  // Handle keyboard navigation in search
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (searchResults.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSearchSelectedIndex((prev) => 
+        prev < searchResults.length - 1 ? prev + 1 : prev
       );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSearchSelectedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const selectedItem = searchResults[searchSelectedIndex];
+      if (selectedItem) {
+        handleTabChange(selectedItem.value);
+      }
     }
-    
+  };
+
+  // Reset search selection when search term changes
+  useEffect(() => {
+    setSearchSelectedIndex(0);
+  }, [searchTerm]);
+
+  // Auto-expand group containing active item
+  const shouldGroupBeExpanded = (group: NavigationGroup) => {
     // Check if active tab is in this group
     const hasActiveItem = group.items.some(item => item.value === activeTab);
     if (hasActiveItem) return true;
@@ -219,6 +255,13 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     return !collapsedGroups[group.label];
   };
 
+  // Get opacity for visual hierarchy
+  const getGroupOpacity = (groupLabel: string) => {
+    if (groupLabel === "Dashboard") return "opacity-100";
+    if (groupLabel === "Admin") return "opacity-70";
+    return "opacity-90";
+  };
+
   return (
     <Sidebar 
       className={cn(
@@ -232,73 +275,116 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         <SidebarSearch 
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
+          onKeyDown={handleSearchKeyDown}
           collapsed={collapsed}
         />
 
-        {/* Recent Items */}
+        {/* Quick Access (Pinned Items) */}
         {!searchTerm && (
-          <RecentItems
-            recentItems={recentItems}
+          <QuickAccess
+            pinnedItems={pinnedItems}
             activeTab={activeTab}
             onTabChange={handleTabChange}
+            onTogglePin={togglePin}
             collapsed={collapsed}
           />
         )}
 
-        {/* Navigation Groups */}
-        {filteredGroups.map((group, groupIndex) => {
+        {/* Flat Search Results */}
+        {searchTerm && (
+          <FlatSearchResults
+            items={searchResults}
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            searchTerm={searchTerm}
+            selectedIndex={searchSelectedIndex}
+            collapsed={collapsed}
+          />
+        )}
+
+        {/* Navigation Groups - Only show when NOT searching */}
+        {!searchTerm && filteredGroups.map((group, groupIndex) => {
           const accessibleItems = group.items.filter(item => hasAccess(item));
           const isExpanded = shouldGroupBeExpanded(group);
+          const groupOpacity = getGroupOpacity(group.label);
+          
+          const groupLabel = (
+            <SidebarGroupLabel className={cn(
+              "text-muted-foreground text-sm font-bold tracking-wider uppercase",
+              "px-4 py-2 mb-2 bg-muted/30 rounded-md border-b border-border/50",
+              "flex items-center justify-between cursor-pointer",
+              "hover:bg-muted/50 transition-colors",
+              "group",
+              groupOpacity
+            )}>
+              <span className="flex items-center gap-2">
+                {group.icon && <group.icon className="h-4 w-4 opacity-70" />}
+                {group.label}
+                <span className="text-xs opacity-60 ml-1 font-normal normal-case">
+                  ({accessibleItems.length})
+                </span>
+              </span>
+              <ChevronDown className={cn(
+                "h-4 w-4 transition-transform duration-200",
+                isExpanded ? "rotate-0" : "-rotate-90"
+              )} />
+            </SidebarGroupLabel>
+          );
           
           return (
             <Collapsible
               key={group.label}
               open={isExpanded}
-              onOpenChange={() => !searchTerm && toggleGroup(group.label)}
+              onOpenChange={() => toggleGroup(group.label)}
             >
               <SidebarGroup className="mb-4">
-                {!collapsed && (
+                {!collapsed ? (
                   <CollapsibleTrigger asChild>
-                    <SidebarGroupLabel className={cn(
-                      "text-muted-foreground text-sm font-bold tracking-wider uppercase",
-                      "px-4 py-2 mb-2 opacity-90 bg-muted/30 rounded-md border-b border-border/50",
-                      "flex items-center justify-between cursor-pointer",
-                      "hover:bg-muted/50 transition-colors",
-                      "group"
-                    )}>
-                      <span className="flex items-center gap-2">
-                        {group.icon && <group.icon className="h-4 w-4 opacity-70" />}
-                        {group.label}
-                        <span className="text-xs opacity-60 ml-1 font-normal normal-case">
-                          ({accessibleItems.length})
-                        </span>
-                      </span>
-                      <ChevronDown className={cn(
-                        "h-4 w-4 transition-transform duration-200",
-                        isExpanded ? "rotate-0" : "-rotate-90"
-                      )} />
-                    </SidebarGroupLabel>
+                    {groupLabel}
                   </CollapsibleTrigger>
+                ) : (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="px-2 mb-2">
+                          {group.icon && (
+                            <div className="h-8 w-8 mx-auto flex items-center justify-center rounded-md bg-muted/30 hover:bg-muted/50 transition-colors">
+                              <group.icon className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <p className="font-semibold mb-1">{group.label}</p>
+                        <ul className="text-xs space-y-0.5">
+                          {accessibleItems.map(item => (
+                            <li key={item.value}>• {item.title}</li>
+                          ))}
+                        </ul>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
                 
                 <CollapsibleContent>
                   <SidebarGroupContent>
                     <SidebarMenu className="space-y-1">
                       {group.items.map((item) => {
-                        // Highlight matching text when searching
-                        const itemTitle = searchTerm 
-                          ? highlightMatch(item.title, searchTerm)
-                          : item.title;
+                        const isPinned = pinnedItemValues.includes(item.value);
                         
                         return (
                           <SidebarMenuItem key={item.value}>
                             <SidebarMenuButton
                               onClick={() => handleTabChange(item.value)}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
+                                togglePin(item.value);
+                              }}
                               isActive={activeTab === item.value}
                               tooltip={collapsed ? item.title : undefined}
                               aria-current={activeTab === item.value ? 'page' : undefined}
                               className={cn(
-                                "relative w-full min-h-[48px]",
+                                "relative w-full min-h-[48px] group",
                                 collapsed ? 'justify-center px-0' : 'justify-start px-4',
                                 "gap-3 py-3 rounded-lg transition-all duration-200",
                                 "hover:bg-accent hover:text-accent-foreground",
@@ -313,10 +399,19 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                                 activeTab === item.value && 'scale-110'
                               )} />
                               {!collapsed && (
-                                <span 
-                                  className="text-sm leading-tight"
-                                  dangerouslySetInnerHTML={{ __html: itemTitle }}
-                                />
+                                <>
+                                  <span className="text-sm leading-tight flex-1">{item.title}</span>
+                                  <span title={isPinned ? "Right-click to unpin" : "Right-click to pin"}>
+                                    <Star 
+                                      className={cn(
+                                        "h-3 w-3 transition-all",
+                                        isPinned 
+                                          ? "fill-primary text-primary opacity-100" 
+                                          : "opacity-0 group-hover:opacity-50"
+                                      )}
+                                    />
+                                  </span>
+                                </>
                               )}
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -337,11 +432,4 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
       </SidebarContent>
     </Sidebar>
   );
-}
-
-// Helper function to highlight search matches
-function highlightMatch(text: string, search: string): string {
-  if (!search) return text;
-  const regex = new RegExp(`(${search})`, 'gi');
-  return text.replace(regex, '<mark class="bg-primary/30 text-foreground rounded px-0.5">$1</mark>');
 }
