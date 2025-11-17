@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.send-admin-invite]
 verify_jwt = false
+
+[functions.fetch-rss-feeds]
+verify_jwt = false

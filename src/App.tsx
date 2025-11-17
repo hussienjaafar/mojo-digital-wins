@@ -29,6 +29,7 @@ import ClientLogin from "./pages/ClientLogin";
 import ClientDashboard from "./pages/ClientDashboard";
 import ClientDashboardCustom from "./pages/ClientDashboardCustom";
 import ClientPortal from "./components/client/ClientPortal";
+import News from "./pages/News";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const AppContent = () => {
         <Route path="/creative-showcase" element={<CreativeShowcase />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/news" element={<News />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />
