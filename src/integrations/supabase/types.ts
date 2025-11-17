@@ -207,6 +207,68 @@ export type Database = {
           },
         ]
       }
+      articles: {
+        Row: {
+          category: string | null
+          content: string | null
+          created_at: string | null
+          description: string | null
+          hash_signature: string | null
+          id: string
+          image_url: string | null
+          published_date: string
+          sentiment_score: number | null
+          source_id: string | null
+          source_name: string
+          source_url: string
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          content?: string | null
+          created_at?: string | null
+          description?: string | null
+          hash_signature?: string | null
+          id?: string
+          image_url?: string | null
+          published_date: string
+          sentiment_score?: number | null
+          source_id?: string | null
+          source_name: string
+          source_url: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          content?: string | null
+          created_at?: string | null
+          description?: string | null
+          hash_signature?: string | null
+          id?: string
+          image_url?: string | null
+          published_date?: string
+          sentiment_score?: number | null
+          source_id?: string | null
+          source_name?: string
+          source_url?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "articles_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "rss_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_attribution: {
         Row: {
           created_at: string | null
@@ -849,6 +911,45 @@ export type Database = {
           },
         ]
       }
+      rss_sources: {
+        Row: {
+          category: string
+          created_at: string | null
+          fetch_error: string | null
+          id: string
+          is_active: boolean | null
+          last_fetched_at: string | null
+          logo_url: string | null
+          name: string
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          fetch_error?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_fetched_at?: string | null
+          logo_url?: string | null
+          name: string
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          fetch_error?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_fetched_at?: string | null
+          logo_url?: string | null
+          name?: string
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
       sms_campaign_metrics: {
         Row: {
           a_b_test_variant: string | null
@@ -982,6 +1083,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_article_preferences: {
+        Row: {
+          created_at: string | null
+          email_frequency: string | null
+          id: string
+          notification_settings: Json | null
+          sms_enabled: boolean | null
+          tracked_keywords: string[] | null
+          tracked_sources: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email_frequency?: string | null
+          id?: string
+          notification_settings?: Json | null
+          sms_enabled?: boolean | null
+          tracked_keywords?: string[] | null
+          tracked_sources?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email_frequency?: string | null
+          id?: string
+          notification_settings?: Json | null
+          sms_enabled?: boolean | null
+          tracked_keywords?: string[] | null
+          tracked_sources?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
