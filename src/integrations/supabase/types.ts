@@ -239,6 +239,47 @@ export type Database = {
           },
         ]
       }
+      article_clusters: {
+        Row: {
+          cluster_summary: string | null
+          cluster_title: string
+          created_at: string | null
+          id: string
+          primary_article_id: string
+          related_article_ids: string[]
+          similarity_threshold: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cluster_summary?: string | null
+          cluster_title: string
+          created_at?: string | null
+          id?: string
+          primary_article_id: string
+          related_article_ids?: string[]
+          similarity_threshold?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cluster_summary?: string | null
+          cluster_title?: string
+          created_at?: string | null
+          id?: string
+          primary_article_id?: string
+          related_article_ids?: string[]
+          similarity_threshold?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_clusters_primary_article_id_fkey"
+            columns: ["primary_article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       articles: {
         Row: {
           ai_summary: string | null

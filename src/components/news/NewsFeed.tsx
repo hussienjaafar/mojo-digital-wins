@@ -5,7 +5,7 @@ import { NewsFilters, FilterState } from "./NewsFilters";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, AlertCircle } from "lucide-react";
+import { RefreshCw, AlertCircle, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export function NewsFeed() {
@@ -87,6 +87,34 @@ export function NewsFeed() {
     }
   };
 
+  const detectDuplicates = async () => {
+    try {
+      toast({
+        title: "Detecting duplicates",
+        description: "This may take a moment...",
+      });
+      
+      const { data, error } = await supabase.functions.invoke('detect-duplicates', {
+        body: { lookbackHours: 24, similarityThreshold: 0.75 }
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Duplicate detection complete",
+        description: `Found ${data.clustersFound} duplicate clusters. ${data.clustersCreated} new clusters created.`,
+      });
+      
+      await loadArticles();
+    } catch (err: any) {
+      toast({
+        title: "Error detecting duplicates",
+        description: err.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const applyFilters = (filters: FilterState) => {
     let filtered = [...articles];
 
@@ -151,14 +179,24 @@ export function NewsFeed() {
             {filteredArticles.length} {filteredArticles.length === 1 ? 'article' : 'articles'}
           </p>
         </div>
-        <Button
-          onClick={fetchNewArticles}
-          disabled={fetching}
-          className="gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
-          {fetching ? 'Fetching...' : 'Refresh Feed'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={detectDuplicates}
+            variant="outline"
+            className="gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            Detect Duplicates
+          </Button>
+          <Button
+            onClick={fetchNewArticles}
+            disabled={fetching}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
+            {fetching ? 'Fetching...' : 'Refresh Feed'}
+          </Button>
+        </div>
       </div>
 
       {error && (

@@ -35,6 +35,7 @@ import BillDetail from "./pages/BillDetail";
 import Bookmarks from "./pages/Bookmarks";
 import Settings from "./pages/Settings";
 import Analytics from "./pages/Analytics";
+import Install from "./pages/Install";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +67,7 @@ const AppContent = () => {
         <Route path="/bookmarks" element={<Bookmarks />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route path="/install" element={<Install />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />
