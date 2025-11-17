@@ -20,6 +20,10 @@ import CampaignAttributionManager from "@/components/admin/CampaignAttributionMa
 import SyncScheduler from "@/components/admin/SyncScheduler";
 import EmailReportManager from "@/components/admin/EmailReportManager";
 import { DashboardHome } from "@/components/DashboardHome";
+import { NewsFeed } from "@/components/news/NewsFeed";
+import { BillTracker } from "@/components/bills/BillTracker";
+import Analytics from "@/pages/Analytics";
+import Bookmarks from "@/pages/Bookmarks";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar, navigationGroups } from "@/components/AdminSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -216,6 +220,14 @@ const Admin = () => {
     switch (activeTab) {
       case "analytics":
         return <DashboardHome />;
+      case "news":
+        return <NewsFeed />;
+      case "bills":
+        return <BillTracker />;
+      case "content-analytics":
+        return <Analytics />;
+      case "bookmarks":
+        return <Bookmarks />;
       case "clients":
         return <ClientOrganizationManager />;
       case "client-users":
