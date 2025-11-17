@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -40,8 +40,10 @@ import { SidebarSearch } from "@/components/admin/SidebarSearch";
 import { QuickAccess } from "@/components/admin/QuickAccess";
 import { FlatSearchResults } from "@/components/admin/FlatSearchResults";
 import { KeyboardShortcutsDialog } from "@/components/admin/KeyboardShortcutsDialog";
+import { NavigationItemContextMenu } from "@/components/admin/NavigationItemContextMenu";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
+import { useSwipeGesture } from "@/hooks/useSwipeGesture";
 import { cn } from "@/lib/utils";
 
 export interface NavigationItem {
@@ -117,15 +119,17 @@ interface AdminSidebarProps {
 }
 
 export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
-  const { state, isMobile, setOpenMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile, open, setOpen } = useSidebar();
   const collapsed = !isMobile && state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
+  const sidebarRef = useRef<HTMLDivElement>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchSelectedIndex, setSearchSelectedIndex] = useState(0);
   const [showShortcutsDialog, setShowShortcutsDialog] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // localStorage for collapsed groups state
   const [collapsedGroups, setCollapsedGroups] = useLocalStorage<Record<string, boolean>>(
@@ -156,6 +160,12 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         ? prev.filter(v => v !== value)
         : [...prev, value].slice(0, 4) // Max 4 pinned items
     );
+  };
+
+  const refreshNavigation = async () => {
+    setIsRefreshing(true);
+    await Promise.all([fetchUserRoles(), fetchUnreadCounts()]);
+    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   const fetchUnreadCounts = async () => {
@@ -262,6 +272,44 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     }
   };
 
+  // Mobile swipe gestures
+  const { handleTouchStart, handleTouchMove, handleTouchEnd } = useSwipeGesture({
+    onSwipeRight: () => {
+      if (isMobile && !open) {
+        setOpenMobile?.(true);
+      }
+    },
+    onSwipeLeft: () => {
+      if (isMobile && open) {
+        setOpenMobile?.(false);
+      }
+    },
+    onSwipeDown: () => {
+      if (isMobile && open) {
+        refreshNavigation();
+      }
+    },
+    threshold: 50,
+  });
+
+  // Attach swipe listeners for mobile
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const mainContent = document.querySelector('main');
+    if (!mainContent) return;
+
+    mainContent.addEventListener('touchstart', handleTouchStart as any);
+    mainContent.addEventListener('touchmove', handleTouchMove as any);
+    mainContent.addEventListener('touchend', handleTouchEnd as any);
+
+    return () => {
+      mainContent.removeEventListener('touchstart', handleTouchStart as any);
+      mainContent.removeEventListener('touchmove', handleTouchMove as any);
+      mainContent.removeEventListener('touchend', handleTouchEnd as any);
+    };
+  }, [isMobile, handleTouchStart, handleTouchMove, handleTouchEnd]);
+
   // Keyboard shortcuts
   useKeyboardShortcut([
     {
@@ -269,11 +317,9 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
       ctrlKey: true,
       metaKey: true,
       callback: () => {
-        const newState = state === "collapsed" ? "expanded" : "collapsed";
-        // Trigger sidebar toggle
-        document.querySelector('[data-sidebar="sidebar"]')?.dispatchEvent(
-          new CustomEvent('toggle')
-        );
+        if (isMobile) {
+          setOpenMobile?.(!open);
+        }
       },
       description: 'Toggle sidebar',
     },
@@ -376,43 +422,63 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         Skip to main content
       </a>
 
-      <Sidebar
-      className={cn(
-        collapsed ? "w-16" : "w-64",
-        "border-r border-border bg-background transition-all duration-300"
-      )}
-      collapsible="icon"
-    >
+      <Sidebar 
+        ref={sidebarRef}
+        className={cn(
+          collapsed ? "w-16" : "w-64",
+          "border-r border-border bg-background transition-all duration-300",
+          isMobile && open && "animate-slide-in-right"
+        )}
+        collapsible="icon"
+        onTouchStart={isMobile ? handleTouchStart as any : undefined}
+        onTouchMove={isMobile ? handleTouchMove as any : undefined}
+        onTouchEnd={isMobile ? handleTouchEnd as any : undefined}
+      >
       <SidebarContent className="py-6 px-2" role="navigation" aria-label="Admin navigation">
+        {/* Mobile refresh indicator */}
+        {isMobile && isRefreshing && (
+          <div className="px-4 pb-2">
+            <div className="h-1 bg-primary/20 rounded-full overflow-hidden">
+              <div className="h-full bg-primary animate-pulse w-full" />
+            </div>
+          </div>
+        )}
+
         {/* Search */}
-        <SidebarSearch 
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          onKeyDown={handleSearchKeyDown}
-          collapsed={collapsed}
-        />
+        <div className="animate-fade-in">
+          <SidebarSearch 
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            onKeyDown={handleSearchKeyDown}
+            collapsed={collapsed}
+          />
+        </div>
 
         {/* Quick Access (Pinned Items) */}
         {!searchTerm && (
-          <QuickAccess
-            pinnedItems={pinnedItems}
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            onTogglePin={togglePin}
-            collapsed={collapsed}
-          />
+          <div className="animate-fade-in">
+            <QuickAccess
+              pinnedItems={pinnedItems}
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              onTogglePin={togglePin}
+              collapsed={collapsed}
+            />
+          </div>
         )}
 
         {/* Flat Search Results */}
         {searchTerm && (
-          <FlatSearchResults
-            items={searchResults}
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            searchTerm={searchTerm}
-            selectedIndex={searchSelectedIndex}
-            collapsed={collapsed}
-          />
+          <div className="animate-fade-in">
+            <FlatSearchResults
+              items={searchResults}
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              searchTerm={searchTerm}
+              selectedIndex={searchSelectedIndex}
+              collapsed={collapsed}
+            />
+          </div>
         )}
 
         {/* Navigation Groups - Only show when NOT searching */}
@@ -479,100 +545,113 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                   </TooltipProvider>
                 )}
                 
-                <CollapsibleContent>
+                <CollapsibleContent className="animate-accordion-down">
                   <SidebarGroupContent>
                     <SidebarMenu className="space-y-1">
-                      {group.items.map((item) => {
+                      {group.items.map((item, itemIndex) => {
                         const isPinned = pinnedItemValues.includes(item.value);
                         const badge = item.badge || (item.value === 'contacts' && unreadCounts.contacts > 0 
                           ? { count: unreadCounts.contacts, status: 'info' as const, pulse: true }
                           : undefined);
                         
                         return (
-                          <SidebarMenuItem key={item.value}>
-                            <SidebarMenuButton
-                              onClick={() => handleTabChange(item.value)}
-                              onContextMenu={(e) => {
-                                e.preventDefault();
-                                togglePin(item.value);
-                              }}
-                              isActive={activeTab === item.value}
-                              tooltip={collapsed ? item.title : undefined}
-                              aria-current={activeTab === item.value ? 'page' : undefined}
-                              aria-label={badge?.count ? `${item.title} (${badge.count} unread)` : item.title}
-                              className={cn(
-                                "relative w-full min-h-[48px] group",
-                                collapsed ? 'justify-center px-0' : 'justify-start px-4',
-                                "gap-3 py-3 rounded-lg transition-all duration-200",
-                                "hover:bg-accent hover:text-accent-foreground",
-                                activeTab === item.value 
-                                  ? 'bg-gradient-to-r from-primary/90 to-primary text-primary-foreground font-semibold shadow-lg border-l-4 border-primary-foreground/50' 
-                                  : 'text-foreground hover:font-medium hover:shadow-sm'
-                              )}
+                          <SidebarMenuItem 
+                            key={item.value}
+                            style={{
+                              animationDelay: `${itemIndex * 50}ms`
+                            }}
+                            className="animate-fade-in"
+                          >
+                            <NavigationItemContextMenu
+                              item={item}
+                              isPinned={isPinned}
+                              onTogglePin={() => togglePin(item.value)}
+                              onNavigate={() => handleTabChange(item.value)}
                             >
-                              <div className="relative">
-                                <item.icon className={cn(
-                                  collapsed ? 'h-6 w-6' : 'h-5 w-5',
-                                  "shrink-0 transition-transform duration-200",
-                                  activeTab === item.value && 'scale-110'
-                                )} />
-                                {badge && collapsed && badge.count && (
-                                  <Badge 
-                                    variant="destructive" 
-                                    className={cn(
-                                      "absolute -top-2 -right-2 h-4 min-w-4 px-1 text-xs flex items-center justify-center",
-                                      badge.pulse && "animate-pulse"
-                                    )}
-                                  >
-                                    {badge.count}
-                                  </Badge>
+                              <SidebarMenuButton
+                                onClick={() => handleTabChange(item.value)}
+                                isActive={activeTab === item.value}
+                                tooltip={collapsed ? item.title : undefined}
+                                aria-current={activeTab === item.value ? 'page' : undefined}
+                                aria-label={badge?.count ? `${item.title} (${badge.count} unread)` : item.title}
+                                className={cn(
+                                  "relative w-full min-h-[48px] group",
+                                  collapsed ? 'justify-center px-0' : 'justify-start px-4',
+                                  "gap-3 py-3 rounded-lg transition-all duration-200",
+                                  "hover:bg-accent hover:text-accent-foreground hover:scale-[1.02]",
+                                  "active:scale-[0.98]",
+                                  activeTab === item.value 
+                                    ? 'bg-gradient-to-r from-primary/90 to-primary text-primary-foreground font-semibold shadow-lg border-l-4 border-primary-foreground/50' 
+                                    : 'text-foreground hover:font-medium hover:shadow-sm'
                                 )}
-                              </div>
-                              {!collapsed && (
-                                <>
-                                  <span className="text-sm leading-tight flex-1">{item.title}</span>
-                                  <div className="flex items-center gap-2">
-                                    {badge && (
-                                      <>
-                                        {badge.count !== undefined && (
-                                          <Badge 
-                                            variant={badge.status === 'error' ? 'destructive' : 'secondary'}
-                                            className={cn(
-                                              "h-5 px-2 text-xs",
-                                              badge.pulse && "animate-pulse",
-                                              badge.status === 'success' && "bg-green-500/10 text-green-500 border-green-500/20",
-                                              badge.status === 'warning' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-                                              badge.status === 'info' && "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                                            )}
-                                          >
-                                            {badge.count}
-                                          </Badge>
-                                        )}
-                                        {badge.status === 'error' && !badge.count && (
-                                          <AlertCircle className="h-3 w-3 text-destructive" />
-                                        )}
-                                        {badge.status === 'success' && !badge.count && (
-                                          <CheckCircle className="h-3 w-3 text-green-500" />
-                                        )}
-                                        {badge.status === 'warning' && !badge.count && (
-                                          <Clock className="h-3 w-3 text-yellow-500" />
-                                        )}
-                                      </>
-                                    )}
-                                    <span title={isPinned ? "Right-click to unpin" : "Right-click to pin"}>
-                                      <Star 
-                                        className={cn(
-                                          "h-3 w-3 transition-all",
-                                          isPinned 
-                                            ? "fill-primary text-primary opacity-100" 
-                                            : "opacity-0 group-hover:opacity-50"
-                                        )}
-                                      />
-                                    </span>
-                                  </div>
-                                </>
-                              )}
-                            </SidebarMenuButton>
+                              >
+                                <div className="relative">
+                                  <item.icon className={cn(
+                                    collapsed ? 'h-6 w-6' : 'h-5 w-5',
+                                    "shrink-0 transition-transform duration-200",
+                                    "group-hover:scale-110",
+                                    activeTab === item.value && 'scale-110'
+                                  )} />
+                                  {badge && collapsed && badge.count && (
+                                    <Badge 
+                                      variant="destructive" 
+                                      className={cn(
+                                        "absolute -top-2 -right-2 h-4 min-w-4 px-1 text-xs flex items-center justify-center",
+                                        "animate-scale-in",
+                                        badge.pulse && "animate-pulse"
+                                      )}
+                                    >
+                                      {badge.count}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {!collapsed && (
+                                  <>
+                                    <span className="text-sm leading-tight flex-1">{item.title}</span>
+                                    <div className="flex items-center gap-2">
+                                      {badge && (
+                                        <>
+                                          {badge.count !== undefined && (
+                                            <Badge 
+                                              variant={badge.status === 'error' ? 'destructive' : 'secondary'}
+                                              className={cn(
+                                                "h-5 px-2 text-xs animate-scale-in",
+                                                badge.pulse && "animate-pulse",
+                                                badge.status === 'success' && "bg-green-500/10 text-green-500 border-green-500/20",
+                                                badge.status === 'warning' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+                                                badge.status === 'info' && "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                              )}
+                                            >
+                                              {badge.count}
+                                            </Badge>
+                                          )}
+                                          {badge.status === 'error' && !badge.count && (
+                                            <AlertCircle className="h-3 w-3 text-destructive animate-scale-in" />
+                                          )}
+                                          {badge.status === 'success' && !badge.count && (
+                                            <CheckCircle className="h-3 w-3 text-green-500 animate-scale-in" />
+                                          )}
+                                          {badge.status === 'warning' && !badge.count && (
+                                            <Clock className="h-3 w-3 text-yellow-500 animate-scale-in" />
+                                          )}
+                                        </>
+                                      )}
+                                      <span title={isPinned ? "Right-click to unpin" : "Right-click to pin"}>
+                                        <Star 
+                                          className={cn(
+                                            "h-3 w-3 transition-all duration-200",
+                                            "group-hover:rotate-12",
+                                            isPinned 
+                                              ? "fill-primary text-primary opacity-100" 
+                                              : "opacity-0 group-hover:opacity-50"
+                                          )}
+                                        />
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
+                              </SidebarMenuButton>
+                            </NavigationItemContextMenu>
                           </SidebarMenuItem>
                         );
                       })}
