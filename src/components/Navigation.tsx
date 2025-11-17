@@ -117,7 +117,7 @@ const Navigation = () => {
             </div>
 
             {/* Mobile Menu Links - Optimized spacing and layout */}
-            <nav className="flex-1 flex flex-col justify-start pt-20 pb-8 px-6 space-y-4" aria-label="Mobile navigation">
+            <nav className="flex-1 flex flex-col justify-start pt-8 pb-4 px-6 space-y-4" aria-label="Mobile navigation">
               {navLinks.map((link, index) => (
                 <Link
                   key={link.path}
