@@ -1039,6 +1039,84 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          created_at: string | null
+          email_frequency: string | null
+          email_notifications: boolean | null
+          id: string
+          notify_bill_updates: boolean | null
+          notify_bookmarked_articles: boolean | null
+          notify_new_articles: boolean | null
+          notify_new_bills: boolean | null
+          push_notifications: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email_frequency?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          notify_bill_updates?: boolean | null
+          notify_bookmarked_articles?: boolean | null
+          notify_new_articles?: boolean | null
+          notify_new_bills?: boolean | null
+          push_notifications?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email_frequency?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          notify_bill_updates?: boolean | null
+          notify_bookmarked_articles?: boolean | null
+          notify_new_articles?: boolean | null
+          notify_new_bills?: boolean | null
+          push_notifications?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          link: string | null
+          message: string
+          read: boolean | null
+          sent_via: string[] | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          link?: string | null
+          message: string
+          read?: boolean | null
+          sent_via?: string[] | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          link?: string | null
+          message?: string
+          read?: boolean | null
+          sent_via?: string[] | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1063,6 +1141,33 @@ export type Database = {
           is_active?: boolean
           last_sign_in_at?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string | null
+          endpoint: string
+          id: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_id?: string
         }
         Relationships: []
       }
