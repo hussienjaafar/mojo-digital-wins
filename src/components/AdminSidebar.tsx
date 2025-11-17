@@ -17,6 +17,9 @@ import {
   PenTool,
   ChevronDown,
   Star,
+  AlertCircle,
+  CheckCircle,
+  Clock,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import {
@@ -32,10 +35,13 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import { SidebarSearch } from "@/components/admin/SidebarSearch";
 import { QuickAccess } from "@/components/admin/QuickAccess";
 import { FlatSearchResults } from "@/components/admin/FlatSearchResults";
+import { KeyboardShortcutsDialog } from "@/components/admin/KeyboardShortcutsDialog";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { cn } from "@/lib/utils";
 
 export interface NavigationItem {
@@ -43,6 +49,11 @@ export interface NavigationItem {
   icon: React.ComponentType<{ className?: string }>;
   value: string;
   requiredRole?: 'admin' | 'manager';
+  badge?: {
+    count?: number;
+    status?: 'success' | 'warning' | 'error' | 'info';
+    pulse?: boolean;
+  };
 }
 
 export interface NavigationGroup {
@@ -113,6 +124,8 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchSelectedIndex, setSearchSelectedIndex] = useState(0);
+  const [showShortcutsDialog, setShowShortcutsDialog] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   
   // localStorage for collapsed groups state
   const [collapsedGroups, setCollapsedGroups] = useLocalStorage<Record<string, boolean>>(
@@ -145,8 +158,25 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     );
   };
 
+  const fetchUnreadCounts = async () => {
+    try {
+      // Fetch unread contact submissions
+      const { count: contactCount } = await supabase
+        .from('contact_submissions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      
+      setUnreadCounts({
+        contacts: contactCount || 0,
+      });
+    } catch (error) {
+      logger.error('Failed to fetch unread counts', error);
+    }
+  };
+
   useEffect(() => {
     fetchUserRoles();
+    fetchUnreadCounts();
   }, []);
 
   const fetchUserRoles = async () => {
@@ -232,6 +262,80 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     }
   };
 
+  // Keyboard shortcuts
+  useKeyboardShortcut([
+    {
+      key: 'b',
+      ctrlKey: true,
+      metaKey: true,
+      callback: () => {
+        const newState = state === "collapsed" ? "expanded" : "collapsed";
+        // Trigger sidebar toggle
+        document.querySelector('[data-sidebar="sidebar"]')?.dispatchEvent(
+          new CustomEvent('toggle')
+        );
+      },
+      description: 'Toggle sidebar',
+    },
+    {
+      key: '?',
+      shiftKey: true,
+      callback: () => setShowShortcutsDialog(true),
+      description: 'Show keyboard shortcuts',
+    },
+    {
+      key: 'd',
+      callback: () => {
+        // Only if 'g' was pressed recently (within 500ms)
+        if (recentKey === 'g') {
+          handleTabChange('analytics');
+          setRecentKey(null);
+        }
+      },
+    },
+    {
+      key: 'c',
+      callback: () => {
+        if (recentKey === 'g') {
+          handleTabChange('clients');
+          setRecentKey(null);
+        }
+      },
+    },
+    {
+      key: 'm',
+      callback: () => {
+        if (recentKey === 'g') {
+          handleTabChange('contacts');
+          setRecentKey(null);
+        }
+      },
+    },
+    {
+      key: 'a',
+      callback: () => {
+        if (recentKey === 'g') {
+          handleTabChange('attribution');
+          setRecentKey(null);
+        }
+      },
+    },
+    {
+      key: 'g',
+      callback: () => setRecentKey('g'),
+    },
+  ]);
+
+  const [recentKey, setRecentKey] = useState<string | null>(null);
+
+  // Reset recent key after 500ms
+  useEffect(() => {
+    if (recentKey === 'g') {
+      const timeout = setTimeout(() => setRecentKey(null), 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [recentKey]);
+
   // Reset search selection when search term changes
   useEffect(() => {
     setSearchSelectedIndex(0);
@@ -263,7 +367,16 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
   };
 
   return (
-    <Sidebar 
+    <>
+      {/* Skip to main content link for accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md"
+      >
+        Skip to main content
+      </a>
+
+      <Sidebar
       className={cn(
         collapsed ? "w-16" : "w-64",
         "border-r border-border bg-background transition-all duration-300"
@@ -371,6 +484,9 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                     <SidebarMenu className="space-y-1">
                       {group.items.map((item) => {
                         const isPinned = pinnedItemValues.includes(item.value);
+                        const badge = item.badge || (item.value === 'contacts' && unreadCounts.contacts > 0 
+                          ? { count: unreadCounts.contacts, status: 'info' as const, pulse: true }
+                          : undefined);
                         
                         return (
                           <SidebarMenuItem key={item.value}>
@@ -383,6 +499,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                               isActive={activeTab === item.value}
                               tooltip={collapsed ? item.title : undefined}
                               aria-current={activeTab === item.value ? 'page' : undefined}
+                              aria-label={badge?.count ? `${item.title} (${badge.count} unread)` : item.title}
                               className={cn(
                                 "relative w-full min-h-[48px] group",
                                 collapsed ? 'justify-center px-0' : 'justify-start px-4',
@@ -393,24 +510,66 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                                   : 'text-foreground hover:font-medium hover:shadow-sm'
                               )}
                             >
-                              <item.icon className={cn(
-                                collapsed ? 'h-6 w-6' : 'h-5 w-5',
-                                "shrink-0 transition-transform duration-200",
-                                activeTab === item.value && 'scale-110'
-                              )} />
+                              <div className="relative">
+                                <item.icon className={cn(
+                                  collapsed ? 'h-6 w-6' : 'h-5 w-5',
+                                  "shrink-0 transition-transform duration-200",
+                                  activeTab === item.value && 'scale-110'
+                                )} />
+                                {badge && collapsed && badge.count && (
+                                  <Badge 
+                                    variant="destructive" 
+                                    className={cn(
+                                      "absolute -top-2 -right-2 h-4 min-w-4 px-1 text-xs flex items-center justify-center",
+                                      badge.pulse && "animate-pulse"
+                                    )}
+                                  >
+                                    {badge.count}
+                                  </Badge>
+                                )}
+                              </div>
                               {!collapsed && (
                                 <>
                                   <span className="text-sm leading-tight flex-1">{item.title}</span>
-                                  <span title={isPinned ? "Right-click to unpin" : "Right-click to pin"}>
-                                    <Star 
-                                      className={cn(
-                                        "h-3 w-3 transition-all",
-                                        isPinned 
-                                          ? "fill-primary text-primary opacity-100" 
-                                          : "opacity-0 group-hover:opacity-50"
-                                      )}
-                                    />
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    {badge && (
+                                      <>
+                                        {badge.count !== undefined && (
+                                          <Badge 
+                                            variant={badge.status === 'error' ? 'destructive' : 'secondary'}
+                                            className={cn(
+                                              "h-5 px-2 text-xs",
+                                              badge.pulse && "animate-pulse",
+                                              badge.status === 'success' && "bg-green-500/10 text-green-500 border-green-500/20",
+                                              badge.status === 'warning' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+                                              badge.status === 'info' && "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                            )}
+                                          >
+                                            {badge.count}
+                                          </Badge>
+                                        )}
+                                        {badge.status === 'error' && !badge.count && (
+                                          <AlertCircle className="h-3 w-3 text-destructive" />
+                                        )}
+                                        {badge.status === 'success' && !badge.count && (
+                                          <CheckCircle className="h-3 w-3 text-green-500" />
+                                        )}
+                                        {badge.status === 'warning' && !badge.count && (
+                                          <Clock className="h-3 w-3 text-yellow-500" />
+                                        )}
+                                      </>
+                                    )}
+                                    <span title={isPinned ? "Right-click to unpin" : "Right-click to pin"}>
+                                      <Star 
+                                        className={cn(
+                                          "h-3 w-3 transition-all",
+                                          isPinned 
+                                            ? "fill-primary text-primary opacity-100" 
+                                            : "opacity-0 group-hover:opacity-50"
+                                        )}
+                                      />
+                                    </span>
+                                  </div>
                                 </>
                               )}
                             </SidebarMenuButton>
@@ -431,5 +590,12 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         })}
       </SidebarContent>
     </Sidebar>
+
+    {/* Keyboard Shortcuts Dialog */}
+    <KeyboardShortcutsDialog 
+      open={showShortcutsDialog}
+      onOpenChange={setShowShortcutsDialog}
+    />
+  </>
   );
 }
