@@ -249,47 +249,45 @@ const Admin = () => {
   };
 
   return (
-    <SidebarProvider defaultOpen>
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-muted/10">
+    <SidebarProvider defaultOpen={false}>
+      <div className="min-h-screen flex w-full bg-background">
         <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
         
-        <div className="flex-1 flex flex-col">
-          <header className="sticky top-0 z-10 border-b border-border/50 bg-card/80 backdrop-blur-xl shadow-sm">
-            <div className="flex h-20 items-center gap-6 px-8">
-              <SidebarTrigger />
-              <div className="flex-1">
-                <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Mobile-optimized header */}
+          <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex h-14 sm:h-16 items-center gap-2 sm:gap-4 px-3 sm:px-6">
+              {/* Mobile menu trigger - always visible */}
+              <SidebarTrigger className="min-h-[44px] min-w-[44px]" />
+              
+              {/* Title - responsive sizing */}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-base sm:text-lg md:text-xl font-bold tracking-tight truncate">
                   Admin Dashboard
                 </h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Manage your platform and clients
-                </p>
               </div>
-              <div className="flex items-center gap-3">
+              
+              {/* Actions - responsive */}
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                 <ThemeToggle />
-                <div className="hidden md:flex flex-col items-end">
-                  <span className="text-sm font-medium text-foreground">
-                    {session?.user?.email}
-                  </span>
-                  <span className="text-xs text-muted-foreground">Administrator</span>
-                </div>
                 <Button 
-                  variant="outline" 
+                  variant="ghost" 
+                  size="sm"
                   onClick={handleSignOut} 
-                  className="border-border/50 hover:border-destructive/50 hover:text-destructive transition-colors gap-2"
+                  className="gap-2 min-h-[44px] min-w-[44px] hover:text-destructive"
+                  title="Sign Out"
                 >
                   <LogOut className="h-4 w-4" />
-                  Sign Out
+                  <span className="hidden sm:inline">Sign Out</span>
                 </Button>
               </div>
             </div>
           </header>
 
+          {/* Main content - mobile optimized padding */}
           <main className="flex-1 overflow-auto">
-            <div className="container mx-auto py-8 px-6 max-w-[1800px]">
-              <div className="space-y-8">
-                {renderContent()}
-              </div>
+            <div className="p-3 sm:p-4 md:p-6 lg:p-8 max-w-[1800px] mx-auto">
+              {renderContent()}
             </div>
           </main>
         </div>
