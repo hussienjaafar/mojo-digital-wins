@@ -361,7 +361,7 @@ const Index = () => {
               <Card
                 key={index}
                 className={`bg-gradient-to-br from-card to-muted border-2 border-secondary/20 hover:border-secondary/60 backdrop-blur-sm overflow-hidden group hover:shadow-[0_12px_40px_rgba(20,100,217,0.2)] transition-all duration-700 ${
-                  howWeWin.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                  howWeWin.isVisible ? 'animate-fade-in-up' : ''
                 }`}
                 style={{ 
                   transitionDelay: `${index * 150}ms`
@@ -801,17 +801,17 @@ const Index = () => {
         <div className="absolute inset-0 energy-glow" />
         <div className="container mx-auto px-4 text-center relative z-10">
           <h2 className={`font-bebas text-6xl md:text-8xl mb-8 uppercase tracking-wide leading-none transition-all duration-700 ${
-            finalCTA.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+            finalCTA.isVisible ? 'animate-fade-in-up' : ''
           }`}>
             Let's Win More.<br/>Together.
           </h2>
           <p className={`text-xl md:text-2xl text-primary-foreground/95 mb-12 max-w-2xl mx-auto font-medium transition-all duration-700 ${
-            finalCTA.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            finalCTA.isVisible ? 'animate-fade-in-up' : ''
           }`} style={{ transitionDelay: '200ms' }}>
             Book a strategy call to discover how we can grow your campaign and maximize your impact.
           </p>
           <div className={`transition-all duration-700 ${
-            finalCTA.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            finalCTA.isVisible ? 'animate-fade-in-up' : ''
           }`} style={{ transitionDelay: '400ms' }}>
             <ParticleButton
               href="https://calendly.com/molitico/30min"
