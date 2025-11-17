@@ -455,7 +455,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         onTouchEnd={isMobile ? handleTouchEnd as any : undefined}
         aria-expanded={isEffectivelyExpanded}
       >
-      <SidebarContent className="py-6 px-2" role="navigation" aria-label="Admin navigation">
+      <SidebarContent className="py-6 px-2 scrollbar-thin scrollbar-thumb-primary/20 hover:scrollbar-thumb-primary/40 scrollbar-track-transparent" role="navigation" aria-label="Admin navigation">
         {/* Mobile refresh indicator */}
         {isMobile && isRefreshing && (
           <div className="px-4 pb-2">
