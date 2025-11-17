@@ -87,7 +87,6 @@ const Navigation = () => {
               <Link to="/contact">Work With Us</Link>
             </Button>
             {user && <NotificationCenter />}
-            <ThemeToggle />
           </div>
 
           {/* Mobile Menu Button */}
