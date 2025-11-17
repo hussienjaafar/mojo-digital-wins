@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Calendar, Sparkles } from "lucide-react";
+import { BookmarkButton } from "./BookmarkButton";
 import { SentimentBadge } from "./SentimentIndicator";
 import { formatDistanceToNow } from "date-fns";
 
@@ -54,7 +55,7 @@ export function NewsCard({ article }: NewsCardProps) {
       
       <CardHeader className="space-y-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="secondary" className={getCategoryColor(article.category)}>
               {article.source_name}
             </Badge>
@@ -63,9 +64,12 @@ export function NewsCard({ article }: NewsCardProps) {
               confidence={article.sentiment_confidence}
             />
           </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Calendar className="h-3 w-3" />
-            <span>{formatDistanceToNow(new Date(article.published_date), { addSuffix: true })}</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Calendar className="h-3 w-3" />
+              <span>{formatDistanceToNow(new Date(article.published_date), { addSuffix: true })}</span>
+            </div>
+            <BookmarkButton articleId={article.id} />
           </div>
         </div>
         
