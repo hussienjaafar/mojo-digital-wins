@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.sync-congress-bills]
 verify_jwt = false
+
+[functions.fetch-bill-text]
+verify_jwt = false
