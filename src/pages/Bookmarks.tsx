@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
 import { NewsCard } from "@/components/news/NewsCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { LoadingCard } from "@/components/ui/loading-spinner";
@@ -61,58 +59,50 @@ export default function Bookmarks() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-        <Navigation />
-        <main className="container mx-auto px-4 py-8 mt-16">
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Bookmark className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-              <h2 className="text-2xl font-bold mb-2">Sign In Required</h2>
-              <p className="text-muted-foreground mb-6">
-                Please sign in to view your bookmarked articles
-              </p>
-              <div className="flex gap-4 justify-center">
-                <Button asChild variant="outline">
-                  <Link to="/news">
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to News
-                  </Link>
-                </Button>
-                <Button asChild>
-                  <Link to="/auth">Sign In</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </main>
-        <Footer />
-      </div>
+      <Card>
+        <CardContent className="p-12 text-center">
+          <Bookmark className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+          <h2 className="text-2xl font-bold mb-2">Sign In Required</h2>
+          <p className="text-muted-foreground mb-6">
+            Please sign in to view your bookmarked articles
+          </p>
+          <div className="flex gap-4 justify-center">
+            <Button asChild variant="outline">
+              <Link to="/admin">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Dashboard
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/auth">Sign In</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <Navigation />
-      <main className="container mx-auto px-4 py-8 mt-16">
-        <div className="mb-8">
-          <Button variant="ghost" asChild className="mb-4">
-            <Link to="/news">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to News
-            </Link>
-          </Button>
-          <div className="flex items-center gap-3">
-            <Bookmark className="w-8 h-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold">My Bookmarks</h1>
-              <p className="text-muted-foreground">
-                {bookmarks.length} saved {bookmarks.length === 1 ? 'article' : 'articles'}
-              </p>
-            </div>
+    <div className="space-y-6">
+      <div className="mb-8">
+        <Button variant="ghost" asChild className="mb-4">
+          <Link to="/admin">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Link>
+        </Button>
+        <div className="flex items-center gap-3">
+          <Bookmark className="w-8 h-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">My Bookmarks</h1>
+            <p className="text-muted-foreground">
+              {bookmarks.length} saved {bookmarks.length === 1 ? 'article' : 'articles'}
+            </p>
           </div>
         </div>
+      </div>
 
-        {loading ? (
+      {loading ? (
           <LoadingCard />
         ) : bookmarks.length === 0 ? (
           <Card>
@@ -123,7 +113,7 @@ export default function Bookmarks() {
                 Start bookmarking articles to build your reading list
               </p>
               <Button asChild>
-                <Link to="/news">Browse Articles</Link>
+                <Link to="/admin?tab=news">Browse Articles</Link>
               </Button>
             </CardContent>
           </Card>
@@ -134,8 +124,6 @@ export default function Bookmarks() {
             ))}
           </div>
         )}
-      </main>
-      <Footer />
     </div>
   );
 }

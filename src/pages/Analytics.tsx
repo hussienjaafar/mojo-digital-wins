@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -155,11 +153,9 @@ export default function Analytics() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <Navigation />
-      <main className="container mx-auto px-4 py-8 mt-16">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
             <h1 className="text-4xl font-bold mb-2">Analytics Dashboard</h1>
             <p className="text-muted-foreground">Insights and trends from news and legislation</p>
           </div>
@@ -350,8 +346,6 @@ export default function Analytics() {
             </Card>
           </TabsContent>
         </Tabs>
-      </main>
-      <Footer />
     </div>
   );
 }
