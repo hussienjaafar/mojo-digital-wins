@@ -16,33 +16,17 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png'],
-      manifest: {
-        name: 'Molitico - News & Legislative Tracker',
-        short_name: 'Molitico',
-        description: 'Track news and congressional bills affecting Arab and Muslim American communities',
-        theme_color: '#0A1E3E',
-        background_color: '#ffffff',
-        display: 'standalone',
-        orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
-        icons: [
-          {
-            src: '/pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any maskable'
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
-          }
-        ]
-      },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Increase cache size limit to 5MB
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Don't precache very large images
+        globIgnores: [
+          '**/billboard-times-square-*.jpg',
+          '**/a-new-policy.png',
+          '**/rashid-illinois.jpg',
+          '**/unity-justice-fund.png'
+        ],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
@@ -68,6 +52,31 @@ export default defineConfig(({ mode }) => ({
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
               }
             }
+          }
+        ]
+      },
+      manifest: {
+        name: 'Molitico - News & Legislative Tracker',
+        short_name: 'Molitico',
+        description: 'Track news and congressional bills affecting Arab and Muslim American communities',
+        theme_color: '#0A1E3E',
+        background_color: '#ffffff',
+        display: 'standalone',
+        orientation: 'portrait',
+        scope: '/',
+        start_url: '/',
+        icons: [
+          {
+            src: '/pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any maskable'
+          },
+          {
+            src: '/pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
           }
         ]
       }
