@@ -89,8 +89,9 @@ interface AdminSidebarProps {
 }
 
 export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
-  const { state } = useSidebar();
-  const collapsed = state === "collapsed";
+  const { state, isMobile } = useSidebar();
+  // Collapse only on desktop; on mobile the sheet should always show full labels
+  const collapsed = !isMobile && state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
   const [userRoles, setUserRoles] = useState<string[]>([]);
