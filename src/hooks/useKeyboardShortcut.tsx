@@ -13,6 +13,19 @@ interface KeyboardShortcut {
 export function useKeyboardShortcut(shortcuts: KeyboardShortcut[]) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't trigger shortcuts when user is typing in an input, textarea, or contenteditable element
+      const target = event.target as HTMLElement;
+      const isTyping = target.tagName === 'INPUT' || 
+                      target.tagName === 'TEXTAREA' || 
+                      target.isContentEditable;
+      
+      // Only ignore shortcuts without modifier keys when typing
+      const hasModifier = event.ctrlKey || event.metaKey || event.altKey;
+      
+      if (isTyping && !hasModifier) {
+        return; // Don't process shortcuts while typing
+      }
+      
       for (const shortcut of shortcuts) {
         const ctrlMatch = shortcut.ctrlKey === undefined || shortcut.ctrlKey === event.ctrlKey;
         const metaMatch = shortcut.metaKey === undefined || shortcut.metaKey === event.metaKey;
