@@ -8,9 +8,10 @@ interface SidebarSearchProps {
   onSearchChange: (value: string) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   collapsed?: boolean;
+  isEffectivelyExpanded?: boolean;
 }
 
-export function SidebarSearch({ searchTerm, onSearchChange, onKeyDown, collapsed }: SidebarSearchProps) {
+export function SidebarSearch({ searchTerm, onSearchChange, onKeyDown, collapsed, isEffectivelyExpanded = true }: SidebarSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Focus input when search is initiated
@@ -30,23 +31,23 @@ export function SidebarSearch({ searchTerm, onSearchChange, onKeyDown, collapsed
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [onSearchChange]);
 
-  if (collapsed) return null;
-
   return (
-    <div className="px-3 pb-4">
+    <div className={`px-3 pb-4 transition-all duration-200 ${!isEffectivelyExpanded ? 'px-1' : ''}`}>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className={`absolute top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-all duration-200 ${isEffectivelyExpanded ? 'left-3' : 'left-1/2 -translate-x-1/2'}`} />
         <Input
           ref={inputRef}
           type="text"
-          placeholder="Search navigation... (Ctrl+K)"
+          placeholder={isEffectivelyExpanded ? "Search navigation... (Ctrl+K)" : ""}
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={onKeyDown}
-          className="pl-9 pr-9 h-10 bg-muted/50 border-border/50 focus-visible:ring-primary"
+          className={`h-10 bg-muted/50 border-border/50 focus-visible:ring-primary transition-all duration-200 ${
+            isEffectivelyExpanded ? 'pl-9 pr-9' : 'pl-2 pr-2 w-10 text-transparent caret-transparent cursor-pointer'
+          }`}
           aria-label="Search navigation items"
         />
-        {searchTerm && (
+        {searchTerm && isEffectivelyExpanded && (
           <Button
             variant="ghost"
             size="icon"
@@ -58,7 +59,7 @@ export function SidebarSearch({ searchTerm, onSearchChange, onKeyDown, collapsed
           </Button>
         )}
       </div>
-      {searchTerm && (
+      {isEffectivelyExpanded && searchTerm && (
         <p className="text-xs text-muted-foreground mt-2 px-1">
           Use ↑↓ to navigate, Enter to select
         </p>
