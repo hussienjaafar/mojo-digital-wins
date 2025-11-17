@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Calendar } from "lucide-react";
+import { ExternalLink, Calendar, Sparkles } from "lucide-react";
+import { SentimentBadge } from "./SentimentIndicator";
 import { formatDistanceToNow } from "date-fns";
 
 interface NewsCardProps {
@@ -14,10 +15,18 @@ interface NewsCardProps {
     image_url: string | null;
     tags: string[];
     category: string | null;
+    sentiment_label?: string | null;
+    sentiment_confidence?: number | null;
+    ai_summary?: string | null;
+    is_duplicate?: boolean;
   };
 }
 
 export function NewsCard({ article }: NewsCardProps) {
+  if (article.is_duplicate) {
+    return null;
+  }
+
   const getCategoryColor = (category: string | null) => {
     switch (category) {
       case 'independent': return 'bg-purple-500/20 text-purple-700 dark:text-purple-300';
@@ -45,9 +54,15 @@ export function NewsCard({ article }: NewsCardProps) {
       
       <CardHeader className="space-y-2">
         <div className="flex items-start justify-between gap-2">
-          <Badge variant="secondary" className={getCategoryColor(article.category)}>
-            {article.source_name}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className={getCategoryColor(article.category)}>
+              {article.source_name}
+            </Badge>
+            <SentimentBadge 
+              sentiment={article.sentiment_label} 
+              confidence={article.sentiment_confidence}
+            />
+          </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Calendar className="h-3 w-3" />
             <span>{formatDistanceToNow(new Date(article.published_date), { addSuffix: true })}</span>
