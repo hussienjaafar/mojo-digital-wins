@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SentimentTrendCard } from "./SentimentIndicator";
+import { SentimentTrendChart } from "./SentimentTrendChart";
 import { LoadingCard } from "@/components/ui/loading-spinner";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
@@ -101,19 +102,28 @@ export function SentimentDashboard() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {trends.map((trend) => (
-            <SentimentTrendCard
-              key={trend.id}
-              category={trend.category}
-              data={{
-                positive_count: trend.positive_count,
-                neutral_count: trend.neutral_count,
-                negative_count: trend.negative_count,
-                avg_sentiment_score: trend.avg_sentiment_score,
-              }}
-            />
-          ))}
+        <div className="space-y-6">
+          {/* Historical Trend Chart */}
+          <SentimentTrendChart />
+
+          {/* Today's Sentiment Cards */}
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Today's Sentiment by Category</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {trends.map((trend) => (
+                <SentimentTrendCard
+                  key={trend.id}
+                  category={trend.category}
+                  data={{
+                    positive_count: trend.positive_count,
+                    neutral_count: trend.neutral_count,
+                    negative_count: trend.negative_count,
+                    avg_sentiment_score: trend.avg_sentiment_score,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
