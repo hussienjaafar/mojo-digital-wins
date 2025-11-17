@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.fetch-rss-feeds]
 verify_jwt = false
+
+[functions.sync-congress-bills]
+verify_jwt = false
