@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,17 @@ type ContactSubmission = {
 };
 
 const Admin = () => {
+  // Load sidebar state from localStorage
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
+    const saved = localStorage.getItem('admin-sidebar-open');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  // Save sidebar state to localStorage whenever it changes
+  const handleSidebarChange = (open: boolean) => {
+    setSidebarOpen(open);
+    localStorage.setItem('admin-sidebar-open', JSON.stringify(open));
+  };
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [session, setSession] = useState<Session | null>(null);
@@ -260,7 +271,7 @@ const Admin = () => {
   };
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarChange}>
       <div className="min-h-screen flex w-full bg-background">
         <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
         
