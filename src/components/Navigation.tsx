@@ -117,7 +117,7 @@ const Navigation = () => {
             </div>
 
             {/* Mobile Menu Links - Optimized spacing and layout */}
-            <nav className="flex-1 flex flex-col justify-start pt-8 pb-4 px-6 space-y-4" aria-label="Mobile navigation">
+            <nav className="flex flex-col pt-4 pb-2 px-6 space-y-3" aria-label="Mobile navigation">
               {navLinks.map((link, index) => (
                 <Link
                   key={link.path}
@@ -141,7 +141,7 @@ const Navigation = () => {
             </nav>
 
             {/* Mobile Menu Footer with CTA and Theme Toggle */}
-            <div className="p-6 border-t border-primary-foreground/20 space-y-4">
+            <div className="px-6 pt-3 pb-6 border-t border-primary-foreground/20 space-y-4">
               <Button 
                 variant="default" 
                 size="lg"
