@@ -1,9 +1,9 @@
+/* Import React Grid Layout styles - MUST be before tailwind directives */
+@import './components/dashboard/dashboard-grid.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import React Grid Layout styles */
-@import './components/dashboard/dashboard-grid.css';
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
