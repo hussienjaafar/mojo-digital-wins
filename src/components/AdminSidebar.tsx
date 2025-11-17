@@ -130,10 +130,9 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
   const [showShortcutsDialog, setShowShortcutsDialog] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
   
-  // Calculate effective expansion state
-  const isEffectivelyExpanded = !collapsed || isHovering;
+  // Calculate effective expansion state (removed hover functionality)
+  const isEffectivelyExpanded = !collapsed;
   
   // localStorage for collapsed groups state
   const [collapsedGroups, setCollapsedGroups] = useLocalStorage<Record<string, boolean>>(
@@ -172,18 +171,6 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     setTimeout(() => setIsRefreshing(false), 500);
   }, []);
 
-  // Hover handlers for expand-on-hover
-  const handleMouseEnter = useCallback(() => {
-    if (collapsed && !isMobile) {
-      setIsHovering(true);
-    }
-  }, [collapsed, isMobile]);
-
-  const handleMouseLeave = useCallback(() => {
-    if (collapsed && !isMobile) {
-      setIsHovering(false);
-    }
-  }, [collapsed, isMobile]);
 
   const fetchUnreadCounts = async () => {
     try {
@@ -444,12 +431,9 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         className={cn(
           "border-r border-border bg-background transition-all duration-300 ease-in-out shadow-md",
           isEffectivelyExpanded ? "w-64" : "w-16",
-          isHovering && "shadow-lg",
           isMobile && open && "animate-slide-in-right"
         )}
         collapsible="icon"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
         onTouchStart={isMobile ? handleTouchStart as any : undefined}
         onTouchMove={isMobile ? handleTouchMove as any : undefined}
         onTouchEnd={isMobile ? handleTouchEnd as any : undefined}
@@ -471,7 +455,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             onKeyDown={handleSearchKeyDown}
-            collapsed={collapsed && !isHovering}
+            collapsed={!isEffectivelyExpanded}
             isEffectivelyExpanded={isEffectivelyExpanded}
           />
         </div>
@@ -484,7 +468,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
               activeTab={activeTab}
               onTabChange={handleTabChange}
               onTogglePin={togglePin}
-              collapsed={collapsed && !isHovering}
+              collapsed={!isEffectivelyExpanded}
               isEffectivelyExpanded={isEffectivelyExpanded}
             />
           </div>
@@ -499,7 +483,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
               onTabChange={handleTabChange}
               searchTerm={searchTerm}
               selectedIndex={searchSelectedIndex}
-              collapsed={collapsed && !isHovering}
+              collapsed={!isEffectivelyExpanded}
               isEffectivelyExpanded={isEffectivelyExpanded}
             />
           </div>
