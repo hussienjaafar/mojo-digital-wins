@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -130,6 +130,10 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
   const [showShortcutsDialog, setShowShortcutsDialog] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  
+  // Calculate effective expansion state
+  const isEffectivelyExpanded = !collapsed || isHovering;
   
   // localStorage for collapsed groups state
   const [collapsedGroups, setCollapsedGroups] = useLocalStorage<Record<string, boolean>>(
@@ -162,11 +166,24 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     );
   };
 
-  const refreshNavigation = async () => {
+  const refreshNavigation = useCallback(async () => {
     setIsRefreshing(true);
     await Promise.all([fetchUserRoles(), fetchUnreadCounts()]);
     setTimeout(() => setIsRefreshing(false), 500);
-  };
+  }, []);
+
+  // Hover handlers for expand-on-hover
+  const handleMouseEnter = useCallback(() => {
+    if (collapsed && !isMobile) {
+      setIsHovering(true);
+    }
+  }, [collapsed, isMobile]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (collapsed && !isMobile) {
+      setIsHovering(false);
+    }
+  }, [collapsed, isMobile]);
 
   const fetchUnreadCounts = async () => {
     try {
@@ -413,7 +430,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
   };
 
   return (
-    <>
+    <TooltipProvider delayDuration={200}>
       {/* Skip to main content link for accessibility */}
       <a
         href="#main-content"
@@ -425,14 +442,18 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
       <Sidebar 
         ref={sidebarRef}
         className={cn(
-          collapsed ? "w-16" : "w-64",
-          "border-r border-border bg-background transition-all duration-300",
+          "border-r border-border bg-background transition-all duration-300 ease-in-out shadow-md",
+          isEffectivelyExpanded ? "w-64" : "w-16",
+          isHovering && "shadow-lg",
           isMobile && open && "animate-slide-in-right"
         )}
         collapsible="icon"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         onTouchStart={isMobile ? handleTouchStart as any : undefined}
         onTouchMove={isMobile ? handleTouchMove as any : undefined}
         onTouchEnd={isMobile ? handleTouchEnd as any : undefined}
+        aria-expanded={isEffectivelyExpanded}
       >
       <SidebarContent className="py-6 px-2" role="navigation" aria-label="Admin navigation">
         {/* Mobile refresh indicator */}
@@ -450,7 +471,8 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             onKeyDown={handleSearchKeyDown}
-            collapsed={collapsed}
+            collapsed={collapsed && !isHovering}
+            isEffectivelyExpanded={isEffectivelyExpanded}
           />
         </div>
 
@@ -462,7 +484,8 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
               activeTab={activeTab}
               onTabChange={handleTabChange}
               onTogglePin={togglePin}
-              collapsed={collapsed}
+              collapsed={collapsed && !isHovering}
+              isEffectivelyExpanded={isEffectivelyExpanded}
             />
           </div>
         )}
@@ -476,7 +499,8 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
               onTabChange={handleTabChange}
               searchTerm={searchTerm}
               selectedIndex={searchSelectedIndex}
-              collapsed={collapsed}
+              collapsed={collapsed && !isHovering}
+              isEffectivelyExpanded={isEffectivelyExpanded}
             />
           </div>
         )}
@@ -517,32 +541,30 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
               onOpenChange={() => toggleGroup(group.label)}
             >
               <SidebarGroup className="mb-4">
-                {!collapsed ? (
+                {isEffectivelyExpanded ? (
                   <CollapsibleTrigger asChild>
                     {groupLabel}
                   </CollapsibleTrigger>
                 ) : (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="px-2 mb-2">
-                          {group.icon && (
-                            <div className="h-8 w-8 mx-auto flex items-center justify-center rounded-md bg-muted/30 hover:bg-muted/50 transition-colors">
-                              <group.icon className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="max-w-xs">
-                        <p className="font-semibold mb-1">{group.label}</p>
-                        <ul className="text-xs space-y-0.5">
-                          {accessibleItems.map(item => (
-                            <li key={item.value}>• {item.title}</li>
-                          ))}
-                        </ul>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="px-2 mb-2 cursor-pointer" onClick={() => toggleGroup(group.label)}>
+                        {group.icon && (
+                          <div className="h-8 w-8 mx-auto flex items-center justify-center rounded-md bg-muted/30 hover:bg-muted/50 transition-all hover:scale-110">
+                            <group.icon className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      <p className="font-semibold mb-1">{group.label}</p>
+                      <ul className="text-xs space-y-0.5">
+                        {accessibleItems.map(item => (
+                          <li key={item.value}>• {item.title}</li>
+                        ))}
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
                 )}
                 
                 <CollapsibleContent className="animate-accordion-down">
@@ -568,89 +590,62 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                               onTogglePin={() => togglePin(item.value)}
                               onNavigate={() => handleTabChange(item.value)}
                             >
-                              <SidebarMenuButton
-                                onClick={() => handleTabChange(item.value)}
-                                isActive={activeTab === item.value}
-                                tooltip={collapsed ? item.title : undefined}
-                                aria-current={activeTab === item.value ? 'page' : undefined}
-                                aria-label={badge?.count ? `${item.title} (${badge.count} unread)` : item.title}
-                                className={cn(
-                                  "relative w-full min-h-[48px] group",
-                                  collapsed ? 'justify-center px-0' : 'justify-start px-4',
-                                  "gap-3 py-3 rounded-lg transition-all duration-200",
-                                  "hover:bg-accent hover:text-accent-foreground hover:scale-[1.02]",
-                                  "active:scale-[0.98]",
-                                  activeTab === item.value 
-                                    ? 'bg-gradient-to-r from-primary/90 to-primary text-primary-foreground font-semibold shadow-lg border-l-4 border-primary-foreground/50' 
-                                    : 'text-foreground hover:font-medium hover:shadow-sm'
-                                )}
-                              >
-                                <div className="relative">
-                                  <item.icon className={cn(
-                                    collapsed ? 'h-6 w-6' : 'h-5 w-5',
-                                    "shrink-0 transition-transform duration-200",
-                                    "group-hover:scale-110",
-                                    activeTab === item.value && 'scale-110'
-                                  )} />
-                                  {badge && collapsed && badge.count && (
-                                    <Badge 
-                                      variant="destructive" 
-                                      className={cn(
-                                        "absolute -top-2 -right-2 h-4 min-w-4 px-1 text-xs flex items-center justify-center",
-                                        "animate-scale-in",
-                                        badge.pulse && "animate-pulse"
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <SidebarMenuButton
+                                    onClick={() => handleTabChange(item.value)}
+                                    isActive={activeTab === item.value}
+                                    aria-current={activeTab === item.value ? 'page' : undefined}
+                                    className={cn(
+                                      "relative w-full min-h-[48px] group",
+                                      collapsed ? 'justify-center px-0' : 'justify-start px-4',
+                                      "gap-3 py-3 rounded-lg transition-all duration-200",
+                                      "hover:bg-accent hover:text-accent-foreground hover:scale-[1.02] active:scale-[0.98]",
+                                      activeTab === item.value 
+                                        ? 'bg-gradient-to-r from-primary/90 to-primary text-primary-foreground font-semibold shadow-lg border-l-4 border-primary-foreground/50' 
+                                        : 'text-foreground hover:font-medium hover:shadow-sm'
+                                    )}
+                                  >
+                                    <div className="relative">
+                                      <item.icon className={cn(
+                                        collapsed ? 'h-6 w-6' : 'h-5 w-5',
+                                        "shrink-0 transition-all duration-200 group-hover:scale-110",
+                                        activeTab === item.value && 'scale-110'
+                                      )} />
+                                      {badge && !isEffectivelyExpanded && (
+                                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center animate-pulse">
+                                          {badge.count}
+                                        </span>
                                       )}
-                                    >
-                                      {badge.count}
-                                    </Badge>
-                                  )}
-                                </div>
-                                {!collapsed && (
-                                  <>
-                                    <span className="text-sm leading-tight flex-1">{item.title}</span>
-                                    <div className="flex items-center gap-2">
-                                      {badge && (
-                                        <>
-                                          {badge.count !== undefined && (
-                                            <Badge 
-                                              variant={badge.status === 'error' ? 'destructive' : 'secondary'}
-                                              className={cn(
-                                                "h-5 px-2 text-xs animate-scale-in",
-                                                badge.pulse && "animate-pulse",
-                                                badge.status === 'success' && "bg-green-500/10 text-green-500 border-green-500/20",
-                                                badge.status === 'warning' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-                                                badge.status === 'info' && "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                                              )}
-                                            >
-                                              {badge.count}
-                                            </Badge>
-                                          )}
-                                          {badge.status === 'error' && !badge.count && (
-                                            <AlertCircle className="h-3 w-3 text-destructive animate-scale-in" />
-                                          )}
-                                          {badge.status === 'success' && !badge.count && (
-                                            <CheckCircle className="h-3 w-3 text-green-500 animate-scale-in" />
-                                          )}
-                                          {badge.status === 'warning' && !badge.count && (
-                                            <Clock className="h-3 w-3 text-yellow-500 animate-scale-in" />
-                                          )}
-                                        </>
-                                      )}
-                                      <span title={isPinned ? "Right-click to unpin" : "Right-click to pin"}>
-                                        <Star 
-                                          className={cn(
-                                            "h-3 w-3 transition-all duration-200",
-                                            "group-hover:rotate-12",
-                                            isPinned 
-                                              ? "fill-primary text-primary opacity-100" 
-                                              : "opacity-0 group-hover:opacity-50"
-                                          )}
-                                        />
-                                      </span>
                                     </div>
-                                  </>
+                                    <span className={cn(
+                                      "text-sm leading-tight flex-1 transition-all duration-200",
+                                      isEffectivelyExpanded ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2 w-0 overflow-hidden"
+                                    )}>
+                                      {item.title}
+                                    </span>
+                                    {isEffectivelyExpanded && (
+                                      <div className="flex items-center gap-2">
+                                        {isPinned && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 transition-transform group-hover:rotate-12" />}
+                                        {badge && (
+                                          <Badge 
+                                            variant={badge.status === 'error' ? 'destructive' : 'secondary'}
+                                            className={cn("h-5 px-2 text-xs animate-scale-in", badge.pulse && "animate-pulse")}
+                                          >
+                                            {badge.count}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    )}
+                                  </SidebarMenuButton>
+                                </TooltipTrigger>
+                                {!isEffectivelyExpanded && (
+                                  <TooltipContent side="right">
+                                    <span className="font-medium">{item.title}</span>
+                                    {badge && <span className="text-xs text-muted-foreground block">{badge.count} items</span>}
+                                  </TooltipContent>
                                 )}
-                              </SidebarMenuButton>
+                              </Tooltip>
                             </NavigationItemContextMenu>
                           </SidebarMenuItem>
                         );
@@ -670,11 +665,11 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
       </SidebarContent>
     </Sidebar>
 
-    {/* Keyboard Shortcuts Dialog */}
-    <KeyboardShortcutsDialog 
-      open={showShortcutsDialog}
-      onOpenChange={setShowShortcutsDialog}
-    />
-  </>
+      {/* Keyboard Shortcuts Dialog */}
+      <KeyboardShortcutsDialog 
+        open={showShortcutsDialog}
+        onOpenChange={setShowShortcutsDialog}
+      />
+    </TooltipProvider>
   );
 }
