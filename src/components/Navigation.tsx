@@ -83,7 +83,7 @@ const Navigation = () => {
 
           {/* Mobile Menu Button */}
           <button
-            className={`md:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${
+            className={`md:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors rounded-lg hover:bg-primary-foreground/10 ${
               isScrolled ? "text-primary-foreground" : "text-primary-foreground"
             }`}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -93,48 +93,77 @@ const Navigation = () => {
             {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
+      </div>
 
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <nav 
-            className={`md:hidden py-4 space-y-2 animate-fade-in-down border-t ${
-              isScrolled ? "border-primary-foreground/10" : "border-foreground/10"
-            }`}
-            aria-label="Mobile navigation"
-          >
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
+      {/* Full-Screen Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="md:hidden fixed inset-0 z-50 bg-primary animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mobile navigation menu"
+        >
+          <div className="flex flex-col h-full">
+            {/* Mobile Menu Header */}
+            <div className="flex items-center justify-between h-16 px-6 border-b border-primary-foreground/20">
+              <div className="font-bebas text-2xl text-primary-foreground">MOLITICO</div>
+              <button
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary-foreground hover:bg-primary-foreground/10 rounded-lg transition-colors"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`block py-3.5 px-4 rounded-lg font-semibold text-[15px] transition-colors min-h-[48px] flex items-center ${
-                  isActive(link.path)
-                    ? isScrolled 
-                      ? "text-primary-foreground bg-secondary/20" 
-                      : "text-primary-foreground bg-secondary/20"
-                    : isScrolled
-                      ? "text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/5"
-                      : "text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/5"
-                }`}
+                aria-label="Close menu"
               >
-                {link.name}
-              </Link>
-            ))}
-            <div className="pt-2">
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Mobile Menu Links - Centered with animations */}
+            <nav className="flex-1 flex flex-col justify-center px-6 space-y-2" aria-label="Mobile navigation">
+              {navLinks.map((link, index) => (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`
+                    min-h-[56px] flex items-center px-4 rounded-xl font-bold text-lg tracking-tight
+                    transition-all duration-200
+                    ${isActive(link.path)
+                      ? "bg-secondary text-secondary-foreground shadow-lg"
+                      : "text-primary-foreground hover:bg-primary-foreground/10"
+                    }
+                  `}
+                  style={{ 
+                    animation: `slide-in-right 0.3s ease-out ${index * 0.05}s both` 
+                  }}
+                >
+                  {link.name}
+                </Link>
+              ))}
+            </nav>
+
+            {/* Mobile Menu Footer with CTA and Theme Toggle */}
+            <div className="p-6 border-t border-primary-foreground/20 space-y-4">
               <Button 
                 variant="default" 
-                size="default" 
-                className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-medium"
+                size="lg"
                 asChild
+                className="w-full min-h-[52px] bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold text-base shadow-lg"
               >
                 <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)}>
                   Work With Us
                 </Link>
               </Button>
+              
+              {/* Theme Toggle - Centered in footer */}
+              <div className="flex justify-center pt-2">
+                <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-primary-foreground/10">
+                  <span className="text-sm font-medium text-primary-foreground">Theme</span>
+                  <ThemeToggle />
+                </div>
+              </div>
             </div>
-          </nav>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };
