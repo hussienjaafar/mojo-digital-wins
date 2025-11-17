@@ -269,6 +269,163 @@ export type Database = {
           },
         ]
       }
+      bill_actions: {
+        Row: {
+          action_code: string | null
+          action_date: string
+          action_text: string
+          bill_id: string | null
+          chamber: string | null
+          created_at: string | null
+          id: string
+        }
+        Insert: {
+          action_code?: string | null
+          action_date: string
+          action_text: string
+          bill_id?: string | null
+          chamber?: string | null
+          created_at?: string | null
+          id?: string
+        }
+        Update: {
+          action_code?: string | null
+          action_date?: string
+          action_text?: string
+          bill_id?: string | null
+          chamber?: string | null
+          created_at?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_actions_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bill_alerts: {
+        Row: {
+          alert_type: string
+          bill_id: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          last_notified_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          alert_type?: string
+          bill_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_notified_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          alert_type?: string
+          bill_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_notified_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_alerts_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bills: {
+        Row: {
+          bill_number: string
+          bill_text_url: string | null
+          bill_type: string
+          committee_assignments: string[] | null
+          congress: number
+          cosponsor_count: number | null
+          cosponsor_party_breakdown: Json | null
+          created_at: string | null
+          current_status: string | null
+          full_text: string | null
+          id: string
+          introduced_date: string | null
+          latest_action_date: string | null
+          latest_action_text: string | null
+          origin_chamber: string | null
+          related_bills: string[] | null
+          relevance_score: number | null
+          short_title: string | null
+          sponsor_id: string | null
+          sponsor_name: string | null
+          sponsor_party: string | null
+          sponsor_state: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          bill_number: string
+          bill_text_url?: string | null
+          bill_type: string
+          committee_assignments?: string[] | null
+          congress: number
+          cosponsor_count?: number | null
+          cosponsor_party_breakdown?: Json | null
+          created_at?: string | null
+          current_status?: string | null
+          full_text?: string | null
+          id?: string
+          introduced_date?: string | null
+          latest_action_date?: string | null
+          latest_action_text?: string | null
+          origin_chamber?: string | null
+          related_bills?: string[] | null
+          relevance_score?: number | null
+          short_title?: string | null
+          sponsor_id?: string | null
+          sponsor_name?: string | null
+          sponsor_party?: string | null
+          sponsor_state?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          bill_number?: string
+          bill_text_url?: string | null
+          bill_type?: string
+          committee_assignments?: string[] | null
+          congress?: number
+          cosponsor_count?: number | null
+          cosponsor_party_breakdown?: Json | null
+          created_at?: string | null
+          current_status?: string | null
+          full_text?: string | null
+          id?: string
+          introduced_date?: string | null
+          latest_action_date?: string | null
+          latest_action_text?: string | null
+          origin_chamber?: string | null
+          related_bills?: string[] | null
+          relevance_score?: number | null
+          short_title?: string | null
+          sponsor_id?: string | null
+          sponsor_name?: string | null
+          sponsor_party?: string | null
+          sponsor_state?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       campaign_attribution: {
         Row: {
           created_at: string | null
