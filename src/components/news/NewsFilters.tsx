@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar, Filter, Search, X } from "lucide-react";
+import { TagInput } from "./TagInput";
 import {
   Select,
   SelectContent,
@@ -26,16 +27,6 @@ export interface FilterState {
   tags: string[];
 }
 
-const COMMON_TAGS = [
-  'arab american',
-  'muslim american',
-  'islamophobia',
-  'palestine',
-  'israel',
-  'civil liberties',
-  'discrimination'
-];
-
 export function NewsFilters({ categories, sources, onFilterChange }: NewsFiltersProps) {
   const [filters, setFilters] = useState<FilterState>({
     search: '',
@@ -53,10 +44,7 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
     onFilterChange(newFilters);
   };
 
-  const toggleTag = (tag: string) => {
-    const newTags = filters.tags.includes(tag)
-      ? filters.tags.filter(t => t !== tag)
-      : [...filters.tags, tag];
+  const handleTagsChange = (newTags: string[]) => {
     updateFilters({ tags: newTags });
   };
 
@@ -160,18 +148,11 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
 
           <div className="space-y-2">
             <Label>Filter by tags</Label>
-            <div className="flex flex-wrap gap-2">
-              {COMMON_TAGS.map((tag) => (
-                <Badge
-                  key={tag}
-                  variant={filters.tags.includes(tag) ? "default" : "outline"}
-                  className="cursor-pointer hover:scale-105 transition-transform"
-                  onClick={() => toggleTag(tag)}
-                >
-                  {tag}
-                </Badge>
-              ))}
-            </div>
+            <TagInput 
+              selectedTags={filters.tags}
+              onTagsChange={handleTagsChange}
+              placeholder="Type to search or add tags..."
+            />
           </div>
         </div>
       )}
@@ -202,7 +183,7 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
               {tag}
               <X 
                 className="h-3 w-3 ml-1 cursor-pointer" 
-                onClick={() => toggleTag(tag)}
+                onClick={() => handleTagsChange(filters.tags.filter(t => t !== tag))}
               />
             </Badge>
           ))}
