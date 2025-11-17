@@ -29,12 +29,8 @@ import ClientLogin from "./pages/ClientLogin";
 import ClientDashboard from "./pages/ClientDashboard";
 import ClientDashboardCustom from "./pages/ClientDashboardCustom";
 import ClientPortal from "./components/client/ClientPortal";
-import News from "./pages/News";
-import Bills from "./pages/Bills";
 import BillDetail from "./pages/BillDetail";
-import Bookmarks from "./pages/Bookmarks";
 import Settings from "./pages/Settings";
-import Analytics from "./pages/Analytics";
 import Install from "./pages/Install";
 
 const queryClient = new QueryClient();
