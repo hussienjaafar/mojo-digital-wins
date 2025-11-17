@@ -429,7 +429,8 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
       <Sidebar 
         ref={sidebarRef}
         className={cn(
-          "border-r border-border bg-background transition-all duration-300 ease-in-out shadow-md",
+          "border-r border-border bg-background shadow-md",
+          "transition-all duration-500 ease-in-out",
           isEffectivelyExpanded ? "w-64" : "w-16",
           isMobile && open && "animate-slide-in-right"
         )}
