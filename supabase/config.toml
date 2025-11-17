@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.fetch-bill-text]
 verify_jwt = false
+
+[functions.analyze-articles]
+verify_jwt = false

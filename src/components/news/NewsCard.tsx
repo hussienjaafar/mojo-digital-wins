@@ -68,7 +68,21 @@ export function NewsCard({ article }: NewsCardProps) {
       </CardHeader>
       
       <CardContent className="space-y-3">
-        {article.description && (
+        {/* AI Summary */}
+        {article.ai_summary && (
+          <div className="p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">AI Summary</span>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {article.ai_summary}
+            </p>
+          </div>
+        )}
+
+        {/* Original Description */}
+        {article.description && !article.ai_summary && (
           <CardDescription className="line-clamp-3">
             {article.description}
           </CardDescription>

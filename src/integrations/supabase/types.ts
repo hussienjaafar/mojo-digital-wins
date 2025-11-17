@@ -209,14 +209,20 @@ export type Database = {
       }
       articles: {
         Row: {
+          ai_summary: string | null
           category: string | null
           content: string | null
           created_at: string | null
           description: string | null
+          duplicate_of: string | null
           hash_signature: string | null
           id: string
           image_url: string | null
+          is_duplicate: boolean | null
+          processing_status: string | null
           published_date: string
+          sentiment_confidence: number | null
+          sentiment_label: string | null
           sentiment_score: number | null
           source_id: string | null
           source_name: string
@@ -226,14 +232,20 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ai_summary?: string | null
           category?: string | null
           content?: string | null
           created_at?: string | null
           description?: string | null
+          duplicate_of?: string | null
           hash_signature?: string | null
           id?: string
           image_url?: string | null
+          is_duplicate?: boolean | null
+          processing_status?: string | null
           published_date: string
+          sentiment_confidence?: number | null
+          sentiment_label?: string | null
           sentiment_score?: number | null
           source_id?: string | null
           source_name: string
@@ -243,14 +255,20 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ai_summary?: string | null
           category?: string | null
           content?: string | null
           created_at?: string | null
           description?: string | null
+          duplicate_of?: string | null
           hash_signature?: string | null
           id?: string
           image_url?: string | null
+          is_duplicate?: boolean | null
+          processing_status?: string | null
           published_date?: string
+          sentiment_confidence?: number | null
+          sentiment_label?: string | null
           sentiment_score?: number | null
           source_id?: string | null
           source_name?: string
@@ -260,6 +278,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "articles_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "articles_source_id_fkey"
             columns: ["source_id"]
@@ -1104,6 +1129,39 @@ export type Database = {
           name?: string
           updated_at?: string | null
           url?: string
+        }
+        Relationships: []
+      }
+      sentiment_trends: {
+        Row: {
+          avg_sentiment_score: number | null
+          category: string
+          created_at: string | null
+          date: string
+          id: string
+          negative_count: number | null
+          neutral_count: number | null
+          positive_count: number | null
+        }
+        Insert: {
+          avg_sentiment_score?: number | null
+          category: string
+          created_at?: string | null
+          date: string
+          id?: string
+          negative_count?: number | null
+          neutral_count?: number | null
+          positive_count?: number | null
+        }
+        Update: {
+          avg_sentiment_score?: number | null
+          category?: string
+          created_at?: string | null
+          date?: string
+          id?: string
+          negative_count?: number | null
+          neutral_count?: number | null
+          positive_count?: number | null
         }
         Relationships: []
       }
