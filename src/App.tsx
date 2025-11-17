@@ -33,6 +33,7 @@ import News from "./pages/News";
 import Bills from "./pages/Bills";
 import BillDetail from "./pages/BillDetail";
 import Bookmarks from "./pages/Bookmarks";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,7 @@ const AppContent = () => {
         <Route path="/bills" element={<Bills />} />
         <Route path="/bills/:billNumber" element={<BillDetail />} />
         <Route path="/bookmarks" element={<Bookmarks />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />

@@ -3,11 +3,18 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { supabase } from "@/integrations/supabase/client";
 
 const Navigation = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const location = useLocation();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -82,6 +89,8 @@ const Navigation = () => {
             >
               <Link to="/contact">Work With Us</Link>
             </Button>
+            {user && <NotificationCenter />}
+            <ThemeToggle />
           </div>
 
           {/* Mobile Menu Button */}
