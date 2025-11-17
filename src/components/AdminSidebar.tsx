@@ -45,46 +45,54 @@ export interface NavigationItem {
 export interface NavigationGroup {
   label: string;
   items: NavigationItem[];
+  icon?: React.ComponentType<{ className?: string }>;
+  collapsedByDefault?: boolean;
 }
 
 export const navigationGroups: NavigationGroup[] = [
   {
-    label: "Overview & Analytics",
+    label: "Dashboard",
+    icon: LayoutDashboard,
     items: [
-      { title: "Analytics Dashboard", icon: LayoutDashboard, value: "analytics" },
+      { title: "Overview", icon: LayoutDashboard, value: "analytics" },
     ],
   },
   {
-    label: "Client Management",
+    label: "Clients",
+    icon: Building2,
     items: [
-      { title: "Client Organizations", icon: Building2, value: "clients" },
-      { title: "Client Users", icon: Users, value: "client-users" },
-      { title: "Email Reports", icon: Mail, value: "email-reports" },
+      { title: "Organizations", icon: Building2, value: "clients" },
+      { title: "Users", icon: Users, value: "client-users" },
+      { title: "Reports", icon: Mail, value: "email-reports" },
     ],
   },
   {
-    label: "Platform Integration",
+    label: "Marketing",
+    icon: GitBranch,
     items: [
-      { title: "API Credentials", icon: Key, value: "api-credentials", requiredRole: 'admin' },
-      { title: "Campaign Attribution", icon: GitBranch, value: "attribution" },
-      { title: "Sync Scheduler", icon: Calendar, value: "scheduler", requiredRole: 'admin' },
+      { title: "Campaigns", icon: GitBranch, value: "attribution" },
+      { title: "API Keys", icon: Key, value: "api-credentials", requiredRole: 'admin' },
+      { title: "Sync Schedule", icon: Calendar, value: "scheduler", requiredRole: 'admin' },
     ],
   },
   {
-    label: "System Administration",
+    label: "Content",
+    icon: PenTool,
     items: [
-      { title: "User Management", icon: UserCog, value: "users", requiredRole: 'admin' },
-      { title: "Admin Invite Codes", icon: Shield, value: "invite-codes", requiredRole: 'admin' },
-      { title: "Session Management", icon: Activity, value: "sessions", requiredRole: 'admin' },
-      { title: "Audit Logs", icon: FileText, value: "audit-logs", requiredRole: 'admin' },
-    ],
-  },
-  {
-    label: "Content & Communications",
-    items: [
-      { title: "Contact Submissions", icon: MessageSquare, value: "contacts" },
+      { title: "Messages", icon: MessageSquare, value: "contacts" },
       { title: "Newsletter", icon: Mail, value: "newsletter" },
-      { title: "Blog Generator", icon: PenTool, value: "blog-generator" },
+      { title: "Blog", icon: PenTool, value: "blog-generator" },
+    ],
+  },
+  {
+    label: "Admin",
+    icon: Shield,
+    collapsedByDefault: true,
+    items: [
+      { title: "Users", icon: UserCog, value: "users", requiredRole: 'admin' },
+      { title: "Invites", icon: Shield, value: "invite-codes", requiredRole: 'admin' },
+      { title: "Sessions", icon: Activity, value: "sessions", requiredRole: 'admin' },
+      { title: "Audit Log", icon: FileText, value: "audit-logs", requiredRole: 'admin' },
     ],
   },
 ];
@@ -186,13 +194,29 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     .filter(group => group.items.length > 0);
 
   // Auto-expand group containing active item or search results
-  const shouldGroupBeExpanded = (groupLabel: string) => {
-    if (searchTerm) return true; // Expand all when searching
-    const group = navigationGroups.find(g => g.label === groupLabel);
-    if (!group) return false;
+  const shouldGroupBeExpanded = (group: NavigationGroup) => {
+    // If searching, expand groups with matches
+    if (searchTerm) {
+      return group.items.some(item => 
+        hasAccess(item) && 
+        item.title.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Check if active tab is in this group
     const hasActiveItem = group.items.some(item => item.value === activeTab);
     if (hasActiveItem) return true;
-    return !collapsedGroups[groupLabel];
+    
+    // Dashboard group is always expanded, Admin group collapsed by default
+    if (group.collapsedByDefault !== undefined) {
+      // Use stored state if exists, otherwise use collapsedByDefault
+      return collapsedGroups[group.label] !== undefined 
+        ? !collapsedGroups[group.label]
+        : !group.collapsedByDefault;
+    }
+    
+    // Otherwise use stored state (default to expanded)
+    return !collapsedGroups[group.label];
   };
 
   return (
@@ -223,7 +247,8 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
 
         {/* Navigation Groups */}
         {filteredGroups.map((group, groupIndex) => {
-          const isExpanded = shouldGroupBeExpanded(group.label);
+          const accessibleItems = group.items.filter(item => hasAccess(item));
+          const isExpanded = shouldGroupBeExpanded(group);
           
           return (
             <Collapsible
@@ -241,7 +266,13 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                       "hover:bg-muted/50 transition-colors",
                       "group"
                     )}>
-                      <span>{group.label}</span>
+                      <span className="flex items-center gap-2">
+                        {group.icon && <group.icon className="h-4 w-4 opacity-70" />}
+                        {group.label}
+                        <span className="text-xs opacity-60 ml-1 font-normal normal-case">
+                          ({accessibleItems.length})
+                        </span>
+                      </span>
                       <ChevronDown className={cn(
                         "h-4 w-4 transition-transform duration-200",
                         isExpanded ? "rotate-0" : "-rotate-90"
