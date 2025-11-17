@@ -116,8 +116,8 @@ const Navigation = () => {
               </button>
             </div>
 
-            {/* Mobile Menu Links - Centered with animations */}
-            <nav className="flex-1 flex flex-col justify-center px-6 space-y-2" aria-label="Mobile navigation">
+            {/* Mobile Menu Links - Optimized spacing and layout */}
+            <nav className="flex-1 flex flex-col justify-start pt-20 pb-8 px-6 space-y-4" aria-label="Mobile navigation">
               {navLinks.map((link, index) => (
                 <Link
                   key={link.path}
@@ -153,10 +153,10 @@ const Navigation = () => {
                 </Link>
               </Button>
               
-              {/* Theme Toggle - Centered in footer */}
-              <div className="flex justify-center pt-2">
-                <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-primary-foreground/10">
-                  <span className="text-sm font-medium text-primary-foreground">Theme</span>
+              {/* Theme Toggle - Enhanced visibility and touch target */}
+              <div className="flex justify-center pt-3">
+                <div className="flex items-center gap-3 px-5 py-3 rounded-lg bg-primary-foreground/15">
+                  <span className="text-base font-semibold text-primary-foreground">Theme</span>
                   <ThemeToggle />
                 </div>
               </div>
