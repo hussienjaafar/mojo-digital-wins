@@ -122,19 +122,33 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
 
   return (
     <Sidebar 
-      className={`${collapsed ? "w-14" : "w-64"} border-r border-border/50 bg-card/50 backdrop-blur`} 
+      className={`
+        ${collapsed ? "w-16" : "w-64"} 
+        border-r border-border 
+        bg-background
+        transition-all duration-300
+      `} 
       collapsible="icon"
     >
-      <SidebarContent className="py-4">
+      <SidebarContent className="py-6 px-2">
         {navigationGroups.map((group) => (
-          <SidebarGroup key={group.label} className="mb-2">
+          <SidebarGroup key={group.label} className="mb-6">
             {!collapsed && (
-              <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 mb-2">
+              <SidebarGroupLabel className="
+                text-muted-foreground 
+                text-xs 
+                font-bold 
+                tracking-wider 
+                uppercase 
+                px-4 
+                mb-3
+                opacity-70
+              ">
                 {group.label}
               </SidebarGroupLabel>
             )}
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="space-y-1">
                 {group.items.filter(hasAccess).map((item) => (
                   <SidebarMenuItem key={item.value}>
                     <SidebarMenuButton
@@ -142,15 +156,24 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                       isActive={activeTab === item.value}
                       tooltip={collapsed ? item.title : undefined}
                       className={`
-                        w-full transition-all duration-200 mx-2 rounded-lg
+                        w-full 
+                        min-h-[48px]
+                        ${collapsed ? 'justify-center px-0' : 'justify-start px-4'}
+                        gap-3 
+                        py-3
+                        rounded-lg
+                        transition-all duration-200
+                        hover:bg-accent hover:text-accent-foreground
                         ${activeTab === item.value 
-                          ? 'bg-primary text-primary-foreground shadow-md' 
-                          : 'hover:bg-muted/50'
+                          ? 'bg-primary text-primary-foreground font-semibold shadow-md scale-[1.02]' 
+                          : 'text-foreground hover:font-medium'
                         }
                       `}
                     >
-                      <item.icon className={`h-4 w-4 ${activeTab === item.value ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
-                      {!collapsed && <span className="font-medium">{item.title}</span>}
+                      <item.icon className={`${collapsed ? 'h-6 w-6' : 'h-5 w-5'} shrink-0`} />
+                      {!collapsed && (
+                        <span className="text-sm leading-tight">{item.title}</span>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
