@@ -61,12 +61,9 @@ const AppContent = () => {
         <Route path="/creative-showcase" element={<CreativeShowcase />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/news" element={<News />} />
-        <Route path="/bills" element={<Bills />} />
+        {/* News, Bills, Analytics, and Bookmarks moved to admin dashboard */}
         <Route path="/bills/:billNumber" element={<BillDetail />} />
-        <Route path="/bookmarks" element={<Bookmarks />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/analytics" element={<Analytics />} />
         <Route path="/install" element={<Install />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin />} />

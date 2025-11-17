@@ -20,6 +20,10 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  Newspaper,
+  ScrollText,
+  BarChart3,
+  Bookmark,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import {
@@ -71,6 +75,16 @@ export const navigationGroups: NavigationGroup[] = [
     icon: LayoutDashboard,
     items: [
       { title: "Overview", icon: LayoutDashboard, value: "analytics" },
+    ],
+  },
+  {
+    label: "Content",
+    icon: Newspaper,
+    items: [
+      { title: "News", icon: Newspaper, value: "news" },
+      { title: "Bills", icon: ScrollText, value: "bills" },
+      { title: "Analytics", icon: BarChart3, value: "content-analytics" },
+      { title: "Bookmarks", icon: Bookmark, value: "bookmarks" },
     ],
   },
   {

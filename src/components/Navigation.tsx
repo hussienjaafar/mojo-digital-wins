@@ -28,10 +28,6 @@ const Navigation = () => {
     { name: "About", path: "/about" },
     { name: "Services", path: "/services" },
     { name: "Work", path: "/case-studies" },
-    { name: "News", path: "/news" },
-    { name: "Bills", path: "/bills" },
-    { name: "Analytics", path: "/analytics" },
-    { name: "Bookmarks", path: "/bookmarks" },
     { name: "Contact", path: "/contact" },
   ];
 
