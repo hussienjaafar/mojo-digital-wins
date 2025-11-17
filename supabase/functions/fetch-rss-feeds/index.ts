@@ -30,6 +30,16 @@ function generateHash(title: string, content: string): string {
   return btoa(text.substring(0, 100)); // Simple hash using first 100 chars
 }
 
+// Sanitize text to handle special characters and prevent encoding errors
+function sanitizeText(text: string): string {
+  if (!text) return '';
+  // Remove problematic characters while preserving content
+  return text
+    .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, '') // Remove control characters
+    .replace(/\uFFFD/g, '') // Remove replacement characters
+    .trim();
+}
+
 // Extract tags from content
 function extractTags(title: string, description: string, content: string): string[] {
   const text = `${title} ${description} ${content}`.toLowerCase();
@@ -161,15 +171,17 @@ serve(async (req) => {
 
         // Insert articles
         for (const item of items) {
-          const hash = generateHash(item.title, item.description);
-          const tags = extractTags(item.title, item.description, item.description);
+          const sanitizedTitle = sanitizeText(item.title);
+          const sanitizedDescription = sanitizeText(item.description);
+          const hash = generateHash(sanitizedTitle, sanitizedDescription);
+          const tags = extractTags(sanitizedTitle, sanitizedDescription, sanitizedDescription);
           
           const { error: insertError } = await supabase
             .from('articles')
             .insert({
-              title: item.title,
-              description: item.description,
-              content: item.description,
+              title: sanitizedTitle,
+              description: sanitizedDescription,
+              content: sanitizedDescription,
               source_id: source.id,
               source_name: source.name,
               source_url: item.link,
