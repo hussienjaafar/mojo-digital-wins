@@ -1,8 +1,9 @@
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Users, Calendar, TrendingUp } from "lucide-react";
+import { ExternalLink, Users, Calendar, TrendingUp, Eye } from "lucide-react";
 import { format } from "date-fns";
 
 interface BillCardProps {
@@ -175,24 +176,37 @@ export function BillCard({ bill }: BillCardProps) {
         )}
 
         {/* Actions */}
-        {bill.bill_text_url && (
+        <div className="flex gap-2">
           <Button 
             variant="outline" 
             size="sm" 
-            className="w-full"
+            className="flex-1"
             asChild
           >
-            <a 
-              href={bill.bill_text_url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2"
-            >
-              <ExternalLink className="w-4 h-4" />
-              View Full Bill Text
-            </a>
+            <Link to={`/bills/${bill.bill_number}`} className="flex items-center justify-center gap-2">
+              <Eye className="w-4 h-4" />
+              View Details
+            </Link>
           </Button>
-        )}
+          {bill.bill_text_url && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1"
+              asChild
+            >
+              <a 
+                href={bill.bill_text_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Congress.gov
+              </a>
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

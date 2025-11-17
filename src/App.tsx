@@ -31,6 +31,7 @@ import ClientDashboardCustom from "./pages/ClientDashboardCustom";
 import ClientPortal from "./components/client/ClientPortal";
 import News from "./pages/News";
 import Bills from "./pages/Bills";
+import BillDetail from "./pages/BillDetail";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const AppContent = () => {
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/news" element={<News />} />
         <Route path="/bills" element={<Bills />} />
+        <Route path="/bills/:billNumber" element={<BillDetail />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />
