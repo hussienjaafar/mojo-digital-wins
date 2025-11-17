@@ -541,30 +541,10 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
               onOpenChange={() => toggleGroup(group.label)}
             >
               <SidebarGroup className="mb-4">
-                {isEffectivelyExpanded ? (
+                {isEffectivelyExpanded && (
                   <CollapsibleTrigger asChild>
                     {groupLabel}
                   </CollapsibleTrigger>
-                ) : (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="px-2 mb-2 cursor-pointer" onClick={() => toggleGroup(group.label)}>
-                        {group.icon && (
-                          <div className="h-8 w-8 mx-auto flex items-center justify-center rounded-md bg-muted/30 hover:bg-muted/50 transition-all hover:scale-110">
-                            <group.icon className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-xs">
-                      <p className="font-semibold mb-1">{group.label}</p>
-                      <ul className="text-xs space-y-0.5">
-                        {accessibleItems.map(item => (
-                          <li key={item.value}>• {item.title}</li>
-                        ))}
-                      </ul>
-                    </TooltipContent>
-                  </Tooltip>
                 )}
                 
                 <CollapsibleContent className="animate-accordion-down">
