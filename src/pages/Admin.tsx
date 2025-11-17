@@ -21,10 +21,11 @@ import SyncScheduler from "@/components/admin/SyncScheduler";
 import EmailReportManager from "@/components/admin/EmailReportManager";
 import { DashboardHome } from "@/components/DashboardHome";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AdminSidebar } from "@/components/AdminSidebar";
+import { AdminSidebar, navigationGroups } from "@/components/AdminSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogOut } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type ContactSubmission = {
   id: string;
@@ -38,6 +39,7 @@ type ContactSubmission = {
 
 const Admin = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,6 +48,15 @@ const Admin = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("analytics");
+
+  // Get current section title for breadcrumb
+  const getCurrentSectionTitle = () => {
+    for (const group of navigationGroups) {
+      const item = group.items.find(i => i.value === activeTab);
+      if (item) return item.title;
+    }
+    return "Dashboard";
+  };
 
   useEffect(() => {
     // Set up auth state listener
@@ -254,38 +265,47 @@ const Admin = () => {
         <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
         
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Mobile-optimized header */}
+          {/* Mobile-optimized header with breadcrumb */}
           <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-14 sm:h-16 items-center gap-2 sm:gap-4 px-3 sm:px-6">
-              {/* Mobile menu trigger - always visible */}
-              <SidebarTrigger className="h-11 w-11" />
-              
-              {/* Title - responsive sizing */}
-              <div className="flex-1 min-w-0">
-                <h1 className="text-base sm:text-lg md:text-xl font-bold tracking-tight truncate">
-                  Admin Dashboard
-                </h1>
-              </div>
-              
-              {/* Actions - responsive */}
-              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                <ThemeToggle />
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={handleSignOut} 
-                  className="gap-2 min-h-[44px] min-w-[44px] hover:text-destructive"
-                  title="Sign Out"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="hidden sm:inline">Sign Out</span>
-                </Button>
+            <div className="flex flex-col">
+              <div className="flex h-14 sm:h-16 items-center gap-2 sm:gap-4 px-3 sm:px-6">
+                {/* Mobile menu trigger - always visible */}
+                <SidebarTrigger className="h-11 w-11" aria-label="Toggle sidebar navigation" />
+                
+                {/* Title - responsive sizing */}
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-base sm:text-lg md:text-xl font-bold tracking-tight truncate">
+                    Admin Dashboard
+                  </h1>
+                  {/* Mobile breadcrumb - shows current section */}
+                  {isMobile && (
+                    <p className="text-xs text-muted-foreground truncate" aria-live="polite">
+                      {getCurrentSectionTitle()}
+                    </p>
+                  )}
+                </div>
+                
+                {/* Actions - responsive */}
+                <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                  <ThemeToggle />
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={handleSignOut} 
+                    className="gap-2 min-h-[44px] min-w-[44px] hover:text-destructive"
+                    title="Sign Out"
+                    aria-label="Sign out"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span className="hidden sm:inline">Sign Out</span>
+                  </Button>
+                </div>
               </div>
             </div>
           </header>
 
           {/* Main content - mobile optimized padding */}
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto" role="main" aria-label="Admin content">
             <div className="p-3 sm:p-4 md:p-6 lg:p-8 max-w-[1800px] mx-auto">
               {renderContent()}
             </div>

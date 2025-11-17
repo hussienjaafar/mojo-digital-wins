@@ -41,7 +41,7 @@ interface NavigationGroup {
   items: NavigationItem[];
 }
 
-const navigationGroups: NavigationGroup[] = [
+export const navigationGroups: NavigationGroup[] = [
   {
     label: "Overview & Analytics",
     items: [
@@ -139,19 +139,23 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
       `} 
       collapsible="icon"
     >
-      <SidebarContent className="py-6 px-2">
-        {navigationGroups.map((group) => (
-          <SidebarGroup key={group.label} className="mb-6">
+      <SidebarContent className="py-6 px-2" role="navigation" aria-label="Admin navigation">
+        {navigationGroups.map((group, groupIndex) => (
+          <SidebarGroup key={group.label} className="mb-4">
             {!collapsed && (
               <SidebarGroupLabel className="
                 text-muted-foreground 
-                text-xs 
+                text-sm 
                 font-bold 
                 tracking-wider 
                 uppercase 
                 px-4 
-                mb-3
-                opacity-70
+                py-2
+                mb-2
+                opacity-90
+                bg-muted/30
+                rounded-md
+                border-b border-border/50
               ">
                 {group.label}
               </SidebarGroupLabel>
@@ -164,7 +168,9 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                       onClick={() => handleTabChange(item.value)}
                       isActive={activeTab === item.value}
                       tooltip={collapsed ? item.title : undefined}
+                      aria-current={activeTab === item.value ? 'page' : undefined}
                       className={`
+                        relative
                         w-full 
                         min-h-[48px]
                         ${collapsed ? 'justify-center px-0' : 'justify-start px-4'}
@@ -174,12 +180,17 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                         transition-all duration-200
                         hover:bg-accent hover:text-accent-foreground
                         ${activeTab === item.value 
-                          ? 'bg-primary text-primary-foreground font-semibold shadow-md scale-[1.02]' 
-                          : 'text-foreground hover:font-medium'
+                          ? 'bg-gradient-to-r from-primary/90 to-primary text-primary-foreground font-semibold shadow-lg border-l-4 border-primary-foreground/50' 
+                          : 'text-foreground hover:font-medium hover:shadow-sm'
                         }
                       `}
                     >
-                      <item.icon className={`${collapsed ? 'h-6 w-6' : 'h-5 w-5'} shrink-0`} />
+                      <item.icon className={`
+                        ${collapsed ? 'h-6 w-6' : 'h-5 w-5'} 
+                        shrink-0
+                        transition-transform duration-200
+                        ${activeTab === item.value ? 'scale-110' : ''}
+                      `} />
                       {!collapsed && (
                         <span className="text-sm leading-tight">{item.title}</span>
                       )}
@@ -188,6 +199,10 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
+            {/* Separator between groups */}
+            {groupIndex < navigationGroups.length - 1 && !collapsed && (
+              <div className="h-px bg-border/50 mt-4" />
+            )}
           </SidebarGroup>
         ))}
       </SidebarContent>
