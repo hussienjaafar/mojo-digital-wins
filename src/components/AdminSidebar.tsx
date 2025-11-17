@@ -89,12 +89,20 @@ interface AdminSidebarProps {
 }
 
 export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
-  const { state, isMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   // Collapse only on desktop; on mobile the sheet should always show full labels
   const collapsed = !isMobile && state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
   const [userRoles, setUserRoles] = useState<string[]>([]);
+
+  const handleTabChange = (value: string) => {
+    onTabChange(value);
+    // Close mobile menu when item is selected
+    if (isMobile && setOpenMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   useEffect(() => {
     fetchUserRoles();
@@ -153,7 +161,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                 {group.items.filter(hasAccess).map((item) => (
                   <SidebarMenuItem key={item.value}>
                     <SidebarMenuButton
-                      onClick={() => onTabChange(item.value)}
+                      onClick={() => handleTabChange(item.value)}
                       isActive={activeTab === item.value}
                       tooltip={collapsed ? item.title : undefined}
                       className={`
