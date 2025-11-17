@@ -258,7 +258,7 @@ const Admin = () => {
           <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex h-14 sm:h-16 items-center gap-2 sm:gap-4 px-3 sm:px-6">
               {/* Mobile menu trigger - always visible */}
-              <SidebarTrigger className="min-h-[44px] min-w-[44px]" />
+              <SidebarTrigger className="h-11 w-11" />
               
               {/* Title - responsive sizing */}
               <div className="flex-1 min-w-0">
