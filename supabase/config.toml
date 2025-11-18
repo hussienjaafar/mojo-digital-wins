@@ -47,3 +47,21 @@ verify_jwt = false
 
 [functions.detect-duplicates]
 verify_jwt = false
+
+[functions.fetch-executive-orders]
+verify_jwt = false
+
+[functions.track-state-actions]
+verify_jwt = false
+
+[functions.smart-alerting]
+verify_jwt = false
+
+[functions.run-scheduled-jobs]
+verify_jwt = false
+
+[functions.send-daily-briefing]
+verify_jwt = false
+
+[functions.send-webhook]
+verify_jwt = false
