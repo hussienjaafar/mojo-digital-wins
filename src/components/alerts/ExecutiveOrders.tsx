@@ -11,23 +11,24 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { ExportDialog } from "@/components/reports/ExportDialog";
 
-interface ExecutiveOrder {
-  id: string;
-  document_number: string;
-  title: string;
-  abstract: string;
-  signing_date: string;
-  publication_date: string;
-  president: string;
-  executive_order_number: number;
-  document_type: string;
-  agencies: string[];
-  topics: string[];
-  relevance_score: number;
-  threat_level: string;
-  auto_tags: string[];
-  html_url: string;
-  pdf_url: string;
+import type { Database } from "@/integrations/supabase/types";
+
+type ExecutiveOrderRow = Database['public']['Tables']['executive_orders']['Row'];
+
+interface ExecutiveOrder extends ExecutiveOrderRow {
+  document_number?: string;
+  abstract?: string;
+  signing_date?: string;
+  publication_date?: string;
+  president?: string;
+  executive_order_number?: number;
+  document_type?: string;
+  agencies?: string[];
+  topics?: string[];
+  auto_tags?: string[];
+  html_url?: string;
+  pdf_url?: string;
+  threat_level?: string;
 }
 
 const threatLevelColors: Record<string, string> = {
@@ -60,7 +61,7 @@ export function ExecutiveOrders() {
       const { data, error } = await supabase
         .from('executive_orders')
         .select('*')
-        .order('signing_date', { ascending: false })
+        .order('issued_date', { ascending: false })
         .limit(100);
 
       if (error) throw error;
