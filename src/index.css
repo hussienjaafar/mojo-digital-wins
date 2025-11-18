@@ -1,5 +1,6 @@
 /* Import React Grid Layout styles - MUST be before tailwind directives */
 @import './components/dashboard/dashboard-grid.css';
+@import './styles/accessibility.css';
 
 @tailwind base;
 @tailwind components;
