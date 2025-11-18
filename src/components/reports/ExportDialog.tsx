@@ -16,7 +16,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Download, FileText, FileSpreadsheet, FileJson, CalendarIcon, Loader2 } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { format as formatDate, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -50,7 +50,7 @@ export function ExportDialog({
         body: {
           report_type: reportType,
           format,
-          start_date: format === "string" ? startDate.toISOString().split("T")[0] : startDate.toISOString().split("T")[0],
+          start_date: startDate.toISOString().split("T")[0],
           end_date: endDate.toISOString().split("T")[0],
         },
       });
@@ -151,7 +151,7 @@ export function ExportDialog({
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? format(startDate, "MMM d") : "Pick date"}
+                      {startDate ? formatDate(startDate, "PPP") : "Pick date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -176,7 +176,7 @@ export function ExportDialog({
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? format(endDate, "MMM d") : "Pick date"}
+                      {endDate ? formatDate(endDate, "PPP") : "Pick date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">

@@ -23,33 +23,10 @@ import {
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
-interface ScheduledJob {
-  id: string;
-  job_name: string;
-  job_type: string;
-  description: string;
-  cron_expression: string;
-  is_enabled: boolean;
-  last_run_at: string | null;
-  last_run_status: string | null;
-  last_run_duration_ms: number | null;
-  last_error: string | null;
-  next_run_at: string | null;
-  run_count: number;
-  failure_count: number;
-}
+import type { Database } from "@/integrations/supabase/types";
 
-interface JobExecution {
-  id: string;
-  job_id: string;
-  started_at: string;
-  completed_at: string | null;
-  status: string;
-  duration_ms: number | null;
-  items_processed: number;
-  items_created: number;
-  error_message: string | null;
-}
+type ScheduledJob = Database['public']['Tables']['scheduled_jobs']['Row'];
+type JobExecution = Database['public']['Tables']['job_executions']['Row'];
 
 const SyncScheduler = () => {
   const { toast } = useToast();
@@ -99,12 +76,12 @@ const SyncScheduler = () => {
     try {
       const { error } = await supabase
         .from('scheduled_jobs')
-        .update({ is_enabled: isEnabled, updated_at: new Date().toISOString() })
+        .update({ is_active: isEnabled, updated_at: new Date().toISOString() })
         .eq('id', jobId);
 
       if (error) throw error;
 
-      setJobs(jobs.map(j => j.id === jobId ? { ...j, is_enabled: isEnabled } : j));
+      setJobs(jobs.map(j => j.id === jobId ? { ...j, is_active: isEnabled } : j));
 
       toast({
         title: isEnabled ? "Job Enabled" : "Job Disabled",
@@ -313,17 +290,17 @@ const SyncScheduler = () => {
                   <div key={job.id} className="border rounded-lg p-4 space-y-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(job.last_run_status)}
-                          <h4 className="font-semibold">{job.job_name}</h4>
-                          {getStatusBadge(job.last_run_status)}
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {job.description}
-                        </p>
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(null)}
+                            <h4 className="font-semibold">{job.job_name}</h4>
+                            {getStatusBadge(null)}
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {job.job_type}
+                          </p>
                       </div>
                       <Switch
-                        checked={job.is_enabled}
+                        checked={job.is_active}
                         onCheckedChange={(checked) => toggleJob(job.id, checked)}
                       />
                     </div>
@@ -331,11 +308,9 @@ const SyncScheduler = () => {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <Label className="text-xs text-muted-foreground">Schedule</Label>
-                        <Input
-                          value={job.cron_expression}
-                          onChange={(e) => updateCronExpression(job.id, e.target.value)}
-                          className="h-8 text-xs font-mono"
-                        />
+                        <p className="text-xs mt-1 font-mono">
+                          {job.schedule}
+                        </p>
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">Last Run</Label>
@@ -354,18 +329,12 @@ const SyncScheduler = () => {
                         </p>
                       </div>
                       <div>
-                        <Label className="text-xs text-muted-foreground">Stats</Label>
+                        <Label className="text-xs text-muted-foreground">Status</Label>
                         <p className="text-xs mt-1">
-                          {job.run_count} runs, {job.failure_count} failures
+                          {job.is_active ? 'Active' : 'Inactive'}
                         </p>
                       </div>
                     </div>
-
-                    {job.last_error && (
-                      <div className="bg-red-50 text-red-800 text-xs p-2 rounded">
-                        Last error: {job.last_error}
-                      </div>
-                    )}
 
                     <div className="flex justify-end">
                       <Button
@@ -431,13 +400,8 @@ const SyncScheduler = () => {
                           {exec.duration_ms ? `${exec.duration_ms}ms` : '-'}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {exec.items_processed > 0 && (
-                            <span>{exec.items_processed} processed</span>
-                          )}
-                          {exec.items_created > 0 && (
-                            <span className="ml-2 text-green-600">
-                              +{exec.items_created} new
-                            </span>
+                          {exec.result && typeof exec.result === 'object' && 'items_processed' in exec.result && (
+                            <span>{(exec.result as any).items_processed} processed</span>
                           )}
                         </TableCell>
                         <TableCell className="text-sm text-red-600 max-w-[200px] truncate">

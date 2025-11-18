@@ -61,15 +61,29 @@ export function CriticalAlerts() {
     try {
       setLoading(true);
 
-      // Fetch from the critical_alerts view
+      // Fetch from alert_queue for critical/high severity items
       const { data, error } = await supabase
-        .from('critical_alerts')
+        .from('alert_queue')
         .select('*')
-        .order('date', { ascending: false })
+        .in('severity', ['critical', 'high'])
+        .order('created_at', { ascending: false })
         .limit(20);
 
       if (error) throw error;
-      setAlerts(data || []);
+      
+      // Map to CriticalAlert format
+      const mappedAlerts: CriticalAlert[] = (data || []).map(alert => ({
+        source_type: alert.alert_type,
+        id: alert.id,
+        title: alert.title,
+        summary: alert.message,
+        date: alert.created_at || '',
+        threat_level: alert.severity,
+        affected_organizations: [],
+        url: '',
+      }));
+      
+      setAlerts(mappedAlerts);
     } catch (error) {
       console.error('Error fetching critical alerts:', error);
     } finally {

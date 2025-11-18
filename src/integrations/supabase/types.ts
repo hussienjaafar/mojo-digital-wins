@@ -1183,6 +1183,105 @@ export type Database = {
         }
         Relationships: []
       }
+      export_templates: {
+        Row: {
+          columns: Json
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          filters: Json | null
+          id: string
+          is_active: boolean | null
+          is_system: boolean | null
+          template_name: string
+          template_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          columns: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          filters?: Json | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          template_name: string
+          template_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          columns?: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          filters?: Json | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          template_name?: string
+          template_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      generated_reports: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          date_range_end: string | null
+          date_range_start: string | null
+          error_message: string | null
+          file_size_bytes: number | null
+          file_url: string | null
+          filters: Json | null
+          generated_by: string | null
+          id: string
+          metadata: Json | null
+          page_count: number | null
+          report_format: string
+          report_name: string
+          report_type: string
+          status: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          date_range_end?: string | null
+          date_range_start?: string | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          file_url?: string | null
+          filters?: Json | null
+          generated_by?: string | null
+          id?: string
+          metadata?: Json | null
+          page_count?: number | null
+          report_format: string
+          report_name: string
+          report_type: string
+          status?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          date_range_end?: string | null
+          date_range_start?: string | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          file_url?: string | null
+          filters?: Json | null
+          generated_by?: string | null
+          id?: string
+          metadata?: Json | null
+          page_count?: number | null
+          report_format?: string
+          report_name?: string
+          report_type?: string
+          status?: string | null
+        }
+        Relationships: []
+      }
       government_announcements: {
         Row: {
           agency: string
@@ -1761,6 +1860,68 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_reports: {
+        Row: {
+          created_at: string | null
+          filters: Json | null
+          id: string
+          is_active: boolean | null
+          last_generated_at: string | null
+          next_generation_at: string | null
+          recipients: string[] | null
+          report_name: string
+          report_type: string
+          schedule: string
+          schedule_day: number | null
+          schedule_time: string | null
+          template_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          filters?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_generated_at?: string | null
+          next_generation_at?: string | null
+          recipients?: string[] | null
+          report_name: string
+          report_type: string
+          schedule: string
+          schedule_day?: number | null
+          schedule_time?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          filters?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_generated_at?: string | null
+          next_generation_at?: string | null
+          recipients?: string[] | null
+          report_name?: string
+          report_type?: string
+          schedule?: string
+          schedule_day?: number | null
+          schedule_time?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_reports_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "export_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sentiment_trends: {
         Row: {
           avg_sentiment_score: number | null
@@ -2176,6 +2337,15 @@ export type Database = {
           total_sms_cost: number
           total_sms_sent: number
         }[]
+      }
+      get_export_data: {
+        Args: {
+          p_end_date?: string
+          p_export_type: string
+          p_filters?: Json
+          p_start_date?: string
+        }
+        Returns: Json
       }
       get_submissions_with_details: {
         Args: never
