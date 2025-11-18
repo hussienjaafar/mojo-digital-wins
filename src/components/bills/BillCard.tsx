@@ -12,29 +12,54 @@ interface BillCardProps {
     bill_number: string;
     bill_type: string;
     title: string;
-    current_status: string;
+    current_status: string | null;
     sponsor_name: string | null;
     sponsor_party: string | null;
     sponsor_state: string | null;
-    cosponsor_count: number;
-    cosponsor_party_breakdown: Record<string, number>;
+    cosponsor_count: number | null;
+    cosponsor_party_breakdown: Record<string, number> | null;
     latest_action_date: string | null;
     latest_action_text: string | null;
-    committee_assignments: string[];
-    related_bills: string[];
+    committee_assignments: string[] | null;
+    related_bills: string[] | null;
     bill_text_url: string | null;
-    congress_gov_url: string | null;
-    relevance_score: number;
-    threat_level: string;
+    congress: number;
+    relevance_score: number | null;
     introduced_date: string | null;
   };
 }
+
+// Calculate threat level from relevance score
+const getThreatLevel = (score: number | null): string => {
+  if (!score) return 'low';
+  if (score >= 50) return 'critical';
+  if (score >= 30) return 'high';
+  if (score >= 15) return 'medium';
+  return 'low';
+};
 
 const THREAT_COLORS: Record<string, string> = {
   'critical': 'border-l-4 border-l-red-500',
   'high': 'border-l-4 border-l-orange-500',
   'medium': 'border-l-4 border-l-yellow-500',
   'low': '',
+};
+
+// Generate Congress.gov URL from bill data
+const getCongressGovUrl = (billNumber: string, billType: string, congress: number): string => {
+  const numberOnly = billNumber.replace(/[^0-9]/g, '');
+  const typeMap: Record<string, string> = {
+    'hr': 'house-bill',
+    's': 'senate-bill',
+    'hjres': 'house-joint-resolution',
+    'sjres': 'senate-joint-resolution',
+    'hconres': 'house-concurrent-resolution',
+    'sconres': 'senate-concurrent-resolution',
+    'hres': 'house-resolution',
+    'sres': 'senate-resolution',
+  };
+  const urlType = typeMap[billType.toLowerCase()] || billType;
+  return `https://www.congress.gov/bill/${congress}th-congress/${urlType}/${numberOnly}`;
 };
 
 const STATUS_STEPS = {
@@ -54,8 +79,10 @@ const PARTY_COLORS: Record<string, string> = {
 };
 
 export function BillCard({ bill }: BillCardProps) {
-  const statusInfo = STATUS_STEPS[bill.current_status as keyof typeof STATUS_STEPS] || STATUS_STEPS.introduced;
-  const threatStyle = THREAT_COLORS[bill.threat_level] || '';
+  const statusInfo = STATUS_STEPS[(bill.current_status || 'introduced') as keyof typeof STATUS_STEPS] || STATUS_STEPS.introduced;
+  const threatLevel = getThreatLevel(bill.relevance_score);
+  const threatStyle = THREAT_COLORS[threatLevel] || '';
+  const congressGovUrl = getCongressGovUrl(bill.bill_number, bill.bill_type, bill.congress);
 
   return (
     <Card className={`hover:shadow-lg transition-shadow ${threatStyle}`}>
@@ -112,23 +139,25 @@ export function BillCard({ bill }: BillCardProps) {
         )}
 
         {/* Cosponsors */}
-        {bill.cosponsor_count > 0 && (
+        {bill.cosponsor_count && bill.cosponsor_count > 0 && (
           <div className="text-sm space-y-1">
             <div className="flex items-center gap-2">
               <span className="font-medium">Cosponsors:</span>
               <span className="text-muted-foreground">{bill.cosponsor_count} total</span>
             </div>
-            <div className="flex gap-2">
-              {Object.entries(bill.cosponsor_party_breakdown).map(([party, count]) => (
-                <Badge 
-                  key={party}
-                  variant="outline"
-                  className={`text-xs ${PARTY_COLORS[party]} text-white border-0`}
-                >
-                  {party}: {count}
-                </Badge>
-              ))}
-            </div>
+            {bill.cosponsor_party_breakdown && (
+              <div className="flex gap-2">
+                {Object.entries(bill.cosponsor_party_breakdown).map(([party, count]) => (
+                  <Badge
+                    key={party}
+                    variant="outline"
+                    className={`text-xs ${PARTY_COLORS[party]} text-white border-0`}
+                  >
+                    {party}: {count}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -148,7 +177,7 @@ export function BillCard({ bill }: BillCardProps) {
         )}
 
         {/* Committees */}
-        {bill.committee_assignments.length > 0 && (
+        {bill.committee_assignments && bill.committee_assignments.length > 0 && (
           <div className="text-sm">
             <span className="font-medium">Committees:</span>
             <div className="flex flex-wrap gap-1 mt-1">
@@ -167,7 +196,7 @@ export function BillCard({ bill }: BillCardProps) {
         )}
 
         {/* Related Bills */}
-        {bill.related_bills.length > 0 && (
+        {bill.related_bills && bill.related_bills.length > 0 && (
           <div className="text-sm">
             <span className="font-medium">Related Bills:</span>
             <div className="flex flex-wrap gap-1 mt-1">
@@ -198,24 +227,22 @@ export function BillCard({ bill }: BillCardProps) {
               View Details
             </Link>
           </Button>
-          {(bill.congress_gov_url || bill.bill_text_url) && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              asChild
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            asChild
+          >
+            <a
+              href={congressGovUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2"
             >
-              <a
-                href={bill.congress_gov_url || bill.bill_text_url || ''}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Congress.gov
-              </a>
-            </Button>
-          )}
+              <ExternalLink className="w-4 h-4" />
+              Congress.gov
+            </a>
+          </Button>
         </div>
       </CardContent>
     </Card>

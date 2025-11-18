@@ -137,7 +137,7 @@ serve(async (req) => {
             }
           }
 
-          // Upsert bill into database
+          // Upsert bill into database (matching Lovable's schema)
           const { error: billError } = await supabaseClient
             .from('bills')
             .upsert({
@@ -164,6 +164,11 @@ serve(async (req) => {
             }, {
               onConflict: 'bill_number'
             });
+
+          // Log successful inserts for debugging
+          if (!billError) {
+            console.log(`Inserted bill: ${billDetail.number} with relevance ${relevanceScore}`);
+          }
 
           if (billError) {
             console.error(`Error upserting bill ${billDetail.number}:`, billError);
