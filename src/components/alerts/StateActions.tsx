@@ -14,21 +14,19 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { ExportDialog } from "@/components/reports/ExportDialog";
 
-interface StateAction {
-  id: string;
-  state_code: string;
-  state_name: string;
-  action_type: string;
-  title: string;
-  description: string;
-  source_url: string;
-  official_name: string;
-  official_title: string;
-  action_date: string;
-  relevance_score: number;
-  threat_level: string;
-  auto_tags: string[];
-  affected_organizations: string[];
+import type { Database } from "@/integrations/supabase/types";
+
+type StateActionRow = Database['public']['Tables']['state_actions']['Row'];
+
+interface StateAction extends StateActionRow {
+  state_code?: string;
+  state_name?: string;
+  official_name?: string;
+  official_title?: string;
+  action_date?: string;
+  auto_tags?: string[];
+  affected_organizations?: string[];
+  threat_level?: string;
 }
 
 const threatLevelColors: Record<string, string> = {
@@ -84,7 +82,7 @@ export function StateActions() {
       const { data, error } = await supabase
         .from('state_actions')
         .select('*')
-        .order('action_date', { ascending: false })
+        .order('introduced_date', { ascending: false })
         .limit(100);
 
       if (error) throw error;

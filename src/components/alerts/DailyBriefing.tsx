@@ -23,31 +23,31 @@ import {
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
-interface DailyBriefingData {
-  id: string;
-  briefing_date: string;
-  total_articles: number;
-  total_bills: number;
-  total_executive_orders: number;
-  total_state_actions: number;
-  critical_count: number;
-  high_count: number;
-  medium_count: number;
-  top_critical_items: any[];
-  breaking_news_clusters: string[];
-  organization_mentions: Record<string, { total: number; critical: number; high: number }>;
-  executive_summary: string;
-  key_takeaways: string[];
+import type { Database } from "@/integrations/supabase/types";
+
+type DailyBriefingRow = Database['public']['Tables']['daily_briefings']['Row'];
+type BreakingNewsRow = Database['public']['Tables']['breaking_news_clusters']['Row'];
+
+interface DailyBriefingData extends DailyBriefingRow {
+  total_articles?: number;
+  total_bills?: number;
+  total_executive_orders?: number;
+  total_state_actions?: number;
+  critical_count?: number;
+  high_count?: number;
+  medium_count?: number;
+  top_critical_items?: any[];
+  breaking_news_clusters?: string[];
+  organization_mentions?: Record<string, { total: number; critical: number; high: number }>;
+  executive_summary?: string;
+  key_takeaways?: string[];
 }
 
-interface BreakingNewsCluster {
-  id: string;
-  cluster_topic: string;
-  article_count: number;
-  source_names: string[];
-  threat_level: string;
-  affected_organizations: string[];
-  first_detected_at: string;
+interface BreakingNewsCluster extends BreakingNewsRow {
+  cluster_topic?: string;
+  article_count?: number;
+  source_names?: string[];
+  affected_organizations?: string[];
 }
 
 export function DailyBriefing() {
@@ -80,7 +80,7 @@ export function DailyBriefing() {
       const { data: newsData } = await supabase
         .from('breaking_news_clusters')
         .select('*')
-        .eq('is_active', true)
+        .eq('is_resolved', false)
         .gte('first_detected_at', today)
         .order('first_detected_at', { ascending: false });
 
@@ -125,7 +125,7 @@ export function DailyBriefing() {
   };
 
   const totalItems = briefing
-    ? briefing.total_articles + briefing.total_bills + briefing.total_executive_orders + briefing.total_state_actions
+    ? (briefing.total_articles || 0) + (briefing.total_bills || 0) + (briefing.total_executive_orders || 0) + (briefing.total_state_actions || 0)
     : 0;
 
   const threatScore = briefing
@@ -288,13 +288,19 @@ export function DailyBriefing() {
                   <div className="space-y-3">
                     {breakingNews.map((cluster) => (
                       <Card key={cluster.id} className={`${
-                        cluster.threat_level === 'critical' ? 'border-red-300' :
-                        cluster.threat_level === 'high' ? 'border-orange-300' : ''
+                        typeof cluster.threat_level === 'number' 
+                          ? (cluster.threat_level >= 75 ? 'border-red-300' : cluster.threat_level >= 50 ? 'border-orange-300' : '')
+                          : (cluster.threat_level === 'critical' ? 'border-red-300' : cluster.threat_level === 'high' ? 'border-orange-300' : '')
                       }`}>
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between gap-2 mb-2">
-                            <Badge variant={cluster.threat_level === 'critical' ? 'destructive' : 'secondary'}>
-                              {cluster.article_count} sources
+                            <Badge variant={
+                              (typeof cluster.threat_level === 'number' && cluster.threat_level >= 75) ||
+                              (typeof cluster.threat_level === 'string' && cluster.threat_level === 'critical')
+                                ? 'destructive' 
+                                : 'secondary'
+                            }>
+                              {cluster.article_count || cluster.article_ids?.length || 0} sources
                             </Badge>
                             <span className="text-xs text-muted-foreground">
                               {format(new Date(cluster.first_detected_at), 'h:mm a')}
