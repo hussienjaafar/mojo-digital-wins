@@ -13,10 +13,12 @@ import {
   Building2,
   ExternalLink,
   RefreshCw,
-  Bell
+  Bell,
+  Download
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { ExportDialog } from "@/components/reports/ExportDialog";
 
 interface CriticalAlert {
   source_type: string;
@@ -157,10 +159,22 @@ export function CriticalAlerts() {
                 {criticalCount} critical, {highCount} high priority items from all sources
               </CardDescription>
             </div>
-            <Button onClick={syncAllSources} disabled={syncing} size="sm">
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-              Sync All
-            </Button>
+            <div className="flex gap-2">
+              <ExportDialog
+                reportType="critical_alerts"
+                title="Critical Alerts"
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                }
+              />
+              <Button onClick={syncAllSources} disabled={syncing} size="sm">
+                <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                Sync All
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

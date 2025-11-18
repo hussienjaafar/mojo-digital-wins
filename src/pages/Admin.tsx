@@ -29,6 +29,7 @@ import { ExecutiveOrders } from "@/components/alerts/ExecutiveOrders";
 import { StateActions } from "@/components/alerts/StateActions";
 import { DailyBriefing } from "@/components/alerts/DailyBriefing";
 import { AlertSettings } from "@/components/alerts/AlertSettings";
+import { ReportHistory } from "@/components/reports/ReportHistory";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar, navigationGroups } from "@/components/AdminSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -241,6 +242,8 @@ const Admin = () => {
         return <Analytics />;
       case "bookmarks":
         return <Bookmarks />;
+      case "reports":
+        return <ReportHistory />;
       case "alert-settings":
         return <AlertSettings />;
       case "clients":

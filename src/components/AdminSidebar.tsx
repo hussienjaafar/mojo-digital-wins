@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   Landmark,
   Bell,
+  Download,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import {
@@ -92,6 +93,7 @@ export const navigationGroups: NavigationGroup[] = [
       { title: "Bills", icon: ScrollText, value: "bills" },
       { title: "Analytics", icon: BarChart3, value: "content-analytics" },
       { title: "Bookmarks", icon: Bookmark, value: "bookmarks" },
+      { title: "Reports", icon: Download, value: "reports" },
       { title: "Alert Settings", icon: Bell, value: "alert-settings" },
     ],
   },

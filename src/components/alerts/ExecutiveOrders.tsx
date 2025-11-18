@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LoadingCard } from "@/components/ui/loading-spinner";
-import { Shield, RefreshCw, Search, ExternalLink, FileText, Calendar } from "lucide-react";
+import { Shield, RefreshCw, Search, ExternalLink, FileText, Calendar, Download } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { ExportDialog } from "@/components/reports/ExportDialog";
 
 interface ExecutiveOrder {
   id: string;
@@ -138,10 +139,22 @@ export function ExecutiveOrders() {
             Tracking {filteredOrders.length} relevant presidential actions
           </p>
         </div>
-        <Button onClick={syncOrders} disabled={syncing}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-          Sync Orders
-        </Button>
+        <div className="flex gap-2">
+          <ExportDialog
+            reportType="executive_orders"
+            title="Executive Orders"
+            trigger={
+              <Button variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+            }
+          />
+          <Button onClick={syncOrders} disabled={syncing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            Sync Orders
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { LoadingCard } from "@/components/ui/loading-spinner";
-import { Building2, RefreshCw, Search, ExternalLink, Plus, MapPin } from "lucide-react";
+import { Building2, RefreshCw, Search, ExternalLink, Plus, MapPin, Download } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { ExportDialog } from "@/components/reports/ExportDialog";
 
 interface StateAction {
   id: string;
@@ -211,6 +212,16 @@ export function StateActions() {
           </p>
         </div>
         <div className="flex gap-2">
+          <ExportDialog
+            reportType="state_actions"
+            title="State Actions"
+            trigger={
+              <Button variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+            }
+          />
           <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <DialogTrigger asChild>
               <Button variant="outline">
