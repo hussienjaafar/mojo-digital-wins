@@ -1,0 +1,467 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Organizations to track
+const TRACKED_ORGANIZATIONS = [
+  { abbrev: 'CAIR', full: 'Council on American-Islamic Relations', variants: ['cair', 'council on american-islamic relations'] },
+  { abbrev: 'MPAC', full: 'Muslim Public Affairs Council', variants: ['mpac', 'muslim public affairs council'] },
+  { abbrev: 'ISNA', full: 'Islamic Society of North America', variants: ['isna', 'islamic society of north america'] },
+  { abbrev: 'ADC', full: 'American-Arab Anti-Discrimination Committee', variants: ['adc', 'american-arab anti-discrimination'] },
+  { abbrev: 'AAI', full: 'Arab American Institute', variants: ['aai', 'arab american institute'] },
+  { abbrev: 'MAS', full: 'Muslim American Society', variants: ['mas', 'muslim american society'] },
+  { abbrev: 'ICNA', full: 'Islamic Circle of North America', variants: ['icna', 'islamic circle of north america'] },
+  { abbrev: 'ACLU', full: 'American Civil Liberties Union', variants: ['aclu', 'american civil liberties union'] },
+  { abbrev: 'NAIT', full: 'North American Islamic Trust', variants: ['nait', 'north american islamic trust'] },
+];
+
+// Simple similarity function for breaking news detection
+function calculateSimilarity(text1: string, text2: string): number {
+  const words1 = new Set(text1.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+  const words2 = new Set(text2.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+
+  const intersection = new Set([...words1].filter(x => words2.has(x)));
+  const union = new Set([...words1, ...words2]);
+
+  return intersection.size / union.size;
+}
+
+// Extract context around organization mention
+function extractMentionContext(text: string, orgName: string): string {
+  const lowerText = text.toLowerCase();
+  const index = lowerText.indexOf(orgName.toLowerCase());
+
+  if (index === -1) return '';
+
+  const start = Math.max(0, index - 100);
+  const end = Math.min(text.length, index + orgName.length + 100);
+
+  return '...' + text.substring(start, end) + '...';
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const body = await req.json().catch(() => ({}));
+    const action = body.action || 'full';
+
+    console.log(`Smart Alerting: Running action "${action}"`);
+
+    const results: any = {};
+
+    // =================================================================
+    // 1. DETECT BREAKING NEWS (Multiple sources reporting same story)
+    // =================================================================
+    if (action === 'full' || action === 'breaking_news') {
+      console.log('Detecting breaking news clusters...');
+
+      // Get recent articles (last 6 hours)
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+      const { data: recentArticles } = await supabase
+        .from('articles')
+        .select('id, title, description, source_name, threat_level, affected_organizations, published_date')
+        .gte('published_date', sixHoursAgo)
+        .order('published_date', { ascending: false });
+
+      const clusters: Map<string, any> = new Map();
+      const processed = new Set<string>();
+
+      for (const article of recentArticles || []) {
+        if (processed.has(article.id)) continue;
+
+        const clusterArticles = [article];
+        const clusterSources = new Set([article.source_name]);
+
+        // Find similar articles
+        for (const other of recentArticles || []) {
+          if (other.id === article.id || processed.has(other.id)) continue;
+
+          const similarity = calculateSimilarity(
+            `${article.title} ${article.description || ''}`,
+            `${other.title} ${other.description || ''}`
+          );
+
+          if (similarity > 0.4) {
+            clusterArticles.push(other);
+            clusterSources.add(other.source_name);
+            processed.add(other.id);
+          }
+        }
+
+        // Breaking news = 3+ sources reporting
+        if (clusterSources.size >= 3) {
+          const clusterKey = article.title.substring(0, 50);
+
+          // Determine cluster threat level (highest of all articles)
+          const threatLevels = ['critical', 'high', 'medium', 'low'];
+          let clusterThreat = 'low';
+          for (const level of threatLevels) {
+            if (clusterArticles.some(a => a.threat_level === level)) {
+              clusterThreat = level;
+              break;
+            }
+          }
+
+          // Collect affected organizations
+          const affectedOrgs = new Set<string>();
+          clusterArticles.forEach(a => {
+            (a.affected_organizations || []).forEach((org: string) => affectedOrgs.add(org));
+          });
+
+          clusters.set(clusterKey, {
+            topic: article.title,
+            articles: clusterArticles,
+            sources: Array.from(clusterSources),
+            threatLevel: clusterThreat,
+            affectedOrgs: Array.from(affectedOrgs),
+            primaryArticleId: article.id,
+          });
+        }
+
+        processed.add(article.id);
+      }
+
+      // Save breaking news clusters
+      let clustersCreated = 0;
+      for (const [key, cluster] of clusters) {
+        const { error } = await supabase
+          .from('breaking_news_clusters')
+          .upsert({
+            cluster_topic: cluster.topic,
+            article_count: cluster.articles.length,
+            source_names: cluster.sources,
+            threat_level: cluster.threatLevel,
+            affected_organizations: cluster.affectedOrgs,
+            primary_article_id: cluster.primaryArticleId,
+            last_updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'cluster_topic'
+          });
+
+        if (!error) clustersCreated++;
+
+        // Create alert for breaking news
+        if (cluster.sources.length >= 3) {
+          await supabase.from('alert_queue').insert({
+            alert_type: 'breaking_news',
+            priority: cluster.threatLevel,
+            source_type: 'breaking_news_cluster',
+            source_id: cluster.primaryArticleId,
+            title: `🔴 Breaking: ${cluster.sources.length} sources reporting`,
+            message: cluster.topic,
+            metadata: {
+              sources: cluster.sources,
+              article_count: cluster.articles.length,
+              affected_organizations: cluster.affectedOrgs,
+            },
+          });
+        }
+      }
+
+      results.breaking_news = { clustersFound: clusters.size, clustersCreated };
+      console.log(`Found ${clusters.size} breaking news clusters`);
+    }
+
+    // =================================================================
+    // 2. TRACK ORGANIZATION MENTIONS
+    // =================================================================
+    if (action === 'full' || action === 'org_mentions') {
+      console.log('Tracking organization mentions...');
+
+      let mentionsFound = 0;
+      const today = new Date().toISOString().split('T')[0];
+
+      // Check articles
+      const { data: todayArticles } = await supabase
+        .from('articles')
+        .select('id, title, description, content, threat_level')
+        .gte('published_date', today);
+
+      for (const article of todayArticles || []) {
+        const text = `${article.title} ${article.description || ''} ${article.content || ''}`.toLowerCase();
+
+        for (const org of TRACKED_ORGANIZATIONS) {
+          for (const variant of org.variants) {
+            if (text.includes(variant)) {
+              // Check if mention already exists
+              const { data: existing } = await supabase
+                .from('organization_mentions')
+                .select('id')
+                .eq('source_type', 'article')
+                .eq('source_id', article.id)
+                .eq('organization_abbrev', org.abbrev)
+                .single();
+
+              if (!existing) {
+                await supabase.from('organization_mentions').insert({
+                  organization_name: org.full,
+                  organization_abbrev: org.abbrev,
+                  source_type: 'article',
+                  source_id: article.id,
+                  source_title: article.title,
+                  mention_context: extractMentionContext(article.title + ' ' + (article.description || ''), variant),
+                  threat_level: article.threat_level,
+                });
+                mentionsFound++;
+
+                // Create alert for organization mention if threat level is high
+                if (article.threat_level === 'critical' || article.threat_level === 'high') {
+                  await supabase.from('alert_queue').insert({
+                    alert_type: 'org_mention',
+                    priority: article.threat_level,
+                    source_type: 'article',
+                    source_id: article.id,
+                    title: `${org.abbrev} mentioned in ${article.threat_level} alert`,
+                    message: article.title,
+                    metadata: { organization: org.abbrev },
+                  });
+                }
+              }
+              break; // Only count once per org per article
+            }
+          }
+        }
+      }
+
+      // Check state actions
+      const { data: todayStateActions } = await supabase
+        .from('state_actions')
+        .select('id, title, description, threat_level')
+        .gte('action_date', today);
+
+      for (const action of todayStateActions || []) {
+        const text = `${action.title} ${action.description || ''}`.toLowerCase();
+
+        for (const org of TRACKED_ORGANIZATIONS) {
+          for (const variant of org.variants) {
+            if (text.includes(variant)) {
+              const { data: existing } = await supabase
+                .from('organization_mentions')
+                .select('id')
+                .eq('source_type', 'state_action')
+                .eq('source_id', action.id)
+                .eq('organization_abbrev', org.abbrev)
+                .single();
+
+              if (!existing) {
+                await supabase.from('organization_mentions').insert({
+                  organization_name: org.full,
+                  organization_abbrev: org.abbrev,
+                  source_type: 'state_action',
+                  source_id: action.id,
+                  source_title: action.title,
+                  mention_context: extractMentionContext(action.title + ' ' + (action.description || ''), variant),
+                  threat_level: action.threat_level,
+                });
+                mentionsFound++;
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      results.org_mentions = { mentionsFound };
+      console.log(`Tracked ${mentionsFound} organization mentions`);
+    }
+
+    // =================================================================
+    // 3. GENERATE DAILY BRIEFING
+    // =================================================================
+    if (action === 'full' || action === 'daily_briefing') {
+      console.log('Generating daily briefing...');
+
+      const today = new Date().toISOString().split('T')[0];
+
+      // Get briefing stats
+      const { data: stats } = await supabase.rpc('get_briefing_stats', { target_date: today });
+
+      // Get top critical items
+      const { data: criticalArticles } = await supabase
+        .from('articles')
+        .select('id, title, threat_level, source_name')
+        .eq('threat_level', 'critical')
+        .gte('published_date', today)
+        .limit(5);
+
+      const { data: criticalBills } = await supabase
+        .from('bills')
+        .select('id, title, threat_level, bill_number')
+        .eq('threat_level', 'critical')
+        .gte('latest_action_date', today)
+        .limit(5);
+
+      const { data: criticalStateActions } = await supabase
+        .from('state_actions')
+        .select('id, title, threat_level, state_code')
+        .eq('threat_level', 'critical')
+        .gte('action_date', today)
+        .limit(5);
+
+      // Get breaking news clusters
+      const { data: breakingNews } = await supabase
+        .from('breaking_news_clusters')
+        .select('id')
+        .eq('is_active', true)
+        .gte('first_detected_at', today);
+
+      // Get organization mentions summary
+      const { data: orgMentions } = await supabase
+        .from('organization_mentions')
+        .select('organization_abbrev, threat_level')
+        .gte('mentioned_at', today);
+
+      const orgSummary: Record<string, { total: number; critical: number; high: number }> = {};
+      for (const mention of orgMentions || []) {
+        if (!orgSummary[mention.organization_abbrev]) {
+          orgSummary[mention.organization_abbrev] = { total: 0, critical: 0, high: 0 };
+        }
+        orgSummary[mention.organization_abbrev].total++;
+        if (mention.threat_level === 'critical') orgSummary[mention.organization_abbrev].critical++;
+        if (mention.threat_level === 'high') orgSummary[mention.organization_abbrev].high++;
+      }
+
+      // Calculate totals
+      const totalCritical =
+        (stats?.articles?.critical || 0) +
+        (stats?.bills?.critical || 0) +
+        (stats?.executive_orders?.critical || 0) +
+        (stats?.state_actions?.critical || 0);
+
+      const totalHigh =
+        (stats?.articles?.high || 0) +
+        (stats?.bills?.high || 0) +
+        (stats?.executive_orders?.high || 0) +
+        (stats?.state_actions?.high || 0);
+
+      // Upsert daily briefing
+      const { error: briefingError } = await supabase
+        .from('daily_briefings')
+        .upsert({
+          briefing_date: today,
+          total_articles: stats?.articles?.total || 0,
+          total_bills: stats?.bills?.total || 0,
+          total_executive_orders: stats?.executive_orders?.total || 0,
+          total_state_actions: stats?.state_actions?.total || 0,
+          critical_count: totalCritical,
+          high_count: totalHigh,
+          medium_count: 0, // Calculate if needed
+          top_critical_items: [
+            ...(criticalArticles || []).map(a => ({ type: 'article', ...a })),
+            ...(criticalBills || []).map(b => ({ type: 'bill', ...b })),
+            ...(criticalStateActions || []).map(s => ({ type: 'state_action', ...s })),
+          ],
+          breaking_news_clusters: (breakingNews || []).map(b => b.id),
+          organization_mentions: orgSummary,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'briefing_date'
+        });
+
+      results.daily_briefing = {
+        date: today,
+        critical: totalCritical,
+        high: totalHigh,
+        breaking_news: breakingNews?.length || 0,
+        organizations_mentioned: Object.keys(orgSummary).length,
+      };
+
+      console.log(`Daily briefing generated: ${totalCritical} critical, ${totalHigh} high`);
+    }
+
+    // =================================================================
+    // 4. PROCESS ALERT QUEUE
+    // =================================================================
+    if (action === 'full' || action === 'process_queue') {
+      console.log('Processing alert queue...');
+
+      // Get unprocessed alerts
+      const { data: alerts } = await supabase
+        .from('alert_queue')
+        .select('*')
+        .eq('processed', false)
+        .order('priority', { ascending: true }) // critical first
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      let notificationsSent = 0;
+
+      for (const alert of alerts || []) {
+        // Get users who should receive this alert
+        let userQuery = supabase
+          .from('user_article_preferences')
+          .select('user_id, alert_threshold, immediate_critical_alerts, watched_organizations');
+
+        // Filter by threshold
+        if (alert.priority === 'critical') {
+          userQuery = userQuery.eq('immediate_critical_alerts', true);
+        }
+
+        const { data: users } = await userQuery;
+
+        // Create notifications
+        const notifications = [];
+        for (const user of users || []) {
+          // Check if user's threshold allows this alert
+          const thresholds = ['critical', 'high', 'medium', 'low'];
+          const userThresholdIndex = thresholds.indexOf(user.alert_threshold);
+          const alertIndex = thresholds.indexOf(alert.priority);
+
+          if (alertIndex <= userThresholdIndex) {
+            notifications.push({
+              user_id: user.user_id,
+              title: alert.title,
+              message: alert.message,
+              priority: alert.priority,
+              source_type: alert.source_type,
+              source_id: alert.source_id,
+              link: alert.metadata?.url || null,
+            });
+          }
+        }
+
+        if (notifications.length > 0) {
+          await supabase.from('notifications').insert(notifications);
+          notificationsSent += notifications.length;
+        }
+
+        // Mark alert as processed
+        await supabase
+          .from('alert_queue')
+          .update({ processed: true, processed_at: new Date().toISOString() })
+          .eq('id', alert.id);
+      }
+
+      results.process_queue = {
+        alertsProcessed: alerts?.length || 0,
+        notificationsSent,
+      };
+
+      console.log(`Processed ${alerts?.length || 0} alerts, sent ${notificationsSent} notifications`);
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, results }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error in smart-alerting:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});

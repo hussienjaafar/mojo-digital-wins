@@ -1,33 +1,62 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/fixed-client";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, Play, Pause, Trash2 } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  Clock,
+  Play,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  History,
+  Settings,
+  Zap,
+} from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 
-type Organization = {
+interface ScheduledJob {
   id: string;
-  name: string;
-};
+  job_name: string;
+  job_type: string;
+  description: string;
+  cron_expression: string;
+  is_enabled: boolean;
+  last_run_at: string | null;
+  last_run_status: string | null;
+  last_run_duration_ms: number | null;
+  last_error: string | null;
+  next_run_at: string | null;
+  run_count: number;
+  failure_count: number;
+}
 
-type ScheduledSync = {
-  job_id: number;
-  organization_id: string;
-  sync_type: string;
-  cron_schedule: string;
-  is_active: boolean;
-};
+interface JobExecution {
+  id: string;
+  job_id: string;
+  started_at: string;
+  completed_at: string | null;
+  status: string;
+  duration_ms: number | null;
+  items_processed: number;
+  items_created: number;
+  error_message: string | null;
+}
 
 const SyncScheduler = () => {
   const { toast } = useToast();
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [schedules, setSchedules] = useState<ScheduledSync[]>([]);
+  const [jobs, setJobs] = useState<ScheduledJob[]>([]);
+  const [executions, setExecutions] = useState<JobExecution[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [runningJobs, setRunningJobs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
@@ -36,18 +65,25 @@ const SyncScheduler = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const { data: orgsData, error: orgsError } = await (supabase as any)
-        .from('client_organizations')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name');
+      // Fetch scheduled jobs
+      const { data: jobsData, error: jobsError } = await supabase
+        .from('scheduled_jobs')
+        .select('*')
+        .order('job_name');
 
-      if (orgsError) throw orgsError;
-      setOrganizations(orgsData || []);
+      if (jobsError) throw jobsError;
+      setJobs(jobsData || []);
 
-      // In a real implementation, you would query a schedules table
-      // For now, we'll show a placeholder
-      setSchedules([]);
+      // Fetch recent executions
+      const { data: execData, error: execError } = await supabase
+        .from('job_executions')
+        .select('*')
+        .order('started_at', { ascending: false })
+        .limit(50);
+
+      if (execError) throw execError;
+      setExecutions(execData || []);
+
     } catch (error: any) {
       toast({
         title: "Error",
@@ -59,169 +95,399 @@ const SyncScheduler = () => {
     }
   };
 
-  const setupCronJob = async (orgId: string, syncType: string) => {
-    toast({
-      title: "Setting up scheduled sync",
-      description: "Configuring automatic data synchronization...",
-    });
-
+  const toggleJob = async (jobId: string, isEnabled: boolean) => {
     try {
-      // Example SQL for setting up pg_cron job
-      const cronSchedule = '0 2 * * *'; // 2 AM daily
-      
-      const setupSQL = `
--- Enable pg_cron extension (run once)
-CREATE EXTENSION IF NOT EXISTS pg_cron;
+      const { error } = await supabase
+        .from('scheduled_jobs')
+        .update({ is_enabled: isEnabled, updated_at: new Date().toISOString() })
+        .eq('id', jobId);
 
--- Schedule Meta Ads sync
-SELECT cron.schedule(
-  'sync-meta-ads-${orgId}',
-  '${cronSchedule}',
-  $$
-  SELECT net.http_post(
-    url := '${window.location.origin.replace('lovable.app', 'supabase.co')}/functions/v1/sync-meta-ads',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}"}'::jsonb,
-    body := '{"organization_id": "${orgId}"}'::jsonb
-  );
-  $$
-);
+      if (error) throw error;
 
--- Schedule Switchboard SMS sync
-SELECT cron.schedule(
-  'sync-switchboard-${orgId}',
-  '${cronSchedule}',
-  $$
-  SELECT net.http_post(
-    url := '${window.location.origin.replace('lovable.app', 'supabase.co')}/functions/v1/sync-switchboard-sms',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}"}'::jsonb,
-    body := '{"organization_id": "${orgId}"}'::jsonb
-  );
-  $$
-);
-
--- Schedule ROI calculation (runs after syncs)
-SELECT cron.schedule(
-  'calculate-roi-${orgId}',
-  '0 3 * * *', -- 3 AM daily, after syncs complete
-  $$
-  SELECT net.http_post(
-    url := '${window.location.origin.replace('lovable.app', 'supabase.co')}/functions/v1/calculate-roi',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}"}'::jsonb,
-    body := '{"organization_id": "${orgId}"}'::jsonb
-  );
-  $$
-);
-      `;
+      setJobs(jobs.map(j => j.id === jobId ? { ...j, is_enabled: isEnabled } : j));
 
       toast({
-        title: "SQL Generated",
-        description: "Copy the SQL below and run it in your Supabase SQL Editor",
+        title: isEnabled ? "Job Enabled" : "Job Disabled",
+        description: `The scheduled job has been ${isEnabled ? 'enabled' : 'disabled'}`,
       });
-
-      // Copy to clipboard
-      await navigator.clipboard.writeText(setupSQL);
-
-      toast({
-        title: "Copied to Clipboard",
-        description: "SQL has been copied. Run it in your Supabase SQL Editor to set up automated syncing.",
-      });
-
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to generate cron setup",
+        description: error.message || "Failed to update job",
         variant: "destructive",
       });
     }
   };
 
-  const getOrganizationName = (orgId: string) => {
-    return organizations.find(o => o.id === orgId)?.name || 'Unknown';
+  const runJobNow = async (job: ScheduledJob) => {
+    setRunningJobs(prev => new Set(prev).add(job.id));
+
+    try {
+      toast({
+        title: "Running job...",
+        description: `Starting ${job.job_name}`,
+      });
+
+      const { data, error } = await supabase.functions.invoke('run-scheduled-jobs', {
+        body: { job_type: job.job_type, force: true }
+      });
+
+      if (error) throw error;
+
+      const result = data?.results?.[0];
+
+      if (result?.status === 'success') {
+        toast({
+          title: "Job completed",
+          description: `${job.job_name} finished successfully in ${result.duration_ms}ms`,
+        });
+      } else {
+        toast({
+          title: "Job failed",
+          description: result?.error || "Unknown error",
+          variant: "destructive",
+        });
+      }
+
+      // Refresh data
+      await loadData();
+
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to run job",
+        variant: "destructive",
+      });
+    } finally {
+      setRunningJobs(prev => {
+        const next = new Set(prev);
+        next.delete(job.id);
+        return next;
+      });
+    }
+  };
+
+  const runAllJobs = async () => {
+    try {
+      toast({
+        title: "Running all jobs...",
+        description: "Starting all enabled scheduled jobs",
+      });
+
+      const { data, error } = await supabase.functions.invoke('run-scheduled-jobs', {
+        body: { force: true }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Jobs completed",
+        description: `${data.successful} successful, ${data.failed} failed`,
+      });
+
+      await loadData();
+
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to run jobs",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateCronExpression = async (jobId: string, cronExpression: string) => {
+    try {
+      const { error } = await supabase
+        .from('scheduled_jobs')
+        .update({
+          cron_expression: cronExpression,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+
+      if (error) throw error;
+
+      setJobs(jobs.map(j => j.id === jobId ? { ...j, cron_expression: cronExpression } : j));
+
+      toast({
+        title: "Schedule Updated",
+        description: "The cron expression has been updated",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update schedule",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getStatusIcon = (status: string | null) => {
+    switch (status) {
+      case 'success':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'failed':
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      case 'running':
+        return <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-gray-400" />;
+    }
+  };
+
+  const getStatusBadge = (status: string | null) => {
+    switch (status) {
+      case 'success':
+        return <Badge className="bg-green-100 text-green-800">Success</Badge>;
+      case 'failed':
+        return <Badge variant="destructive">Failed</Badge>;
+      case 'running':
+        return <Badge className="bg-blue-100 text-blue-800">Running</Badge>;
+      default:
+        return <Badge variant="secondary">Never Run</Badge>;
+    }
+  };
+
+  const getJobName = (jobId: string) => {
+    return jobs.find(j => j.id === jobId)?.job_name || 'Unknown';
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading schedules...</div>;
+    return (
+      <div className="flex items-center justify-center py-12">
+        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5" />
-            Sync Scheduler
-          </CardTitle>
-          <CardDescription>
-            Set up automated daily syncing for client organizations
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="bg-muted/50 p-4 rounded-lg space-y-3">
-              <h3 className="font-medium">Setup Instructions</h3>
-              <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-                <li>Select an organization below</li>
-                <li>Click "Generate Cron SQL" to copy the setup script</li>
-                <li>Open your Supabase SQL Editor</li>
-                <li>Paste and run the SQL to enable automated syncing</li>
-                <li>Data will sync automatically every night at 2 AM UTC</li>
-              </ol>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Select Organization</Label>
-              {organizations.map((org) => (
-                <div key={org.id} className="flex items-center justify-between p-3 border border-border rounded-md">
-                  <span className="font-medium">{org.name}</span>
-                  <Button onClick={() => setupCronJob(org.id, 'all')} size="sm">
-                    Generate Cron SQL
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {organizations.length === 0 && (
-              <p className="text-center text-muted-foreground py-8">
-                No organizations found. Create an organization first.
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>View Scheduled Jobs</CardTitle>
-          <CardDescription>
-            Check active cron jobs in your Supabase SQL Editor with this query
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            readOnly
-            value={`-- View all scheduled jobs
-SELECT * FROM cron.job;
-
--- View job run history
-SELECT * FROM cron.job_run_details 
-ORDER BY start_time DESC 
-LIMIT 20;
-
--- Unschedule a job (replace job_name)
-SELECT cron.unschedule('sync-meta-ads-org-id');`}
-            className="font-mono text-xs h-32"
-          />
-          <Button
-            onClick={() => {
-              navigator.clipboard.writeText(`SELECT * FROM cron.job;`);
-              toast({ title: "Copied", description: "Query copied to clipboard" });
-            }}
-            variant="outline"
-            size="sm"
-            className="mt-2"
-          >
-            Copy View Jobs Query
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-3xl font-bold flex items-center gap-2">
+            <Clock className="h-7 w-7" />
+            Job Scheduler
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Manage automated data fetching and processing jobs
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={loadData}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
           </Button>
+          <Button onClick={runAllJobs}>
+            <Zap className="w-4 h-4 mr-2" />
+            Run All Now
+          </Button>
+        </div>
+      </div>
+
+      <Tabs defaultValue="jobs" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="jobs" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Scheduled Jobs
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            Execution History
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Jobs Tab */}
+        <TabsContent value="jobs">
+          <Card>
+            <CardHeader>
+              <CardTitle>Scheduled Jobs</CardTitle>
+              <CardDescription>
+                Configure and manage automated data synchronization jobs
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {jobs.map((job) => (
+                  <div key={job.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          {getStatusIcon(job.last_run_status)}
+                          <h4 className="font-semibold">{job.job_name}</h4>
+                          {getStatusBadge(job.last_run_status)}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {job.description}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={job.is_enabled}
+                        onCheckedChange={(checked) => toggleJob(job.id, checked)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Schedule</Label>
+                        <Input
+                          value={job.cron_expression}
+                          onChange={(e) => updateCronExpression(job.id, e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Last Run</Label>
+                        <p className="text-xs mt-1">
+                          {job.last_run_at
+                            ? formatDistanceToNow(new Date(job.last_run_at), { addSuffix: true })
+                            : 'Never'}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Next Run</Label>
+                        <p className="text-xs mt-1">
+                          {job.next_run_at
+                            ? formatDistanceToNow(new Date(job.next_run_at), { addSuffix: true })
+                            : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Stats</Label>
+                        <p className="text-xs mt-1">
+                          {job.run_count} runs, {job.failure_count} failures
+                        </p>
+                      </div>
+                    </div>
+
+                    {job.last_error && (
+                      <div className="bg-red-50 text-red-800 text-xs p-2 rounded">
+                        Last error: {job.last_error}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => runJobNow(job)}
+                        disabled={runningJobs.has(job.id)}
+                      >
+                        {runningJobs.has(job.id) ? (
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Play className="w-4 h-4 mr-2" />
+                        )}
+                        {runningJobs.has(job.id) ? 'Running...' : 'Run Now'}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                {jobs.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No scheduled jobs found. Run the migration to create default jobs.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* History Tab */}
+        <TabsContent value="history">
+          <Card>
+            <CardHeader>
+              <CardTitle>Execution History</CardTitle>
+              <CardDescription>
+                Recent job execution logs and results
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[500px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Started</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead>Error</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {executions.map((exec) => (
+                      <TableRow key={exec.id}>
+                        <TableCell className="font-medium">
+                          {getJobName(exec.job_id)}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(exec.status)}</TableCell>
+                        <TableCell className="text-sm">
+                          {format(new Date(exec.started_at), 'MMM d, h:mm a')}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {exec.duration_ms ? `${exec.duration_ms}ms` : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {exec.items_processed > 0 && (
+                            <span>{exec.items_processed} processed</span>
+                          )}
+                          {exec.items_created > 0 && (
+                            <span className="ml-2 text-green-600">
+                              +{exec.items_created} new
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-red-600 max-w-[200px] truncate">
+                          {exec.error_message || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {executions.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No execution history yet
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Cron Reference */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Cron Expression Reference</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+            <div>
+              <code className="bg-muted px-1 rounded">*/30 * * * *</code>
+              <p className="text-muted-foreground mt-1">Every 30 min</p>
+            </div>
+            <div>
+              <code className="bg-muted px-1 rounded">0 */4 * * *</code>
+              <p className="text-muted-foreground mt-1">Every 4 hours</p>
+            </div>
+            <div>
+              <code className="bg-muted px-1 rounded">0 6,18 * * *</code>
+              <p className="text-muted-foreground mt-1">6 AM & 6 PM</p>
+            </div>
+            <div>
+              <code className="bg-muted px-1 rounded">0 8 * * *</code>
+              <p className="text-muted-foreground mt-1">Daily at 8 AM</p>
+            </div>
+            <div>
+              <code className="bg-muted px-1 rounded">0 0 * * 1</code>
+              <p className="text-muted-foreground mt-1">Weekly Monday</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

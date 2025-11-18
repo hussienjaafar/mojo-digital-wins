@@ -24,6 +24,9 @@ import {
   ScrollText,
   BarChart3,
   Bookmark,
+  AlertTriangle,
+  Landmark,
+  Bell,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import {
@@ -78,13 +81,18 @@ export const navigationGroups: NavigationGroup[] = [
     ],
   },
   {
-    label: "Content",
-    icon: Newspaper,
+    label: "Intelligence",
+    icon: AlertTriangle,
     items: [
+      { title: "Daily Briefing", icon: Calendar, value: "daily-briefing" },
+      { title: "Critical Alerts", icon: AlertTriangle, value: "critical-alerts" },
+      { title: "Executive Orders", icon: Shield, value: "executive-orders" },
+      { title: "State Actions", icon: Landmark, value: "state-actions" },
       { title: "News", icon: Newspaper, value: "news" },
       { title: "Bills", icon: ScrollText, value: "bills" },
       { title: "Analytics", icon: BarChart3, value: "content-analytics" },
       { title: "Bookmarks", icon: Bookmark, value: "bookmarks" },
+      { title: "Alert Settings", icon: Bell, value: "alert-settings" },
     ],
   },
   {

@@ -24,6 +24,11 @@ import { NewsFeed } from "@/components/news/NewsFeed";
 import { BillTracker } from "@/components/bills/BillTracker";
 import Analytics from "@/pages/Analytics";
 import Bookmarks from "@/pages/Bookmarks";
+import { CriticalAlerts } from "@/components/alerts/CriticalAlerts";
+import { ExecutiveOrders } from "@/components/alerts/ExecutiveOrders";
+import { StateActions } from "@/components/alerts/StateActions";
+import { DailyBriefing } from "@/components/alerts/DailyBriefing";
+import { AlertSettings } from "@/components/alerts/AlertSettings";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar, navigationGroups } from "@/components/AdminSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -220,6 +225,14 @@ const Admin = () => {
     switch (activeTab) {
       case "analytics":
         return <DashboardHome />;
+      case "daily-briefing":
+        return <DailyBriefing />;
+      case "critical-alerts":
+        return <CriticalAlerts />;
+      case "executive-orders":
+        return <ExecutiveOrders />;
+      case "state-actions":
+        return <StateActions />;
       case "news":
         return <NewsFeed />;
       case "bills":
@@ -228,6 +241,8 @@ const Admin = () => {
         return <Analytics />;
       case "bookmarks":
         return <Bookmarks />;
+      case "alert-settings":
+        return <AlertSettings />;
       case "clients":
         return <ClientOrganizationManager />;
       case "client-users":

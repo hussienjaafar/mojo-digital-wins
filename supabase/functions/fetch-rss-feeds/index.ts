@@ -24,6 +24,129 @@ const KEYWORDS = [
   'profiling'
 ];
 
+// Enhanced threat detection keywords
+const THREAT_KEYWORDS = {
+  critical: [
+    'terrorist designation',
+    'terrorist organization',
+    'material support',
+    'foreign terrorist',
+    'designated entity',
+    'sanctions',
+    'asset freeze',
+    'travel ban',
+    'muslim ban',
+    'immigration ban',
+    'mosque surveillance',
+    'religious registry',
+  ],
+  high: [
+    'muslim',
+    'islam',
+    'islamic',
+    'arab',
+    'cair',
+    'mpac',
+    'immigration enforcement',
+    'deportation',
+    'visa restriction',
+    'refugee ban',
+    'asylum',
+    'surveillance program',
+    'counterterrorism',
+    'radicalization',
+    'extremism',
+    'religious freedom',
+    'civil liberties violation',
+    'discrimination lawsuit',
+    'hate crime',
+    'profiling',
+    'executive order',
+  ],
+  medium: [
+    'immigration',
+    'border security',
+    'national security',
+    'homeland security',
+    'nonprofit',
+    'charitable organization',
+    'religious organization',
+    'first amendment',
+    'free speech',
+  ]
+};
+
+// Organizations to specifically track
+const TRACKED_ORGANIZATIONS = [
+  'cair', 'council on american-islamic relations',
+  'mpac', 'muslim public affairs council',
+  'isna', 'islamic society of north america',
+  'adc', 'american-arab anti-discrimination committee',
+  'aai', 'arab american institute',
+  'mas', 'muslim american society',
+  'icna', 'islamic circle of north america',
+  'aclu',
+];
+
+// Calculate threat level for articles
+function calculateThreatLevel(text: string): { level: string; score: number; affectedOrgs: string[] } {
+  const lowerText = text.toLowerCase();
+  const affectedOrgs: string[] = [];
+  let score = 0;
+
+  // Check critical keywords
+  for (const keyword of THREAT_KEYWORDS.critical) {
+    if (lowerText.includes(keyword)) {
+      score += 50;
+    }
+  }
+
+  // Check high-priority keywords
+  for (const keyword of THREAT_KEYWORDS.high) {
+    if (lowerText.includes(keyword)) {
+      score += 15;
+    }
+  }
+
+  // Check medium-priority keywords
+  for (const keyword of THREAT_KEYWORDS.medium) {
+    if (lowerText.includes(keyword)) {
+      score += 5;
+    }
+  }
+
+  // Check for tracked organizations
+  for (const org of TRACKED_ORGANIZATIONS) {
+    if (lowerText.includes(org)) {
+      score += 30;
+      // Extract org name for affected_organizations
+      const orgName = org.includes('cair') ? 'CAIR' :
+                      org.includes('mpac') ? 'MPAC' :
+                      org.includes('isna') ? 'ISNA' :
+                      org.includes('adc') ? 'ADC' :
+                      org.includes('aai') ? 'AAI' :
+                      org.includes('mas') ? 'MAS' :
+                      org.includes('icna') ? 'ICNA' :
+                      org.includes('aclu') ? 'ACLU' : org.toUpperCase();
+      if (!affectedOrgs.includes(orgName)) {
+        affectedOrgs.push(orgName);
+      }
+    }
+  }
+
+  // Determine threat level
+  let level = 'low';
+  if (score >= 50) {
+    level = 'critical';
+  } else if (score >= 30) {
+    level = 'high';
+  } else if (score >= 15) {
+    level = 'medium';
+  }
+
+  return { level, score: Math.min(score, 100), affectedOrgs };
+}
+
 // Simple hash function for deduplication
 function generateHash(title: string, content: string): string {
   const text = (title + content).toLowerCase().replace(/\s+/g, '');
@@ -175,8 +298,12 @@ serve(async (req) => {
           const sanitizedDescription = sanitizeText(item.description);
           const hash = generateHash(sanitizedTitle, sanitizedDescription);
           const tags = extractTags(sanitizedTitle, sanitizedDescription, sanitizedDescription);
-          
-          const { error: insertError } = await supabase
+
+          // Calculate threat level
+          const textToAnalyze = `${sanitizedTitle} ${sanitizedDescription}`;
+          const { level: threatLevel, score, affectedOrgs } = calculateThreatLevel(textToAnalyze);
+
+          const { data: insertedArticle, error: insertError } = await supabase
             .from('articles')
             .insert({
               title: sanitizedTitle,
@@ -189,14 +316,41 @@ serve(async (req) => {
               image_url: item.imageUrl,
               tags,
               hash_signature: hash,
-              category: source.category
+              category: source.category,
+              threat_level: threatLevel,
+              affected_organizations: affectedOrgs,
             })
             .select()
             .maybeSingle();
 
-          if (!insertError) {
+          if (!insertError && insertedArticle) {
             totalArticles++;
-          } else if (!insertError.message?.includes('duplicate key')) {
+
+            // Create notifications for critical/high threat articles
+            if (threatLevel === 'critical' || threatLevel === 'high') {
+              const { data: users } = await supabase
+                .from('user_article_preferences')
+                .select('user_id')
+                .limit(100);
+
+              if (users && users.length > 0) {
+                const priorityEmoji = threatLevel === 'critical' ? '🚨' : '⚠️';
+                const notifications = users.map((user: any) => ({
+                  user_id: user.user_id,
+                  title: `${priorityEmoji} ${threatLevel.toUpperCase()}: ${source.name}`,
+                  message: sanitizedTitle.substring(0, 200),
+                  priority: threatLevel,
+                  source_type: 'article',
+                  source_id: insertedArticle.id,
+                  link: item.link,
+                }));
+
+                await supabase
+                  .from('notifications')
+                  .insert(notifications);
+              }
+            }
+          } else if (insertError && !insertError.message?.includes('duplicate key')) {
             console.error(`Error inserting article from ${source.name}:`, insertError);
           }
         }
