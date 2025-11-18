@@ -120,17 +120,23 @@ serve(async (req) => {
           const detailData = await detailResponse.json();
           const billDetail = detailData.bill;
 
-          // Calculate relevance score based on keywords in title and text
+          // Calculate relevance score based on keywords in title and summary
           const titleLower = (billDetail.title || '').toLowerCase();
+          const summaryLower = (billDetail.summaries?.[0]?.text || '').toLowerCase();
           let relevanceScore = 0;
           
           for (const keyword of KEYWORDS) {
             if (titleLower.includes(keyword)) {
               relevanceScore += 15;
             }
+            if (summaryLower.includes(keyword)) {
+              relevanceScore += 10;
+            }
           }
 
-          // Skip bills with no relevance
+          // Log all bills for debugging, save those with relevance > 0
+          console.log(`Bill ${billDetail.number}: relevance score ${relevanceScore}`);
+          
           if (relevanceScore === 0) {
             continue;
           }
@@ -140,10 +146,17 @@ serve(async (req) => {
           const sponsor = sponsors[0] || {};
 
           // Get cosponsor count and party breakdown
-          const cosponsors = billDetail.cosponsors || [];
+          // Handle both array and object formats from API
+          let cosponsorsArray = [];
+          if (Array.isArray(billDetail.cosponsors)) {
+            cosponsorsArray = billDetail.cosponsors;
+          } else if (billDetail.cosponsors?.cosponsors) {
+            cosponsorsArray = billDetail.cosponsors.cosponsors;
+          }
+          
           const cosponsorPartyBreakdown: Record<string, number> = {};
           
-          for (const cosponsor of cosponsors) {
+          for (const cosponsor of cosponsorsArray) {
             const party = cosponsor.party || 'Unknown';
             cosponsorPartyBreakdown[party] = (cosponsorPartyBreakdown[party] || 0) + 1;
           }
@@ -196,7 +209,7 @@ serve(async (req) => {
               sponsor_name: sponsor.fullName || null,
               sponsor_party: sponsor.party || null,
               sponsor_state: sponsor.state || null,
-              cosponsor_count: cosponsors.length,
+              cosponsor_count: cosponsorsArray.length,
               cosponsor_party_breakdown: cosponsorPartyBreakdown,
               committee_assignments: committeeAssignments,
               related_bills: relatedBills,
