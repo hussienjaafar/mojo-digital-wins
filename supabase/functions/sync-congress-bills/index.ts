@@ -16,6 +16,42 @@ const KEYWORDS = [
   'visa', 'refugee', 'asylum', 'islam', 'palestinian', 'gaza'
 ];
 
+// Helper function to make authenticated Congress.gov API calls
+async function fetchCongressAPI(url: string): Promise<Response> {
+  console.log('Fetching from Congress.gov:', url);
+  
+  // Try with X-API-Key header first (recommended method)
+  let response = await fetch(url, {
+    headers: {
+      'Accept': 'application/json',
+      'X-API-Key': CONGRESS_API_KEY || ''
+    }
+  });
+
+  // If forbidden, try query parameter as fallback
+  if (response.status === 403) {
+    console.log('Header auth failed (403), retrying with query parameter...');
+    const separator = url.includes('?') ? '&' : '?';
+    response = await fetch(`${url}${separator}api_key=${CONGRESS_API_KEY}`, {
+      headers: { 'Accept': 'application/json' }
+    });
+  }
+
+  // Log detailed error information if still failing
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error('Congress.gov API Error:', {
+      url: url,
+      status: response.status,
+      statusText: response.statusText,
+      body: errorBody.substring(0, 500),
+      headers: Object.fromEntries(response.headers.entries())
+    });
+  }
+
+  return response;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -23,6 +59,23 @@ serve(async (req) => {
 
   try {
     console.log('Starting Congress.gov bill sync...');
+
+    // Validate API key is configured
+    if (!CONGRESS_API_KEY) {
+      console.error('CONGRESS_GOV_API_KEY environment variable is not set');
+      return new Response(
+        JSON.stringify({ 
+          error: 'API key not configured',
+          message: 'Please add CONGRESS_GOV_API_KEY secret in Lovable Cloud settings'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    console.log('API key configured, length:', CONGRESS_API_KEY.length);
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -38,17 +91,12 @@ serve(async (req) => {
     for (const billType of ['hr', 's']) {
       console.log(`Fetching ${billType.toUpperCase()} bills...`);
       
-      const response = await fetch(
-        `${CONGRESS_API_BASE}/bill/${currentCongress}/${billType}?api_key=${CONGRESS_API_KEY}&limit=100&sort=updateDate+desc`,
-        {
-          headers: {
-            'Accept': 'application/json'
-          }
-        }
+      const response = await fetchCongressAPI(
+        `${CONGRESS_API_BASE}/bill/${currentCongress}/${billType}?limit=100&sort=updateDate+desc`
       );
 
       if (!response.ok) {
-        console.error(`Failed to fetch ${billType} bills:`, response.statusText);
+        console.error(`Failed to fetch ${billType} bills after retries`);
         continue;
       }
 
@@ -62,14 +110,7 @@ serve(async (req) => {
       for (const bill of bills) {
         try {
           // Fetch detailed bill information
-          const detailResponse = await fetch(
-            `${bill.url}?api_key=${CONGRESS_API_KEY}`,
-            {
-              headers: {
-                'Accept': 'application/json'
-              }
-            }
-          );
+          const detailResponse = await fetchCongressAPI(bill.url);
 
           if (!detailResponse.ok) {
             console.error(`Failed to fetch bill details for ${bill.number}`);
