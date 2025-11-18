@@ -165,12 +165,21 @@ serve(async (req) => {
           const actions = billDetail.actions?.actions || [];
           const latestAction = actions[0];
 
-          // Extract committee assignments
-          const committees = billDetail.committees || [];
-          const committeeAssignments = committees.map((c: any) => c.name);
+          // Extract committee assignments - handle both array and object formats
+          let committeeAssignments = [];
+          if (Array.isArray(billDetail.committees)) {
+            committeeAssignments = billDetail.committees.map((c: any) => c.name);
+          } else if (billDetail.committees?.committees) {
+            committeeAssignments = billDetail.committees.committees.map((c: any) => c.name);
+          }
 
-          // Get related bills
-          const relatedBills = (billDetail.relatedBills || []).map((rb: any) => rb.number);
+          // Get related bills - handle both array and object formats
+          let relatedBills = [];
+          if (Array.isArray(billDetail.relatedBills)) {
+            relatedBills = billDetail.relatedBills.map((rb: any) => rb.number);
+          } else if (billDetail.relatedBills?.relatedBills) {
+            relatedBills = billDetail.relatedBills.relatedBills.map((rb: any) => rb.number);
+          }
 
           // Determine current status
           let currentStatus = 'introduced';
