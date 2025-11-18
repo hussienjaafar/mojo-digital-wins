@@ -23,10 +23,19 @@ interface BillCardProps {
     committee_assignments: string[];
     related_bills: string[];
     bill_text_url: string | null;
+    congress_gov_url: string | null;
     relevance_score: number;
+    threat_level: string;
     introduced_date: string | null;
   };
 }
+
+const THREAT_COLORS: Record<string, string> = {
+  'critical': 'border-l-4 border-l-red-500',
+  'high': 'border-l-4 border-l-orange-500',
+  'medium': 'border-l-4 border-l-yellow-500',
+  'low': '',
+};
 
 const STATUS_STEPS = {
   'introduced': { label: 'Introduced', progress: 10, color: 'bg-blue-500' },
@@ -46,9 +55,10 @@ const PARTY_COLORS: Record<string, string> = {
 
 export function BillCard({ bill }: BillCardProps) {
   const statusInfo = STATUS_STEPS[bill.current_status as keyof typeof STATUS_STEPS] || STATUS_STEPS.introduced;
-  
+  const threatStyle = THREAT_COLORS[bill.threat_level] || '';
+
   return (
-    <Card className="hover:shadow-lg transition-shadow">
+    <Card className={`hover:shadow-lg transition-shadow ${threatStyle}`}>
       <CardHeader>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
@@ -188,16 +198,16 @@ export function BillCard({ bill }: BillCardProps) {
               View Details
             </Link>
           </Button>
-          {bill.bill_text_url && (
-            <Button 
-              variant="outline" 
-              size="sm" 
+          {(bill.congress_gov_url || bill.bill_text_url) && (
+            <Button
+              variant="outline"
+              size="sm"
               className="flex-1"
               asChild
             >
-              <a 
-                href={bill.bill_text_url} 
-                target="_blank" 
+              <a
+                href={bill.congress_gov_url || bill.bill_text_url || ''}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2"
               >
