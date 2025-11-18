@@ -82,7 +82,7 @@ export function StateActions() {
       const { data, error } = await supabase
         .from('state_actions')
         .select('*')
-        .order('introduced_date', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;

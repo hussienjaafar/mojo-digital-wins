@@ -61,7 +61,7 @@ export function ExecutiveOrders() {
       const { data, error } = await supabase
         .from('executive_orders')
         .select('*')
-        .order('issued_date', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
@@ -203,12 +203,16 @@ export function ExecutiveOrders() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <Badge className={threatLevelColors[order.threat_level]}>
-                        {order.threat_level.toUpperCase()}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {order.document_type.replace('_', ' ').toUpperCase()}
-                      </Badge>
+                      {order.threat_level && (
+                        <Badge className={threatLevelColors[order.threat_level] || ''}>
+                          {order.threat_level.toUpperCase()}
+                        </Badge>
+                      )}
+                      {order.document_type && (
+                        <Badge variant="outline" className="text-xs">
+                          {order.document_type.replace('_', ' ').toUpperCase()}
+                        </Badge>
+                      )}
                       {order.executive_order_number && (
                         <Badge variant="secondary" className="text-xs">
                           EO {order.executive_order_number}
@@ -248,7 +252,7 @@ export function ExecutiveOrders() {
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    {order.signing_date && format(new Date(order.signing_date), 'MMM d, yyyy')}
+                    {(order.signing_date || order.created_at) && format(new Date(order.signing_date || order.created_at), 'MMM d, yyyy')}
                   </div>
                   <div className="flex items-center gap-2">
                     {order.html_url && (
