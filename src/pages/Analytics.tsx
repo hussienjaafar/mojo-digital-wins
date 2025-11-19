@@ -125,7 +125,7 @@ export default function Analytics() {
           const firstAvg = firstHalf.length ? firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length : avgSentiment;
           const secondAvg = secondHalf.length ? secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length : avgSentiment;
           const diff = secondAvg - firstAvg;
-          const trend = diff > 0.1 ? 'rising' : diff < -0.1 ? 'falling' : 'stable';
+          const trend: 'rising' | 'stable' | 'falling' = diff > 0.1 ? 'rising' : diff < -0.1 ? 'falling' : 'stable';
 
           return {
             topic,
