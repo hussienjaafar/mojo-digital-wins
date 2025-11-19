@@ -9,12 +9,28 @@ const corsHeaders = {
 const CONGRESS_API_KEY = Deno.env.get('CONGRESS_GOV_API_KEY');
 const CONGRESS_API_BASE = 'https://api.congress.gov/v3';
 
-// Keywords to search for relevant bills
-const KEYWORDS = [
-  'muslim', 'arab', 'immigration', 'civil rights', 'religious freedom',
-  'middle east', 'foreign aid', 'discrimination', 'hate crime',
-  'visa', 'refugee', 'asylum', 'islam', 'palestinian', 'gaza'
-];
+// Keywords to search for relevant bills - comprehensive list
+const KEYWORDS = {
+  // High priority - direct community impact (25 points each)
+  high: [
+    'muslim', 'arab', 'islam', 'islamic', 'mosque', 'hijab', 'halal',
+    'cair', 'isna', 'mpac', 'islamophobia', 'anti-muslim',
+    'palestinian', 'gaza', 'west bank',
+  ],
+  // Medium priority - regional/policy relevance (15 points each)
+  medium: [
+    'middle east', 'israel', 'iran', 'iraq', 'syria', 'yemen', 'libya',
+    'lebanon', 'jordan', 'egypt', 'saudi', 'qatar', 'uae', 'bahrain',
+    'afghanistan', 'pakistan', 'terrorism', 'counterterrorism',
+    'foreign aid', 'sanctions', 'refugee', 'asylum',
+  ],
+  // Lower priority - civil liberties generally (10 points each)
+  low: [
+    'civil rights', 'religious freedom', 'discrimination', 'hate crime',
+    'immigration', 'visa', 'surveillance', 'profiling', 'civil liberties',
+    'xenophobia', 'national security', 'homeland security',
+  ]
+};
 
 // Helper function to make authenticated Congress.gov API calls
 async function fetchCongressAPI(url: string): Promise<Response> {
@@ -87,12 +103,15 @@ serve(async (req) => {
     let totalBillsFetched = 0;
     let totalBillsInserted = 0;
 
-    // Fetch recent bills from both House and Senate
-    for (const billType of ['hr', 's']) {
+    // Fetch recent bills from House, Senate, and resolutions
+    // Resolutions (hres, sres, hjres, sjres) often contain relevant foreign policy content
+    const billTypes = ['hr', 's', 'hres', 'sres', 'hjres', 'sjres'];
+
+    for (const billType of billTypes) {
       console.log(`Fetching ${billType.toUpperCase()} bills...`);
-      
+
       const response = await fetchCongressAPI(
-        `${CONGRESS_API_BASE}/bill/${currentCongress}/${billType}?limit=100&sort=updateDate+desc`
+        `${CONGRESS_API_BASE}/bill/${currentCongress}/${billType}?limit=250&sort=updateDate+desc`
       );
 
       if (!response.ok) {
@@ -120,23 +139,72 @@ serve(async (req) => {
           const detailData = await detailResponse.json();
           const billDetail = detailData.bill;
 
-          // Calculate relevance score based on keywords in title and summary
+          // Calculate relevance score based on keywords in title, summary, and subjects
           const titleLower = (billDetail.title || '').toLowerCase();
           const summaryLower = (billDetail.summaries?.[0]?.text || '').toLowerCase();
+
+          // Get subjects/topics from the bill
+          let subjectsText = '';
+          if (billDetail.subjects?.legislativeSubjects) {
+            subjectsText = billDetail.subjects.legislativeSubjects
+              .map((s: any) => s.name || '')
+              .join(' ')
+              .toLowerCase();
+          }
+          if (billDetail.subjects?.policyArea?.name) {
+            subjectsText += ' ' + billDetail.subjects.policyArea.name.toLowerCase();
+          }
+
           let relevanceScore = 0;
-          
-          for (const keyword of KEYWORDS) {
+          const matchedKeywords: string[] = [];
+
+          // High priority keywords (25 points in title, 20 in summary, 15 in subjects)
+          for (const keyword of KEYWORDS.high) {
             if (titleLower.includes(keyword)) {
+              relevanceScore += 25;
+              matchedKeywords.push(`${keyword}(title)`);
+            } else if (summaryLower.includes(keyword)) {
+              relevanceScore += 20;
+              matchedKeywords.push(`${keyword}(summary)`);
+            } else if (subjectsText.includes(keyword)) {
               relevanceScore += 15;
-            }
-            if (summaryLower.includes(keyword)) {
-              relevanceScore += 10;
+              matchedKeywords.push(`${keyword}(subject)`);
             }
           }
 
-          // Log all bills for debugging, save those with relevance > 0
-          console.log(`Bill ${billDetail.number}: relevance score ${relevanceScore}`);
-          
+          // Medium priority keywords (15 points in title, 12 in summary, 8 in subjects)
+          for (const keyword of KEYWORDS.medium) {
+            if (titleLower.includes(keyword)) {
+              relevanceScore += 15;
+              matchedKeywords.push(`${keyword}(title)`);
+            } else if (summaryLower.includes(keyword)) {
+              relevanceScore += 12;
+              matchedKeywords.push(`${keyword}(summary)`);
+            } else if (subjectsText.includes(keyword)) {
+              relevanceScore += 8;
+              matchedKeywords.push(`${keyword}(subject)`);
+            }
+          }
+
+          // Low priority keywords (10 points in title, 8 in summary, 5 in subjects)
+          for (const keyword of KEYWORDS.low) {
+            if (titleLower.includes(keyword)) {
+              relevanceScore += 10;
+              matchedKeywords.push(`${keyword}(title)`);
+            } else if (summaryLower.includes(keyword)) {
+              relevanceScore += 8;
+              matchedKeywords.push(`${keyword}(summary)`);
+            } else if (subjectsText.includes(keyword)) {
+              relevanceScore += 5;
+              matchedKeywords.push(`${keyword}(subject)`);
+            }
+          }
+
+          // Log bills with relevance for debugging
+          if (relevanceScore > 0) {
+            console.log(`Bill ${billDetail.number}: score ${relevanceScore}, matches: ${matchedKeywords.join(', ')}`);
+          }
+
           if (relevanceScore === 0) {
             continue;
           }
