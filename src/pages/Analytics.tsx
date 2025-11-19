@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, subDays } from "date-fns";
-import { CalendarIcon, Download, TrendingUp, AlertTriangle, Newspaper, Scale, Building2 } from "lucide-react";
+import { CalendarIcon, Download, TrendingUp, AlertTriangle, Newspaper, Scale, Building2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Area, Line } from "recharts";
@@ -39,6 +39,7 @@ export default function Analytics() {
   const [entityMentions, setEntityMentions] = useState<any[]>([]);
   const [sentimentTimeline, setSentimentTimeline] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     fetchAnalytics();
@@ -283,6 +284,29 @@ export default function Analytics() {
     }
   };
 
+  const runSentimentAnalysis = async () => {
+    try {
+      setAnalyzing(true);
+      toast.info('Starting sentiment analysis... This may take a minute.');
+
+      const { data, error } = await supabase.functions.invoke('analyze-articles');
+
+      if (error) throw error;
+
+      toast.success(
+        `Analysis complete! Processed ${data.processed} articles, found ${data.duplicates} duplicates.`
+      );
+
+      // Refresh analytics data to show new sentiment results
+      await fetchAnalytics();
+    } catch (error) {
+      console.error('Error running sentiment analysis:', error);
+      toast.error('Failed to analyze articles. Check console for details.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const getSentimentColor = (sentiment: number) => {
     if (sentiment > 0.6) return 'text-green-600';
     if (sentiment < 0.4) return 'text-red-600';
@@ -325,6 +349,15 @@ export default function Analytics() {
               </div>
             </PopoverContent>
           </Popover>
+
+          <Button
+            variant="outline"
+            onClick={runSentimentAnalysis}
+            disabled={analyzing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
+            {analyzing ? 'Analyzing...' : 'Analyze Articles'}
+          </Button>
 
           <Button variant="outline" onClick={exportToCSV}>
             <Download className="mr-2 h-4 w-4" />
