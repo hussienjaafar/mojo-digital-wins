@@ -350,6 +350,7 @@ serve(async (req) => {
               category: source.category,
               threat_level: threatLevel,
               affected_organizations: affectedOrgs,
+              processing_status: 'pending',
             })
             .select()
             .maybeSingle();
