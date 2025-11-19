@@ -105,12 +105,15 @@ export default function BillDetail() {
     try {
       setLoadingText(true);
       
-      // Call GovInfo API to fetch full text
+      // Call Congress.gov API to fetch full text
+      // Extract just the number from bill_number (e.g., "HR123" -> "123", "HRES876" -> "876")
+      const numberOnly = bill.bill_number.replace(/[^0-9]/g, '');
+
       const { data, error } = await supabase.functions.invoke('fetch-bill-text', {
-        body: { 
+        body: {
           congress: bill.congress,
-          billType: bill.bill_type,
-          billNumber: bill.bill_number.split('.')[1]
+          billType: bill.bill_type.toLowerCase(),
+          billNumber: numberOnly
         }
       });
 
