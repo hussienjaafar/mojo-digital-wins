@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,13 +27,40 @@ const PARTY_COLORS: Record<string, string> = {
   'I': 'bg-purple-600',
 };
 
+// Generate Congress.gov URL from bill data
+const getCongressGovUrl = (billNumber: string, billType: string, congress: number): string => {
+  const numberOnly = billNumber.replace(/[^0-9]/g, '');
+  const typeMap: Record<string, string> = {
+    'hr': 'house-bill',
+    's': 'senate-bill',
+    'hjres': 'house-joint-resolution',
+    'sjres': 'senate-joint-resolution',
+    'hconres': 'house-concurrent-resolution',
+    'sconres': 'senate-concurrent-resolution',
+    'hres': 'house-resolution',
+    'sres': 'senate-resolution',
+  };
+  const urlType = typeMap[billType.toLowerCase()] || billType;
+  return `https://www.congress.gov/bill/${congress}th-congress/${urlType}/${numberOnly}`;
+};
+
 export default function BillDetail() {
   const { billNumber } = useParams();
+  const navigate = useNavigate();
   const [bill, setBill] = useState<any>(null);
   const [actions, setActions] = useState<any[]>([]);
   const [fullText, setFullText] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [loadingText, setLoadingText] = useState(false);
+
+  const handleBack = () => {
+    // Try to go back in history, or go to admin dashboard
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/admin');
+    }
+  };
 
   useEffect(() => {
     if (billNumber) {
@@ -103,8 +128,7 @@ export default function BillDetail() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-        <Navigation />
-        <main className="container mx-auto px-4 py-8 mt-16">
+        <main className="container mx-auto px-4 py-8">
           <LoadingCard />
         </main>
       </div>
@@ -114,13 +138,12 @@ export default function BillDetail() {
   if (!bill) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-        <Navigation />
-        <main className="container mx-auto px-4 py-8 mt-16">
+        <main className="container mx-auto px-4 py-8">
           <Card>
             <CardContent className="p-12 text-center">
               <p className="text-muted-foreground">Bill not found</p>
-              <Button asChild className="mt-4">
-                <Link to="/bills">Back to Bills</Link>
+              <Button onClick={handleBack} className="mt-4">
+                Back to Bills
               </Button>
             </CardContent>
           </Card>
@@ -133,14 +156,11 @@ export default function BillDetail() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <Navigation />
-      <main className="container mx-auto px-4 py-8 mt-16">
+      <main className="container mx-auto px-4 py-8">
         {/* Back Button */}
-        <Button variant="ghost" asChild className="mb-4">
-          <Link to="/bills">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Bills
-          </Link>
+        <Button variant="ghost" onClick={handleBack} className="mb-4">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Bills
         </Button>
 
         {/* Bill Header */}
@@ -321,23 +341,25 @@ export default function BillDetail() {
                 <CardContent>
                   <div className="space-y-3">
                     <p className="text-2xl font-bold">{bill.cosponsor_count}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(bill.cosponsor_party_breakdown).map(([party, count]) => (
-                        <Badge 
-                          key={party}
-                          className={`${PARTY_COLORS[party]} text-white border-0`}
-                        >
-                          {party}: {count as number}
-                        </Badge>
-                      ))}
-                    </div>
+                    {bill.cosponsor_party_breakdown && (
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(bill.cosponsor_party_breakdown).map(([party, count]) => (
+                          <Badge
+                            key={party}
+                            className={`${PARTY_COLORS[party]} text-white border-0`}
+                          >
+                            {party}: {count as number}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             )}
 
             {/* Committees */}
-            {bill.committee_assignments.length > 0 && (
+            {bill.committee_assignments && bill.committee_assignments.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Committees</CardTitle>
@@ -355,7 +377,7 @@ export default function BillDetail() {
             )}
 
             {/* Related Bills */}
-            {bill.related_bills.length > 0 && (
+            {bill.related_bills && bill.related_bills.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Related Bills</CardTitle>
@@ -372,24 +394,21 @@ export default function BillDetail() {
               </Card>
             )}
 
-            {/* External Link */}
-            {bill.bill_text_url && (
-              <Button variant="outline" className="w-full" asChild>
-                <a 
-                  href={bill.bill_text_url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  View on Congress.gov
-                </a>
-              </Button>
-            )}
+            {/* External Link - always available using generated URL */}
+            <Button variant="outline" className="w-full" asChild>
+              <a
+                href={getCongressGovUrl(bill.bill_number, bill.bill_type, bill.congress)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View on Congress.gov
+              </a>
+            </Button>
           </div>
         </div>
       </main>
-      <Footer />
     </div>
   );
 }
