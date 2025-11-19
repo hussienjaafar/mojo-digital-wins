@@ -374,6 +374,7 @@ export type Database = {
       }
       articles: {
         Row: {
+          affected_organizations: string[] | null
           ai_summary: string | null
           category: string | null
           content: string | null
@@ -393,10 +394,12 @@ export type Database = {
           source_name: string
           source_url: string
           tags: string[] | null
+          threat_level: string | null
           title: string
           updated_at: string | null
         }
         Insert: {
+          affected_organizations?: string[] | null
           ai_summary?: string | null
           category?: string | null
           content?: string | null
@@ -416,10 +419,12 @@ export type Database = {
           source_name: string
           source_url: string
           tags?: string[] | null
+          threat_level?: string | null
           title: string
           updated_at?: string | null
         }
         Update: {
+          affected_organizations?: string[] | null
           ai_summary?: string | null
           category?: string | null
           content?: string | null
@@ -439,6 +444,7 @@ export type Database = {
           source_name?: string
           source_url?: string
           tags?: string[] | null
+          threat_level?: string | null
           title?: string
           updated_at?: string | null
         }
