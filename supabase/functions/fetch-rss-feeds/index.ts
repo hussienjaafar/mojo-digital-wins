@@ -156,8 +156,31 @@ function generateHash(title: string, content: string): string {
 // Sanitize text to handle special characters and prevent encoding errors
 function sanitizeText(text: string): string {
   if (!text) return '';
+
+  // First decode HTML entities
+  let decoded = text
+    // Named entities
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&ndash;/g, '–')
+    .replace(/&mdash;/g, '—')
+    .replace(/&ldquo;/g, '"')
+    .replace(/&rdquo;/g, '"')
+    .replace(/&lsquo;/g, ''')
+    .replace(/&rsquo;/g, ''')
+    .replace(/&hellip;/g, '…')
+    // Numeric entities (decimal)
+    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num, 10)))
+    // Numeric entities (hex)
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+
   // Remove problematic characters while preserving content
-  return text
+  return decoded
     .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, '') // Remove control characters
     .replace(/\uFFFD/g, '') // Remove replacement characters
     .trim();

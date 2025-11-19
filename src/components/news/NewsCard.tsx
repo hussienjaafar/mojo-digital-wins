@@ -34,6 +34,9 @@ export function NewsCard({ article }: NewsCardProps) {
       case 'mainstream': return 'bg-blue-500/20 text-blue-700 dark:text-blue-300';
       case 'conservative': return 'bg-red-500/20 text-red-700 dark:text-red-300';
       case 'specialized': return 'bg-green-500/20 text-green-700 dark:text-green-300';
+      case 'government': return 'bg-amber-500/20 text-amber-700 dark:text-amber-300';
+      case 'state_government': return 'bg-orange-500/20 text-orange-700 dark:text-orange-300';
+      case 'civil_rights': return 'bg-teal-500/20 text-teal-700 dark:text-teal-300';
       default: return 'bg-gray-500/20 text-gray-700 dark:text-gray-300';
     }
   };

@@ -17,7 +17,15 @@ export function NewsFeed() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const categories = ['independent', 'mainstream', 'conservative', 'specialized'];
+  const categories = [
+    'independent',
+    'mainstream',
+    'conservative',
+    'specialized',
+    'government',
+    'state_government',
+    'civil_rights'
+  ];
 
   useEffect(() => {
     loadArticles();
