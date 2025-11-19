@@ -11,20 +11,27 @@ const CONGRESS_API_BASE = 'https://api.congress.gov/v3';
 
 // Keywords to search for relevant bills - comprehensive list
 const KEYWORDS = {
-  // High priority - direct community impact (25 points each)
+  // Critical priority - direct community/humanitarian impact (30 points each)
+  critical: [
+    'palestinian', 'gaza', 'west bank', 'genocide', 'ethnic cleansing',
+    'apartheid', 'occupation', 'blockade', 'ceasefire', 'war crimes',
+    'muslim', 'arab', 'islam', 'islamic', 'mosque', 'islamophobia', 'anti-muslim',
+    'cair', 'isna', 'mpac',
+  ],
+  // High priority - regional conflicts (20 points each)
   high: [
-    'muslim', 'arab', 'islam', 'islamic', 'mosque', 'hijab', 'halal',
-    'cair', 'isna', 'mpac', 'islamophobia', 'anti-muslim',
-    'palestinian', 'gaza', 'west bank',
+    'israel', 'hamas', 'hezbollah', 'idf', 'netanyahu',
+    'iran', 'iraq', 'syria', 'yemen', 'libya', 'lebanon',
+    'humanitarian', 'civilian casualties', 'refugee', 'asylum',
+    'hijab', 'halal', 'ramadan',
   ],
-  // Medium priority - regional/policy relevance (15 points each)
+  // Medium priority - broader regional/policy (12 points each)
   medium: [
-    'middle east', 'israel', 'iran', 'iraq', 'syria', 'yemen', 'libya',
-    'lebanon', 'jordan', 'egypt', 'saudi', 'qatar', 'uae', 'bahrain',
+    'middle east', 'jordan', 'egypt', 'saudi', 'qatar', 'uae', 'bahrain',
     'afghanistan', 'pakistan', 'terrorism', 'counterterrorism',
-    'foreign aid', 'sanctions', 'refugee', 'asylum',
+    'foreign aid', 'sanctions', 'arms sales', 'military aid',
   ],
-  // Lower priority - civil liberties generally (10 points each)
+  // Lower priority - civil liberties generally (8 points each)
   low: [
     'civil rights', 'religious freedom', 'discrimination', 'hate crime',
     'immigration', 'visa', 'surveillance', 'profiling', 'civil liberties',
@@ -192,28 +199,46 @@ serve(async (req) => {
 
           let relevanceScore = 0;
           const matchedKeywords: string[] = [];
+          let criticalMatches = 0;
 
-          // High priority keywords (25 points in title, 20 in summary, 15 in subjects)
+          // Critical priority keywords (30 points in title, 25 in summary, 20 in subjects)
+          for (const keyword of KEYWORDS.critical) {
+            if (titleLower.includes(keyword)) {
+              relevanceScore += 30;
+              criticalMatches++;
+              matchedKeywords.push(`${keyword}(title)`);
+            } else if (summaryLower.includes(keyword)) {
+              relevanceScore += 25;
+              criticalMatches++;
+              matchedKeywords.push(`${keyword}(summary)`);
+            } else if (subjectsText.includes(keyword)) {
+              relevanceScore += 20;
+              criticalMatches++;
+              matchedKeywords.push(`${keyword}(subject)`);
+            }
+          }
+
+          // High priority keywords (20 points in title, 15 in summary, 12 in subjects)
           for (const keyword of KEYWORDS.high) {
             if (titleLower.includes(keyword)) {
-              relevanceScore += 25;
+              relevanceScore += 20;
               matchedKeywords.push(`${keyword}(title)`);
             } else if (summaryLower.includes(keyword)) {
-              relevanceScore += 20;
+              relevanceScore += 15;
               matchedKeywords.push(`${keyword}(summary)`);
             } else if (subjectsText.includes(keyword)) {
-              relevanceScore += 15;
+              relevanceScore += 12;
               matchedKeywords.push(`${keyword}(subject)`);
             }
           }
 
-          // Medium priority keywords (15 points in title, 12 in summary, 8 in subjects)
+          // Medium priority keywords (12 points in title, 10 in summary, 8 in subjects)
           for (const keyword of KEYWORDS.medium) {
             if (titleLower.includes(keyword)) {
-              relevanceScore += 15;
+              relevanceScore += 12;
               matchedKeywords.push(`${keyword}(title)`);
             } else if (summaryLower.includes(keyword)) {
-              relevanceScore += 12;
+              relevanceScore += 10;
               matchedKeywords.push(`${keyword}(summary)`);
             } else if (subjectsText.includes(keyword)) {
               relevanceScore += 8;
@@ -221,18 +246,26 @@ serve(async (req) => {
             }
           }
 
-          // Low priority keywords (10 points in title, 8 in summary, 5 in subjects)
+          // Low priority keywords (8 points in title, 6 in summary, 4 in subjects)
           for (const keyword of KEYWORDS.low) {
             if (titleLower.includes(keyword)) {
-              relevanceScore += 10;
+              relevanceScore += 8;
               matchedKeywords.push(`${keyword}(title)`);
             } else if (summaryLower.includes(keyword)) {
-              relevanceScore += 8;
+              relevanceScore += 6;
               matchedKeywords.push(`${keyword}(summary)`);
             } else if (subjectsText.includes(keyword)) {
-              relevanceScore += 5;
+              relevanceScore += 4;
               matchedKeywords.push(`${keyword}(subject)`);
             }
+          }
+
+          // Bonus multiplier for multiple critical keyword matches
+          // Bills with 2+ critical matches are highly relevant
+          if (criticalMatches >= 3) {
+            relevanceScore = Math.round(relevanceScore * 1.3);
+          } else if (criticalMatches >= 2) {
+            relevanceScore = Math.round(relevanceScore * 1.15);
           }
 
           // Log bills with relevance for debugging
