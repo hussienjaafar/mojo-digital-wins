@@ -39,14 +39,18 @@ serve(async (req) => {
     const signature = req.headers.get('x-actblue-signature');
     const requestBody = await req.text();
 
-    console.log('Received ActBlue webhook');
+    if (Deno.env.get('ENVIRONMENT') === 'development') {
+      console.log('Received ActBlue webhook');
+    }
 
     // Parse and validate payload
     let payload;
     try {
       payload = actblueWebhookSchema.parse(JSON.parse(requestBody));
     } catch (validationError) {
-      console.error('Invalid webhook payload:', validationError);
+      if (Deno.env.get('ENVIRONMENT') === 'development') {
+        console.error('Invalid webhook payload:', validationError);
+      }
       return new Response(
         JSON.stringify({ error: 'Invalid payload format' }),
         { 
@@ -64,7 +68,9 @@ serve(async (req) => {
       .eq('is_active', true);
 
     if (credError || !credData || credData.length === 0) {
-      console.error('No active ActBlue credentials found');
+      if (Deno.env.get('ENVIRONMENT') === 'development') {
+        console.error('No active ActBlue credentials found');
+      }
       return new Response(
         JSON.stringify({ error: 'No matching organization found' }),
         { 
@@ -81,7 +87,9 @@ serve(async (req) => {
     });
 
     if (!matchingCred) {
-      console.error('No organization matches entity_id:', payload.entity_id);
+      if (Deno.env.get('ENVIRONMENT') === 'development') {
+        console.error('No organization matches entity_id:', payload.entity_id);
+      }
       return new Response(
         JSON.stringify({ error: 'Organization not found for entity_id' }),
         { 
@@ -97,8 +105,9 @@ serve(async (req) => {
     // Validate webhook signature
     if (signature && credentials.webhook_secret) {
       // In production, implement proper HMAC validation
-      // For now, we'll log it for debugging
-      console.log('Webhook signature validation would happen here');
+      if (Deno.env.get('ENVIRONMENT') === 'development') {
+        console.log('Webhook signature validation would happen here');
+      }
       // const isValid = validateSignature(requestBody, signature, credentials.webhook_secret);
       // if (!isValid) {
       //   throw new Error('Invalid webhook signature');

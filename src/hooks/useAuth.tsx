@@ -77,7 +77,9 @@ export const useAuth = () => {
 
       setOrganizations(orgs);
     } catch (error) {
-      console.error('Error fetching organizations:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching organizations:', error);
+      }
       setOrganizations([]);
     } finally {
       setLoading(false);
@@ -100,7 +102,9 @@ export const useAuth = () => {
       // Navigate to login
       navigate('/client-login');
     } catch (error) {
-      console.error('Error logging out:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error logging out:', error);
+      }
     }
   };
 
@@ -113,7 +117,9 @@ export const useAuth = () => {
         .update({ last_login_at: new Date().toISOString() })
         .eq('id', user.id);
     } catch (error) {
-      console.error('Error updating last login:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error updating last login:', error);
+      }
     }
   };
 

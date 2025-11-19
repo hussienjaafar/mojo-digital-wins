@@ -25,7 +25,9 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const data: ContactNotificationRequest = await req.json();
-    console.log("Received contact notification request:", { ...data, message: data.message.substring(0, 50) + "..." });
+    if (Deno.env.get('ENVIRONMENT') === 'development') {
+      console.log("Received contact notification request:", { ...data, message: data.message.substring(0, 50) + "..." });
+    }
 
     const { name, email, campaign, organization_type, message, created_at } = data;
     const timestamp = created_at ? new Date(created_at).toLocaleString() : new Date().toLocaleString();

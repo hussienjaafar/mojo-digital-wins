@@ -34,7 +34,9 @@ export function BillAlertToggle({ billId, billNumber }: BillAlertToggleProps) {
       if (error) throw error;
       setIsSubscribed(!!data);
     } catch (error) {
-      console.error('Error checking subscription:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error checking subscription:', error);
+      }
     }
   };
 
@@ -86,7 +88,9 @@ export function BillAlertToggle({ billId, billNumber }: BillAlertToggleProps) {
         setIsSubscribed(true);
       }
     } catch (error) {
-      console.error('Error toggling alert:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error toggling alert:', error);
+      }
       toast({
         title: "Error",
         description: "Failed to update alert settings",

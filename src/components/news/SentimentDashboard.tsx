@@ -31,7 +31,9 @@ export function SentimentDashboard() {
       if (error) throw error;
       setTrends(data || []);
     } catch (error) {
-      console.error('Error fetching sentiment trends:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching sentiment trends:', error);
+      }
     } finally {
       setLoading(false);
     }
@@ -56,7 +58,9 @@ export function SentimentDashboard() {
 
       await fetchTrends();
     } catch (error) {
-      console.error('Error running analysis:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error running analysis:', error);
+      }
       toast({
         title: "Analysis failed",
         description: "Failed to analyze articles",

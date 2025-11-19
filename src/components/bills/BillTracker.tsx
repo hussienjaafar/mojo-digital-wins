@@ -38,7 +38,9 @@ export function BillTracker() {
       if (error) throw error;
       setBills(data || []);
     } catch (error) {
-      console.error('Error fetching bills:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching bills:', error);
+      }
       toast({
         title: "Error",
         description: "Failed to fetch bills",
@@ -68,7 +70,9 @@ export function BillTracker() {
 
       await fetchBills();
     } catch (error) {
-      console.error('Error syncing bills:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error syncing bills:', error);
+      }
       toast({
         title: "Sync failed",
         description: "Failed to sync bills from Congress.gov",
