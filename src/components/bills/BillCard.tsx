@@ -3,8 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Users, Calendar, TrendingUp, Eye } from "lucide-react";
-import { format } from "date-fns";
+import { ExternalLink, Users, Calendar, TrendingUp, Eye, AlertTriangle, Clock, Scale } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 
 interface BillCardProps {
   bill: {
@@ -39,10 +39,24 @@ const getThreatLevel = (score: number | null): string => {
 };
 
 const THREAT_COLORS: Record<string, string> = {
-  'critical': 'border-l-4 border-l-red-500',
-  'high': 'border-l-4 border-l-orange-500',
+  'critical': 'border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-950/20',
+  'high': 'border-l-4 border-l-orange-500 bg-orange-50/50 dark:bg-orange-950/20',
   'medium': 'border-l-4 border-l-yellow-500',
   'low': '',
+};
+
+const THREAT_BADGE_COLORS: Record<string, string> = {
+  'critical': 'bg-red-500 text-white',
+  'high': 'bg-orange-500 text-white',
+  'medium': 'bg-yellow-500 text-black',
+  'low': 'bg-gray-200 text-gray-700',
+};
+
+// Check if bill has bipartisan support
+const isBipartisan = (breakdown: Record<string, number> | null): boolean => {
+  if (!breakdown) return false;
+  const parties = Object.keys(breakdown);
+  return parties.includes('D') && parties.includes('R');
 };
 
 // Generate Congress.gov URL from bill data
@@ -86,27 +100,42 @@ export function BillCard({ bill }: BillCardProps) {
 
   return (
     <Card className={`hover:shadow-lg transition-shadow ${threatStyle}`}>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              {/* Threat Level Badge - Prominent */}
+              <Badge className={THREAT_BADGE_COLORS[threatLevel]}>
+                {threatLevel === 'critical' && <AlertTriangle className="w-3 h-3 mr-1" />}
+                {threatLevel.toUpperCase()}
+              </Badge>
               <Badge variant="outline" className="font-mono">
                 {bill.bill_number}
               </Badge>
-              <Badge variant="secondary">
-                {bill.bill_type.toUpperCase()}
-              </Badge>
-              <Badge 
-                className="ml-auto"
-                style={{ 
-                  backgroundColor: `hsl(${(bill.relevance_score / 100) * 120}, 70%, 50%)` 
-                }}
-              >
-                <TrendingUp className="w-3 h-3 mr-1" />
-                Relevance: {bill.relevance_score}%
-              </Badge>
+              {/* Bipartisan Indicator */}
+              {isBipartisan(bill.cosponsor_party_breakdown) && (
+                <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                  <Scale className="w-3 h-3 mr-1" />
+                  Bipartisan
+                </Badge>
+              )}
             </div>
-            <CardTitle className="text-lg leading-tight">{bill.title}</CardTitle>
+            <CardTitle className="text-base leading-tight line-clamp-2">{bill.title}</CardTitle>
+            {/* Time Info */}
+            {bill.introduced_date && (
+              <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  Introduced {formatDistanceToNow(new Date(bill.introduced_date), { addSuffix: true })}
+                </span>
+                {bill.latest_action_date && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    Updated {formatDistanceToNow(new Date(bill.latest_action_date), { addSuffix: true })}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </CardHeader>

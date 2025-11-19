@@ -326,24 +326,66 @@ serve(async (req) => {
             relatedBills = billDetail.relatedBills.relatedBills.map((rb: any) => rb.number);
           }
 
-          // Determine current status
+          // Determine current status with improved detection
           let currentStatus = 'introduced';
-          if (billDetail.enacted) {
+
+          // Check API flags first (most reliable)
+          if (billDetail.laws && billDetail.laws.length > 0) {
             currentStatus = 'enacted';
           } else if (billDetail.vetoed) {
             currentStatus = 'vetoed';
-          } else if (latestAction) {
-            const actionText = (latestAction.text || '').toLowerCase();
-            if (actionText.includes('passed') && actionText.includes('senate') && actionText.includes('house')) {
+          } else {
+            // Analyze all actions to determine status (not just latest)
+            let passedHouse = false;
+            let passedSenate = false;
+            let inCommittee = false;
+
+            for (const action of actions) {
+              const actionText = (action.text || '').toLowerCase();
+              const actionCode = (action.actionCode || '').toUpperCase();
+
+              // Check for passage
+              if (actionText.includes('passed house') ||
+                  actionText.includes('passed the house') ||
+                  actionCode === 'H8D' || actionCode === '8000') {
+                passedHouse = true;
+              }
+              if (actionText.includes('passed senate') ||
+                  actionText.includes('passed the senate') ||
+                  actionCode === '17000') {
+                passedSenate = true;
+              }
+
+              // Check for committee activity
+              if (actionText.includes('referred to') && actionText.includes('committee')) {
+                inCommittee = true;
+              }
+              if (actionText.includes('reported') && actionText.includes('committee')) {
+                inCommittee = true;
+              }
+              if (actionText.includes('ordered to be reported')) {
+                inCommittee = true;
+              }
+
+              // Check for floor activity (beyond committee)
+              if (actionText.includes('placed on') && actionText.includes('calendar')) {
+                inCommittee = true; // Still mark as in process
+              }
+            }
+
+            // Determine final status
+            if (passedHouse && passedSenate) {
               currentStatus = 'passed_both';
-            } else if (actionText.includes('passed senate')) {
+            } else if (passedSenate) {
               currentStatus = 'passed_senate';
-            } else if (actionText.includes('passed house')) {
+            } else if (passedHouse) {
               currentStatus = 'passed_house';
-            } else if (actionText.includes('committee')) {
+            } else if (inCommittee) {
               currentStatus = 'in_committee';
             }
           }
+
+          console.log(`Bill ${billDetail.number}: status=${currentStatus}, actions=${actions.length}`);
 
           // Upsert bill into database (matching Lovable's schema)
           const { error: billError } = await supabaseClient
