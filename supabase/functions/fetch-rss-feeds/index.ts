@@ -147,10 +147,18 @@ function calculateThreatLevel(text: string): { level: string; score: number; aff
   return { level, score: Math.min(score, 100), affectedOrgs };
 }
 
-// Simple hash function for deduplication
+// Simple hash function for deduplication (UTF-8 safe)
 function generateHash(title: string, content: string): string {
   const text = (title + content).toLowerCase().replace(/\s+/g, '');
-  return btoa(text.substring(0, 100)); // Simple hash using first 100 chars
+  // Use a simple hash instead of btoa to avoid encoding issues
+  let hash = 0;
+  const textSubstring = text.substring(0, 100);
+  for (let i = 0; i < textSubstring.length; i++) {
+    const char = textSubstring.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash.toString(36);
 }
 
 // Sanitize text to handle special characters and prevent encoding errors
