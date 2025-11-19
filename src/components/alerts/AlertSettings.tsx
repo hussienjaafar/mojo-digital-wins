@@ -85,7 +85,9 @@ export function AlertSettings() {
         });
       }
     } catch (error) {
-      console.error('Error fetching preferences:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching preferences:', error);
+      }
       toast({
         title: "Failed to load preferences",
         description: "Using default settings",

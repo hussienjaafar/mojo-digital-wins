@@ -47,7 +47,9 @@ serve(async (req) => {
     const accessToken = Deno.env.get('META_CONVERSIONS_API_TOKEN');
     
     if (!accessToken) {
-      console.error('META_CONVERSIONS_API_TOKEN not configured');
+      if (Deno.env.get('ENVIRONMENT') === 'development') {
+        console.error('META_CONVERSIONS_API_TOKEN not configured');
+      }
       return new Response(
         JSON.stringify({ error: 'Conversions API not configured' }),
         { 
@@ -121,7 +123,9 @@ serve(async (req) => {
     const result = await response.json();
 
     if (!response.ok) {
-      console.error('Meta Conversions API error:', result);
+      if (Deno.env.get('ENVIRONMENT') === 'development') {
+        console.error('Meta Conversions API error:', result);
+      }
       return new Response(
         JSON.stringify({ error: 'Failed to send conversion event', details: result }),
         { 
@@ -131,11 +135,13 @@ serve(async (req) => {
       );
     }
 
-    console.log('Conversion event sent successfully:', {
-      event_name,
-      events_received: result.events_received,
-      fbtrace_id: result.fbtrace_id,
-    });
+    if (Deno.env.get('ENVIRONMENT') === 'development') {
+      console.log('Conversion event sent successfully:', {
+        event_name,
+        events_received: result.events_received,
+        fbtrace_id: result.fbtrace_id,
+      });
+    }
 
     return new Response(
       JSON.stringify({ 
@@ -149,7 +155,9 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in meta-conversions function:', error);
+    if (Deno.env.get('ENVIRONMENT') === 'development') {
+      console.error('Error in meta-conversions function:', error);
+    }
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { 

@@ -85,7 +85,9 @@ export function CriticalAlerts() {
       
       setAlerts(mappedAlerts);
     } catch (error) {
-      console.error('Error fetching critical alerts:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching critical alerts:', error);
+      }
     } finally {
       setLoading(false);
     }
@@ -119,7 +121,9 @@ export function CriticalAlerts() {
 
       await fetchAlerts();
     } catch (error) {
-      console.error('Error syncing sources:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error syncing sources:', error);
+      }
       toast({
         title: "Sync failed",
         description: "Some sources may not have updated",
