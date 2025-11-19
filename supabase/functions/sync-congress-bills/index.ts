@@ -13,10 +13,17 @@ const CONGRESS_API_BASE = 'https://api.congress.gov/v3';
 const KEYWORDS = {
   // Critical priority - direct community/humanitarian impact (30 points each)
   critical: [
+    // Palestinian/Gaza humanitarian crisis
     'palestinian', 'gaza', 'west bank', 'genocide', 'ethnic cleansing',
     'apartheid', 'occupation', 'blockade', 'ceasefire', 'war crimes',
+    // Muslim/Arab American community
     'muslim', 'arab', 'islam', 'islamic', 'mosque', 'islamophobia', 'anti-muslim',
-    'cair', 'isna', 'mpac',
+    // Organizations serving the community (potential targets)
+    'cair', 'isna', 'mpac', 'ams', 'msa', 'icna', 'mas',
+    // Organization targeting language
+    'terrorist organization', 'terrorist designation', 'material support',
+    'foreign terrorist', 'designated entity', 'unindicted co-conspirator',
+    'muslim brotherhood', 'brotherhood-linked',
   ],
   // High priority - regional conflicts (20 points each)
   high: [
@@ -24,6 +31,8 @@ const KEYWORDS = {
     'iran', 'iraq', 'syria', 'yemen', 'libya', 'lebanon',
     'humanitarian', 'civilian casualties', 'refugee', 'asylum',
     'hijab', 'halal', 'ramadan',
+    // Additional targeting terms
+    'radical islam', 'extremism', 'radicalization', 'sharia',
   ],
   // Medium priority - broader regional/policy (12 points each)
   medium: [
