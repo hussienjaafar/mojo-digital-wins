@@ -110,8 +110,9 @@ serve(async (req) => {
     for (const billType of billTypes) {
       console.log(`Fetching ${billType.toUpperCase()} bills...`);
 
+      // Reduced limit since we now make 3 API calls per bill (detail, summary, subjects)
       const response = await fetchCongressAPI(
-        `${CONGRESS_API_BASE}/bill/${currentCongress}/${billType}?limit=250&sort=updateDate+desc`
+        `${CONGRESS_API_BASE}/bill/${currentCongress}/${billType}?limit=100&sort=updateDate+desc`
       );
 
       if (!response.ok) {
@@ -141,19 +142,53 @@ serve(async (req) => {
 
           // Calculate relevance score based on keywords in title, summary, and subjects
           const titleLower = (billDetail.title || '').toLowerCase();
-          const summaryLower = (billDetail.summaries?.[0]?.text || '').toLowerCase();
 
-          // Get subjects/topics from the bill
+          // Fetch summaries (it's a separate endpoint in Congress.gov API)
+          let summaryLower = '';
+          if (billDetail.summaries?.url) {
+            try {
+              const summaryResponse = await fetchCongressAPI(billDetail.summaries.url);
+              if (summaryResponse.ok) {
+                const summaryData = await summaryResponse.json();
+                const summaries = summaryData.summaries || [];
+                if (summaries.length > 0) {
+                  // Get the most recent/detailed summary
+                  summaryLower = (summaries[0]?.text || '').toLowerCase();
+                }
+              }
+            } catch (e) {
+              console.log(`Could not fetch summaries for ${billDetail.number}`);
+            }
+          }
+
+          // Fetch subjects (also a separate endpoint)
           let subjectsText = '';
-          if (billDetail.subjects?.legislativeSubjects) {
-            subjectsText = billDetail.subjects.legislativeSubjects
-              .map((s: any) => s.name || '')
-              .join(' ')
-              .toLowerCase();
+          if (billDetail.subjects?.url) {
+            try {
+              const subjectsResponse = await fetchCongressAPI(billDetail.subjects.url);
+              if (subjectsResponse.ok) {
+                const subjectsData = await subjectsResponse.json();
+                const subjects = subjectsData.subjects || {};
+
+                // Get legislative subjects
+                if (subjects.legislativeSubjects) {
+                  subjectsText = subjects.legislativeSubjects
+                    .map((s: any) => s.name || '')
+                    .join(' ')
+                    .toLowerCase();
+                }
+                // Add policy area
+                if (subjects.policyArea?.name) {
+                  subjectsText += ' ' + subjects.policyArea.name.toLowerCase();
+                }
+              }
+            } catch (e) {
+              console.log(`Could not fetch subjects for ${billDetail.number}`);
+            }
           }
-          if (billDetail.subjects?.policyArea?.name) {
-            subjectsText += ' ' + billDetail.subjects.policyArea.name.toLowerCase();
-          }
+
+          // Log what we're searching through for debugging
+          console.log(`Bill ${billDetail.number}: title=${titleLower.substring(0, 50)}..., summary=${summaryLower.length} chars, subjects=${subjectsText.substring(0, 100)}`)
 
           let relevanceScore = 0;
           const matchedKeywords: string[] = [];
@@ -338,8 +373,8 @@ serve(async (req) => {
             }
           }
 
-          // Small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Delay to avoid rate limiting (increased since we make 3 API calls per bill)
+          await new Promise(resolve => setTimeout(resolve, 200));
 
         } catch (error) {
           console.error(`Error processing bill:`, error);
