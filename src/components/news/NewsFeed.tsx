@@ -50,15 +50,35 @@ export function NewsFeed() {
         },
         (payload) => {
           console.log('New article received:', payload.new);
+          const newArticle = payload.new as any;
 
-          // Add new article to the top of the list
-          setArticles(prev => [payload.new as any, ...prev]);
-          setFilteredArticles(prev => [payload.new as any, ...prev]);
-          setDisplayedArticles(prev => [payload.new as any, ...prev]);
+          // Insert article in correct chronological order by published_date
+          const insertSorted = (prev: any[]) => {
+            const newList = [...prev];
+            const newDate = new Date(newArticle.published_date).getTime();
+
+            // Find the correct position to insert (descending order)
+            let insertIndex = newList.findIndex(article =>
+              new Date(article.published_date).getTime() < newDate
+            );
+
+            // If not found, add to end; otherwise insert at position
+            if (insertIndex === -1) {
+              newList.push(newArticle);
+            } else {
+              newList.splice(insertIndex, 0, newArticle);
+            }
+
+            return newList;
+          };
+
+          setArticles(insertSorted);
+          setFilteredArticles(insertSorted);
+          setDisplayedArticles(insertSorted);
 
           toast({
             title: "New article added",
-            description: (payload.new as any).title,
+            description: newArticle.title,
           });
         }
       )
