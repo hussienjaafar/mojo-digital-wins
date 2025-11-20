@@ -105,8 +105,12 @@ export function DailyBriefing() {
         description: "Analyzing all sources and detecting patterns",
       });
 
+      // Get local date to pass to server
+      const now = new Date();
+      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
       const { data, error } = await supabase.functions.invoke('smart-alerting', {
-        body: { action: 'full' }
+        body: { action: 'full', localDate }
       });
 
       if (error) throw error;

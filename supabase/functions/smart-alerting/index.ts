@@ -56,8 +56,9 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const action = body.action || 'full';
+    const localDate = body.localDate; // Client's local date to avoid timezone mismatch
 
-    console.log(`Smart Alerting: Running action "${action}"`);
+    console.log(`Smart Alerting: Running action "${action}", localDate: ${localDate}`);
 
     const results: any = {};
 
@@ -181,9 +182,11 @@ serve(async (req) => {
       console.log('Tracking organization mentions...');
 
       let mentionsFound = 0;
-      // Get local date (not UTC) to avoid timezone issues
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      // Use client's local date if provided, otherwise use server date
+      const today = localDate || (() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      })();
 
       // Check articles
       const { data: todayArticles } = await supabase
@@ -285,9 +288,11 @@ serve(async (req) => {
     if (action === 'full' || action === 'daily_briefing') {
       console.log('Generating daily briefing...');
 
-      // Get local date (not UTC) to avoid timezone issues
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      // Use client's local date if provided, otherwise use server date
+      const today = localDate || (() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      })();
       const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
       // Get briefing stats (now looks at last 24 hours)
