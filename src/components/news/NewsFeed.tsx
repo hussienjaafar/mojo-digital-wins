@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { NewsCard } from "./NewsCard";
 import { NewsFilters, FilterState } from "./NewsFilters";
@@ -8,14 +8,21 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertCircle, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+const ARTICLES_PER_PAGE = 50;
+
 export function NewsFeed() {
   const [articles, setArticles] = useState<any[]>([]);
+  const [displayedArticles, setDisplayedArticles] = useState<any[]>([]);
   const [filteredArticles, setFilteredArticles] = useState<any[]>([]);
   const [sources, setSources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
   const { toast } = useToast();
+  const observerTarget = useRef<HTMLDivElement>(null);
 
   const categories = [
     'independent',
@@ -32,18 +39,71 @@ export function NewsFeed() {
     loadSources();
   }, []);
 
-  const loadArticles = async () => {
+  // Infinite scroll observer
+  const loadMoreArticles = useCallback(() => {
+    if (!loadingMore && hasMore) {
+      loadArticles(page + 1);
+    }
+  }, [loadingMore, hasMore, page]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          loadMoreArticles();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [loadMoreArticles, hasMore, loadingMore]);
+
+  const loadArticles = async (pageNum: number = 0) => {
     try {
-      setLoading(true);
-      const { data, error } = await supabase
+      if (pageNum === 0) {
+        setLoading(true);
+        setPage(0);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const from = pageNum * ARTICLES_PER_PAGE;
+      const to = from + ARTICLES_PER_PAGE - 1;
+
+      const { data, error, count } = await supabase
         .from('articles')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('published_date', { ascending: false })
-        .limit(100);
+        .range(from, to);
 
       if (error) throw error;
-      setArticles(data || []);
-      setFilteredArticles(data || []);
+
+      const newArticles = data || [];
+
+      if (pageNum === 0) {
+        setArticles(newArticles);
+        setFilteredArticles(newArticles);
+        setDisplayedArticles(newArticles);
+      } else {
+        setArticles(prev => [...prev, ...newArticles]);
+        setFilteredArticles(prev => [...prev, ...newArticles]);
+        setDisplayedArticles(prev => [...prev, ...newArticles]);
+      }
+
+      // Check if there are more articles
+      setHasMore(count ? (from + newArticles.length) < count : false);
+      setPage(pageNum);
+
     } catch (err: any) {
       setError(err.message);
       toast({
@@ -53,6 +113,7 @@ export function NewsFeed() {
       });
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -167,6 +228,7 @@ export function NewsFeed() {
       );
     }
 
+    setDisplayedArticles(filtered);
     setFilteredArticles(filtered);
   };
 
@@ -220,7 +282,7 @@ export function NewsFeed() {
         onFilterChange={applyFilters}
       />
 
-      {filteredArticles.length === 0 ? (
+      {displayedArticles.length === 0 ? (
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -228,11 +290,25 @@ export function NewsFeed() {
           </AlertDescription>
         </Alert>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredArticles.map((article) => (
-            <NewsCard key={article.id} article={article} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {displayedArticles.map((article) => (
+              <NewsCard key={article.id} article={article} />
+            ))}
+          </div>
+
+          {/* Infinite scroll trigger */}
+          <div ref={observerTarget} className="flex justify-center py-8">
+            {loadingMore && (
+              <LoadingSpinner size="md" label="Loading more articles..." />
+            )}
+            {!hasMore && displayedArticles.length > 0 && (
+              <p className="text-muted-foreground text-sm">
+                No more articles to load
+              </p>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

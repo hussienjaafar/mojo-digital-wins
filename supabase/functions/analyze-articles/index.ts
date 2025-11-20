@@ -9,6 +9,43 @@ const corsHeaders = {
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
+// Fetch and extract article content from URL
+async function fetchArticleContent(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; IntelligenceBot/1.0)',
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    });
+
+    if (!response.ok) return '';
+
+    const html = await response.text();
+
+    // Extract text content from HTML (simple extraction)
+    // Remove scripts, styles, and HTML tags
+    let text = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Limit to first 3000 characters to avoid token limits
+    return text.substring(0, 3000);
+  } catch (error) {
+    console.error(`Error fetching article content from ${url}:`, error);
+    return '';
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -27,7 +64,7 @@ serve(async (req) => {
       .from('articles')
       .select('*')
       .eq('processing_status', 'pending')
-      .limit(20);
+      .limit(100);
 
     if (fetchError) throw fetchError;
 
@@ -72,14 +109,33 @@ serve(async (req) => {
           }
         }
 
-        // 2. Perform sentiment analysis and generate summary using AI
+        // 2. Fetch full article content from source URL
+        let fullContent = article.content || article.description || '';
+
+        if (article.source_url && (!fullContent || fullContent.length < 500)) {
+          console.log(`Fetching full content for article ${article.id} from ${article.source_url}`);
+          const fetchedContent = await fetchArticleContent(article.source_url);
+          if (fetchedContent) {
+            fullContent = fetchedContent;
+
+            // Update article with fetched content
+            await supabaseClient
+              .from('articles')
+              .update({ content: fetchedContent })
+              .eq('id', article.id);
+          }
+        }
+
+        // 3. Perform sentiment analysis and generate summary using AI
+        const contentForAnalysis = fullContent.substring(0, 3000) || article.description || 'No content available';
+
         const analysisPrompt = `Analyze the following news article and provide:
 1. Sentiment (positive, neutral, or negative)
 2. Confidence score (0-1)
 3. A concise 2-sentence summary
 
 Article Title: ${article.title}
-Article Content: ${article.description || article.content?.substring(0, 500) || 'No content available'}
+Article Content: ${contentForAnalysis}
 
 Respond in JSON format:
 {
@@ -151,7 +207,7 @@ Respond in JSON format:
 
         const analysis = JSON.parse(toolCall.function.arguments);
 
-        // 3. Calculate numeric sentiment score
+        // 4. Calculate numeric sentiment score
         const sentimentScoreMap: Record<string, number> = {
           'positive': 0.75,
           'neutral': 0.5,
@@ -160,7 +216,7 @@ Respond in JSON format:
 
         const sentimentScore = sentimentScoreMap[analysis.sentiment] || 0.5;
 
-        // 4. Update article with analysis results
+        // 5. Update article with analysis results
         const { error: updateError } = await supabaseClient
           .from('articles')
           .update({
@@ -189,7 +245,7 @@ Respond in JSON format:
       }
     }
 
-    // 5. Update sentiment trends
+    // 6. Update sentiment trends
     await updateSentimentTrends(supabaseClient);
 
     console.log(`Processing complete: ${processedCount} analyzed, ${duplicateCount} duplicates found`);
