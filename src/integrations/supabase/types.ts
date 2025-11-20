@@ -2212,6 +2212,66 @@ export type Database = {
         }
         Relationships: []
       }
+      trending_topics: {
+        Row: {
+          article_ids: string[] | null
+          avg_sentiment_score: number | null
+          created_at: string | null
+          day_date: string
+          hour_timestamp: string
+          id: string
+          mention_count: number
+          momentum: number | null
+          negative_count: number | null
+          neutral_count: number | null
+          peak_position: number | null
+          positive_count: number | null
+          related_keywords: string[] | null
+          sample_titles: string[] | null
+          topic: string
+          updated_at: string | null
+          velocity_score: number | null
+        }
+        Insert: {
+          article_ids?: string[] | null
+          avg_sentiment_score?: number | null
+          created_at?: string | null
+          day_date: string
+          hour_timestamp: string
+          id?: string
+          mention_count?: number
+          momentum?: number | null
+          negative_count?: number | null
+          neutral_count?: number | null
+          peak_position?: number | null
+          positive_count?: number | null
+          related_keywords?: string[] | null
+          sample_titles?: string[] | null
+          topic: string
+          updated_at?: string | null
+          velocity_score?: number | null
+        }
+        Update: {
+          article_ids?: string[] | null
+          avg_sentiment_score?: number | null
+          created_at?: string | null
+          day_date?: string
+          hour_timestamp?: string
+          id?: string
+          mention_count?: number
+          momentum?: number | null
+          negative_count?: number | null
+          neutral_count?: number | null
+          peak_position?: number | null
+          positive_count?: number | null
+          related_keywords?: string[] | null
+          sample_titles?: string[] | null
+          topic?: string
+          updated_at?: string | null
+          velocity_score?: number | null
+        }
+        Relationships: []
+      }
       user_article_preferences: {
         Row: {
           created_at: string | null
