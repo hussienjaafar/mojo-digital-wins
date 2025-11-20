@@ -74,6 +74,8 @@ export function DailyBriefing() {
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
+
+      console.log('Fetched briefing data:', briefingData);
       setBriefing(briefingData);
 
       // Fetch breaking news
@@ -84,6 +86,7 @@ export function DailyBriefing() {
         .gte('first_detected_at', today)
         .order('first_detected_at', { ascending: false });
 
+      console.log('Fetched breaking news:', newsData);
       setBreakingNews(newsData || []);
     } catch (error) {
       console.error('Error fetching briefing:', error);
@@ -106,9 +109,15 @@ export function DailyBriefing() {
 
       if (error) throw error;
 
+      // Log full response for debugging
+      console.log('Smart alerting response:', data);
+
+      const criticalCount = data?.results?.daily_briefing?.critical || 0;
+      const highCount = data?.results?.daily_briefing?.high || 0;
+
       toast({
         title: "Briefing generated",
-        description: `Found ${data.results?.daily_briefing?.critical || 0} critical items`,
+        description: `Found ${criticalCount} critical, ${highCount} high priority items`,
       });
 
       await fetchBriefing();
@@ -116,7 +125,7 @@ export function DailyBriefing() {
       console.error('Error generating briefing:', error);
       toast({
         title: "Failed to generate briefing",
-        description: "Please try again",
+        description: error instanceof Error ? error.message : "Please try again",
         variant: "destructive",
       });
     } finally {
