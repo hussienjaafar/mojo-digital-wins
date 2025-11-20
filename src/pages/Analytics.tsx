@@ -23,6 +23,7 @@ interface TopicSentiment {
   trend: 'rising' | 'stable' | 'falling';
   velocity?: number; // Percentage growth rate
   momentum?: number; // Acceleration
+  trendingScore?: number; // velocity * log(mentions) for ranking
   sampleTitles?: string[];
   keywords?: string[];
 }
@@ -232,6 +233,10 @@ export default function Analytics() {
             trend = 'stable';
           }
 
+          // Calculate trending score: velocity weighted by mention count
+          // This prevents topics with 1 mention from ranking higher than topics with 30 mentions
+          const trendingScore = (data.velocity || 0) * Math.log(data.total + 1);
+
           return {
             topic,
             total: data.total,
@@ -242,12 +247,13 @@ export default function Analytics() {
             trend,
             velocity: data.velocity,
             momentum: data.momentum,
+            trendingScore,
             sampleTitles: Array.from(data.sampleTitles).slice(0, 3),
             keywords: Array.from(data.keywords).slice(0, 5),
           };
         })
-        // Sort by velocity (what's trending NOW), not just total mentions
-        .sort((a, b) => (b.velocity || 0) - (a.velocity || 0))
+        // Sort by trending score (velocity * log(mentions)) - balances growth rate with popularity
+        .sort((a, b) => (b.trendingScore || 0) - (a.trendingScore || 0))
         .slice(0, 15);
 
       // Detect new trending topics

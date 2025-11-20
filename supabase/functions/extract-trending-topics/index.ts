@@ -84,7 +84,7 @@ ${articlesText}
 Extract ONLY:
 - PEOPLE: "Donald Trump", "Nancy Pelosi", "Dick Cheney"
 - PLACES: "Gaza", "Ukraine", "Texas"
-- ORGANIZATIONS: "Supreme Court", "FBI", "NATO"
+- ORGANIZATIONS: "Supreme Court", "FBI", "NATO" (NOT news outlets)
 - BILLS: "HR 1234", "S 456"
 - PRODUCTS/EVENTS: "iPhone", "Super Bowl", "TikTok"
 
@@ -92,19 +92,21 @@ DO NOT extract:
 - Categories: "immigration", "healthcare", "politics"
 - Actions: "debate", "reform", "investigation"
 - Descriptions: "administration", "crisis", "tensions"
+- NEWS SOURCES: "Associated Press", "Reuters", "CNN", "BBC" (publishers reporting the news)
 
 Rules:
 1. Must be a proper noun (starts with capital letter)
 2. 1-3 words max
 3. Would have a Wikipedia page
 4. NOT a topic/theme/category
+5. NOT a news organization/publisher
 
 Examples:
-✅ "Elon Musk" (person)
-✅ "Gaza" (place)
-✅ "TikTok" (product)
+✅ "Elon Musk" (person IN the news)
+✅ "Gaza" (place IN the news)
+✅ "TikTok" (product IN the news)
+❌ "Associated Press" (news publisher, not news)
 ❌ "social media" (category)
-❌ "tech debate" (topic)
 ❌ "administration" (description)
 
 Return JSON array:
@@ -163,6 +165,16 @@ Return JSON array:
           'election', 'politics', 'government', 'movement', 'strategy', 'approach'
         ];
 
+        // News sources that should NOT be trending topics (they're publishers, not news)
+        const newsSources = [
+          'associated press', 'reuters', 'bbc', 'cnn', 'fox news', 'nbc', 'cbs', 'abc',
+          'washington post', 'new york times', 'wall street journal', 'guardian',
+          'al jazeera', 'npr', 'politico', 'the hill', 'daily wire', 'axios',
+          'bloomberg', 'cnbc', 'the intercept', 'mondoweiss', 'democracy now',
+          'middle east eye', 'electronic intifada', 'cair', 'national review',
+          'dropsite news', 'ap news'
+        ];
+
         const beforeFilter = extractedTopics.length;
         extractedTopics = extractedTopics.filter(topic => {
           const topicLower = topic.topic.toLowerCase();
@@ -177,6 +189,12 @@ Return JSON array:
           // Must start with capital letter
           if (topic.topic[0] !== topic.topic[0].toUpperCase()) {
             console.log(`❌ Filtered "${topic.topic}": doesn't start with capital`);
+            return false;
+          }
+
+          // Must not be a news source (publisher, not news)
+          if (newsSources.includes(topicLower)) {
+            console.log(`❌ Filtered "${topic.topic}": news source/publisher`);
             return false;
           }
 
