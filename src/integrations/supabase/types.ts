@@ -940,46 +940,85 @@ export type Database = {
       }
       daily_briefings: {
         Row: {
+          breaking_news_clusters: Json | null
           briefing_date: string
           created_at: string
+          critical_count: number | null
           executive_orders_summary: Json | null
+          executive_summary: string | null
           generated_at: string
+          high_count: number | null
           id: string
           key_developments: Json | null
+          key_takeaways: string[] | null
+          medium_count: number | null
+          organization_mentions: Json | null
           organization_mentions_summary: Json | null
           overall_threat_score: number | null
           recommendations: string[] | null
           sent_at: string | null
           state_actions_summary: Json | null
+          top_critical_items: Json | null
           top_threats: Json | null
+          total_articles: number | null
+          total_bills: number | null
+          total_executive_orders: number | null
+          total_state_actions: number | null
+          updated_at: string | null
         }
         Insert: {
+          breaking_news_clusters?: Json | null
           briefing_date: string
           created_at?: string
+          critical_count?: number | null
           executive_orders_summary?: Json | null
+          executive_summary?: string | null
           generated_at?: string
+          high_count?: number | null
           id?: string
           key_developments?: Json | null
+          key_takeaways?: string[] | null
+          medium_count?: number | null
+          organization_mentions?: Json | null
           organization_mentions_summary?: Json | null
           overall_threat_score?: number | null
           recommendations?: string[] | null
           sent_at?: string | null
           state_actions_summary?: Json | null
+          top_critical_items?: Json | null
           top_threats?: Json | null
+          total_articles?: number | null
+          total_bills?: number | null
+          total_executive_orders?: number | null
+          total_state_actions?: number | null
+          updated_at?: string | null
         }
         Update: {
+          breaking_news_clusters?: Json | null
           briefing_date?: string
           created_at?: string
+          critical_count?: number | null
           executive_orders_summary?: Json | null
+          executive_summary?: string | null
           generated_at?: string
+          high_count?: number | null
           id?: string
           key_developments?: Json | null
+          key_takeaways?: string[] | null
+          medium_count?: number | null
+          organization_mentions?: Json | null
           organization_mentions_summary?: Json | null
           overall_threat_score?: number | null
           recommendations?: string[] | null
           sent_at?: string | null
           state_actions_summary?: Json | null
+          top_critical_items?: Json | null
           top_threats?: Json | null
+          total_articles?: number | null
+          total_bills?: number | null
+          total_executive_orders?: number | null
+          total_state_actions?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }
