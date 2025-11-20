@@ -77,27 +77,42 @@ serve(async (req) => {
         `ID: ${a.id}\nTitle: ${a.title}\nContent: ${(a.description || a.content || '').substring(0, 500)}`
       ).join('\n\n---\n\n');
 
-      const extractionPrompt = `Analyze these news articles and extract the KEY TOPICS/THEMES being discussed.
+      const extractionPrompt = `Extract SPECIFIC trending topics like Twitter's trending section from these news articles.
 
 ${articlesText}
 
-For each major topic, provide:
-1. Topic name (2-4 words max, e.g., "Immigration Reform", "Climate Policy")
-2. Related keywords (3-5 words)
-3. Relevance score (0-1, how central this topic is to the articles)
+TWITTER-STYLE RULES (CRITICAL):
+- Use PROPER NOUNS: specific people, places, bills, events (e.g., "HR 5376", "Nancy Pelosi", "Gaza ceasefire")
+- Use EXACT NAMES: bills by number, people by full name, specific events
+- BE SPECIFIC: "Epstein files release" NOT "transparency"
+- BE CONCRETE: "Dick Cheney funeral" NOT "political events"
+- Include BILL NUMBERS: "HR 2847", "S 1234"
+- Include PEOPLE: "Donald Trump", "Joe Biden", specific names mentioned
+- Include PLACES: "Gaza", "West Bank", specific locations
+- AVOID vague terms: "policy", "reform", "debate", "issues"
+- Maximum 2-3 words per topic
+- Only topics mentioned in at least 1 article (breaking news counts)
+- Maximum 10 topics per batch
 
-IMPORTANT RULES:
-- Focus on SPECIFIC topics, not vague terms (e.g., "Supreme Court Ruling" not just "Politics")
-- Only extract topics mentioned in at least 2 articles OR are breaking news
-- Combine similar topics (e.g., "Climate Change" and "Climate Crisis" → "Climate Policy")
-- Skip generic terms like "news", "update", "today"
-- Maximum 8 topics per batch
+Examples of GOOD topics:
+✅ "HR 5376"
+✅ "Epstein documents"
+✅ "Dick Cheney"
+✅ "Gaza ceasefire"
+✅ "Nancy Pelosi"
+✅ "Supreme Court"
+
+Examples of BAD topics:
+❌ "immigration policy"
+❌ "healthcare debate"
+❌ "political reform"
+❌ "climate issues"
 
 Respond with JSON array:
 [
   {
-    "topic": "Topic Name",
-    "keywords": ["keyword1", "keyword2", "keyword3"],
+    "topic": "Specific Topic",
+    "keywords": ["keyword1", "keyword2"],
     "relevance": 0.9
   }
 ]`;
@@ -205,8 +220,8 @@ Respond with JSON array:
     let topicsInserted = 0;
 
     for (const [topicKey, data] of allTopics.entries()) {
-      // Only store topics with at least 2 mentions
-      if (data.count < 2) continue;
+      // Store topics with at least 1 mention (Twitter-style: even single breaking news counts)
+      if (data.count < 1) continue;
 
       const avgSentiment = data.sentimentScores.reduce((a, b) => a + b, 0) / data.sentimentScores.length;
 

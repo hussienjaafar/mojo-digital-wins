@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format, subDays } from "date-fns";
 import { CalendarIcon, Download, TrendingUp, AlertTriangle, Newspaper, Scale, Building2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +49,8 @@ export default function Analytics() {
   const [newArticleCount, setNewArticleCount] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [topicArticles, setTopicArticles] = useState<any[]>([]);
 
   // Real-time subscription for new articles
   useEffect(() => {
@@ -462,6 +465,44 @@ export default function Analytics() {
     }
   };
 
+  const fetchTopicArticles = async (topicData: TopicSentiment) => {
+    try {
+      setSelectedTopic(topicData.topic);
+
+      // Get article IDs from trending_topics table
+      const { data: trendingData, error: trendingError } = await supabase
+        .from('trending_topics')
+        .select('article_ids, sample_titles')
+        .eq('topic', topicData.topic)
+        .gte('hour_timestamp', dateRange.from.toISOString())
+        .lte('hour_timestamp', dateRange.to.toISOString())
+        .order('hour_timestamp', { ascending: false })
+        .limit(1);
+
+      if (trendingError) throw trendingError;
+
+      if (trendingData && trendingData.length > 0 && trendingData[0].article_ids) {
+        const articleIds = trendingData[0].article_ids;
+
+        // Fetch full article details
+        const { data: articles, error: articlesError } = await supabase
+          .from('articles')
+          .select('id, title, description, url, source_name, published_date, sentiment_label')
+          .in('id', articleIds)
+          .order('published_date', { ascending: false })
+          .limit(20);
+
+        if (articlesError) throw articlesError;
+        setTopicArticles(articles || []);
+      } else {
+        setTopicArticles([]);
+      }
+    } catch (error) {
+      console.error('Error fetching topic articles:', error);
+      toast.error('Failed to load articles for this topic');
+    }
+  };
+
   const getSentimentColor = (sentiment: number) => {
     if (sentiment > 0.6) return 'text-green-600';
     if (sentiment < 0.4) return 'text-red-600';
@@ -656,13 +697,17 @@ export default function Analytics() {
                   <p className="text-muted-foreground text-center py-8">No trending topics found in this time period</p>
                 ) : (
                   topicSentiments.map((topic, index) => (
-                    <div key={topic.topic} className={`border-b pb-4 last:border-0 ${topic.trend === 'rising' && isLive ? 'bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border-green-200' : ''}`}>
+                    <div
+                      key={topic.topic}
+                      onClick={() => fetchTopicArticles(topic)}
+                      className={`border-b pb-4 last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors ${topic.trend === 'rising' && isLive ? 'bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border-green-200' : 'p-3'}`}
+                    >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="text-2xl font-bold text-muted-foreground">#{index + 1}</span>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold text-lg capitalize">{topic.topic}</h3>
+                              <h3 className="font-bold text-lg hover:underline">{topic.topic}</h3>
                               <span className="text-xl">{getTrendIcon(topic.trend)}</span>
                               {topic.trend === 'rising' && isLive && (
                                 <span className="px-2 py-1 bg-green-500 text-white text-xs font-bold rounded animate-pulse">
@@ -828,6 +873,68 @@ export default function Analytics() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog for Trending Topic Articles */}
+      <Dialog open={selectedTopic !== null} onOpenChange={(open) => !open && setSelectedTopic(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold capitalize">{selectedTopic}</DialogTitle>
+            <DialogDescription>
+              {topicArticles.length} article{topicArticles.length !== 1 ? 's' : ''} mentioning this topic
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            {topicArticles.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No articles found</p>
+            ) : (
+              topicArticles.map((article) => (
+                <a
+                  key={article.id}
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg mb-1 hover:underline">
+                        {article.title}
+                      </h3>
+                      {article.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                          {article.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="font-medium">{article.source_name}</span>
+                        <span>•</span>
+                        <span>{new Date(article.published_date).toLocaleDateString()}</span>
+                        {article.sentiment_label && (
+                          <>
+                            <span>•</span>
+                            <span
+                              className={`px-2 py-0.5 rounded ${
+                                article.sentiment_label === 'positive'
+                                  ? 'bg-green-100 text-green-800'
+                                  : article.sentiment_label === 'negative'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {article.sentiment_label}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </a>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
