@@ -24,123 +24,186 @@ const KEYWORDS = [
   'profiling'
 ];
 
-// Enhanced threat detection keywords
-const THREAT_KEYWORDS = {
+// IMPROVED THREAT DETECTION
+// Threat indicators - show something BAD is happening TO an organization
+const THREAT_INDICATORS = {
   critical: [
+    'designated as terrorist',
     'terrorist designation',
-    'terrorist organization',
-    'material support',
-    'foreign terrorist',
-    'designated entity',
-    'sanctions',
+    'sanctions against',
+    'banned',
     'asset freeze',
-    'travel ban',
-    'muslim ban',
-    'immigration ban',
-    'mosque surveillance',
-    'religious registry',
+    'criminal charges',
+    'indictment',
+    'sued for',
+    'investigation into',
+    'crackdown on',
+    'shutdown',
+    'dissolved',
   ],
   high: [
-    'muslim',
-    'islam',
-    'islamic',
-    'arab',
-    'cair',
-    'mpac',
-    'immigration enforcement',
-    'deportation',
-    'visa restriction',
-    'refugee ban',
-    'asylum',
-    'surveillance program',
-    'counterterrorism',
-    'radicalization',
-    'extremism',
-    'religious freedom',
-    'civil liberties violation',
-    'discrimination lawsuit',
-    'hate crime',
-    'profiling',
-    'executive order',
+    'accused of',
+    'alleged',
+    'controversy',
+    'criticism',
+    'protest against',
+    'opposition to',
+    'concerns about',
+    'questioned',
+    'challenged',
+    'scrutiny',
+    'under fire',
+    'backlash',
   ],
   medium: [
-    'immigration',
-    'border security',
-    'national security',
-    'homeland security',
-    'nonprofit',
-    'charitable organization',
-    'religious organization',
-    'first amendment',
-    'free speech',
+    'debate over',
+    'discussion about',
+    'focus on',
+    'attention to',
   ]
 };
 
-// Organizations to specifically track
-const TRACKED_ORGANIZATIONS = [
-  'cair', 'council on american-islamic relations',
-  'mpac', 'muslim public affairs council',
-  'isna', 'islamic society of north america',
-  'adc', 'american-arab anti-discrimination committee',
-  'aai', 'arab american institute',
-  'mas', 'muslim american society',
-  'icna', 'islamic circle of north america',
-  'aclu',
-];
+// Issue keywords - topics that are relevant to monitor
+const ISSUE_KEYWORDS = {
+  high_priority: [
+    'surveillance',
+    'profiling',
+    'discrimination lawsuit',
+    'hate crime',
+    'civil rights violation',
+    'religious freedom violation',
+    'deportation',
+    'immigration enforcement',
+    'travel ban',
+    'refugee ban',
+  ],
+  medium_priority: [
+    'immigration',
+    'border security',
+    'national security',
+    'counterterrorism',
+    'religious freedom',
+    'civil liberties',
+    'first amendment',
+  ]
+};
 
-// Calculate threat level for articles
-function calculateThreatLevel(text: string): { level: string; score: number; affectedOrgs: string[] } {
+// Organizations to track (pattern -> display name)
+const TRACKED_ORGS: Record<string, string> = {
+  'cair': 'CAIR',
+  'council on american-islamic relations': 'CAIR',
+  'mpac': 'MPAC',
+  'muslim public affairs council': 'MPAC',
+  'isna': 'ISNA',
+  'islamic society of north america': 'ISNA',
+  'adc': 'ADC',
+  'american-arab anti-discrimination committee': 'ADC',
+  'aai': 'AAI',
+  'arab american institute': 'AAI',
+  'mas': 'MAS',
+  'muslim american society': 'MAS',
+  'icna': 'ICNA',
+  'islamic circle of north america': 'ICNA',
+  'aclu': 'ACLU',
+  'american civil liberties union': 'ACLU',
+};
+
+// Calculate threat level for articles - IMPROVED VERSION
+function calculateThreatLevel(text: string, sourceName: string): { level: string; score: number; affectedOrgs: string[] } {
   const lowerText = text.toLowerCase();
+  const lowerSource = sourceName.toLowerCase();
   const affectedOrgs: string[] = [];
   let score = 0;
 
-  // Check critical keywords
-  for (const keyword of THREAT_KEYWORDS.critical) {
-    if (lowerText.includes(keyword)) {
-      score += 50;
-    }
-  }
-
-  // Check high-priority keywords
-  for (const keyword of THREAT_KEYWORDS.high) {
-    if (lowerText.includes(keyword)) {
-      score += 15;
-    }
-  }
-
-  // Check medium-priority keywords
-  for (const keyword of THREAT_KEYWORDS.medium) {
-    if (lowerText.includes(keyword)) {
-      score += 5;
-    }
-  }
-
-  // Check for tracked organizations
-  for (const org of TRACKED_ORGANIZATIONS) {
-    if (lowerText.includes(org)) {
-      score += 30;
-      // Extract org name for affected_organizations
-      const orgName = org.includes('cair') ? 'CAIR' :
-                      org.includes('mpac') ? 'MPAC' :
-                      org.includes('isna') ? 'ISNA' :
-                      org.includes('adc') ? 'ADC' :
-                      org.includes('aai') ? 'AAI' :
-                      org.includes('mas') ? 'MAS' :
-                      org.includes('icna') ? 'ICNA' :
-                      org.includes('aclu') ? 'ACLU' : org.toUpperCase();
+  // 1. IDENTIFY AFFECTED ORGANIZATIONS
+  const mentionedOrgs = new Set<string>();
+  for (const [pattern, orgName] of Object.entries(TRACKED_ORGS)) {
+    if (lowerText.includes(pattern)) {
+      mentionedOrgs.add(orgName);
       if (!affectedOrgs.includes(orgName)) {
         affectedOrgs.push(orgName);
       }
     }
   }
 
-  // Determine threat level
+  // 2. CHECK IF ARTICLE IS FROM A TRACKED ORG
+  let isFromTrackedOrg = false;
+  for (const [pattern] of Object.entries(TRACKED_ORGS)) {
+    if (lowerSource.includes(pattern)) {
+      isFromTrackedOrg = true;
+      break;
+    }
+  }
+
+  // 3. SCORE BASED ON THREAT INDICATORS
+  // Critical threats (things happening TO organizations)
+  for (const indicator of THREAT_INDICATORS.critical) {
+    if (lowerText.includes(indicator)) {
+      // Only score if an org is mentioned (threat must target someone)
+      if (mentionedOrgs.size > 0) {
+        score += 50;
+        break; // One critical indicator is enough
+      }
+    }
+  }
+
+  // High threat indicators
+  if (score < 50) { // Don't stack if already critical
+    for (const indicator of THREAT_INDICATORS.high) {
+      if (lowerText.includes(indicator)) {
+        if (mentionedOrgs.size > 0) {
+          score += 20;
+          break; // One high indicator is enough
+        }
+      }
+    }
+  }
+
+  // Medium threat indicators
+  if (score < 20) { // Don't stack if already high/critical
+    for (const indicator of THREAT_INDICATORS.medium) {
+      if (lowerText.includes(indicator)) {
+        if (mentionedOrgs.size > 0) {
+          score += 10;
+          break;
+        }
+      }
+    }
+  }
+
+  // 4. SCORE BASED ON ISSUE RELEVANCE
+  // High priority issues
+  for (const issue of ISSUE_KEYWORDS.high_priority) {
+    if (lowerText.includes(issue)) {
+      score += 15;
+      break; // One mention is enough
+    }
+  }
+
+  // Medium priority issues
+  if (score < 15) { // Only if no high-priority issues found
+    for (const issue of ISSUE_KEYWORDS.medium_priority) {
+      if (lowerText.includes(issue)) {
+        score += 5;
+        break;
+      }
+    }
+  }
+
+  // 5. BONUS POINTS IF ARTICLE IS ABOUT (NOT FROM) A TRACKED ORG
+  if (mentionedOrgs.size > 0 && !isFromTrackedOrg) {
+    // Article mentions tracked org but isn't from that org
+    // This means outside coverage, which could be significant
+    score += 10;
+  }
+
+  // 6. DETERMINE THREAT LEVEL
   let level = 'low';
   if (score >= 50) {
     level = 'critical';
-  } else if (score >= 30) {
+  } else if (score >= 25) {
     level = 'high';
-  } else if (score >= 15) {
+  } else if (score >= 10) {
     level = 'medium';
   }
 
@@ -332,7 +395,7 @@ serve(async (req) => {
 
           // Calculate threat level
           const textToAnalyze = `${sanitizedTitle} ${sanitizedDescription}`;
-          const { level: threatLevel, score, affectedOrgs } = calculateThreatLevel(textToAnalyze);
+          const { level: threatLevel, score, affectedOrgs } = calculateThreatLevel(textToAnalyze, source.name);
 
           const { data: insertedArticle, error: insertError } = await supabase
             .from('articles')
@@ -342,7 +405,8 @@ serve(async (req) => {
               content: sanitizedDescription,
               source_id: source.id,
               source_name: source.name,
-              source_url: item.link,
+              source_url: source.url, // RSS feed URL
+              url: item.link, // Individual article link
               published_date: item.pubDate,
               image_url: item.imageUrl,
               tags,

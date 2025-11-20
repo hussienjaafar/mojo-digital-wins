@@ -396,6 +396,17 @@ export function DailyBriefing() {
                                   </p>
                                 )}
                               </div>
+                              {item.url && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => window.open(item.url, '_blank')}
+                                  title="Open article"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </CardContent>
                         </Card>

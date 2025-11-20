@@ -137,6 +137,9 @@ serve(async (req) => {
       // Save breaking news clusters
       let clustersCreated = 0;
       for (const [key, cluster] of clusters) {
+        // Get earliest article publish time for first_detected_at
+        const earliestTime = new Date(Math.min(...cluster.articles.map((a: any) => new Date(a.published_date).getTime())));
+
         const { error } = await supabase
           .from('breaking_news_clusters')
           .upsert({
@@ -146,6 +149,9 @@ serve(async (req) => {
             threat_level: cluster.threatLevel,
             affected_organizations: cluster.affectedOrgs,
             primary_article_id: cluster.primaryArticleId,
+            first_detected_at: earliestTime.toISOString(),
+            is_active: true,
+            is_resolved: false,
             last_updated_at: new Date().toISOString(),
           }, {
             onConflict: 'cluster_topic'
@@ -218,6 +224,7 @@ serve(async (req) => {
                   source_title: article.title,
                   mention_context: extractMentionContext(article.title + ' ' + (article.description || ''), variant),
                   threat_level: article.threat_level,
+                  mentioned_at: new Date().toISOString(),
                 });
                 mentionsFound++;
 
@@ -269,6 +276,7 @@ serve(async (req) => {
                   source_title: action.title,
                   mention_context: extractMentionContext(action.title + ' ' + (action.description || ''), variant),
                   threat_level: action.threat_level,
+                  mentioned_at: new Date().toISOString(),
                 });
                 mentionsFound++;
               }
@@ -301,7 +309,7 @@ serve(async (req) => {
       // Get top critical/high/medium items from last 24 hours
       const { data: criticalArticles } = await supabase
         .from('articles')
-        .select('id, title, threat_level, source_name')
+        .select('id, title, threat_level, source_name, url')
         .in('threat_level', ['critical', 'high', 'medium'])
         .gte('published_date', last24Hours)
         .order('threat_level', { ascending: true })
