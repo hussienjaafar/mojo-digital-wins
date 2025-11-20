@@ -177,7 +177,11 @@ Return JSON array:
         ];
 
         // Overly generic standalone terms (too broad to be useful trending topics)
-        const genericTerms = ['us', 'uk', 'eu', 'dc', 'trump', 'biden', 'house', 'senate'];
+        const genericTerms = [
+          'us', 'uk', 'eu', 'dc', 'u.s.', 'u.k.',  // Country codes (with/without periods)
+          'trump', 'biden', 'vance', 'netanyahu',   // Last names without first names
+          'house', 'senate', 'congress'             // Institutions without context
+        ];
 
         const beforeFilter = extractedTopics.length;
         extractedTopics = extractedTopics.filter(topic => {
