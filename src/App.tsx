@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import ScrollToTop from "@/components/ScrollToTop";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
@@ -37,6 +37,8 @@ const queryClient = new QueryClient();
 
 const AppContent = () => {
   useSmoothScroll();
+  const location = useLocation();
+  const isPublicPage = !location.pathname.startsWith('/admin') && !location.pathname.startsWith('/client');
   
   return (
     <>
@@ -45,7 +47,7 @@ const AppContent = () => {
       <BackToTop />
       <CookieConsent />
       <MetaPixel />
-      <ExitIntentPopup />
+      {isPublicPage && <ExitIntentPopup />}
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/about" element={<About />} />
