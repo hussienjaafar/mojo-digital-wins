@@ -71,7 +71,7 @@ export function DailyBriefing() {
         .from('daily_briefings')
         .select('*')
         .eq('briefing_date', today)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
       setBriefing(briefingData);
