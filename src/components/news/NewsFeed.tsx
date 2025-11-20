@@ -37,6 +37,37 @@ export function NewsFeed() {
   useEffect(() => {
     loadArticles();
     loadSources();
+
+    // Set up real-time subscription for new articles
+    const articlesChannel = supabase
+      .channel('news-feed-articles')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'articles'
+        },
+        (payload) => {
+          console.log('New article received:', payload.new);
+
+          // Add new article to the top of the list
+          setArticles(prev => [payload.new as any, ...prev]);
+          setFilteredArticles(prev => [payload.new as any, ...prev]);
+          setDisplayedArticles(prev => [payload.new as any, ...prev]);
+
+          toast({
+            title: "New article added",
+            description: (payload.new as any).title,
+          });
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(articlesChannel);
+    };
   }, []);
 
   // Infinite scroll observer
