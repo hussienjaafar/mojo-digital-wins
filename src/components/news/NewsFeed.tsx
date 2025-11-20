@@ -104,8 +104,10 @@ export function NewsFeed() {
       if (pageNum === 0) {
         setLoading(true);
         setPage(0);
+        console.log('📰 Loading articles (page 0)...');
       } else {
         setLoadingMore(true);
+        console.log(`📰 Loading more articles (page ${pageNum})...`);
       }
 
       const from = pageNum * ARTICLES_PER_PAGE;
@@ -117,9 +119,13 @@ export function NewsFeed() {
         .order('published_date', { ascending: false })
         .range(from, to);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error loading articles:', error);
+        throw error;
+      }
 
       const newArticles = data || [];
+      console.log(`✅ Loaded ${newArticles.length} articles (total: ${count})`);
 
       if (pageNum === 0) {
         setArticles(newArticles);
@@ -136,6 +142,7 @@ export function NewsFeed() {
       setPage(pageNum);
 
     } catch (err: any) {
+      console.error('❌ Error in loadArticles:', err);
       setError(err.message);
       toast({
         title: "Error loading articles",
@@ -166,20 +173,32 @@ export function NewsFeed() {
   const fetchNewArticles = async () => {
     try {
       setFetching(true);
+      console.log('🔄 Starting RSS feed fetch...');
+
       const { data, error } = await supabase.functions.invoke('fetch-rss-feeds');
 
-      if (error) throw error;
+      console.log('📡 RSS fetch response:', { data, error });
+
+      if (error) {
+        console.error('❌ RSS fetch error:', error);
+        throw error;
+      }
+
+      console.log(`✅ RSS fetch complete: ${data?.articlesAdded || 0} articles from ${data?.sourcesProcessed || 0} sources`);
 
       toast({
         title: "RSS feeds updated",
-        description: `Added ${data.articlesAdded} new articles from ${data.sourcesProcessed} sources`,
+        description: `Added ${data?.articlesAdded || 0} new articles from ${data?.sourcesProcessed || 0} sources`,
       });
 
+      // Reload articles to show new ones
+      console.log('🔄 Reloading articles...');
       await loadArticles();
     } catch (err: any) {
+      console.error('❌ Error in fetchNewArticles:', err);
       toast({
         title: "Error fetching feeds",
-        description: err.message,
+        description: err.message || 'Unknown error occurred',
         variant: "destructive"
       });
     } finally {

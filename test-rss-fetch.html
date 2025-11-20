@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>RSS Feed Diagnostic Tool</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+    .section {
+      background: #f5f5f5;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 5px;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    button:disabled {
+      background: #cccccc;
+      cursor: not-allowed;
+    }
+    .log {
+      background: #333;
+      color: #0f0;
+      padding: 15px;
+      border-radius: 5px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .error { color: #f00; }
+    .success { color: #0f0; }
+    .info { color: #0af; }
+  </style>
+</head>
+<body>
+  <h1>🔍 RSS Feed Diagnostic Tool</h1>
+
+  <div class="section">
+    <h2>Step 1: Check RSS Sources</h2>
+    <button onclick="checkSources()">Check Active RSS Sources</button>
+    <div id="sourcesResult" class="log"></div>
+  </div>
+
+  <div class="section">
+    <h2>Step 2: Fetch RSS Feeds</h2>
+    <button onclick="fetchFeeds()" id="fetchBtn">Fetch RSS Feeds</button>
+    <div id="fetchResult" class="log"></div>
+  </div>
+
+  <div class="section">
+    <h2>Step 3: Check Recent Articles</h2>
+    <button onclick="checkArticles()">Check Recent Articles</button>
+    <div id="articlesResult" class="log"></div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://nuclmzoasgydubdshtab.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im51Y2xtem9hc2d5ZHViZHNodGFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5MDgxNTMsImV4cCI6MjA3ODQ4NDE1M30.-1EDAX7A5pQxtFs3a9M4R2BHBMbWkoMdA5NLWdZyEjo';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function log(elementId, message, className = '') {
+      const element = document.getElementById(elementId);
+      const timestamp = new Date().toLocaleTimeString();
+      const line = `[${timestamp}] ${message}\n`;
+      element.innerHTML += `<span class="${className}">${line}</span>`;
+      element.scrollTop = element.scrollHeight;
+    }
+
+    async function checkSources() {
+      const result = document.getElementById('sourcesResult');
+      result.innerHTML = '';
+
+      try {
+        log('sourcesResult', '🔍 Checking RSS sources...', 'info');
+
+        const { data: sources, error, count } = await supabase
+          .from('rss_sources')
+          .select('*', { count: 'exact' })
+          .eq('is_active', true);
+
+        if (error) throw error;
+
+        log('sourcesResult', `✅ Found ${count} active RSS sources`, 'success');
+
+        if (sources && sources.length > 0) {
+          sources.forEach((source, i) => {
+            log('sourcesResult', `\n${i + 1}. ${source.name}`, 'info');
+            log('sourcesResult', `   URL: ${source.url}`, '');
+            log('sourcesResult', `   Category: ${source.category}`, '');
+            log('sourcesResult', `   Last Fetched: ${source.last_fetched_at || 'Never'}`, '');
+            log('sourcesResult', `   Error: ${source.fetch_error || 'None'}`, source.fetch_error ? 'error' : '');
+          });
+        } else {
+          log('sourcesResult', '⚠️ No active RSS sources found! You need to add RSS sources first.', 'error');
+        }
+      } catch (err) {
+        log('sourcesResult', `❌ Error: ${err.message}`, 'error');
+        console.error(err);
+      }
+    }
+
+    async function fetchFeeds() {
+      const result = document.getElementById('fetchResult');
+      const btn = document.getElementById('fetchBtn');
+      result.innerHTML = '';
+      btn.disabled = true;
+
+      try {
+        log('fetchResult', '🔄 Starting RSS feed fetch...', 'info');
+        log('fetchResult', '⏳ This may take 30-60 seconds...', 'info');
+
+        const startTime = Date.now();
+
+        const { data, error } = await supabase.functions.invoke('fetch-rss-feeds');
+
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+        if (error) throw error;
+
+        log('fetchResult', `\n✅ RSS fetch completed in ${duration}s`, 'success');
+        log('fetchResult', `📰 Articles added: ${data.articlesAdded}`, 'success');
+        log('fetchResult', `📡 Sources processed: ${data.sourcesProcessed}`, 'success');
+        log('fetchResult', `❌ Errors: ${data.errors || 0}`, data.errors > 0 ? 'error' : 'success');
+
+        if (data.articlesAdded === 0) {
+          log('fetchResult', '\n⚠️ No new articles were added. This could mean:', 'info');
+          log('fetchResult', '  - All articles were duplicates', '');
+          log('fetchResult', '  - RSS feeds have no new content', '');
+          log('fetchResult', '  - RSS feeds are not accessible', '');
+        }
+      } catch (err) {
+        log('fetchResult', `\n❌ Error: ${err.message}`, 'error');
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function checkArticles() {
+      const result = document.getElementById('articlesResult');
+      result.innerHTML = '';
+
+      try {
+        log('articlesResult', '📰 Checking recent articles...', 'info');
+
+        // Get total count
+        const { count: totalCount } = await supabase
+          .from('articles')
+          .select('*', { count: 'exact', head: true });
+
+        log('articlesResult', `📊 Total articles in database: ${totalCount}`, 'success');
+
+        // Get articles from last 24 hours
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: recentArticles, error } = await supabase
+          .from('articles')
+          .select('id, title, source_name, published_date, created_at')
+          .gte('created_at', yesterday)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (error) throw error;
+
+        log('articlesResult', `\n📅 Articles added in last 24 hours: ${recentArticles.length}`, 'success');
+
+        if (recentArticles && recentArticles.length > 0) {
+          log('articlesResult', '\n🔖 Most recent articles:', 'info');
+          recentArticles.forEach((article, i) => {
+            const createdAt = new Date(article.created_at).toLocaleString();
+            log('articlesResult', `\n${i + 1}. ${article.title.substring(0, 60)}...`, '');
+            log('articlesResult', `   Source: ${article.source_name}`, '');
+            log('articlesResult', `   Added: ${createdAt}`, '');
+          });
+        } else {
+          log('articlesResult', '\n⚠️ No articles added in the last 24 hours', 'error');
+        }
+      } catch (err) {
+        log('articlesResult', `❌ Error: ${err.message}`, 'error');
+        console.error(err);
+      }
+    }
+
+    // Auto-check sources on load
+    window.addEventListener('load', () => {
+      checkSources();
+    });
+  </script>
+</body>
+</html>
