@@ -28,20 +28,8 @@ import type { Database } from "@/integrations/supabase/types";
 type DailyBriefingRow = Database['public']['Tables']['daily_briefings']['Row'];
 type BreakingNewsRow = Database['public']['Tables']['breaking_news_clusters']['Row'];
 
-interface DailyBriefingData extends DailyBriefingRow {
-  total_articles?: number;
-  total_bills?: number;
-  total_executive_orders?: number;
-  total_state_actions?: number;
-  critical_count?: number;
-  high_count?: number;
-  medium_count?: number;
-  top_critical_items?: any[];
-  breaking_news_clusters?: string[];
-  organization_mentions?: Record<string, { total: number; critical: number; high: number }>;
-  executive_summary?: string;
-  key_takeaways?: string[];
-}
+// The database row now includes all these fields
+type DailyBriefingData = DailyBriefingRow;
 
 interface BreakingNewsCluster extends BreakingNewsRow {
   cluster_topic?: string;
@@ -365,7 +353,7 @@ export function DailyBriefing() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {!briefing?.top_critical_items?.length ? (
+              {!Array.isArray(briefing?.top_critical_items) || briefing.top_critical_items.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No critical items today</p>
@@ -373,7 +361,7 @@ export function DailyBriefing() {
               ) : (
                 <ScrollArea className="h-[300px]">
                   <div className="space-y-3">
-                    {briefing.top_critical_items.map((item: any, index: number) => {
+                    {(briefing.top_critical_items as any[]).map((item: any, index: number) => {
                       const Icon = item.type === 'article' ? Newspaper :
                                   item.type === 'bill' ? ScrollText :
                                   item.type === 'state_action' ? Building2 : Shield;
