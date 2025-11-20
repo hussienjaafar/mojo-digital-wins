@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { logger } from "@/lib/logger";
+import { Shield } from "lucide-react";
 
 const Footer = () => {
   const { toast } = useToast();
@@ -179,6 +180,20 @@ const Footer = () => {
             <p className="mt-2">
               Paid for by Molitico. Not authorized by any candidate or candidate's committee.
             </p>
+
+            {/* Admin Login Button */}
+            <div className="mt-6 pt-4 border-t border-primary-foreground/10">
+              <Link to="/admin">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary-foreground/40 hover:text-primary-foreground/70 hover:bg-primary-foreground/5 gap-2"
+                >
+                  <Shield className="w-3 h-3" />
+                  <span className="text-xs">Staff Login</span>
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
