@@ -77,45 +77,48 @@ serve(async (req) => {
         `ID: ${a.id}\nTitle: ${a.title}\nContent: ${(a.description || a.content || '').substring(0, 500)}`
       ).join('\n\n---\n\n');
 
-      const extractionPrompt = `Extract SPECIFIC trending topics like Twitter's trending section from these news articles.
+      const extractionPrompt = `You are extracting Twitter-style trending topics. Extract ONLY proper nouns, names, and specific events.
 
 ${articlesText}
 
-TWITTER-STYLE RULES (CRITICAL):
-- Use PROPER NOUNS: specific people, places, bills, events (e.g., "HR 5376", "Nancy Pelosi", "Gaza ceasefire")
-- Use EXACT NAMES: bills by number, people by full name, specific events
-- BE SPECIFIC: "Epstein files release" NOT "transparency"
-- BE CONCRETE: "Dick Cheney funeral" NOT "political events"
-- Include BILL NUMBERS: "HR 2847", "S 1234"
-- Include PEOPLE: "Donald Trump", "Joe Biden", specific names mentioned
-- Include PLACES: "Gaza", "West Bank", specific locations
-- AVOID vague terms: "policy", "reform", "debate", "issues"
-- Maximum 2-3 words per topic
-- Only topics mentioned in at least 1 article (breaking news counts)
-- Maximum 10 topics per batch
+MANDATORY RULES - FOLLOW EXACTLY:
+1. ONLY extract PROPER NOUNS (capitalized names)
+2. PEOPLE: Extract full names EXACTLY as written: "Donald Trump", "Nancy Pelosi", "Elon Musk"
+3. BILLS: Extract bill numbers: "HR 1234", "S 567"
+4. PLACES: Extract specific locations: "Gaza", "Ukraine", "West Bank"
+5. EVENTS: Extract specific named events: "Epstein files", "G20 summit"
+6. COMPANIES: Extract company names: "Tesla", "OpenAI", "Microsoft"
+7. ORGANIZATIONS: Extract org names: "FBI", "Supreme Court", "NATO"
 
-Examples of GOOD topics:
-✅ "HR 5376"
-✅ "Epstein documents"
-✅ "Dick Cheney"
-✅ "Gaza ceasefire"
-✅ "Nancy Pelosi"
-✅ "Supreme Court"
+ABSOLUTELY FORBIDDEN - NEVER EXTRACT:
+❌ Generic nouns: "policy", "reform", "debate", "legislation", "issues"
+❌ Verbs: "investigating", "announcing", "reforming"
+❌ Adjectives: "controversial", "new", "major"
+❌ Vague phrases: "immigration issues", "healthcare debate", "political tensions"
 
-Examples of BAD topics:
-❌ "immigration policy"
-❌ "healthcare debate"
-❌ "political reform"
-❌ "climate issues"
+EXTRACT ONLY IF:
+- It's a PROPER NOUN (capitalized)
+- It appears in article title or first 100 words
+- 1-3 words maximum
+- Specific person, place, bill, or organization name
 
-Respond with JSON array:
-[
-  {
-    "topic": "Specific Topic",
-    "keywords": ["keyword1", "keyword2"],
-    "relevance": 0.9
-  }
-]`;
+CORRECT EXAMPLES:
+✅ "Jeffrey Epstein" (person name)
+✅ "HR 2847" (bill number)
+✅ "Dick Cheney" (person name)
+✅ "Gaza" (place)
+✅ "Supreme Court" (organization)
+✅ "TikTok ban" (specific event)
+
+WRONG EXAMPLES (DO NOT EXTRACT):
+❌ "voting rights" → too generic, not a proper noun
+❌ "healthcare reform" → vague category
+❌ "immigration debate" → generic issue
+❌ "new legislation" → no specific name
+❌ "political controversy" → too broad
+
+Return JSON array with ONLY proper nouns:
+[{"topic": "Proper Noun", "keywords": ["related", "words"], "relevance": 0.9}]`;
 
       try {
         const aiResponse = await fetch(AI_GATEWAY_URL, {

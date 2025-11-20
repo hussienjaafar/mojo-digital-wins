@@ -468,6 +468,7 @@ export default function Analytics() {
   const fetchTopicArticles = async (topicData: TopicSentiment) => {
     try {
       setSelectedTopic(topicData.topic);
+      console.log('Fetching articles for topic:', topicData.topic);
 
       // Get article IDs from trending_topics table
       const { data: trendingData, error: trendingError } = await supabase
@@ -479,10 +480,22 @@ export default function Analytics() {
         .order('hour_timestamp', { ascending: false })
         .limit(1);
 
-      if (trendingError) throw trendingError;
+      console.log('Trending data:', trendingData, 'Error:', trendingError);
+
+      if (trendingError) {
+        console.error('Trending data error:', trendingError);
+        throw trendingError;
+      }
 
       if (trendingData && trendingData.length > 0 && trendingData[0].article_ids) {
         const articleIds = trendingData[0].article_ids;
+        console.log('Article IDs:', articleIds);
+
+        if (!articleIds || articleIds.length === 0) {
+          console.warn('No article IDs found for topic');
+          setTopicArticles([]);
+          return;
+        }
 
         // Fetch full article details
         const { data: articles, error: articlesError } = await supabase
@@ -492,14 +505,21 @@ export default function Analytics() {
           .order('published_date', { ascending: false })
           .limit(20);
 
-        if (articlesError) throw articlesError;
+        console.log('Articles fetched:', articles, 'Error:', articlesError);
+
+        if (articlesError) {
+          console.error('Articles fetch error:', articlesError);
+          throw articlesError;
+        }
+
         setTopicArticles(articles || []);
       } else {
+        console.warn('No trending data found or no article_ids');
         setTopicArticles([]);
       }
     } catch (error) {
       console.error('Error fetching topic articles:', error);
-      toast.error('Failed to load articles for this topic');
+      toast.error(`Failed to load articles: ${error.message || 'Unknown error'}`);
     }
   };
 
