@@ -77,48 +77,38 @@ serve(async (req) => {
         `ID: ${a.id}\nTitle: ${a.title}\nContent: ${(a.description || a.content || '').substring(0, 500)}`
       ).join('\n\n---\n\n');
 
-      const extractionPrompt = `You are extracting Twitter-style trending topics. Extract ONLY proper nouns, names, and specific events.
+      const extractionPrompt = `Extract names from these news headlines like Twitter trending. Answer: WHO? WHERE? WHAT specific thing?
 
 ${articlesText}
 
-MANDATORY RULES - FOLLOW EXACTLY:
-1. ONLY extract PROPER NOUNS (capitalized names)
-2. PEOPLE: Extract full names EXACTLY as written: "Donald Trump", "Nancy Pelosi", "Elon Musk"
-3. BILLS: Extract bill numbers: "HR 1234", "S 567"
-4. PLACES: Extract specific locations: "Gaza", "Ukraine", "West Bank"
-5. EVENTS: Extract specific named events: "Epstein files", "G20 summit"
-6. COMPANIES: Extract company names: "Tesla", "OpenAI", "Microsoft"
-7. ORGANIZATIONS: Extract org names: "FBI", "Supreme Court", "NATO"
+Extract ONLY:
+- PEOPLE: "Donald Trump", "Nancy Pelosi", "Dick Cheney"
+- PLACES: "Gaza", "Ukraine", "Texas"
+- ORGANIZATIONS: "Supreme Court", "FBI", "NATO"
+- BILLS: "HR 1234", "S 456"
+- PRODUCTS/EVENTS: "iPhone", "Super Bowl", "TikTok"
 
-ABSOLUTELY FORBIDDEN - NEVER EXTRACT:
-❌ Generic nouns: "policy", "reform", "debate", "legislation", "issues"
-❌ Verbs: "investigating", "announcing", "reforming"
-❌ Adjectives: "controversial", "new", "major"
-❌ Vague phrases: "immigration issues", "healthcare debate", "political tensions"
+DO NOT extract:
+- Categories: "immigration", "healthcare", "politics"
+- Actions: "debate", "reform", "investigation"
+- Descriptions: "administration", "crisis", "tensions"
 
-EXTRACT ONLY IF:
-- It's a PROPER NOUN (capitalized)
-- It appears in article title or first 100 words
-- 1-3 words maximum
-- Specific person, place, bill, or organization name
+Rules:
+1. Must be a proper noun (starts with capital letter)
+2. 1-3 words max
+3. Would have a Wikipedia page
+4. NOT a topic/theme/category
 
-CORRECT EXAMPLES:
-✅ "Jeffrey Epstein" (person name)
-✅ "HR 2847" (bill number)
-✅ "Dick Cheney" (person name)
+Examples:
+✅ "Elon Musk" (person)
 ✅ "Gaza" (place)
-✅ "Supreme Court" (organization)
-✅ "TikTok ban" (specific event)
+✅ "TikTok" (product)
+❌ "social media" (category)
+❌ "tech debate" (topic)
+❌ "administration" (description)
 
-WRONG EXAMPLES (DO NOT EXTRACT):
-❌ "voting rights" → too generic, not a proper noun
-❌ "healthcare reform" → vague category
-❌ "immigration debate" → generic issue
-❌ "new legislation" → no specific name
-❌ "political controversy" → too broad
-
-Return JSON array with ONLY proper nouns:
-[{"topic": "Proper Noun", "keywords": ["related", "words"], "relevance": 0.9}]`;
+Return JSON array:
+[{"topic": "Name Here", "keywords": ["word1", "word2"], "relevance": 0.9}]`;
 
       try {
         const aiResponse = await fetch(AI_GATEWAY_URL, {
@@ -132,7 +122,7 @@ Return JSON array with ONLY proper nouns:
             messages: [
               {
                 role: 'system',
-                content: 'You are a news analysis AI that extracts trending topics from article content. Always respond with valid JSON arrays.'
+                content: 'You extract ONLY proper nouns (names) from news. NOT topics, NOT themes, NOT categories - ONLY names of people, places, organizations, events, bills. Think: WHO, WHERE, WHAT specific thing. Always respond with valid JSON arrays.'
               },
               {
                 role: 'user',
@@ -165,6 +155,50 @@ Return JSON array with ONLY proper nouns:
           console.error('Failed to parse AI response:', e);
           continue;
         }
+
+        // VALIDATION: Filter out non-proper-nouns
+        const forbiddenWords = [
+          'administration', 'debate', 'reform', 'policy', 'crisis', 'issues', 'tensions',
+          'investigation', 'controversy', 'legislation', 'announcement', 'campaign',
+          'election', 'politics', 'government', 'movement', 'strategy', 'approach'
+        ];
+
+        const beforeFilter = extractedTopics.length;
+        extractedTopics = extractedTopics.filter(topic => {
+          const topicLower = topic.topic.toLowerCase();
+          const words = topicLower.split(/\s+/);
+
+          // Must be 1-3 words
+          if (words.length > 3) {
+            console.log(`❌ Filtered "${topic.topic}": too many words`);
+            return false;
+          }
+
+          // Must start with capital letter
+          if (topic.topic[0] !== topic.topic[0].toUpperCase()) {
+            console.log(`❌ Filtered "${topic.topic}": doesn't start with capital`);
+            return false;
+          }
+
+          // Must not contain forbidden words
+          const hasForbidden = words.find(word => forbiddenWords.includes(word));
+          if (hasForbidden) {
+            console.log(`❌ Filtered "${topic.topic}": contains forbidden word "${hasForbidden}"`);
+            return false;
+          }
+
+          // Must not be just common words
+          const commonWords = ['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'new', 'old'];
+          if (words.every(word => commonWords.includes(word))) {
+            console.log(`❌ Filtered "${topic.topic}": only common words`);
+            return false;
+          }
+
+          console.log(`✅ Keeping proper noun: "${topic.topic}"`);
+          return true;
+        });
+
+        console.log(`Validation: ${beforeFilter} extracted → ${extractedTopics.length} valid proper nouns`);
 
         // Aggregate topics
         for (const extracted of extractedTopics) {
