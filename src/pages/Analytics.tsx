@@ -40,6 +40,55 @@ export default function Analytics() {
   const [sentimentTimeline, setSentimentTimeline] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [isLive, setIsLive] = useState(true);
+  const [newArticleCount, setNewArticleCount] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [previousTopics, setPreviousTopics] = useState<string[]>([]);
+
+  // Real-time subscription for new articles
+  useEffect(() => {
+    const channel = supabase
+      .channel('analytics-articles')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'articles',
+        },
+        (payload) => {
+          console.log('New article detected:', payload.new);
+          setNewArticleCount((prev) => prev + 1);
+
+          // Show toast notification
+          toast.success(`New article: ${(payload.new as any).title?.substring(0, 50)}...`, {
+            description: 'Trending topics updating...',
+          });
+
+          // Trigger analytics refresh
+          if (isLive) {
+            fetchAnalytics();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isLive]);
+
+  // Auto-refresh every 30 seconds when live mode is enabled
+  useEffect(() => {
+    if (!isLive) return;
+
+    const interval = setInterval(() => {
+      console.log('Auto-refreshing analytics (live mode)');
+      fetchAnalytics();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [isLive, dateRange]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -47,6 +96,7 @@ export default function Analytics() {
 
   const fetchAnalytics = async () => {
     setLoading(true);
+    setLastUpdated(new Date());
     try {
       // Fetch articles in date range
       const { data: articles } = await supabase
@@ -141,6 +191,21 @@ export default function Analytics() {
         .sort((a, b) => b.total - a.total)
         .slice(0, 15);
 
+      // Detect new trending topics
+      if (isLive && previousTopics.length > 0) {
+        const currentTopicNames = topicSentimentArray.map(t => t.topic);
+        const newTopics = currentTopicNames.filter(topic => !previousTopics.includes(topic));
+
+        if (newTopics.length > 0) {
+          newTopics.slice(0, 3).forEach(topic => {
+            toast.info(`🔥 New trending topic: ${topic}`, {
+              description: 'This topic just entered the top 15',
+            });
+          });
+        }
+      }
+
+      setPreviousTopics(topicSentimentArray.map(t => t.topic));
       setTopicSentiments(topicSentimentArray);
 
       // === SENTIMENT TIMELINE (Daily breakdown) ===
@@ -323,8 +388,26 @@ export default function Analytics() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-4xl font-bold mb-2">Intelligence Snapshot</h1>
-          <p className="text-muted-foreground">Real-time overview of news, politics, and emerging threats</p>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-4xl font-bold">Intelligence Snapshot</h1>
+            {isLive && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-semibold animate-pulse">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                </span>
+                LIVE
+              </div>
+            )}
+            {newArticleCount > 0 && (
+              <div className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm font-semibold">
+                +{newArticleCount} new
+              </div>
+            )}
+          </div>
+          <p className="text-muted-foreground">
+            {isLive ? 'Real-time updates enabled • Auto-refresh every 30s' : 'Real-time overview of news, politics, and emerging threats'}
+          </p>
         </div>
 
         <div className="flex gap-2">
@@ -351,6 +434,15 @@ export default function Analytics() {
           </Popover>
 
           <Button
+            variant={isLive ? "default" : "outline"}
+            onClick={() => setIsLive(!isLive)}
+            title={isLive ? "Disable live updates" : "Enable live updates"}
+          >
+            <TrendingUp className={`mr-2 h-4 w-4 ${isLive ? 'animate-pulse' : ''}`} />
+            {isLive ? 'Live Mode' : 'Static Mode'}
+          </Button>
+
+          <Button
             variant="outline"
             onClick={runSentimentAnalysis}
             disabled={analyzing}
@@ -364,6 +456,11 @@ export default function Analytics() {
             Export
           </Button>
         </div>
+      </div>
+
+      {/* Last Updated Indicator */}
+      <div className="flex items-center justify-end text-sm text-muted-foreground">
+        <span>Last updated: {format(lastUpdated, 'h:mm:ss a')}</span>
       </div>
 
       {/* Key Metrics */}
@@ -429,10 +526,30 @@ export default function Analytics() {
         <TabsContent value="topics" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Trending Topics & Sentiment</CardTitle>
-              <CardDescription>
-                What's being discussed and how people feel about it
-              </CardDescription>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    Trending Topics & Sentiment
+                    {isLive && (
+                      <span className="text-xs px-2 py-1 bg-red-500 text-white rounded-full animate-pulse">
+                        LIVE
+                      </span>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    {isLive
+                      ? `Real-time analysis • ${topicSentiments.length} topics tracked • Updates every 30s`
+                      : 'What\'s being discussed and how people feel about it'
+                    }
+                  </CardDescription>
+                </div>
+                {newArticleCount > 0 && (
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-600">+{newArticleCount}</div>
+                    <p className="text-xs text-muted-foreground">new articles</p>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -440,7 +557,7 @@ export default function Analytics() {
                   <p className="text-muted-foreground text-center py-8">No trending topics found in this time period</p>
                 ) : (
                   topicSentiments.map((topic, index) => (
-                    <div key={topic.topic} className="border-b pb-4 last:border-0">
+                    <div key={topic.topic} className={`border-b pb-4 last:border-0 ${topic.trend === 'rising' && isLive ? 'bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border-green-200' : ''}`}>
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="text-2xl font-bold text-muted-foreground">#{index + 1}</span>
@@ -448,6 +565,11 @@ export default function Analytics() {
                             <div className="flex items-center gap-2">
                               <h3 className="font-semibold text-lg">{topic.topic}</h3>
                               <span className="text-xl">{getTrendIcon(topic.trend)}</span>
+                              {topic.trend === 'rising' && isLive && (
+                                <span className="px-2 py-1 bg-green-500 text-white text-xs font-bold rounded animate-pulse">
+                                  TRENDING
+                                </span>
+                              )}
                             </div>
                             <p className="text-sm text-muted-foreground">{topic.total} mentions</p>
                           </div>
