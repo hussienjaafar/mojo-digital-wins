@@ -129,6 +129,16 @@ serve(async (req) => {
             itemsProcessed = result?.emails_sent || 0;
             break;
 
+          case 'analyze_articles':
+            const analyzeResponse = await supabase.functions.invoke('analyze-articles', {
+              body: {}
+            });
+            if (analyzeResponse.error) throw new Error(analyzeResponse.error.message);
+            result = analyzeResponse.data;
+            itemsProcessed = result?.processed || 0;
+            itemsCreated = result?.analyzed || 0;
+            break;
+
           default:
             throw new Error(`Unknown job type: ${job.job_type}`);
         }
