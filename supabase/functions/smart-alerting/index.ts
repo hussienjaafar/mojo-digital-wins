@@ -359,29 +359,45 @@ serve(async (req) => {
         (stats?.executive_orders?.high || 0) +
         (stats?.state_actions?.high || 0);
 
+      // Log what we found
+      console.log(`Found ${criticalArticles?.length || 0} articles, ${criticalBills?.length || 0} bills, ${criticalStateActions?.length || 0} state actions`);
+      console.log(`Stats:`, JSON.stringify(stats));
+
+      // Prepare briefing data
+      const briefingData = {
+        briefing_date: today,
+        total_articles: stats?.articles?.total || 0,
+        total_bills: stats?.bills?.total || 0,
+        total_executive_orders: stats?.executive_orders?.total || 0,
+        total_state_actions: stats?.state_actions?.total || 0,
+        critical_count: totalCritical,
+        high_count: totalHigh,
+        medium_count: 0, // Calculate if needed
+        top_critical_items: [
+          ...(criticalArticles || []).map(a => ({ type: 'article', ...a })),
+          ...(criticalBills || []).map(b => ({ type: 'bill', ...b })),
+          ...(criticalStateActions || []).map(s => ({ type: 'state_action', ...s })),
+        ],
+        breaking_news_clusters: (breakingNews || []).map(b => b.id),
+        organization_mentions: orgSummary,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log(`Upserting briefing for date: ${today}`);
+      console.log(`Briefing data:`, JSON.stringify(briefingData));
+
       // Upsert daily briefing
       const { error: briefingError } = await supabase
         .from('daily_briefings')
-        .upsert({
-          briefing_date: today,
-          total_articles: stats?.articles?.total || 0,
-          total_bills: stats?.bills?.total || 0,
-          total_executive_orders: stats?.executive_orders?.total || 0,
-          total_state_actions: stats?.state_actions?.total || 0,
-          critical_count: totalCritical,
-          high_count: totalHigh,
-          medium_count: 0, // Calculate if needed
-          top_critical_items: [
-            ...(criticalArticles || []).map(a => ({ type: 'article', ...a })),
-            ...(criticalBills || []).map(b => ({ type: 'bill', ...b })),
-            ...(criticalStateActions || []).map(s => ({ type: 'state_action', ...s })),
-          ],
-          breaking_news_clusters: (breakingNews || []).map(b => b.id),
-          organization_mentions: orgSummary,
-          updated_at: new Date().toISOString(),
-        }, {
+        .upsert(briefingData, {
           onConflict: 'briefing_date'
         });
+
+      if (briefingError) {
+        console.error('ERROR inserting daily briefing:', briefingError);
+      } else {
+        console.log('✅ Daily briefing upserted successfully');
+      }
 
       results.daily_briefing = {
         date: today,
@@ -389,6 +405,8 @@ serve(async (req) => {
         high: totalHigh,
         breaking_news: breakingNews?.length || 0,
         organizations_mentioned: Object.keys(orgSummary).length,
+        insertSuccess: !briefingError,
+        error: briefingError?.message || null,
       };
 
       console.log(`Daily briefing generated: ${totalCritical} critical, ${totalHigh} high`);
