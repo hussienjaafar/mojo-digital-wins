@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Single RSS Source</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+    .section {
+      background: #f5f5f5;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 5px;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    button:disabled {
+      background: #cccccc;
+      cursor: not-allowed;
+    }
+    .log {
+      background: #333;
+      color: #0f0;
+      padding: 15px;
+      border-radius: 5px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .error { color: #f00; }
+    .success { color: #0f0; }
+    .info { color: #0af; }
+    .warning { color: #fa0; }
+    select {
+      padding: 8px;
+      font-size: 14px;
+      border-radius: 4px;
+      width: 100%;
+      max-width: 600px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test Single RSS Source</h1>
+  <p>This tool fetches ONE RSS source at a time to help debug why no new articles are appearing.</p>
+
+  <div class="section">
+    <h2>Step 1: Select RSS Source</h2>
+    <select id="sourceSelect">
+      <option value="">Loading sources...</option>
+    </select>
+    <button onclick="loadSource()" id="loadBtn">Load This Source</button>
+  </div>
+
+  <div class="section">
+    <h2>Step 2: Parse RSS Feed</h2>
+    <button onclick="parseFeed()" id="parseBtn" disabled>Parse Feed URL</button>
+    <div id="parseResult" class="log"></div>
+  </div>
+
+  <div class="section">
+    <h2>Step 3: Check Against Database</h2>
+    <button onclick="checkDuplicates()" id="checkBtn" disabled>Check for Duplicates</button>
+    <div id="checkResult" class="log"></div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://nuclmzoasgydubdshtab.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im51Y2xtem9hc2d5ZHViZHNodGFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5MDgxNTMsImV4cCI6MjA3ODQ4NDE1M30.-1EDAX7A5pQxtFs3a9M4R2BHBMbWkoMdA5NLWdZyEjo';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let selectedSource = null;
+    let parsedItems = [];
+
+    function log(elementId, message, className = '') {
+      const element = document.getElementById(elementId);
+      const timestamp = new Date().toLocaleTimeString();
+      const line = `[${timestamp}] ${message}\n`;
+      element.innerHTML += `<span class="${className}">${line}</span>`;
+      element.scrollTop = element.scrollHeight;
+    }
+
+    async function init() {
+      try {
+        const { data: sources, error } = await supabase
+          .from('rss_sources')
+          .select('*')
+          .eq('is_active', true)
+          .order('name');
+
+        if (error) throw error;
+
+        const select = document.getElementById('sourceSelect');
+        select.innerHTML = '<option value="">-- Select a source --</option>';
+
+        sources.forEach(source => {
+          const option = document.createElement('option');
+          option.value = JSON.stringify(source);
+          option.textContent = `${source.name} (${source.category})`;
+          select.appendChild(option);
+        });
+      } catch (err) {
+        console.error(err);
+        alert('Error loading sources: ' + err.message);
+      }
+    }
+
+    function loadSource() {
+      const select = document.getElementById('sourceSelect');
+      const value = select.value;
+
+      if (!value) {
+        alert('Please select a source');
+        return;
+      }
+
+      selectedSource = JSON.parse(value);
+      document.getElementById('parseBtn').disabled = false;
+      document.getElementById('checkBtn').disabled = true;
+
+      document.getElementById('parseResult').innerHTML = '';
+      document.getElementById('checkResult').innerHTML = '';
+
+      log('parseResult', `✅ Selected: ${selectedSource.name}`, 'success');
+      log('parseResult', `📡 URL: ${selectedSource.url}`, 'info');
+      log('parseResult', `📂 Category: ${selectedSource.category}`, 'info');
+      log('parseResult', `⏰ Last fetched: ${selectedSource.last_fetched_at || 'Never'}`, 'info');
+    }
+
+    async function parseFeed() {
+      if (!selectedSource) return;
+
+      const result = document.getElementById('parseResult');
+      const btn = document.getElementById('parseBtn');
+      btn.disabled = true;
+
+      try {
+        log('parseResult', '\n🔄 Fetching RSS feed...', 'info');
+
+        // Use a CORS proxy to fetch the feed
+        const proxyUrl = 'https://api.allorigins.win/raw?url=';
+        const response = await fetch(proxyUrl + encodeURIComponent(selectedSource.url));
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const text = await response.text();
+        log('parseResult', `✅ Fetched ${text.length} characters`, 'success');
+
+        // Parse RSS/Atom
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(text, 'text/xml');
+
+        // Check for parse errors
+        const parseError = xml.querySelector('parsererror');
+        if (parseError) {
+          throw new Error('XML parsing error: ' + parseError.textContent);
+        }
+
+        // Try to find items
+        let items = xml.querySelectorAll('item');
+        if (items.length === 0) {
+          items = xml.querySelectorAll('entry'); // Atom format
+        }
+
+        log('parseResult', `📰 Found ${items.length} items in feed`, items.length > 0 ? 'success' : 'warning');
+
+        parsedItems = [];
+        items.forEach((item, index) => {
+          if (index < 10) { // Show first 10
+            const title = item.querySelector('title')?.textContent || 'No title';
+            const link = item.querySelector('link')?.textContent ||
+                        item.querySelector('link')?.getAttribute('href') || 'No link';
+            const pubDate = item.querySelector('pubDate')?.textContent ||
+                           item.querySelector('published')?.textContent ||
+                           item.querySelector('updated')?.textContent || 'No date';
+
+            parsedItems.push({ title, link, pubDate });
+
+            log('parseResult', `\n${index + 1}. ${title}`, 'info');
+            log('parseResult', `   Published: ${pubDate}`, '');
+            log('parseResult', `   Link: ${link.substring(0, 60)}...`, '');
+          }
+        });
+
+        if (parsedItems.length > 0) {
+          document.getElementById('checkBtn').disabled = false;
+          log('parseResult', `\n✅ Ready to check against database`, 'success');
+        } else {
+          log('parseResult', `\n⚠️ No items found to check`, 'warning');
+        }
+
+      } catch (err) {
+        log('parseResult', `\n❌ Error: ${err.message}`, 'error');
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function checkDuplicates() {
+      if (parsedItems.length === 0) return;
+
+      const result = document.getElementById('checkResult');
+      result.innerHTML = '';
+
+      try {
+        log('checkResult', '🔍 Checking articles against database...', 'info');
+
+        // Get recent articles from this source
+        const { data: dbArticles, error } = await supabase
+          .from('articles')
+          .select('title, source_name, published_date, created_at')
+          .eq('source_name', selectedSource.name)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (error) throw error;
+
+        log('checkResult', `📊 Found ${dbArticles.length} recent articles in database from "${selectedSource.name}"`, 'success');
+
+        // Compare parsed items with database
+        let newCount = 0;
+        let duplicateCount = 0;
+
+        parsedItems.forEach((item, index) => {
+          const isDuplicate = dbArticles.some(dbArticle => {
+            // Simple duplicate check by title similarity
+            const titleMatch = dbArticle.title.toLowerCase() === item.title.toLowerCase();
+            return titleMatch;
+          });
+
+          if (isDuplicate) {
+            duplicateCount++;
+            if (index < 5) {
+              log('checkResult', `\n❌ DUPLICATE: ${item.title}`, 'error');
+            }
+          } else {
+            newCount++;
+            if (index < 5) {
+              log('checkResult', `\n✅ NEW: ${item.title}`, 'success');
+            }
+          }
+        });
+
+        log('checkResult', `\n📈 Summary:`, 'info');
+        log('checkResult', `   Total items in feed: ${parsedItems.length}`, '');
+        log('checkResult', `   New articles: ${newCount}`, newCount > 0 ? 'success' : 'warning');
+        log('checkResult', `   Duplicates: ${duplicateCount}`, '');
+
+        if (newCount === 0) {
+          log('checkResult', `\n⚠️ ALL ARTICLES ARE DUPLICATES`, 'warning');
+          log('checkResult', `This RSS source has no new content since last fetch.`, 'warning');
+          log('checkResult', `This is NORMAL if feeds haven't published new articles yet.`, 'info');
+        }
+
+        // Show most recent article in database
+        if (dbArticles.length > 0) {
+          const newest = dbArticles[0];
+          log('checkResult', `\n📅 Most recent article in database:`, 'info');
+          log('checkResult', `   Title: ${newest.title}`, '');
+          log('checkResult', `   Published: ${newest.published_date}`, '');
+          log('checkResult', `   Added to DB: ${newest.created_at}`, '');
+
+          const hoursAgo = (Date.now() - new Date(newest.published_date).getTime()) / (1000 * 60 * 60);
+          log('checkResult', `   Age: ${hoursAgo.toFixed(1)} hours ago`, hoursAgo > 6 ? 'warning' : 'success');
+        }
+
+      } catch (err) {
+        log('checkResult', `❌ Error: ${err.message}`, 'error');
+        console.error(err);
+      }
+    }
+
+    // Initialize on load
+    window.addEventListener('load', () => {
+      init();
+    });
+  </script>
+</body>
+</html>
