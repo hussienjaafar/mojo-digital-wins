@@ -2347,6 +2347,7 @@ export type Database = {
       }
     }
     Functions: {
+      get_briefing_stats: { Args: { target_date?: string }; Returns: Json }
       get_daily_metrics_summary: {
         Args: {
           _end_date: string
