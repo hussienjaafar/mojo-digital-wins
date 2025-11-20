@@ -167,13 +167,17 @@ Return JSON array:
 
         // News sources that should NOT be trending topics (they're publishers, not news)
         const newsSources = [
-          'associated press', 'reuters', 'bbc', 'cnn', 'fox news', 'nbc', 'cbs', 'abc',
+          'associated press', 'ap news', 'reuters', 'bbc', 'cnn', 'fox news', 'nbc', 'cbs', 'abc',
           'washington post', 'new york times', 'wall street journal', 'guardian',
           'al jazeera', 'npr', 'politico', 'the hill', 'daily wire', 'axios',
           'bloomberg', 'cnbc', 'the intercept', 'mondoweiss', 'democracy now',
           'middle east eye', 'electronic intifada', 'cair', 'national review',
-          'dropsite news', 'ap news'
+          'dropsite news', 'drop site', 'breitbart', 'mediaite', 'abc news',
+          'nbc news', 'cbs news', 'world of travel'
         ];
+
+        // Overly generic standalone terms (too broad to be useful trending topics)
+        const genericTerms = ['us', 'uk', 'eu', 'dc', 'trump', 'biden', 'house', 'senate'];
 
         const beforeFilter = extractedTopics.length;
         extractedTopics = extractedTopics.filter(topic => {
@@ -192,8 +196,23 @@ Return JSON array:
             return false;
           }
 
-          // Must not be a news source (publisher, not news)
-          if (newsSources.includes(topicLower)) {
+          // Must not be an overly generic standalone term
+          if (words.length === 1 && genericTerms.includes(topicLower)) {
+            console.log(`❌ Filtered "${topic.topic}": overly generic standalone term`);
+            return false;
+          }
+
+          // Must not be a news source (use partial matching to catch variations)
+          // Check if topic contains any news source name OR if any news source contains the topic
+          const isNewsSource = newsSources.some(source => {
+            // Remove punctuation for comparison
+            const cleanTopic = topicLower.replace(/[!?.,'"-]/g, '').trim();
+            const cleanSource = source.replace(/[!?.,'"-]/g, '').trim();
+
+            return cleanTopic.includes(cleanSource) || cleanSource.includes(cleanTopic);
+          });
+
+          if (isNewsSource) {
             console.log(`❌ Filtered "${topic.topic}": news source/publisher`);
             return false;
           }
