@@ -20,6 +20,10 @@ interface TopicSentiment {
   negative: number;
   avgSentiment: number;
   trend: 'rising' | 'stable' | 'falling';
+  velocity?: number; // Percentage growth rate
+  momentum?: number; // Acceleration
+  sampleTitles?: string[];
+  keywords?: string[];
 }
 
 export default function Analytics() {
@@ -47,6 +51,9 @@ export default function Analytics() {
 
   // Real-time subscription for new articles
   useEffect(() => {
+    let articleBuffer: any[] = [];
+    let extractionTimer: NodeJS.Timeout;
+
     const channel = supabase
       .channel('analytics-articles')
       .on(
@@ -59,11 +66,31 @@ export default function Analytics() {
         (payload) => {
           console.log('New article detected:', payload.new);
           setNewArticleCount((prev) => prev + 1);
+          articleBuffer.push(payload.new);
 
           // Show toast notification
           toast.success(`New article: ${(payload.new as any).title?.substring(0, 50)}...`, {
-            description: 'Trending topics updating...',
+            description: 'Analyzing for trending topics...',
           });
+
+          // Debounce: Extract topics after 5 articles or 60 seconds
+          clearTimeout(extractionTimer);
+
+          if (articleBuffer.length >= 5) {
+            // Enough articles accumulated, extract now
+            console.log('🔍 Extracting topics from', articleBuffer.length, 'new articles');
+            extractTrendingTopics();
+            articleBuffer = [];
+          } else {
+            // Wait for more articles or timeout
+            extractionTimer = setTimeout(() => {
+              if (articleBuffer.length > 0) {
+                console.log('🔍 Extracting topics from', articleBuffer.length, 'new articles (timeout)');
+                extractTrendingTopics();
+                articleBuffer = [];
+              }
+            }, 60000); // 60 seconds
+          }
 
           // Trigger analytics refresh
           if (isLive) {
@@ -74,6 +101,7 @@ export default function Analytics() {
       .subscribe();
 
     return () => {
+      clearTimeout(extractionTimer);
       supabase.removeChannel(channel);
     };
   }, [isLive]);
@@ -98,13 +126,26 @@ export default function Analytics() {
     setLoading(true);
     setLastUpdated(new Date());
     try {
-      // Fetch articles in date range
+      // Fetch AI-extracted trending topics with velocity scores
+      const { data: trendingTopicsData, error: topicsError } = await supabase
+        .from('trending_topics')
+        .select('*')
+        .gte('hour_timestamp', dateRange.from.toISOString())
+        .lte('hour_timestamp', dateRange.to.toISOString())
+        .order('velocity_score', { ascending: false })
+        .limit(50);
+
+      if (topicsError) {
+        console.error('Error fetching trending topics:', topicsError);
+      }
+
+      // Fetch articles in date range (for metrics)
       const { data: articles } = await supabase
         .from('articles')
         .select('*')
         .gte('published_date', dateRange.from.toISOString())
         .lte('published_date', dateRange.to.toISOString())
-        .order('published_date', { ascending: true });
+        .order('published_date', { ascending: true});
 
       // Fetch bills in date range
       const { data: bills } = await supabase
@@ -129,54 +170,64 @@ export default function Analytics() {
         avgSentiment,
       });
 
-      // === TRENDING TOPICS WITH SENTIMENT ===
-      const topicSentimentMap = new Map<string, {
+      // === AGGREGATE AI-EXTRACTED TRENDING TOPICS ===
+      const topicAggregateMap = new Map<string, {
         total: number;
         positive: number;
         neutral: number;
         negative: number;
-        scores: number[];
-        dates: string[];
+        avgSentiment: number;
+        velocity: number;
+        momentum: number;
+        sampleTitles: Set<string>;
+        keywords: Set<string>;
       }>();
 
-      articles.forEach(article => {
-        const tags = article.tags || [];
-        const sentiment = article.sentiment_label || 'neutral';
-        const score = article.sentiment_score || 0.5;
-        const date = article.published_date;
+      // Aggregate topics across time periods
+      (trendingTopicsData || []).forEach((topicRecord: any) => {
+        const topicKey = topicRecord.topic;
 
-        tags.forEach((tag: string) => {
-          if (!topicSentimentMap.has(tag)) {
-            topicSentimentMap.set(tag, {
-              total: 0,
-              positive: 0,
-              neutral: 0,
-              negative: 0,
-              scores: [],
-              dates: [],
-            });
-          }
-          const data = topicSentimentMap.get(tag)!;
-          data.total++;
-          data[sentiment as 'positive' | 'neutral' | 'negative']++;
-          data.scores.push(score);
-          data.dates.push(date);
-        });
+        if (!topicAggregateMap.has(topicKey)) {
+          topicAggregateMap.set(topicKey, {
+            total: 0,
+            positive: 0,
+            neutral: 0,
+            negative: 0,
+            avgSentiment: 0,
+            velocity: 0,
+            momentum: 0,
+            sampleTitles: new Set(),
+            keywords: new Set(),
+          });
+        }
+
+        const agg = topicAggregateMap.get(topicKey)!;
+        agg.total += topicRecord.mention_count || 0;
+        agg.positive += topicRecord.positive_count || 0;
+        agg.neutral += topicRecord.neutral_count || 0;
+        agg.negative += topicRecord.negative_count || 0;
+        agg.avgSentiment += (topicRecord.avg_sentiment_score || 0.5) * (topicRecord.mention_count || 1);
+        agg.velocity = Math.max(agg.velocity, topicRecord.velocity_score || 0);
+        agg.momentum = Math.max(agg.momentum, topicRecord.momentum || 0);
+
+        (topicRecord.sample_titles || []).forEach((title: string) => agg.sampleTitles.add(title));
+        (topicRecord.related_keywords || []).forEach((kw: string) => agg.keywords.add(kw));
       });
 
-      // Convert to array and calculate trends
-      const topicSentimentArray: TopicSentiment[] = Array.from(topicSentimentMap.entries())
+      // Convert to array with calculated averages
+      const topicSentimentArray: TopicSentiment[] = Array.from(topicAggregateMap.entries())
         .map(([topic, data]) => {
-          const avgSentiment = data.scores.reduce((a, b) => a + b, 0) / data.scores.length;
+          const avgSentiment = data.total > 0 ? data.avgSentiment / data.total : 0.5;
 
-          // Calculate trend (compare first half vs second half of period)
-          const midpoint = Math.floor(data.dates.length / 2);
-          const firstHalf = data.scores.slice(0, midpoint);
-          const secondHalf = data.scores.slice(midpoint);
-          const firstAvg = firstHalf.length ? firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length : avgSentiment;
-          const secondAvg = secondHalf.length ? secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length : avgSentiment;
-          const diff = secondAvg - firstAvg;
-          const trend: 'rising' | 'stable' | 'falling' = diff > 0.1 ? 'rising' : diff < -0.1 ? 'falling' : 'stable';
+          // Determine trend based on velocity and momentum
+          let trend: 'rising' | 'stable' | 'falling';
+          if (data.velocity > 20 || data.momentum > 0.2) {
+            trend = 'rising';
+          } else if (data.velocity < -20 || data.momentum < -0.2) {
+            trend = 'falling';
+          } else {
+            trend = 'stable';
+          }
 
           return {
             topic,
@@ -186,9 +237,14 @@ export default function Analytics() {
             negative: data.negative,
             avgSentiment,
             trend,
+            velocity: data.velocity,
+            momentum: data.momentum,
+            sampleTitles: Array.from(data.sampleTitles).slice(0, 3),
+            keywords: Array.from(data.keywords).slice(0, 5),
           };
         })
-        .sort((a, b) => b.total - a.total)
+        // Sort by velocity (what's trending NOW), not just total mentions
+        .sort((a, b) => (b.velocity || 0) - (a.velocity || 0))
         .slice(0, 15);
 
       // Detect new trending topics
@@ -372,6 +428,31 @@ export default function Analytics() {
     }
   };
 
+  const extractTrendingTopics = async () => {
+    try {
+      setAnalyzing(true);
+      toast.info('Extracting trending topics from articles using AI...');
+
+      const { data, error } = await supabase.functions.invoke('extract-trending-topics', {
+        body: { hoursBack: 24 } // Analyze last 24 hours
+      });
+
+      if (error) throw error;
+
+      toast.success(
+        `✨ Found ${data.topicsExtracted} trending topics from ${data.articlesAnalyzed} articles!`
+      );
+
+      // Refresh analytics to show new topics
+      await fetchAnalytics();
+    } catch (error) {
+      console.error('Error extracting topics:', error);
+      toast.error('Failed to extract trending topics.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const getSentimentColor = (sentiment: number) => {
     if (sentiment > 0.6) return 'text-green-600';
     if (sentiment < 0.4) return 'text-red-600';
@@ -448,7 +529,16 @@ export default function Analytics() {
             disabled={analyzing}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
-            {analyzing ? 'Analyzing...' : 'Analyze Articles'}
+            {analyzing ? 'Analyzing...' : 'Analyze Sentiment'}
+          </Button>
+
+          <Button
+            variant="default"
+            onClick={extractTrendingTopics}
+            disabled={analyzing}
+          >
+            <TrendingUp className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
+            {analyzing ? 'Extracting...' : 'Extract Topics'}
           </Button>
 
           <Button variant="outline" onClick={exportToCSV}>
@@ -561,17 +651,31 @@ export default function Analytics() {
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="text-2xl font-bold text-muted-foreground">#{index + 1}</span>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-lg">{topic.topic}</h3>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold text-lg capitalize">{topic.topic}</h3>
                               <span className="text-xl">{getTrendIcon(topic.trend)}</span>
                               {topic.trend === 'rising' && isLive && (
                                 <span className="px-2 py-1 bg-green-500 text-white text-xs font-bold rounded animate-pulse">
                                   TRENDING
                                 </span>
                               )}
+                              {topic.velocity !== undefined && topic.velocity > 0 && (
+                                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
+                                  +{topic.velocity.toFixed(0)}% velocity
+                                </span>
+                              )}
                             </div>
                             <p className="text-sm text-muted-foreground">{topic.total} mentions</p>
+                            {topic.keywords && topic.keywords.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {topic.keywords.map(kw => (
+                                  <span key={kw} className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs rounded">
+                                    {kw}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className={`text-right ${getSentimentColor(topic.avgSentiment)}`}>
