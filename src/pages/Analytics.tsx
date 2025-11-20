@@ -500,7 +500,7 @@ export default function Analytics() {
         // Fetch full article details
         const { data: articles, error: articlesError } = await supabase
           .from('articles')
-          .select('id, title, description, url, source_name, published_date, sentiment_label')
+          .select('id, title, description, source_url, source_name, published_date, sentiment_label')
           .in('id', articleIds)
           .order('published_date', { ascending: false })
           .limit(20);
@@ -911,7 +911,7 @@ export default function Analytics() {
               topicArticles.map((article) => (
                 <a
                   key={article.id}
-                  href={article.url}
+                  href={article.source_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
