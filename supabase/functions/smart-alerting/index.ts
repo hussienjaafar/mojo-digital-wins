@@ -284,44 +284,48 @@ serve(async (req) => {
       console.log('Generating daily briefing...');
 
       const today = new Date().toISOString().split('T')[0];
+      const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      // Get briefing stats
+      // Get briefing stats (now looks at last 24 hours)
       const { data: stats } = await supabase.rpc('get_briefing_stats', { target_date: today });
 
-      // Get top critical items
+      // Get top critical items from last 24 hours
       const { data: criticalArticles } = await supabase
         .from('articles')
         .select('id, title, threat_level, source_name')
-        .eq('threat_level', 'critical')
-        .gte('published_date', today)
-        .limit(5);
+        .in('threat_level', ['critical', 'high'])
+        .gte('published_date', last24Hours)
+        .order('threat_level', { ascending: true })
+        .limit(10);
 
       const { data: criticalBills } = await supabase
         .from('bills')
         .select('id, title, threat_level, bill_number')
-        .eq('threat_level', 'critical')
-        .gte('latest_action_date', today)
-        .limit(5);
+        .in('threat_level', ['critical', 'high'])
+        .gte('latest_action_date', last24Hours)
+        .order('threat_level', { ascending: true })
+        .limit(10);
 
       const { data: criticalStateActions } = await supabase
         .from('state_actions')
         .select('id, title, threat_level, state_code')
-        .eq('threat_level', 'critical')
-        .gte('action_date', today)
-        .limit(5);
+        .in('threat_level', ['critical', 'high'])
+        .gte('action_date', last24Hours)
+        .order('threat_level', { ascending: true })
+        .limit(10);
 
-      // Get breaking news clusters
+      // Get breaking news clusters from last 24 hours
       const { data: breakingNews } = await supabase
         .from('breaking_news_clusters')
         .select('id')
         .eq('is_active', true)
-        .gte('first_detected_at', today);
+        .gte('first_detected_at', last24Hours);
 
-      // Get organization mentions summary
+      // Get organization mentions from last 24 hours
       const { data: orgMentions } = await supabase
         .from('organization_mentions')
         .select('organization_abbrev, threat_level')
-        .gte('mentioned_at', today);
+        .gte('mentioned_at', last24Hours);
 
       const orgSummary: Record<string, { total: number; critical: number; high: number }> = {};
       for (const mention of orgMentions || []) {
