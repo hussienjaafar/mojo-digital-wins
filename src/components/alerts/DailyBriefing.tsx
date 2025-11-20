@@ -64,7 +64,9 @@ export function DailyBriefing() {
   const fetchBriefing = async () => {
     try {
       setLoading(true);
-      const today = new Date().toISOString().split('T')[0];
+      // Get local date (not UTC) to avoid timezone issues
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
       // Fetch today's briefing
       const { data: briefingData, error } = await supabase
