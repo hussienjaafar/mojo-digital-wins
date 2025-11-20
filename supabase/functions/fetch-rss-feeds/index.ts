@@ -405,8 +405,7 @@ serve(async (req) => {
               content: sanitizedDescription,
               source_id: source.id,
               source_name: source.name,
-              source_url: source.url, // RSS feed URL
-              url: item.link, // Individual article link
+              source_url: item.link, // Individual article link
               published_date: item.pubDate,
               image_url: item.imageUrl,
               tags,
