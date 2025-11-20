@@ -289,30 +289,30 @@ serve(async (req) => {
       // Get briefing stats (now looks at last 24 hours)
       const { data: stats } = await supabase.rpc('get_briefing_stats', { target_date: today });
 
-      // Get top critical items from last 24 hours
+      // Get top critical/high/medium items from last 24 hours
       const { data: criticalArticles } = await supabase
         .from('articles')
         .select('id, title, threat_level, source_name')
-        .in('threat_level', ['critical', 'high'])
+        .in('threat_level', ['critical', 'high', 'medium'])
         .gte('published_date', last24Hours)
         .order('threat_level', { ascending: true })
-        .limit(10);
+        .limit(20);
 
       const { data: criticalBills } = await supabase
         .from('bills')
         .select('id, title, threat_level, bill_number')
-        .in('threat_level', ['critical', 'high'])
+        .in('threat_level', ['critical', 'high', 'medium'])
         .gte('latest_action_date', last24Hours)
         .order('threat_level', { ascending: true })
-        .limit(10);
+        .limit(20);
 
       const { data: criticalStateActions } = await supabase
         .from('state_actions')
         .select('id, title, threat_level, state_code')
-        .in('threat_level', ['critical', 'high'])
+        .in('threat_level', ['critical', 'high', 'medium'])
         .gte('action_date', last24Hours)
         .order('threat_level', { ascending: true })
-        .limit(10);
+        .limit(20);
 
       // Get breaking news clusters from last 24 hours
       const { data: breakingNews } = await supabase
