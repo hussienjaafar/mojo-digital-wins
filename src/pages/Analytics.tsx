@@ -437,7 +437,16 @@ export default function Analytics() {
         body: { hoursBack: 24 } // Analyze last 24 hours
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        toast.error(`Failed to extract topics: ${error.message || 'Unknown error'}`);
+        return;
+      }
+
+      if (!data) {
+        toast.error('No data returned from extraction function');
+        return;
+      }
 
       toast.success(
         `✨ Found ${data.topicsExtracted} trending topics from ${data.articlesAnalyzed} articles!`
@@ -447,7 +456,7 @@ export default function Analytics() {
       await fetchAnalytics();
     } catch (error) {
       console.error('Error extracting topics:', error);
-      toast.error('Failed to extract trending topics.');
+      toast.error(`Failed to extract trending topics: ${error.message || 'Unknown error'}`);
     } finally {
       setAnalyzing(false);
     }
