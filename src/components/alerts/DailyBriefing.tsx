@@ -322,15 +322,16 @@ export function DailyBriefing() {
                     >
                       <div className="w-full space-y-2">
                         <div className="flex items-start justify-between gap-2">
-                          <Badge
-                            variant={
-                              (typeof cluster.threat_level === 'number' && cluster.threat_level >= 75) ||
-                              cluster.threat_level === 'critical'
-                                ? 'destructive'
-                                : 'secondary'
-                            }
-                            className="text-xs"
-                          >
+                      <Badge
+                        variant={
+                          (typeof cluster.threat_level === 'number' && cluster.threat_level >= 75) ||
+                          cluster.threat_level === 'critical' ||
+                          cluster.severity === 'critical'
+                            ? 'destructive'
+                            : 'secondary'
+                        }
+                        className="text-xs"
+                      >
                             {cluster.article_count || cluster.article_ids?.length || 0} sources
                           </Badge>
                           <span className="text-xs text-muted-foreground">
@@ -511,7 +512,8 @@ export function DailyBriefing() {
                   <Badge
                     variant={
                       (typeof selectedCluster.threat_level === 'number' && selectedCluster.threat_level >= 75) ||
-                      selectedCluster.threat_level === 'critical'
+                      selectedCluster.threat_level === 'critical' ||
+                      selectedCluster.severity === 'critical'
                         ? 'destructive'
                         : 'secondary'
                     }
