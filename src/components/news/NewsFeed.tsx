@@ -21,6 +21,7 @@ export function NewsFeed() {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
+  const [currentFilters, setCurrentFilters] = useState<FilterState | null>(null);
   const { toast } = useToast();
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -93,9 +94,9 @@ export function NewsFeed() {
   // Infinite scroll observer
   const loadMoreArticles = useCallback(() => {
     if (!loadingMore && hasMore) {
-      loadArticles(page + 1);
+      loadArticles(page + 1, currentFilters);
     }
-  }, [loadingMore, hasMore, page]);
+  }, [loadingMore, hasMore, page, currentFilters]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -119,7 +120,7 @@ export function NewsFeed() {
     };
   }, [loadMoreArticles, hasMore, loadingMore]);
 
-  const loadArticles = async (pageNum: number = 0) => {
+  const loadArticles = async (pageNum: number = 0, filters: FilterState | null = null) => {
     try {
       if (pageNum === 0) {
         setLoading(true);
@@ -133,9 +134,51 @@ export function NewsFeed() {
       const from = pageNum * ARTICLES_PER_PAGE;
       const to = from + ARTICLES_PER_PAGE - 1;
 
-      const { data, error, count } = await supabase
+      // Build query with filters
+      let query = supabase
         .from('articles')
-        .select('*', { count: 'exact' })
+        .select('*', { count: 'exact' });
+
+      // Apply filters to query
+      if (filters) {
+        // Search filter
+        if (filters.search) {
+          query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+        }
+
+        // Category filter
+        if (filters.category !== 'all') {
+          query = query.eq('category', filters.category);
+        }
+
+        // Source filter
+        if (filters.sourceId !== 'all') {
+          query = query.eq('source_id', filters.sourceId);
+        }
+
+        // Date range filter
+        if (filters.dateRange !== 'all') {
+          const now = new Date();
+          const ranges: Record<string, number> = {
+            today: 1,
+            week: 7,
+            month: 30
+          };
+          const days = ranges[filters.dateRange] || 0;
+          if (days > 0) {
+            const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+            query = query.gte('published_date', cutoff.toISOString());
+          }
+        }
+
+        // Tags filter
+        if (filters.tags.length > 0) {
+          // Use overlaps for array containment check
+          query = query.overlaps('tags', filters.tags);
+        }
+      }
+
+      const { data, error, count } = await query
         .order('published_date', { ascending: false })
         .range(from, to);
 
@@ -255,51 +298,11 @@ export function NewsFeed() {
   };
 
   const applyFilters = (filters: FilterState) => {
-    let filtered = [...articles];
+    // Save current filters
+    setCurrentFilters(filters);
 
-    // Search filter
-    if (filters.search) {
-      const search = filters.search.toLowerCase();
-      filtered = filtered.filter(article =>
-        article.title?.toLowerCase().includes(search) ||
-        article.description?.toLowerCase().includes(search)
-      );
-    }
-
-    // Category filter
-    if (filters.category !== 'all') {
-      filtered = filtered.filter(article => article.category === filters.category);
-    }
-
-    // Source filter
-    if (filters.sourceId !== 'all') {
-      filtered = filtered.filter(article => article.source_id === filters.sourceId);
-    }
-
-    // Date range filter
-    if (filters.dateRange !== 'all') {
-      const now = new Date();
-      const ranges: Record<string, number> = {
-        today: 1,
-        week: 7,
-        month: 30
-      };
-      const days = ranges[filters.dateRange] || 0;
-      if (days > 0) {
-        const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-        filtered = filtered.filter(article => new Date(article.published_date) >= cutoff);
-      }
-    }
-
-    // Tags filter
-    if (filters.tags.length > 0) {
-      filtered = filtered.filter(article =>
-        filters.tags.some(tag => article.tags?.includes(tag))
-      );
-    }
-
-    setDisplayedArticles(filtered);
-    setFilteredArticles(filtered);
+    // Reload articles with new filters applied at query level
+    loadArticles(0, filters);
   };
 
   if (loading) {
