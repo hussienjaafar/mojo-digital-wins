@@ -176,6 +176,11 @@ export function NewsFeed() {
           // Use overlaps for array containment check
           query = query.overlaps('tags', filters.tags);
         }
+
+        // Geographic scope filter
+        if (filters.geographicScope && filters.geographicScope !== 'all') {
+          query = query.eq('geographic_scope', filters.geographicScope);
+        }
       }
 
       const { data, error, count } = await query

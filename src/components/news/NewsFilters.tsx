@@ -25,6 +25,7 @@ export interface FilterState {
   sourceId: string;
   dateRange: string;
   tags: string[];
+  geographicScope: string;
 }
 
 export function NewsFilters({ categories, sources, onFilterChange }: NewsFiltersProps) {
@@ -33,7 +34,8 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
     category: 'all',
     sourceId: 'all',
     dateRange: 'all',
-    tags: []
+    tags: [],
+    geographicScope: 'all'
   });
 
   const [showFilters, setShowFilters] = useState(false);
@@ -54,18 +56,20 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
       category: 'all',
       sourceId: 'all',
       dateRange: 'all',
-      tags: []
+      tags: [],
+      geographicScope: 'all'
     };
     setFilters(cleared);
     onFilterChange(cleared);
   };
 
-  const hasActiveFilters = 
-    filters.search || 
-    filters.category !== 'all' || 
-    filters.sourceId !== 'all' || 
+  const hasActiveFilters =
+    filters.search ||
+    filters.category !== 'all' ||
+    filters.sourceId !== 'all' ||
     filters.dateRange !== 'all' ||
-    filters.tags.length > 0;
+    filters.tags.length > 0 ||
+    filters.geographicScope !== 'all';
 
   return (
     <div className="space-y-4">
@@ -95,7 +99,7 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
 
       {showFilters && (
         <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Category</Label>
               <Select value={filters.category} onValueChange={(value) => updateFilters({ category: value })}>
@@ -144,6 +148,22 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label>Geographic Scope</Label>
+              <Select value={filters.geographicScope} onValueChange={(value) => updateFilters({ geographicScope: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All levels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All levels</SelectItem>
+                  <SelectItem value="national">National</SelectItem>
+                  <SelectItem value="state">State</SelectItem>
+                  <SelectItem value="local">Local</SelectItem>
+                  <SelectItem value="international">International</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -172,9 +192,18 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
           {filters.category !== 'all' && (
             <Badge variant="secondary">
               {filters.category}
-              <X 
-                className="h-3 w-3 ml-1 cursor-pointer" 
+              <X
+                className="h-3 w-3 ml-1 cursor-pointer"
                 onClick={() => updateFilters({ category: 'all' })}
+              />
+            </Badge>
+          )}
+          {filters.geographicScope !== 'all' && (
+            <Badge variant="secondary">
+              {filters.geographicScope.charAt(0).toUpperCase() + filters.geographicScope.slice(1)}
+              <X
+                className="h-3 w-3 ml-1 cursor-pointer"
+                onClick={() => updateFilters({ geographicScope: 'all' })}
               />
             </Badge>
           )}
