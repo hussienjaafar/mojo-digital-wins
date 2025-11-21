@@ -4,9 +4,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   AlertTriangle,
   Newspaper,
@@ -19,6 +26,10 @@ import {
   Calendar,
   ExternalLink,
   Users,
+  ChevronRight,
+  Activity,
+  FileText,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +39,6 @@ import type { Database } from "@/integrations/supabase/types";
 type DailyBriefingRow = Database['public']['Tables']['daily_briefings']['Row'];
 type BreakingNewsRow = Database['public']['Tables']['breaking_news_clusters']['Row'];
 
-// The database row now includes all these fields
 type DailyBriefingData = DailyBriefingRow;
 
 interface BreakingNewsCluster extends BreakingNewsRow {
@@ -39,8 +49,11 @@ interface BreakingNewsCluster extends BreakingNewsRow {
 }
 
 export function DailyBriefing() {
+  const isMobile = useIsMobile();
   const [briefing, setBriefing] = useState<DailyBriefingData | null>(null);
   const [breakingNews, setBreakingNews] = useState<BreakingNewsCluster[]>([]);
+  const [selectedCluster, setSelectedCluster] = useState<BreakingNewsCluster | null>(null);
+  const [selectedCriticalItem, setSelectedCriticalItem] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const { toast } = useToast();
@@ -52,11 +65,9 @@ export function DailyBriefing() {
   const fetchBriefing = async () => {
     try {
       setLoading(true);
-      // Get local date (not UTC) to avoid timezone issues
       const now = new Date();
       const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-      // Fetch today's briefing
       const { data: briefingData, error } = await supabase
         .from('daily_briefings')
         .select('*')
@@ -68,7 +79,6 @@ export function DailyBriefing() {
       console.log('Fetched briefing data:', briefingData);
       setBriefing(briefingData);
 
-      // Fetch breaking news
       const { data: newsData } = await supabase
         .from('breaking_news_clusters')
         .select('*')
@@ -93,7 +103,6 @@ export function DailyBriefing() {
         description: "Analyzing all sources and detecting patterns",
       });
 
-      // Get local date to pass to server
       const now = new Date();
       const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
@@ -103,7 +112,6 @@ export function DailyBriefing() {
 
       if (error) throw error;
 
-      // Log full response for debugging
       console.log('Smart alerting response:', data);
 
       const criticalCount = data?.results?.daily_briefing?.critical || 0;
@@ -149,27 +157,41 @@ export function DailyBriefing() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold flex items-center gap-2">
-            <Calendar className="h-7 w-7" />
-            Daily Intelligence Briefing
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            {format(new Date(), 'EEEE, MMMM d, yyyy')}
-          </p>
+    <div className="space-y-6 sm:space-y-8">
+      {/* Hero Header */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Calendar className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
+                  Daily Intelligence
+                </h1>
+                <p className="text-sm sm:text-base text-muted-foreground">
+                  {format(new Date(), 'EEEE, MMMM d, yyyy')}
+                </p>
+              </div>
+            </div>
+          </div>
+          <Button
+            onClick={generateBriefing}
+            disabled={generating}
+            variant="outline"
+            size={isMobile ? "sm" : "default"}
+            className="shrink-0"
+          >
+            <RefreshCw className={`w-4 h-4 ${isMobile ? '' : 'mr-2'} ${generating ? 'animate-spin' : ''}`} />
+            {!isMobile && (generating ? 'Generating...' : 'Refresh')}
+          </Button>
         </div>
-        <Button onClick={generateBriefing} disabled={generating}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${generating ? 'animate-spin' : ''}`} />
-          {generating ? 'Generating...' : 'Refresh Briefing'}
-        </Button>
       </div>
 
       {/* Critical Alert Banner */}
       {briefing && briefing.critical_count > 0 && (
-        <Alert variant="destructive" className="border-red-600">
+        <Alert variant="destructive" className="border-2 border-red-600">
           <AlertTriangle className="h-5 w-5" />
           <AlertTitle className="text-lg font-bold">
             {briefing.critical_count} Critical Alert{briefing.critical_count !== 1 ? 's' : ''} Today
@@ -180,295 +202,466 @@ export function DailyBriefing() {
         </Alert>
       )}
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-3xl font-bold text-red-600">{briefing?.critical_count || 0}</div>
-            <div className="text-xs text-muted-foreground">Critical</div>
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              <Badge variant="destructive" className="text-xs">
+                Critical
+              </Badge>
+            </div>
+            <div className="text-3xl font-bold text-red-600 dark:text-red-400 mb-1">
+              {briefing?.critical_count || 0}
+            </div>
+            <p className="text-sm text-muted-foreground">Immediate attention</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-3xl font-bold text-orange-600">{briefing?.high_count || 0}</div>
-            <div className="text-xs text-muted-foreground">High Priority</div>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
+                <TrendingUp className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-400">
+                High
+              </Badge>
+            </div>
+            <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 mb-1">
+              {briefing?.high_count || 0}
+            </div>
+            <p className="text-sm text-muted-foreground">Review soon</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-3xl font-bold">{briefing?.total_articles || 0}</div>
-            <div className="text-xs text-muted-foreground">Articles</div>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <Badge variant="outline" className="text-xs">
+                Items
+              </Badge>
+            </div>
+            <div className="text-3xl font-bold mb-1">
+              {totalItems}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {briefing?.total_articles || 0} articles, {briefing?.total_bills || 0} bills
+            </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-3xl font-bold">{briefing?.total_bills || 0}</div>
-            <div className="text-xs text-muted-foreground">Bills</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-3xl font-bold">{briefing?.total_executive_orders || 0}</div>
-            <div className="text-xs text-muted-foreground">Exec Orders</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-3xl font-bold">{briefing?.total_state_actions || 0}</div>
-            <div className="text-xs text-muted-foreground">State Actions</div>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+                <Activity className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <Badge
+                variant="outline"
+                className={`text-xs ${
+                  threatScore >= 75 ? 'border-red-600 text-red-600' :
+                  threatScore >= 50 ? 'border-orange-600 text-orange-600' :
+                  threatScore >= 25 ? 'border-yellow-600 text-yellow-600' :
+                  'border-green-600 text-green-600'
+                }`}
+              >
+                {threatScore >= 75 ? 'Severe' : threatScore >= 50 ? 'High' : threatScore >= 25 ? 'Moderate' : 'Low'}
+              </Badge>
+            </div>
+            <div className={`text-3xl font-bold mb-1 ${
+              threatScore >= 75 ? 'text-red-600' :
+              threatScore >= 50 ? 'text-orange-600' :
+              threatScore >= 25 ? 'text-yellow-600' : 'text-green-600'
+            }`}>
+              {threatScore}/100
+            </div>
+            <p className="text-sm text-muted-foreground">Threat level</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Threat Level Indicator */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Today's Threat Level
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Threat Score</span>
-              <span className={`font-bold ${
-                threatScore >= 75 ? 'text-red-600' :
-                threatScore >= 50 ? 'text-orange-600' :
-                threatScore >= 25 ? 'text-yellow-600' : 'text-green-600'
-              }`}>
-                {threatScore}/100
-              </span>
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Trending Topics */}
+        <Card className="flex flex-col">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+                <Bell className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">Trending Topics</CardTitle>
+                <CardDescription className="text-sm">
+                  {breakingNews.length} active cluster{breakingNews.length !== 1 ? 's' : ''}
+                </CardDescription>
+              </div>
             </div>
-            <Progress
-              value={threatScore}
-              className={`h-3 ${
-                threatScore >= 75 ? '[&>div]:bg-red-600' :
-                threatScore >= 50 ? '[&>div]:bg-orange-600' :
-                threatScore >= 25 ? '[&>div]:bg-yellow-600' : '[&>div]:bg-green-600'
-              }`}
-            />
-            <p className="text-xs text-muted-foreground">
-              Based on {briefing?.critical_count || 0} critical and {briefing?.high_count || 0} high priority items
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Tabs defaultValue="breaking" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="breaking" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Breaking News
-          </TabsTrigger>
-          <TabsTrigger value="critical" className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Critical Items
-          </TabsTrigger>
-          <TabsTrigger value="organizations" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Org Mentions
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Breaking News Tab */}
-        <TabsContent value="breaking">
-          <Card>
-            <CardHeader>
-              <CardTitle>Breaking News Clusters</CardTitle>
-              <CardDescription>
-                Stories being reported by multiple sources
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {breakingNews.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No breaking news clusters detected today</p>
-                </div>
-              ) : (
-                <ScrollArea className="h-[300px]">
-                  <div className="space-y-3">
-                    {breakingNews.map((cluster) => (
-                      <Card key={cluster.id} className={`${
-                        typeof cluster.threat_level === 'number' 
-                          ? (cluster.threat_level >= 75 ? 'border-red-300' : cluster.threat_level >= 50 ? 'border-orange-300' : '')
-                          : (cluster.threat_level === 'critical' ? 'border-red-300' : cluster.threat_level === 'high' ? 'border-orange-300' : '')
-                      }`}>
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <Badge variant={
+          </CardHeader>
+          <CardContent className="flex-1">
+            {breakingNews.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                <Bell className="h-16 w-16 mb-4 opacity-30" />
+                <p className="text-sm">No trending topics detected today</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[400px] pr-4">
+                <div className="space-y-3">
+                  {breakingNews.map((cluster) => (
+                    <Button
+                      key={cluster.id}
+                      variant="outline"
+                      className="w-full h-auto p-4 text-left hover:bg-accent transition-colors"
+                      onClick={() => setSelectedCluster(cluster)}
+                    >
+                      <div className="w-full space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <Badge
+                            variant={
                               (typeof cluster.threat_level === 'number' && cluster.threat_level >= 75) ||
-                              (typeof cluster.threat_level === 'string' && cluster.threat_level === 'critical')
-                                ? 'destructive' 
+                              cluster.threat_level === 'critical'
+                                ? 'destructive'
                                 : 'secondary'
-                            }>
-                              {cluster.article_count || cluster.article_ids?.length || 0} sources
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {format(new Date(cluster.first_detected_at), 'h:mm a')}
-                            </span>
-                          </div>
-                          <h4 className="font-semibold text-sm mb-2 line-clamp-2">
-                            {cluster.cluster_topic}
-                          </h4>
-                          <div className="flex flex-wrap gap-1">
-                            {cluster.source_names.slice(0, 5).map((source) => (
+                            }
+                            className="text-xs"
+                          >
+                            {cluster.article_count || cluster.article_ids?.length || 0} sources
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(cluster.first_detected_at), 'h:mm a')}
+                          </span>
+                        </div>
+                        <h4 className="font-semibold text-sm line-clamp-2 text-left">
+                          {cluster.cluster_topic}
+                        </h4>
+                        <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap gap-1 flex-1">
+                            {cluster.source_names?.slice(0, 3).map((source) => (
                               <Badge key={source} variant="outline" className="text-xs">
                                 {source}
                               </Badge>
                             ))}
-                            {cluster.source_names.length > 5 && (
+                            {cluster.source_names && cluster.source_names.length > 3 && (
                               <Badge variant="outline" className="text-xs">
-                                +{cluster.source_names.length - 5}
+                                +{cluster.source_names.length - 3}
                               </Badge>
                             )}
                           </div>
-                          {cluster.affected_organizations.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {cluster.affected_organizations.map((org) => (
-                                <Badge key={org} variant="destructive" className="text-xs">
-                                  {org}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Critical Items Tab */}
-        <TabsContent value="critical">
-          <Card>
-            <CardHeader>
-              <CardTitle>Critical & High Priority Items</CardTitle>
-              <CardDescription>
-                Items requiring immediate attention
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!Array.isArray(briefing?.top_critical_items) || briefing.top_critical_items.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No critical items today</p>
-                </div>
-              ) : (
-                <ScrollArea className="h-[300px]">
-                  <div className="space-y-3">
-                    {(briefing.top_critical_items as any[]).map((item: any, index: number) => {
-                      const Icon = item.type === 'article' ? Newspaper :
-                                  item.type === 'bill' ? ScrollText :
-                                  item.type === 'state_action' ? Building2 : Shield;
-
-                      return (
-                        <Card key={`${item.type}-${item.id}`} className="border-red-300">
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                              <div className="p-2 rounded-lg bg-red-100 text-red-600">
-                                <Icon className="h-4 w-4" />
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Badge variant="destructive" className="text-xs">
-                                    {item.threat_level?.toUpperCase()}
-                                  </Badge>
-                                  <Badge variant="outline" className="text-xs">
-                                    {item.type.replace('_', ' ')}
-                                  </Badge>
-                                </div>
-                                <h4 className="font-semibold text-sm line-clamp-2">
-                                  {item.title}
-                                </h4>
-                                {item.source_name && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {item.source_name}
-                                  </p>
-                                )}
-                                {item.state_code && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {item.state_code}
-                                  </p>
-                                )}
-                              </div>
-                              {item.url && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  onClick={() => window.open(item.url, '_blank')}
-                                  title="Open article"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </ScrollArea>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Organization Mentions Tab */}
-        <TabsContent value="organizations">
-          <Card>
-            <CardHeader>
-              <CardTitle>Organization Mentions</CardTitle>
-              <CardDescription>
-                Tracked organizations mentioned today
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!briefing?.organization_mentions || Object.keys(briefing.organization_mentions).length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No organization mentions tracked today</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {Object.entries(briefing.organization_mentions).map(([org, data]) => (
-                    <Card key={org} className={`${
-                      data.critical > 0 ? 'border-red-300' :
-                      data.high > 0 ? 'border-orange-300' : ''
-                    }`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-bold">{org}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              {data.total} mention{data.total !== 1 ? 's' : ''} today
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            {data.critical > 0 && (
-                              <Badge variant="destructive">{data.critical} critical</Badge>
-                            )}
-                            {data.high > 0 && (
-                              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-                                {data.high} high
-                              </Badge>
-                            )}
-                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </Button>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </ScrollArea>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Critical Items */}
+        <Card className="flex flex-col">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">Critical Items</CardTitle>
+                <CardDescription className="text-sm">
+                  {Array.isArray(briefing?.top_critical_items) ? briefing.top_critical_items.length : 0} items requiring attention
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1">
+            {!Array.isArray(briefing?.top_critical_items) || briefing.top_critical_items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                <Shield className="h-16 w-16 mb-4 opacity-30" />
+                <p className="text-sm">No critical items today</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[400px] pr-4">
+                <div className="space-y-3">
+                  {(briefing.top_critical_items as any[]).map((item: any) => {
+                    const Icon = item.type === 'article' ? Newspaper :
+                                item.type === 'bill' ? ScrollText :
+                                item.type === 'state_action' ? Building2 : Shield;
+
+                    return (
+                      <Button
+                        key={`${item.type}-${item.id}`}
+                        variant="outline"
+                        className="w-full h-auto p-4 text-left hover:bg-accent transition-colors border-red-200 dark:border-red-900"
+                        onClick={() => setSelectedCriticalItem(item)}
+                      >
+                        <div className="w-full space-y-2">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950 shrink-0">
+                              <Icon className="h-4 w-4 text-red-600 dark:text-red-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <Badge variant="destructive" className="text-xs">
+                                  {item.threat_level?.toUpperCase()}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {item.type.replace('_', ' ')}
+                                </Badge>
+                              </div>
+                              <h4 className="font-semibold text-sm line-clamp-2 text-left">
+                                {item.title}
+                              </h4>
+                              {item.source_name && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {item.source_name}
+                                </p>
+                              )}
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                          </div>
+                        </div>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Organization Mentions */}
+      {briefing?.organization_mentions && Object.keys(briefing.organization_mentions).length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+                <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">Organization Mentions</CardTitle>
+                <CardDescription>
+                  Tracked organizations mentioned today
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(briefing.organization_mentions).map(([org, data]) => (
+                <Card
+                  key={org}
+                  className={`hover:shadow-md transition-shadow ${
+                    data.critical > 0 ? 'border-red-300 dark:border-red-900' :
+                    data.high > 0 ? 'border-orange-300 dark:border-orange-900' : ''
+                  }`}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-sm truncate">{org}</h4>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {data.total} mention{data.total !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        {data.critical > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            {data.critical}
+                          </Badge>
+                        )}
+                        {data.high > 0 && (
+                          <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 dark:bg-orange-950">
+                            {data.high}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Trending Topic Drawer */}
+      <Sheet open={!!selectedCluster} onOpenChange={() => setSelectedCluster(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          {selectedCluster && (
+            <>
+              <SheetHeader className="space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 pr-8">
+                    <SheetTitle className="text-2xl leading-tight">
+                      {selectedCluster.cluster_topic}
+                    </SheetTitle>
+                    <SheetDescription className="mt-2">
+                      Detected at {format(new Date(selectedCluster.first_detected_at), 'h:mm a')}
+                    </SheetDescription>
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Badge
+                    variant={
+                      (typeof selectedCluster.threat_level === 'number' && selectedCluster.threat_level >= 75) ||
+                      selectedCluster.threat_level === 'critical'
+                        ? 'destructive'
+                        : 'secondary'
+                    }
+                  >
+                    {selectedCluster.article_count || selectedCluster.article_ids?.length || 0} sources
+                  </Badge>
+                  {selectedCluster.affected_organizations && selectedCluster.affected_organizations.length > 0 && (
+                    <Badge variant="outline">
+                      {selectedCluster.affected_organizations.length} orgs affected
+                    </Badge>
+                  )}
+                </div>
+              </SheetHeader>
+
+              <Separator className="my-6" />
+
+              <div className="space-y-6">
+                {/* Sources */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-3">Sources</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCluster.source_names?.map((source) => (
+                      <Badge key={source} variant="outline">
+                        {source}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Affected Organizations */}
+                {selectedCluster.affected_organizations && selectedCluster.affected_organizations.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-3">Affected Organizations</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCluster.affected_organizations.map((org) => (
+                        <Badge key={org} variant="destructive">
+                          {org}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Details */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-3">Details</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Article Count</span>
+                      <span className="font-medium">
+                        {selectedCluster.article_count || selectedCluster.article_ids?.length || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">First Detected</span>
+                      <span className="font-medium">
+                        {format(new Date(selectedCluster.first_detected_at), 'MMM d, yyyy h:mm a')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Status</span>
+                      <Badge variant={selectedCluster.is_resolved ? 'secondary' : 'default'}>
+                        {selectedCluster.is_resolved ? 'Resolved' : 'Active'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Critical Item Drawer */}
+      <Sheet open={!!selectedCriticalItem} onOpenChange={() => setSelectedCriticalItem(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          {selectedCriticalItem && (
+            <>
+              <SheetHeader className="space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 pr-8">
+                    <SheetTitle className="text-2xl leading-tight">
+                      {selectedCriticalItem.title}
+                    </SheetTitle>
+                    {selectedCriticalItem.source_name && (
+                      <SheetDescription className="mt-2">
+                        {selectedCriticalItem.source_name}
+                      </SheetDescription>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Badge variant="destructive">
+                    {selectedCriticalItem.threat_level?.toUpperCase()}
+                  </Badge>
+                  <Badge variant="outline">
+                    {selectedCriticalItem.type.replace('_', ' ')}
+                  </Badge>
+                </div>
+              </SheetHeader>
+
+              <Separator className="my-6" />
+
+              <div className="space-y-6">
+                {/* Summary */}
+                {selectedCriticalItem.summary && (
+                  <div>
+                    <h3 className="font-semibold text-lg mb-3">Summary</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {selectedCriticalItem.summary}
+                    </p>
+                  </div>
+                )}
+
+                {/* Details */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-3">Details</h3>
+                  <div className="space-y-2 text-sm">
+                    {selectedCriticalItem.state_code && (
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">State</span>
+                        <span className="font-medium">{selectedCriticalItem.state_code}</span>
+                      </div>
+                    )}
+                    {selectedCriticalItem.type === 'bill' && selectedCriticalItem.bill_number && (
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Bill Number</span>
+                        <span className="font-medium">{selectedCriticalItem.bill_number}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                {selectedCriticalItem.url && (
+                  <div>
+                    <Button
+                      className="w-full"
+                      onClick={() => window.open(selectedCriticalItem.url, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View Full Article
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
