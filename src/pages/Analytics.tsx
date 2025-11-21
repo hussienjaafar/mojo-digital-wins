@@ -52,6 +52,12 @@ export default function Analytics() {
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [topicArticles, setTopicArticles] = useState<any[]>([]);
+  const [blueskyTrends, setBlueskyTrends] = useState<any[]>([]);
+  const [socialMetrics, setSocialMetrics] = useState({
+    totalPosts: 0,
+    trendingTopics: 0,
+    predictiveSignals: 0,
+  });
 
   // Real-time subscription for new articles
   useEffect(() => {
@@ -372,6 +378,37 @@ export default function Analytics() {
         .slice(0, 10);
 
       setBillTopicCorrelation(correlationData);
+
+      // === FETCH BLUESKY SOCIAL INTELLIGENCE ===
+      const { data: blueskyData, error: blueskyError } = await supabase
+        .from('bluesky_trends')
+        .select('*')
+        .gte('last_seen_at', subDays(new Date(), 7).toISOString())
+        .order('velocity', { ascending: false })
+        .limit(20);
+
+      if (blueskyError) {
+        console.error('Error fetching Bluesky trends:', blueskyError);
+      } else {
+        setBlueskyTrends(blueskyData || []);
+      }
+
+      // Fetch social metrics
+      const { count: postsCount } = await supabase
+        .from('bluesky_posts')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', dateRange.from.toISOString());
+
+      const { count: predictiveCount } = await supabase
+        .from('bluesky_article_correlations')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_predictive', true);
+
+      setSocialMetrics({
+        totalPosts: postsCount || 0,
+        trendingTopics: (blueskyData || []).filter((t: any) => t.is_trending).length,
+        predictiveSignals: predictiveCount || 0,
+      });
 
     } catch (error) {
       console.error('Error fetching analytics:', error);
@@ -715,7 +752,8 @@ export default function Analytics() {
       {/* Main Content */}
       <Tabs defaultValue="topics" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="topics">Trending Topics</TabsTrigger>
+          <TabsTrigger value="topics">News Topics</TabsTrigger>
+          <TabsTrigger value="social">Social Trends</TabsTrigger>
           <TabsTrigger value="timeline">Sentiment Timeline</TabsTrigger>
           <TabsTrigger value="threats">Threat Trends</TabsTrigger>
           <TabsTrigger value="entities">Key Entities</TabsTrigger>
@@ -861,6 +899,196 @@ export default function Analytics() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* BLUESKY SOCIAL TRENDS */}
+        <TabsContent value="social" className="space-y-4">
+          {/* Social Metrics Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+                    <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Social Posts</p>
+                  <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                    {socialMetrics.totalPosts}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Bluesky posts tracked</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+                    <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Trending Now</p>
+                  <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                    {socialMetrics.trendingTopics}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Hot topics on social</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950">
+                    <AlertTriangle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Predictive Signals</p>
+                  <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                    {socialMetrics.predictiveSignals}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Social predicted news</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Bluesky Trending Topics */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-xl font-semibold">Bluesky Social Intelligence</h2>
+              <span className="text-xs px-2 py-1 bg-blue-500 text-white rounded-full">
+                REAL-TIME
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              AI-powered trend analysis from Bluesky social media • Velocity-ranked by spike detection
+            </p>
+
+            {blueskyTrends.length === 0 ? (
+              <Card>
+                <CardContent className="p-12">
+                  <p className="text-muted-foreground text-center">
+                    No Bluesky trends detected yet. The stream processor needs to be deployed and running.
+                  </p>
+                  <p className="text-sm text-muted-foreground text-center mt-2">
+                    Deploy the <code className="px-2 py-1 bg-muted rounded">bluesky-stream</code> edge function to start collecting social data.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {blueskyTrends.map((trend, index) => (
+                  <Card
+                    key={trend.id}
+                    className={cn(
+                      "hover:shadow-lg transition-all",
+                      trend.is_trending && 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                    )}
+                  >
+                    <CardContent className="p-6">
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-500/10 text-blue-600 font-bold">
+                            #{index + 1}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-bold text-lg">{trend.topic}</h3>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className="text-sm text-muted-foreground">
+                                {trend.mentions_last_24_hours} mentions (24h)
+                              </span>
+                              {trend.is_trending && (
+                                <span className="px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded animate-pulse">
+                                  🔥 TRENDING
+                                </span>
+                              )}
+                              {trend.velocity && trend.velocity > 0 && (
+                                <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-semibold rounded">
+                                  +{trend.velocity.toFixed(0)}% velocity
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Sentiment Score */}
+                        {trend.sentiment_avg !== null && (
+                          <div className="text-right">
+                            <div className={cn(
+                              "text-3xl font-bold",
+                              trend.sentiment_avg > 0.3
+                                ? 'text-green-600 dark:text-green-400'
+                                : trend.sentiment_avg < -0.3
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-600 dark:text-gray-400'
+                            )}>
+                              {((trend.sentiment_avg + 1) * 50).toFixed(0)}%
+                            </div>
+                            <p className="text-xs text-muted-foreground">sentiment</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Stats Row */}
+                      <div className="grid grid-cols-3 gap-2 mb-4">
+                        <div className="bg-muted/50 rounded p-2 text-center">
+                          <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                            {trend.sentiment_positive || 0}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Positive</div>
+                        </div>
+                        <div className="bg-muted/50 rounded p-2 text-center">
+                          <div className="text-lg font-bold text-gray-600 dark:text-gray-400">
+                            {trend.sentiment_neutral || 0}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Neutral</div>
+                        </div>
+                        <div className="bg-muted/50 rounded p-2 text-center">
+                          <div className="text-lg font-bold text-red-600 dark:text-red-400">
+                            {trend.sentiment_negative || 0}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Negative</div>
+                        </div>
+                      </div>
+
+                      {/* Correlation Info */}
+                      {trend.related_articles && trend.related_articles.length > 0 && (
+                        <div className="bg-purple-50 dark:bg-purple-950/30 rounded p-3 border border-purple-200 dark:border-purple-800">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Newspaper className="h-4 w-4 text-purple-600" />
+                            <span className="font-semibold text-purple-900 dark:text-purple-100">
+                              Correlated with {trend.related_articles.length} news article{trend.related_articles.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          {trend.correlation_score && (
+                            <div className="mt-1 text-xs text-purple-700 dark:text-purple-300">
+                              Correlation strength: {(trend.correlation_score * 100).toFixed(0)}%
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Time Info */}
+                      <div className="mt-3 pt-3 border-t text-xs text-muted-foreground flex justify-between">
+                        <span>Last seen: {new Date(trend.last_seen_at).toLocaleTimeString()}</span>
+                        {trend.trending_since && (
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">
+                            Trending since: {new Date(trend.trending_since).toLocaleTimeString()}
+                          </span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         {/* SENTIMENT TIMELINE */}
