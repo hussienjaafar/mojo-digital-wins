@@ -49,8 +49,15 @@ type ContactSubmission = {
 };
 
 const Admin = () => {
-  // Load sidebar state from localStorage
+  const isMobile = useIsMobile();
+
+  // Load sidebar state from localStorage, default to closed on mobile
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
+    // On mobile, default to closed
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return false;
+    }
+    // On desktop, use saved state or default to true
     const saved = localStorage.getItem('admin-sidebar-open');
     return saved !== null ? JSON.parse(saved) : true;
   });

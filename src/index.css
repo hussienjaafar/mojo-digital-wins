@@ -744,3 +744,70 @@ All colors MUST be HSL.
   }
 }
 
+/* Mobile Optimization Utilities */
+@layer utilities {
+  /* Prevent horizontal scroll on mobile */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Touch-friendly hit targets (minimum 44x44px for accessibility) */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Prevent text overflow on mobile */
+  .mobile-truncate {
+    @apply truncate max-w-full;
+  }
+
+  /* Mobile-friendly scrollbar for horizontal scroll containers */
+  @media (max-width: 768px) {
+    .horizontal-scroll {
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+
+    /* Hide scrollbar for cleaner mobile UI while maintaining functionality */
+    .horizontal-scroll::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    .horizontal-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .horizontal-scroll::-webkit-scrollbar-thumb {
+      background: hsl(var(--border));
+      border-radius: 2px;
+    }
+  }
+
+  /* Ensure responsive images */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Prevent zoom on input focus (iOS Safari) */
+  @media (max-width: 768px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
+}
+

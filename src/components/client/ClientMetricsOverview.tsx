@@ -65,9 +65,9 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
   }
 
   return (
-    <div className="space-y-6">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      {/* KPI Cards - Mobile Optimized */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Raised</CardTitle>
@@ -123,14 +123,14 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
         </Card>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Charts - Mobile Optimized */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle>Funds Raised Over Time</CardTitle>
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg">Funds Raised Over Time</CardTitle>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="pb-4">
+            <ResponsiveContainer width="100%" height={250}>
               <LineChart data={metrics}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
@@ -154,11 +154,11 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Spend by Channel</CardTitle>
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg">Spend by Channel</CardTitle>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="pb-4">
+            <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
                   data={spendByChannel}
@@ -181,13 +181,13 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
         </Card>
       </div>
 
-      {/* ROI Trend */}
+      {/* ROI Trend - Mobile Optimized */}
       <Card>
-        <CardHeader>
-          <CardTitle>ROI Trend</CardTitle>
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="text-base sm:text-lg">ROI Trend</CardTitle>
         </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
+        <CardContent className="pb-4">
+          <ResponsiveContainer width="100%" height={250}>
             <LineChart data={metrics}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
