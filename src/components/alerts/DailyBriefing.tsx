@@ -325,7 +325,6 @@ export function DailyBriefing() {
                       <Badge
                         variant={
                           (typeof cluster.threat_level === 'number' && cluster.threat_level >= 75) ||
-                          cluster.threat_level === 'critical' ||
                           cluster.severity === 'critical'
                             ? 'destructive'
                             : 'secondary'
@@ -512,7 +511,6 @@ export function DailyBriefing() {
                   <Badge
                     variant={
                       (typeof selectedCluster.threat_level === 'number' && selectedCluster.threat_level >= 75) ||
-                      selectedCluster.threat_level === 'critical' ||
                       selectedCluster.severity === 'critical'
                         ? 'destructive'
                         : 'secondary'
