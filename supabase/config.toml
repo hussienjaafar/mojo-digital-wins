@@ -68,3 +68,12 @@ verify_jwt = false
 
 [functions.extract-trending-topics]
 verify_jwt = false
+
+[functions.bluesky-stream]
+verify_jwt = false
+
+[functions.analyze-bluesky-posts]
+verify_jwt = false
+
+[functions.correlate-social-news]
+verify_jwt = false

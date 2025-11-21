@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { inflate } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,7 +78,7 @@ async function processBlueskyStream() {
 
   // Connect to JetStream WebSocket
   const ws = new WebSocket(
-    'wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post&compress=true'
+    'wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post'
   );
 
   let postCount = 0;
@@ -92,7 +93,22 @@ async function processBlueskyStream() {
 
   ws.onmessage = async (event) => {
     try {
-      const data = JSON.parse(event.data);
+      let data;
+      
+      // Handle both text and binary (compressed) data
+      if (typeof event.data === 'string') {
+        data = JSON.parse(event.data);
+      } else if (event.data instanceof Blob) {
+        // Bluesky sends zlib-compressed JSON
+        const arrayBuffer = await event.data.arrayBuffer();
+        const compressed = new Uint8Array(arrayBuffer);
+        const decompressed = inflate(compressed);
+        const text = new TextDecoder().decode(decompressed);
+        data = JSON.parse(text);
+      } else {
+        console.error('Unknown data type:', typeof event.data);
+        return;
+      }
 
       // Only process commit events for posts
       if (data.kind !== 'commit' || !data.commit?.record) {

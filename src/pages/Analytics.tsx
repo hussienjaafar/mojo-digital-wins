@@ -381,7 +381,7 @@ export default function Analytics() {
 
       // === FETCH BLUESKY SOCIAL INTELLIGENCE ===
       const { data: blueskyData, error: blueskyError } = await supabase
-        .from('bluesky_trends')
+        .from('bluesky_trends' as any)
         .select('*')
         .gte('last_seen_at', subDays(new Date(), 7).toISOString())
         .order('velocity', { ascending: false })
@@ -395,12 +395,12 @@ export default function Analytics() {
 
       // Fetch social metrics
       const { count: postsCount } = await supabase
-        .from('bluesky_posts')
+        .from('bluesky_posts' as any)
         .select('*', { count: 'exact', head: true })
         .gte('created_at', dateRange.from.toISOString());
 
       const { count: predictiveCount } = await supabase
-        .from('bluesky_article_correlations')
+        .from('bluesky_article_correlations' as any)
         .select('*', { count: 'exact', head: true })
         .eq('is_predictive', true);
 
