@@ -4,12 +4,13 @@ import { format, subDays } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/fixed-client";
-import { 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
-  BarChart3, 
-  Building2, 
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  TrendingUp,
+  Users,
+  DollarSign,
+  BarChart3,
+  Building2,
   Activity,
   ArrowUpRight,
   ArrowDownRight,
@@ -65,6 +66,7 @@ const COLORS = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b'];
 
 export function DashboardHome() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [stats, setStats] = useState<DashboardStats>({
     totalClients: 0,
     activeClients: 0,
@@ -220,31 +222,45 @@ export function DashboardHome() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Section with Date Filter */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard Overview</h2>
-          <p className="text-muted-foreground mt-2">
-            Monitor your organization's performance and key metrics
-          </p>
+    <div className="space-y-4 sm:space-y-6 md:space-y-8">
+      {/* Welcome Section with Date Filter - Mobile Optimized */}
+      <div className="flex flex-col gap-4">
+        {/* Title Section */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight truncate">
+              Dashboard Overview
+            </h2>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2 hidden sm:block">
+              Monitor your organization's performance and key metrics
+            </p>
+          </div>
+          {/* Demo Button - Desktop Only */}
+          {!isMobile && (
+            <Button
+              onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')}
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              View Demo
+            </Button>
+          )}
         </div>
-        <div className="flex items-center gap-3">
+
+        {/* Date Range Selector - Full Width on Mobile */}
+        <div className="w-full">
           <DateRangeSelector
             startDate={startDate}
             endDate={endDate}
             onDateChange={handleDateChange}
           />
-          
-          <Button onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')} variant="outline">
-            <Plus className="h-4 w-4 mr-2" />
-            View Demo
-          </Button>
         </div>
       </div>
 
-      {/* Key Metrics Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {/* Key Metrics Grid - Mobile Optimized */}
+      <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -315,42 +331,43 @@ export function DashboardHome() {
         </Card>
       </div>
 
-      {/* Demo Organization Card */}
+      {/* Demo Organization Card - Mobile Optimized */}
       <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-        <CardHeader>
-          <CardTitle className="text-2xl flex items-center gap-2">
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="text-lg sm:text-xl md:text-2xl flex items-center gap-2">
             🎯 Demo Organization
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs sm:text-sm">
             Explore sample data with the Progressive Victory Fund organization
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 bg-background rounded-lg border">
-              <div className="text-sm text-muted-foreground">Total Funds Raised</div>
-              <div className="text-2xl font-bold text-primary">$245,750</div>
+        <CardContent className="space-y-3 sm:space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="p-3 sm:p-4 bg-background rounded-lg border">
+              <div className="text-xs sm:text-sm text-muted-foreground">Total Funds Raised</div>
+              <div className="text-xl sm:text-2xl font-bold text-primary">$245,750</div>
             </div>
-            <div className="p-4 bg-background rounded-lg border">
-              <div className="text-sm text-muted-foreground">Ad Spend</div>
-              <div className="text-2xl font-bold text-primary">$18,500</div>
+            <div className="p-3 sm:p-4 bg-background rounded-lg border">
+              <div className="text-xs sm:text-sm text-muted-foreground">Ad Spend</div>
+              <div className="text-xl sm:text-2xl font-bold text-primary">$18,500</div>
             </div>
-            <div className="p-4 bg-background rounded-lg border">
-              <div className="text-sm text-muted-foreground">ROI</div>
-              <div className="text-2xl font-bold text-primary">1,228%</div>
+            <div className="p-3 sm:p-4 bg-background rounded-lg border">
+              <div className="text-xs sm:text-sm text-muted-foreground">ROI</div>
+              <div className="text-xl sm:text-2xl font-bold text-primary">1,228%</div>
             </div>
           </div>
-          <Button 
+          <Button
             onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')}
-            className="w-full"
+            className="w-full min-h-[44px]"
+            size={isMobile ? "default" : "lg"}
           >
             View Full Dashboard →
           </Button>
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Quick Actions - Mobile Optimized */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/admin')}>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -394,18 +411,18 @@ export function DashboardHome() {
         </Card>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* Charts Section - Mobile Optimized */}
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
         {/* Revenue Trends Chart */}
         <Card>
-          <CardHeader>
-            <CardTitle>Revenue & Spend Trends</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg">Revenue & Spend Trends</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               {format(new Date(startDate), 'MMM dd, yyyy')} - {format(new Date(endDate), 'MMM dd, yyyy')}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="pb-4">
+            <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -460,14 +477,14 @@ export function DashboardHome() {
 
         {/* ROI Over Time Chart */}
         <Card>
-          <CardHeader>
-            <CardTitle>ROI Trend</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg">ROI Trend</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Return on investment: {format(new Date(startDate), 'MMM dd')} - {format(new Date(endDate), 'MMM dd')}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="pb-4">
+            <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis 
@@ -504,14 +521,14 @@ export function DashboardHome() {
 
         {/* Campaign Performance Bar Chart */}
         <Card>
-          <CardHeader>
-            <CardTitle>Top Campaigns</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg">Top Campaigns</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Top performing campaigns in selected period
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="pb-4">
+            <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
               <BarChart data={campaignData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis 
@@ -545,14 +562,14 @@ export function DashboardHome() {
 
         {/* Donations Trend Chart */}
         <Card>
-          <CardHeader>
-            <CardTitle>Donations Trend</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg">Donations Trend</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Donations: {format(new Date(startDate), 'MMM dd')} - {format(new Date(endDate), 'MMM dd')}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+          <CardContent className="pb-4">
+            <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorDonations" x1="0" y1="0" x2="0" y2="1">
@@ -593,8 +610,8 @@ export function DashboardHome() {
         </Card>
       </div>
 
-      {/* Financial Overview */}
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* Financial Overview - Mobile Optimized */}
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Spending Overview</CardTitle>
