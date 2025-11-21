@@ -1,0 +1,264 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface BlueSkyPost {
+  id: string;
+  text: string;
+  author_handle: string;
+  created_at: string;
+}
+
+// Analyze posts using Claude AI
+async function analyzePosts(posts: BlueSkyPost[]): Promise<any[]> {
+  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+
+  if (!anthropicKey) {
+    throw new Error('ANTHROPIC_API_KEY not configured');
+  }
+
+  // Prepare batch analysis prompt
+  const postsText = posts.map((p, i) =>
+    `[${i}] @${p.author_handle}: ${p.text}`
+  ).join('\n\n');
+
+  const prompt = `Analyze these Bluesky posts and extract topics and sentiment. Focus on:
+- Muslim American and Arab American communities
+- Civil rights and discrimination
+- Middle East topics (Palestine, Gaza, etc.)
+- Islamophobia and hate crimes
+- Surveillance and profiling
+- Policy and legislation
+
+For each post, provide:
+1. Topics (array of 1-5 specific topics mentioned)
+2. Sentiment score (-1.0 to 1.0, where -1 is very negative, 0 is neutral, 1 is very positive)
+3. Sentiment label (positive, neutral, or negative)
+
+Return ONLY a JSON array with this structure:
+[
+  {
+    "index": 0,
+    "topics": ["topic1", "topic2"],
+    "sentiment": 0.5,
+    "sentiment_label": "positive"
+  }
+]
+
+Posts:
+${postsText}`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': anthropicKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-3-haiku-20240307',
+      max_tokens: 4000,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Claude API error: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  const content = data.content[0].text;
+
+  // Extract JSON from response (might be wrapped in markdown code blocks)
+  const jsonMatch = content.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    throw new Error('Could not extract JSON from Claude response');
+  }
+
+  const analyses = JSON.parse(jsonMatch[0]);
+
+  // Map analyses back to posts
+  return posts.map((post, i) => {
+    const analysis = analyses.find((a: any) => a.index === i) || {
+      topics: [],
+      sentiment: 0,
+      sentiment_label: 'neutral'
+    };
+
+    return {
+      id: post.id,
+      ai_topics: analysis.topics,
+      ai_sentiment: analysis.sentiment,
+      ai_sentiment_label: analysis.sentiment_label,
+      ai_processed: true,
+      ai_processed_at: new Date().toISOString()
+    };
+  });
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    console.log('🤖 Starting AI analysis of Bluesky posts...');
+
+    const { batchSize = 20 } = await req.json().catch(() => ({ batchSize: 20 }));
+
+    // Get unprocessed posts with relevance > 0.5 (prioritize highly relevant)
+    const { data: posts, error: fetchError } = await supabase
+      .from('bluesky_posts')
+      .select('id, text, author_handle, created_at')
+      .eq('ai_processed', false)
+      .gte('ai_relevance_score', 0.5)
+      .order('created_at', { ascending: false })
+      .limit(batchSize);
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    if (!posts || posts.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'No unprocessed posts found',
+          processed: 0
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`📊 Found ${posts.length} posts to analyze`);
+
+    // Analyze posts using AI
+    const analyses = await analyzePosts(posts);
+
+    // Update posts with AI analysis
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const analysis of analyses) {
+      const { error } = await supabase
+        .from('bluesky_posts')
+        .update({
+          ai_topics: analysis.ai_topics,
+          ai_sentiment: analysis.ai_sentiment,
+          ai_sentiment_label: analysis.ai_sentiment_label,
+          ai_processed: true,
+          ai_processed_at: analysis.ai_processed_at
+        })
+        .eq('id', analysis.id);
+
+      if (error) {
+        console.error(`❌ Error updating post ${analysis.id}:`, error);
+        errorCount++;
+      } else {
+        successCount++;
+      }
+    }
+
+    console.log(`✅ Processed ${successCount} posts successfully, ${errorCount} errors`);
+
+    // Update trends based on newly analyzed posts
+    await updateTrends(supabase, analyses);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        processed: successCount,
+        errors: errorCount,
+        topics_extracted: analyses.flatMap(a => a.ai_topics).length
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error: any) {
+    console.error('Error in analyze-bluesky-posts:', error);
+    return new Response(
+      JSON.stringify({ error: error?.message || 'Unknown error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
+
+// Update trends table based on analyzed posts
+async function updateTrends(supabase: any, analyses: any[]) {
+  console.log('📈 Updating trends...');
+
+  // Extract all unique topics
+  const topicCounts = new Map<string, { count: number, sentiment: number[] }>();
+
+  for (const analysis of analyses) {
+    for (const topic of analysis.ai_topics) {
+      if (!topicCounts.has(topic)) {
+        topicCounts.set(topic, { count: 0, sentiment: [] });
+      }
+      const data = topicCounts.get(topic)!;
+      data.count++;
+      data.sentiment.push(analysis.ai_sentiment);
+    }
+  }
+
+  // Update or insert trends
+  for (const [topic, data] of topicCounts.entries()) {
+    const avgSentiment = data.sentiment.reduce((a, b) => a + b, 0) / data.sentiment.length;
+
+    // Calculate counts from database
+    const { data: hourData } = await supabase
+      .from('bluesky_posts')
+      .select('id', { count: 'exact', head: true })
+      .contains('ai_topics', [topic])
+      .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString());
+
+    const { data: dayData } = await supabase
+      .from('bluesky_posts')
+      .select('id', { count: 'exact', head: true })
+      .contains('ai_topics', [topic])
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+    const mentionsLastHour = hourData?.count || 0;
+    const mentionsLast24Hours = dayData?.count || 0;
+
+    // Calculate velocity
+    const dailyAvg = mentionsLast24Hours / 24;
+    const velocity = dailyAvg > 0 ? (mentionsLastHour / dailyAvg) * 100 : 0;
+    const isTrending = velocity > 200; // 200% = 2x normal rate
+
+    // Upsert trend
+    const { error } = await supabase
+      .from('bluesky_trends')
+      .upsert({
+        topic,
+        mentions_last_hour: mentionsLastHour,
+        mentions_last_24_hours: mentionsLast24Hours,
+        velocity,
+        sentiment_avg: avgSentiment,
+        is_trending: isTrending,
+        trending_since: isTrending ? new Date().toISOString() : null,
+        last_seen_at: new Date().toISOString(),
+        calculated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'topic'
+      });
+
+    if (error) {
+      console.error(`❌ Error updating trend for "${topic}":`, error);
+    }
+  }
+
+  console.log(`✅ Updated ${topicCounts.size} trends`);
+}
