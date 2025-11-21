@@ -91,7 +91,7 @@ export const navigationGroups: NavigationGroup[] = [
       { title: "State Actions", icon: Landmark, value: "state-actions" },
       { title: "News", icon: Newspaper, value: "news" },
       { title: "Bills", icon: ScrollText, value: "bills" },
-      { title: "Analytics", icon: BarChart3, value: "content-analytics" },
+      { title: "News Pulse", icon: BarChart3, value: "content-analytics" },
       { title: "Bookmarks", icon: Bookmark, value: "bookmarks" },
       { title: "Reports", icon: Download, value: "reports" },
       { title: "Alert Settings", icon: Bell, value: "alert-settings" },

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format, subDays } from "date-fns";
-import { CalendarIcon, Download, TrendingUp, AlertTriangle, Newspaper, Scale, Building2, RefreshCw } from "lucide-react";
+import { CalendarIcon, Download, TrendingUp, AlertTriangle, Newspaper, Scale, Building2, RefreshCw, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Area, Line } from "recharts";
@@ -543,137 +543,189 @@ export default function Analytics() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-4xl font-bold">Intelligence Snapshot</h1>
-            {isLive && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-semibold animate-pulse">
-                <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
-                </span>
-                LIVE
-              </div>
-            )}
-            {newArticleCount > 0 && (
-              <div className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm font-semibold">
-                +{newArticleCount} new
-              </div>
-            )}
-          </div>
-          <p className="text-muted-foreground">
-            {isLive ? 'Real-time updates enabled • Auto-refresh every 30s' : 'Real-time overview of news, politics, and emerging threats'}
-          </p>
-        </div>
-
-        <div className="flex gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("justify-start text-left font-normal")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <div className="p-3 space-y-2">
-                <Button variant="outline" size="sm" className="w-full" onClick={() => setDateRange({ from: subDays(new Date(), 1), to: new Date() })}>
-                  Last 24h
-                </Button>
-                <Button variant="outline" size="sm" className="w-full" onClick={() => setDateRange({ from: subDays(new Date(), 7), to: new Date() })}>
-                  Last 7 days
-                </Button>
-                <Button variant="outline" size="sm" className="w-full" onClick={() => setDateRange({ from: subDays(new Date(), 30), to: new Date() })}>
-                  Last 30 days
-                </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <Button
-            variant={isLive ? "default" : "outline"}
-            onClick={() => setIsLive(!isLive)}
-            title={isLive ? "Disable live updates" : "Enable live updates"}
-          >
-            <TrendingUp className={`mr-2 h-4 w-4 ${isLive ? 'animate-pulse' : ''}`} />
-            {isLive ? 'Live Mode' : 'Static Mode'}
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={runSentimentAnalysis}
-            disabled={analyzing}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
-            {analyzing ? 'Analyzing...' : 'Analyze Sentiment'}
-          </Button>
-
-          <Button
-            variant="default"
-            onClick={extractTrendingTopics}
-            disabled={analyzing}
-          >
-            <TrendingUp className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
-            {analyzing ? 'Extracting...' : 'Extract Topics'}
-          </Button>
-
-          <Button variant="outline" onClick={exportToCSV}>
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-        </div>
-      </div>
-
-      {/* Last Updated Indicator */}
-      <div className="flex items-center justify-end text-sm text-muted-foreground">
-        <span>Last updated: {format(lastUpdated, 'h:mm:ss a')}</span>
-      </div>
-
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Coverage</CardTitle>
-            <Newspaper className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalArticles}</div>
-            <p className="text-xs text-muted-foreground">Articles tracked</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Critical Threats</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{metrics.criticalThreats}</div>
-            <p className="text-xs text-muted-foreground">High priority items</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Bills</CardTitle>
-            <Scale className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalBills}</div>
-            <p className="text-xs text-muted-foreground">Legislative activity</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overall Sentiment</CardTitle>
-            <TrendingUp className={`h-4 w-4 ${getSentimentColor(metrics.avgSentiment)}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${getSentimentColor(metrics.avgSentiment)}`}>
-              {(metrics.avgSentiment * 100).toFixed(0)}%
+      <div className="flex flex-col gap-4">
+        {/* Header - Matches DailyBriefing Style */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3 mb-2 flex-1">
+            <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+              <Activity className="h-6 w-6 sm:h-7 sm:w-7 text-purple-600 dark:text-purple-400" />
             </div>
-            <p className="text-xs text-muted-foreground">Sentiment score</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">News Pulse</h1>
+                {isLive && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-semibold animate-pulse">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                    </span>
+                    LIVE
+                  </div>
+                )}
+                {newArticleCount > 0 && (
+                  <div className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm font-semibold">
+                    +{newArticleCount} new
+                  </div>
+                )}
+              </div>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">
+                {isLive ? 'Real-time updates enabled • Auto-refresh every 30s' : 'Real-time overview of news, politics, and emerging threats'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("justify-start text-left font-normal")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <div className="p-3 space-y-2">
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => setDateRange({ from: subDays(new Date(), 1), to: new Date() })}>
+                    Last 24h
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => setDateRange({ from: subDays(new Date(), 7), to: new Date() })}>
+                    Last 7 days
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => setDateRange({ from: subDays(new Date(), 30), to: new Date() })}>
+                    Last 30 days
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Button
+              variant={isLive ? "default" : "outline"}
+              onClick={() => setIsLive(!isLive)}
+              title={isLive ? "Disable live updates" : "Enable live updates"}
+            >
+              <TrendingUp className={`mr-2 h-4 w-4 ${isLive ? 'animate-pulse' : ''}`} />
+              {isLive ? 'Live Mode' : 'Static Mode'}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={runSentimentAnalysis}
+              disabled={analyzing}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
+              {analyzing ? 'Analyzing...' : 'Analyze Sentiment'}
+            </Button>
+
+            <Button
+              variant="default"
+              onClick={extractTrendingTopics}
+              disabled={analyzing}
+            >
+              <TrendingUp className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
+              {analyzing ? 'Extracting...' : 'Extract Topics'}
+            </Button>
+
+            <Button variant="outline" onClick={exportToCSV}>
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          </div>
+        </div>
+
+        {/* Last Updated Indicator */}
+        <div className="flex items-center justify-end text-sm text-muted-foreground">
+          <span>Last updated: {format(lastUpdated, 'h:mm:ss a')}</span>
+        </div>
+      </div>
+
+      {/* Key Metrics - Redesigned */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Coverage - Blue */}
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+                <Newspaper className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Total Coverage</p>
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                {metrics.totalArticles}
+              </div>
+              <p className="text-xs text-muted-foreground">Articles tracked</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Critical Threats - Red */}
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Critical Threats</p>
+              <div className="text-3xl font-bold text-red-600 dark:text-red-400">
+                {metrics.criticalThreats}
+              </div>
+              <p className="text-xs text-muted-foreground">High priority items</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Active Bills - Purple */}
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+                <Scale className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Active Bills</p>
+              <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                {metrics.totalBills}
+              </div>
+              <p className="text-xs text-muted-foreground">Legislative activity</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Overall Sentiment - Dynamic Color */}
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className={`p-2 rounded-lg ${
+                metrics.avgSentiment > 0.6
+                  ? 'bg-green-100 dark:bg-green-950'
+                  : metrics.avgSentiment < 0.4
+                  ? 'bg-red-100 dark:bg-red-950'
+                  : 'bg-gray-100 dark:bg-gray-800'
+              }`}>
+                <TrendingUp className={`h-5 w-5 ${
+                  metrics.avgSentiment > 0.6
+                    ? 'text-green-600 dark:text-green-400'
+                    : metrics.avgSentiment < 0.4
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-gray-600 dark:text-gray-400'
+                }`} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Overall Sentiment</p>
+              <div className={`text-3xl font-bold ${
+                metrics.avgSentiment > 0.6
+                  ? 'text-green-600 dark:text-green-400'
+                  : metrics.avgSentiment < 0.4
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-gray-600 dark:text-gray-400'
+              }`}>
+                {(metrics.avgSentiment * 100).toFixed(0)}%
+              </div>
+              <p className="text-xs text-muted-foreground">Sentiment score</p>
+            </div>
           </CardContent>
         </Card>
       </div>
