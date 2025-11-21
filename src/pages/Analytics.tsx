@@ -46,7 +46,7 @@ export default function Analytics() {
   const [sentimentTimeline, setSentimentTimeline] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const [isLive, setIsLive] = useState(true);
+  const isLive = true; // Always in live mode
   const [newArticleCount, setNewArticleCount] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
@@ -598,30 +598,12 @@ export default function Analytics() {
             </Popover>
 
             <Button
-              variant={isLive ? "default" : "outline"}
-              onClick={() => setIsLive(!isLive)}
-              title={isLive ? "Disable live updates" : "Enable live updates"}
-            >
-              <TrendingUp className={`mr-2 h-4 w-4 ${isLive ? 'animate-pulse' : ''}`} />
-              {isLive ? 'Live Mode' : 'Static Mode'}
-            </Button>
-
-            <Button
               variant="outline"
-              onClick={runSentimentAnalysis}
-              disabled={analyzing}
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
-              {analyzing ? 'Analyzing...' : 'Analyze Sentiment'}
-            </Button>
-
-            <Button
-              variant="default"
               onClick={extractTrendingTopics}
               disabled={analyzing}
             >
-              <TrendingUp className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
-              {analyzing ? 'Extracting...' : 'Extract Topics'}
+              <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
+              {analyzing ? 'Refreshing...' : 'Refresh Topics'}
             </Button>
 
             <Button variant="outline" onClick={exportToCSV}>
@@ -742,119 +724,143 @@ export default function Analytics() {
 
         {/* TRENDING TOPICS WITH SENTIMENT */}
         <TabsContent value="topics" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    Trending Topics & Sentiment
-                    {isLive && (
-                      <span className="text-xs px-2 py-1 bg-red-500 text-white rounded-full animate-pulse">
-                        LIVE
-                      </span>
-                    )}
-                  </CardTitle>
-                  <CardDescription>
-                    {isLive
-                      ? `Real-time analysis • ${topicSentiments.length} topics tracked • Updates every 30s`
-                      : 'What\'s being discussed and how people feel about it'
-                    }
-                  </CardDescription>
-                </div>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold">Trending Topics</h2>
+                <span className="text-xs px-2 py-1 bg-red-500 text-white rounded-full animate-pulse">
+                  LIVE
+                </span>
                 {newArticleCount > 0 && (
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-blue-600">+{newArticleCount}</div>
-                    <p className="text-xs text-muted-foreground">new articles</p>
-                  </div>
+                  <span className="px-2 py-1 bg-blue-500 text-white rounded-full text-xs font-semibold">
+                    +{newArticleCount} new
+                  </span>
                 )}
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {topicSentiments.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No trending topics found in this time period</p>
-                ) : (
-                  topicSentiments.map((topic, index) => (
-                    <div
-                      key={topic.topic}
-                      onClick={() => fetchTopicArticles(topic)}
-                      className={`border-b pb-4 last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors ${topic.trend === 'rising' && isLive ? 'bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border-green-200' : 'p-3'}`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl font-bold text-muted-foreground">#{index + 1}</span>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-bold text-lg hover:underline">{topic.topic}</h3>
-                              <span className="text-xl">{getTrendIcon(topic.trend)}</span>
-                              {topic.trend === 'rising' && isLive && (
-                                <span className="px-2 py-1 bg-green-500 text-white text-xs font-bold rounded animate-pulse">
-                                  TRENDING
-                                </span>
-                              )}
-                              {topic.velocity !== undefined && topic.velocity > 0 && (
-                                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
-                                  +{topic.velocity.toFixed(0)}% velocity
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground">{topic.total} mentions</p>
-                            {topic.keywords && topic.keywords.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {topic.keywords.map(kw => (
-                                  <span key={kw} className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs rounded">
-                                    {kw}
-                                  </span>
-                                ))}
-                              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Real-time analysis • {topicSentiments.length} topics tracked • Updates every 30s
+              </p>
+            </div>
+          </div>
+
+          {topicSentiments.length === 0 ? (
+            <Card>
+              <CardContent className="p-12">
+                <p className="text-muted-foreground text-center">No trending topics found in this time period</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {topicSentiments.map((topic, index) => (
+                <Card
+                  key={topic.topic}
+                  onClick={() => fetchTopicArticles(topic)}
+                  className={cn(
+                    "cursor-pointer hover:shadow-lg transition-all group",
+                    topic.trend === 'rising' && 'border-green-500 bg-green-50 dark:bg-green-950/20'
+                  )}
+                >
+                  <CardContent className="p-6">
+                    {/* Header with Rank and Sentiment */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold">
+                          #{index + 1}
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-lg group-hover:text-primary transition-colors">
+                            {topic.topic}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="text-sm text-muted-foreground">{topic.total} mentions</span>
+                            {topic.trend === 'rising' && (
+                              <span className="px-2 py-0.5 bg-green-500 text-white text-xs font-bold rounded animate-pulse">
+                                🔥 TRENDING
+                              </span>
+                            )}
+                            {topic.velocity !== undefined && topic.velocity > 0 && (
+                              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-semibold rounded">
+                                +{topic.velocity.toFixed(0)}%
+                              </span>
                             )}
                           </div>
                         </div>
-                        <div className={`text-right ${getSentimentColor(topic.avgSentiment)}`}>
-                          <div className="text-2xl font-bold">{(topic.avgSentiment * 100).toFixed(0)}%</div>
-                          <p className="text-xs">sentiment</p>
-                        </div>
                       </div>
 
-                      {/* Sentiment breakdown bar */}
-                      <div className="flex gap-1 h-8 rounded overflow-hidden">
+                      {/* Large Sentiment Score */}
+                      <div className="text-right">
+                        <div className={cn(
+                          "text-3xl font-bold",
+                          topic.avgSentiment > 0.6
+                            ? 'text-green-600 dark:text-green-400'
+                            : topic.avgSentiment < 0.4
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-gray-600 dark:text-gray-400'
+                        )}>
+                          {(topic.avgSentiment * 100).toFixed(0)}%
+                        </div>
+                        <p className="text-xs text-muted-foreground">sentiment</p>
+                      </div>
+                    </div>
+
+                    {/* Keywords */}
+                    {topic.keywords && topic.keywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-4">
+                        {topic.keywords.map(kw => (
+                          <span key={kw} className="px-2 py-1 bg-muted text-muted-foreground text-xs rounded-full">
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Visual Sentiment Bar */}
+                    <div className="space-y-2">
+                      <div className="flex gap-1 h-6 rounded-full overflow-hidden">
                         {topic.positive > 0 && (
                           <div
-                            className="bg-green-500 flex items-center justify-center text-white text-xs font-medium"
+                            className="bg-green-500 flex items-center justify-center text-white text-xs font-medium transition-all"
                             style={{ width: `${(topic.positive / topic.total) * 100}%` }}
                           >
-                            {topic.positive}
+                            {((topic.positive / topic.total) * 100) > 15 && topic.positive}
                           </div>
                         )}
                         {topic.neutral > 0 && (
                           <div
-                            className="bg-gray-400 flex items-center justify-center text-white text-xs font-medium"
+                            className="bg-gray-400 flex items-center justify-center text-white text-xs font-medium transition-all"
                             style={{ width: `${(topic.neutral / topic.total) * 100}%` }}
                           >
-                            {topic.neutral}
+                            {((topic.neutral / topic.total) * 100) > 15 && topic.neutral}
                           </div>
                         )}
                         {topic.negative > 0 && (
                           <div
-                            className="bg-red-500 flex items-center justify-center text-white text-xs font-medium"
+                            className="bg-red-500 flex items-center justify-center text-white text-xs font-medium transition-all"
                             style={{ width: `${(topic.negative / topic.total) * 100}%` }}
                           >
-                            {topic.negative}
+                            {((topic.negative / topic.total) * 100) > 15 && topic.negative}
                           </div>
                         )}
                       </div>
 
-                      <div className="flex gap-4 mt-2 text-xs">
-                        <span className="text-green-600">✓ {topic.positive} positive</span>
-                        <span className="text-gray-600">● {topic.neutral} neutral</span>
-                        <span className="text-red-600">✗ {topic.negative} negative</span>
+                      {/* Sentiment Breakdown */}
+                      <div className="flex justify-between text-xs">
+                        <span className="text-green-600 dark:text-green-400 font-medium">
+                          {topic.positive} positive
+                        </span>
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">
+                          {topic.neutral} neutral
+                        </span>
+                        <span className="text-red-600 dark:text-red-400 font-medium">
+                          {topic.negative} negative
+                        </span>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         {/* SENTIMENT TIMELINE */}
