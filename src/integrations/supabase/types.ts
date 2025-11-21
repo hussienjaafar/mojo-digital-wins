@@ -625,6 +625,78 @@ export type Database = {
         }
         Relationships: []
       }
+      bluesky_posts: {
+        Row: {
+          ai_processed: boolean | null
+          ai_processed_at: string | null
+          ai_relevance_score: number | null
+          ai_sentiment: number | null
+          ai_sentiment_label: string | null
+          ai_topics: string[] | null
+          author_did: string
+          author_handle: string | null
+          created_at: string
+          embed_type: string | null
+          hashtags: string[] | null
+          id: string
+          indexed_at: string | null
+          langs: string[] | null
+          mentions: string[] | null
+          post_cid: string | null
+          post_uri: string
+          quote_of: string | null
+          reply_to: string | null
+          text: string | null
+          urls: string[] | null
+        }
+        Insert: {
+          ai_processed?: boolean | null
+          ai_processed_at?: string | null
+          ai_relevance_score?: number | null
+          ai_sentiment?: number | null
+          ai_sentiment_label?: string | null
+          ai_topics?: string[] | null
+          author_did: string
+          author_handle?: string | null
+          created_at: string
+          embed_type?: string | null
+          hashtags?: string[] | null
+          id?: string
+          indexed_at?: string | null
+          langs?: string[] | null
+          mentions?: string[] | null
+          post_cid?: string | null
+          post_uri: string
+          quote_of?: string | null
+          reply_to?: string | null
+          text?: string | null
+          urls?: string[] | null
+        }
+        Update: {
+          ai_processed?: boolean | null
+          ai_processed_at?: string | null
+          ai_relevance_score?: number | null
+          ai_sentiment?: number | null
+          ai_sentiment_label?: string | null
+          ai_topics?: string[] | null
+          author_did?: string
+          author_handle?: string | null
+          created_at?: string
+          embed_type?: string | null
+          hashtags?: string[] | null
+          id?: string
+          indexed_at?: string | null
+          langs?: string[] | null
+          mentions?: string[] | null
+          post_cid?: string | null
+          post_uri?: string
+          quote_of?: string | null
+          reply_to?: string | null
+          text?: string | null
+          urls?: string[] | null
+        }
+        Relationships: []
+      }
       breaking_news_clusters: {
         Row: {
           article_ids: string[] | null
