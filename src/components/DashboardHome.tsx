@@ -14,7 +14,10 @@ import {
   Activity,
   ArrowUpRight,
   ArrowDownRight,
-  Plus
+  Plus,
+  LayoutDashboard,
+  Target,
+  Sparkles
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
@@ -222,17 +225,19 @@ export function DashboardHome() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 md:space-y-8">
-      {/* Welcome Section with Date Filter - Mobile Optimized */}
-      <div className="flex flex-col gap-4">
-        {/* Title Section */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight truncate">
+    <div className="space-y-6">
+      {/* Header Section - Matches DailyBriefing Style */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+            <LayoutDashboard className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
               Dashboard Overview
-            </h2>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2 hidden sm:block">
-              Monitor your organization's performance and key metrics
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Monitor performance and key metrics across all organizations
             </p>
           </div>
           {/* Demo Button - Desktop Only */}
@@ -243,137 +248,171 @@ export function DashboardHome() {
               size="sm"
               className="shrink-0"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Sparkles className="h-4 w-4 mr-2" />
               View Demo
             </Button>
           )}
         </div>
 
-        {/* Date Range Selector - Full Width on Mobile */}
-        <div className="w-full">
-          <DateRangeSelector
-            startDate={startDate}
-            endDate={endDate}
-            onDateChange={handleDateChange}
-          />
-        </div>
+        {/* Date Range Selector */}
+        <DateRangeSelector
+          startDate={startDate}
+          endDate={endDate}
+          onDateChange={handleDateChange}
+        />
       </div>
 
-      {/* Key Metrics Grid - Mobile Optimized */}
-      <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
-            <p className="text-xs text-muted-foreground flex items-center mt-1">
+      {/* Key Metrics Grid - Redesigned with Semantic Colors */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Revenue - Green */}
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950">
+                <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
               {stats.revenueChange > 0 ? (
-                <>
-                  <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
-                  <span className="text-green-500">+{stats.revenueChange}%</span>
-                </>
+                <div className="flex items-center text-xs font-medium text-green-600 dark:text-green-400">
+                  <ArrowUpRight className="h-3 w-3 mr-1" />
+                  +{stats.revenueChange}%
+                </div>
               ) : (
-                <>
-                  <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
-                  <span className="text-red-500">{stats.revenueChange}%</span>
-                </>
+                <div className="flex items-center text-xs font-medium text-red-600 dark:text-red-400">
+                  <ArrowDownRight className="h-3 w-3 mr-1" />
+                  {stats.revenueChange}%
+                </div>
               )}
-              <span className="ml-1">from last month</span>
-            </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+              <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                {formatCurrency(stats.totalRevenue)}
+              </div>
+              <p className="text-xs text-muted-foreground">from last month</p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Clients</CardTitle>
-            <Building2 className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.activeClients}</div>
-            <p className="text-xs text-muted-foreground flex items-center mt-1">
-              <span className="text-muted-foreground">of {stats.totalClients} total</span>
+        {/* Active Clients - Blue */}
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+                <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
               {stats.clientChange > 0 && (
-                <>
-                  <ArrowUpRight className="h-3 w-3 text-green-500 ml-2 mr-1" />
-                  <span className="text-green-500">+{stats.clientChange}%</span>
-                </>
+                <div className="flex items-center text-xs font-medium text-green-600 dark:text-green-400">
+                  <ArrowUpRight className="h-3 w-3 mr-1" />
+                  +{stats.clientChange}%
+                </div>
               )}
-            </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Active Clients</p>
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                {stats.activeClients}
+              </div>
+              <p className="text-xs text-muted-foreground">of {stats.totalClients} total</p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average ROI</CardTitle>
-            <TrendingUp className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.avgROI.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Return on investment
-            </p>
+        {/* Average ROI - Purple */}
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+                <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Average ROI</p>
+              <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                {stats.avgROI.toFixed(1)}%
+              </div>
+              <p className="text-xs text-muted-foreground">Return on investment</p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Donations</CardTitle>
-            <Activity className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(stats.totalDonations)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Across all campaigns
-            </p>
+        {/* Total Donations - Orange */}
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
+                <Users className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Total Donations</p>
+              <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+                {formatNumber(stats.totalDonations)}
+              </div>
+              <p className="text-xs text-muted-foreground">Across all campaigns</p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Demo Organization Card - Mobile Optimized */}
-      <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-        <CardHeader className="pb-3 sm:pb-6">
-          <CardTitle className="text-lg sm:text-xl md:text-2xl flex items-center gap-2">
-            🎯 Demo Organization
-          </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">
-            Explore sample data with the Progressive Victory Fund organization
-          </CardDescription>
+      {/* Demo Organization Card - Redesigned */}
+      <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-800">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+              <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div>
+              <CardTitle className="text-xl">Demo Organization</CardTitle>
+              <CardDescription className="text-sm">
+                Progressive Victory Fund • Sample Data
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-3 sm:space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <div className="p-3 sm:p-4 bg-background rounded-lg border">
-              <div className="text-xs sm:text-sm text-muted-foreground">Total Funds Raised</div>
-              <div className="text-xl sm:text-2xl font-bold text-primary">$245,750</div>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 bg-background rounded-lg border space-y-1">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <div className="text-xs font-medium text-muted-foreground">Funds Raised</div>
+              </div>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">$245,750</div>
             </div>
-            <div className="p-3 sm:p-4 bg-background rounded-lg border">
-              <div className="text-xs sm:text-sm text-muted-foreground">Ad Spend</div>
-              <div className="text-xl sm:text-2xl font-bold text-primary">$18,500</div>
+            <div className="p-4 bg-background rounded-lg border space-y-1">
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <div className="text-xs font-medium text-muted-foreground">Ad Spend</div>
+              </div>
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">$18,500</div>
             </div>
-            <div className="p-3 sm:p-4 bg-background rounded-lg border">
-              <div className="text-xs sm:text-sm text-muted-foreground">ROI</div>
-              <div className="text-xl sm:text-2xl font-bold text-primary">1,228%</div>
+            <div className="p-4 bg-background rounded-lg border space-y-1">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <div className="text-xs font-medium text-muted-foreground">ROI</div>
+              </div>
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">1,228%</div>
             </div>
           </div>
           <Button
             onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')}
             className="w-full min-h-[44px]"
-            size={isMobile ? "default" : "lg"}
+            size="lg"
           >
             View Full Dashboard →
           </Button>
         </CardContent>
       </Card>
 
-      {/* Quick Actions - Mobile Optimized */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/admin')}>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              Manage Clients
-            </CardTitle>
+      {/* Quick Actions - Redesigned */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+        <Card className="hover:shadow-md transition-all hover:border-blue-200 dark:hover:border-blue-800 cursor-pointer" onClick={() => navigate('/admin')}>
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+                <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <CardTitle className="text-lg">Manage Clients</CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -382,12 +421,14 @@ export function DashboardHome() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              View Reports
-            </CardTitle>
+        <Card className="hover:shadow-md transition-all hover:border-purple-200 dark:hover:border-purple-800 cursor-pointer">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+                <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <CardTitle className="text-lg">View Reports</CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -396,12 +437,14 @@ export function DashboardHome() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              Monitor Campaigns
-            </CardTitle>
+        <Card className="hover:shadow-md transition-all hover:border-orange-200 dark:hover:border-orange-800 cursor-pointer">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
+                <Activity className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <CardTitle className="text-lg">Monitor Campaigns</CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -411,13 +454,18 @@ export function DashboardHome() {
         </Card>
       </div>
 
-      {/* Charts Section - Mobile Optimized */}
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
+      {/* Charts Section - Redesigned */}
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
         {/* Revenue Trends Chart */}
         <Card>
-          <CardHeader className="pb-3 sm:pb-4">
-            <CardTitle className="text-base sm:text-lg">Revenue & Spend Trends</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950">
+                <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+              </div>
+              <CardTitle className="text-lg">Revenue & Spend Trends</CardTitle>
+            </div>
+            <CardDescription className="text-sm">
               {format(new Date(startDate), 'MMM dd, yyyy')} - {format(new Date(endDate), 'MMM dd, yyyy')}
             </CardDescription>
           </CardHeader>
@@ -477,9 +525,14 @@ export function DashboardHome() {
 
         {/* ROI Over Time Chart */}
         <Card>
-          <CardHeader className="pb-3 sm:pb-4">
-            <CardTitle className="text-base sm:text-lg">ROI Trend</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+                <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              </div>
+              <CardTitle className="text-lg">ROI Trend</CardTitle>
+            </div>
+            <CardDescription className="text-sm">
               Return on investment: {format(new Date(startDate), 'MMM dd')} - {format(new Date(endDate), 'MMM dd')}
             </CardDescription>
           </CardHeader>
@@ -521,9 +574,14 @@ export function DashboardHome() {
 
         {/* Campaign Performance Bar Chart */}
         <Card>
-          <CardHeader className="pb-3 sm:pb-4">
-            <CardTitle className="text-base sm:text-lg">Top Campaigns</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+                <BarChart3 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <CardTitle className="text-lg">Top Campaigns</CardTitle>
+            </div>
+            <CardDescription className="text-sm">
               Top performing campaigns in selected period
             </CardDescription>
           </CardHeader>
@@ -562,9 +620,14 @@ export function DashboardHome() {
 
         {/* Donations Trend Chart */}
         <Card>
-          <CardHeader className="pb-3 sm:pb-4">
-            <CardTitle className="text-base sm:text-lg">Donations Trend</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
+                <Users className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+              </div>
+              <CardTitle className="text-lg">Donations Trend</CardTitle>
+            </div>
+            <CardDescription className="text-sm">
               Donations: {format(new Date(startDate), 'MMM dd')} - {format(new Date(endDate), 'MMM dd')}
             </CardDescription>
           </CardHeader>
@@ -610,42 +673,52 @@ export function DashboardHome() {
         </Card>
       </div>
 
-      {/* Financial Overview - Mobile Optimized */}
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
+      {/* Financial Overview - Redesigned */}
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Spending Overview</CardTitle>
-            <CardDescription>Total advertising and SMS costs</CardDescription>
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950">
+                <Target className="h-4 w-4 text-red-600 dark:text-red-400" />
+              </div>
+              <CardTitle className="text-lg">Spending Overview</CardTitle>
+            </div>
+            <CardDescription className="text-sm">Total advertising and SMS costs</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Total Spend</span>
-                <span className="text-2xl font-bold">{formatCurrency(stats.totalSpend)}</span>
+                <span className="text-sm font-medium text-muted-foreground">Total Spend</span>
+                <span className="text-3xl font-bold text-red-600 dark:text-red-400">{formatCurrency(stats.totalSpend)}</span>
               </div>
-              <div className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Combined advertising and SMS campaign costs across all clients
-              </div>
+              </p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Performance Metrics</CardTitle>
-            <CardDescription>Key performance indicators</CardDescription>
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950">
+                <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+              </div>
+              <CardTitle className="text-lg">Performance Metrics</CardTitle>
+            </div>
+            <CardDescription className="text-sm">Key performance indicators</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Profit</span>
-                <span className="text-2xl font-bold text-green-600">
+                <span className="text-sm font-medium text-muted-foreground">Net Profit</span>
+                <span className="text-3xl font-bold text-green-600 dark:text-green-400">
                   {formatCurrency(stats.totalRevenue - stats.totalSpend)}
                 </span>
               </div>
-              <div className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Net revenue after all campaign costs
-              </div>
+              </p>
             </div>
           </CardContent>
         </Card>
