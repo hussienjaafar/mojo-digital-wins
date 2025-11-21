@@ -68,7 +68,6 @@ const Admin = () => {
     localStorage.setItem('admin-sidebar-open', JSON.stringify(open));
   };
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
