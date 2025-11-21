@@ -381,6 +381,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           duplicate_of: string | null
+          geographic_scope: string | null
           hash_signature: string | null
           id: string
           image_url: string | null
@@ -406,6 +407,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           duplicate_of?: string | null
+          geographic_scope?: string | null
           hash_signature?: string | null
           id?: string
           image_url?: string | null
@@ -431,6 +433,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           duplicate_of?: string | null
+          geographic_scope?: string | null
           hash_signature?: string | null
           id?: string
           image_url?: string | null
@@ -1829,6 +1832,7 @@ export type Database = {
           category: string
           created_at: string | null
           fetch_error: string | null
+          geographic_scope: string | null
           id: string
           is_active: boolean | null
           last_fetched_at: string | null
@@ -1841,6 +1845,7 @@ export type Database = {
           category: string
           created_at?: string | null
           fetch_error?: string | null
+          geographic_scope?: string | null
           id?: string
           is_active?: boolean | null
           last_fetched_at?: string | null
@@ -1853,6 +1858,7 @@ export type Database = {
           category?: string
           created_at?: string | null
           fetch_error?: string | null
+          geographic_scope?: string | null
           id?: string
           is_active?: boolean | null
           last_fetched_at?: string | null
