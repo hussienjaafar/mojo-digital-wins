@@ -62,6 +62,8 @@ export default function Analytics() {
   const [error, setError] = useState<{ message: string; type: string; retryable: boolean } | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [retryCount, setRetryCount] = useState(0);
+  const [nextRefreshIn, setNextRefreshIn] = useState<number>(120); // Seconds until next refresh
+  const [timeAgo, setTimeAgo] = useState<string>("just now");
   const [blueskyTrends, setBlueskyTrends] = useState<any[]>([]);
   const [socialMetrics, setSocialMetrics] = useState({
     totalPosts: 0,
@@ -206,6 +208,38 @@ export default function Analytics() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Update "time ago" and countdown timer every second
+  useEffect(() => {
+    const updateTimers = () => {
+      // Calculate time ago
+      const now = new Date();
+      const secondsAgo = Math.floor((now.getTime() - lastUpdated.getTime()) / 1000);
+
+      if (secondsAgo < 60) {
+        setTimeAgo("just now");
+      } else if (secondsAgo < 3600) {
+        const minutes = Math.floor(secondsAgo / 60);
+        setTimeAgo(`${minutes}m ago`);
+      } else {
+        const hours = Math.floor(secondsAgo / 3600);
+        setTimeAgo(`${hours}h ago`);
+      }
+
+      // Calculate next refresh countdown (2 minute cycle)
+      const secondsSinceUpdate = Math.floor((now.getTime() - lastUpdated.getTime()) / 1000);
+      const nextRefresh = Math.max(0, 120 - secondsSinceUpdate);
+      setNextRefreshIn(nextRefresh);
+    };
+
+    // Update immediately
+    updateTimers();
+
+    // Update every second
+    const timer = setInterval(updateTimers, 1000);
+
+    return () => clearInterval(timer);
+  }, [lastUpdated]);
 
   // Real-time subscription for new articles
   useEffect(() => {
@@ -907,9 +941,24 @@ export default function Analytics() {
                   </div>
                 )}
               </div>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">
-                {isLive ? 'Auto-updates in background • Fresh data on every login • Live updates when open' : 'Real-time overview of news, politics, and emerging threats'}
-              </p>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1 text-xs sm:text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                  Updated {timeAgo}
+                </span>
+                {!loading && nextRefreshIn > 0 && (
+                  <span className="flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" />
+                    Next refresh in {Math.floor(nextRefreshIn / 60)}:{String(nextRefreshIn % 60).padStart(2, '0')}
+                  </span>
+                )}
+                {loading && (
+                  <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    Updating...
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
