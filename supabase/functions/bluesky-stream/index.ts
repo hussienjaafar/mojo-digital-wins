@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { inflate } from "https://deno.land/x/denoflate@1.2.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,21 +14,24 @@ const TRACKED_KEYWORDS = [
   'palestine', 'gaza', 'west bank', 'middle east'
 ];
 
-interface BlueSkyPost {
-  uri: string;
-  cid: string;
-  author: {
-    did: string;
-    handle: string;
-  };
-  record: {
-    text: string;
-    createdAt: string;
-    langs?: string[];
-    reply?: {
-      parent: { uri: string };
+interface JetStreamEvent {
+  did: string;
+  time_us: number;
+  kind: string;
+  commit?: {
+    rev: string;
+    operation: string;
+    collection: string;
+    rkey: string;
+    record: {
+      $type: string;
+      text: string;
+      createdAt: string;
+      langs?: string[];
+      reply?: { parent: { uri: string } };
+      embed?: any;
     };
-    embed?: any;
+    cid: string;
   };
 }
 
@@ -68,148 +70,164 @@ function calculateRelevance(text: string): number {
   return Math.min(score, 1.0); // Cap at 1.0
 }
 
-// Main stream processor
-async function processBlueskyStream() {
+// Cursor-based stream processor with timeout
+async function processBlueskyStreamWithCursor(durationMs: number = 45000) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  console.log('🔵 Connecting to Bluesky JetStream...');
+  console.log('🔵 Starting cursor-based JetStream collection...');
 
-  // Connect to JetStream WebSocket
-  const ws = new WebSocket(
-    'wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post'
-  );
+  // Get last cursor position
+  const { data: cursorData, error: cursorError } = await supabase
+    .from('bluesky_stream_cursor')
+    .select('last_cursor')
+    .eq('id', 1)
+    .single();
 
-  let postCount = 0;
-  let relevantCount = 0;
-  let batchSize = 0;
-  let postsBuffer: any[] = [];
-  const BATCH_INSERT_SIZE = 10; // Insert in batches of 10
+  if (cursorError) {
+    console.error('❌ Error reading cursor:', cursorError);
+    throw cursorError;
+  }
 
-  ws.onopen = () => {
-    console.log('✅ Connected to JetStream');
-  };
+  const lastCursor = cursorData.last_cursor;
+  console.log(`📍 Resuming from cursor: ${lastCursor}`);
 
-  ws.onmessage = async (event) => {
-    try {
-      let data;
-      
-      // Handle both text and binary (compressed) data
-      if (typeof event.data === 'string') {
-        data = JSON.parse(event.data);
-      } else if (event.data instanceof Blob) {
-        // Bluesky sends zlib-compressed JSON
-        const arrayBuffer = await event.data.arrayBuffer();
-        const compressed = new Uint8Array(arrayBuffer);
-        const decompressed = inflate(compressed);
-        const text = new TextDecoder().decode(decompressed);
-        data = JSON.parse(text);
-      } else {
-        console.error('Unknown data type:', typeof event.data);
-        return;
+  // Build WebSocket URL with cursor (rewind 5 seconds for safety)
+  const cursorWithBuffer = lastCursor - (5 * 1000000); // Subtract 5 seconds in microseconds
+  const wsUrl = `wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post&cursor=${cursorWithBuffer}`;
+
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl);
+
+    let postCount = 0;
+    let relevantCount = 0;
+    let postsBuffer: any[] = [];
+    let latestCursor = lastCursor;
+    const BATCH_SIZE = 10;
+
+    // Set timeout to stop collection before edge function times out
+    const timeout = setTimeout(async () => {
+      console.log(`⏱️ Reached ${durationMs}ms limit, stopping collection...`);
+
+      // Flush remaining posts
+      if (postsBuffer.length > 0) {
+        await supabase.from('bluesky_posts').insert(postsBuffer);
+        console.log(`✅ Flushed final batch of ${postsBuffer.length} posts`);
       }
 
-      // Only process commit events for posts
-      if (data.kind !== 'commit' || !data.commit?.record) {
-        return;
-      }
+      // Update cursor position
+      await supabase
+        .from('bluesky_stream_cursor')
+        .update({
+          last_cursor: latestCursor,
+          last_updated_at: new Date().toISOString(),
+          posts_collected: relevantCount
+        })
+        .eq('id', 1);
 
-      const post = data.commit as BlueSkyPost;
-      const record = post.record;
+      ws.close();
 
-      if (!record.text) return;
+      resolve({
+        success: true,
+        postsCollected: relevantCount,
+        totalProcessed: postCount,
+        lastCursor: latestCursor,
+        durationMs
+      });
+    }, durationMs);
 
-      postCount++;
+    ws.onopen = () => {
+      console.log('✅ Connected to JetStream');
+    };
 
-      // Calculate relevance
-      const relevanceScore = calculateRelevance(record.text);
+    ws.onmessage = async (event) => {
+      try {
+        const data: JetStreamEvent = JSON.parse(event.data);
 
-      // Only store posts with some relevance (>0.1) to save space
-      if (relevanceScore < 0.1) {
-        return;
-      }
-
-      relevantCount++;
-
-      // Extract structured data
-      const hashtags = extractHashtags(record.text);
-      const mentions = extractMentions(record.text);
-      const urls = extractUrls(record.text);
-
-      // Prepare post data
-      const postData = {
-        post_uri: post.uri,
-        post_cid: post.cid,
-        author_did: post.author.did,
-        author_handle: post.author.handle,
-        text: record.text,
-        hashtags,
-        mentions,
-        urls,
-        reply_to: record.reply?.parent?.uri || null,
-        langs: record.langs || [],
-        created_at: record.createdAt,
-        ai_relevance_score: relevanceScore,
-        ai_processed: false
-      };
-
-      // Add to buffer
-      postsBuffer.push(postData);
-      batchSize++;
-
-      // Insert in batches
-      if (batchSize >= BATCH_INSERT_SIZE) {
-        const { error } = await supabase
-          .from('bluesky_posts')
-          .insert(postsBuffer);
-
-        if (error && !error.message?.includes('duplicate key')) {
-          console.error('❌ Error inserting posts:', error);
-        } else {
-          console.log(`✅ Inserted batch of ${batchSize} posts (${relevantCount}/${postCount} relevant)`);
+        // Update cursor
+        if (data.time_us) {
+          latestCursor = data.time_us;
         }
 
-        postsBuffer = [];
-        batchSize = 0;
+        // Only process commit events for posts
+        if (data.kind !== 'commit' || !data.commit?.record?.text) {
+          return;
+        }
+
+        postCount++;
+
+        const record = data.commit.record;
+        const text = record.text;
+
+        // Calculate relevance
+        const relevanceScore = calculateRelevance(text);
+
+        // Only store posts with relevance >0.1
+        if (relevanceScore < 0.1) {
+          return;
+        }
+
+        relevantCount++;
+
+        // Extract structured data
+        const hashtags = extractHashtags(text);
+        const mentions = extractMentions(text);
+        const urls = extractUrls(text);
+
+        // Build post URI
+        const postUri = `at://${data.did}/${data.commit.collection}/${data.commit.rkey}`;
+
+        // Prepare post data
+        const postData = {
+          post_uri: postUri,
+          post_cid: data.commit.cid,
+          author_did: data.did,
+          author_handle: data.did, // Will be resolved later if needed
+          text,
+          hashtags,
+          mentions,
+          urls,
+          reply_to: record.reply?.parent?.uri || null,
+          langs: record.langs || [],
+          created_at: record.createdAt,
+          ai_relevance_score: relevanceScore,
+          ai_processed: false
+        };
+
+        postsBuffer.push(postData);
+
+        // Insert in batches
+        if (postsBuffer.length >= BATCH_SIZE) {
+          const { error } = await supabase
+            .from('bluesky_posts')
+            .insert(postsBuffer);
+
+          if (error && !error.message?.includes('duplicate key')) {
+            console.error('❌ Error inserting batch:', error.message);
+          } else {
+            console.log(`✅ Inserted batch: ${postsBuffer.length} posts (${relevantCount}/${postCount} relevant, cursor: ${latestCursor})`);
+          }
+
+          postsBuffer = [];
+        }
+
+      } catch (err: any) {
+        console.error('❌ Error processing message:', err.message);
       }
+    };
 
-      // Log progress every 100 posts
-      if (postCount % 100 === 0) {
-        console.log(`📊 Processed ${postCount} posts, ${relevantCount} relevant (${((relevantCount/postCount)*100).toFixed(1)}%)`);
-      }
+    ws.onerror = (error) => {
+      console.error('❌ WebSocket error:', error);
+      clearTimeout(timeout);
+      reject(error);
+    };
 
-    } catch (err: any) {
-      console.error('❌ Error processing message:', err.message);
-    }
-  };
-
-  ws.onerror = (error) => {
-    console.error('❌ WebSocket error:', error);
-  };
-
-  ws.onclose = () => {
-    console.log('🔴 JetStream connection closed, reconnecting in 5 seconds...');
-    setTimeout(() => processBlueskyStream(), 5000);
-  };
-
-  // Flush buffer periodically (every 30 seconds)
-  setInterval(async () => {
-    if (postsBuffer.length > 0) {
-      const { error } = await supabase
-        .from('bluesky_posts')
-        .insert(postsBuffer);
-
-      if (error && !error.message?.includes('duplicate key')) {
-        console.error('❌ Error flushing buffer:', error);
-      } else {
-        console.log(`✅ Flushed ${postsBuffer.length} posts from buffer`);
-      }
-
-      postsBuffer = [];
-      batchSize = 0;
-    }
-  }, 30000);
+    ws.onclose = () => {
+      console.log('🔴 WebSocket closed');
+      clearTimeout(timeout);
+    };
+  });
 }
 
 serve(async (req) => {
@@ -218,28 +236,33 @@ serve(async (req) => {
   }
 
   try {
-    const { action } = await req.json().catch(() => ({ action: 'start' }));
+    const body = await req.json().catch(() => ({}));
+    const durationMs = body.durationMs || 45000; // Default 45 seconds
 
-    if (action === 'start') {
-      // Start the stream processor (runs indefinitely)
-      processBlueskyStream();
+    console.log(`🚀 Starting ${durationMs}ms collection session...`);
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Bluesky stream processor started'
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const result = await processBlueskyStreamWithCursor(durationMs);
+
+    console.log(`✅ Collection complete: ${result.postsCollected} posts collected`);
 
     return new Response(
-      JSON.stringify({ error: 'Unknown action' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify(result),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
     console.error('Error in bluesky-stream:', error);
+
+    // Store error in cursor table
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    await supabase
+      .from('bluesky_stream_cursor')
+      .update({ last_error: error?.message || 'Unknown error' })
+      .eq('id', 1);
+
     return new Response(
       JSON.stringify({ error: error?.message || 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

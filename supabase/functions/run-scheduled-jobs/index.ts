@@ -168,12 +168,16 @@ serve(async (req) => {
             itemsCreated = result?.correlationsCreated || 0;
             break;
 
-          case 'bluesky_stream_keepalive':
-            // Bluesky stream is a WebSocket connection that should stay running
-            // This job just checks if it's running and logs status
-            console.log('Bluesky stream keepalive check - stream should be running continuously');
-            result = { status: 'Stream should be deployed and running continuously' };
-            itemsProcessed = 1;
+          case 'collect_bluesky':
+          case 'bluesky_stream_keepalive': // Legacy name, same behavior
+            // Cursor-based JetStream polling (runs for 45 seconds, resumes from last cursor)
+            const blueskyResponse = await supabase.functions.invoke('bluesky-stream', {
+              body: { durationMs: 45000 }
+            });
+            if (blueskyResponse.error) throw new Error(blueskyResponse.error.message);
+            result = blueskyResponse.data;
+            itemsProcessed = result?.postsCollected || 0;
+            itemsCreated = result?.postsCollected || 0;
             break;
 
           default:
