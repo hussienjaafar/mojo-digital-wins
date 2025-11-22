@@ -43,6 +43,7 @@ serve(async (req) => {
     const { data: articles, error: fetchError } = await supabase
       .from('articles')
       .select('id, title, description, content, source_name, published_date, sentiment_label, sentiment_score')
+      .eq('topics_extracted', false)
       .gte('published_date', cutoffTime)
       .order('published_date', { ascending: false })
       .limit(50);
@@ -50,14 +51,14 @@ serve(async (req) => {
     if (fetchError) throw fetchError;
 
     if (!articles || articles.length === 0) {
-      console.log('No recent articles to analyze');
+      console.log('No new articles to analyze');
       return new Response(
-        JSON.stringify({ message: 'No articles found', topicCount: 0 }),
+        JSON.stringify({ message: 'No new articles found', topicCount: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`📰 Analyzing ${articles.length} articles from last ${hoursBack} hour(s)`);
+    console.log(`📰 Analyzing ${articles.length} NEW articles (never analyzed before) from last ${hoursBack} hour(s)`);
 
     // ====================================================================
     // 2. USE AI TO EXTRACT TOPICS FROM ARTICLE CONTENT
@@ -298,6 +299,28 @@ Return JSON array:
               extracted.keywords.forEach(kw => topicData.keywords.add(kw));
             }
           }
+        }
+
+        // Mark articles in this batch as analyzed with their extracted topics
+        const articleUpdates = batch.map(article => ({
+          id: article.id,
+          topics_extracted: true,
+          topics_extracted_at: new Date().toISOString(),
+          extracted_topics: extractedTopics.filter(topic => {
+            const articleText = `${article.title} ${article.description || ''}`.toLowerCase();
+            return topic.keywords.some(kw => articleText.includes(kw.toLowerCase()));
+          })
+        }));
+
+        for (const update of articleUpdates) {
+          await supabase
+            .from('articles')
+            .update({
+              topics_extracted: update.topics_extracted,
+              topics_extracted_at: update.topics_extracted_at,
+              extracted_topics: update.extracted_topics
+            })
+            .eq('id', update.id);
         }
 
         // Small delay to avoid rate limiting
