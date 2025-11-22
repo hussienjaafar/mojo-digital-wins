@@ -211,7 +211,10 @@ export default function Analytics() {
       }
 
       // Calculate core metrics
-      const avgSentiment = articles.reduce((sum, a) => sum + (a.sentiment_score || 0.5), 0) / (articles.length || 1);
+      const articlesWithSentiment = articles.filter(a => a.sentiment_score !== null && a.sentiment_score !== undefined);
+      const avgSentiment = articlesWithSentiment.length > 0
+        ? articlesWithSentiment.reduce((sum, a) => sum + a.sentiment_score, 0) / articlesWithSentiment.length
+        : 0; // 0 means "no data" - will show as N/A in UI
       const criticalThreats = articles.filter(a => a.threat_level === 'critical' || a.threat_level === 'high').length;
 
       setMetrics({
@@ -228,6 +231,7 @@ export default function Analytics() {
         neutral: number;
         negative: number;
         avgSentiment: number;
+        sentimentCount: number; // Track mentions with valid sentiment for weighted average
         velocity: number;
         momentum: number;
         sampleTitles: Set<string>;
@@ -245,6 +249,7 @@ export default function Analytics() {
             neutral: 0,
             negative: 0,
             avgSentiment: 0,
+            sentimentCount: 0,
             velocity: 0,
             momentum: 0,
             sampleTitles: new Set(),
@@ -257,7 +262,14 @@ export default function Analytics() {
         agg.positive += topicRecord.positive_count || 0;
         agg.neutral += topicRecord.neutral_count || 0;
         agg.negative += topicRecord.negative_count || 0;
-        agg.avgSentiment += (topicRecord.avg_sentiment_score || 0.5) * (topicRecord.mention_count || 1);
+
+        // Only include sentiment if valid (not null/undefined)
+        if (topicRecord.avg_sentiment_score !== null && topicRecord.avg_sentiment_score !== undefined) {
+          const mentions = topicRecord.mention_count || 1;
+          agg.avgSentiment += topicRecord.avg_sentiment_score * mentions;
+          agg.sentimentCount += mentions;
+        }
+
         agg.velocity = Math.max(agg.velocity, topicRecord.velocity_score || 0);
         agg.momentum = Math.max(agg.momentum, topicRecord.momentum || 0);
 
@@ -268,7 +280,7 @@ export default function Analytics() {
       // Convert to array with calculated averages
       const topicSentimentArray: TopicSentiment[] = Array.from(topicAggregateMap.entries())
         .map(([topic, data]) => {
-          const avgSentiment = data.total > 0 ? data.avgSentiment / data.total : 0.5;
+          const avgSentiment = data.sentimentCount > 0 ? data.avgSentiment / data.sentimentCount : 0; // 0 = no sentiment data
 
           // Determine trend based on velocity and momentum
           let trend: 'rising' | 'stable' | 'falling';
@@ -319,8 +331,11 @@ export default function Analytics() {
       const dailySentiment = new Map<string, { positive: number; neutral: number; negative: number; total: number }>();
 
       articles.forEach(article => {
+        // Skip articles without sentiment labels
+        if (!article.sentiment_label) return;
+
         const date = new Date(article.published_date).toISOString().split('T')[0];
-        const sentiment = article.sentiment_label || 'neutral';
+        const sentiment = article.sentiment_label;
 
         if (!dailySentiment.has(date)) {
           dailySentiment.set(date, { positive: 0, neutral: 0, negative: 0, total: 0 });
@@ -337,7 +352,7 @@ export default function Analytics() {
           neutral: data.neutral,
           negative: data.negative,
           total: data.total,
-          avgSentiment: ((data.positive * 1 + data.neutral * 0.5 + data.negative * 0) / data.total) * 100,
+          avgSentiment: data.total > 0 ? (data.positive * 1 + data.neutral * 0.5 + data.negative * 0) / data.total : 0,
         }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -741,7 +756,7 @@ export default function Analytics() {
                   ? 'text-red-600 dark:text-red-400'
                   : 'text-gray-600 dark:text-gray-400'
               }`}>
-                {(metrics.avgSentiment * 100).toFixed(0)}%
+                {metrics.avgSentiment > 0 ? `${(metrics.avgSentiment * 100).toFixed(0)}%` : 'N/A'}
               </div>
               <p className="text-xs text-muted-foreground">Sentiment score</p>
             </div>
@@ -883,7 +898,7 @@ export default function Analytics() {
                             ? 'text-red-600 dark:text-red-400'
                             : 'text-gray-600 dark:text-gray-400'
                         )}>
-                          {(topic.avgSentiment * 100).toFixed(0)}%
+                          {topic.avgSentiment > 0 ? `${(topic.avgSentiment * 100).toFixed(0)}%` : 'N/A'}
                         </div>
                         <p className="text-xs text-muted-foreground">sentiment</p>
                       </div>
