@@ -381,6 +381,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           duplicate_of: string | null
+          extracted_topics: Json | null
           geographic_scope: string | null
           hash_signature: string | null
           id: string
@@ -397,6 +398,8 @@ export type Database = {
           tags: string[] | null
           threat_level: string | null
           title: string
+          topics_extracted: boolean | null
+          topics_extracted_at: string | null
           updated_at: string | null
         }
         Insert: {
@@ -407,6 +410,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           duplicate_of?: string | null
+          extracted_topics?: Json | null
           geographic_scope?: string | null
           hash_signature?: string | null
           id?: string
@@ -423,6 +427,8 @@ export type Database = {
           tags?: string[] | null
           threat_level?: string | null
           title: string
+          topics_extracted?: boolean | null
+          topics_extracted_at?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -433,6 +439,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           duplicate_of?: string | null
+          extracted_topics?: Json | null
           geographic_scope?: string | null
           hash_signature?: string | null
           id?: string
@@ -449,6 +456,8 @@ export type Database = {
           tags?: string[] | null
           threat_level?: string | null
           title?: string
+          topics_extracted?: boolean | null
+          topics_extracted_at?: string | null
           updated_at?: string | null
         }
         Relationships: [
