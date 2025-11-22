@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Progress } from "@/components/ui/progress";
 import { format, subDays } from "date-fns";
 import { CalendarIcon, Download, TrendingUp, TrendingDown, AlertTriangle, Newspaper, Scale, Building2, RefreshCw, Activity, ExternalLink, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,10 +51,13 @@ export default function Analytics() {
   const [entityMentions, setEntityMentions] = useState<any[]>([]);
   const [sentimentTimeline, setSentimentTimeline] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPhase, setLoadingPhase] = useState<string>("");
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const [analyzing, setAnalyzing] = useState(false);
   const isLive = true; // Always in live mode
   const [newArticleCount, setNewArticleCount] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isStale, setIsStale] = useState(false); // Data older than 3 minutes
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
   const [blueskyTrends, setBlueskyTrends] = useState<any[]>([]);
   const [socialMetrics, setSocialMetrics] = useState({
@@ -129,11 +133,23 @@ export default function Analytics() {
 
     const interval = setInterval(() => {
       console.log('Auto-refreshing analytics (live mode)');
+      setIsStale(true); // Mark as stale before refresh
       fetchAnalytics();
     }, 120000); // 2 minutes
 
     return () => clearInterval(interval);
   }, [isLive, dateRange]);
+
+  // Check for stale data (> 3 minutes old)
+  useEffect(() => {
+    const staleCheckInterval = setInterval(() => {
+      const now = new Date();
+      const minutesSinceUpdate = (now.getTime() - lastUpdated.getTime()) / 60000;
+      setIsStale(minutesSinceUpdate > 3);
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(staleCheckInterval);
+  }, [lastUpdated]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -141,9 +157,16 @@ export default function Analytics() {
 
   const fetchAnalytics = async () => {
     setLoading(true);
+    setLoadingPhase("Fetching data...");
+    setLoadingProgress(10);
     setLastUpdated(new Date());
+    setIsStale(false); // Fresh data incoming
+
     try {
       // Fetch all data in parallel for better performance
+      setLoadingPhase("Loading news & trends...");
+      setLoadingProgress(30);
+
       const [
         { data: trendingTopicsData, error: topicsError },
         { data: articles },
@@ -207,10 +230,15 @@ export default function Analytics() {
 
       if (!articles) {
         setLoading(false);
+        setLoadingPhase("");
+        setLoadingProgress(0);
         return;
       }
 
       // Calculate core metrics
+      setLoadingPhase("Analyzing sentiment...");
+      setLoadingProgress(50);
+
       const articlesWithSentiment = articles.filter(a => a.sentiment_score !== null && a.sentiment_score !== undefined);
       const avgSentiment = articlesWithSentiment.length > 0
         ? articlesWithSentiment.reduce((sum, a) => sum + a.sentiment_score, 0) / articlesWithSentiment.length
@@ -431,6 +459,9 @@ export default function Analytics() {
       setBillTopicCorrelation(correlationData);
 
       // === SET BLUESKY SOCIAL INTELLIGENCE (already fetched in parallel) ===
+      setLoadingPhase("Loading social intelligence...");
+      setLoadingProgress(85);
+
       setBlueskyTrends(blueskyData || []);
 
       setSocialMetrics({
@@ -439,11 +470,18 @@ export default function Analytics() {
         predictiveSignals: predictiveCount || 0,
       });
 
+      setLoadingPhase("Finalizing...");
+      setLoadingProgress(100);
+
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast.error('Failed to load analytics');
+      setLoadingPhase("");
+      setLoadingProgress(0);
     } finally {
       setLoading(false);
+      setLoadingPhase("");
+      setLoadingProgress(0);
     }
   };
 
@@ -594,6 +632,30 @@ export default function Analytics() {
 
   return (
     <div className="space-y-6">
+      {/* Loading Progress Bar */}
+      {loading && loadingProgress > 0 && (
+        <div className="fixed top-0 left-0 right-0 z-50">
+          <Progress value={loadingProgress} className="h-1 rounded-none" />
+          {loadingPhase && (
+            <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-4 py-2">
+              <p className="text-sm text-muted-foreground text-center animate-pulse">
+                {loadingPhase}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Stale Data Warning */}
+      {isStale && !loading && (
+        <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            Data may be stale. Refreshing automatically in the background...
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col gap-4">
         {/* Header - Matches DailyBriefing Style */}
         <div className="flex items-start justify-between gap-4">
@@ -807,14 +869,15 @@ export default function Analytics() {
           {loading ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {[...Array(6)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
+                <Card key={i} className="relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 dark:via-white/5 to-transparent animate-shimmer-slide"></div>
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3 flex-1">
-                        <div className="w-10 h-10 rounded-full bg-muted"></div>
+                        <div className="w-10 h-10 rounded-full bg-muted animate-pulse"></div>
                         <div className="flex-1 space-y-2">
-                          <div className="h-5 bg-muted rounded w-3/4"></div>
-                          <div className="h-4 bg-muted rounded w-1/2"></div>
+                          <div className="h-5 bg-muted rounded w-3/4 animate-pulse"></div>
+                          <div className="h-4 bg-muted rounded w-1/2 animate-pulse"></div>
                         </div>
                       </div>
                       <div className="w-16 h-12 bg-muted rounded"></div>

@@ -317,6 +317,20 @@ All colors MUST be HSL.
     animation: shimmer 2s linear infinite;
   }
 
+  /* Shimmer Animation for Loading Skeletons (translateX variant) */
+  @keyframes shimmer-slide {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .animate-shimmer-slide {
+    animation: shimmer-slide 2s ease-in-out infinite;
+  }
+
   .text-caption {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-normal);
