@@ -207,6 +207,39 @@ export type Database = {
           },
         ]
       }
+      ai_analysis_cache: {
+        Row: {
+          content_hash: string
+          created_at: string | null
+          hit_count: number | null
+          id: string
+          last_used_at: string | null
+          model: string
+          prompt_hash: string
+          response: Json
+        }
+        Insert: {
+          content_hash: string
+          created_at?: string | null
+          hit_count?: number | null
+          id?: string
+          last_used_at?: string | null
+          model: string
+          prompt_hash: string
+          response: Json
+        }
+        Update: {
+          content_hash?: string
+          created_at?: string | null
+          hit_count?: number | null
+          id?: string
+          last_used_at?: string | null
+          model?: string
+          prompt_hash?: string
+          response?: Json
+        }
+        Relationships: []
+      }
       alert_queue: {
         Row: {
           alert_type: string
