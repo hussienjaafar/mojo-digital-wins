@@ -6,25 +6,81 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
-// Fetch and extract article content from URL
+const VALID_GROUPS = [
+  'muslim_american', 'arab_american', 'lgbtq', 'immigrants', 'refugees',
+  'black_american', 'latino_hispanic', 'asian_american', 'indigenous',
+  'women', 'youth', 'seniors', 'disabled', 'veterans', 'workers'
+];
+
+const VALID_CATEGORIES = [
+  'civil_rights', 'immigration', 'healthcare', 'education', 'housing',
+  'employment', 'criminal_justice', 'voting_rights', 'religious_freedom',
+  'lgbtq_rights', 'foreign_policy', 'climate', 'economy', 'other'
+];
+
+const VALID_THREAT_LEVELS = ['critical', 'high', 'medium', 'low'];
+
+// Data validation function
+function validateAnalysis(analysis: any): { valid: boolean; errors: string[]; confidence: number } {
+  const errors: string[] = [];
+  let confidence = 1.0;
+
+  // Check required fields
+  if (!analysis.affected_groups || !Array.isArray(analysis.affected_groups)) {
+    errors.push('Missing or invalid affected_groups');
+    return { valid: false, errors, confidence: 0 };
+  }
+
+  if (!analysis.relevance_category) {
+    errors.push('Missing relevance_category');
+    confidence -= 0.2;
+  }
+
+  // Validate group labels
+  const invalidGroups = analysis.affected_groups.filter(
+    (g: string) => !VALID_GROUPS.includes(g)
+  );
+  if (invalidGroups.length > 0) {
+    errors.push(`Invalid groups: ${invalidGroups.join(', ')}`);
+    confidence -= 0.3;
+  }
+
+  // Validate category
+  if (analysis.relevance_category && !VALID_CATEGORIES.includes(analysis.relevance_category)) {
+    errors.push(`Invalid category: ${analysis.relevance_category}`);
+    confidence -= 0.2;
+  }
+
+  // Validate sentiment range
+  if (analysis.sentiment_score !== null && (analysis.sentiment_score < -1 || analysis.sentiment_score > 1)) {
+    errors.push('Sentiment score out of range [-1, 1]');
+    confidence -= 0.2;
+  }
+
+  // Validate threat level
+  if (analysis.threat_level && !VALID_THREAT_LEVELS.includes(analysis.threat_level)) {
+    errors.push(`Invalid threat level: ${analysis.threat_level}`);
+    confidence -= 0.1;
+  }
+
+  const valid = errors.length === 0 || confidence >= 0.5;
+  return { valid, errors, confidence: Math.max(0, confidence) };
+}
+
+// Fetch article content from URL
 async function fetchArticleContent(url: string): Promise<string> {
   try {
     const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; IntelligenceBot/1.0)',
-      },
-      signal: AbortSignal.timeout(10000), // 10 second timeout
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IntelligenceBot/1.0)' },
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) return '';
 
     const html = await response.text();
-
-    // Extract text content from HTML (simple extraction)
-    // Remove scripts, styles, and HTML tags
     let text = html
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
@@ -38,10 +94,9 @@ async function fetchArticleContent(url: string): Promise<string> {
       .replace(/\s+/g, ' ')
       .trim();
 
-    // Limit to first 3000 characters to avoid token limits
     return text.substring(0, 3000);
   } catch (error) {
-    console.error(`Error fetching article content from ${url}:`, error);
+    console.error(`Error fetching content from ${url}:`, error);
     return '';
   }
 }
@@ -52,290 +107,193 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Starting AI analysis of articles...');
-
-    const supabaseClient = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch articles that haven't been processed
-    const { data: articles, error: fetchError } = await supabaseClient
+    const { batchSize = 30 } = await req.json().catch(() => ({}));
+
+    console.log(`Starting comprehensive article analysis (batch: ${batchSize})...`);
+
+    // Fetch unanalyzed articles
+    const { data: articles, error: fetchError } = await supabase
       .from('articles')
-      .select('*')
-      .eq('processing_status', 'pending')
-      .limit(100);
+      .select('id, title, description, content, source_url, source_name, published_date')
+      .or('affected_groups.is.null,relevance_category.is.null')
+      .order('published_date', { ascending: false })
+      .limit(batchSize);
 
     if (fetchError) throw fetchError;
-
     if (!articles || articles.length === 0) {
-      console.log('No articles to process');
+      console.log('No articles to analyze');
       return new Response(
-        JSON.stringify({ message: 'No articles to process' }),
+        JSON.stringify({ success: true, analyzed: 0, message: 'No articles pending analysis' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Processing ${articles.length} articles`);
-    let processedCount = 0;
-    let duplicateCount = 0;
+    console.log(`Analyzing ${articles.length} articles...`);
+
+    let analyzed = 0;
+    let failed = 0;
+    let validationFailed = 0;
 
     for (const article of articles) {
       try {
-        // 1. Detect duplicates using hash signature
-        if (article.hash_signature) {
-          const { data: existingArticles } = await supabaseClient
-            .from('articles')
-            .select('id, created_at')
-            .eq('hash_signature', article.hash_signature)
-            .neq('id', article.id)
-            .order('created_at', { ascending: true })
-            .limit(1);
-
-          if (existingArticles && existingArticles.length > 0) {
-            // Mark as duplicate
-            await supabaseClient
-              .from('articles')
-              .update({
-                is_duplicate: true,
-                duplicate_of: existingArticles[0].id,
-                processing_status: 'completed'
-              })
-              .eq('id', article.id);
-            
-            duplicateCount++;
-            console.log(`Article ${article.id} marked as duplicate`);
-            continue;
-          }
-        }
-
-        // 2. Fetch full article content from source URL
+        // Fetch full content if needed
         let fullContent = article.content || article.description || '';
-
         if (article.source_url && (!fullContent || fullContent.length < 500)) {
           console.log(`Fetching full content for article ${article.id} from ${article.source_url}`);
           const fetchedContent = await fetchArticleContent(article.source_url);
           if (fetchedContent) {
             fullContent = fetchedContent;
-
-            // Update article with fetched content
-            await supabaseClient
-              .from('articles')
-              .update({ content: fetchedContent })
-              .eq('id', article.id);
+            await supabase.from('articles').update({ content: fetchedContent }).eq('id', article.id);
           }
         }
 
-        // 3. Perform sentiment analysis and generate summary using AI
-        const contentForAnalysis = fullContent.substring(0, 3000) || article.description || 'No content available';
+        const contentForAnalysis = fullContent.substring(0, 3000) || article.description || '';
 
-        const analysisPrompt = `Analyze the following news article and provide:
-1. Sentiment (positive, neutral, or negative)
-2. Confidence score (0-1)
-3. A concise 2-sentence summary
+        const prompt = `Analyze this news article comprehensively for political impact across ALL demographic groups and policy areas.
 
-Article Title: ${article.title}
-Article Content: ${contentForAnalysis}
+Article: "${article.title}"
+Description: ${article.description || 'N/A'}
+Source: ${article.source_name}
+Content: ${contentForAnalysis}
 
-Respond in JSON format:
+Extract the following in JSON format:
 {
-  "sentiment": "positive|neutral|negative",
-  "confidence": 0.95,
-  "summary": "Your summary here"
-}`;
+  "affected_groups": ["array of affected demographic groups"],
+  "relevance_category": "primary policy category",
+  "sentiment_score": -1 to 1 (negative to positive),
+  "sentiment_label": "positive/neutral/negative",
+  "threat_level": "critical/high/medium/low",
+  "key_topics": ["array of 3-5 key topics"],
+  "ai_summary": "2-3 sentence summary focusing on impact"
+}
 
-        const aiResponse = await fetch(AI_GATEWAY_URL, {
+Valid groups: ${VALID_GROUPS.join(', ')}
+Valid categories: ${VALID_CATEGORIES.join(', ')}
+
+Consider ALL affected communities, not just obvious ones. Be comprehensive but accurate.`;
+
+        const response = await fetch(ANTHROPIC_API_URL, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_API_KEY!,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a news analysis AI. Analyze articles for sentiment and create summaries. Always respond with valid JSON.'
-              },
-              {
-                role: 'user',
-                content: analysisPrompt
-              }
-            ],
-            tools: [{
-              type: 'function',
-              function: {
-                name: 'analyze_article',
-                description: 'Analyze article sentiment and create summary',
-                parameters: {
-                  type: 'object',
-                  properties: {
-                    sentiment: {
-                      type: 'string',
-                      enum: ['positive', 'neutral', 'negative']
-                    },
-                    confidence: {
-                      type: 'number',
-                      minimum: 0,
-                      maximum: 1
-                    },
-                    summary: {
-                      type: 'string'
-                    }
-                  },
-                  required: ['sentiment', 'confidence', 'summary'],
-                  additionalProperties: false
-                }
-              }
-            }],
-            tool_choice: { type: 'function', function: { name: 'analyze_article' } }
-          }),
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 2000,
+            messages: [{ role: 'user', content: prompt }]
+          })
         });
 
-        if (!aiResponse.ok) {
-          console.error(`AI API error: ${aiResponse.status}`);
-          continue;
+        if (!response.ok) {
+          throw new Error(`Claude API error: ${response.status}`);
         }
 
-        const aiData = await aiResponse.json();
-        const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+        const data = await response.json();
+        const analysisText = data.content[0].text;
+        const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
         
-        if (!toolCall) {
-          console.error('No tool call in AI response');
+        if (!jsonMatch) {
+          throw new Error('No JSON found in Claude response');
+        }
+
+        const analysis = JSON.parse(jsonMatch[0]);
+
+        // VALIDATION: Check data quality before storing
+        const validation = validateAnalysis(analysis);
+        
+        if (!validation.valid && validation.confidence < 0.5) {
+          console.log(`Article ${article.id} failed validation:`, validation.errors);
+          validationFailed++;
+          
+          await supabase.from('articles').update({
+            validation_passed: false,
+            validation_errors: validation.errors,
+            ai_confidence_score: validation.confidence
+          }).eq('id', article.id);
+          
+          await supabase.from('job_failures').insert({
+            function_name: 'analyze-articles',
+            error_message: 'Validation failed: ' + validation.errors.join('; '),
+            context_data: { article_id: article.id, analysis }
+          });
+          
           continue;
         }
 
-        const analysis = JSON.parse(toolCall.function.arguments);
-
-        // 4. Calculate numeric sentiment score
-        const sentimentScoreMap: Record<string, number> = {
-          'positive': 0.75,
-          'neutral': 0.5,
-          'negative': 0.25
-        };
-
-        const sentimentScore = sentimentScoreMap[analysis.sentiment] || 0.5;
-
-        // 5. Update article with analysis results
-        const { error: updateError } = await supabaseClient
+        // Store validated analysis
+        const { error: updateError } = await supabase
           .from('articles')
           .update({
-            sentiment_label: analysis.sentiment,
-            sentiment_confidence: analysis.confidence,
-            sentiment_score: sentimentScore,
-            ai_summary: analysis.summary,
-            processing_status: 'completed',
-            is_duplicate: false
+            affected_groups: analysis.affected_groups || [],
+            relevance_category: analysis.relevance_category,
+            sentiment_score: analysis.sentiment_score,
+            sentiment_label: analysis.sentiment_label,
+            sentiment_confidence: validation.confidence >= 0.8 ? 0.9 : 0.7,
+            threat_level: analysis.threat_level,
+            extracted_topics: { topics: analysis.key_topics || [] },
+            ai_summary: analysis.ai_summary,
+            ai_confidence_score: validation.confidence,
+            validation_passed: true,
+            validation_errors: validation.errors.length > 0 ? validation.errors : null,
+            topics_extracted: true,
+            topics_extracted_at: new Date().toISOString(),
+            processing_status: 'completed'
           })
           .eq('id', article.id);
 
-        if (updateError) {
-          console.error(`Error updating article ${article.id}:`, updateError);
-          continue;
-        }
+        if (updateError) throw updateError;
 
-        processedCount++;
-        console.log(`Article ${article.id} analyzed: ${analysis.sentiment} (${analysis.confidence})`);
+        analyzed++;
+        console.log(`Article ${article.id} analyzed: ${analysis.relevance_category}, confidence: ${validation.confidence.toFixed(2)}`);
 
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-      } catch (error) {
-        console.error(`Error processing article ${article.id}:`, error);
+      } catch (error: any) {
+        console.error(`Error analyzing article ${article.id}:`, error);
+        failed++;
+        
+        // Log failure for retry
+        await supabase.from('job_failures').insert({
+          function_name: 'analyze-articles',
+          error_message: error?.message || 'Unknown error',
+          error_stack: error?.stack,
+          context_data: { article_id: article.id }
+        });
       }
     }
 
-    // 6. Update sentiment trends
-    await updateSentimentTrends(supabaseClient);
+    // Update checkpoint
+    await supabase.from('processing_checkpoints').upsert({
+      function_name: 'analyze-articles',
+      last_processed_at: new Date().toISOString(),
+      records_processed: analyzed,
+      updated_at: new Date().toISOString()
+    });
 
-    console.log(`Processing complete: ${processedCount} analyzed, ${duplicateCount} duplicates found`);
+    console.log(`Analysis complete: ${analyzed} successful, ${failed} failed, ${validationFailed} validation failed`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        processed: processedCount,
-        duplicates: duplicateCount,
-        total: articles.length
+        analyzed,
+        failed,
+        validationFailed,
+        totalProcessed: articles.length,
+        dataQuality: analyzed > 0 ? (analyzed / (analyzed + validationFailed)).toFixed(2) : 0
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
-    console.error('Error in analyze-articles function:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+  } catch (error: any) {
+    console.error('Error in analyze-articles:', error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      JSON.stringify({ error: error?.message || 'Unknown error' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 });
-
-async function updateSentimentTrends(supabaseClient: any) {
-  try {
-    // Get today's date
-    const today = new Date().toISOString().split('T')[0];
-
-    // Get all categories
-    const { data: categories } = await supabaseClient
-      .from('rss_sources')
-      .select('category')
-      .eq('is_active', true);
-
-    const uniqueCategories = [...new Set(categories?.map((c: any) => c.category))];
-
-    for (const category of uniqueCategories) {
-      // Count sentiment by category for today
-      const { data: sentimentData } = await supabaseClient
-        .from('articles')
-        .select('sentiment_label, sentiment_score')
-        .eq('category', category)
-        .gte('published_date', today)
-        .eq('processing_status', 'completed')
-        .not('sentiment_label', 'is', null);
-
-      if (!sentimentData || sentimentData.length === 0) continue;
-
-      const counts = {
-        positive: 0,
-        neutral: 0,
-        negative: 0
-      };
-
-      let totalScore = 0;
-
-      sentimentData.forEach((item: any) => {
-        if (item.sentiment_label in counts) {
-          counts[item.sentiment_label as keyof typeof counts]++;
-        }
-        if (item.sentiment_score) {
-          totalScore += item.sentiment_score;
-        }
-      });
-
-      const avgScore = totalScore / sentimentData.length;
-
-      // Upsert sentiment trends
-      await supabaseClient
-        .from('sentiment_trends')
-        .upsert({
-          date: today,
-          category: category,
-          positive_count: counts.positive,
-          neutral_count: counts.neutral,
-          negative_count: counts.negative,
-          avg_sentiment_score: avgScore
-        }, {
-          onConflict: 'date,category'
-        });
-    }
-
-    console.log('Sentiment trends updated');
-  } catch (error) {
-    console.error('Error updating sentiment trends:', error);
-  }
-}

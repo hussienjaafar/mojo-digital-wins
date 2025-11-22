@@ -379,22 +379,26 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('Starting RSS feed fetch...');
-
-    // Get all active RSS sources
+    console.log('Starting incremental RSS feed fetch...');
+    
+    // OPTIMIZATION: Incremental processing - fetch oldest 50 sources
+    // This prevents CPU timeout by processing in smaller batches
     const { data: sources, error: sourcesError } = await supabase
       .from('rss_sources')
       .select('*')
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .order('last_fetched_at', { ascending: true, nullsFirst: true })
+      .limit(50);
 
     if (sourcesError) {
       throw sourcesError;
     }
 
-    console.log(`Found ${sources?.length || 0} active RSS sources`);
+    console.log(`Processing batch: ${sources?.length || 0} sources (oldest first)`);
 
     let totalArticles = 0;
     let totalErrors = 0;
+    let processedSources = 0;
 
     // Process source helper function
     const processSource = async (source: any) => {
@@ -492,6 +496,14 @@ serve(async (req) => {
           })
           .eq('id', source.id);
 
+        // Log failure for retry
+        await supabase.from('job_failures').insert({
+          function_name: 'fetch-rss-feeds',
+          error_message: error?.message || 'Unknown error',
+          error_stack: error?.stack,
+          context_data: { source_id: source.id, source_name: source.name }
+        });
+
         return { success: false, error: error?.message };
       }
     };
@@ -509,20 +521,31 @@ serve(async (req) => {
       results.forEach(result => {
         if (result.success) {
           totalArticles += result.articlesAdded || 0;
+          processedSources++;
         } else {
           totalErrors++;
         }
       });
     }
 
-    console.log(`Completed: ${totalArticles} new articles, ${totalErrors} errors`);
+    // Update checkpoint
+    await supabase.from('processing_checkpoints').upsert({
+      function_name: 'fetch-rss-feeds',
+      last_processed_at: new Date().toISOString(),
+      records_processed: processedSources,
+      updated_at: new Date().toISOString()
+    });
+
+    console.log(`Batch complete: ${processedSources} sources processed, ${totalErrors} failed, ${totalArticles} articles collected`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         articlesAdded: totalArticles,
-        sourcesProcessed: sources?.length || 0,
-        errors: totalErrors
+        sourcesProcessed: processedSources,
+        sourcesFailed: totalErrors,
+        batchSize: sources?.length || 0,
+        incrementalProcessing: true
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

@@ -6,8 +6,52 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+
+const VALID_GROUPS = [
+  'muslim_american', 'arab_american', 'lgbtq', 'immigrants', 'refugees',
+  'black_american', 'latino_hispanic', 'asian_american', 'indigenous',
+  'women', 'youth', 'seniors', 'disabled', 'veterans', 'workers'
+];
+
+const VALID_CATEGORIES = [
+  'civil_rights', 'immigration', 'healthcare', 'education', 'housing',
+  'employment', 'criminal_justice', 'voting_rights', 'religious_freedom',
+  'lgbtq_rights', 'foreign_policy', 'climate', 'economy', 'other'
+];
+
+// Data validation function
+function validateAnalysis(analysis: any): { valid: boolean; errors: string[]; confidence: number } {
+  const errors: string[] = [];
+  let confidence = 1.0;
+
+  if (!analysis.affected_groups || !Array.isArray(analysis.affected_groups)) {
+    errors.push('Missing or invalid affected_groups');
+    return { valid: false, errors, confidence: 0 };
+  }
+
+  const invalidGroups = analysis.affected_groups.filter(
+    (g: string) => !VALID_GROUPS.includes(g)
+  );
+  if (invalidGroups.length > 0) {
+    errors.push(`Invalid groups: ${invalidGroups.join(', ')}`);
+    confidence -= 0.3;
+  }
+
+  if (analysis.relevance_category && !VALID_CATEGORIES.includes(analysis.relevance_category)) {
+    errors.push(`Invalid category: ${analysis.relevance_category}`);
+    confidence -= 0.2;
+  }
+
+  if (analysis.sentiment !== null && (analysis.sentiment < -1 || analysis.sentiment > 1)) {
+    errors.push('Sentiment out of range [-1, 1]');
+    confidence -= 0.2;
+  }
+
+  const valid = errors.length === 0 || confidence >= 0.5;
+  return { valid, errors, confidence: Math.max(0, confidence) };
+}
 
 interface BlueSkyPost {
   id: string;
@@ -37,10 +81,10 @@ function normalizeTopic(topic: string): string {
   return TOPIC_NORMALIZATIONS[lower] || topic;
 }
 
-// Analyze posts using Lovable AI (Gemini)
+// Analyze posts using Claude Sonnet 4.5
 async function analyzePosts(posts: BlueSkyPost[]): Promise<any[]> {
-  if (!LOVABLE_API_KEY) {
-    throw new Error('LOVABLE_API_KEY not configured');
+  if (!ANTHROPIC_API_KEY) {
+    throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
   // Prepare batch analysis prompt
@@ -77,36 +121,34 @@ Return ONLY a JSON array with this exact structure:
 Posts:
 ${postsText}`;
 
-  const response = await fetch(AI_GATEWAY_URL, {
+  const response = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY!,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      messages: [{ role: 'user', content: prompt }]
     })
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Lovable AI error: ${response.status} - ${errorText}`);
+    throw new Error(`Claude API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-
-  if (!content) {
-    throw new Error('No content in AI response');
+  const analysisText = data.content[0].text;
+  
+  const jsonMatch = analysisText.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    throw new Error('No JSON array found in Claude response');
   }
 
-  // Parse JSON response
-  const parsed = JSON.parse(content);
-  const analyses = Array.isArray(parsed) ? parsed : (parsed.analyses || parsed.results || []);
+  const analyses = JSON.parse(jsonMatch[0]);
 
   // Map analyses back to posts
   return posts.map((post, i) => {
@@ -174,43 +216,90 @@ serve(async (req) => {
     // Analyze posts using AI
     const analyses = await analyzePosts(posts);
 
-    // Update posts with AI analysis
+    // Update posts with AI analysis - with validation
     let successCount = 0;
     let errorCount = 0;
+    let validationFailedCount = 0;
 
     for (const analysis of analyses) {
-      const { error } = await supabase
-        .from('bluesky_posts')
-        .update({
-          ai_topics: analysis.ai_topics,
-          affected_groups: analysis.affected_groups,
-          relevance_category: analysis.relevance_category,
-          ai_sentiment: analysis.ai_sentiment,
-          ai_sentiment_label: analysis.ai_sentiment_label,
-          ai_processed: true,
-          ai_processed_at: analysis.ai_processed_at
-        })
-        .eq('id', analysis.id);
+      try {
+        // Validate analysis
+        const validation = validateAnalysis(analysis);
+        
+        if (!validation.valid && validation.confidence < 0.5) {
+          console.log(`Post ${analysis.id} failed validation:`, validation.errors);
+          validationFailedCount++;
+          
+          await supabase.from('bluesky_posts').update({
+            validation_passed: false,
+            validation_errors: validation.errors,
+            ai_confidence_score: validation.confidence
+          }).eq('id', analysis.id);
+          
+          await supabase.from('job_failures').insert({
+            function_name: 'analyze-bluesky-posts',
+            error_message: 'Validation failed: ' + validation.errors.join('; '),
+            context_data: { post_id: analysis.id, analysis }
+          });
+          
+          continue;
+        }
 
-      if (error) {
-        console.error(`❌ Error updating post ${analysis.id}:`, error);
+        const { error } = await supabase
+          .from('bluesky_posts')
+          .update({
+            ai_topics: analysis.ai_topics,
+            affected_groups: analysis.affected_groups,
+            relevance_category: analysis.relevance_category,
+            ai_sentiment: analysis.ai_sentiment,
+            ai_sentiment_label: analysis.ai_sentiment_label,
+            ai_confidence_score: validation.confidence,
+            validation_passed: true,
+            validation_errors: validation.errors.length > 0 ? validation.errors : null,
+            ai_processed: true,
+            ai_processed_at: analysis.ai_processed_at
+          })
+          .eq('id', analysis.id);
+
+        if (error) {
+          console.error(`❌ Error updating post ${analysis.id}:`, error);
+          errorCount++;
+          
+          await supabase.from('job_failures').insert({
+            function_name: 'analyze-bluesky-posts',
+            error_message: error.message,
+            context_data: { post_id: analysis.id }
+          });
+        } else {
+          successCount++;
+        }
+      } catch (error) {
+        console.error(`Error processing post ${analysis.id}:`, error);
         errorCount++;
-      } else {
-        successCount++;
       }
     }
 
-    console.log(`✅ Processed ${successCount} posts successfully, ${errorCount} errors`);
+    // Update checkpoint
+    await supabase.from('processing_checkpoints').upsert({
+      function_name: 'analyze-bluesky-posts',
+      last_processed_at: new Date().toISOString(),
+      records_processed: successCount,
+      updated_at: new Date().toISOString()
+    });
+
+    console.log(`✅ Processed ${successCount} posts successfully, ${validationFailedCount} validation failed, ${errorCount} errors`);
 
     // Update trends based on newly analyzed posts
-    await updateTrends(supabase, analyses);
+    await updateTrends(supabase, analyses.filter(a => a.ai_processed));
 
     return new Response(
       JSON.stringify({
         success: true,
         processed: successCount,
+        validationFailed: validationFailedCount,
         errors: errorCount,
-        topics_extracted: analyses.flatMap(a => a.ai_topics).length
+        dataQuality: successCount > 0 ? (successCount / (successCount + validationFailedCount)).toFixed(2) : 0,
+        topics_extracted: analyses.flatMap(a => a.ai_topics || []).length
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
