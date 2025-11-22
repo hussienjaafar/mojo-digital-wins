@@ -376,6 +376,7 @@ export type Database = {
         Row: {
           affected_groups: string[] | null
           affected_organizations: string[] | null
+          ai_confidence_score: number | null
           ai_summary: string | null
           category: string | null
           content: string | null
@@ -403,10 +404,13 @@ export type Database = {
           topics_extracted: boolean | null
           topics_extracted_at: string | null
           updated_at: string | null
+          validation_errors: string[] | null
+          validation_passed: boolean | null
         }
         Insert: {
           affected_groups?: string[] | null
           affected_organizations?: string[] | null
+          ai_confidence_score?: number | null
           ai_summary?: string | null
           category?: string | null
           content?: string | null
@@ -434,10 +438,13 @@ export type Database = {
           topics_extracted?: boolean | null
           topics_extracted_at?: string | null
           updated_at?: string | null
+          validation_errors?: string[] | null
+          validation_passed?: boolean | null
         }
         Update: {
           affected_groups?: string[] | null
           affected_organizations?: string[] | null
+          ai_confidence_score?: number | null
           ai_summary?: string | null
           category?: string | null
           content?: string | null
@@ -465,6 +472,8 @@ export type Database = {
           topics_extracted?: boolean | null
           topics_extracted_at?: string | null
           updated_at?: string | null
+          validation_errors?: string[] | null
+          validation_passed?: boolean | null
         }
         Relationships: [
           {
@@ -735,6 +744,7 @@ export type Database = {
       bluesky_posts: {
         Row: {
           affected_groups: string[] | null
+          ai_confidence_score: number | null
           ai_processed: boolean | null
           ai_processed_at: string | null
           ai_relevance_score: number | null
@@ -757,9 +767,12 @@ export type Database = {
           reply_to: string | null
           text: string | null
           urls: string[] | null
+          validation_errors: string[] | null
+          validation_passed: boolean | null
         }
         Insert: {
           affected_groups?: string[] | null
+          ai_confidence_score?: number | null
           ai_processed?: boolean | null
           ai_processed_at?: string | null
           ai_relevance_score?: number | null
@@ -782,9 +795,12 @@ export type Database = {
           reply_to?: string | null
           text?: string | null
           urls?: string[] | null
+          validation_errors?: string[] | null
+          validation_passed?: boolean | null
         }
         Update: {
           affected_groups?: string[] | null
+          ai_confidence_score?: number | null
           ai_processed?: boolean | null
           ai_processed_at?: string | null
           ai_relevance_score?: number | null
@@ -807,6 +823,8 @@ export type Database = {
           reply_to?: string | null
           text?: string | null
           urls?: string[] | null
+          validation_errors?: string[] | null
+          validation_passed?: boolean | null
         }
         Relationships: []
       }
@@ -1760,6 +1778,45 @@ export type Database = {
           },
         ]
       }
+      job_failures: {
+        Row: {
+          context_data: Json | null
+          created_at: string | null
+          error_message: string | null
+          error_stack: string | null
+          function_name: string
+          id: string
+          last_retry_at: string | null
+          max_retries: number | null
+          resolved_at: string | null
+          retry_count: number | null
+        }
+        Insert: {
+          context_data?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          error_stack?: string | null
+          function_name: string
+          id?: string
+          last_retry_at?: string | null
+          max_retries?: number | null
+          resolved_at?: string | null
+          retry_count?: number | null
+        }
+        Update: {
+          context_data?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          error_stack?: string | null
+          function_name?: string
+          id?: string
+          last_retry_at?: string | null
+          max_retries?: number | null
+          resolved_at?: string | null
+          retry_count?: number | null
+        }
+        Relationships: []
+      }
       login_history: {
         Row: {
           created_at: string
@@ -2055,6 +2112,30 @@ export type Database = {
           sentiment?: string | null
           source_id?: string
           source_type?: string
+        }
+        Relationships: []
+      }
+      processing_checkpoints: {
+        Row: {
+          function_name: string
+          last_processed_at: string | null
+          last_processed_id: string | null
+          records_processed: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          function_name: string
+          last_processed_at?: string | null
+          last_processed_id?: string | null
+          records_processed?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          function_name?: string
+          last_processed_at?: string | null
+          last_processed_id?: string | null
+          records_processed?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }
