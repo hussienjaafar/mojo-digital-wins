@@ -86,8 +86,8 @@ function calculateRelevance(text: string): number {
 }
 
 // Cursor-based stream processor with timeout
-// Reduced from 45s to 30s to prevent CPU timeout (edge function limit is 50s)
-async function processBlueskyStreamWithCursor(durationMs: number = 30000) {
+// Optimized to 20s for efficient 2-minute cron runs with margin
+async function processBlueskyStreamWithCursor(durationMs: number = 20000) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -193,9 +193,13 @@ async function processBlueskyStreamWithCursor(durationMs: number = 30000) {
             const batch = [...collectedPosts];
             collectedPosts.length = 0; // Clear array
 
+            // Use upsert to handle duplicates gracefully
             const { error: insertError } = await supabase
               .from('bluesky_posts')
-              .insert(batch);
+              .upsert(batch, {
+                onConflict: 'post_uri',
+                ignoreDuplicates: true
+              });
 
             if (insertError) {
               console.error('❌ Error inserting batch:', insertError);
@@ -226,9 +230,13 @@ async function processBlueskyStreamWithCursor(durationMs: number = 30000) {
 
         // Insert remaining posts
         if (collectedPosts.length > 0) {
+          // Use upsert to handle duplicates gracefully
           const { error: insertError } = await supabase
             .from('bluesky_posts')
-            .insert(collectedPosts);
+            .upsert(collectedPosts, {
+              onConflict: 'post_uri',
+              ignoreDuplicates: true
+            });
 
           if (insertError) {
             console.error('❌ Error inserting final batch:', insertError);
