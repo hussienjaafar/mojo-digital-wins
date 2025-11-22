@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Progress } from "@/components/ui/progress";
 import { format, subDays } from "date-fns";
-import { CalendarIcon, Download, TrendingUp, TrendingDown, AlertTriangle, Newspaper, Scale, Building2, RefreshCw, Activity, ExternalLink, Search } from "lucide-react";
+import { CalendarIcon, Download, TrendingUp, TrendingDown, AlertTriangle, Newspaper, Scale, Building2, RefreshCw, Activity, ExternalLink, Search, WifiOff, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Area, Line } from "recharts";
@@ -59,6 +59,9 @@ export default function Analytics() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isStale, setIsStale] = useState(false); // Data older than 3 minutes
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
+  const [error, setError] = useState<{ message: string; type: string; retryable: boolean } | null>(null);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [retryCount, setRetryCount] = useState(0);
   const [blueskyTrends, setBlueskyTrends] = useState<any[]>([]);
   const [socialMetrics, setSocialMetrics] = useState({
     totalPosts: 0,
@@ -71,6 +74,138 @@ export default function Analytics() {
   const [sheetTopic, setSheetTopic] = useState<string>("");
   const [sheetArticles, setSheetArticles] = useState<any[]>([]);
   const [sheetLoading, setSheetLoading] = useState(false);
+
+  // Error handling utility: Parse error and return user-friendly message
+  const parseError = (error: any): { message: string; type: string; retryable: boolean } => {
+    // Check if offline
+    if (!navigator.onLine) {
+      return {
+        message: "You're offline. Please check your internet connection.",
+        type: 'offline',
+        retryable: true
+      };
+    }
+
+    // Network errors
+    if (error.message?.includes('fetch') || error.message?.includes('network')) {
+      return {
+        message: "Network error. Please check your connection and try again.",
+        type: 'network',
+        retryable: true
+      };
+    }
+
+    // Timeout errors
+    if (error.message?.includes('timeout') || error.code === 'ETIMEDOUT') {
+      return {
+        message: "Request timed out. The server took too long to respond.",
+        type: 'timeout',
+        retryable: true
+      };
+    }
+
+    // Authentication errors
+    if (error.status === 401 || error.message?.includes('auth')) {
+      return {
+        message: "Authentication error. Please refresh the page and try again.",
+        type: 'auth',
+        retryable: false
+      };
+    }
+
+    // Server errors (500+)
+    if (error.status >= 500) {
+      return {
+        message: "Server error. Our team has been notified. Please try again later.",
+        type: 'server',
+        retryable: true
+      };
+    }
+
+    // Rate limiting
+    if (error.status === 429) {
+      return {
+        message: "Too many requests. Please wait a moment and try again.",
+        type: 'rate_limit',
+        retryable: true
+      };
+    }
+
+    // Generic fallback
+    return {
+      message: error.message || "An unexpected error occurred. Please try again.",
+      type: 'unknown',
+      retryable: true
+    };
+  };
+
+  // Retry utility with exponential backoff
+  const retryWithBackoff = async <T,>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+  ): Promise<T> => {
+    let lastError: any;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          // Show retry toast
+          toast.info(`Retrying... (Attempt ${attempt + 1}/${maxRetries + 1})`, {
+            description: 'Please wait...'
+          });
+          setRetryCount(attempt);
+        }
+
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        console.error(`Attempt ${attempt + 1} failed:`, error);
+
+        // Don't retry if error is not retryable
+        const parsedError = parseError(error);
+        if (!parsedError.retryable || attempt === maxRetries) {
+          throw error;
+        }
+
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    throw lastError;
+  };
+
+  // Detect online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('🟢 Connection restored');
+      setIsOffline(false);
+      toast.success('Connection restored', {
+        description: 'Refreshing data...'
+      });
+      // Auto-retry fetch when connection restored
+      fetchAnalytics();
+    };
+
+    const handleOffline = () => {
+      console.log('🔴 Connection lost');
+      setIsOffline(true);
+      toast.error('You\'re offline', {
+        description: 'Some features may not work until connection is restored'
+      });
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Real-time subscription for new articles
   useEffect(() => {
@@ -475,13 +610,36 @@ export default function Analytics() {
 
     } catch (error) {
       console.error('Error fetching analytics:', error);
-      toast.error('Failed to load analytics');
+
+      // Parse error and set error state
+      const parsedError = parseError(error);
+      setError(parsedError);
+
+      // Show user-friendly error toast
+      toast.error(parsedError.message, {
+        description: parsedError.retryable
+          ? 'Click the retry button below to try again'
+          : 'Please refresh the page',
+        duration: 5000
+      });
+
       setLoadingPhase("");
       setLoadingProgress(0);
     } finally {
       setLoading(false);
       setLoadingPhase("");
       setLoadingProgress(0);
+      setRetryCount(0); // Reset retry count
+    }
+  };
+
+  const handleRetry = async () => {
+    setError(null); // Clear error state
+    try {
+      await retryWithBackoff(fetchAnalytics);
+    } catch (error) {
+      // Error already handled in fetchAnalytics
+      console.error('Retry failed:', error);
     }
   };
 
@@ -511,10 +669,17 @@ export default function Analytics() {
       a.click();
       window.URL.revokeObjectURL(url);
 
-      toast.success('CSV exported successfully');
-    } catch (error) {
+      toast.success('CSV exported successfully', {
+        description: 'Your data has been downloaded',
+        duration: 3000
+      });
+    } catch (error: any) {
       console.error('Error exporting CSV:', error);
-      toast.error('Failed to export CSV');
+      const parsedError = parseError(error);
+      toast.error('Export Failed', {
+        description: parsedError.message,
+        duration: 5000
+      });
     }
   };
 
@@ -529,24 +694,39 @@ export default function Analytics() {
 
       if (error) {
         console.error('Edge function error:', error);
-        toast.error(`Failed to extract topics: ${error.message || 'Unknown error'}`);
+        const parsedError = parseError(error);
+        toast.error('Topic Extraction Failed', {
+          description: parsedError.message,
+          duration: 5000
+        });
         return;
       }
 
       if (!data) {
-        toast.error('No data returned from extraction function');
+        toast.error('Topic Extraction Failed', {
+          description: 'No data returned from extraction function',
+          duration: 5000
+        });
         return;
       }
 
       toast.success(
-        `✨ Found ${data.topicsExtracted} trending topics from ${data.articlesAnalyzed} articles!`
+        `✨ Found ${data.topicsExtracted} trending topics from ${data.articlesAnalyzed} articles!`,
+        {
+          description: 'Refreshing dashboard...',
+          duration: 3000
+        }
       );
 
       // Refresh analytics to show new topics
       await fetchAnalytics();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error extracting topics:', error);
-      toast.error(`Failed to extract trending topics: ${error.message || 'Unknown error'}`);
+      const parsedError = parseError(error);
+      toast.error('Topic Extraction Failed', {
+        description: parsedError.message,
+        duration: 5000
+      });
     } finally {
       setAnalyzing(false);
     }
@@ -610,9 +790,14 @@ export default function Analytics() {
         console.warn('No trending data found or no article_ids');
         setSheetArticles([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching topic articles:', error);
-      toast.error(`Failed to load articles: ${error.message || 'Unknown error'}`);
+      const parsedError = parseError(error);
+      toast.error('Failed to Load Articles', {
+        description: parsedError.message,
+        duration: 5000
+      });
+      setSheetArticles([]); // Clear articles on error
     } finally {
       setSheetLoading(false);
     }
@@ -647,11 +832,52 @@ export default function Analytics() {
       )}
 
       {/* Stale Data Warning */}
-      {isStale && !loading && (
+      {isStale && !loading && !error && (
         <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
           <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           <AlertDescription className="text-amber-800 dark:text-amber-200">
             Data may be stale. Refreshing automatically in the background...
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Offline Warning */}
+      {isOffline && (
+        <Alert variant="destructive" className="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800">
+          <WifiOff className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              <strong>You're offline.</strong> Some features may not work until your connection is restored.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Error Alert */}
+      {error && !loading && (
+        <Alert variant="destructive" className="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="font-semibold mb-1">{error.type === 'network' ? 'Network Error' : error.type === 'timeout' ? 'Request Timeout' : error.type === 'server' ? 'Server Error' : 'Error'}</p>
+              <p className="text-sm">{error.message}</p>
+              {retryCount > 0 && (
+                <p className="text-xs mt-1 text-muted-foreground">
+                  Retry attempt {retryCount}/3
+                </p>
+              )}
+            </div>
+            {error.retryable && (
+              <Button
+                onClick={handleRetry}
+                variant="outline"
+                size="sm"
+                className="ml-4 shrink-0"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       )}
