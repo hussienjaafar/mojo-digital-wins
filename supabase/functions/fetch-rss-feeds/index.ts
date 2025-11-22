@@ -378,11 +378,12 @@ serve(async (req) => {
     let totalArticles = 0;
     let totalErrors = 0;
 
-    // Process each source
-    for (const source of sources || []) {
+    // Process source helper function
+    const processSource = async (source: any) => {
+      let articlesAdded = 0;
       try {
         console.log(`Fetching ${source.name}...`);
-        
+
         const items = await parseRSSFeed(source.url);
         console.log(`Found ${items.length} items from ${source.name}`);
 
@@ -419,7 +420,7 @@ serve(async (req) => {
             .maybeSingle();
 
           if (!insertError && insertedArticle) {
-            totalArticles++;
+            articlesAdded++;
 
             // Create notifications for critical/high threat articles
             if (threatLevel === 'critical' || threatLevel === 'high') {
@@ -453,25 +454,47 @@ serve(async (req) => {
         // Update source last fetch time
         await supabase
           .from('rss_sources')
-          .update({ 
+          .update({
             last_fetched_at: new Date().toISOString(),
-            fetch_error: null 
+            fetch_error: null
           })
           .eq('id', source.id);
 
+        return { success: true, articlesAdded };
+
       } catch (error: any) {
-        totalErrors++;
         console.error(`Error processing ${source.name}:`, error);
-        
+
         // Update source with error
         await supabase
           .from('rss_sources')
-          .update({ 
+          .update({
             fetch_error: error?.message || 'Unknown error',
             last_fetched_at: new Date().toISOString()
           })
           .eq('id', source.id);
+
+        return { success: false, error: error?.message };
       }
+    };
+
+    // Process sources in parallel batches of 30
+    const BATCH_SIZE = 30;
+    const sourcesToProcess = sources || [];
+
+    for (let i = 0; i < sourcesToProcess.length; i += BATCH_SIZE) {
+      const batch = sourcesToProcess.slice(i, i + BATCH_SIZE);
+      console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(sourcesToProcess.length / BATCH_SIZE)} (${batch.length} sources)`);
+
+      const results = await Promise.all(batch.map(processSource));
+
+      results.forEach(result => {
+        if (result.success) {
+          totalArticles += result.articlesAdded;
+        } else {
+          totalErrors++;
+        }
+      });
     }
 
     console.log(`Completed: ${totalArticles} new articles, ${totalErrors} errors`);
