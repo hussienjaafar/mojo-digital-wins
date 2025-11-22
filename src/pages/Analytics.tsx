@@ -35,6 +35,49 @@ interface TopicSentiment {
 export default function Analytics() {
   const { setSearchTerm, navigateToTab } = useNewsFilters();
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only trigger if not typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // R key: Refresh data
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        fetchAnalytics();
+        toast.info('Refreshing data...', { description: 'Keyboard shortcut: R' });
+      }
+
+      // E key: Export to CSV
+      if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        exportToCSV();
+        toast.info('Exporting to CSV...', { description: 'Keyboard shortcut: E' });
+      }
+
+      // T key: Extract trending topics
+      if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        extractTrendingTopics();
+        toast.info('Extracting topics...', { description: 'Keyboard shortcut: T' });
+      }
+
+      // ? key: Show keyboard shortcuts
+      if (e.key === '?') {
+        e.preventDefault();
+        toast.info('Keyboard Shortcuts', {
+          description: 'R: Refresh • E: Export • T: Extract Topics • ?: Help',
+          duration: 5000
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
+
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: subDays(new Date(), 7),
     to: new Date(),
@@ -850,7 +893,19 @@ export default function Analytics() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="News Pulse Analytics Dashboard">
+      {/* Screen reader announcements for dynamic updates */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {loading && "Loading analytics data"}
+        {!loading && lastUpdated && `Analytics last updated ${timeAgo}`}
+        {error && `Error: ${error.message}`}
+        {newArticleCount > 0 && `${newArticleCount} new articles detected`}
+      </div>
       {/* Loading Progress Bar */}
       {loading && loadingProgress > 0 && (
         <div className="fixed top-0 left-0 right-0 z-50">
@@ -965,20 +1020,46 @@ export default function Analytics() {
           <div className="flex gap-2 flex-wrap">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("justify-start text-left font-normal")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                <Button
+                  variant="outline"
+                  className={cn("justify-start text-left font-normal")}
+                  aria-label="Select date range for analytics"
+                  aria-describedby="date-range-description"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
                   {format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd")}
+                  <span id="date-range-description" className="sr-only">
+                    Current date range: {format(dateRange.from, "MMMM dd, yyyy")} to {format(dateRange.to, "MMMM dd, yyyy")}
+                  </span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
+              <PopoverContent className="w-auto p-0" align="end" role="dialog" aria-label="Date range options">
                 <div className="p-3 space-y-2">
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => setDateRange({ from: subDays(new Date(), 1), to: new Date() })}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setDateRange({ from: subDays(new Date(), 1), to: new Date() })}
+                    aria-label="Show data from last 24 hours"
+                  >
                     Last 24h
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => setDateRange({ from: subDays(new Date(), 7), to: new Date() })}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setDateRange({ from: subDays(new Date(), 7), to: new Date() })}
+                    aria-label="Show data from last 7 days"
+                  >
                     Last 7 days
                   </Button>
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => setDateRange({ from: subDays(new Date(), 30), to: new Date() })}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setDateRange({ from: subDays(new Date(), 30), to: new Date() })}
+                    aria-label="Show data from last 30 days"
+                  >
                     Last 30 days
                   </Button>
                 </div>
@@ -989,15 +1070,24 @@ export default function Analytics() {
               variant="outline"
               onClick={() => fetchAnalytics()}
               disabled={loading}
-              title="Refresh data (auto-updates every 30 sec)"
+              title="Refresh data (Keyboard shortcut: R)"
+              aria-label={loading ? "Refreshing analytics data" : "Refresh analytics data"}
+              aria-busy={loading}
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
               Refresh View
+              <span className="sr-only">(Press R key)</span>
             </Button>
 
-            <Button variant="outline" onClick={exportToCSV}>
-              <Download className="mr-2 h-4 w-4" />
+            <Button
+              variant="outline"
+              onClick={exportToCSV}
+              aria-label="Export trending topics to CSV file"
+              title="Export to CSV (Keyboard shortcut: E)"
+            >
+              <Download className="mr-2 h-4 w-4" aria-hidden="true" />
               Export
+              <span className="sr-only">(Press E key)</span>
             </Button>
           </div>
         </div>
@@ -1011,16 +1101,16 @@ export default function Analytics() {
       {/* Key Metrics - Redesigned */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Coverage - Blue */}
-        <Card className="hover:shadow-md transition-shadow">
+        <Card className="hover:shadow-md transition-shadow" role="article" aria-label="Total coverage metric">
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
-                <Newspaper className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <Newspaper className="h-5 w-5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
               </div>
             </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">Total Coverage</p>
-              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400" aria-label={`${metrics.totalArticles} articles tracked`}>
                 {metrics.totalArticles}
               </div>
               <p className="text-xs text-muted-foreground">Articles tracked</p>
@@ -1029,16 +1119,16 @@ export default function Analytics() {
         </Card>
 
         {/* Critical Threats - Red */}
-        <Card className="hover:shadow-md transition-shadow">
+        <Card className="hover:shadow-md transition-shadow" role="article" aria-label="Critical threats metric">
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950">
-                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" aria-hidden="true" />
               </div>
             </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">Critical Threats</p>
-              <div className="text-3xl font-bold text-red-600 dark:text-red-400">
+              <div className="text-3xl font-bold text-red-600 dark:text-red-400" aria-label={`${metrics.criticalThreats} high priority items`}>
                 {metrics.criticalThreats}
               </div>
               <p className="text-xs text-muted-foreground">High priority items</p>
@@ -1047,11 +1137,11 @@ export default function Analytics() {
         </Card>
 
         {/* Active Bills - Purple */}
-        <Card className="hover:shadow-md transition-shadow">
+        <Card className="hover:shadow-md transition-shadow" role="article" aria-label="Active bills metric">
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
-                <Scale className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <Scale className="h-5 w-5 text-purple-600 dark:text-purple-400" aria-hidden="true" />
               </div>
             </div>
             <div className="space-y-1">
@@ -1102,14 +1192,18 @@ export default function Analytics() {
       </div>
 
       {/* Main Content */}
-      <Tabs defaultValue="topics" className="space-y-4">
-        <TabsList className="grid grid-cols-2">
-          <TabsTrigger value="topics">News Topics</TabsTrigger>
-          <TabsTrigger value="social">Social Trends</TabsTrigger>
+      <Tabs defaultValue="topics" className="space-y-4" aria-label="Analytics content views">
+        <TabsList className="grid grid-cols-2" role="tablist">
+          <TabsTrigger value="topics" aria-label="View news-based trending topics and sentiment analysis">
+            News Topics
+          </TabsTrigger>
+          <TabsTrigger value="social" aria-label="View social media trending topics from Bluesky">
+            Social Trends
+          </TabsTrigger>
         </TabsList>
 
         {/* TRENDING TOPICS WITH SENTIMENT */}
-        <TabsContent value="topics" className="space-y-4">
+        <TabsContent value="topics" className="space-y-4" role="tabpanel">
           {/* Warning when date range > 24 hours */}
           {Math.floor((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60)) > 24 && (
             <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
