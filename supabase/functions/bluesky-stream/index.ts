@@ -145,6 +145,7 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
   let keywordMatchCount = 0;
   let languageFiltered = 0;
   let lengthFiltered = 0;
+  let shouldStop = false; // Flag to prevent processing after limit
   const batchSize = 50; // Larger batches reduce DB roundtrips
   const collectedPosts: any[] = [];
 
@@ -165,6 +166,9 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
       };
 
       ws.onmessage = async (event) => {
+        // Skip processing if we've already hit the limit
+        if (shouldStop) return;
+        
         try {
           const data: JetStreamEvent = JSON.parse(event.data);
 
@@ -177,15 +181,16 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
           if (data.kind !== 'commit' || !data.commit?.record?.text) {
             return;
           }
+
+          postCount++;
           
           // Safety valve: stop processing if we've hit the limit
           if (postCount >= maxPostsProcessed) {
             console.log(`⚠️ Safety limit reached: ${maxPostsProcessed} posts processed`);
+            shouldStop = true;
             ws.close();
             return;
           }
-
-          postCount++;
 
           const record = data.commit.record;
           const text = record.text;
