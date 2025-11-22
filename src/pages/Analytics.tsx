@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format, subDays } from "date-fns";
-import { CalendarIcon, Download, TrendingUp, AlertTriangle, Newspaper, Scale, Building2, RefreshCw, Activity, ExternalLink } from "lucide-react";
+import { CalendarIcon, Download, TrendingUp, TrendingDown, AlertTriangle, Newspaper, Scale, Building2, RefreshCw, Activity, ExternalLink, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Area, Line } from "recharts";
@@ -23,9 +23,8 @@ interface TopicSentiment {
   negative: number;
   avgSentiment: number;
   trend: 'rising' | 'stable' | 'falling';
-  velocity?: number; // Percentage growth rate
+  velocity?: number; // Percentage growth rate from database
   momentum?: number; // Acceleration
-  trendingScore?: number; // velocity * log(mentions) for ranking
   sampleTitles?: string[];
   keywords?: string[];
 }
@@ -275,10 +274,6 @@ export default function Analytics() {
             trend = 'stable';
           }
 
-          // Calculate trending score: velocity weighted by mention count
-          // This prevents topics with 1 mention from ranking higher than topics with 30 mentions
-          const trendingScore = (data.velocity || 0) * Math.log(data.total + 1);
-
           return {
             topic,
             total: data.total,
@@ -289,13 +284,12 @@ export default function Analytics() {
             trend,
             velocity: data.velocity,
             momentum: data.momentum,
-            trendingScore,
             sampleTitles: Array.from(data.sampleTitles).slice(0, 3),
             keywords: Array.from(data.keywords).slice(0, 5),
           };
         })
-        // Sort by trending score (velocity * log(mentions)) - balances growth rate with popularity
-        .sort((a, b) => (b.trendingScore || 0) - (a.trendingScore || 0))
+        // Sort by velocity score from database (already accounts for growth rate)
+        .sort((a, b) => (b.velocity || 0) - (a.velocity || 0))
         .slice(0, 15);
 
       // Detect new trending topics
@@ -743,13 +737,9 @@ export default function Analytics() {
 
       {/* Main Content */}
       <Tabs defaultValue="topics" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid grid-cols-2">
           <TabsTrigger value="topics">News Topics</TabsTrigger>
           <TabsTrigger value="social">Social Trends</TabsTrigger>
-          <TabsTrigger value="timeline">Sentiment Timeline</TabsTrigger>
-          <TabsTrigger value="threats">Threat Trends</TabsTrigger>
-          <TabsTrigger value="entities">Key Entities</TabsTrigger>
-          <TabsTrigger value="correlation">Bill Correlation</TabsTrigger>
         </TabsList>
 
         {/* TRENDING TOPICS WITH SENTIMENT */}
@@ -810,11 +800,27 @@ export default function Analytics() {
               ))}
             </div>
           ) : topicSentiments.length === 0 ? (
-            <Card>
-              <CardContent className="p-12">
-                <p className="text-muted-foreground text-center">No trending topics found in this time period</p>
-              </CardContent>
-            </Card>
+            <div className="text-center py-12">
+              <TrendingDown className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h3 className="text-lg font-semibold mb-2">No trending topics found</h3>
+              <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                {Math.floor((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60)) > 24
+                  ? "Trending topics are calculated from the last 24 hours. Try selecting a shorter date range to see recent trends."
+                  : "No significant trends detected in the last 24 hours. This is normal during quiet news periods. Check back later!"
+                }
+              </p>
+              {Math.floor((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60)) > 24 && (
+                <Button
+                  onClick={() => setDateRange({
+                    from: subDays(new Date(), 1),
+                    to: new Date()
+                  })}
+                  variant="outline"
+                >
+                  View Last 24 Hours
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {topicSentiments.map((topic, index) => (
@@ -923,7 +929,7 @@ export default function Analytics() {
                       </div>
                     </div>
 
-                    {/* View in Feed Button */}
+                    {/* View Articles Button */}
                     <Button
                       variant="outline"
                       size="sm"
@@ -937,8 +943,8 @@ export default function Analytics() {
                         }
                       }}
                     >
-                      <ExternalLink className="h-4 w-4" />
-                      View in Feed
+                      <Search className="h-4 w-4" />
+                      View Articles
                     </Button>
                   </CardContent>
                 </Card>
@@ -1016,16 +1022,25 @@ export default function Analytics() {
             </p>
 
             {blueskyTrends.length === 0 ? (
-              <Card>
-                <CardContent className="p-12">
-                  <p className="text-muted-foreground text-center">
-                    No Bluesky trends detected yet. The stream processor needs to be deployed and running.
-                  </p>
-                  <p className="text-sm text-muted-foreground text-center mt-2">
-                    Deploy the <code className="px-2 py-1 bg-muted rounded">bluesky-stream</code> edge function to start collecting social data.
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="text-center py-12">
+                <Activity className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <h3 className="text-lg font-semibold mb-2">No social trends detected yet</h3>
+                <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                  {socialMetrics.totalPosts === 0
+                    ? "The Bluesky stream processor needs to be deployed and running to collect social data."
+                    : "Social data is being collected, but no trending topics have emerged yet. Check back in a few hours!"}
+                </p>
+                {socialMetrics.totalPosts === 0 && (
+                  <div className="bg-muted/50 rounded-lg p-4 max-w-lg mx-auto">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      <strong>To enable social intelligence:</strong>
+                    </p>
+                    <code className="text-xs block bg-background p-2 rounded">
+                      npx supabase functions deploy bluesky-stream
+                    </code>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {blueskyTrends.map((trend, index) => (
@@ -1120,7 +1135,7 @@ export default function Analytics() {
                         </div>
                       )}
 
-                      {/* View in Feed Button */}
+                      {/* View Articles Button */}
                       <Button
                         variant="outline"
                         size="sm"
@@ -1143,8 +1158,8 @@ export default function Analytics() {
                           }, 100);
                         }}
                       >
-                        <ExternalLink className="h-4 w-4" />
-                        View in Feed
+                        <Search className="h-4 w-4" />
+                        View Articles
                       </Button>
 
                       {/* Time Info */}
@@ -1162,100 +1177,6 @@ export default function Analytics() {
               </div>
             )}
           </div>
-        </TabsContent>
-
-        {/* SENTIMENT TIMELINE */}
-        <TabsContent value="timeline" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Sentiment Over Time</CardTitle>
-              <CardDescription>Daily sentiment breakdown and trends</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={sentimentTimeline}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Area type="monotone" dataKey="positive" stackId="1" fill="#10b981" stroke="#10b981" name="Positive" />
-                  <Area type="monotone" dataKey="neutral" stackId="1" fill="#6b7280" stroke="#6b7280" name="Neutral" />
-                  <Area type="monotone" dataKey="negative" stackId="1" fill="#ef4444" stroke="#ef4444" name="Negative" />
-                  <Line type="monotone" dataKey="avgSentiment" stroke="#8b5cf6" strokeWidth={2} name="Avg Sentiment %" />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* THREAT TRENDS */}
-        <TabsContent value="threats" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Threat Level Trends</CardTitle>
-              <CardDescription>Escalation and de-escalation of threat levels over time</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={threatTrends}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="critical" stackId="a" fill="#dc2626" name="Critical" />
-                  <Bar dataKey="high" stackId="a" fill="#f97316" name="High" />
-                  <Bar dataKey="medium" stackId="a" fill="#eab308" name="Medium" />
-                  <Bar dataKey="low" stackId="a" fill="#6b7280" name="Low" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* KEY ENTITIES */}
-        <TabsContent value="entities" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Key Organizations & Entities</CardTitle>
-              <CardDescription>Most mentioned organizations in current coverage</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={entityMentions} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={150} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="hsl(var(--primary))" name="Mentions" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* BILL-TOPIC CORRELATION */}
-        <TabsContent value="correlation" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Bill-to-News Correlation</CardTitle>
-              <CardDescription>Topics with both legislative and news activity</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={billTopicCorrelation}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="topic" angle={-45} textAnchor="end" height={120} />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="bills" fill="#8b5cf6" name="Bills" />
-                  <Bar dataKey="articles" fill="#3b82f6" name="Articles" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
 
