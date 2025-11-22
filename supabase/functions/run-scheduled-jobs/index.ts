@@ -164,12 +164,39 @@ serve(async (req) => {
             });
             if (correlateResponse.error) throw new Error(correlateResponse.error.message);
             result = correlateResponse.data;
-            itemsProcessed = result?.correlationsFound || 0;
-            itemsCreated = result?.correlationsCreated || 0;
+            itemsProcessed = result?.trends_analyzed || 0;
+            itemsCreated = result?.correlations_found || 0;
+            break;
+
+          case 'aggregate_sentiment':
+            const sentimentResponse = await supabase.functions.invoke('aggregate-sentiment', {
+              body: {}
+            });
+            if (sentimentResponse.error) throw new Error(sentimentResponse.error.message);
+            result = sentimentResponse.data;
+            itemsProcessed = result?.snapshots_created || 0;
+            break;
+
+          case 'detect_anomalies':
+            const anomalyResponse = await supabase.functions.invoke('detect-anomalies', {
+              body: {}
+            });
+            if (anomalyResponse.error) throw new Error(anomalyResponse.error.message);
+            result = anomalyResponse.data;
+            itemsProcessed = result?.anomalies_detected || 0;
+            break;
+
+          case 'cleanup_cache':
+            const cleanupResponse = await supabase.functions.invoke('cleanup-old-cache', {
+              body: {}
+            });
+            if (cleanupResponse.error) throw new Error(cleanupResponse.error.message);
+            result = cleanupResponse.data;
+            itemsProcessed = result?.deleted || 0;
             break;
 
           case 'collect_bluesky':
-          case 'bluesky_stream_keepalive': // Legacy name, same behavior
+          case 'bluesky_stream_keepalive':
             // Cursor-based JetStream polling (runs for 45 seconds, resumes from last cursor)
             const collectBlueskyResponse = await supabase.functions.invoke('bluesky-stream', {
               body: { durationMs: 45000 }

@@ -19,6 +19,7 @@ import APICredentialsManager from "@/components/admin/APICredentialsManager";
 import CampaignAttributionManager from "@/components/admin/CampaignAttributionManager";
 import SyncScheduler from "@/components/admin/SyncScheduler";
 import EmailReportManager from "@/components/admin/EmailReportManager";
+import { DataBackfillPanel } from "@/components/admin/DataBackfillPanel";
 import { DashboardHome } from "@/components/DashboardHome";
 import { NewsFeed } from "@/components/news/NewsFeed";
 import { BillTracker } from "@/components/bills/BillTracker";
@@ -296,7 +297,12 @@ const Admin = () => {
       case "attribution":
         return <CampaignAttributionManager />;
       case "scheduler":
-        return <SyncScheduler />;
+        return (
+          <div className="space-y-6">
+            <DataBackfillPanel />
+            <SyncScheduler />
+          </div>
+        );
       case "users":
         return <UserManagement />;
       case "contacts":
