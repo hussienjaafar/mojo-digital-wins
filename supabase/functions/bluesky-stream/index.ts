@@ -61,9 +61,23 @@ function extractUrls(text: string): string[] {
 
 // **FAST KEYWORD PRE-CHECK**: Returns true if ANY tracked keyword appears in text
 // This runs BEFORE calculateRelevance to filter out 99% of irrelevant posts immediately
+// Optimized: Check word boundaries to avoid false positives (e.g., "caring" vs "cair")
 function hasAnyKeyword(text: string): boolean {
   const lowerText = text.toLowerCase();
-  return TRACKED_KEYWORDS_LOWER.some(keyword => lowerText.includes(keyword));
+  
+  // Quick reject: if text is too short, likely not relevant
+  if (lowerText.length < 10) return false;
+  
+  // Use word boundary matching for better precision
+  for (const keyword of TRACKED_KEYWORDS_LOWER) {
+    // Create regex with word boundaries for multi-word phrases
+    const regex = new RegExp(`\\b${keyword.replace(/\s+/g, '\\s+')}\\b`, 'i');
+    if (regex.test(text)) {
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 // Calculate relevance score (0-1) based on tracked keywords
@@ -86,8 +100,8 @@ function calculateRelevance(text: string): number {
 }
 
 // Cursor-based stream processor with timeout
-// Optimized to 20s for efficient 2-minute cron runs with margin
-async function processBlueskyStreamWithCursor(durationMs: number = 20000) {
+// Optimized to 15s to give headroom under the CPU limit
+async function processBlueskyStreamWithCursor(durationMs: number = 15000) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -112,7 +126,8 @@ async function processBlueskyStreamWithCursor(durationMs: number = 20000) {
   let latestCursor = startCursor;
   let postCount = 0;
   let relevantCount = 0;
-  const batchSize = 10;
+  let keywordMatchCount = 0;
+  const batchSize = 20; // Increased batch size for fewer DB calls
   const collectedPosts: any[] = [];
 
   // Timeout handler
@@ -155,6 +170,8 @@ async function processBlueskyStreamWithCursor(durationMs: number = 20000) {
           if (!hasAnyKeyword(text)) {
             return; // Skip posts with zero keyword matches immediately
           }
+          
+          keywordMatchCount++;
 
           // Calculate detailed relevance score only for keyword-matching posts
           const relevanceScore = calculateRelevance(text);
@@ -205,7 +222,7 @@ async function processBlueskyStreamWithCursor(durationMs: number = 20000) {
               console.error('❌ Error inserting batch:', insertError);
             } else {
               console.log(
-                `✅ Inserted batch: ${batch.length} posts (${relevantCount}/${postCount} relevant, cursor: ${latestCursor})`
+                `✅ Batch: ${batch.length} posts | Relevant: ${relevantCount}/${keywordMatchCount} matches/${postCount} total | Cursor: ${latestCursor}`
               );
             }
           }
@@ -242,7 +259,7 @@ async function processBlueskyStreamWithCursor(durationMs: number = 20000) {
             console.error('❌ Error inserting final batch:', insertError);
           } else {
             console.log(
-              `✅ Inserted final batch: ${collectedPosts.length} posts (${relevantCount}/${postCount} relevant)`
+              `✅ Final batch: ${collectedPosts.length} posts | Total relevant: ${relevantCount}/${keywordMatchCount} matches/${postCount} total`
             );
           }
         }
@@ -268,7 +285,7 @@ async function processBlueskyStreamWithCursor(durationMs: number = 20000) {
         }
 
         console.log(
-          `✅ Collection complete: ${relevantCount} relevant posts saved from ${postCount} processed (cursor: ${latestCursor})`
+          `✅ Collection complete: ${relevantCount} saved | ${keywordMatchCount} keyword matches | ${postCount} total processed | Efficiency: ${((relevantCount/postCount)*100).toFixed(2)}%`
         );
 
         resolve({
