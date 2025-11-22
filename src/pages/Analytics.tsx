@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format, subDays } from "date-fns";
 import { CalendarIcon, Download, TrendingUp, TrendingDown, AlertTriangle, Newspaper, Scale, Building2, RefreshCw, Activity, ExternalLink, Search } from "lucide-react";
@@ -53,14 +54,18 @@ export default function Analytics() {
   const [newArticleCount, setNewArticleCount] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
-  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
-  const [topicArticles, setTopicArticles] = useState<any[]>([]);
   const [blueskyTrends, setBlueskyTrends] = useState<any[]>([]);
   const [socialMetrics, setSocialMetrics] = useState({
     totalPosts: 0,
     trendingTopics: 0,
     predictiveSignals: 0,
   });
+
+  // Sheet drawer state for viewing articles
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetTopic, setSheetTopic] = useState<string>("");
+  const [sheetArticles, setSheetArticles] = useState<any[]>([]);
+  const [sheetLoading, setSheetLoading] = useState(false);
 
   // Real-time subscription for new articles
   useEffect(() => {
@@ -117,14 +122,14 @@ export default function Analytics() {
     };
   }, [isLive]);
 
-  // Auto-refresh every 30 seconds when live mode is enabled
+  // Auto-refresh every 2 minutes when live mode is enabled
   useEffect(() => {
     if (!isLive) return;
 
     const interval = setInterval(() => {
       console.log('Auto-refreshing analytics (live mode)');
       fetchAnalytics();
-    }, 30000); // 30 seconds
+    }, 120000); // 2 minutes
 
     return () => clearInterval(interval);
   }, [isLive, dateRange]);
@@ -495,7 +500,12 @@ export default function Analytics() {
 
   const fetchTopicArticles = async (topicData: TopicSentiment) => {
     try {
-      setSelectedTopic(topicData.topic);
+      // Open sheet and show loading
+      setSheetTopic(topicData.topic);
+      setSheetOpen(true);
+      setSheetLoading(true);
+      setSheetArticles([]);
+
       console.log('Fetching articles for topic:', topicData.topic);
 
       // Get article IDs from trending_topics table
@@ -521,7 +531,8 @@ export default function Analytics() {
 
         if (!articleIds || articleIds.length === 0) {
           console.warn('No article IDs found for topic');
-          setTopicArticles([]);
+          setSheetArticles([]);
+          setSheetLoading(false);
           return;
         }
 
@@ -540,14 +551,16 @@ export default function Analytics() {
           throw articlesError;
         }
 
-        setTopicArticles(articles || []);
+        setSheetArticles(articles || []);
       } else {
         console.warn('No trending data found or no article_ids');
-        setTopicArticles([]);
+        setSheetArticles([]);
       }
     } catch (error) {
       console.error('Error fetching topic articles:', error);
       toast.error(`Failed to load articles: ${error.message || 'Unknown error'}`);
+    } finally {
+      setSheetLoading(false);
     }
   };
 
@@ -935,12 +948,8 @@ export default function Analytics() {
                       size="sm"
                       className="w-full mt-4 gap-2"
                       onClick={(e) => {
-                        e.stopPropagation(); // Don't trigger card onClick
-                        setSearchTerm(topic.topic);
-                        if (navigateToTab) {
-                          navigateToTab('feed');
-                          toast.success(`Filtering news feed by "${topic.topic}"`);
-                        }
+                        e.stopPropagation(); // Don't trigger card onClick twice
+                        fetchTopicArticles(topic);
                       }}
                     >
                       <Search className="h-4 w-4" />
@@ -1142,20 +1151,8 @@ export default function Analytics() {
                         className="w-full mt-4 gap-2"
                         onClick={(e) => {
                           e.stopPropagation();
-
-                          if (!navigateToTab) {
-                            toast.error("Navigation not available. Please refresh the page.");
-                            return;
-                          }
-
-                          // Set search term first
-                          setSearchTerm(trend.topic);
-
-                          // Use setTimeout to ensure state update propagates before navigation
-                          setTimeout(() => {
-                            navigateToTab('feed');
-                            toast.success(`Filtering news feed by "${trend.topic}"`);
-                          }, 100);
+                          // Create minimal TopicSentiment object for Bluesky trend
+                          fetchTopicArticles({ topic: trend.topic } as TopicSentiment);
                         }}
                       >
                         <Search className="h-4 w-4" />
@@ -1180,21 +1177,28 @@ export default function Analytics() {
         </TabsContent>
       </Tabs>
 
-      {/* Dialog for Trending Topic Articles */}
-      <Dialog open={selectedTopic !== null} onOpenChange={(open) => !open && setSelectedTopic(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold capitalize">{selectedTopic}</DialogTitle>
-            <DialogDescription>
-              {topicArticles.length} article{topicArticles.length !== 1 ? 's' : ''} mentioning this topic
-            </DialogDescription>
-          </DialogHeader>
+      {/* Sheet drawer for Trending Topic Articles */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-2xl font-bold capitalize">{sheetTopic}</SheetTitle>
+            <SheetDescription>
+              {sheetLoading
+                ? 'Loading articles...'
+                : `${sheetArticles.length} article${sheetArticles.length !== 1 ? 's' : ''} mentioning this topic`
+              }
+            </SheetDescription>
+          </SheetHeader>
 
-          <div className="space-y-4 mt-4">
-            {topicArticles.length === 0 ? (
+          <div className="space-y-4 mt-6">
+            {sheetLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <LoadingSpinner size="md" label="Loading articles..." />
+              </div>
+            ) : sheetArticles.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No articles found</p>
             ) : (
-              topicArticles.map((article) => (
+              sheetArticles.map((article) => (
                 <a
                   key={article.id}
                   href={article.source_url}
@@ -1239,8 +1243,8 @@ export default function Analytics() {
               ))
             )}
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
