@@ -75,7 +75,17 @@ const Admin = () => {
   const [filteredSubmissions, setFilteredSubmissions] = useState<ContactSubmission[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [activeTab, setActiveTab] = useState("analytics");
+
+  // Load active tab from localStorage on mount, default to "analytics"
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const savedTab = localStorage.getItem('admin-active-tab');
+    return savedTab || "analytics";
+  });
+
+  // Save active tab to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('admin-active-tab', activeTab);
+  }, [activeTab]);
 
   // Get current section title for breadcrumb
   const getCurrentSectionTitle = () => {

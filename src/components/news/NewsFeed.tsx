@@ -5,6 +5,7 @@ import { NewsFilters, FilterState } from "./NewsFilters";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RefreshCw, AlertCircle, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -299,24 +300,41 @@ export function NewsFeed() {
             {hasMore && ' • Scroll for more'}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={detectDuplicates}
-            variant="outline"
-            className="gap-2"
-          >
-            <Sparkles className="h-4 w-4" />
-            Detect Duplicates
-          </Button>
-          <Button
-            onClick={() => loadArticles(0, currentFilters)}
-            variant="outline"
-            className="gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Reload Articles
-          </Button>
-        </div>
+        <TooltipProvider>
+          <div className="flex gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={detectDuplicates}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Detect Duplicates
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Find and cluster duplicate articles across sources</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={() => loadArticles(0, currentFilters)}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Reload Articles
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Reload articles from database (RSS syncs every 5 min automatically)</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
       </div>
 
       {error && (
@@ -336,7 +354,7 @@ export function NewsFeed() {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            No articles found. Try adjusting your filters or click "Refresh Feed" to fetch new articles.
+            No articles found. Try adjusting your filters or click "Reload Articles" to refresh the view.
           </AlertDescription>
         </Alert>
       ) : (
