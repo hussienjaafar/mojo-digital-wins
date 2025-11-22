@@ -59,20 +59,36 @@ function extractUrls(text: string): string[] {
   return Array.from(matches, m => m[1]);
 }
 
-// **FAST KEYWORD PRE-CHECK**: Returns true if ANY tracked keyword appears in text
-// This runs BEFORE calculateRelevance to filter out 99% of irrelevant posts immediately
-// Optimized: Check word boundaries to avoid false positives (e.g., "caring" vs "cair")
+// Pre-compiled regex patterns for performance (created once, not per-post)
+const KEYWORD_PATTERNS = TRACKED_KEYWORDS_LOWER.map(keyword => 
+  new RegExp(`\\b${keyword.replace(/\s+/g, '\\s+')}\\b`, 'i')
+);
+
+// **ULTRA-FAST KEYWORD PRE-CHECK**: Multi-stage filtering
+// Stage 1: Quick string includes (very fast)
+// Stage 2: Regex with word boundaries (precise)
 function hasAnyKeyword(text: string): boolean {
+  // Quick length bounds check (most posts are 20-500 chars if relevant)
+  if (text.length < 20 || text.length > 500) return false;
+  
   const lowerText = text.toLowerCase();
   
-  // Quick reject: if text is too short, likely not relevant
-  if (lowerText.length < 10) return false;
-  
-  // Use word boundary matching for better precision
+  // Stage 1: Fast substring check (no regex overhead)
+  // This filters out 95%+ of posts instantly
+  let hasSubstring = false;
   for (const keyword of TRACKED_KEYWORDS_LOWER) {
-    // Create regex with word boundaries for multi-word phrases
-    const regex = new RegExp(`\\b${keyword.replace(/\s+/g, '\\s+')}\\b`, 'i');
-    if (regex.test(text)) {
+    if (lowerText.includes(keyword)) {
+      hasSubstring = true;
+      break;
+    }
+  }
+  
+  if (!hasSubstring) return false;
+  
+  // Stage 2: Precise word-boundary matching on remaining ~5%
+  // Use pre-compiled patterns to avoid regex creation overhead
+  for (const pattern of KEYWORD_PATTERNS) {
+    if (pattern.test(text)) {
       return true;
     }
   }
@@ -99,9 +115,9 @@ function calculateRelevance(text: string): number {
   return score;
 }
 
-// Cursor-based stream processor with timeout
-// Optimized to 15s to give headroom under the CPU limit
-async function processBlueskyStreamWithCursor(durationMs: number = 15000) {
+// Cursor-based stream processor with timeout and safety limits
+// Optimized to 15s duration with 50k post processing limit
+async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPostsProcessed: number = 50000) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -127,7 +143,9 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000) {
   let postCount = 0;
   let relevantCount = 0;
   let keywordMatchCount = 0;
-  const batchSize = 20; // Increased batch size for fewer DB calls
+  let languageFiltered = 0;
+  let lengthFiltered = 0;
+  const batchSize = 50; // Larger batches reduce DB roundtrips
   const collectedPosts: any[] = [];
 
   // Timeout handler
@@ -159,16 +177,38 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000) {
           if (data.kind !== 'commit' || !data.commit?.record?.text) {
             return;
           }
+          
+          // Safety valve: stop processing if we've hit the limit
+          if (postCount >= maxPostsProcessed) {
+            console.log(`⚠️ Safety limit reached: ${maxPostsProcessed} posts processed`);
+            ws.close();
+            return;
+          }
 
           postCount++;
 
           const record = data.commit.record;
           const text = record.text;
+          
+          // **OPTIMIZATION 1: Language filter** - Only process English posts
+          // This filters out ~50% of firehose immediately
+          const langs = record.langs || [];
+          if (langs.length > 0 && !langs.includes('en')) {
+            languageFiltered++;
+            return;
+          }
+          
+          // **OPTIMIZATION 2: Length bounds** - Filter very short/long posts early
+          // Checked again in hasAnyKeyword but doing it here avoids string ops
+          if (text.length < 20 || text.length > 500) {
+            lengthFiltered++;
+            return;
+          }
 
-          // **CRITICAL OPTIMIZATION**: Fast keyword pre-check before full relevance calculation
-          // This prevents processing 50k+ irrelevant posts per run
+          // **OPTIMIZATION 3: Ultra-fast keyword pre-check**
+          // Two-stage filter: simple includes() then word-boundary regex
           if (!hasAnyKeyword(text)) {
-            return; // Skip posts with zero keyword matches immediately
+            return;
           }
           
           keywordMatchCount++;
@@ -221,8 +261,9 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000) {
             if (insertError) {
               console.error('❌ Error inserting batch:', insertError);
             } else {
+              const efficiency = ((relevantCount / postCount) * 100).toFixed(2);
               console.log(
-                `✅ Batch: ${batch.length} posts | Relevant: ${relevantCount}/${keywordMatchCount} matches/${postCount} total | Cursor: ${latestCursor}`
+                `✅ Batch: ${batch.length} | ${relevantCount}/${keywordMatchCount}/${postCount} (${efficiency}%) | Lang: -${languageFiltered} | Len: -${lengthFiltered}`
               );
             }
           }
@@ -284,8 +325,10 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000) {
             .eq('id', 1);
         }
 
+        const efficiency = ((relevantCount / postCount) * 100).toFixed(2);
+        const filterReduction = ((languageFiltered + lengthFiltered) / postCount * 100).toFixed(1);
         console.log(
-          `✅ Collection complete: ${relevantCount} saved | ${keywordMatchCount} keyword matches | ${postCount} total processed | Efficiency: ${((relevantCount/postCount)*100).toFixed(2)}%`
+          `✅ Complete: ${relevantCount} saved | ${keywordMatchCount} matches | ${postCount} processed (${efficiency}% efficiency) | Filtered: ${filterReduction}% (lang:${languageFiltered}, len:${lengthFiltered})`
         );
 
         resolve({
@@ -310,9 +353,9 @@ serve(async (req) => {
   try {
     console.log('🚀 Starting collection session...');
     
-    const { durationMs = 30000 } = await req.json().catch(() => ({}));
+    const { durationMs = 15000, maxPostsProcessed = 50000 } = await req.json().catch(() => ({}));
     
-    const result = await processBlueskyStreamWithCursor(durationMs);
+    const result = await processBlueskyStreamWithCursor(durationMs, maxPostsProcessed);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
