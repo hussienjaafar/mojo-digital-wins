@@ -216,6 +216,11 @@ async function updateTrends(supabase: any, analyses: any[]) {
   for (const [topic, data] of topicCounts.entries()) {
     const avgSentiment = data.sentiment.reduce((a, b) => a + b, 0) / data.sentiment.length;
 
+    // Calculate sentiment breakdown (positive > 0.3, neutral -0.3 to 0.3, negative < -0.3)
+    const sentimentPositive = data.sentiment.filter(s => s > 0.3).length;
+    const sentimentNeutral = data.sentiment.filter(s => s >= -0.3 && s <= 0.3).length;
+    const sentimentNegative = data.sentiment.filter(s => s < -0.3).length;
+
     // Calculate counts from database using cs (contains) filter for array queries
     const { count: hourCount, error: hourError } = await supabase
       .from('bluesky_posts')
@@ -252,6 +257,9 @@ async function updateTrends(supabase: any, analyses: any[]) {
       mentions_last_24_hours: mentionsLast24Hours,
       velocity,
       sentiment_avg: avgSentiment,
+      sentiment_positive: sentimentPositive,
+      sentiment_neutral: sentimentNeutral,
+      sentiment_negative: sentimentNegative,
       is_trending: isTrending,
       trending_since: isTrending ? new Date().toISOString() : null,
       last_seen_at: new Date().toISOString(),

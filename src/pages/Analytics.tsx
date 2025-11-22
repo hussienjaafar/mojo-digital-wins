@@ -177,7 +177,7 @@ export default function Analytics() {
           .select('*')
           .gte('last_seen_at', subDays(new Date(), 7).toISOString())
           .order('velocity', { ascending: false })
-          .limit(20),
+          .limit(100),
 
         // Bluesky posts count
         supabase
@@ -1119,6 +1119,24 @@ export default function Analytics() {
                           )}
                         </div>
                       )}
+
+                      {/* View in Feed Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-4 gap-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSearchTerm(trend.topic);
+                          if (navigateToTab) {
+                            navigateToTab('feed');
+                            toast.success(`Filtering news feed by "${trend.topic}"`);
+                          }
+                        }}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        View in Feed
+                      </Button>
 
                       {/* Time Info */}
                       <div className="mt-3 pt-3 border-t text-xs text-muted-foreground flex justify-between">
