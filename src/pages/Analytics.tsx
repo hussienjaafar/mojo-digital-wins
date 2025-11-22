@@ -606,7 +606,7 @@ export default function Analytics() {
                 )}
               </div>
               <p className="text-sm sm:text-base text-muted-foreground mt-1">
-                {isLive ? 'Real-time updates enabled • Auto-refresh every 30s' : 'Real-time overview of news, politics, and emerging threats'}
+                {isLive ? 'Auto-updates in background • Fresh data on every login • Live updates when open' : 'Real-time overview of news, politics, and emerging threats'}
               </p>
             </div>
           </div>
@@ -638,9 +638,10 @@ export default function Analytics() {
               variant="outline"
               onClick={extractTrendingTopics}
               disabled={analyzing}
+              title="Manual refresh (auto-extracts every 30 min)"
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
-              {analyzing ? 'Refreshing...' : 'Refresh Topics'}
+              {analyzing ? 'Extracting...' : 'Extract Now'}
             </Button>
 
             <Button variant="outline" onClick={exportToCSV}>
@@ -776,7 +777,7 @@ export default function Analytics() {
                 )}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                Real-time analysis • {topicSentiments.length} topics tracked • Updates every 30s
+                Auto-extracts every 30 min • {topicSentiments.length} topics tracked • Live updates when site is open
               </p>
             </div>
           </div>
@@ -966,7 +967,7 @@ export default function Analytics() {
               </span>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              AI-powered trend analysis from Bluesky social media • Velocity-ranked by spike detection
+              AI analysis every 10 min • Correlation with news every 15 min • Velocity-ranked by spike detection
             </p>
 
             {blueskyTrends.length === 0 ? (
