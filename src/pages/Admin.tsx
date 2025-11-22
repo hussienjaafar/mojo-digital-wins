@@ -37,6 +37,7 @@ import { LogOut } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LiveRegionProvider } from "@/components/accessibility";
+import { NewsFilterProvider, useNewsFilters } from "@/contexts/NewsFilterContext";
 
 type ContactSubmission = {
   id: string;
@@ -46,6 +47,27 @@ type ContactSubmission = {
   campaign: string | null;
   organization_type: string | null;
   message: string;
+};
+
+// Inner component that uses the NewsFilterContext
+const AdminContent = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
+  const { setNavigateToTab } = useNewsFilters();
+
+  // Set up the navigation function when component mounts
+  useEffect(() => {
+    setNavigateToTab((tab: 'feed' | 'analytics') => {
+      if (tab === 'feed') {
+        setActiveTab('news');
+      } else if (tab === 'analytics') {
+        setActiveTab('content-analytics');
+      }
+    });
+
+    // Cleanup on unmount
+    return () => setNavigateToTab(null);
+  }, [setActiveTab, setNavigateToTab]);
+
+  return null; // This component only sets up the navigation
 };
 
 const Admin = () => {
@@ -321,9 +343,11 @@ const Admin = () => {
 
   return (
     <LiveRegionProvider>
-      <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarChange}>
-        <div className="min-h-screen flex w-full bg-background">
-          <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <NewsFilterProvider>
+        <AdminContent setActiveTab={setActiveTab} />
+        <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarChange}>
+          <div className="min-h-screen flex w-full bg-background">
+            <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
           <div className="flex-1 flex flex-col min-w-0">
             {/* Mobile-optimized header with breadcrumb */}
@@ -380,6 +404,7 @@ const Admin = () => {
           </div>
         </div>
       </SidebarProvider>
+      </NewsFilterProvider>
     </LiveRegionProvider>
   );
 };

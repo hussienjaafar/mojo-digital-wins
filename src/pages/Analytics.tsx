@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format, subDays } from "date-fns";
-import { CalendarIcon, Download, TrendingUp, AlertTriangle, Newspaper, Scale, Building2, RefreshCw, Activity } from "lucide-react";
+import { CalendarIcon, Download, TrendingUp, AlertTriangle, Newspaper, Scale, Building2, RefreshCw, Activity, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Area, Line } from "recharts";
 import { cn } from "@/lib/utils";
+import { useNewsFilters } from "@/contexts/NewsFilterContext";
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
@@ -29,6 +30,8 @@ interface TopicSentiment {
 }
 
 export default function Analytics() {
+  const { setSearchTerm, navigateToTab } = useNewsFilters();
+
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: subDays(new Date(), 7),
     to: new Date(),
@@ -102,10 +105,8 @@ export default function Analytics() {
             }, 60000); // 60 seconds
           }
 
-          // Trigger analytics refresh
-          if (isLive) {
-            fetchAnalytics();
-          }
+          // Note: Analytics auto-refreshes every 30 seconds (see effect below)
+          // No need to trigger fetchAnalytics() here - prevents excessive DB queries
         }
       )
       .subscribe();
@@ -136,33 +137,67 @@ export default function Analytics() {
     setLoading(true);
     setLastUpdated(new Date());
     try {
-      // Fetch AI-extracted trending topics with velocity scores
-      const { data: trendingTopicsData, error: topicsError } = await supabase
-        .from('trending_topics')
-        .select('*')
-        .gte('hour_timestamp', dateRange.from.toISOString())
-        .lte('hour_timestamp', dateRange.to.toISOString())
-        .order('velocity_score', { ascending: false })
-        .limit(50);
+      // Fetch all data in parallel for better performance
+      const [
+        { data: trendingTopicsData, error: topicsError },
+        { data: articles },
+        { data: bills },
+        { data: blueskyData, error: blueskyError },
+        { count: postsCount },
+        { count: predictiveCount }
+      ] = await Promise.all([
+        // AI-extracted trending topics with velocity scores
+        supabase
+          .from('trending_topics')
+          .select('*')
+          .gte('hour_timestamp', dateRange.from.toISOString())
+          .lte('hour_timestamp', dateRange.to.toISOString())
+          .order('velocity_score', { ascending: false })
+          .limit(50),
+
+        // Articles in date range (for metrics)
+        supabase
+          .from('articles')
+          .select('*')
+          .gte('published_date', dateRange.from.toISOString())
+          .lte('published_date', dateRange.to.toISOString())
+          .order('published_date', { ascending: true }),
+
+        // Bills in date range
+        supabase
+          .from('bills')
+          .select('*')
+          .gte('introduced_date', dateRange.from.toISOString())
+          .lte('introduced_date', dateRange.to.toISOString()),
+
+        // Bluesky social intelligence
+        supabase
+          .from('bluesky_trends' as any)
+          .select('*')
+          .gte('last_seen_at', subDays(new Date(), 7).toISOString())
+          .order('velocity', { ascending: false })
+          .limit(20),
+
+        // Bluesky posts count
+        supabase
+          .from('bluesky_posts' as any)
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', dateRange.from.toISOString()),
+
+        // Predictive signals count
+        supabase
+          .from('bluesky_article_correlations' as any)
+          .select('*', { count: 'exact', head: true })
+          .eq('is_predictive', true)
+      ]);
 
       if (topicsError) {
         console.error('Error fetching trending topics:', topicsError);
       }
 
-      // Fetch articles in date range (for metrics)
-      const { data: articles } = await supabase
-        .from('articles')
-        .select('*')
-        .gte('published_date', dateRange.from.toISOString())
-        .lte('published_date', dateRange.to.toISOString())
-        .order('published_date', { ascending: true});
-
-      // Fetch bills in date range
-      const { data: bills } = await supabase
-        .from('bills')
-        .select('*')
-        .gte('introduced_date', dateRange.from.toISOString())
-        .lte('introduced_date', dateRange.to.toISOString());
+      if (blueskyError) {
+        console.error('Error fetching Bluesky trends:', blueskyError);
+      }
 
       if (!articles) {
         setLoading(false);
@@ -379,30 +414,8 @@ export default function Analytics() {
 
       setBillTopicCorrelation(correlationData);
 
-      // === FETCH BLUESKY SOCIAL INTELLIGENCE ===
-      const { data: blueskyData, error: blueskyError } = await supabase
-        .from('bluesky_trends' as any)
-        .select('*')
-        .gte('last_seen_at', subDays(new Date(), 7).toISOString())
-        .order('velocity', { ascending: false })
-        .limit(20);
-
-      if (blueskyError) {
-        console.error('Error fetching Bluesky trends:', blueskyError);
-      } else {
-        setBlueskyTrends(blueskyData || []);
-      }
-
-      // Fetch social metrics
-      const { count: postsCount } = await supabase
-        .from('bluesky_posts' as any)
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', dateRange.from.toISOString());
-
-      const { count: predictiveCount } = await supabase
-        .from('bluesky_article_correlations' as any)
-        .select('*', { count: 'exact', head: true })
-        .eq('is_predictive', true);
+      // === SET BLUESKY SOCIAL INTELLIGENCE (already fetched in parallel) ===
+      setBlueskyTrends(blueskyData || []);
 
       setSocialMetrics({
         totalPosts: postsCount || 0,
@@ -448,29 +461,6 @@ export default function Analytics() {
     } catch (error) {
       console.error('Error exporting CSV:', error);
       toast.error('Failed to export CSV');
-    }
-  };
-
-  const runSentimentAnalysis = async () => {
-    try {
-      setAnalyzing(true);
-      toast.info('Starting sentiment analysis... This may take a minute.');
-
-      const { data, error } = await supabase.functions.invoke('analyze-articles');
-
-      if (error) throw error;
-
-      toast.success(
-        `Analysis complete! Processed ${data.processed} articles, found ${data.duplicates} duplicates.`
-      );
-
-      // Refresh analytics data to show new sentiment results
-      await fetchAnalytics();
-    } catch (error) {
-      console.error('Error running sentiment analysis:', error);
-      toast.error('Failed to analyze articles. Check console for details.');
-    } finally {
-      setAnalyzing(false);
     }
   };
 
@@ -636,12 +626,12 @@ export default function Analytics() {
 
             <Button
               variant="outline"
-              onClick={extractTrendingTopics}
-              disabled={analyzing}
-              title="Manual refresh (auto-extracts every 30 min)"
+              onClick={() => fetchAnalytics()}
+              disabled={loading}
+              title="Refresh data (auto-updates every 30 sec)"
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? 'animate-spin' : ''}`} />
-              {analyzing ? 'Extracting...' : 'Extract Now'}
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh View
             </Button>
 
             <Button variant="outline" onClick={exportToCSV}>
@@ -763,6 +753,18 @@ export default function Analytics() {
 
         {/* TRENDING TOPICS WITH SENTIMENT */}
         <TabsContent value="topics" className="space-y-4">
+          {/* Warning when date range > 24 hours */}
+          {Math.floor((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60)) > 24 && (
+            <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertDescription className="text-amber-800 dark:text-amber-200">
+                <strong>Note:</strong> You've selected a {Math.floor((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24))}-day date range,
+                but trending topics are auto-extracted from the <strong>last 24 hours</strong> only.
+                Other metrics (articles, bills, sentiment timeline) will show data for your full selected range.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex justify-between items-center mb-4">
             <div>
               <div className="flex items-center gap-2">
@@ -782,7 +784,31 @@ export default function Analytics() {
             </div>
           </div>
 
-          {topicSentiments.length === 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-10 h-10 rounded-full bg-muted"></div>
+                        <div className="flex-1 space-y-2">
+                          <div className="h-5 bg-muted rounded w-3/4"></div>
+                          <div className="h-4 bg-muted rounded w-1/2"></div>
+                        </div>
+                      </div>
+                      <div className="w-16 h-12 bg-muted rounded"></div>
+                    </div>
+                    <div className="space-y-2 mb-4">
+                      <div className="h-3 bg-muted rounded w-full"></div>
+                      <div className="h-3 bg-muted rounded w-5/6"></div>
+                    </div>
+                    <div className="h-6 bg-muted rounded-full w-full"></div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : topicSentiments.length === 0 ? (
             <Card>
               <CardContent className="p-12">
                 <p className="text-muted-foreground text-center">No trending topics found in this time period</p>
@@ -895,6 +921,24 @@ export default function Analytics() {
                         </span>
                       </div>
                     </div>
+
+                    {/* View in Feed Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-4 gap-2"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Don't trigger card onClick
+                        setSearchTerm(topic.topic);
+                        if (navigateToTab) {
+                          navigateToTab('feed');
+                          toast.success(`Filtering news feed by "${topic.topic}"`);
+                        }
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      View in Feed
+                    </Button>
                   </CardContent>
                 </Card>
               ))}

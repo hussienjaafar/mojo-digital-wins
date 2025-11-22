@@ -6,22 +6,25 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { RefreshCw, AlertCircle, Sparkles } from "lucide-react";
+import { RefreshCw, AlertCircle, Sparkles, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useNewsFilters } from "@/contexts/NewsFilterContext";
 
 const ARTICLES_PER_PAGE = 50;
 
 export function NewsFeed() {
+  const { searchTerm, setSearchTerm, navigateToTab } = useNewsFilters();
+
   const [articles, setArticles] = useState<any[]>([]);
-  const [displayedArticles, setDisplayedArticles] = useState<any[]>([]);
-  const [filteredArticles, setFilteredArticles] = useState<any[]>([]);
   const [sources, setSources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState<FilterState | null>(null);
+  const [trendingCount, setTrendingCount] = useState<number>(0);
   const { toast } = useToast();
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -35,9 +38,38 @@ export function NewsFeed() {
     'civil_rights'
   ];
 
+  // Listen for search term from Analytics (cross-tab navigation)
+  useEffect(() => {
+    if (searchTerm) {
+      console.log('📍 Applying search term from Analytics:', searchTerm);
+
+      // Create filter with the search term
+      const filterWithSearch: FilterState = {
+        search: searchTerm,
+        category: 'all',
+        sourceId: 'all',
+        dateRange: 'all',
+        tags: [],
+        geographicScope: 'all'
+      };
+
+      // Apply the filter
+      applyFilters(filterWithSearch);
+
+      // Clear the search term from context after applying
+      setSearchTerm(null);
+
+      toast({
+        title: "Search applied",
+        description: `Filtering articles by "${searchTerm}"`,
+      });
+    }
+  }, [searchTerm]);
+
   useEffect(() => {
     loadArticles();
     loadSources();
+    loadTrendingCount();
 
     // Set up real-time subscription for new articles
     const articlesChannel = supabase
@@ -52,6 +84,75 @@ export function NewsFeed() {
         (payload) => {
           console.log('New article received:', payload.new);
           const newArticle = payload.new as any;
+
+          // Check if article matches current filters before inserting
+          if (currentFilters) {
+            let matchesFilters = true;
+
+            // Search filter
+            if (currentFilters.search) {
+              const searchLower = currentFilters.search.toLowerCase();
+              const titleMatch = newArticle.title?.toLowerCase().includes(searchLower);
+              const descMatch = newArticle.description?.toLowerCase().includes(searchLower);
+              if (!titleMatch && !descMatch) {
+                matchesFilters = false;
+              }
+            }
+
+            // Category filter
+            if (matchesFilters && currentFilters.category !== 'all') {
+              if (newArticle.category !== currentFilters.category) {
+                matchesFilters = false;
+              }
+            }
+
+            // Source filter
+            if (matchesFilters && currentFilters.sourceId !== 'all') {
+              if (newArticle.source_id !== currentFilters.sourceId) {
+                matchesFilters = false;
+              }
+            }
+
+            // Date range filter
+            if (matchesFilters && currentFilters.dateRange !== 'all') {
+              const now = new Date();
+              const ranges: Record<string, number> = {
+                today: 1,
+                week: 7,
+                month: 30
+              };
+              const days = ranges[currentFilters.dateRange] || 0;
+              if (days > 0) {
+                const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+                const articleDate = new Date(newArticle.published_date);
+                if (articleDate < cutoff) {
+                  matchesFilters = false;
+                }
+              }
+            }
+
+            // Tags filter
+            if (matchesFilters && currentFilters.tags.length > 0) {
+              const articleTags = newArticle.tags || [];
+              const hasMatchingTag = currentFilters.tags.some(tag => articleTags.includes(tag));
+              if (!hasMatchingTag) {
+                matchesFilters = false;
+              }
+            }
+
+            // Geographic scope filter
+            if (matchesFilters && currentFilters.geographicScope && currentFilters.geographicScope !== 'all') {
+              if (newArticle.geographic_scope !== currentFilters.geographicScope) {
+                matchesFilters = false;
+              }
+            }
+
+            // Don't insert if article doesn't match filters
+            if (!matchesFilters) {
+              console.log('New article filtered out:', newArticle.title);
+              return;
+            }
+          }
 
           // Insert article in correct chronological order by published_date
           const insertSorted = (prev: any[]) => {
@@ -73,9 +174,7 @@ export function NewsFeed() {
             return newList;
           };
 
-          setArticles(insertSorted);
-          setFilteredArticles(insertSorted);
-          setDisplayedArticles(insertSorted);
+          setArticles(prev => insertSorted(prev));
 
           toast({
             title: "New article added",
@@ -107,7 +206,7 @@ export function NewsFeed() {
       hasMore,
       loadingMore,
       page,
-      displayedCount: displayedArticles.length
+      displayedCount: articles.length
     });
 
     const currentTarget = observerTarget.current;
@@ -140,7 +239,7 @@ export function NewsFeed() {
       observer.disconnect();
       console.log('🔌 IntersectionObserver disconnected');
     };
-  }, [loadMoreArticles, hasMore, loadingMore, displayedArticles.length]);
+  }, [loadMoreArticles, hasMore, loadingMore, articles.length]);
 
   const loadArticles = async (pageNum: number = 0, filters: FilterState | null = null) => {
     try {
@@ -217,14 +316,13 @@ export function NewsFeed() {
       const newArticles = data || [];
       console.log(`✅ Loaded ${newArticles.length} articles (page ${pageNum}, range: ${from}-${to}, total in DB: ${count})`);
 
+      // Save total count for display
+      setTotalCount(count || 0);
+
       if (pageNum === 0) {
         setArticles(newArticles);
-        setFilteredArticles(newArticles);
-        setDisplayedArticles(newArticles);
       } else {
         setArticles(prev => [...prev, ...newArticles]);
-        setFilteredArticles(prev => [...prev, ...newArticles]);
-        setDisplayedArticles(prev => [...prev, ...newArticles]);
       }
 
       // Check if there are more articles
@@ -260,6 +358,24 @@ export function NewsFeed() {
       setSources(data || []);
     } catch (err: any) {
       console.error('Error loading sources:', err);
+    }
+  };
+
+  const loadTrendingCount = async () => {
+    try {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const { count, error } = await supabase
+        .from('trending_topics')
+        .select('*', { count: 'exact', head: true })
+        .gte('hour_timestamp', yesterday.toISOString())
+        .gt('velocity_score', 50); // Only count topics with significant velocity
+
+      if (error) throw error;
+      setTrendingCount(count || 0);
+    } catch (err: any) {
+      console.error('Error loading trending count:', err);
     }
   };
 
@@ -313,7 +429,7 @@ export function NewsFeed() {
         <div>
           <h2 className="text-3xl font-bold">News Feed</h2>
           <p className="text-muted-foreground mt-1">
-            Showing {displayedArticles.length} {displayedArticles.length === 1 ? 'article' : 'articles'}
+            Showing {articles.length} of {totalCount.toLocaleString()} {totalCount === 1 ? 'article' : 'articles'}
             {hasMore && ' • Scroll for more'}
           </p>
         </div>
@@ -361,13 +477,40 @@ export function NewsFeed() {
         </Alert>
       )}
 
+      {trendingCount > 0 && (
+        <Alert className="bg-primary/5 border-primary/20">
+          <TrendingUp className="h-4 w-4 text-primary" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              <strong>{trendingCount}</strong> trending topic{trendingCount > 1 ? 's' : ''} detected in the last 24 hours
+            </span>
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-primary"
+              onClick={() => {
+                if (navigateToTab) {
+                  navigateToTab('analytics');
+                  toast({
+                    title: "Switched to Analytics",
+                    description: "View trending topics and sentiment analysis",
+                  });
+                }
+              }}
+            >
+              View Analytics →
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <NewsFilters
         categories={categories}
         sources={sources}
         onFilterChange={applyFilters}
       />
 
-      {displayedArticles.length === 0 ? (
+      {articles.length === 0 ? (
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -377,7 +520,7 @@ export function NewsFeed() {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {displayedArticles.map((article) => (
+            {articles.map((article) => (
               <NewsCard key={article.id} article={article} />
             ))}
           </div>
@@ -388,24 +531,13 @@ export function NewsFeed() {
               <LoadingSpinner size="md" label="Loading more articles..." />
             )}
             {!loadingMore && hasMore && (
-              <>
-                <p className="text-muted-foreground text-sm">
-                  Scroll down to load more • {displayedArticles.length} of {displayedArticles.length + 50}+ articles
-                </p>
-                <Button
-                  onClick={() => loadArticles(page + 1, currentFilters)}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Load More Articles
-                </Button>
-              </>
-            )}
-            {!hasMore && displayedArticles.length > 0 && (
               <p className="text-muted-foreground text-sm">
-                ✓ All {displayedArticles.length} articles loaded
+                Scroll down to load more • {articles.length} of {totalCount.toLocaleString()} articles
+              </p>
+            )}
+            {!hasMore && articles.length > 0 && (
+              <p className="text-muted-foreground text-sm">
+                ✓ All {totalCount.toLocaleString()} articles loaded
               </p>
             )}
           </div>
