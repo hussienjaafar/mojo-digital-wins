@@ -27,7 +27,7 @@ serve(async (req) => {
     let query = supabase
       .from('scheduled_jobs')
       .select('*')
-      .eq('is_enabled', true);
+      .eq('is_active', true);
 
     if (jobType) {
       query = query.eq('job_type', jobType);
