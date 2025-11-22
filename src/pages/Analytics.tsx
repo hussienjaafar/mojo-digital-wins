@@ -1127,11 +1127,20 @@ export default function Analytics() {
                         className="w-full mt-4 gap-2"
                         onClick={(e) => {
                           e.stopPropagation();
+
+                          if (!navigateToTab) {
+                            toast.error("Navigation not available. Please refresh the page.");
+                            return;
+                          }
+
+                          // Set search term first
                           setSearchTerm(trend.topic);
-                          if (navigateToTab) {
+
+                          // Use setTimeout to ensure state update propagates before navigation
+                          setTimeout(() => {
                             navigateToTab('feed');
                             toast.success(`Filtering news feed by "${trend.topic}"`);
-                          }
+                          }, 100);
                         }}
                       >
                         <ExternalLink className="h-4 w-4" />
