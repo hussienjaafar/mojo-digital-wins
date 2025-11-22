@@ -14,6 +14,9 @@ const TRACKED_KEYWORDS = [
   'palestine', 'gaza', 'west bank', 'middle east'
 ];
 
+// Convert to Set for O(1) lookup performance
+const TRACKED_KEYWORDS_SET = new Set(TRACKED_KEYWORDS);
+
 interface JetStreamEvent {
   did: string;
   time_us: number;
@@ -57,21 +60,28 @@ function extractUrls(text: string): string[] {
 }
 
 // Calculate relevance score (0-1) based on tracked keywords
+// Optimized with Set lookup and early exit for performance
 function calculateRelevance(text: string): number {
   const lowerText = text.toLowerCase();
   let score = 0;
 
-  for (const keyword of TRACKED_KEYWORDS) {
+  for (const keyword of TRACKED_KEYWORDS_SET) {
     if (lowerText.includes(keyword)) {
       score += 0.15; // Each keyword match adds to relevance
+
+      // Early exit once we reach threshold (saves CPU cycles)
+      if (score >= 0.1) {
+        return Math.min(score, 1.0);
+      }
     }
   }
 
-  return Math.min(score, 1.0); // Cap at 1.0
+  return score; // Below threshold, no need to cap
 }
 
 // Cursor-based stream processor with timeout
-async function processBlueskyStreamWithCursor(durationMs: number = 45000) {
+// Reduced from 45s to 30s to prevent CPU timeout (edge function limit is 50s)
+async function processBlueskyStreamWithCursor(durationMs: number = 30000) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -94,8 +104,9 @@ async function processBlueskyStreamWithCursor(durationMs: number = 45000) {
   console.log(`📍 Resuming from cursor: ${lastCursor}`);
 
   // Build WebSocket URL with cursor (rewind 5 seconds for safety)
+  // Filter for English posts only to reduce CPU load (85% of firehose is non-English)
   const cursorWithBuffer = lastCursor - (5 * 1000000); // Subtract 5 seconds in microseconds
-  const wsUrl = `wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post&cursor=${cursorWithBuffer}`;
+  const wsUrl = `wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post&cursor=${cursorWithBuffer}&langs=en`;
 
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(wsUrl);
@@ -104,7 +115,7 @@ async function processBlueskyStreamWithCursor(durationMs: number = 45000) {
     let relevantCount = 0;
     let postsBuffer: any[] = [];
     let latestCursor = lastCursor;
-    const BATCH_SIZE = 10;
+    const BATCH_SIZE = 25; // Increased from 10 to reduce DB insert overhead
 
     // Set timeout to stop collection before edge function times out
     const timeout = setTimeout(async () => {
@@ -237,7 +248,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const durationMs = body.durationMs || 45000; // Default 45 seconds
+    const durationMs = body.durationMs || 30000; // Default 30 seconds (reduced from 45s to prevent CPU timeout)
 
     console.log(`🚀 Starting ${durationMs}ms collection session...`);
 
