@@ -17,7 +17,6 @@ export function NewsFeed() {
   const [sources, setSources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
@@ -246,42 +245,6 @@ export function NewsFeed() {
     }
   };
 
-  const fetchNewArticles = async () => {
-    try {
-      setFetching(true);
-      console.log('🔄 Starting RSS feed fetch...');
-
-      const { data, error } = await supabase.functions.invoke('fetch-rss-feeds');
-
-      console.log('📡 RSS fetch response:', { data, error });
-
-      if (error) {
-        console.error('❌ RSS fetch error:', error);
-        throw error;
-      }
-
-      console.log(`✅ RSS fetch complete: ${data?.articlesAdded || 0} articles from ${data?.sourcesProcessed || 0} sources`);
-
-      toast({
-        title: "RSS feeds updated",
-        description: `Added ${data?.articlesAdded || 0} new articles from ${data?.sourcesProcessed || 0} sources`,
-      });
-
-      // Reload articles to show new ones
-      console.log('🔄 Reloading articles...');
-      await loadArticles();
-    } catch (err: any) {
-      console.error('❌ Error in fetchNewArticles:', err);
-      toast({
-        title: "Error fetching feeds",
-        description: err.message || 'Unknown error occurred',
-        variant: "destructive"
-      });
-    } finally {
-      setFetching(false);
-    }
-  };
-
   const detectDuplicates = async () => {
     try {
       toast({
@@ -332,7 +295,8 @@ export function NewsFeed() {
         <div>
           <h2 className="text-3xl font-bold">News Feed</h2>
           <p className="text-muted-foreground mt-1">
-            {filteredArticles.length} {filteredArticles.length === 1 ? 'article' : 'articles'}
+            Showing {displayedArticles.length} {displayedArticles.length === 1 ? 'article' : 'articles'}
+            {hasMore && ' • Scroll for more'}
           </p>
         </div>
         <div className="flex gap-2">
@@ -345,12 +309,12 @@ export function NewsFeed() {
             Detect Duplicates
           </Button>
           <Button
-            onClick={fetchNewArticles}
-            disabled={fetching}
+            onClick={() => loadArticles(0, currentFilters)}
+            variant="outline"
             className="gap-2"
           >
-            <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} />
-            {fetching ? 'Fetching...' : 'Refresh Feed'}
+            <RefreshCw className="h-4 w-4" />
+            Reload Articles
           </Button>
         </div>
       </div>
