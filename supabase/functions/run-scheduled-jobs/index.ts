@@ -149,11 +149,11 @@ serve(async (req) => {
             break;
 
           case 'analyze_bluesky':
-            const blueskyResponse = await supabase.functions.invoke('analyze-bluesky-posts', {
+            const analyzeBlueskyResponse = await supabase.functions.invoke('analyze-bluesky-posts', {
               body: {}
             });
-            if (blueskyResponse.error) throw new Error(blueskyResponse.error.message);
-            result = blueskyResponse.data;
+            if (analyzeBlueskyResponse.error) throw new Error(analyzeBlueskyResponse.error.message);
+            result = analyzeBlueskyResponse.data;
             itemsProcessed = result?.processed || 0;
             itemsCreated = result?.analyzed || 0;
             break;
@@ -171,11 +171,11 @@ serve(async (req) => {
           case 'collect_bluesky':
           case 'bluesky_stream_keepalive': // Legacy name, same behavior
             // Cursor-based JetStream polling (runs for 45 seconds, resumes from last cursor)
-            const blueskyResponse = await supabase.functions.invoke('bluesky-stream', {
+            const collectBlueskyResponse = await supabase.functions.invoke('bluesky-stream', {
               body: { durationMs: 45000 }
             });
-            if (blueskyResponse.error) throw new Error(blueskyResponse.error.message);
-            result = blueskyResponse.data;
+            if (collectBlueskyResponse.error) throw new Error(collectBlueskyResponse.error.message);
+            result = collectBlueskyResponse.data;
             itemsProcessed = result?.postsCollected || 0;
             itemsCreated = result?.postsCollected || 0;
             break;

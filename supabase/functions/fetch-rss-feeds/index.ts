@@ -490,7 +490,7 @@ serve(async (req) => {
 
       results.forEach(result => {
         if (result.success) {
-          totalArticles += result.articlesAdded;
+          totalArticles += result.articlesAdded || 0;
         } else {
           totalErrors++;
         }

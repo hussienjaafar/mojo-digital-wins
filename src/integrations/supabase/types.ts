@@ -625,6 +625,98 @@ export type Database = {
         }
         Relationships: []
       }
+      bluesky_article_correlations: {
+        Row: {
+          article_id: string | null
+          article_published: string | null
+          correlation_strength: number | null
+          detected_at: string | null
+          id: string
+          is_predictive: boolean | null
+          peak_social_time: string | null
+          social_mentions: number | null
+          social_sentiment: number | null
+          time_lag_minutes: number | null
+          topic: string
+        }
+        Insert: {
+          article_id?: string | null
+          article_published?: string | null
+          correlation_strength?: number | null
+          detected_at?: string | null
+          id?: string
+          is_predictive?: boolean | null
+          peak_social_time?: string | null
+          social_mentions?: number | null
+          social_sentiment?: number | null
+          time_lag_minutes?: number | null
+          topic: string
+        }
+        Update: {
+          article_id?: string | null
+          article_published?: string | null
+          correlation_strength?: number | null
+          detected_at?: string | null
+          id?: string
+          is_predictive?: boolean | null
+          peak_social_time?: string | null
+          social_mentions?: number | null
+          social_sentiment?: number | null
+          time_lag_minutes?: number | null
+          topic?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bluesky_article_correlations_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bluesky_keywords: {
+        Row: {
+          alert_sent: boolean | null
+          alert_threshold: number | null
+          category: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          keyword: string
+          last_mention_at: string | null
+          priority: string | null
+          total_mentions: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          alert_sent?: boolean | null
+          alert_threshold?: number | null
+          category: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          keyword: string
+          last_mention_at?: string | null
+          priority?: string | null
+          total_mentions?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          alert_sent?: boolean | null
+          alert_threshold?: number | null
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          keyword?: string
+          last_mention_at?: string | null
+          priority?: string | null
+          total_mentions?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       bluesky_posts: {
         Row: {
           ai_processed: boolean | null
@@ -694,6 +786,165 @@ export type Database = {
           reply_to?: string | null
           text?: string | null
           urls?: string[] | null
+        }
+        Relationships: []
+      }
+      bluesky_stream_cursor: {
+        Row: {
+          id: number
+          last_cursor: number
+          last_error: string | null
+          last_updated_at: string | null
+          posts_collected: number | null
+        }
+        Insert: {
+          id?: number
+          last_cursor: number
+          last_error?: string | null
+          last_updated_at?: string | null
+          posts_collected?: number | null
+        }
+        Update: {
+          id?: number
+          last_cursor?: number
+          last_error?: string | null
+          last_updated_at?: string | null
+          posts_collected?: number | null
+        }
+        Relationships: []
+      }
+      bluesky_topic_clusters: {
+        Row: {
+          author_count: number | null
+          central_topic: string | null
+          centrality: number | null
+          cluster_name: string
+          cluster_sentiment: number | null
+          cluster_velocity: number | null
+          density: number | null
+          detected_at: string | null
+          engagement_score: number | null
+          id: string
+          is_breaking: boolean | null
+          last_updated: string | null
+          post_count: number | null
+          related_news_cluster_id: string | null
+          topics: string[]
+        }
+        Insert: {
+          author_count?: number | null
+          central_topic?: string | null
+          centrality?: number | null
+          cluster_name: string
+          cluster_sentiment?: number | null
+          cluster_velocity?: number | null
+          density?: number | null
+          detected_at?: string | null
+          engagement_score?: number | null
+          id?: string
+          is_breaking?: boolean | null
+          last_updated?: string | null
+          post_count?: number | null
+          related_news_cluster_id?: string | null
+          topics: string[]
+        }
+        Update: {
+          author_count?: number | null
+          central_topic?: string | null
+          centrality?: number | null
+          cluster_name?: string
+          cluster_sentiment?: number | null
+          cluster_velocity?: number | null
+          density?: number | null
+          detected_at?: string | null
+          engagement_score?: number | null
+          id?: string
+          is_breaking?: boolean | null
+          last_updated?: string | null
+          post_count?: number | null
+          related_news_cluster_id?: string | null
+          topics?: string[]
+        }
+        Relationships: []
+      }
+      bluesky_trends: {
+        Row: {
+          calculated_at: string | null
+          correlation_score: number | null
+          first_seen_at: string | null
+          id: string
+          is_trending: boolean | null
+          keyword_variations: string[] | null
+          last_seen_at: string | null
+          mentions_last_24_hours: number | null
+          mentions_last_6_hours: number | null
+          mentions_last_hour: number | null
+          mentions_last_week: number | null
+          peak_at: string | null
+          peak_velocity: number | null
+          related_articles: string[] | null
+          related_bills: string[] | null
+          related_executive_orders: string[] | null
+          sentiment_avg: number | null
+          sentiment_negative: number | null
+          sentiment_neutral: number | null
+          sentiment_positive: number | null
+          topic: string
+          trending_since: string | null
+          updated_at: string | null
+          velocity: number | null
+        }
+        Insert: {
+          calculated_at?: string | null
+          correlation_score?: number | null
+          first_seen_at?: string | null
+          id?: string
+          is_trending?: boolean | null
+          keyword_variations?: string[] | null
+          last_seen_at?: string | null
+          mentions_last_24_hours?: number | null
+          mentions_last_6_hours?: number | null
+          mentions_last_hour?: number | null
+          mentions_last_week?: number | null
+          peak_at?: string | null
+          peak_velocity?: number | null
+          related_articles?: string[] | null
+          related_bills?: string[] | null
+          related_executive_orders?: string[] | null
+          sentiment_avg?: number | null
+          sentiment_negative?: number | null
+          sentiment_neutral?: number | null
+          sentiment_positive?: number | null
+          topic: string
+          trending_since?: string | null
+          updated_at?: string | null
+          velocity?: number | null
+        }
+        Update: {
+          calculated_at?: string | null
+          correlation_score?: number | null
+          first_seen_at?: string | null
+          id?: string
+          is_trending?: boolean | null
+          keyword_variations?: string[] | null
+          last_seen_at?: string | null
+          mentions_last_24_hours?: number | null
+          mentions_last_6_hours?: number | null
+          mentions_last_hour?: number | null
+          mentions_last_week?: number | null
+          peak_at?: string | null
+          peak_velocity?: number | null
+          related_articles?: string[] | null
+          related_bills?: string[] | null
+          related_executive_orders?: string[] | null
+          sentiment_avg?: number | null
+          sentiment_negative?: number | null
+          sentiment_neutral?: number | null
+          sentiment_positive?: number | null
+          topic?: string
+          trending_since?: string | null
+          updated_at?: string | null
+          velocity?: number | null
         }
         Relationships: []
       }
@@ -2173,6 +2424,36 @@ export type Database = {
           },
         ]
       }
+      social_velocity_snapshots: {
+        Row: {
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          metric_type: string
+          metric_value: number
+          snapshot_time: string
+          topic: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          metric_type: string
+          metric_value: number
+          snapshot_time: string
+          topic?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          metric_type?: string
+          metric_value?: number
+          snapshot_time?: string
+          topic?: string | null
+        }
+        Relationships: []
+      }
       state_actions: {
         Row: {
           action_type: string
@@ -2524,6 +2805,10 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_bluesky_trend_velocity: {
+        Args: { topic_name: string }
+        Returns: number
+      }
       get_briefing_stats: { Args: { target_date?: string }; Returns: Json }
       get_daily_metrics_summary: {
         Args: {
