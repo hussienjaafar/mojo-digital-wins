@@ -243,7 +243,7 @@ serve(async (req) => {
 
     const result = await processBlueskyStreamWithCursor(durationMs);
 
-    console.log(`✅ Collection complete: ${result.postsCollected} posts collected`);
+    console.log(`✅ Collection complete: ${(result as any).postsCollected} posts collected`);
 
     return new Response(
       JSON.stringify(result),
