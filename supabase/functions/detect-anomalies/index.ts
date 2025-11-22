@@ -160,13 +160,36 @@ serve(async (req) => {
       }
     }
 
-    // Insert anomalies
+    // Insert anomalies and create alerts
     if (anomalies.length > 0) {
       const { error: insertError } = await supabase
         .from('detected_anomalies')
         .insert(anomalies);
 
       if (insertError) throw insertError;
+
+      // Create alerts for critical/high severity anomalies
+      const criticalAnomalies = anomalies.filter(a => 
+        a.severity === 'critical' || a.severity === 'high'
+      );
+
+      if (criticalAnomalies.length > 0) {
+        const alerts = criticalAnomalies.map(anomaly => ({
+          alert_type: anomaly.anomaly_type,
+          severity: anomaly.severity,
+          title: `${anomaly.severity.toUpperCase()}: ${anomaly.entity_name}`,
+          message: `Anomaly detected: ${anomaly.anomaly_type} for ${anomaly.entity_type} "${anomaly.entity_name}". Z-score: ${anomaly.z_score.toFixed(2)}. Current value: ${anomaly.current_value?.toFixed(2)}, Baseline: ${anomaly.baseline_value?.toFixed(2)}`,
+          data: {
+            entity_type: anomaly.entity_type,
+            entity_id: anomaly.entity_id,
+            z_score: anomaly.z_score,
+            metadata: anomaly.metadata
+          }
+        }));
+
+        await supabase.from('alert_queue').insert(alerts);
+        console.log(`[detect-anomalies] Created ${alerts.length} alerts`);
+      }
     }
 
     console.log(`[detect-anomalies] Detected ${anomalies.length} anomalies`);
