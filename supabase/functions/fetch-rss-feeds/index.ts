@@ -6,22 +6,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Keywords to tag articles
+// COMPREHENSIVE POLITICAL KEYWORDS - Tag all relevant topics
 const KEYWORDS = [
-  'arab american',
-  'muslim american',
-  'islamophobia',
-  'middle east',
-  'palestine',
-  'israel',
-  'gaza',
-  'syria',
-  'iraq',
-  'civil liberties',
-  'discrimination',
-  'hate crime',
-  'surveillance',
-  'profiling'
+  // Communities & Identity
+  'muslim american', 'arab american', 'jewish american', 'christian',
+  'lgbtq', 'transgender', 'gay rights', 'black lives matter', 
+  'latino', 'hispanic', 'asian american', 'indigenous', 'native american',
+  'disability rights', 'women rights', 'reproductive rights',
+  
+  // Civil Rights & Justice
+  'civil liberties', 'civil rights', 'discrimination', 'hate crime',
+  'police brutality', 'criminal justice', 'voting rights', 'surveillance',
+  'profiling', 'first amendment', 'religious freedom', 'islamophobia',
+  'antisemitism', 'racism', 'xenophobia', 'homophobia', 'transphobia',
+  
+  // Immigration
+  'immigration', 'refugee', 'asylum', 'deportation', 'border', 'daca',
+  'travel ban', 'sanctuary city', 'ice', 'customs',
+  
+  // Policy Areas
+  'healthcare', 'medicare', 'medicaid', 'affordable care act',
+  'climate change', 'environment', 'clean energy',
+  'education', 'student debt', 'charter schools',
+  'economy', 'inflation', 'minimum wage', 'unemployment',
+  'housing', 'homelessness', 'affordable housing',
+  'gun control', 'second amendment',
+  
+  // International (US Policy Impact)
+  'middle east', 'palestine', 'israel', 'gaza', 'west bank',
+  'syria', 'iraq', 'afghanistan', 'iran', 'yemen',
+  'ukraine', 'russia', 'china', 'foreign policy',
+  
+  // Government
+  'congress', 'senate', 'house of representatives', 'legislation',
+  'executive order', 'supreme court', 'federal court', 'state legislature'
 ];
 
 // IMPROVED THREAT DETECTION

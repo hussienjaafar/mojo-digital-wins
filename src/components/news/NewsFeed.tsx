@@ -50,7 +50,9 @@ export function NewsFeed() {
         sourceId: 'all',
         dateRange: 'all',
         tags: [],
-        geographicScope: 'all'
+        geographicScope: 'all',
+        affectedGroup: 'all',
+        relevanceCategory: 'all'
       };
 
       // Apply the filter

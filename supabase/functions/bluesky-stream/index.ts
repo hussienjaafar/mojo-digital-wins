@@ -6,16 +6,36 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Tracked keywords for relevance filtering
-const TRACKED_KEYWORDS = [
-  'cair', 'mpac', 'adc', 'muslim american', 'arab american',
-  'islamophobia', 'anti-muslim', 'civil liberties', 'religious freedom',
-  'surveillance', 'profiling', 'discrimination', 'hate crime',
-  'palestine', 'gaza', 'west bank', 'middle east'
+// BROAD POLITICAL KEYWORDS - Collect comprehensive political discourse
+// Categories: Politics, Policy, Rights, Justice, Community, Identity
+const POLITICAL_KEYWORDS = [
+  // US Politics
+  'congress', 'senate', 'house', 'biden', 'trump', 'democrats', 'republicans',
+  'election', 'vote', 'campaign', 'legislation', 'bill', 'executive order',
+  'white house', 'supreme court', 'federal', 'state legislature',
+  
+  // Policy Areas
+  'immigration', 'healthcare', 'climate', 'education', 'economy', 'inflation',
+  'housing', 'minimum wage', 'social security', 'medicare', 'medicaid',
+  'student debt', 'tax', 'regulation', 'foreign policy',
+  
+  // Civil Rights & Justice
+  'civil rights', 'civil liberties', 'discrimination', 'equality', 'justice',
+  'hate crime', 'police', 'criminal justice', 'prison', 'surveillance',
+  'voting rights', 'gerrymandering', 'protest', 'first amendment',
+  
+  // Communities & Identity
+  'muslim', 'arab', 'jewish', 'christian', 'lgbtq', 'transgender', 'gay rights',
+  'black lives matter', 'latino', 'hispanic', 'asian american', 'indigenous',
+  'native american', 'disability', 'women rights', 'abortion', 'reproductive',
+  
+  // International (affecting US policy)
+  'israel', 'palestine', 'gaza', 'middle east', 'ukraine', 'russia', 'china',
+  'iran', 'iraq', 'afghanistan', 'syria', 'yemen'
 ];
 
 // Lowercase keywords for fast matching (case-insensitive O(1) lookup)
-const TRACKED_KEYWORDS_LOWER = TRACKED_KEYWORDS.map(k => k.toLowerCase());
+const POLITICAL_KEYWORDS_LOWER = POLITICAL_KEYWORDS.map(k => k.toLowerCase());
 
 interface JetStreamEvent {
   did: string;
@@ -60,7 +80,7 @@ function extractUrls(text: string): string[] {
 }
 
 // Pre-compiled regex patterns for performance (created once, not per-post)
-const KEYWORD_PATTERNS = TRACKED_KEYWORDS_LOWER.map(keyword => 
+const KEYWORD_PATTERNS = POLITICAL_KEYWORDS_LOWER.map(keyword => 
   new RegExp(`\\b${keyword.replace(/\s+/g, '\\s+')}\\b`, 'i')
 );
 
@@ -74,9 +94,9 @@ function hasAnyKeyword(text: string): boolean {
   const lowerText = text.toLowerCase();
   
   // Stage 1: Fast substring check (no regex overhead)
-  // This filters out 95%+ of posts instantly
+  // This filters out ~90% of posts instantly (broader than before)
   let hasSubstring = false;
-  for (const keyword of TRACKED_KEYWORDS_LOWER) {
+  for (const keyword of POLITICAL_KEYWORDS_LOWER) {
     if (lowerText.includes(keyword)) {
       hasSubstring = true;
       break;
@@ -96,14 +116,14 @@ function hasAnyKeyword(text: string): boolean {
   return false;
 }
 
-// Calculate relevance score (0-1) based on tracked keywords
+// Calculate relevance score (0-1) based on political keywords
 function calculateRelevance(text: string): number {
   const lowerText = text.toLowerCase();
   let score = 0;
 
-  for (const keyword of TRACKED_KEYWORDS_LOWER) {
+  for (const keyword of POLITICAL_KEYWORDS_LOWER) {
     if (lowerText.includes(keyword)) {
-      score += 0.15; // Each keyword match adds to relevance
+      score += 0.1; // Each keyword match adds to relevance
       
       // Early exit once we reach threshold (saves CPU cycles)
       if (score >= 0.1) {
@@ -221,8 +241,8 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
           // Calculate detailed relevance score only for keyword-matching posts
           const relevanceScore = calculateRelevance(text);
 
-          // Store posts with relevance > 0.05
-          if (relevanceScore < 0.05) {
+          // Store posts with relevance > 0.1 (broader threshold)
+          if (relevanceScore < 0.1) {
             return;
           }
 

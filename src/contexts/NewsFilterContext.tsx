@@ -7,6 +7,8 @@ export interface FilterState {
   dateRange: string;
   tags: string[];
   geographicScope?: string;
+  affectedGroup?: string;
+  relevanceCategory?: string;
 }
 
 interface NewsContextType {
