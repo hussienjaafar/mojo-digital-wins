@@ -16,6 +16,27 @@ interface BlueSkyPost {
   created_at: string;
 }
 
+// Topic normalization map (same as news extraction)
+const TOPIC_NORMALIZATIONS: Record<string, string> = {
+  'donald trump': 'Donald Trump',
+  'trump': 'Donald Trump',
+  'joe biden': 'Joe Biden',
+  'biden': 'Joe Biden',
+  'netanyahu': 'Benjamin Netanyahu',
+  'israel': 'Israel',
+  'palestine': 'Palestine',
+  'gaza': 'Gaza',
+  'un': 'United Nations',
+  'ice': 'ICE',
+  'nyc': 'New York City',
+  'dc': 'Washington DC',
+};
+
+function normalizeTopic(topic: string): string {
+  const lower = topic.toLowerCase();
+  return TOPIC_NORMALIZATIONS[lower] || topic;
+}
+
 // Analyze posts using Lovable AI (Gemini)
 async function analyzePosts(posts: BlueSkyPost[]): Promise<any[]> {
   if (!LOVABLE_API_KEY) {
@@ -198,15 +219,17 @@ serve(async (req) => {
 async function updateTrends(supabase: any, analyses: any[]) {
   console.log('📈 Updating trends...');
 
-  // Extract all unique topics
+  // Extract all unique topics with normalization
   const topicCounts = new Map<string, { count: number, sentiment: number[] }>();
 
   for (const analysis of analyses) {
     for (const topic of analysis.ai_topics) {
-      if (!topicCounts.has(topic)) {
-        topicCounts.set(topic, { count: 0, sentiment: [] });
+      const normalizedTopic = normalizeTopic(topic);
+      
+      if (!topicCounts.has(normalizedTopic)) {
+        topicCounts.set(normalizedTopic, { count: 0, sentiment: [] });
       }
-      const data = topicCounts.get(topic)!;
+      const data = topicCounts.get(normalizedTopic)!;
       data.count++;
       data.sentiment.push(analysis.ai_sentiment);
     }

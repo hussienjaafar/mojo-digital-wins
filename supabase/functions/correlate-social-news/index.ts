@@ -6,15 +6,36 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Calculate similarity between two strings (Jaccard similarity)
+// Enhanced similarity with semantic understanding
 function calculateSimilarity(str1: string, str2: string): number {
   const words1 = new Set(str1.toLowerCase().split(/\s+/));
   const words2 = new Set(str2.toLowerCase().split(/\s+/));
 
+  // Jaccard similarity
   const intersection = new Set([...words1].filter(x => words2.has(x)));
   const union = new Set([...words1, ...words2]);
+  const jaccardScore = intersection.size / union.size;
 
-  return intersection.size / union.size;
+  // Boost score if there are common multi-word phrases
+  const str1Lower = str1.toLowerCase();
+  const str2Lower = str2.toLowerCase();
+  
+  // Extract potential entity names (capitalized words)
+  const entities1 = str1.split(/\s+/).filter(w => w.length > 0 && w[0] === w[0].toUpperCase());
+  const entities2 = str2.split(/\s+/).filter(w => w.length > 0 && w[0] === w[0].toUpperCase());
+  
+  let entityMatches = 0;
+  for (const e1 of entities1) {
+    if (entities2.some(e2 => e1.toLowerCase() === e2.toLowerCase())) {
+      entityMatches++;
+    }
+  }
+  
+  const entityBonus = entityMatches > 0 && entities1.length > 0 
+    ? 0.2 * Math.min(entityMatches / entities1.length, 1) 
+    : 0;
+
+  return Math.min(jaccardScore + entityBonus, 1.0);
 }
 
 // Find matching articles for a Bluesky trend
@@ -38,20 +59,33 @@ async function findMatchingArticles(supabase: any, topic: string, trendData: any
     const articleText = `${article.title} ${article.description || ''}`.toLowerCase();
     const topicLower = topic.toLowerCase();
 
-    // Calculate correlation strength
+    // Calculate correlation strength with multiple signals
     let correlationScore = 0;
 
-    // Direct keyword match
+    // 1. Direct keyword match (40% weight)
     if (articleText.includes(topicLower)) {
       correlationScore += 0.4;
     }
 
-    // Similarity score
+    // 2. Similarity score (40% weight)
     const titleSimilarity = calculateSimilarity(topic, article.title);
-    correlationScore += titleSimilarity * 0.6;
+    const descSimilarity = article.description 
+      ? calculateSimilarity(topic, article.description) 
+      : 0;
+    const maxSimilarity = Math.max(titleSimilarity, descSimilarity);
+    correlationScore += maxSimilarity * 0.4;
 
-    // Only include if correlation is significant
-    if (correlationScore >= 0.3) {
+    // 3. Related keywords match (20% weight)
+    if (trendData.keyword_variations && Array.isArray(trendData.keyword_variations)) {
+      const keywordMatches = trendData.keyword_variations.filter((kw: string) =>
+        articleText.includes(kw.toLowerCase())
+      ).length;
+      const keywordScore = Math.min(keywordMatches / trendData.keyword_variations.length, 1) * 0.2;
+      correlationScore += keywordScore;
+    }
+
+    // Only include if correlation is significant (lowered threshold from 0.3 to 0.25)
+    if (correlationScore >= 0.25) {
       // Calculate time lag
       const articleTime = new Date(article.published_date).getTime();
       const trendTime = new Date(trendData.last_seen_at).getTime();
