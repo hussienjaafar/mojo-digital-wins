@@ -2590,6 +2590,7 @@ export type Database = {
           id: string
           mention_count: number
           momentum: number | null
+          momentum_score: number | null
           negative_count: number | null
           neutral_count: number | null
           peak_position: number | null
@@ -2597,6 +2598,7 @@ export type Database = {
           related_keywords: string[] | null
           sample_titles: string[] | null
           topic: string
+          trending_hour: string | null
           updated_at: string | null
           velocity_score: number | null
         }
@@ -2609,6 +2611,7 @@ export type Database = {
           id?: string
           mention_count?: number
           momentum?: number | null
+          momentum_score?: number | null
           negative_count?: number | null
           neutral_count?: number | null
           peak_position?: number | null
@@ -2616,6 +2619,7 @@ export type Database = {
           related_keywords?: string[] | null
           sample_titles?: string[] | null
           topic: string
+          trending_hour?: string | null
           updated_at?: string | null
           velocity_score?: number | null
         }
@@ -2628,6 +2632,7 @@ export type Database = {
           id?: string
           mention_count?: number
           momentum?: number | null
+          momentum_score?: number | null
           negative_count?: number | null
           neutral_count?: number | null
           peak_position?: number | null
@@ -2635,6 +2640,7 @@ export type Database = {
           related_keywords?: string[] | null
           sample_titles?: string[] | null
           topic?: string
+          trending_hour?: string | null
           updated_at?: string | null
           velocity_score?: number | null
         }

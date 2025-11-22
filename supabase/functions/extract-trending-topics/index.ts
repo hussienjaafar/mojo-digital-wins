@@ -9,6 +9,10 @@ const corsHeaders = {
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
+if (!LOVABLE_API_KEY) {
+  console.error('LOVABLE_API_KEY not configured');
+}
+
 interface ExtractedTopic {
   topic: string;
   keywords: string[];
@@ -139,7 +143,7 @@ Return JSON array:
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'google/gemini-flash-1.5',
+              model: 'google/gemini-2.5-flash',
               messages: [
                 {
                   role: 'system',
@@ -149,8 +153,7 @@ Return JSON array:
                   role: 'user',
                   content: extractionPrompt
                 }
-              ],
-              response_format: { type: 'json_object' }
+              ]
             }),
           }),
           timeoutPromise
@@ -334,12 +337,25 @@ Return JSON array:
     }
 
     // ====================================================================
-    // 3. STORE TRENDING TOPICS IN DATABASE
+    // 3. CALCULATE VELOCITY & MOMENTUM, STORE TRENDING TOPICS
     // ====================================================================
 
     const currentHour = new Date();
     currentHour.setMinutes(0, 0, 0);
     const currentDate = currentHour.toISOString().split('T')[0];
+
+    // Get previous hour's data for velocity calculation
+    const previousHour = new Date(currentHour);
+    previousHour.setHours(previousHour.getHours() - 1);
+
+    const { data: previousData } = await supabase
+      .from('trending_topics')
+      .select('topic, mention_count')
+      .eq('hour_timestamp', previousHour.toISOString());
+
+    const previousMentions = new Map(
+      (previousData || []).map((t: any) => [t.topic, t.mention_count])
+    );
 
     let topicsInserted = 0;
 
@@ -353,17 +369,26 @@ Return JSON array:
       const neuCount = data.sentimentLabels.filter(s => s === 'neutral').length;
       const negCount = data.sentimentLabels.filter(s => s === 'negative').length;
 
+      // Calculate velocity: (current - previous) / previous * 100
+      const prevCount = previousMentions.get(topicKey) || 0;
+      const velocity = prevCount > 0 
+        ? ((data.count - prevCount) / prevCount) * 100 
+        : data.count > 0 ? 100 : 0; // 100% if new topic with mentions
+
       const topicRecord = {
         topic: topicKey,
         mention_count: data.count,
         hour_timestamp: currentHour.toISOString(),
+        trending_hour: currentHour.toISOString(),
         day_date: currentDate,
         avg_sentiment_score: avgSentiment,
         positive_count: posCount,
         neutral_count: neuCount,
         negative_count: negCount,
-        article_ids: data.articleIds.slice(0, 20), // Limit to 20 articles
-        sample_titles: data.sampleTitles.slice(0, 5), // Store 5 sample titles
+        velocity_score: velocity,
+        momentum_score: velocity > 0 ? velocity / 10 : 0, // Simple momentum approximation
+        article_ids: data.articleIds.slice(0, 20),
+        sample_titles: data.sampleTitles.slice(0, 5),
         related_keywords: Array.from(data.keywords).slice(0, 10),
       };
 
@@ -378,7 +403,7 @@ Return JSON array:
         console.error(`Error upserting topic "${topicKey}":`, upsertError);
       } else {
         topicsInserted++;
-        console.log(`✅ Topic "${topicKey}": ${data.count} mentions, sentiment ${avgSentiment.toFixed(2)}`);
+        console.log(`✅ Topic "${topicKey}": ${data.count} mentions (${velocity > 0 ? '+' : ''}${velocity.toFixed(0)}% velocity), sentiment ${avgSentiment.toFixed(2)}`);
       }
     }
 
