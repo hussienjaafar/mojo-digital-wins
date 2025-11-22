@@ -1824,7 +1824,10 @@ export type Database = {
           created_at: string
           duration_ms: number | null
           error_message: string | null
+          execution_log: Json | null
           id: string
+          items_created: number | null
+          items_processed: number | null
           job_id: string | null
           result: Json | null
           started_at: string
@@ -1835,7 +1838,10 @@ export type Database = {
           created_at?: string
           duration_ms?: number | null
           error_message?: string | null
+          execution_log?: Json | null
           id?: string
+          items_created?: number | null
+          items_processed?: number | null
           job_id?: string | null
           result?: Json | null
           started_at?: string
@@ -1846,7 +1852,10 @@ export type Database = {
           created_at?: string
           duration_ms?: number | null
           error_message?: string | null
+          execution_log?: Json | null
           id?: string
+          items_created?: number | null
+          items_processed?: number | null
           job_id?: string | null
           result?: Json | null
           started_at?: string
@@ -1870,6 +1879,7 @@ export type Database = {
           error_stack: string | null
           function_name: string
           id: string
+          job_name: string | null
           last_retry_at: string | null
           max_retries: number | null
           resolved_at: string | null
@@ -1882,6 +1892,7 @@ export type Database = {
           error_stack?: string | null
           function_name: string
           id?: string
+          job_name?: string | null
           last_retry_at?: string | null
           max_retries?: number | null
           resolved_at?: string | null
@@ -1894,6 +1905,7 @@ export type Database = {
           error_stack?: string | null
           function_name?: string
           id?: string
+          job_name?: string | null
           last_retry_at?: string | null
           max_retries?: number | null
           resolved_at?: string | null
@@ -2339,11 +2351,16 @@ export type Database = {
       rss_sources: {
         Row: {
           category: string
+          consecutive_errors: number | null
           created_at: string | null
+          error_count: number | null
           fetch_error: string | null
+          fetch_frequency_minutes: number | null
           geographic_scope: string | null
           id: string
           is_active: boolean | null
+          last_error_message: string | null
+          last_fetch_status: string | null
           last_fetched_at: string | null
           logo_url: string | null
           name: string
@@ -2352,11 +2369,16 @@ export type Database = {
         }
         Insert: {
           category: string
+          consecutive_errors?: number | null
           created_at?: string | null
+          error_count?: number | null
           fetch_error?: string | null
+          fetch_frequency_minutes?: number | null
           geographic_scope?: string | null
           id?: string
           is_active?: boolean | null
+          last_error_message?: string | null
+          last_fetch_status?: string | null
           last_fetched_at?: string | null
           logo_url?: string | null
           name: string
@@ -2365,11 +2387,16 @@ export type Database = {
         }
         Update: {
           category?: string
+          consecutive_errors?: number | null
           created_at?: string | null
+          error_count?: number | null
           fetch_error?: string | null
+          fetch_frequency_minutes?: number | null
           geographic_scope?: string | null
           id?: string
           is_active?: boolean | null
+          last_error_message?: string | null
+          last_fetch_status?: string | null
           last_fetched_at?: string | null
           logo_url?: string | null
           name?: string
@@ -2380,39 +2407,51 @@ export type Database = {
       }
       scheduled_jobs: {
         Row: {
+          consecutive_failures: number | null
           created_at: string
           endpoint: string
           id: string
           is_active: boolean | null
           job_name: string
           job_type: string
+          last_error: string | null
           last_run_at: string | null
+          last_run_duration_ms: number | null
+          last_run_status: string | null
           next_run_at: string | null
           payload: Json | null
           schedule: string
           updated_at: string
         }
         Insert: {
+          consecutive_failures?: number | null
           created_at?: string
           endpoint: string
           id?: string
           is_active?: boolean | null
           job_name: string
           job_type: string
+          last_error?: string | null
           last_run_at?: string | null
+          last_run_duration_ms?: number | null
+          last_run_status?: string | null
           next_run_at?: string | null
           payload?: Json | null
           schedule: string
           updated_at?: string
         }
         Update: {
+          consecutive_failures?: number | null
           created_at?: string
           endpoint?: string
           id?: string
           is_active?: boolean | null
           job_name?: string
           job_type?: string
+          last_error?: string | null
           last_run_at?: string | null
+          last_run_duration_ms?: number | null
+          last_run_status?: string | null
           next_run_at?: string | null
           payload?: Json | null
           schedule?: string
@@ -2813,6 +2852,10 @@ export type Database = {
           positive_count: number | null
           related_keywords: string[] | null
           sample_titles: string[] | null
+          sentiment_avg: number | null
+          sentiment_negative: number | null
+          sentiment_neutral: number | null
+          sentiment_positive: number | null
           topic: string
           trending_hour: string | null
           updated_at: string | null
@@ -2834,6 +2877,10 @@ export type Database = {
           positive_count?: number | null
           related_keywords?: string[] | null
           sample_titles?: string[] | null
+          sentiment_avg?: number | null
+          sentiment_negative?: number | null
+          sentiment_neutral?: number | null
+          sentiment_positive?: number | null
           topic: string
           trending_hour?: string | null
           updated_at?: string | null
@@ -2855,6 +2902,10 @@ export type Database = {
           positive_count?: number | null
           related_keywords?: string[] | null
           sample_titles?: string[] | null
+          sentiment_avg?: number | null
+          sentiment_negative?: number | null
+          sentiment_neutral?: number | null
+          sentiment_positive?: number | null
           topic?: string
           trending_hour?: string | null
           updated_at?: string | null
@@ -3040,6 +3091,7 @@ export type Database = {
         Args: { topic_name: string }
         Returns: number
       }
+      calculate_next_run: { Args: { cron_schedule: string }; Returns: string }
       get_briefing_stats: { Args: { target_date?: string }; Returns: Json }
       get_daily_metrics_summary: {
         Args: {
@@ -3130,6 +3182,15 @@ export type Database = {
         Returns: string
       }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
+      update_job_after_execution: {
+        Args: {
+          p_duration_ms: number
+          p_error: string
+          p_job_id: string
+          p_status: string
+        }
+        Returns: undefined
+      }
       verify_admin_invite_code: {
         Args: { invite_code: string; user_id: string }
         Returns: boolean
