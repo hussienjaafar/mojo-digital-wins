@@ -48,26 +48,29 @@ async function analyzePosts(posts: BlueSkyPost[]): Promise<any[]> {
     `[${i}] @${p.author_handle}: ${p.text}`
   ).join('\n\n');
 
-  const prompt = `Analyze these Bluesky posts and extract topics and sentiment. Focus on:
-- Muslim American and Arab American communities
-- Civil rights and discrimination
-- Middle East topics (Palestine, Gaza, etc.)
-- Islamophobia and hate crimes
-- Surveillance and profiling
-- Policy and legislation
+  const prompt = `Analyze these Bluesky posts comprehensively. Extract:
 
-For each post, provide:
-1. Topics (array of 1-5 specific topics mentioned)
-2. Sentiment score (-1.0 to 1.0, where -1 is very negative, 0 is neutral, 1 is very positive)
-3. Sentiment label (positive, neutral, or negative)
+1. **topics**: Array of 1-5 specific topics (e.g., "immigration policy", "lgbtq rights", "climate legislation")
+2. **affected_groups**: Which communities are discussed? Use standardized labels:
+   - muslim_american, arab_american, jewish_american, christian
+   - lgbtq, transgender, women, reproductive_rights
+   - black_american, latino, asian_american, indigenous
+   - immigrants, refugees, asylum_seekers
+   - disability, elderly, youth, veterans
+   - general_public (if broadly applicable)
+3. **relevance_category**: Primary category (civil_rights, immigration, healthcare, education, climate, economy, national_security, foreign_policy, criminal_justice, etc.)
+4. **sentiment**: Overall sentiment (-1.0 to 1.0, where -1 is very negative, 0 neutral, 1 positive)
+5. **sentiment_label**: "positive", "neutral", or "negative"
 
-Return ONLY a JSON array with this structure:
+Return ONLY a JSON array with this exact structure:
 [
   {
     "index": 0,
-    "topics": ["topic1", "topic2"],
-    "sentiment": 0.5,
-    "sentiment_label": "positive"
+    "topics": ["immigration reform", "border security"],
+    "affected_groups": ["immigrants", "latino"],
+    "relevance_category": "immigration",
+    "sentiment": -0.4,
+    "sentiment_label": "negative"
   }
 ]
 
@@ -109,6 +112,8 @@ ${postsText}`;
   return posts.map((post, i) => {
     const analysis = analyses.find((a: any) => a.index === i) || {
       topics: [],
+      affected_groups: [],
+      relevance_category: 'general',
       sentiment: 0,
       sentiment_label: 'neutral'
     };
@@ -116,6 +121,8 @@ ${postsText}`;
     return {
       id: post.id,
       ai_topics: analysis.topics,
+      affected_groups: analysis.affected_groups,
+      relevance_category: analysis.relevance_category,
       ai_sentiment: analysis.sentiment,
       ai_sentiment_label: analysis.sentiment_label,
       ai_processed: true,
@@ -176,6 +183,8 @@ serve(async (req) => {
         .from('bluesky_posts')
         .update({
           ai_topics: analysis.ai_topics,
+          affected_groups: analysis.affected_groups,
+          relevance_category: analysis.relevance_category,
           ai_sentiment: analysis.ai_sentiment,
           ai_sentiment_label: analysis.ai_sentiment_label,
           ai_processed: true,

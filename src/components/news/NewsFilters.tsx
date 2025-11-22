@@ -26,6 +26,8 @@ export interface FilterState {
   dateRange: string;
   tags: string[];
   geographicScope: string;
+  affectedGroup: string; // NEW: Filter by affected community
+  relevanceCategory: string; // NEW: Filter by policy category
 }
 
 export function NewsFilters({ categories, sources, onFilterChange }: NewsFiltersProps) {
@@ -35,7 +37,9 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
     sourceId: 'all',
     dateRange: 'all',
     tags: [],
-    geographicScope: 'all'
+    geographicScope: 'all',
+    affectedGroup: 'all',
+    relevanceCategory: 'all'
   });
 
   const [showFilters, setShowFilters] = useState(false);
@@ -57,7 +61,9 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
       sourceId: 'all',
       dateRange: 'all',
       tags: [],
-      geographicScope: 'all'
+      geographicScope: 'all',
+      affectedGroup: 'all',
+      relevanceCategory: 'all'
     };
     setFilters(cleared);
     onFilterChange(cleared);
@@ -69,7 +75,9 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
     filters.sourceId !== 'all' ||
     filters.dateRange !== 'all' ||
     filters.tags.length > 0 ||
-    filters.geographicScope !== 'all';
+    filters.geographicScope !== 'all' ||
+    filters.affectedGroup !== 'all' ||
+    filters.relevanceCategory !== 'all';
 
   return (
     <div className="space-y-4">
@@ -99,7 +107,55 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
 
       {showFilters && (
         <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Affected Community Filter */}
+            <div className="space-y-2">
+              <Label>Affected Community</Label>
+              <Select value={filters.affectedGroup} onValueChange={(value) => updateFilters({ affectedGroup: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All communities" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All communities</SelectItem>
+                  <SelectItem value="muslim_american">Muslim American</SelectItem>
+                  <SelectItem value="arab_american">Arab American</SelectItem>
+                  <SelectItem value="jewish_american">Jewish American</SelectItem>
+                  <SelectItem value="lgbtq">LGBTQ+</SelectItem>
+                  <SelectItem value="black_american">Black American</SelectItem>
+                  <SelectItem value="latino">Latino/Hispanic</SelectItem>
+                  <SelectItem value="asian_american">Asian American</SelectItem>
+                  <SelectItem value="indigenous">Indigenous/Native</SelectItem>
+                  <SelectItem value="immigrants">Immigrants/Refugees</SelectItem>
+                  <SelectItem value="women">Women's Rights</SelectItem>
+                  <SelectItem value="disability">Disability Rights</SelectItem>
+                  <SelectItem value="veterans">Veterans</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Policy Category Filter */}
+            <div className="space-y-2">
+              <Label>Policy Category</Label>
+              <Select value={filters.relevanceCategory} onValueChange={(value) => updateFilters({ relevanceCategory: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All categories</SelectItem>
+                  <SelectItem value="civil_rights">Civil Rights</SelectItem>
+                  <SelectItem value="immigration">Immigration</SelectItem>
+                  <SelectItem value="healthcare">Healthcare</SelectItem>
+                  <SelectItem value="education">Education</SelectItem>
+                  <SelectItem value="climate">Climate & Environment</SelectItem>
+                  <SelectItem value="economy">Economy & Labor</SelectItem>
+                  <SelectItem value="national_security">National Security</SelectItem>
+                  <SelectItem value="foreign_policy">Foreign Policy</SelectItem>
+                  <SelectItem value="criminal_justice">Criminal Justice</SelectItem>
+                  <SelectItem value="housing">Housing</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label>Category</Label>
               <Select value={filters.category} onValueChange={(value) => updateFilters({ category: value })}>
@@ -186,6 +242,24 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
               <X 
                 className="h-3 w-3 ml-1 cursor-pointer" 
                 onClick={() => updateFilters({ search: '' })}
+              />
+            </Badge>
+          )}
+          {filters.affectedGroup !== 'all' && (
+            <Badge variant="secondary">
+              {filters.affectedGroup.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              <X
+                className="h-3 w-3 ml-1 cursor-pointer"
+                onClick={() => updateFilters({ affectedGroup: 'all' })}
+              />
+            </Badge>
+          )}
+          {filters.relevanceCategory !== 'all' && (
+            <Badge variant="secondary">
+              {filters.relevanceCategory.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              <X
+                className="h-3 w-3 ml-1 cursor-pointer"
+                onClick={() => updateFilters({ relevanceCategory: 'all' })}
               />
             </Badge>
           )}

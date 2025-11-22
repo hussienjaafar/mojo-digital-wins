@@ -374,6 +374,7 @@ export type Database = {
       }
       articles: {
         Row: {
+          affected_groups: string[] | null
           affected_organizations: string[] | null
           ai_summary: string | null
           category: string | null
@@ -389,6 +390,7 @@ export type Database = {
           is_duplicate: boolean | null
           processing_status: string | null
           published_date: string
+          relevance_category: string | null
           sentiment_confidence: number | null
           sentiment_label: string | null
           sentiment_score: number | null
@@ -403,6 +405,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          affected_groups?: string[] | null
           affected_organizations?: string[] | null
           ai_summary?: string | null
           category?: string | null
@@ -418,6 +421,7 @@ export type Database = {
           is_duplicate?: boolean | null
           processing_status?: string | null
           published_date: string
+          relevance_category?: string | null
           sentiment_confidence?: number | null
           sentiment_label?: string | null
           sentiment_score?: number | null
@@ -432,6 +436,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          affected_groups?: string[] | null
           affected_organizations?: string[] | null
           ai_summary?: string | null
           category?: string | null
@@ -447,6 +452,7 @@ export type Database = {
           is_duplicate?: boolean | null
           processing_status?: string | null
           published_date?: string
+          relevance_category?: string | null
           sentiment_confidence?: number | null
           sentiment_label?: string | null
           sentiment_score?: number | null
@@ -728,6 +734,7 @@ export type Database = {
       }
       bluesky_posts: {
         Row: {
+          affected_groups: string[] | null
           ai_processed: boolean | null
           ai_processed_at: string | null
           ai_relevance_score: number | null
@@ -746,11 +753,13 @@ export type Database = {
           post_cid: string | null
           post_uri: string
           quote_of: string | null
+          relevance_category: string | null
           reply_to: string | null
           text: string | null
           urls: string[] | null
         }
         Insert: {
+          affected_groups?: string[] | null
           ai_processed?: boolean | null
           ai_processed_at?: string | null
           ai_relevance_score?: number | null
@@ -769,11 +778,13 @@ export type Database = {
           post_cid?: string | null
           post_uri: string
           quote_of?: string | null
+          relevance_category?: string | null
           reply_to?: string | null
           text?: string | null
           urls?: string[] | null
         }
         Update: {
+          affected_groups?: string[] | null
           ai_processed?: boolean | null
           ai_processed_at?: string | null
           ai_relevance_score?: number | null
@@ -792,6 +803,7 @@ export type Database = {
           post_cid?: string | null
           post_uri?: string
           quote_of?: string | null
+          relevance_category?: string | null
           reply_to?: string | null
           text?: string | null
           urls?: string[] | null
