@@ -163,8 +163,8 @@ async function processBlueskyStreamWithCursor(durationMs: number = 45000) {
         // Calculate relevance
         const relevanceScore = calculateRelevance(text);
 
-        // Only store posts with relevance >0.1
-        if (relevanceScore < 0.1) {
+        // Only store posts with relevance >0.05 (lowered to reduce CPU load)
+        if (relevanceScore < 0.05) {
           return;
         }
 
