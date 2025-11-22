@@ -21,6 +21,17 @@ const VALID_CATEGORIES = [
   'lgbtq_rights', 'foreign_policy', 'climate', 'economy', 'other'
 ];
 
+// Simple hash for caching
+function hashContent(text: string): string {
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+}
+
 // Data validation function
 function validateAnalysis(analysis: any): { valid: boolean; errors: string[]; confidence: number } {
   const errors: string[] = [];
@@ -185,7 +196,7 @@ serve(async (req) => {
 
     console.log('🤖 Starting AI analysis of Bluesky posts...');
 
-    const { batchSize = 20 } = await req.json().catch(() => ({ batchSize: 20 }));
+    const { batchSize = 100 } = await req.json().catch(() => ({ batchSize: 100 })); // OPTIMIZATION: Increased from 20 to 100
 
     // Get unprocessed posts with relevance > 0.1 (matches bluesky-stream filter)
     const { data: posts, error: fetchError } = await supabase

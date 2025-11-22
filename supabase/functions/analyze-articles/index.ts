@@ -23,7 +23,55 @@ const VALID_CATEGORIES = [
 
 const VALID_THREAT_LEVELS = ['critical', 'high', 'medium', 'low'];
 
-// Data validation function
+// Simple hash function for cache keys
+function hashContent(text: string): string {
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+}
+
+// Check cache for existing analysis
+async function getCachedAnalysis(supabase: any, contentHash: string, model: string, promptHash: string): Promise<any | null> {
+  const { data, error } = await supabase
+    .from('ai_analysis_cache')
+    .select('response, created_at')
+    .eq('content_hash', contentHash)
+    .eq('model', model)
+    .eq('prompt_hash', promptHash)
+    .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // 7 day cache
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  // Update hit count
+  await supabase
+    .from('ai_analysis_cache')
+    .update({ 
+      hit_count: supabase.rpc('increment', { x: 1 }),
+      last_used_at: new Date().toISOString()
+    })
+    .eq('content_hash', contentHash);
+
+  return data.response;
+}
+
+// Store analysis in cache
+async function cacheAnalysis(supabase: any, contentHash: string, model: string, promptHash: string, response: any): Promise<void> {
+  await supabase
+    .from('ai_analysis_cache')
+    .insert({
+      content_hash: contentHash,
+      model: model,
+      prompt_hash: promptHash,
+      response: response
+    })
+    .onConflict('content_hash')
+    .ignore();
+}
 function validateAnalysis(analysis: any): { valid: boolean; errors: string[]; confidence: number } {
   const errors: string[] = [];
   let confidence = 1.0;
@@ -112,7 +160,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { batchSize = 30 } = await req.json().catch(() => ({}));
+    const { batchSize = 50 } = await req.json().catch(() => ({})); // OPTIMIZATION: Increased from 30 to 50
 
     console.log(`Starting comprehensive article analysis (batch: ${batchSize})...`);
 
@@ -138,6 +186,7 @@ serve(async (req) => {
     let analyzed = 0;
     let failed = 0;
     let validationFailed = 0;
+    let cacheHits = 0;
 
     for (const article of articles) {
       try {
@@ -154,12 +203,26 @@ serve(async (req) => {
 
         const contentForAnalysis = fullContent.substring(0, 3000) || article.description || '';
 
-        const prompt = `Analyze this news article comprehensively for political impact across ALL demographic groups and policy areas.
+        // OPTIMIZATION: Check cache first
+        const contentHash = hashContent(article.title + contentForAnalysis);
+        const promptText = `Analyze this news article comprehensively for political impact across ALL demographic groups and policy areas.
 
 Article: "${article.title}"
 Description: ${article.description || 'N/A'}
 Source: ${article.source_name}
-Content: ${contentForAnalysis}
+Content: ${contentForAnalysis}`;
+        
+        const promptHash = hashContent(promptText);
+        const cached = await getCachedAnalysis(supabase, contentHash, 'claude-sonnet-4-20250514', promptHash);
+
+        let analysis;
+        if (cached) {
+          console.log(`Cache hit for article ${article.id}`);
+          analysis = cached;
+          cacheHits++;
+        } else {
+          // Make API call
+          const prompt = `${promptText}
 
 Extract the following in JSON format:
 {
@@ -177,33 +240,37 @@ Valid categories: ${VALID_CATEGORIES.join(', ')}
 
 Consider ALL affected communities, not just obvious ones. Be comprehensive but accurate.`;
 
-        const response = await fetch(ANTHROPIC_API_URL, {
-          method: 'POST',
-          headers: {
-            'x-api-key': ANTHROPIC_API_KEY!,
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 2000,
-            messages: [{ role: 'user', content: prompt }]
-          })
-        });
+          const response = await fetch(ANTHROPIC_API_URL, {
+            method: 'POST',
+            headers: {
+              'x-api-key': ANTHROPIC_API_KEY!,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 2000,
+              messages: [{ role: 'user', content: prompt }]
+            })
+          });
 
-        if (!response.ok) {
-          throw new Error(`Claude API error: ${response.status}`);
+          if (!response.ok) {
+            throw new Error(`Claude API error: ${response.status}`);
+          }
+
+          const data = await response.json();
+          const analysisText = data.content[0].text;
+          const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+          
+          if (!jsonMatch) {
+            throw new Error('No JSON found in Claude response');
+          }
+
+          analysis = JSON.parse(jsonMatch[0]);
+          
+          // Cache the response
+          await cacheAnalysis(supabase, contentHash, 'claude-sonnet-4-20250514', promptHash, analysis);
         }
-
-        const data = await response.json();
-        const analysisText = data.content[0].text;
-        const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-        
-        if (!jsonMatch) {
-          throw new Error('No JSON found in Claude response');
-        }
-
-        const analysis = JSON.parse(jsonMatch[0]);
 
         // VALIDATION: Check data quality before storing
         const validation = validateAnalysis(analysis);
@@ -275,7 +342,7 @@ Consider ALL affected communities, not just obvious ones. Be comprehensive but a
       updated_at: new Date().toISOString()
     });
 
-    console.log(`Analysis complete: ${analyzed} successful, ${failed} failed, ${validationFailed} validation failed`);
+    console.log(`Analysis complete: ${analyzed} successful, ${failed} failed, ${validationFailed} validation failed, ${cacheHits} cache hits (${cacheHits > 0 ? ((cacheHits / articles.length) * 100).toFixed(1) : 0}%)`);
 
     return new Response(
       JSON.stringify({
@@ -283,7 +350,9 @@ Consider ALL affected communities, not just obvious ones. Be comprehensive but a
         analyzed,
         failed,
         validationFailed,
+        cacheHits,
         totalProcessed: articles.length,
+        cacheHitRate: cacheHits > 0 ? ((cacheHits / articles.length) * 100).toFixed(1) + '%' : '0%',
         dataQuality: analyzed > 0 ? (analyzed / (analyzed + validationFailed)).toFixed(2) : 0
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
