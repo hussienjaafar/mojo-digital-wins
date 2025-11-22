@@ -117,12 +117,12 @@ serve(async (req) => {
 
     const { batchSize = 20 } = await req.json().catch(() => ({ batchSize: 20 }));
 
-    // Get unprocessed posts with relevance > 0.5 (prioritize highly relevant)
+    // Get unprocessed posts with relevance > 0.1 (matches bluesky-stream filter)
     const { data: posts, error: fetchError } = await supabase
       .from('bluesky_posts')
       .select('id, text, author_handle, created_at')
       .eq('ai_processed', false)
-      .gte('ai_relevance_score', 0.5)
+      .gte('ai_relevance_score', 0.1)
       .order('created_at', { ascending: false })
       .limit(batchSize);
 
