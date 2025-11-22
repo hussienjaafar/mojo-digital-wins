@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { format, subDays } from "date-fns";
 import { CalendarIcon, Download, TrendingUp, TrendingDown, AlertTriangle, Newspaper, Scale, Building2, RefreshCw, Activity, ExternalLink, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
