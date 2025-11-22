@@ -1420,6 +1420,57 @@ export type Database = {
         }
         Relationships: []
       }
+      detected_anomalies: {
+        Row: {
+          alert_sent: boolean | null
+          anomaly_type: string
+          baseline_value: number | null
+          created_at: string | null
+          current_value: number | null
+          detected_at: string | null
+          entity_id: string
+          entity_name: string
+          entity_type: string
+          id: string
+          metadata: Json | null
+          resolved_at: string | null
+          severity: string | null
+          z_score: number
+        }
+        Insert: {
+          alert_sent?: boolean | null
+          anomaly_type: string
+          baseline_value?: number | null
+          created_at?: string | null
+          current_value?: number | null
+          detected_at?: string | null
+          entity_id: string
+          entity_name: string
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          resolved_at?: string | null
+          severity?: string | null
+          z_score: number
+        }
+        Update: {
+          alert_sent?: boolean | null
+          anomaly_type?: string
+          baseline_value?: number | null
+          created_at?: string | null
+          current_value?: number | null
+          detected_at?: string | null
+          entity_id?: string
+          entity_name?: string
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          resolved_at?: string | null
+          severity?: string | null
+          z_score?: number
+        }
+        Relationships: []
+      }
       email_queue: {
         Row: {
           attachments: Json | null
@@ -2430,6 +2481,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sentiment_snapshots: {
+        Row: {
+          affected_group: string
+          avg_sentiment: number | null
+          created_at: string | null
+          id: string
+          negative_count: number | null
+          neutral_count: number | null
+          platform: string
+          positive_count: number | null
+          snapshot_date: string
+          total_mentions: number | null
+        }
+        Insert: {
+          affected_group: string
+          avg_sentiment?: number | null
+          created_at?: string | null
+          id?: string
+          negative_count?: number | null
+          neutral_count?: number | null
+          platform: string
+          positive_count?: number | null
+          snapshot_date: string
+          total_mentions?: number | null
+        }
+        Update: {
+          affected_group?: string
+          avg_sentiment?: number | null
+          created_at?: string | null
+          id?: string
+          negative_count?: number | null
+          neutral_count?: number | null
+          platform?: string
+          positive_count?: number | null
+          snapshot_date?: string
+          total_mentions?: number | null
+        }
+        Relationships: []
       }
       sentiment_trends: {
         Row: {

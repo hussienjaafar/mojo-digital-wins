@@ -6,45 +6,52 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Enhanced similarity with semantic understanding
+// Enhanced similarity calculation with fuzzy matching and entity overlap
 function calculateSimilarity(str1: string, str2: string): number {
-  const words1 = new Set(str1.toLowerCase().split(/\s+/));
-  const words2 = new Set(str2.toLowerCase().split(/\s+/));
-
+  const s1 = str1.toLowerCase();
+  const s2 = str2.toLowerCase();
+  
   // Jaccard similarity
-  const intersection = new Set([...words1].filter(x => words2.has(x)));
-  const union = new Set([...words1, ...words2]);
-  const jaccardScore = intersection.size / union.size;
-
-  // Boost score if there are common multi-word phrases
-  const str1Lower = str1.toLowerCase();
-  const str2Lower = str2.toLowerCase();
+  const set1 = new Set(s1.split(/\s+/));
+  const set2 = new Set(s2.split(/\s+/));
+  const intersection = new Set([...set1].filter(x => set2.has(x)));
+  const union = new Set([...set1, ...set2]);
+  let similarity = intersection.size / union.size;
   
-  // Extract potential entity names (capitalized words)
-  const entities1 = str1.split(/\s+/).filter(w => w.length > 0 && w[0] === w[0].toUpperCase());
-  const entities2 = str2.split(/\s+/).filter(w => w.length > 0 && w[0] === w[0].toUpperCase());
-  
-  let entityMatches = 0;
-  for (const e1 of entities1) {
-    if (entities2.some(e2 => e1.toLowerCase() === e2.toLowerCase())) {
-      entityMatches++;
-    }
+  // Entity overlap (capitalized words)
+  const entities1: string[] = str1.match(/[A-Z][a-z]+/g) || [];
+  const entities2: string[] = str2.match(/[A-Z][a-z]+/g) || [];
+  const entityMatches = entities1.filter(e => entities2.includes(e)).length;
+  if (entityMatches > 0) {
+    similarity += (entityMatches * 0.15);
   }
   
-  const entityBonus = entityMatches > 0 && entities1.length > 0 
-    ? 0.2 * Math.min(entityMatches / entities1.length, 1) 
-    : 0;
-
-  return Math.min(jaccardScore + entityBonus, 1.0);
+  // Fuzzy matching for partial word matches
+  const words1 = s1.split(/\s+/);
+  const words2 = s2.split(/\s+/);
+  let partialMatches = 0;
+  for (const w1 of words1) {
+    for (const w2 of words2) {
+      if (w1.length > 3 && w2.length > 3) {
+        if (w1.includes(w2) || w2.includes(w1)) {
+          partialMatches++;
+        }
+      }
+    }
+  }
+  if (partialMatches > 0) {
+    similarity += (partialMatches * 0.05);
+  }
+  
+  return Math.min(similarity, 1.0);
 }
 
-// Find matching articles for a Bluesky trend
+// Find matching articles for a Bluesky trend with enhanced correlation
 async function findMatchingArticles(supabase: any, topic: string, trendData: any) {
-  // Search for articles with similar titles or descriptions
   const { data: articles, error } = await supabase
     .from('articles')
-    .select('id, title, description, published_date, source_name')
-    .gte('published_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
+    .select('id, title, description, content, published_date, source_name, extracted_topics')
+    .gte('published_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
     .order('published_date', { ascending: false })
     .limit(100);
 
@@ -56,42 +63,43 @@ async function findMatchingArticles(supabase: any, topic: string, trendData: any
   const matches: any[] = [];
 
   for (const article of articles) {
-    const articleText = `${article.title} ${article.description || ''}`.toLowerCase();
-    const topicLower = topic.toLowerCase();
-
-    // Calculate correlation strength with multiple signals
-    let correlationScore = 0;
-
-    // 1. Direct keyword match (40% weight)
-    if (articleText.includes(topicLower)) {
-      correlationScore += 0.4;
-    }
-
-    // 2. Similarity score (40% weight)
+    // Enhanced correlation scoring with entity overlap
     const titleSimilarity = calculateSimilarity(topic, article.title);
-    const descSimilarity = article.description 
-      ? calculateSimilarity(topic, article.description) 
+    const contentSimilarity = article.content 
+      ? calculateSimilarity(topic, article.content.substring(0, 500))
       : 0;
-    const maxSimilarity = Math.max(titleSimilarity, descSimilarity);
-    correlationScore += maxSimilarity * 0.4;
-
-    // 3. Related keywords match (20% weight)
-    if (trendData.keyword_variations && Array.isArray(trendData.keyword_variations)) {
-      const keywordMatches = trendData.keyword_variations.filter((kw: string) =>
-        articleText.includes(kw.toLowerCase())
-      ).length;
-      const keywordScore = Math.min(keywordMatches / trendData.keyword_variations.length, 1) * 0.2;
-      correlationScore += keywordScore;
+    
+    let correlationScore = (titleSimilarity * 0.6) + (contentSimilarity * 0.4);
+    
+    // Entity overlap bonus
+    const topicEntities: string[] = topic.match(/[A-Z][a-z]+/g) || [];
+    const titleEntities: string[] = article.title.match(/[A-Z][a-z]+/g) || [];
+    const entityOverlap = topicEntities.filter(e => titleEntities.includes(e)).length;
+    if (entityOverlap > 0) {
+      correlationScore += (entityOverlap * 0.1);
     }
+    
+    // Extracted topics matching
+    if (article.extracted_topics && Array.isArray(article.extracted_topics)) {
+      const topicMatch = article.extracted_topics.some((t: any) => 
+        typeof t === 'string' && calculateSimilarity(topic, t) > 0.6
+      );
+      if (topicMatch) correlationScore += 0.2;
+    }
+    
+    // Keyword variations bonus
+    const variations = trendData.keyword_variations || [];
+    const variationMatch = variations.some((v: string) => 
+      article.title.toLowerCase().includes(v.toLowerCase()) ||
+      (article.content && article.content.toLowerCase().includes(v.toLowerCase()))
+    );
+    if (variationMatch) correlationScore += 0.15;
 
-    // Only include if correlation is significant (lowered threshold from 0.3 to 0.25)
+    // Only include if correlation is significant
     if (correlationScore >= 0.25) {
-      // Calculate time lag
       const articleTime = new Date(article.published_date).getTime();
       const trendTime = new Date(trendData.last_seen_at).getTime();
       const timeLagMinutes = Math.round((trendTime - articleTime) / (1000 * 60));
-
-      // Is social discussion predictive? (appeared before article)
       const isPredictive = timeLagMinutes < 0;
 
       matches.push({
@@ -123,11 +131,10 @@ serve(async (req) => {
 
     console.log('🔗 Starting social-news correlation analysis...');
 
-    // Get trending topics
     const { data: trends, error: trendsError } = await supabase
       .from('bluesky_trends')
       .select('*')
-      .gte('mentions_last_24_hours', 5) // At least 5 mentions to be meaningful
+      .gte('mentions_last_24_hours', 5)
       .order('velocity', { ascending: false })
       .limit(50);
 
@@ -146,7 +153,6 @@ serve(async (req) => {
       if (matches.length > 0) {
         console.log(`✅ Found ${matches.length} correlations for "${trend.topic}"`);
 
-        // Insert correlations
         const { error: insertError } = await supabase
           .from('bluesky_article_correlations')
           .upsert(matches, {
@@ -158,7 +164,6 @@ serve(async (req) => {
         } else {
           totalCorrelations += matches.length;
 
-          // Update trend with related articles
           const articleIds = matches.map(m => m.article_id);
           await supabase
             .from('bluesky_trends')
@@ -169,7 +174,6 @@ serve(async (req) => {
             })
             .eq('topic', trend.topic);
 
-          // Count predictive signals
           predictiveSignals += matches.filter(m => m.is_predictive).length;
         }
       }
