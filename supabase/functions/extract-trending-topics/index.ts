@@ -29,7 +29,11 @@ serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const hoursBack = body.hoursBack || 1; // Analyze last N hours
+    const hoursBack = body.hoursBack || 0.5; // Analyze last 30 minutes
+
+    // Function timeout tracker
+    const startTime = Date.now();
+    const FUNCTION_TIMEOUT_MS = 45000; // 45 seconds
 
     // ====================================================================
     // 1. FETCH RECENT ARTICLES
@@ -41,7 +45,7 @@ serve(async (req) => {
       .select('id, title, description, content, source_name, published_date, sentiment_label, sentiment_score')
       .gte('published_date', cutoffTime)
       .order('published_date', { ascending: false })
-      .limit(100);
+      .limit(50);
 
     if (fetchError) throw fetchError;
 
@@ -59,8 +63,9 @@ serve(async (req) => {
     // 2. USE AI TO EXTRACT TOPICS FROM ARTICLE CONTENT
     // ====================================================================
 
-    // Batch articles into groups for AI analysis
-    const batchSize = 10;
+    // Batch articles into groups for AI analysis (larger batches = fewer API calls)
+    const batchSize = 20;
+    const AI_TIMEOUT_MS = 30000; // 30 seconds per batch
     const allTopics: Map<string, {
       count: number;
       articleIds: string[];
@@ -71,6 +76,12 @@ serve(async (req) => {
     }> = new Map();
 
     for (let i = 0; i < articles.length; i += batchSize) {
+      // Check if we're approaching function timeout
+      if (Date.now() - startTime > FUNCTION_TIMEOUT_MS - 5000) {
+        console.log(`⏱️ Approaching timeout, stopping after processing ${i} articles`);
+        break;
+      }
+
       const batch = articles.slice(i, i + batchSize);
 
       const articlesText = batch.map(a =>
@@ -113,30 +124,40 @@ Return JSON array:
 [{"topic": "Name Here", "keywords": ["word1", "word2"], "relevance": 0.9}]`;
 
       try {
-        const aiResponse = await fetch(AI_GATEWAY_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [
-              {
-                role: 'system',
-                content: 'You extract ONLY proper nouns (names) from news. NOT topics, NOT themes, NOT categories - ONLY names of people, places, organizations, events, bills. Think: WHO, WHERE, WHAT specific thing. Always respond with valid JSON arrays.'
-              },
-              {
-                role: 'user',
-                content: extractionPrompt
-              }
-            ],
-            response_format: { type: 'json_object' }
-          }),
+        // Create timeout promise
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('AI request timeout')), AI_TIMEOUT_MS);
         });
 
+        // Race AI request against timeout
+        const aiResponse = await Promise.race([
+          fetch(AI_GATEWAY_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-flash-1.5',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You extract ONLY proper nouns (names) from news. NOT topics, NOT themes, NOT categories - ONLY names of people, places, organizations, events, bills. Think: WHO, WHERE, WHAT specific thing. Always respond with valid JSON arrays.'
+                },
+                {
+                  role: 'user',
+                  content: extractionPrompt
+                }
+              ],
+              response_format: { type: 'json_object' }
+            }),
+          }),
+          timeoutPromise
+        ]);
+
         if (!aiResponse.ok) {
-          console.error(`AI API error: ${aiResponse.status}`);
+          console.error(`AI API error: ${aiResponse.status} for batch ${i}-${i + batchSize}`);
+          // Continue processing other batches instead of failing completely
           continue;
         }
 
@@ -280,10 +301,12 @@ Return JSON array:
         }
 
         // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 200));
 
       } catch (error) {
-        console.error(`Error processing batch ${i}-${i + batchSize}:`, error);
+        console.error(`Error processing batch ${i}-${i + batchSize}:`, error instanceof Error ? error.message : error);
+        // Continue processing remaining batches instead of failing completely
+        continue;
       }
     }
 
