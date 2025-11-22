@@ -79,11 +79,13 @@ const Admin = () => {
   // Load active tab from localStorage on mount, default to "analytics"
   const [activeTab, setActiveTab] = useState<string>(() => {
     const savedTab = localStorage.getItem('admin-active-tab');
+    console.log('📍 Initializing activeTab from localStorage:', savedTab || 'analytics (default)');
     return savedTab || "analytics";
   });
 
   // Save active tab to localStorage whenever it changes
   useEffect(() => {
+    console.log('💾 Saving activeTab to localStorage:', activeTab);
     localStorage.setItem('admin-active-tab', activeTab);
   }, [activeTab]);
 

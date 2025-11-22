@@ -102,28 +102,45 @@ export function NewsFeed() {
   }, [loadingMore, hasMore, page, currentFilters]);
 
   useEffect(() => {
+    console.log('🔧 Setting up IntersectionObserver...', {
+      hasRef: !!observerTarget.current,
+      hasMore,
+      loadingMore,
+      page,
+      displayedCount: displayedArticles.length
+    });
+
+    const currentTarget = observerTarget.current;
+
+    if (!currentTarget) {
+      console.warn('⚠️ Observer target ref is null, will retry on next render');
+      return;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
+        console.log('👁️ IntersectionObserver callback fired', {
+          isIntersecting: entries[0].isIntersecting,
+          intersectionRatio: entries[0].intersectionRatio,
+          hasMore,
+          loadingMore
+        });
+
         if (entries[0].isIntersecting) {
-          console.log('👁️ Intersection detected, triggering loadMore');
           loadMoreArticles();
         }
       },
       { threshold: 0.1 }
     );
 
-    const currentTarget = observerTarget.current;
-    if (currentTarget) {
-      observer.observe(currentTarget);
-      console.log('👀 IntersectionObserver attached to scroll trigger');
-    }
+    observer.observe(currentTarget);
+    console.log('✅ IntersectionObserver attached successfully to trigger div');
 
     return () => {
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
-      }
+      observer.disconnect();
+      console.log('🔌 IntersectionObserver disconnected');
     };
-  }, [loadMoreArticles]);
+  }, [loadMoreArticles, hasMore, loadingMore, displayedArticles.length]);
 
   const loadArticles = async (pageNum: number = 0, filters: FilterState | null = null) => {
     try {
@@ -366,14 +383,25 @@ export function NewsFeed() {
           </div>
 
           {/* Infinite scroll trigger */}
-          <div ref={observerTarget} className="flex justify-center py-8 min-h-[100px]">
+          <div ref={observerTarget} className="flex flex-col items-center gap-4 py-8 min-h-[100px]">
             {loadingMore && (
               <LoadingSpinner size="md" label="Loading more articles..." />
             )}
             {!loadingMore && hasMore && (
-              <p className="text-muted-foreground text-sm">
-                Scroll down to load more articles
-              </p>
+              <>
+                <p className="text-muted-foreground text-sm">
+                  Scroll down to load more • {displayedArticles.length} of {displayedArticles.length + 50}+ articles
+                </p>
+                <Button
+                  onClick={() => loadArticles(page + 1, currentFilters)}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Load More Articles
+                </Button>
+              </>
             )}
             {!hasMore && displayedArticles.length > 0 && (
               <p className="text-muted-foreground text-sm">
