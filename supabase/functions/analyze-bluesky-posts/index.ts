@@ -216,21 +216,29 @@ async function updateTrends(supabase: any, analyses: any[]) {
   for (const [topic, data] of topicCounts.entries()) {
     const avgSentiment = data.sentiment.reduce((a, b) => a + b, 0) / data.sentiment.length;
 
-    // Calculate counts from database
-    const { data: hourData } = await supabase
+    // Calculate counts from database using cs (contains) filter for array queries
+    const { count: hourCount, error: hourError } = await supabase
       .from('bluesky_posts')
-      .select('id', { count: 'exact', head: true })
-      .contains('ai_topics', [topic])
+      .select('*', { count: 'exact', head: true })
+      .filter('ai_topics', 'cs', `{${topic}}`)
       .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString());
 
-    const { data: dayData } = await supabase
+    if (hourError) {
+      console.error(`❌ Error counting hourly mentions for "${topic}":`, hourError);
+    }
+
+    const { count: dayCount, error: dayError } = await supabase
       .from('bluesky_posts')
-      .select('id', { count: 'exact', head: true })
-      .contains('ai_topics', [topic])
+      .select('*', { count: 'exact', head: true })
+      .filter('ai_topics', 'cs', `{${topic}}`)
       .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-    const mentionsLastHour = hourData?.count || 0;
-    const mentionsLast24Hours = dayData?.count || 0;
+    if (dayError) {
+      console.error(`❌ Error counting daily mentions for "${topic}":`, dayError);
+    }
+
+    const mentionsLastHour = hourCount || 0;
+    const mentionsLast24Hours = dayCount || 0;
 
     // Calculate velocity
     const dailyAvg = mentionsLast24Hours / 24;
@@ -238,25 +246,32 @@ async function updateTrends(supabase: any, analyses: any[]) {
     const isTrending = velocity > 200; // 200% = 2x normal rate
 
     // Upsert trend
-    const { error } = await supabase
+    const trendData = {
+      topic,
+      mentions_last_hour: mentionsLastHour,
+      mentions_last_24_hours: mentionsLast24Hours,
+      velocity,
+      sentiment_avg: avgSentiment,
+      is_trending: isTrending,
+      trending_since: isTrending ? new Date().toISOString() : null,
+      last_seen_at: new Date().toISOString(),
+      calculated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    console.log(`📊 Upserting trend: ${topic} (hour: ${mentionsLastHour}, day: ${mentionsLast24Hours}, velocity: ${velocity})`);
+
+    const { error: upsertError } = await supabase
       .from('bluesky_trends')
-      .upsert({
-        topic,
-        mentions_last_hour: mentionsLastHour,
-        mentions_last_24_hours: mentionsLast24Hours,
-        velocity,
-        sentiment_avg: avgSentiment,
-        is_trending: isTrending,
-        trending_since: isTrending ? new Date().toISOString() : null,
-        last_seen_at: new Date().toISOString(),
-        calculated_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }, {
+      .upsert(trendData, {
         onConflict: 'topic'
       });
 
-    if (error) {
-      console.error(`❌ Error updating trend for "${topic}":`, error);
+    if (upsertError) {
+      console.error(`❌ Error upserting trend for "${topic}":`, upsertError);
+      console.error('Trend data:', JSON.stringify(trendData));
+    } else {
+      console.log(`✅ Successfully upserted trend: ${topic}`);
     }
   }
 
