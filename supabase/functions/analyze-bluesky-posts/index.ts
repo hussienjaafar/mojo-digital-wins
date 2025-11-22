@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+
 interface BlueSkyPost {
   id: string;
   text: string;
@@ -13,12 +16,10 @@ interface BlueSkyPost {
   created_at: string;
 }
 
-// Analyze posts using Claude AI
+// Analyze posts using Lovable AI (Gemini)
 async function analyzePosts(posts: BlueSkyPost[]): Promise<any[]> {
-  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-
-  if (!anthropicKey) {
-    throw new Error('ANTHROPIC_API_KEY not configured');
+  if (!LOVABLE_API_KEY) {
+    throw new Error('LOVABLE_API_KEY not configured');
   }
 
   // Prepare batch analysis prompt
@@ -52,16 +53,14 @@ Return ONLY a JSON array with this structure:
 Posts:
 ${postsText}`;
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch(AI_GATEWAY_URL, {
     method: 'POST',
     headers: {
+      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
       'Content-Type': 'application/json',
-      'x-api-key': anthropicKey,
-      'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-3-haiku-20240307',
-      max_tokens: 4000,
+      model: 'google/gemini-2.5-flash',
       messages: [{
         role: 'user',
         content: prompt
@@ -70,19 +69,20 @@ ${postsText}`;
   });
 
   if (!response.ok) {
-    throw new Error(`Claude API error: ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Lovable AI error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
-  const content = data.content[0].text;
+  const content = data.choices?.[0]?.message?.content;
 
-  // Extract JSON from response (might be wrapped in markdown code blocks)
-  const jsonMatch = content.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) {
-    throw new Error('Could not extract JSON from Claude response');
+  if (!content) {
+    throw new Error('No content in AI response');
   }
 
-  const analyses = JSON.parse(jsonMatch[0]);
+  // Parse JSON response
+  const parsed = JSON.parse(content);
+  const analyses = Array.isArray(parsed) ? parsed : (parsed.analyses || parsed.results || []);
 
   // Map analyses back to posts
   return posts.map((post, i) => {
@@ -247,7 +247,7 @@ async function updateTrends(supabase: any, analyses: any[]) {
 
     // Calculate velocity
     const dailyAvg = mentionsLast24Hours / 24;
-    const velocity = dailyAvg > 0 ? (mentionsLastHour / dailyAvg) * 100 : 0;
+    const velocity = dailyAvg > 0 ? ((mentionsLastHour - dailyAvg) / dailyAvg) * 100 : 0;
     const isTrending = velocity > 200; // 200% = 2x normal rate
 
     // Upsert trend
@@ -267,7 +267,7 @@ async function updateTrends(supabase: any, analyses: any[]) {
       updated_at: new Date().toISOString()
     };
 
-    console.log(`📊 Upserting trend: ${topic} (hour: ${mentionsLastHour}, day: ${mentionsLast24Hours}, velocity: ${velocity})`);
+    console.log(`📊 Upserting trend: ${topic} (hour: ${mentionsLastHour}, day: ${mentionsLast24Hours}, velocity: ${velocity.toFixed(0)}%)`);
 
     const { error: upsertError } = await supabase
       .from('bluesky_trends')
@@ -277,7 +277,6 @@ async function updateTrends(supabase: any, analyses: any[]) {
 
     if (upsertError) {
       console.error(`❌ Error upserting trend for "${topic}":`, upsertError);
-      console.error('Trend data:', JSON.stringify(trendData));
     } else {
       console.log(`✅ Successfully upserted trend: ${topic}`);
     }
