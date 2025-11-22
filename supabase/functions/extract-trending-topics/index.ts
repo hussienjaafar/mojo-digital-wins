@@ -19,6 +19,51 @@ interface ExtractedTopic {
   relevance: number;
 }
 
+// Topic normalization map - maps variations to canonical forms
+const TOPIC_NORMALIZATIONS: Record<string, string> = {
+  'donald trump': 'Donald Trump',
+  'trump': 'Donald Trump',
+  'president trump': 'Donald Trump',
+  'joe biden': 'Joe Biden',
+  'biden': 'Joe Biden',
+  'president biden': 'Joe Biden',
+  'netanyahu': 'Benjamin Netanyahu',
+  'benjamin netanyahu': 'Benjamin Netanyahu',
+  'israel': 'Israel',
+  'palestine': 'Palestine',
+  'gaza': 'Gaza',
+  'gaza strip': 'Gaza',
+  'west bank': 'West Bank',
+  'un': 'United Nations',
+  'united nations': 'United Nations',
+  'ice': 'ICE',
+  'immigration and customs enforcement': 'ICE',
+  'epa': 'EPA',
+  'environmental protection agency': 'EPA',
+  'fbi': 'FBI',
+  'federal bureau of investigation': 'FBI',
+  'cia': 'CIA',
+  'central intelligence agency': 'CIA',
+  'nato': 'NATO',
+  'us': 'United States',
+  'usa': 'United States',
+  'united states': 'United States',
+  'new york': 'New York',
+  'new york city': 'New York City',
+  'nyc': 'New York City',
+  'dc': 'Washington DC',
+  'washington': 'Washington DC',
+  'washington dc': 'Washington DC',
+};
+
+/**
+ * Normalize topic to canonical form
+ */
+function normalizeTopic(topic: string): string {
+  const lower = topic.toLowerCase();
+  return TOPIC_NORMALIZATIONS[lower] || topic;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -268,7 +313,9 @@ Return JSON array:
 
         // Aggregate topics
         for (const extracted of extractedTopics) {
-          const topicKey = extracted.topic.toLowerCase();
+          // Normalize topic to canonical form
+          const normalizedTopic = normalizeTopic(extracted.topic);
+          const topicKey = normalizedTopic.toLowerCase();
 
           if (!allTopics.has(topicKey)) {
             allTopics.set(topicKey, {
@@ -286,7 +333,7 @@ Return JSON array:
           // Find which articles in this batch mention this topic
           for (const article of batch) {
             const articleText = `${article.title} ${article.description || ''} ${article.content || ''}`.toLowerCase();
-            const topicWords = extracted.topic.toLowerCase().split(/\s+/);
+            const topicWords = normalizedTopic.toLowerCase().split(/\s+/);
             const keywordMatches = extracted.keywords.filter(kw =>
               articleText.includes(kw.toLowerCase())
             );
@@ -304,12 +351,15 @@ Return JSON array:
           }
         }
 
-        // Mark articles in this batch as analyzed with their extracted topics
+        // Mark articles in this batch as analyzed with their extracted topics (normalized)
         const articleUpdates = batch.map(article => ({
           id: article.id,
           topics_extracted: true,
           topics_extracted_at: new Date().toISOString(),
-          extracted_topics: extractedTopics.filter(topic => {
+          extracted_topics: extractedTopics.map(topic => ({
+            ...topic,
+            topic: normalizeTopic(topic.topic) // Store normalized form
+          })).filter(topic => {
             const articleText = `${article.title} ${article.description || ''}`.toLowerCase();
             return topic.keywords.some(kw => articleText.includes(kw.toLowerCase()));
           })
@@ -375,6 +425,21 @@ Return JSON array:
         ? ((data.count - prevCount) / prevCount) * 100 
         : data.count > 0 ? 100 : 0; // 100% if new topic with mentions
 
+      // Calculate momentum: change in velocity (acceleration)
+      // Get velocity from 2 hours ago to measure acceleration
+      const twoHoursAgo = new Date(currentHour);
+      twoHoursAgo.setHours(twoHoursAgo.getHours() - 2);
+      
+      const { data: twoHoursData } = await supabase
+        .from('trending_topics')
+        .select('mention_count, velocity_score')
+        .eq('topic', topicKey)
+        .eq('hour_timestamp', twoHoursAgo.toISOString())
+        .single();
+      
+      const previousVelocity = twoHoursData?.velocity_score || 0;
+      const momentum = velocity - previousVelocity; // Positive = accelerating, negative = decelerating
+
       const topicRecord = {
         topic: topicKey,
         mention_count: data.count,
@@ -386,7 +451,7 @@ Return JSON array:
         neutral_count: neuCount,
         negative_count: negCount,
         velocity_score: velocity,
-        momentum_score: velocity > 0 ? velocity / 10 : 0, // Simple momentum approximation
+        momentum_score: momentum,
         article_ids: data.articleIds.slice(0, 20),
         sample_titles: data.sampleTitles.slice(0, 5),
         related_keywords: Array.from(data.keywords).slice(0, 10),
