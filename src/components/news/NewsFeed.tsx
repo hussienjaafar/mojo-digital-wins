@@ -94,14 +94,18 @@ export function NewsFeed() {
   // Infinite scroll observer
   const loadMoreArticles = useCallback(() => {
     if (!loadingMore && hasMore) {
+      console.log(`📜 Infinite scroll triggered - loading page ${page + 1}`);
       loadArticles(page + 1, currentFilters);
+    } else {
+      console.log(`📜 Infinite scroll blocked - loadingMore: ${loadingMore}, hasMore: ${hasMore}`);
     }
   }, [loadingMore, hasMore, page, currentFilters]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+        if (entries[0].isIntersecting) {
+          console.log('👁️ Intersection detected, triggering loadMore');
           loadMoreArticles();
         }
       },
@@ -111,6 +115,7 @@ export function NewsFeed() {
     const currentTarget = observerTarget.current;
     if (currentTarget) {
       observer.observe(currentTarget);
+      console.log('👀 IntersectionObserver attached to scroll trigger');
     }
 
     return () => {
@@ -118,7 +123,7 @@ export function NewsFeed() {
         observer.unobserve(currentTarget);
       }
     };
-  }, [loadMoreArticles, hasMore, loadingMore]);
+  }, [loadMoreArticles]);
 
   const loadArticles = async (pageNum: number = 0, filters: FilterState | null = null) => {
     try {
@@ -193,7 +198,7 @@ export function NewsFeed() {
       }
 
       const newArticles = data || [];
-      console.log(`✅ Loaded ${newArticles.length} articles (total: ${count})`);
+      console.log(`✅ Loaded ${newArticles.length} articles (page ${pageNum}, range: ${from}-${to}, total in DB: ${count})`);
 
       if (pageNum === 0) {
         setArticles(newArticles);
@@ -206,7 +211,10 @@ export function NewsFeed() {
       }
 
       // Check if there are more articles
-      setHasMore(count ? (from + newArticles.length) < count : false);
+      const loadedSoFar = from + newArticles.length;
+      const moreAvailable = count ? loadedSoFar < count : false;
+      console.log(`📊 Pagination state: loaded ${loadedSoFar} of ${count} total, hasMore: ${moreAvailable}`);
+      setHasMore(moreAvailable);
       setPage(pageNum);
 
     } catch (err: any) {
@@ -376,13 +384,18 @@ export function NewsFeed() {
           </div>
 
           {/* Infinite scroll trigger */}
-          <div ref={observerTarget} className="flex justify-center py-8">
+          <div ref={observerTarget} className="flex justify-center py-8 min-h-[100px]">
             {loadingMore && (
               <LoadingSpinner size="md" label="Loading more articles..." />
             )}
+            {!loadingMore && hasMore && (
+              <p className="text-muted-foreground text-sm">
+                Scroll down to load more articles
+              </p>
+            )}
             {!hasMore && displayedArticles.length > 0 && (
               <p className="text-muted-foreground text-sm">
-                No more articles to load
+                ✓ All {displayedArticles.length} articles loaded
               </p>
             )}
           </div>
