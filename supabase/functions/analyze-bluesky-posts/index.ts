@@ -71,20 +71,52 @@ interface BlueSkyPost {
   created_at: string;
 }
 
-// Topic normalization map (same as news extraction)
+// EXPANDED: Topic normalization map (same as news extraction)
 const TOPIC_NORMALIZATIONS: Record<string, string> = {
+  // Political figures
   'donald trump': 'Donald Trump',
   'trump': 'Donald Trump',
   'joe biden': 'Joe Biden',
   'biden': 'Joe Biden',
   'netanyahu': 'Benjamin Netanyahu',
+  'benjamin netanyahu': 'Benjamin Netanyahu',
+  
+  // Regions & conflicts
   'israel': 'Israel',
   'palestine': 'Palestine',
   'gaza': 'Gaza',
+  'west bank': 'West Bank',
+  'middle east': 'Middle East',
+  
+  // Organizations
   'un': 'United Nations',
+  'united nations': 'United Nations',
   'ice': 'ICE',
+  'gop': 'Republican Party',
+  'republican party': 'Republican Party',
+  'democratic party': 'Democratic Party',
+  
+  // Cities
   'nyc': 'New York City',
+  'new york city': 'New York City',
   'dc': 'Washington DC',
+  'washington dc': 'Washington DC',
+  
+  // Issues (case-insensitive variants)
+  'climate change': 'Climate Change',
+  'climate crisis': 'Climate Change',
+  'human rights': 'Human Rights',
+  'civil rights': 'Civil Rights',
+  'lgbtq rights': 'LGBTQ Rights',
+  'lgbtq': 'LGBTQ Rights',
+  'immigration': 'Immigration',
+  'surveillance': 'Surveillance',
+  'privacy': 'Privacy',
+  'genocide': 'Genocide',
+  'humanitarian crisis': 'Humanitarian Crisis',
+  'occupation': 'Occupation',
+  'israel-palestine conflict': 'Israel-Palestine Conflict',
+  'palestinian conflict': 'Israel-Palestine Conflict',
 };
 
 function normalizeTopic(topic: string): string {
@@ -377,29 +409,60 @@ async function updateTrends(supabase: any, analyses: any[]) {
     const mentionsLastHour = hourCount || 0;
     const mentionsLast24Hours = dayCount || 0;
 
-    // Calculate velocity
-    const dailyAvg = mentionsLast24Hours / 24;
-    const velocity = dailyAvg > 0 ? ((mentionsLastHour - dailyAvg) / dailyAvg) * 100 : 0;
-    const isTrending = velocity > 200; // 200% = 2x normal rate
+    // FIXED: Calculate velocity with momentum (6hr window for better signal)
+    const { count: sixHourCount } = await supabase
+      .from('bluesky_posts')
+      .select('*', { count: 'exact', head: true })
+      .filter('ai_topics', 'cs', `{${topic}}`)
+      .gte('created_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString());
 
-    // Upsert trend
+    const mentionsLast6Hours = sixHourCount || 0;
+    
+    // Multi-window velocity calculation for better trending detection
+    const hourlyRate = mentionsLastHour;
+    const sixHourAvg = mentionsLast6Hours / 6;
+    const dailyAvg = mentionsLast24Hours / 24;
+    
+    // Velocity: how much faster than baseline (daily average)
+    // Using 6-hour window prevents single-hour spikes from dominating
+    let velocity = 0;
+    if (dailyAvg > 0) {
+      velocity = ((sixHourAvg - dailyAvg) / dailyAvg) * 100;
+    } else if (mentionsLast6Hours > 0) {
+      velocity = 500; // New topic emerging = high velocity
+    }
+    
+    // FIXED: Lower threshold (50% = 1.5x normal rate) + minimum volume filter
+    const isTrending = (velocity > 50 && mentionsLast24Hours >= 3) || mentionsLast6Hours >= 5;
+
+    // Get previous trend to preserve trending_since
+    const { data: existingTrend } = await supabase
+      .from('bluesky_trends')
+      .select('is_trending, trending_since')
+      .eq('topic', topic)
+      .single();
+
+    // Upsert trend with 6-hour metrics
     const trendData = {
       topic,
       mentions_last_hour: mentionsLastHour,
+      mentions_last_6_hours: mentionsLast6Hours,
       mentions_last_24_hours: mentionsLast24Hours,
-      velocity,
-      sentiment_avg: avgSentiment,
+      velocity: Math.round(velocity * 100) / 100, // Round to 2 decimals
+      sentiment_avg: Math.round(avgSentiment * 100) / 100,
       sentiment_positive: sentimentPositive,
       sentiment_neutral: sentimentNeutral,
       sentiment_negative: sentimentNegative,
       is_trending: isTrending,
-      trending_since: isTrending ? new Date().toISOString() : null,
+      trending_since: isTrending 
+        ? (existingTrend?.is_trending ? existingTrend.trending_since : new Date().toISOString())
+        : null,
       last_seen_at: new Date().toISOString(),
       calculated_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 
-    console.log(`📊 Upserting trend: ${topic} (hour: ${mentionsLastHour}, day: ${mentionsLast24Hours}, velocity: ${velocity.toFixed(0)}%)`);
+    console.log(`📊 ${topic}: 1h=${mentionsLastHour} 6h=${mentionsLast6Hours} 24h=${mentionsLast24Hours} vel=${velocity.toFixed(0)}% ${isTrending ? '🔥 TRENDING' : ''}`);
 
     const { error: upsertError } = await supabase
       .from('bluesky_trends')
@@ -409,8 +472,6 @@ async function updateTrends(supabase: any, analyses: any[]) {
 
     if (upsertError) {
       console.error(`❌ Error upserting trend for "${topic}":`, upsertError);
-    } else {
-      console.log(`✅ Successfully upserted trend: ${topic}`);
     }
   }
 
