@@ -422,6 +422,7 @@ export type Database = {
           id: string
           image_url: string | null
           is_duplicate: boolean | null
+          political_leaning: string | null
           processing_status: string | null
           published_date: string
           relevance_category: string | null
@@ -456,6 +457,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_duplicate?: boolean | null
+          political_leaning?: string | null
           processing_status?: string | null
           published_date: string
           relevance_category?: string | null
@@ -490,6 +492,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_duplicate?: boolean | null
+          political_leaning?: string | null
           processing_status?: string | null
           published_date?: string
           relevance_category?: string | null
@@ -2391,6 +2394,7 @@ export type Database = {
           last_fetched_at: string | null
           logo_url: string | null
           name: string
+          political_leaning: string | null
           updated_at: string | null
           url: string
         }
@@ -2409,6 +2413,7 @@ export type Database = {
           last_fetched_at?: string | null
           logo_url?: string | null
           name: string
+          political_leaning?: string | null
           updated_at?: string | null
           url: string
         }
@@ -2427,6 +2432,7 @@ export type Database = {
           last_fetched_at?: string | null
           logo_url?: string | null
           name?: string
+          political_leaning?: string | null
           updated_at?: string | null
           url?: string
         }
