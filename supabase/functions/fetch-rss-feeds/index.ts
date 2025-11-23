@@ -437,6 +437,7 @@ serve(async (req) => {
               threat_level: threatLevel,
               affected_organizations: affectedOrgs,
               processing_status: 'pending',
+              political_leaning: source.political_leaning, // Add political leaning
             })
             .select()
             .maybeSingle();

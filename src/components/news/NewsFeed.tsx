@@ -305,6 +305,11 @@ export function NewsFeed() {
         if (filters.geographicScope && filters.geographicScope !== 'all') {
           query = query.eq('geographic_scope', filters.geographicScope);
         }
+
+        // Political leaning filter
+        if (filters.politicalLeaning && filters.politicalLeaning !== 'all') {
+          query = query.eq('political_leaning', filters.politicalLeaning);
+        }
       }
 
       const { data, error, count } = await query
