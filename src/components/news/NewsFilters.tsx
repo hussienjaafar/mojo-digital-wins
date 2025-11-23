@@ -28,6 +28,7 @@ export interface FilterState {
   geographicScope: string;
   affectedGroup: string; // NEW: Filter by affected community
   relevanceCategory: string; // NEW: Filter by policy category
+  politicalLeaning: string; // NEW: Filter by political spectrum
 }
 
 export function NewsFilters({ categories, sources, onFilterChange }: NewsFiltersProps) {
@@ -39,7 +40,8 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
     tags: [],
     geographicScope: 'all',
     affectedGroup: 'all',
-    relevanceCategory: 'all'
+    relevanceCategory: 'all',
+    politicalLeaning: 'all'
   });
 
   const [showFilters, setShowFilters] = useState(false);
@@ -63,7 +65,8 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
       tags: [],
       geographicScope: 'all',
       affectedGroup: 'all',
-      relevanceCategory: 'all'
+      relevanceCategory: 'all',
+      politicalLeaning: 'all'
     };
     setFilters(cleared);
     onFilterChange(cleared);
@@ -77,7 +80,8 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
     filters.tags.length > 0 ||
     filters.geographicScope !== 'all' ||
     filters.affectedGroup !== 'all' ||
-    filters.relevanceCategory !== 'all';
+    filters.relevanceCategory !== 'all' ||
+    filters.politicalLeaning !== 'all';
 
   return (
     <div className="space-y-4">
@@ -220,6 +224,25 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Political Spectrum Filter */}
+            <div className="space-y-2">
+              <Label>Political Perspective</Label>
+              <Select value={filters.politicalLeaning} onValueChange={(value) => updateFilters({ politicalLeaning: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All perspectives" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All perspectives</SelectItem>
+                  <SelectItem value="left">Left</SelectItem>
+                  <SelectItem value="center-left">Center-Left</SelectItem>
+                  <SelectItem value="center">Center</SelectItem>
+                  <SelectItem value="center-right">Center-Right</SelectItem>
+                  <SelectItem value="right">Right</SelectItem>
+                  <SelectItem value="nonpartisan">Nonpartisan</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -278,6 +301,15 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
               <X
                 className="h-3 w-3 ml-1 cursor-pointer"
                 onClick={() => updateFilters({ geographicScope: 'all' })}
+              />
+            </Badge>
+          )}
+          {filters.politicalLeaning !== 'all' && (
+            <Badge variant="secondary">
+              {filters.politicalLeaning.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              <X
+                className="h-3 w-3 ml-1 cursor-pointer"
+                onClick={() => updateFilters({ politicalLeaning: 'all' })}
               />
             </Badge>
           )}
