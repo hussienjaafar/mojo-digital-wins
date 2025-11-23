@@ -80,3 +80,10 @@ verify_jwt = false
 
 [functions.monitor-attribution-health]
 verify_jwt = false
+
+[functions.calculate-attribution-models]
+verify_jwt = true
+
+[functions.analyze-donor-cohorts]
+verify_jwt = true
+
