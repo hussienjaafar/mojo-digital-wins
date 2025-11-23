@@ -9,6 +9,7 @@ export interface FilterState {
   geographicScope?: string;
   affectedGroup?: string;
   relevanceCategory?: string;
+  politicalLeaning?: string;
 }
 
 interface NewsContextType {
