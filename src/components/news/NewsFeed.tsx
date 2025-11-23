@@ -52,7 +52,9 @@ export function NewsFeed() {
         tags: [],
         geographicScope: 'all',
         affectedGroup: 'all',
-        relevanceCategory: 'all'
+        relevanceCategory: 'all',
+        politicalLeaning: 'all'
+      };
       };
 
       // Apply the filter
