@@ -55,7 +55,6 @@ export function NewsFeed() {
         relevanceCategory: 'all',
         politicalLeaning: 'all'
       };
-      };
 
       // Apply the filter
       applyFilters(filterWithSearch);
