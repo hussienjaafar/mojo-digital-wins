@@ -14,9 +14,10 @@ export const useRealtimeTrends = () => {
       const { data, error } = await supabase
         .from('bluesky_trends')
         .select('*')
-        .eq('is_trending', true)
-        .order('velocity', { ascending: false })
-        .limit(10);
+        .or('is_trending.eq.true,mentions_last_24_hours.gte.10') // Show trending OR high volume
+        .order('velocity', { ascending: false, nullsFirst: false })
+        .order('mentions_last_24_hours', { ascending: false })
+        .limit(15);
 
       if (data && !error) {
         setTrends(data);
