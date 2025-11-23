@@ -6,8 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
 const VALID_GROUPS = [
   'muslim_american', 'arab_american', 'lgbtq', 'immigrants', 'refugees',
@@ -124,10 +124,10 @@ function normalizeTopic(topic: string): string {
   return TOPIC_NORMALIZATIONS[lower] || topic;
 }
 
-// Analyze posts using Claude Sonnet 4.5
+// Analyze posts using Lovable AI (Google Gemini)
 async function analyzePosts(posts: BlueSkyPost[]): Promise<any[]> {
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY not configured');
+  if (!LOVABLE_API_KEY) {
+    throw new Error('LOVABLE_API_KEY not configured');
   }
 
   // Prepare batch analysis prompt
@@ -164,31 +164,36 @@ Return ONLY a JSON array with this exact structure:
 Posts:
 ${postsText}`;
 
-  const response = await fetch(ANTHROPIC_API_URL, {
+  const response = await fetch(LOVABLE_API_URL, {
     method: 'POST',
     headers: {
-      'x-api-key': ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
+      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      model: 'google/gemini-2.5-flash', // Fast and cheap
       messages: [{ role: 'user', content: prompt }]
     })
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+    
+    // Handle rate limits gracefully
+    if (response.status === 429) {
+      console.log('⚠️ Rate limit hit, will retry later');
+      throw new Error('RATE_LIMIT');
+    }
+    
+    throw new Error(`Lovable AI error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
-  const analysisText = data.content[0].text;
+  const analysisText = data.choices[0].message.content;
   
   const jsonMatch = analysisText.match(/\[[\s\S]*\]/);
   if (!jsonMatch) {
-    throw new Error('No JSON array found in Claude response');
+    throw new Error('No JSON array found in AI response');
   }
 
   const analyses = JSON.parse(jsonMatch[0]);
@@ -228,7 +233,7 @@ serve(async (req) => {
 
     console.log('🤖 Starting AI analysis of Bluesky posts...');
 
-    const { batchSize = 100 } = await req.json().catch(() => ({ batchSize: 100 })); // OPTIMIZATION: Increased from 20 to 100
+    const { batchSize = 50 } = await req.json().catch(() => ({ batchSize: 50 })); // OPTIMIZED: 50 posts for Gemini
 
     // Get unprocessed posts with relevance > 0.1 (matches bluesky-stream filter)
     const { data: posts, error: fetchError } = await supabase
