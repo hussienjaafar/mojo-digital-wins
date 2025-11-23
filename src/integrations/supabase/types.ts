@@ -525,6 +525,33 @@ export type Database = {
           },
         ]
       }
+      attribution_health_logs: {
+        Row: {
+          alerts: Json
+          checked_at: string
+          created_at: string
+          critical_alerts: number
+          id: string
+          total_alerts: number
+        }
+        Insert: {
+          alerts?: Json
+          checked_at?: string
+          created_at?: string
+          critical_alerts?: number
+          id?: string
+          total_alerts?: number
+        }
+        Update: {
+          alerts?: Json
+          checked_at?: string
+          created_at?: string
+          critical_alerts?: number
+          id?: string
+          total_alerts?: number
+        }
+        Relationships: []
+      }
       bill_actions: {
         Row: {
           action_code: string | null

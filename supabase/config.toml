@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.correlate-social-news]
 verify_jwt = false
+
+[functions.monitor-attribution-health]
+verify_jwt = false
