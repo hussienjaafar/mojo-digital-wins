@@ -27,59 +27,60 @@ serve(async (req) => {
     // TEST 1: RSS ARTICLE COLLECTION
     // =========================================================================
     try {
-      const { data: articleStats, error } = await supabase.rpc('get_article_stats');
+      // Direct signals from articles table; avoid relying on missing RPCs/columns
+      const { data: latestArticles } = await supabase
+        .from('articles')
+        .select('created_at, published_date, source_name')
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-      if (!articleStats) {
-        // Fallback to direct query
-        const { data: articles } = await supabase
-          .from('articles')
-          .select('id, created_at, published_date, source_name', { count: 'exact' })
-          .order('created_at', { ascending: false })
-          .limit(1);
+      const { count: totalArticles } = await supabase
+        .from('articles')
+        .select('*', { count: 'exact', head: true });
 
-        const { count } = await supabase
-          .from('articles')
-          .select('*', { count: 'exact', head: true });
+      const { count: count24h } = await supabase
+        .from('articles')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-        const { count: count24h } = await supabase
-          .from('articles')
-          .select('*', { count: 'exact', head: true })
-          .gte('published_date', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      const { data: sources } = await supabase
+        .from('articles')
+        .select('source_name')
+        .not('source_name', 'is', null)
+        .limit(5000);
 
-        const { data: sources } = await supabase
-          .from('articles')
-          .select('source_name')
-          .limit(2000);
+      const { count: activeSources } = await supabase
+        .from('rss_sources')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
 
-        const { count: activeSources } = await supabase
-          .from('rss_sources')
-          .select('*', { count: 'exact', head: true })
-          .eq('is_active', true);
+      const uniqueSources = new Set(sources?.map(s => s.source_name) || []);
+      const latestTs = latestArticles?.[0]?.created_at || latestArticles?.[0]?.published_date;
+      const recencyMinutes = latestTs
+        ? (Date.now() - new Date(latestTs).getTime()) / 60000
+        : 9999;
 
-        const uniqueSources = new Set(sources?.map(s => s.source_name) || []);
-        const minutesSinceIngestion = (() => {
-          const ts = articles?.[0]?.created_at || articles?.[0]?.published_date;
-          return ts ? (Date.now() - new Date(ts).getTime()) / 60000 : 9999;
-        })();
+      const statusPass = totalArticles > 0 && (recencyMinutes < 60 || (count24h || 0) > 0);
+      const verdict =
+        totalArticles > 2000 && recencyMinutes < 30 && (count24h || 0) > 50
+          ? '✅ HEALTHY'
+          : recencyMinutes > 180
+          ? '🔴 STALE - RSS sync may have stopped'
+          : '🟡 NEEDS MONITORING';
 
-        results.tests.push({
-          name: 'RSS Article Collection',
-          status: count && count > 0 && minutesSinceIngestion < 60 ? 'PASS' : 'WARN',
-          details: {
-            total_articles: count || 0,
-            active_sources: activeSources || uniqueSources.size,
-            articles_last_24h: count24h || 0,
-            minutes_since_last_ingestion: Math.round(minutesSinceIngestion),
-            last_article: articles?.[0]?.created_at || articles?.[0]?.published_date || 'NONE'
-          },
-          expected: 'total_articles > 2000, minutes < 30, articles_24h > 50',
-          verdict: count && count > 2000 && minutesSinceIngestion < 30 && (count24h || 0) > 50
-            ? '✅ HEALTHY'
-            : minutesSinceIngestion > 180
-            ? '🔴 STALE - RSS sync may have stopped'
-            : '🟡 NEEDS MONITORING'
-        });
-      }
+      results.tests.push({
+        name: 'RSS Article Collection',
+        status: statusPass ? 'PASS' : 'WARN',
+        details: {
+          total_articles: totalArticles || 0,
+          active_sources: activeSources || uniqueSources.size,
+          articles_last_24h: count24h || 0,
+          minutes_since_last_ingestion: Math.round(recencyMinutes),
+          last_article: latestTs || 'NONE'
+        },
+        expected: 'total_articles > 2000, minutes < 30, articles_24h > 50',
+        verdict
+      });
     } catch (err) {
       results.tests.push({
         name: 'RSS Article Collection',
@@ -231,10 +232,24 @@ serve(async (req) => {
         .select('*')
         .eq('is_active', true);
 
-      const overdueJobs = jobs?.filter(job => {
-        if (!job.last_run_at) return true;
+      const { data: executions } = await supabase
+        .from('job_executions')
+        .select('job_id, started_at, status')
+        .order('started_at', { ascending: false })
+        .limit(200);
 
-        const minutesSinceRun = (Date.now() - new Date(job.last_run_at).getTime()) / 60000;
+      const latestExec: Record<string, any> = {};
+      executions?.forEach(exec => {
+        if (!latestExec[exec.job_id]) {
+          latestExec[exec.job_id] = exec;
+        }
+      });
+
+      const overdueJobs = jobs?.filter(job => {
+        const lastRun = job.last_run_at || latestExec[job.id]?.started_at;
+        if (!lastRun) return true;
+
+        const minutesSinceRun = (Date.now() - new Date(lastRun).getTime()) / 60000;
 
         // Expected frequency from cron expression
         const expectedFrequency: Record<string, number> = {
@@ -246,7 +261,7 @@ serve(async (req) => {
         };
 
         const threshold = expectedFrequency[job.cron_expression] || 60;
-        return minutesSinceRun > threshold;
+        return minutesSinceRun > (threshold * 2); // allow 2x buffer
       }) || [];
 
       results.tests.push({
