@@ -191,6 +191,33 @@ function extractAnalysisJson(text: string): any {
   throw new Error('Failed to parse Claude JSON');
 }
 
+// Normalize common variants before validation
+function normalizeAnalysis(raw: any) {
+  if (!raw || typeof raw !== 'object') return raw;
+  const copy = { ...raw };
+
+  // Normalize groups: trim, lowercase, replace spaces with underscores
+  if (Array.isArray(copy.affected_groups)) {
+    copy.affected_groups = copy.affected_groups.map((g: string) =>
+      (g || '').toString().trim().toLowerCase().replace(/\s+/g, '_')
+    );
+  }
+
+  // Normalize category
+  if (copy.relevance_category) {
+    const cat = copy.relevance_category.toString().trim().toLowerCase();
+    // map common variants
+    const catMap: Record<string, string> = {
+      politics: 'other',
+      political: 'other',
+      policy: 'other',
+    };
+    copy.relevance_category = catMap[cat] || cat;
+  }
+
+  return copy;
+}
+
 // Fetch article content from URL
 async function fetchArticleContent(url: string): Promise<string> {
   try {
@@ -334,9 +361,10 @@ Source: ${article.source_name}
 Content: ${textToAnalyze}`;
 
         const data = await callClaudeWithBackoff(prompt);
-        const analysis =
+        const analysis = normalizeAnalysis(
           data?.content?.[0]?.json ??
-          extractAnalysisJson(data?.content?.[0]?.text ?? '');
+          extractAnalysisJson(data?.content?.[0]?.text ?? '')
+        );
         const validation = validateAnalysis(analysis);
         if (!validation.valid) {
           await supabase.from('articles').update({
