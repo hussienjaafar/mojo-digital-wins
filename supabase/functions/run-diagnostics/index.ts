@@ -78,7 +78,7 @@ serve(async (req) => {
       results.tests.push({
         name: 'RSS Article Collection',
         status: 'ERROR',
-        error: err.message
+        error: err instanceof Error ? err.message : String(err)
       });
     }
 
@@ -126,7 +126,7 @@ serve(async (req) => {
       results.tests.push({
         name: 'Bluesky Stream Collection',
         status: 'ERROR',
-        error: err.message
+        error: err instanceof Error ? err.message : String(err)
       });
     }
 
@@ -148,8 +148,8 @@ serve(async (req) => {
         .select('*', { count: 'exact', head: true })
         .not('category', 'is', null);
 
-      const sentimentPct = totalArticles ? (withSentiment / totalArticles * 100).toFixed(1) : 0;
-      const categoryPct = totalArticles ? (withCategory / totalArticles * 100).toFixed(1) : 0;
+      const sentimentPct = totalArticles ? ((withSentiment || 0) / totalArticles * 100).toFixed(1) : 0;
+      const categoryPct = totalArticles ? ((withCategory || 0) / totalArticles * 100).toFixed(1) : 0;
 
       results.tests.push({
         name: 'AI Analysis Completion',
@@ -172,7 +172,7 @@ serve(async (req) => {
       results.tests.push({
         name: 'AI Analysis Completion',
         status: 'ERROR',
-        error: err.message
+        error: err instanceof Error ? err.message : String(err)
       });
     }
 
@@ -212,7 +212,7 @@ serve(async (req) => {
       results.tests.push({
         name: 'Daily Briefing Generation',
         status: 'ERROR',
-        error: err.message
+        error: err instanceof Error ? err.message : String(err)
       });
     }
 
@@ -263,7 +263,7 @@ serve(async (req) => {
       results.tests.push({
         name: 'Scheduled Jobs Automation',
         status: 'ERROR',
-        error: err.message
+        error: err instanceof Error ? err.message : String(err)
       });
     }
 
@@ -304,7 +304,7 @@ serve(async (req) => {
       results.tests.push({
         name: 'Congressional Bill Tracking',
         status: 'ERROR',
-        error: err.message
+        error: err instanceof Error ? err.message : String(err)
       });
     }
 

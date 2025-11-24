@@ -1,8 +1,9 @@
 import { TooltipProps } from "recharts";
+import { ReactNode } from "react";
 
 interface CustomTooltipProps extends TooltipProps<any, any> {
   formatter?: (value: any) => string;
-  labelFormatter?: (label: any) => string;
+  labelFormatter?: (label: any, payload?: any[]) => ReactNode;
 }
 
 /**
