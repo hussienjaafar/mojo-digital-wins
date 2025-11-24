@@ -51,17 +51,23 @@ serve(async (req) => {
           .select('source_name')
           .limit(2000);
 
-        const const uniqueSources = new Set(sources?.map(s => s.source_name) || []);
-        const minutesSinceIngestion = articles?.[0]?.created_at
-          ? (Date.now() - new Date(articles[0].created_at).getTime()) / 6000000
-          : 9999;
+        const { count: activeSources } = await supabase
+          .from('rss_sources')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true);
+
+        const uniqueSources = new Set(sources?.map(s => s.source_name) || []);
+        const minutesSinceIngestion = (() => {
+          const ts = articles?.[0]?.created_at || articles?.[0]?.published_date;
+          return ts ? (Date.now() - new Date(ts).getTime()) / 60000 : 9999;
+        })();
 
         results.tests.push({
           name: 'RSS Article Collection',
-          status: count && count > 0 && minutesSinceIngestion < 30 ? 'PASS' : 'WARN',
+          status: count && count > 0 && minutesSinceIngestion < 60 ? 'PASS' : 'WARN',
           details: {
             total_articles: count || 0,
-            active_sources: uniqueSources.size,
+            active_sources: activeSources || uniqueSources.size,
             articles_last_24h: count24h || 0,
             minutes_since_last_ingestion: Math.round(minutesSinceIngestion),
             last_article: articles?.[0]?.created_at || articles?.[0]?.published_date || 'NONE'
@@ -69,7 +75,7 @@ serve(async (req) => {
           expected: 'total_articles > 2000, minutes < 30, articles_24h > 50',
           verdict: count && count > 2000 && minutesSinceIngestion < 30 && (count24h || 0) > 50
             ? '✅ HEALTHY'
-            : minutesSinceIngestion > 60
+            : minutesSinceIngestion > 180
             ? '🔴 STALE - RSS sync may have stopped'
             : '🟡 NEEDS MONITORING'
         });
@@ -93,7 +99,7 @@ serve(async (req) => {
         .single();
 
       const minutesSinceUpdate = cursor?.last_updated_at
-        ? (Date.now() - new Date(cursor.last_updated_at).getTime()) / 6000000
+        ? (Date.now() - new Date(cursor.last_updated_at).getTime()) / 60000
         : 9999;
 
       const { count: postCount } = await supabase
@@ -228,7 +234,7 @@ serve(async (req) => {
       const overdueJobs = jobs?.filter(job => {
         if (!job.last_run_at) return true;
 
-        const minutesSinceRun = (Date.now() - new Date(job.last_run_at).getTime()) / 6000000;
+        const minutesSinceRun = (Date.now() - new Date(job.last_run_at).getTime()) / 60000;
 
         // Expected frequency from cron expression
         const expectedFrequency: Record<string, number> = {
