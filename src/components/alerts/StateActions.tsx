@@ -214,7 +214,7 @@ export function StateActions() {
             reportType="state_actions"
             title="State Actions"
             trigger={
-              <Button variant="outline">
+              <Button variant="smooth">
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </Button>
@@ -222,7 +222,7 @@ export function StateActions() {
           />
           <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline">
+              <Button variant="smooth">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Manual
               </Button>
@@ -338,7 +338,7 @@ export function StateActions() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button onClick={syncActions} disabled={syncing}>
+          <Button onClick={syncActions} disabled={syncing} variant="smooth">
             <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
             Sync
           </Button>

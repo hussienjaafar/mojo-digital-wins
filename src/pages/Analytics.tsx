@@ -1414,7 +1414,7 @@ export default function Analytics() {
         <TabsContent value="social" className="space-y-4">
           {/* Social Metrics Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card>
+            <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '0ms' }}>
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
@@ -1431,7 +1431,7 @@ export default function Analytics() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '50ms' }}>
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
@@ -1448,7 +1448,7 @@ export default function Analytics() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950">

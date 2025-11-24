@@ -145,13 +145,13 @@ export function ExecutiveOrders() {
             reportType="executive_orders"
             title="Executive Orders"
             trigger={
-              <Button variant="outline">
+              <Button variant="smooth">
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </Button>
             }
           />
-          <Button onClick={syncOrders} disabled={syncing}>
+          <Button onClick={syncOrders} disabled={syncing} variant="smooth">
             <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
             Sync Orders
           </Button>
@@ -188,7 +188,7 @@ export function ExecutiveOrders() {
         <div className="text-center py-12">
           <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-muted-foreground">No executive orders found</p>
-          <Button onClick={syncOrders} className="mt-4" variant="outline">
+          <Button onClick={syncOrders} className="mt-4" variant="smooth">
             Sync from Federal Register
           </Button>
         </div>

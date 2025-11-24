@@ -441,7 +441,7 @@ export function NewsFeed() {
               <TooltipTrigger asChild>
                 <Button
                   onClick={detectDuplicates}
-                  variant="outline"
+                  variant="smooth"
                   className="gap-2"
                 >
                   <Sparkles className="h-4 w-4" />
@@ -457,7 +457,7 @@ export function NewsFeed() {
               <TooltipTrigger asChild>
                 <Button
                   onClick={() => loadArticles(0, currentFilters)}
-                  variant="outline"
+                  variant="smooth"
                   className="gap-2"
                 >
                   <RefreshCw className="h-4 w-4" />
