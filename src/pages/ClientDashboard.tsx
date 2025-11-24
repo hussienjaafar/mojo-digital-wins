@@ -146,10 +146,10 @@ const ClientDashboard = () => {
               </div>
             </div>
 
-            {/* Action Buttons - Mobile Responsive */}
+            {/* Action Buttons - Enhanced with Smooth Variant */}
             <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
               <Button
-                variant="outline"
+                variant="smooth"
                 size={isMobile ? "sm" : "default"}
                 onClick={() => navigate('/client/dashboard/custom')}
                 className="gap-2 min-h-[44px] min-w-[44px]"
@@ -160,10 +160,10 @@ const ClientDashboard = () => {
               </Button>
               <ThemeToggle />
               <Button
-                variant="outline"
+                variant="smooth"
                 size={isMobile ? "sm" : "default"}
                 onClick={handleLogout}
-                className="border-border/50 hover:border-destructive/50 hover:text-destructive transition-colors gap-2 min-h-[44px] min-w-[44px]"
+                className="hover:border-destructive/50 hover:text-destructive gap-2 min-h-[44px] min-w-[44px]"
                 title="Logout"
               >
                 <LogOut className="h-4 w-4" />
@@ -175,9 +175,9 @@ const ClientDashboard = () => {
       </header>
 
       <main className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
-        {/* Date Range Controls with Modern Design - Mobile Optimized */}
+        {/* Date Range Controls - Enhanced with Smooth Variant */}
         <div className="mb-4 sm:mb-6 md:mb-8">
-          <Card className="border-border/50 shadow-lg bg-card/50 backdrop-blur">
+          <Card variant="smooth" className="animate-fade-in-down">
             <CardContent className="p-3 sm:p-4 md:p-6">
               <div className="flex flex-col gap-4 sm:gap-6">
                 {/* Title Section */}

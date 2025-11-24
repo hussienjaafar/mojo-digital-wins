@@ -7,84 +7,80 @@ interface PageTransitionProps {
   className?: string;
 }
 
+/**
+ * Enhanced PageTransition with Claude Console-inspired animations
+ * Uses smooth fade-in-up animation for better UX
+ */
 export function PageTransition({ children, className }: PageTransitionProps) {
   const location = useLocation();
-  const [displayLocation, setDisplayLocation] = useState(location);
-  const [transitionStage, setTransitionStage] = useState<"fade-in" | "fade-out">("fade-in");
-
-  useEffect(() => {
-    if (location !== displayLocation) {
-      setTransitionStage("fade-out");
-    }
-  }, [location, displayLocation]);
-
-  const handleAnimationEnd = () => {
-    if (transitionStage === "fade-out") {
-      setDisplayLocation(location);
-      setTransitionStage("fade-in");
-    }
-  };
 
   return (
     <div
       className={cn(
-        "transition-opacity duration-300",
-        transitionStage === "fade-in" ? "opacity-100" : "opacity-0",
+        "animate-fade-in-up",
         className
       )}
-      onAnimationEnd={handleAnimationEnd}
+      key={location.pathname}
     >
       {children}
     </div>
   );
 }
 
-// Slide transition variant
+/**
+ * Slide transition - slides in from right
+ * Best for: Navigation between sequential pages
+ */
 export function SlideTransition({ children, className }: PageTransitionProps) {
   const location = useLocation();
-  const [isVisible, setIsVisible] = useState(true);
-
-  useEffect(() => {
-    setIsVisible(false);
-    const timer = setTimeout(() => setIsVisible(true), 150);
-    return () => clearTimeout(timer);
-  }, [location]);
 
   return (
     <div
       className={cn(
-        "transition-all duration-300",
-        isVisible
-          ? "opacity-100 translate-x-0"
-          : "opacity-0 -translate-x-4",
+        "animate-slide-in-right",
         className
       )}
+      key={location.pathname}
     >
       {children}
     </div>
   );
 }
 
-// Scale transition variant
-export function ScaleTransition({ children, className }: PageTransitionProps) {
+/**
+ * Pop-in transition - bouncy entrance
+ * Best for: Modal-like pages, special features
+ */
+export function PopTransition({ children, className }: PageTransitionProps) {
   const location = useLocation();
-  const [isVisible, setIsVisible] = useState(true);
-
-  useEffect(() => {
-    setIsVisible(false);
-    const timer = setTimeout(() => setIsVisible(true), 150);
-    return () => clearTimeout(timer);
-  }, [location]);
 
   return (
     <div
       className={cn(
-        "transition-all duration-300 origin-top",
-        isVisible
-          ? "opacity-100 scale-100"
-          : "opacity-0 scale-95",
+        "animate-pop-in",
         className
       )}
+      key={location.pathname}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Simple fade transition - minimal and fast
+ * Best for: Subtle transitions, performance-critical pages
+ */
+export function FadeTransition({ children, className }: PageTransitionProps) {
+  const location = useLocation();
+
+  return (
+    <div
+      className={cn(
+        "animate-fade-in",
+        className
+      )}
+      key={location.pathname}
     >
       {children}
     </div>

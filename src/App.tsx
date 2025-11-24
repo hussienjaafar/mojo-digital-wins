@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { PageTransition } from "@/components/PageTransition";
 import ScrollToTop from "@/components/ScrollToTop";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
 import BackToTop from "@/components/BackToTop";
@@ -48,31 +49,33 @@ const AppContent = () => {
       <CookieConsent />
       <MetaPixel />
       {isPublicPage && <ExitIntentPopup />}
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/case-studies" element={<CaseStudies />} />
-        <Route path="/case-studies/:id" element={<CaseStudyDetail />} />
-        <Route path="/blog" element={<Blog />} />
-        <Route path="/blog/:slug" element={<BlogPost />} />
-        <Route path="/creative-showcase" element={<CreativeShowcase />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        {/* News, Bills, Analytics, and Bookmarks moved to admin dashboard */}
-        <Route path="/bills/:billNumber" element={<BillDetail />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/install" element={<Install />} />
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />
-        <Route path="/client-login" element={<ClientLogin />} />
-        <Route path="/client/dashboard" element={<ClientDashboard />} />
-        <Route path="/client/dashboard/custom" element={<ClientDashboardCustom />} />
-        <Route path="/client/portal" element={<ClientPortal />} />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <PageTransition>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/case-studies" element={<CaseStudies />} />
+          <Route path="/case-studies/:id" element={<CaseStudyDetail />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
+          <Route path="/creative-showcase" element={<CreativeShowcase />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          {/* News, Bills, Analytics, and Bookmarks moved to admin dashboard */}
+          <Route path="/bills/:billNumber" element={<BillDetail />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/install" element={<Install />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />
+          <Route path="/client-login" element={<ClientLogin />} />
+          <Route path="/client/dashboard" element={<ClientDashboard />} />
+          <Route path="/client/dashboard/custom" element={<ClientDashboardCustom />} />
+          <Route path="/client/portal" element={<ClientPortal />} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </PageTransition>
     </>
   );
 };

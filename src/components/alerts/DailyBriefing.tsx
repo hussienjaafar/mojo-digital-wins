@@ -179,7 +179,7 @@ export function DailyBriefing() {
           <Button
             onClick={generateBriefing}
             disabled={generating}
-            variant="outline"
+            variant="smooth"
             size={isMobile ? "sm" : "default"}
             className="shrink-0"
           >
@@ -204,7 +204,7 @@ export function DailyBriefing() {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '0ms' }}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950">
@@ -221,7 +221,7 @@ export function DailyBriefing() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '50ms' }}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
@@ -238,7 +238,7 @@ export function DailyBriefing() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
@@ -257,7 +257,7 @@ export function DailyBriefing() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '150ms' }}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
@@ -290,7 +290,7 @@ export function DailyBriefing() {
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Trending Topics */}
-        <Card className="flex flex-col">
+        <Card variant="smooth" className="flex flex-col animate-slide-in-left">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
@@ -365,7 +365,7 @@ export function DailyBriefing() {
         </Card>
 
         {/* Critical Items */}
-        <Card className="flex flex-col">
+        <Card variant="smooth" className="flex flex-col animate-slide-in-right">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950">
@@ -438,7 +438,7 @@ export function DailyBriefing() {
 
       {/* Organization Mentions */}
       {briefing?.organization_mentions && Object.keys(briefing.organization_mentions).length > 0 && (
-        <Card>
+        <Card variant="smooth" className="animate-fade-in">
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
@@ -457,7 +457,8 @@ export function DailyBriefing() {
               {Object.entries(briefing.organization_mentions).map(([org, data]) => (
                 <Card
                   key={org}
-                  className={`hover:shadow-md transition-shadow ${
+                  variant="elevated"
+                  className={`${
                     data.critical > 0 ? 'border-red-300 dark:border-red-900' :
                     data.high > 0 ? 'border-orange-300 dark:border-orange-900' : ''
                   }`}

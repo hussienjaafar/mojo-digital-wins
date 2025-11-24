@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, DollarSign, Users, Target } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { logger } from "@/lib/logger";
+import { CurrencyChartTooltip, PercentageChartTooltip } from "@/components/charts/CustomChartTooltip";
 
 type Props = {
   organizationId: string;
@@ -66,9 +67,9 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* KPI Cards - Mobile Optimized */}
+      {/* KPI Cards - Enhanced with Claude Console Design */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card>
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '0ms' }}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Raised</CardTitle>
             <DollarSign className="h-4 w-4 text-primary" />
@@ -81,7 +82,7 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '50ms' }}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Spent</CardTitle>
             <Target className="h-4 w-4 text-primary" />
@@ -94,7 +95,7 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">ROI</CardTitle>
             <TrendingUp className="h-4 w-4 text-primary" />
@@ -107,7 +108,7 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '150ms' }}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Avg Donation</CardTitle>
             <Users className="h-4 w-4 text-primary" />
@@ -123,9 +124,9 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
         </Card>
       </div>
 
-      {/* Charts - Mobile Optimized */}
+      {/* Charts - Enhanced with Smooth Variant */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        <Card>
+        <Card variant="smooth" className="animate-slide-in-left">
           <CardHeader className="pb-3 sm:pb-4">
             <CardTitle className="text-base sm:text-lg">Funds Raised Over Time</CardTitle>
           </CardHeader>
@@ -135,16 +136,11 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
                 <YAxis stroke="hsl(var(--muted-foreground))" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))' 
-                  }} 
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="total_funds_raised" 
-                  stroke="hsl(var(--primary))" 
+                <Tooltip content={<CurrencyChartTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="total_funds_raised"
+                  stroke="hsl(var(--primary))"
                   strokeWidth={2}
                   name="Funds Raised"
                 />
@@ -153,7 +149,7 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card variant="smooth" className="animate-slide-in-right">
           <CardHeader className="pb-3 sm:pb-4">
             <CardTitle className="text-base sm:text-lg">Spend by Channel</CardTitle>
           </CardHeader>
@@ -174,15 +170,15 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip content={<CurrencyChartTooltip />} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      {/* ROI Trend - Mobile Optimized */}
-      <Card>
+      {/* ROI Trend - Enhanced with Smooth Variant */}
+      <Card variant="smooth" className="animate-fade-in">
         <CardHeader className="pb-3 sm:pb-4">
           <CardTitle className="text-base sm:text-lg">ROI Trend</CardTitle>
         </CardHeader>
@@ -192,16 +188,11 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
               <YAxis stroke="hsl(var(--muted-foreground))" />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--card))', 
-                  border: '1px solid hsl(var(--border))' 
-                }} 
-              />
-              <Line 
-                type="monotone" 
-                dataKey="roi_percentage" 
-                stroke="hsl(var(--primary))" 
+              <Tooltip content={<PercentageChartTooltip />} />
+              <Line
+                type="monotone"
+                dataKey="roi_percentage"
+                stroke="hsl(var(--primary))"
                 strokeWidth={2}
                 name="ROI %"
               />
