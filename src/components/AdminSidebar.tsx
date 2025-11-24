@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   LayoutDashboard,
   Building2,
@@ -651,6 +652,16 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
             </Collapsible>
           );
         })}
+
+        {/* Theme Toggle - Fixed at bottom */}
+        <div className="mt-auto pt-4 border-t border-border">
+          <div className="px-4 py-3 flex items-center justify-between">
+            {isEffectivelyExpanded && (
+              <span className="text-sm font-medium text-muted-foreground">Theme</span>
+            )}
+            <ThemeToggle />
+          </div>
+        </div>
       </SidebarContent>
     </Sidebar>
 
