@@ -157,6 +157,39 @@ function validateAnalysis(analysis: any): { valid: boolean; errors: string[]; co
   return { valid, errors, confidence: Math.max(0, confidence) };
 }
 
+// Try to extract and parse JSON from model output with light normalization to handle formatting drift
+function extractAnalysisJson(text: string): any {
+  const cleaned = text.replace(/```json|```/g, '').trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) {
+    throw new Error('No JSON object found in Claude response');
+  }
+
+  const tryParse = (candidate: string) => {
+    try {
+      return JSON.parse(candidate);
+    } catch (_err) {
+      return null;
+    }
+  };
+
+  // First attempt as-is
+  const direct = tryParse(match[0]);
+  if (direct) return direct;
+
+  // Second attempt with light cleanup for newlines, smart quotes, and trailing commas
+  const normalized = match[0]
+    .replace(/\r?\n/g, ' ')
+    .replace(/\u201c|\u201d/g, '"')
+    .replace(/\u2018|\u2019/g, "'")
+    .replace(/,\s*([}\]])/g, '$1');
+
+  const cleanedParse = tryParse(normalized);
+  if (cleanedParse) return cleanedParse;
+
+  throw new Error('Failed to parse Claude JSON');
+}
+
 // Fetch article content from URL
 async function fetchArticleContent(url: string): Promise<string> {
   try {
@@ -291,16 +324,8 @@ serve(async (req) => {
 
 7. **ai_summary**: 2-3 sentence summary of the article
 
-Return ONLY valid JSON with this exact structure:
-{
-  "affected_groups": ["muslim_american", "arab_american"],
-  "relevance_category": "civil_rights",
-  "geographic_scope": "national",
-  "threat_level": "high",
-  "sentiment_score": -0.6,
-  "sentiment_label": "negative",
-  "ai_summary": "Brief summary here..."
-}
+Return ONLY valid JSON (no markdown, no code fences, no extra text). Example:
+{"affected_groups":["muslim_american","arab_american"],"relevance_category":"civil_rights","geographic_scope":"national","threat_level":"high","sentiment_score":-0.6,"sentiment_label":"negative","ai_summary":"Brief summary here..."}
 
 Article:
 Title: ${article.title}
@@ -309,12 +334,7 @@ Content: ${textToAnalyze}`;
 
         const data = await callClaudeWithBackoff(prompt);
         const analysisText = data.content?.[0]?.text ?? '';
-        const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          throw new Error('No JSON object found in Claude response');
-        }
-
-        const analysis = JSON.parse(jsonMatch[0]);
+        const analysis = extractAnalysisJson(analysisText);
         const validation = validateAnalysis(analysis);
         if (!validation.valid) {
           await supabase.from('articles').update({
