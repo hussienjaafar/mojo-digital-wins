@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 
 const corsHeaders = {
@@ -10,9 +10,12 @@ const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
 const VALID_GROUPS = [
-  'muslim_american', 'arab_american', 'lgbtq', 'immigrants', 'refugees',
-  'black_american', 'latino_hispanic', 'asian_american', 'indigenous',
-  'women', 'youth', 'seniors', 'disabled', 'veterans', 'workers'
+  'muslim_american', 'arab_american', 'jewish_american', 'christian',
+  'lgbtq', 'transgender', 'women', 'reproductive_rights',
+  'black_american', 'latino', 'latino_hispanic', 'asian_american', 'indigenous',
+  'immigrants', 'refugees', 'asylum_seekers',
+  'disability', 'disabled', 'elderly', 'youth', 'seniors', 'students',
+  'veterans', 'workers', 'general_public'
 ];
 
 const VALID_CATEGORIES = [
@@ -58,11 +61,10 @@ async function callClaudeWithBackoff(prompt: string, retryCount = 0): Promise<an
     return await response.json();
     
   } catch (error: any) {
-    if ((error.message.includes('429') || error.message.includes('Rate limit')) && retryCount < MAX_RETRIES) {
+    if ((error.message?.includes('429') || error.message?.includes('Rate limit')) && retryCount < MAX_RETRIES) {
       // Exponential backoff: 2s, 4s, 8s, 16s, 32s
       const delay = BASE_DELAY * Math.pow(2, retryCount);
       console.log(`[analyze-articles] Rate limited. Waiting ${delay}ms before retry ${retryCount + 1}/${MAX_RETRIES}`);
-      
       await new Promise(resolve => setTimeout(resolve, delay));
       return callClaudeWithBackoff(prompt, retryCount + 1);
     }
@@ -83,7 +85,7 @@ function hashContent(text: string): string {
 
 // Check cache for existing analysis
 async function getCachedAnalysis(supabase: any, contentHash: string, model: string, promptHash: string): Promise<any | null> {
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('ai_analysis_cache')
     .select('response, created_at')
     .eq('content_hash', contentHash)
@@ -92,7 +94,7 @@ async function getCachedAnalysis(supabase: any, contentHash: string, model: stri
     .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // 7 day cache
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (!data) return null;
 
   // Update hit count
   await supabase
@@ -125,39 +127,27 @@ function validateAnalysis(analysis: any): { valid: boolean; errors: string[]; co
   const errors: string[] = [];
   let confidence = 1.0;
 
-  // Check required fields
   if (!analysis.affected_groups || !Array.isArray(analysis.affected_groups)) {
     errors.push('Missing or invalid affected_groups');
     return { valid: false, errors, confidence: 0 };
   }
 
-  if (!analysis.relevance_category) {
-    errors.push('Missing relevance_category');
-    confidence -= 0.2;
-  }
-
-  // Validate group labels
-  const invalidGroups = analysis.affected_groups.filter(
-    (g: string) => !VALID_GROUPS.includes(g)
-  );
-  if (invalidGroups.length > 0) {
-    errors.push(`Invalid groups: ${invalidGroups.join(', ')}`);
-    confidence -= 0.3;
-  }
-
-  // Validate category
   if (analysis.relevance_category && !VALID_CATEGORIES.includes(analysis.relevance_category)) {
     errors.push(`Invalid category: ${analysis.relevance_category}`);
     confidence -= 0.2;
   }
 
-  // Validate sentiment range
+  const invalidGroups = analysis.affected_groups.filter((g: string) => !VALID_GROUPS.includes(g));
+  if (invalidGroups.length > 0) {
+    errors.push(`Invalid groups: ${invalidGroups.join(', ')}`);
+    confidence -= 0.3;
+  }
+
   if (analysis.sentiment_score !== null && (analysis.sentiment_score < -1 || analysis.sentiment_score > 1)) {
     errors.push('Sentiment score out of range [-1, 1]');
     confidence -= 0.2;
   }
 
-  // Validate threat level
   if (analysis.threat_level && !VALID_THREAT_LEVELS.includes(analysis.threat_level)) {
     errors.push(`Invalid threat level: ${analysis.threat_level}`);
     confidence -= 0.1;
@@ -203,10 +193,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const BATCH_SIZE = 5; // Reduced to avoid rate limits
-    const REQUEST_DELAY = 1000; // 1 second between requests
+    // Batch size and pacing; can be overridden via request body for backfills
+    let BATCH_SIZE = 5;
+    let REQUEST_DELAY = 1000; // ms between requests
 
-    console.log(`[analyze-articles] Starting analysis (batch: ${BATCH_SIZE})...`);
+    // Allow overrides via request body for backfills
+    const overrides = await req.json().catch(() => ({}));
+    if (overrides.batchSize && typeof overrides.batchSize === 'number') {
+      BATCH_SIZE = Math.min(Math.max(1, overrides.batchSize), 100); // clamp 1..100
+    }
+    if (overrides.requestDelayMs && typeof overrides.requestDelayMs === 'number') {
+      REQUEST_DELAY = Math.min(Math.max(0, overrides.requestDelayMs), 5000); // clamp 0..5000ms
+    }
+
+    console.log(`[analyze-articles] Starting analysis (batch: ${BATCH_SIZE}, delay: ${REQUEST_DELAY}ms)...`);
 
     // Fetch unanalyzed articles
     const { data: articles, error: fetchError } = await supabase
@@ -225,26 +225,21 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[analyze-articles] Analyzing ${articles.length} articles...`);
-
     let analyzed = 0;
     let failed = 0;
     let validationFailed = 0;
     let cacheHits = 0;
+    const results: any[] = [];
 
-    // Process each article with AI analysis (with delay between requests)
-    const results = [];
     for (const article of articles) {
       try {
-        // Add delay between requests to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY));
-        
-        console.log(`[analyze-articles] Processing article ${article.id}: ${article.title.substring(0, 50)}...`);
+        if (REQUEST_DELAY > 0) {
+          await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY));
+        }
 
         // Fetch full content if needed
         let fullContent = article.content || article.description || '';
         if (article.source_url && (!fullContent || fullContent.length < 500)) {
-          console.log(`[analyze-articles] Fetching full content from ${article.source_url}`);
           const fetchedContent = await fetchArticleContent(article.source_url);
           if (fetchedContent) {
             fullContent = fetchedContent;
@@ -259,15 +254,12 @@ serve(async (req) => {
         // Check cache
         const cached = await getCachedAnalysis(supabase, contentHash, 'claude-3-haiku', promptHash);
         if (cached) {
-          console.log(`[analyze-articles] Cache hit for article ${article.id}`);
           cacheHits++;
-
           await supabase.from('articles').update({
             ...cached,
             processing_status: 'completed',
             updated_at: new Date().toISOString()
           }).eq('id', article.id);
-
           analyzed++;
           results.push({ id: article.id, status: 'success (cached)' });
           continue;
@@ -315,24 +307,16 @@ Title: ${article.title}
 Source: ${article.source_name}
 Content: ${textToAnalyze}`;
 
-        // Call Claude API with exponential backoff for rate limits
         const data = await callClaudeWithBackoff(prompt);
-        const analysisText = data.content[0].text;
-
-        // Parse JSON response
+        const analysisText = data.content?.[0]?.text ?? '';
         const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
           throw new Error('No JSON object found in Claude response');
         }
 
         const analysis = JSON.parse(jsonMatch[0]);
-
-        // Validate analysis
         const validation = validateAnalysis(analysis);
         if (!validation.valid) {
-          console.warn(`[analyze-articles] Validation failed for article ${article.id}:`, validation.errors);
-          validationFailed++;
-
           await supabase.from('articles').update({
             processing_status: 'completed',
             validation_passed: false,
@@ -340,15 +324,13 @@ Content: ${textToAnalyze}`;
             ai_confidence_score: validation.confidence,
             updated_at: new Date().toISOString()
           }).eq('id', article.id);
-
+          validationFailed++;
           results.push({ id: article.id, status: 'validation_failed', errors: validation.errors });
           continue;
         }
 
-        // Cache the successful analysis
         await cacheAnalysis(supabase, contentHash, 'claude-3-haiku', promptHash, analysis);
 
-        // Update article with analysis
         await supabase.from('articles').update({
           affected_groups: analysis.affected_groups || [],
           relevance_category: analysis.relevance_category,
@@ -365,32 +347,19 @@ Content: ${textToAnalyze}`;
 
         analyzed++;
         results.push({ id: article.id, status: 'success' });
-        console.log(`[analyze-articles] ✓ Article ${article.id} analyzed successfully`);
 
       } catch (error: any) {
-        console.error(`[analyze-articles] Error processing article ${article.id}:`, {
-          error: error.message,
-          stack: error.stack,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Log to job_failures table
+        console.error(`[analyze-articles] Error processing article ${article.id}:`, error);
         await supabase.from('job_failures').insert({
           function_name: 'analyze-articles',
           error_message: error.message,
           error_stack: error.stack,
           context_data: { article_id: article.id, title: article.title }
         });
-        
-        // Update article status to failed
         await supabase
           .from('articles')
-          .update({
-            processing_status: 'failed',
-            updated_at: new Date().toISOString()
-          })
+          .update({ processing_status: 'failed', updated_at: new Date().toISOString() })
           .eq('id', article.id);
-
         failed++;
         results.push({ id: article.id, status: 'failed', error: error.message });
       }
@@ -406,19 +375,17 @@ Content: ${textToAnalyze}`;
       results
     };
 
-    console.log(`[analyze-articles] Batch complete:`, summary);
-
     return new Response(
       JSON.stringify(summary),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('[analyze-articles] Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: error?.message || 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
+

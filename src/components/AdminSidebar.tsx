@@ -130,6 +130,7 @@ export const navigationGroups: NavigationGroup[] = [
     icon: Shield,
     collapsedByDefault: true,
     items: [
+      { title: "Ops", icon: Activity, value: "scheduler", requiredRole: 'admin' },
       { title: "Users", icon: UserCog, value: "users", requiredRole: 'admin' },
       { title: "Invites", icon: Shield, value: "invite-codes", requiredRole: 'admin' },
       { title: "Sessions", icon: Activity, value: "sessions", requiredRole: 'admin' },

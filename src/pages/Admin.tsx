@@ -39,6 +39,7 @@ import { Session } from "@supabase/supabase-js";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LiveRegionProvider } from "@/components/accessibility";
 import { NewsFilterProvider, useNewsFilters } from "@/contexts/NewsFilterContext";
+import OpsPanel from "@/components/admin/OpsPanel";
 
 type ContactSubmission = {
   id: string;
@@ -102,13 +103,13 @@ const Admin = () => {
   // Load active tab from localStorage on mount, default to "analytics"
   const [activeTab, setActiveTab] = useState<string>(() => {
     const savedTab = localStorage.getItem('admin-active-tab');
-    console.log('📍 Initializing activeTab from localStorage:', savedTab || 'analytics (default)');
+    console.log('Initializing activeTab from localStorage:', savedTab || 'analytics (default)');
     return savedTab || "analytics";
   });
 
   // Save active tab to localStorage whenever it changes
   useEffect(() => {
-    console.log('💾 Saving activeTab to localStorage:', activeTab);
+    console.log('Saving activeTab to localStorage:', activeTab);
     localStorage.setItem('admin-active-tab', activeTab);
   }, [activeTab]);
 
@@ -300,6 +301,7 @@ const Admin = () => {
         return (
           <div className="space-y-6">
             <DataBackfillPanel />
+            <OpsPanel />
             <SyncScheduler />
           </div>
         );
