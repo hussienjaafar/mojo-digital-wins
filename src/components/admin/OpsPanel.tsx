@@ -83,7 +83,7 @@ export default function OpsPanel() {
   const isActive = (j: ScheduledJob) => (j.is_active ?? j.is_enabled) ? true : false;
   const scheduleOf = (j: ScheduledJob) => j.schedule || j.cron_expression || '';
 
-  const pushTrend = (arrSetter: (v: number[]) => void, value: number) => {
+  const pushTrend = (arrSetter: React.Dispatch<React.SetStateAction<number[]>>, value: number) => {
     arrSetter(prev => {
       const next = [...prev, value];
       return next.length > 20 ? next.slice(next.length - 20) : next;
@@ -135,12 +135,8 @@ export default function OpsPanel() {
         .maybeSingle();
       setBlueskyUpdatedAt(cursor?.last_updated_at || null);
 
-      // Backfill monitoring view (if exists)
-      const { data: bm } = await supabase
-        .from('backfill_monitoring')
-        .select('*')
-        .maybeSingle();
-      setBackfillStats((bm as any) || null);
+      // Skip backfill monitoring for now
+      setBackfillStats(null);
     } finally {
       setLoading(false);
     }
@@ -220,7 +216,7 @@ export default function OpsPanel() {
         <Card className="min-w-[280px] flex-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4" /> Articles Pending</CardTitle>
-            <CardDescription>Needs AI analysis (target: >80% in 10m)</CardDescription>
+            <CardDescription>Needs AI analysis (target: {'>'}80% in 10m)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-end justify-between gap-4">
@@ -234,7 +230,7 @@ export default function OpsPanel() {
         <Card className="min-w-[280px] flex-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2"><Server className="h-4 w-4" /> Bluesky Pending</CardTitle>
-            <CardDescription>Queued for processing (target: < 2h backlog)</CardDescription>
+            <CardDescription>Queued for processing (target: {'<'} 2h backlog)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-end justify-between gap-4">
