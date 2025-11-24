@@ -281,6 +281,36 @@ function extractTags(title: string, description: string, content: string): strin
   return KEYWORDS.filter(keyword => text.includes(keyword.toLowerCase()));
 }
 
+// Fetch full article content when feeds only provide excerpts
+async function fetchArticleContent(url: string): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IntelligenceBot/1.0)' },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) return '';
+    const html = await response.text();
+
+    // Strip scripts/styles and tags, collapse whitespace
+    const text = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return text.substring(0, 8000);
+  } catch (_err) {
+    return '';
+  }
+}
+
 // Parse RSS feed using XMLHttpRequest response text
 async function parseRSSFeed(url: string): Promise<any[]> {
   try {
@@ -413,11 +443,21 @@ serve(async (req) => {
         for (const item of items) {
           const sanitizedTitle = sanitizeText(item.title);
           const sanitizedDescription = sanitizeText(item.description);
+          let fullContent = sanitizedDescription;
+
+          // Try to fetch full content if the description is short
+          if (fullContent.length < 400 && item.link) {
+            const fetched = await fetchArticleContent(item.link);
+            if (fetched) {
+              fullContent = sanitizeText(fetched);
+            }
+          }
+
           const hash = generateHash(sanitizedTitle, sanitizedDescription);
           const tags = extractTags(sanitizedTitle, sanitizedDescription, sanitizedDescription);
 
           // Calculate threat level
-          const textToAnalyze = `${sanitizedTitle} ${sanitizedDescription}`;
+          const textToAnalyze = `${sanitizedTitle} ${fullContent}`;
           const { level: threatLevel, score, affectedOrgs } = calculateThreatLevel(textToAnalyze, source.name);
 
           const { data: insertedArticle, error: insertError } = await supabase
@@ -425,7 +465,7 @@ serve(async (req) => {
             .insert({
               title: sanitizedTitle,
               description: sanitizedDescription,
-              content: sanitizedDescription,
+              content: fullContent || sanitizedDescription,
               source_id: source.id,
               source_name: source.name,
               source_url: item.link, // Individual article link
