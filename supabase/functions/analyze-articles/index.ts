@@ -185,7 +185,16 @@ function extractAnalysisJson(text: string): any {
     .replace(/\u2018|\u2019/g, "'")
     .replace(/,\s*([}\]])/g, '$1');
 
-  const cleanedParse = tryParse(normalized);
+  // Sanitize ai_summary by replacing internal double quotes with single quotes to keep JSON valid
+  let sanitized = normalized;
+  const aiSummaryMatch = sanitized.match(/"ai_summary"\s*:\s*"([\s\S]*?)"/);
+  if (aiSummaryMatch) {
+    const rawSummary = aiSummaryMatch[1];
+    const safeSummary = rawSummary.replace(/"/g, "'");
+    sanitized = sanitized.replace(aiSummaryMatch[0], `"ai_summary":"${safeSummary}"`);
+  }
+
+  const cleanedParse = tryParse(sanitized);
   if (cleanedParse) return cleanedParse;
 
   throw new Error('Failed to parse Claude JSON');
@@ -352,7 +361,7 @@ serve(async (req) => {
 
 7. **ai_summary**: 2-3 sentence summary of the article
 
-Return ONLY valid JSON (no markdown, no code fences, no extra text). Example:
+Return ONLY valid JSON (no markdown, no code fences, no extra text). ai_summary must avoid double quotes; use single quotes if needed. Example:
 {"affected_groups":["muslim_american","arab_american"],"relevance_category":"civil_rights","geographic_scope":"national","threat_level":"high","sentiment_score":-0.6,"sentiment_label":"negative","ai_summary":"Brief summary here..."}
 
 Article:
