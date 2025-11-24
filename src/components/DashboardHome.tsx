@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
+import { CurrencyChartTooltip, PercentageChartTooltip, NumberChartTooltip } from "@/components/charts/CustomChartTooltip";
 import {
   LineChart,
   Line,
@@ -244,7 +245,7 @@ export function DashboardHome() {
           {!isMobile && (
             <Button
               onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')}
-              variant="outline"
+              variant="smooth"
               size="sm"
               className="shrink-0"
             >
@@ -265,7 +266,7 @@ export function DashboardHome() {
       {/* Key Metrics Grid - Redesigned with Semantic Colors */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Revenue - Green */}
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '0ms' }}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950">
@@ -294,7 +295,7 @@ export function DashboardHome() {
         </Card>
 
         {/* Active Clients - Blue */}
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '50ms' }}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
@@ -318,7 +319,7 @@ export function DashboardHome() {
         </Card>
 
         {/* Average ROI - Purple */}
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
@@ -336,7 +337,7 @@ export function DashboardHome() {
         </Card>
 
         {/* Total Donations - Orange */}
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '150ms' }}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
@@ -355,7 +356,7 @@ export function DashboardHome() {
       </div>
 
       {/* Demo Organization Card - Redesigned */}
-      <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-800">
+      <Card variant="gradient" className="animate-fade-in bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-800">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
@@ -405,7 +406,7 @@ export function DashboardHome() {
 
       {/* Quick Actions - Redesigned */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-        <Card className="hover:shadow-md transition-all hover:border-blue-200 dark:hover:border-blue-800 cursor-pointer" onClick={() => navigate('/admin')}>
+        <Card variant="elevated" className="cursor-pointer hover:border-blue-200 dark:hover:border-blue-800" onClick={() => navigate('/admin')}>
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
@@ -421,7 +422,7 @@ export function DashboardHome() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-all hover:border-purple-200 dark:hover:border-purple-800 cursor-pointer">
+        <Card variant="elevated" className="cursor-pointer hover:border-purple-200 dark:hover:border-purple-800">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
@@ -437,7 +438,7 @@ export function DashboardHome() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-all hover:border-orange-200 dark:hover:border-orange-800 cursor-pointer">
+        <Card variant="elevated" className="cursor-pointer hover:border-orange-200 dark:hover:border-orange-800">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
@@ -457,7 +458,7 @@ export function DashboardHome() {
       {/* Charts Section - Redesigned */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
         {/* Revenue Trends Chart */}
-        <Card>
+        <Card variant="smooth" className="animate-slide-in-left">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950">
@@ -483,24 +484,17 @@ export function DashboardHome() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis 
-                  dataKey="date" 
+                <XAxis
+                  dataKey="date"
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
                 />
-                <YAxis 
+                <YAxis
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
                   tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: any) => `$${Number(value).toLocaleString()}`}
-                />
+                <Tooltip content={<CurrencyChartTooltip />} />
                 <Legend />
                 <Area 
                   type="monotone" 
@@ -524,7 +518,7 @@ export function DashboardHome() {
         </Card>
 
         {/* ROI Over Time Chart */}
-        <Card>
+        <Card variant="smooth" className="animate-slide-in-right">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
@@ -540,24 +534,17 @@ export function DashboardHome() {
             <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis 
-                  dataKey="date" 
+                <XAxis
+                  dataKey="date"
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
                 />
-                <YAxis 
+                <YAxis
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
                   tickFormatter={(value) => `${value}%`}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: any) => `${Number(value).toFixed(1)}%`}
-                />
+                <Tooltip content={<PercentageChartTooltip />} />
                 <Legend />
                 <Line 
                   type="monotone" 
@@ -573,7 +560,7 @@ export function DashboardHome() {
         </Card>
 
         {/* Campaign Performance Bar Chart */}
-        <Card>
+        <Card variant="smooth" className="animate-fade-in">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
@@ -602,14 +589,7 @@ export function DashboardHome() {
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
                   tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: any) => `$${Number(value).toLocaleString()}`}
-                />
+                <Tooltip content={<CurrencyChartTooltip />} />
                 <Legend />
                 <Bar dataKey="revenue" fill="#667eea" name="Revenue" radius={[8, 8, 0, 0]} />
                 <Bar dataKey="spend" fill="#764ba2" name="Spend" radius={[8, 8, 0, 0]} />
@@ -619,7 +599,7 @@ export function DashboardHome() {
         </Card>
 
         {/* Donations Trend Chart */}
-        <Card>
+        <Card variant="smooth" className="animate-fade-in">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
@@ -650,14 +630,7 @@ export function DashboardHome() {
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: any) => `${Number(value).toLocaleString()} donations`}
-                />
+                <Tooltip content={<NumberChartTooltip />} />
                 <Legend />
                 <Area 
                   type="monotone" 
