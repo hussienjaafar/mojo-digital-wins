@@ -421,7 +421,7 @@ Content: ${textToAnalyze}`;
           .update({ processing_status: 'failed', updated_at: new Date().toISOString() })
           .eq('id', article.id);
         failed++;
-        results.push({ id: article.id, status: 'failed', error: error.message, raw: data?.content?.[0] ?? null });
+        results.push({ id: article.id, status: 'failed', error: error.message });
       }
     }
 
