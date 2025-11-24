@@ -180,7 +180,7 @@ export function AlertSettings() {
             Configure how and when you receive alerts
           </p>
         </div>
-        <Button onClick={savePreferences} disabled={saving}>
+        <Button onClick={savePreferences} disabled={saving} variant="smooth">
           {saving ? (
             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
           ) : (
@@ -191,7 +191,7 @@ export function AlertSettings() {
       </div>
 
       {/* Alert Threshold */}
-      <Card>
+      <Card variant="smooth" className="animate-fade-in-up" style={{ animationDelay: '0ms' }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5" />
@@ -258,7 +258,7 @@ export function AlertSettings() {
       </Card>
 
       {/* Alert Types */}
-      <Card>
+      <Card variant="smooth" className="animate-fade-in-up" style={{ animationDelay: '50ms' }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
@@ -304,7 +304,7 @@ export function AlertSettings() {
       </Card>
 
       {/* Daily Briefing */}
-      <Card>
+      <Card variant="smooth" className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
@@ -350,7 +350,7 @@ export function AlertSettings() {
       </Card>
 
       {/* Watched Organizations */}
-      <Card>
+      <Card variant="smooth" className="animate-fade-in-up" style={{ animationDelay: '150ms' }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
