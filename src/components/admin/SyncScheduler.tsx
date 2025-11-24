@@ -34,6 +34,7 @@ const SyncScheduler = () => {
   const [executions, setExecutions] = useState<JobExecution[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [runningJobs, setRunningJobs] = useState<Set<string>>(new Set());
+  const [isRunningAll, setIsRunningAll] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -145,6 +146,7 @@ const SyncScheduler = () => {
   };
 
   const runAllJobs = async () => {
+    setIsRunningAll(true);
     try {
       toast({
         title: "Running all jobs...",
@@ -157,9 +159,12 @@ const SyncScheduler = () => {
 
       if (error) throw error;
 
+      const successCount = data?.successful ?? data?.results?.filter((r: any) => r.status === 'success')?.length ?? 0;
+      const failedCount = data?.failed ?? data?.results?.filter((r: any) => r.status === 'failed')?.length ?? 0;
+
       toast({
         title: "Jobs completed",
-        description: `${data.successful} successful, ${data.failed} failed`,
+        description: `${successCount} successful, ${failedCount} failed`,
       });
 
       await loadData();
@@ -167,9 +172,11 @@ const SyncScheduler = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to run jobs",
+        description: error?.message || "Failed to run jobs",
         variant: "destructive",
       });
+    } finally {
+      setIsRunningAll(false);
     }
   };
 
@@ -256,9 +263,13 @@ const SyncScheduler = () => {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={runAllJobs}>
-            <Zap className="w-4 h-4 mr-2" />
-            Run All Now
+          <Button onClick={runAllJobs} disabled={isRunningAll}>
+            {isRunningAll ? (
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Zap className="w-4 h-4 mr-2" />
+            )}
+            {isRunningAll ? "Running..." : "Run All Now"}
           </Button>
         </div>
       </div>
@@ -290,11 +301,11 @@ const SyncScheduler = () => {
                   <div key={job.id} className="border rounded-lg p-4 space-y-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(null)}
+                        <div className="flex items-center gap-2">
+                            {getStatusIcon(job.last_run_status)}
                             <h4 className="font-semibold">{job.job_name}</h4>
-                            {getStatusBadge(null)}
-                          </div>
+                            {getStatusBadge(job.last_run_status)}
+                        </div>
                           <p className="text-sm text-muted-foreground mt-1">
                             {job.job_type}
                           </p>
