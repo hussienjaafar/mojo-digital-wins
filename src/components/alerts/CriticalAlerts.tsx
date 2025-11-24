@@ -165,7 +165,7 @@ export function CriticalAlerts() {
         </Alert>
       )}
 
-      <Card>
+      <Card variant="smooth" className="animate-fade-in">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -182,13 +182,13 @@ export function CriticalAlerts() {
                 reportType="critical_alerts"
                 title="Critical Alerts"
                 trigger={
-                  <Button variant="outline" size="sm">
+                  <Button variant="smooth" size="sm">
                     <Download className="h-4 w-4 mr-2" />
                     Export
                   </Button>
                 }
               />
-              <Button onClick={syncAllSources} disabled={syncing} size="sm">
+              <Button onClick={syncAllSources} disabled={syncing} size="sm" variant="smooth">
                 <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
                 Sync All
               </Button>
@@ -200,7 +200,7 @@ export function CriticalAlerts() {
             <div className="text-center py-8 text-muted-foreground">
               <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No critical or high priority alerts at this time</p>
-              <Button onClick={syncAllSources} className="mt-4" variant="outline" size="sm">
+              <Button onClick={syncAllSources} className="mt-4" variant="smooth" size="sm">
                 Sync Sources
               </Button>
             </div>
