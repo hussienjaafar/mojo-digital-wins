@@ -42,6 +42,7 @@ async function callClaudeWithBackoff(prompt: string, retryCount = 0): Promise<an
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
         max_tokens: 1024,
+        response_format: { type: "json_object" },
         messages: [{
           role: 'user',
           content: prompt
@@ -333,8 +334,9 @@ Source: ${article.source_name}
 Content: ${textToAnalyze}`;
 
         const data = await callClaudeWithBackoff(prompt);
-        const analysisText = data.content?.[0]?.text ?? '';
-        const analysis = extractAnalysisJson(analysisText);
+        const analysis =
+          data?.content?.[0]?.json ??
+          extractAnalysisJson(data?.content?.[0]?.text ?? '');
         const validation = validateAnalysis(analysis);
         if (!validation.valid) {
           await supabase.from('articles').update({
