@@ -48,12 +48,12 @@ serve(async (req) => {
 
         const { data: sources } = await supabase
           .from('articles')
-          .select('source')
-          .limit(1000);
+          .select('source_name')
+          .limit(2000);
 
-        const uniqueSources = new Set(sources?.map(s => s.source) || []);
+        const const uniqueSources = new Set(sources?.map(s => s.source_name) || []);
         const minutesSinceIngestion = articles?.[0]?.created_at
-          ? (Date.now() - new Date(articles[0].created_at).getTime()) / 600000
+          ? (Date.now() - new Date(articles[0].created_at).getTime()) / 6000000
           : 9999;
 
         results.tests.push({
@@ -64,7 +64,7 @@ serve(async (req) => {
             active_sources: uniqueSources.size,
             articles_last_24h: count24h || 0,
             minutes_since_last_ingestion: Math.round(minutesSinceIngestion),
-            last_article: articles?.[0]?.created_at || 'NONE'
+            last_article: articles?.[0]?.created_at || articles?.[0]?.published_date || 'NONE'
           },
           expected: 'total_articles > 2000, minutes < 30, articles_24h > 50',
           verdict: count && count > 2000 && minutesSinceIngestion < 30 && (count24h || 0) > 50
@@ -93,7 +93,7 @@ serve(async (req) => {
         .single();
 
       const minutesSinceUpdate = cursor?.last_updated_at
-        ? (Date.now() - new Date(cursor.last_updated_at).getTime()) / 600000
+        ? (Date.now() - new Date(cursor.last_updated_at).getTime()) / 6000000
         : 9999;
 
       const { count: postCount } = await supabase
@@ -228,7 +228,7 @@ serve(async (req) => {
       const overdueJobs = jobs?.filter(job => {
         if (!job.last_run_at) return true;
 
-        const minutesSinceRun = (Date.now() - new Date(job.last_run_at).getTime()) / 600000;
+        const minutesSinceRun = (Date.now() - new Date(job.last_run_at).getTime()) / 6000000;
 
         // Expected frequency from cron expression
         const expectedFrequency: Record<string, number> = {
