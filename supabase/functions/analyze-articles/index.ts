@@ -264,8 +264,9 @@ serve(async (req) => {
     );
 
     // Batch size and pacing; can be overridden via request body for backfills
-    let BATCH_SIZE = 5;
-    let REQUEST_DELAY = 1000; // ms between requests
+    // Defaults tuned for reasonable throughput while avoiding rate limits
+    let BATCH_SIZE = 25;
+    let REQUEST_DELAY = 400; // ms between requests
 
     // Allow overrides via request body for backfills
     const overrides = await req.json().catch(() => ({}));

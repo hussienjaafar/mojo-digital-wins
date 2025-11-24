@@ -7,12 +7,12 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'
   ) THEN
-    PERFORM cron.unschedule('analyze-articles-every-10-min');
+    PERFORM cron.unschedule('analyze-articles-every-5-min');
 
-    -- Schedule analyze-articles every 10 minutes with conservative defaults
+    -- Schedule analyze-articles every 5 minutes with tuned defaults
     PERFORM cron.schedule(
-      'analyze-articles-every-10-min',
-      '*/10 * * * *',
+      'analyze-articles-every-5-min',
+      '*/5 * * * *',
       $$
       SELECT net.http_post(
         url := current_setting('app.supabase_url') || '/functions/v1/analyze-articles',
@@ -21,8 +21,8 @@ BEGIN
           'Content-Type', 'application/json'
         ),
         body := jsonb_build_object(
-          'batchSize', 10,
-          'requestDelayMs', 800
+          'batchSize', 25,
+          'requestDelayMs', 400
         )
       );
       $$
