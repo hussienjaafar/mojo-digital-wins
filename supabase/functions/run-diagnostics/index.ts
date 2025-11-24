@@ -33,7 +33,7 @@ serve(async (req) => {
         // Fallback to direct query
         const { data: articles } = await supabase
           .from('articles')
-          .select('id, created_at, published_at, source', { count: 'exact' })
+          .select('id, created_at, published_date, source_name', { count: 'exact' })
           .order('created_at', { ascending: false })
           .limit(1);
 
@@ -44,7 +44,7 @@ serve(async (req) => {
         const { count: count24h } = await supabase
           .from('articles')
           .select('*', { count: 'exact', head: true })
-          .gte('published_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+          .gte('published_date', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
         const { data: sources } = await supabase
           .from('articles')
@@ -53,7 +53,7 @@ serve(async (req) => {
 
         const uniqueSources = new Set(sources?.map(s => s.source) || []);
         const minutesSinceIngestion = articles?.[0]?.created_at
-          ? (Date.now() - new Date(articles[0].created_at).getTime()) / 60000
+          ? (Date.now() - new Date(articles[0].created_at).getTime()) / 600000
           : 9999;
 
         results.tests.push({
@@ -93,7 +93,7 @@ serve(async (req) => {
         .single();
 
       const minutesSinceUpdate = cursor?.last_updated_at
-        ? (Date.now() - new Date(cursor.last_updated_at).getTime()) / 60000
+        ? (Date.now() - new Date(cursor.last_updated_at).getTime()) / 600000
         : 9999;
 
       const { count: postCount } = await supabase
@@ -228,7 +228,7 @@ serve(async (req) => {
       const overdueJobs = jobs?.filter(job => {
         if (!job.last_run_at) return true;
 
-        const minutesSinceRun = (Date.now() - new Date(job.last_run_at).getTime()) / 60000;
+        const minutesSinceRun = (Date.now() - new Date(job.last_run_at).getTime()) / 600000;
 
         // Expected frequency from cron expression
         const expectedFrequency: Record<string, number> = {
