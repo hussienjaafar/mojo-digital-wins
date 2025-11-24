@@ -1067,7 +1067,7 @@ export default function Analytics() {
             </Popover>
 
             <Button
-              variant="outline"
+              variant="smooth"
               onClick={() => fetchAnalytics()}
               disabled={loading}
               title="Refresh data (Keyboard shortcut: R)"
@@ -1080,7 +1080,7 @@ export default function Analytics() {
             </Button>
 
             <Button
-              variant="outline"
+              variant="smooth"
               onClick={exportToCSV}
               aria-label="Export trending topics to CSV file"
               title="Export to CSV (Keyboard shortcut: E)"
@@ -1098,10 +1098,10 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* Key Metrics - Redesigned */}
+      {/* Key Metrics - Enhanced with Claude Console Design */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Coverage - Blue */}
-        <Card className="hover:shadow-md transition-shadow" role="article" aria-label="Total coverage metric">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '0ms' }} role="article" aria-label="Total coverage metric">
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
@@ -1119,7 +1119,7 @@ export default function Analytics() {
         </Card>
 
         {/* Critical Threats - Red */}
-        <Card className="hover:shadow-md transition-shadow" role="article" aria-label="Critical threats metric">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '50ms' }} role="article" aria-label="Critical threats metric">
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950">
@@ -1137,7 +1137,7 @@ export default function Analytics() {
         </Card>
 
         {/* Active Bills - Purple */}
-        <Card className="hover:shadow-md transition-shadow" role="article" aria-label="Active bills metric">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '100ms' }} role="article" aria-label="Active bills metric">
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
@@ -1155,7 +1155,7 @@ export default function Analytics() {
         </Card>
 
         {/* Overall Sentiment - Dynamic Color */}
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '150ms' }}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className={`p-2 rounded-lg ${

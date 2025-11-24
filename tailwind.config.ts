@@ -282,6 +282,22 @@ export default {
             transform: "translate(20px, 40px) scale(1.15)",
           },
         },
+        "shimmer": {
+          "0%": {
+            backgroundPosition: "-200% 0",
+          },
+          "100%": {
+            backgroundPosition: "200% 0",
+          },
+        },
+        "wave": {
+          "0%": {
+            transform: "translateX(-100%)",
+          },
+          "100%": {
+            transform: "translateX(100%)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -306,6 +322,8 @@ export default {
         "circle-float-1": "circle-float-1 20s ease-in-out infinite",
         "circle-float-2": "circle-float-2 25s ease-in-out infinite",
         "circle-float-3": "circle-float-3 18s ease-in-out infinite",
+        "shimmer": "shimmer 2s ease-in-out infinite",
+        "wave": "wave 2s ease-in-out infinite",
       },
     },
   },
