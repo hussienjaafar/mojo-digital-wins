@@ -245,22 +245,33 @@ serve(async (req) => {
       .eq('briefing_date', today)
       .single();
 
-    // Get users to send to
-    let usersQuery = supabase
-      .from('user_article_preferences')
-      .select(`
-        user_id,
-        daily_briefing_time,
-        users:user_id (
-          email,
-          raw_user_meta_data
-        )
-      `)
-      .eq('daily_briefing_enabled', true);
+    console.log('=== SEND-DAILY-BRIEFING V2 - Using profiles/user_roles directly ===');
 
-    const { data: users, error: usersError } = await usersQuery;
+    // Get admin users to send briefing to
+    // Query profiles directly since we're using service role key
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, email');
 
-    if (usersError) throw usersError;
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+      throw profilesError;
+    }
+
+    // Get admin users from user_roles
+    const { data: adminRoles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', 'admin');
+
+    if (rolesError) {
+      console.error('Error fetching admin roles:', rolesError);
+      throw rolesError;
+    }
+
+    console.log(`Found ${profiles?.length} profiles, ${adminRoles?.length} admin roles`);
+
+    const adminUserIds = new Set(adminRoles?.map(r => r.user_id) || []);
 
     let emailsSent = 0;
     let emailsFailed = 0;
@@ -269,10 +280,14 @@ serve(async (req) => {
     // If test email provided, only send to that
     const recipients = testEmail
       ? [{ email: testEmail, name: 'Test User' }]
-      : users?.map(u => ({
-          email: (u.users as any)?.email,
-          name: (u.users as any)?.raw_user_meta_data?.full_name || ''
-        })).filter(r => r.email) || [];
+      : (profiles || [])
+          .filter(p => adminUserIds.has(p.id))
+          .map(p => ({
+            email: p.email,
+            name: p.email?.split('@')[0] || 'Admin'
+          }));
+
+    console.log(`Sending to ${recipients.length} recipients`);
 
     for (const recipient of recipients) {
       try {
