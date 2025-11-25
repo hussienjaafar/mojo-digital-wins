@@ -24,11 +24,10 @@ serve(async (req) => {
     console.log(`Scheduler: Running jobs${jobType ? ` (type: ${jobType})` : ''}`);
 
     // Get jobs that are due to run
-    // Treat jobs as active if is_active or is_enabled are true or null (legacy rows)
     let query = supabase
       .from('scheduled_jobs')
       .select('*')
-      .or('is_active.eq.true,is_active.is.null,is_enabled.eq.true,is_enabled.is.null');
+      .eq('is_active', true);
 
     if (jobType) {
       query = query.eq('job_type', jobType);
@@ -206,6 +205,16 @@ serve(async (req) => {
             result = collectBlueskyResponse.data;
             itemsProcessed = result?.postsCollected || 0;
             itemsCreated = result?.postsCollected || 0;
+            break;
+
+          case 'calculate_bluesky_trends':
+            const trendsResponse = await supabase.functions.invoke('calculate-bluesky-trends', {
+              body: {}
+            });
+            if (trendsResponse.error) throw new Error(trendsResponse.error.message);
+            result = trendsResponse.data;
+            itemsProcessed = result?.topicsProcessed || 0;
+            itemsCreated = result?.trendsUpserted || 0;
             break;
 
           default:
