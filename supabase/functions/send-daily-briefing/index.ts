@@ -245,20 +245,8 @@ serve(async (req) => {
       .eq('briefing_date', today)
       .single();
 
-    // Get users to send to
-    let usersQuery = supabase
-      .from('user_article_preferences')
-      .select(`
-        user_id,
-        daily_briefing_time,
-        users:user_id (
-          email,
-          raw_user_meta_data
-        )
-      `)
-      .eq('daily_briefing_enabled', true);
-
-    const { data: users, error: usersError } = await usersQuery;
+    // Get admin users to send briefing to
+    const { data: adminUsers, error: usersError } = await supabase.rpc('get_users_with_roles');
 
     if (usersError) throw usersError;
 
@@ -269,10 +257,12 @@ serve(async (req) => {
     // If test email provided, only send to that
     const recipients = testEmail
       ? [{ email: testEmail, name: 'Test User' }]
-      : users?.map(u => ({
-          email: (u.users as any)?.email,
-          name: (u.users as any)?.raw_user_meta_data?.full_name || ''
-        })).filter(r => r.email) || [];
+      : adminUsers
+          ?.filter(u => u.roles?.includes('admin'))
+          .map(u => ({
+            email: u.email,
+            name: u.email.split('@')[0] // Use email username as name
+          })) || [];
 
     for (const recipient of recipients) {
       try {
