@@ -111,14 +111,8 @@ async function getCachedAnalysis(supabase: any, contentHash: string, model: stri
 
   if (!data) return null;
 
-  // Update hit count
-  await supabase
-    .from('ai_analysis_cache')
-    .update({ 
-      hit_count: supabase.sql`hit_count + 1`,
-      last_used_at: new Date().toISOString()
-    })
-    .eq('content_hash', contentHash);
+  // Update hit count - use raw SQL for increment
+  await supabase.rpc('increment_cache_hit', { content_hash_param: contentHash });
 
   return data.response;
 }
