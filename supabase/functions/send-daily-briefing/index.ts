@@ -257,12 +257,12 @@ serve(async (req) => {
     // If test email provided, only send to that
     const recipients = testEmail
       ? [{ email: testEmail, name: 'Test User' }]
-      : adminUsers
-          ?.filter(u => u.roles?.includes('admin'))
-          .map(u => ({
+      : (adminUsers as any[] || [])
+          .filter((u: any) => u.roles?.includes('admin'))
+          .map((u: any) => ({
             email: u.email,
             name: u.email.split('@')[0] // Use email username as name
-          })) || [];
+          }));
 
     for (const recipient of recipients) {
       try {
