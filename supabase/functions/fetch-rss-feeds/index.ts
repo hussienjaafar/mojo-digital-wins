@@ -411,14 +411,14 @@ serve(async (req) => {
 
     console.log('Starting incremental RSS feed fetch...');
     
-    // OPTIMIZATION: Incremental processing - fetch oldest 50 sources
-    // This prevents CPU timeout by processing in smaller batches
+    // OPTIMIZATION: Incremental processing - fetch oldest 3 sources ONLY
+    // Skip content fetching to avoid CPU timeout
     const { data: sources, error: sourcesError } = await supabase
       .from('rss_sources')
       .select('*')
       .eq('is_active', true)
       .order('last_fetched_at', { ascending: true, nullsFirst: true })
-      .limit(50);
+      .limit(3);
 
     if (sourcesError) {
       throw sourcesError;
@@ -443,15 +443,8 @@ serve(async (req) => {
         for (const item of items) {
           const sanitizedTitle = sanitizeText(item.title);
           const sanitizedDescription = sanitizeText(item.description);
-          let fullContent = sanitizedDescription;
-
-          // Try to fetch full content if the description is short
-          if (fullContent.length < 400 && item.link) {
-            const fetched = await fetchArticleContent(item.link);
-            if (fetched) {
-              fullContent = sanitizeText(fetched);
-            }
-          }
+          // SKIP CONTENT FETCHING TO AVOID CPU TIMEOUT
+          const fullContent = sanitizedDescription;
 
           const hash = generateHash(sanitizedTitle, sanitizedDescription);
           const tags = extractTags(sanitizedTitle, sanitizedDescription, sanitizedDescription);
@@ -548,8 +541,8 @@ serve(async (req) => {
       }
     };
 
-    // Process sources in parallel batches of 30
-    const BATCH_SIZE = 30;
+    // Process sources ONE AT A TIME to reduce CPU load
+    const BATCH_SIZE = 1;
     const sourcesToProcess = sources || [];
 
     for (let i = 0; i < sourcesToProcess.length; i += BATCH_SIZE) {
