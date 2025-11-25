@@ -61,9 +61,9 @@ serve(async (req) => {
         ? (Date.now() - new Date(latestTs).getTime()) / 60000
         : 9999;
 
-      const statusPass = totalArticles > 0 && (recencyMinutes < 60 || (count24h || 0) > 0);
+      const statusPass = (totalArticles || 0) > 0 && (recencyMinutes < 60 || (count24h || 0) > 0);
       const verdict =
-        totalArticles > 2000 && recencyMinutes < 30 && (count24h || 0) > 50
+        (totalArticles || 0) > 2000 && recencyMinutes < 30 && (count24h || 0) > 50
           ? '✅ HEALTHY'
           : recencyMinutes > 180
           ? '🔴 STALE - RSS sync may have stopped'
