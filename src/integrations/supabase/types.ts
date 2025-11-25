@@ -3124,7 +3124,9 @@ export type Database = {
         Args: { topic_name: string }
         Returns: number
       }
-      calculate_next_run: { Args: { cron_schedule: string }; Returns: string }
+      calculate_next_run:
+        | { Args: { cron_schedule: string }; Returns: string }
+        | { Args: { cron_expr: string; from_time?: string }; Returns: string }
       get_briefing_stats: { Args: { target_date?: string }; Returns: Json }
       get_daily_metrics_summary: {
         Args: {
@@ -3218,7 +3220,7 @@ export type Database = {
       update_job_after_execution: {
         Args: {
           p_duration_ms: number
-          p_error: string
+          p_error?: string
           p_job_id: string
           p_status: string
         }
