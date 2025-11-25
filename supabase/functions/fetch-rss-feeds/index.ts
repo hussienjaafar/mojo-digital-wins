@@ -411,14 +411,14 @@ serve(async (req) => {
 
     console.log('Starting incremental RSS feed fetch...');
     
-    // OPTIMIZATION: Incremental processing - fetch oldest 50 sources
+    // OPTIMIZATION: Incremental processing - fetch oldest 10 sources
     // This prevents CPU timeout by processing in smaller batches
     const { data: sources, error: sourcesError } = await supabase
       .from('rss_sources')
       .select('*')
       .eq('is_active', true)
       .order('last_fetched_at', { ascending: true, nullsFirst: true })
-      .limit(50);
+      .limit(10);
 
     if (sourcesError) {
       throw sourcesError;
@@ -548,8 +548,8 @@ serve(async (req) => {
       }
     };
 
-    // Process sources in parallel batches of 30
-    const BATCH_SIZE = 30;
+    // Process sources in parallel batches of 5 to reduce CPU load
+    const BATCH_SIZE = 5;
     const sourcesToProcess = sources || [];
 
     for (let i = 0; i < sourcesToProcess.length; i += BATCH_SIZE) {
