@@ -102,7 +102,7 @@ function hashContent(text: string): string {
 async function getCachedAnalysis(supabase: any, contentHash: string, model: string, promptHash: string): Promise<any | null> {
   const { data } = await supabase
     .from('ai_analysis_cache')
-    .select('response, created_at')
+    .select('response, created_at, hit_count')
     .eq('content_hash', contentHash)
     .eq('model', model)
     .eq('prompt_hash', promptHash)
@@ -111,8 +111,15 @@ async function getCachedAnalysis(supabase: any, contentHash: string, model: stri
 
   if (!data) return null;
 
-  // Update hit count - use raw SQL for increment
-  await supabase.rpc('increment_cache_hit', { content_hash_param: contentHash });
+  // Update hit count
+  const newHitCount = (data.hit_count ?? 0) + 1;
+  await supabase
+    .from('ai_analysis_cache')
+    .update({ 
+      hit_count: newHitCount,
+      last_used_at: new Date().toISOString()
+    })
+    .eq('content_hash', contentHash);
 
   return data.response;
 }
