@@ -268,6 +268,7 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
             reply_to: record.reply?.parent?.uri || null,
             quote_of: null,
             embed_type: record.embed?.$type || null,
+            ai_relevance_score: relevanceScore, // CRITICAL: Save relevance score for analyzer
           });
 
           // Insert batch when full
