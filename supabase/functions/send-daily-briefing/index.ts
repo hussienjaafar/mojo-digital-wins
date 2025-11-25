@@ -246,9 +246,22 @@ serve(async (req) => {
       .single();
 
     // Get admin users to send briefing to
-    const { data: adminUsers, error: usersError } = await supabase.rpc('get_users_with_roles');
+    // Query profiles directly since we're using service role key
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, email');
 
-    if (usersError) throw usersError;
+    if (profilesError) throw profilesError;
+
+    // Get admin users from user_roles
+    const { data: adminRoles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', 'admin');
+
+    if (rolesError) throw rolesError;
+
+    const adminUserIds = new Set(adminRoles?.map(r => r.user_id) || []);
 
     let emailsSent = 0;
     let emailsFailed = 0;
@@ -257,11 +270,11 @@ serve(async (req) => {
     // If test email provided, only send to that
     const recipients = testEmail
       ? [{ email: testEmail, name: 'Test User' }]
-      : (adminUsers as any[] || [])
-          .filter((u: any) => u.roles?.includes('admin'))
-          .map((u: any) => ({
-            email: u.email,
-            name: u.email.split('@')[0] // Use email username as name
+      : (profiles || [])
+          .filter(p => adminUserIds.has(p.id))
+          .map(p => ({
+            email: p.email,
+            name: p.email?.split('@')[0] || 'Admin'
           }));
 
     for (const recipient of recipients) {
