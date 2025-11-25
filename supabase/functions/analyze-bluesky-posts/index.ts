@@ -6,31 +6,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// CRITICAL FIX: Switch to OpenAI GPT-3.5-turbo for 10x rate limits
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+
+// Fallback to Lovable AI if OpenAI not configured
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
 const VALID_GROUPS = [
   'muslim_american', 'arab_american', 'lgbtq', 'immigrants', 'refugees',
   'black_american', 'latino_hispanic', 'asian_american', 'indigenous',
-  'women', 'youth', 'seniors', 'disabled', 'veterans', 'workers'
+  'women', 'youth', 'seniors', 'disabled', 'veterans', 'workers',
+  'general_public'
 ];
 
 const VALID_CATEGORIES = [
   'civil_rights', 'immigration', 'healthcare', 'education', 'housing',
   'employment', 'criminal_justice', 'voting_rights', 'religious_freedom',
-  'lgbtq_rights', 'foreign_policy', 'climate', 'economy', 'other'
+  'lgbtq_rights', 'foreign_policy', 'climate', 'economy', 'politics', 'other'
 ];
-
-// Simple hash for caching
-function hashContent(text: string): string {
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return hash.toString(36);
-}
 
 // Data validation function
 function validateAnalysis(analysis: any): { valid: boolean; errors: string[]; confidence: number } {
@@ -71,7 +66,7 @@ interface BlueSkyPost {
   created_at: string;
 }
 
-// EXPANDED: Topic normalization map (same as news extraction)
+// Topic normalization map
 const TOPIC_NORMALIZATIONS: Record<string, string> = {
   // Political figures
   'donald trump': 'Donald Trump',
@@ -80,14 +75,14 @@ const TOPIC_NORMALIZATIONS: Record<string, string> = {
   'biden': 'Joe Biden',
   'netanyahu': 'Benjamin Netanyahu',
   'benjamin netanyahu': 'Benjamin Netanyahu',
-  
+
   // Regions & conflicts
   'israel': 'Israel',
   'palestine': 'Palestine',
   'gaza': 'Gaza',
   'west bank': 'West Bank',
   'middle east': 'Middle East',
-  
+
   // Organizations
   'un': 'United Nations',
   'united nations': 'United Nations',
@@ -95,14 +90,14 @@ const TOPIC_NORMALIZATIONS: Record<string, string> = {
   'gop': 'Republican Party',
   'republican party': 'Republican Party',
   'democratic party': 'Democratic Party',
-  
+
   // Cities
   'nyc': 'New York City',
   'new york city': 'New York City',
   'dc': 'Washington DC',
   'washington dc': 'Washington DC',
-  
-  // Issues (case-insensitive variants)
+
+  // Issues
   'climate change': 'Climate Change',
   'climate crisis': 'Climate Change',
   'human rights': 'Human Rights',
@@ -124,10 +119,15 @@ function normalizeTopic(topic: string): string {
   return TOPIC_NORMALIZATIONS[lower] || topic;
 }
 
-// Analyze posts using Lovable AI (Google Gemini)
+// Analyze posts using GPT-3.5-turbo (10x rate limits vs Claude)
 async function analyzePosts(posts: BlueSkyPost[]): Promise<any[]> {
-  if (!LOVABLE_API_KEY) {
-    throw new Error('LOVABLE_API_KEY not configured');
+  // Prefer OpenAI for better rate limits
+  const useOpenAI = !!OPENAI_API_KEY;
+  const apiKey = useOpenAI ? OPENAI_API_KEY : LOVABLE_API_KEY;
+  const apiUrl = useOpenAI ? OPENAI_API_URL : LOVABLE_API_URL;
+
+  if (!apiKey) {
+    throw new Error('No API key configured (OPENAI_API_KEY or LOVABLE_API_KEY)');
   }
 
   // Prepare batch analysis prompt
@@ -141,11 +141,10 @@ async function analyzePosts(posts: BlueSkyPost[]): Promise<any[]> {
 2. **affected_groups**: Which communities are discussed? Use standardized labels:
    - muslim_american, arab_american, jewish_american, christian
    - lgbtq, transgender, women, reproductive_rights
-   - black_american, latino, asian_american, indigenous
+   - black_american, latino_hispanic, asian_american, indigenous
    - immigrants, refugees, asylum_seekers
-   - disability, elderly, youth, veterans
-   - general_public (if broadly applicable)
-3. **relevance_category**: Primary category (civil_rights, immigration, healthcare, education, climate, economy, national_security, foreign_policy, criminal_justice, etc.)
+   - disabled, seniors, youth, veterans, workers
+3. **relevance_category**: Primary category (civil_rights, immigration, healthcare, education, climate, economy, foreign_policy, criminal_justice, etc.)
 4. **sentiment**: Overall sentiment (-1.0 to 1.0, where -1 is very negative, 0 neutral, 1 positive)
 5. **sentiment_label**: "positive", "neutral", or "negative"
 
@@ -154,7 +153,7 @@ Return ONLY a JSON array with this exact structure:
   {
     "index": 0,
     "topics": ["immigration reform", "border security"],
-    "affected_groups": ["immigrants", "latino"],
+    "affected_groups": ["immigrants", "latino_hispanic"],
     "relevance_category": "immigration",
     "sentiment": -0.4,
     "sentiment_label": "negative"
@@ -164,33 +163,42 @@ Return ONLY a JSON array with this exact structure:
 Posts:
 ${postsText}`;
 
-  const response = await fetch(LOVABLE_API_URL, {
+  const requestBody = useOpenAI
+    ? {
+        model: 'gpt-3.5-turbo-1106', // Fast, cheap, 10x Claude rate limits
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        response_format: { type: "json_object" } // Ensures JSON response
+      }
+    : {
+        model: 'google/gemini-2.0-flash', // Fallback
+        messages: [{ role: 'user', content: prompt }]
+      };
+
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash', // Fast and cheap
-      messages: [{ role: 'user', content: prompt }]
-    })
+    body: JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    
+
     // Handle rate limits gracefully
     if (response.status === 429) {
       console.log('⚠️ Rate limit hit, will retry later');
       throw new Error('RATE_LIMIT');
     }
-    
-    throw new Error(`Lovable AI error: ${response.status} - ${errorText}`);
+
+    throw new Error(`AI API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
   const analysisText = data.choices[0].message.content;
-  
+
   const jsonMatch = analysisText.match(/\[[\s\S]*\]/);
   if (!jsonMatch) {
     throw new Error('No JSON array found in AI response');
@@ -198,7 +206,7 @@ ${postsText}`;
 
   const analyses = JSON.parse(jsonMatch[0]);
 
-  // Map analyses back to posts
+  // Map analyses back to posts with normalization
   return posts.map((post, i) => {
     const analysis = analyses.find((a: any) => a.index === i) || {
       topics: [],
@@ -208,9 +216,12 @@ ${postsText}`;
       sentiment_label: 'neutral'
     };
 
+    // Normalize topics
+    const normalizedTopics = analysis.topics.map((t: string) => normalizeTopic(t));
+
     return {
       id: post.id,
-      ai_topics: analysis.topics,
+      ai_topics: normalizedTopics,
       affected_groups: analysis.affected_groups,
       relevance_category: analysis.relevance_category,
       ai_sentiment: analysis.sentiment,
@@ -231,24 +242,45 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Best-effort status updates for ops dashboard
+    const markJob = async (status: 'running' | 'success' | 'failed') => {
+      const nextRun = status === 'success'
+        ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
+        : null;
+      await supabase
+        .from('scheduled_jobs')
+        .update({
+          last_run_status: status,
+          last_run_at: new Date().toISOString(),
+          ...(nextRun ? { next_run_at: nextRun } : {})
+        })
+        .eq('job_type', 'analyze_bluesky');
+    };
+
+    await markJob('running').catch(() => {});
+
     console.log('🤖 Starting AI analysis of Bluesky posts...');
 
-    const { batchSize = 50 } = await req.json().catch(() => ({ batchSize: 50 })); // OPTIMIZED: 50 posts for Gemini
+    // Increased batch size for GPT-3.5 (better rate limits) and tunable relevance floor
+    const { batchSize = 100, minRelevance = 0.01 } = await req.json().catch(() => ({ batchSize: 100, minRelevance: 0.01 }));
+    const effectiveMinRelevance = Math.max(0, Number(minRelevance) || 0);
 
-    // Get unprocessed posts with relevance > 0.1 (matches bluesky-stream filter)
+    // Get unprocessed posts with relevance above threshold (default very low to avoid starvation)
     const { data: posts, error: fetchError } = await supabase
       .from('bluesky_posts')
       .select('id, text, author_handle, created_at')
       .eq('ai_processed', false)
-      .gte('ai_relevance_score', 0.1)
+      .gte('ai_relevance_score', effectiveMinRelevance)
       .order('created_at', { ascending: false })
       .limit(batchSize);
 
     if (fetchError) {
+      await markJob('failed').catch(() => {});
       throw fetchError;
     }
 
     if (!posts || posts.length === 0) {
+      await markJob('success').catch(() => {});
       return new Response(
         JSON.stringify({
           success: true,
@@ -264,7 +296,7 @@ serve(async (req) => {
     // Analyze posts using AI
     const analyses = await analyzePosts(posts);
 
-    // Update posts with AI analysis - with validation
+    // Update posts with AI analysis
     let successCount = 0;
     let errorCount = 0;
     let validationFailedCount = 0;
@@ -273,23 +305,17 @@ serve(async (req) => {
       try {
         // Validate analysis
         const validation = validateAnalysis(analysis);
-        
+
         if (!validation.valid && validation.confidence < 0.5) {
           console.log(`Post ${analysis.id} failed validation:`, validation.errors);
           validationFailedCount++;
-          
+
           await supabase.from('bluesky_posts').update({
             validation_passed: false,
             validation_errors: validation.errors,
             ai_confidence_score: validation.confidence
           }).eq('id', analysis.id);
-          
-          await supabase.from('job_failures').insert({
-            function_name: 'analyze-bluesky-posts',
-            error_message: 'Validation failed: ' + validation.errors.join('; '),
-            context_data: { post_id: analysis.id, analysis }
-          });
-          
+
           continue;
         }
 
@@ -312,12 +338,6 @@ serve(async (req) => {
         if (error) {
           console.error(`❌ Error updating post ${analysis.id}:`, error);
           errorCount++;
-          
-          await supabase.from('job_failures').insert({
-            function_name: 'analyze-bluesky-posts',
-            error_message: error.message,
-            context_data: { post_id: analysis.id }
-          });
         } else {
           successCount++;
         }
@@ -335,150 +355,61 @@ serve(async (req) => {
       updated_at: new Date().toISOString()
     });
 
-    console.log(`✅ Processed ${successCount} posts successfully, ${validationFailedCount} validation failed, ${errorCount} errors`);
+    console.log(`✅ Processed ${successCount} posts, ${validationFailedCount} validation failed, ${errorCount} errors`);
 
-    // Update trends based on newly analyzed posts
-    await updateTrends(supabase, analyses.filter(a => a.ai_processed));
+    // FIXED: Use new database function to update trends
+    const { data: trendResults, error: trendError } = await supabase
+      .rpc('update_bluesky_trends');
+
+    if (trendError) {
+      console.error('❌ Error updating trends:', trendError);
+    } else {
+      console.log(`✅ Updated ${trendResults?.length || 0} trends with proper velocity calculations`);
+    }
+
+    // Record performance metrics
+    await supabase.from('bluesky_velocity_metrics').insert({
+      topics_processed: trendResults?.length || 0,
+      trending_detected: trendResults?.filter((t: any) => t.is_trending).length || 0,
+      error_count: trendError ? 1 : 0
+    });
+
+    const responseBody = {
+      success: true,
+      processed: successCount,
+      validationFailed: validationFailedCount,
+      errors: errorCount,
+      dataQuality: successCount > 0 ? (successCount / (successCount + validationFailedCount)).toFixed(2) : 0,
+      topics_extracted: analyses.flatMap(a => a.ai_topics || []).length,
+      trends_updated: trendResults?.length || 0,
+      trending_detected: trendResults?.filter((t: any) => t.is_trending).length || 0
+    };
+
+    await markJob('success').catch(() => {});
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        processed: successCount,
-        validationFailed: validationFailedCount,
-        errors: errorCount,
-        dataQuality: successCount > 0 ? (successCount / (successCount + validationFailedCount)).toFixed(2) : 0,
-        topics_extracted: analyses.flatMap(a => a.ai_topics || []).length
-      }),
+      JSON.stringify(responseBody),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
     console.error('Error in analyze-bluesky-posts:', error);
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      await supabase
+        .from('scheduled_jobs')
+        .update({
+          last_run_status: 'failed',
+          last_run_at: new Date().toISOString()
+        })
+        .eq('job_type', 'analyze_bluesky');
+    } catch (_err) {}
     return new Response(
       JSON.stringify({ error: error?.message || 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
-
-// Update trends table based on analyzed posts
-async function updateTrends(supabase: any, analyses: any[]) {
-  console.log('📈 Updating trends...');
-
-  // Extract all unique topics with normalization
-  const topicCounts = new Map<string, { count: number, sentiment: number[] }>();
-
-  for (const analysis of analyses) {
-    for (const topic of analysis.ai_topics) {
-      const normalizedTopic = normalizeTopic(topic);
-      
-      if (!topicCounts.has(normalizedTopic)) {
-        topicCounts.set(normalizedTopic, { count: 0, sentiment: [] });
-      }
-      const data = topicCounts.get(normalizedTopic)!;
-      data.count++;
-      data.sentiment.push(analysis.ai_sentiment);
-    }
-  }
-
-  // Update or insert trends
-  for (const [topic, data] of topicCounts.entries()) {
-    const avgSentiment = data.sentiment.reduce((a, b) => a + b, 0) / data.sentiment.length;
-
-    // Calculate sentiment breakdown (positive > 0.3, neutral -0.3 to 0.3, negative < -0.3)
-    const sentimentPositive = data.sentiment.filter(s => s > 0.3).length;
-    const sentimentNeutral = data.sentiment.filter(s => s >= -0.3 && s <= 0.3).length;
-    const sentimentNegative = data.sentiment.filter(s => s < -0.3).length;
-
-    // Calculate counts from database using cs (contains) filter for array queries
-    const { count: hourCount, error: hourError } = await supabase
-      .from('bluesky_posts')
-      .select('*', { count: 'exact', head: true })
-      .filter('ai_topics', 'cs', `{${topic}}`)
-      .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString());
-
-    if (hourError) {
-      console.error(`❌ Error counting hourly mentions for "${topic}":`, hourError);
-    }
-
-    const { count: dayCount, error: dayError } = await supabase
-      .from('bluesky_posts')
-      .select('*', { count: 'exact', head: true })
-      .filter('ai_topics', 'cs', `{${topic}}`)
-      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-    if (dayError) {
-      console.error(`❌ Error counting daily mentions for "${topic}":`, dayError);
-    }
-
-    const mentionsLastHour = hourCount || 0;
-    const mentionsLast24Hours = dayCount || 0;
-
-    // FIXED: Calculate velocity with momentum (6hr window for better signal)
-    const { count: sixHourCount } = await supabase
-      .from('bluesky_posts')
-      .select('*', { count: 'exact', head: true })
-      .filter('ai_topics', 'cs', `{${topic}}`)
-      .gte('created_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString());
-
-    const mentionsLast6Hours = sixHourCount || 0;
-    
-    // Multi-window velocity calculation for better trending detection
-    const hourlyRate = mentionsLastHour;
-    const sixHourAvg = mentionsLast6Hours / 6;
-    const dailyAvg = mentionsLast24Hours / 24;
-    
-    // Velocity: how much faster than baseline (daily average)
-    // Using 6-hour window prevents single-hour spikes from dominating
-    let velocity = 0;
-    if (dailyAvg > 0) {
-      velocity = ((sixHourAvg - dailyAvg) / dailyAvg) * 100;
-    } else if (mentionsLast6Hours > 0) {
-      velocity = 500; // New topic emerging = high velocity
-    }
-    
-    // FIXED: Lower threshold (50% = 1.5x normal rate) + minimum volume filter
-    const isTrending = (velocity > 50 && mentionsLast24Hours >= 3) || mentionsLast6Hours >= 5;
-
-    // Get previous trend to preserve trending_since
-    const { data: existingTrend } = await supabase
-      .from('bluesky_trends')
-      .select('is_trending, trending_since')
-      .eq('topic', topic)
-      .single();
-
-    // Upsert trend with 6-hour metrics
-    const trendData = {
-      topic,
-      mentions_last_hour: mentionsLastHour,
-      mentions_last_6_hours: mentionsLast6Hours,
-      mentions_last_24_hours: mentionsLast24Hours,
-      velocity: Math.round(velocity * 100) / 100, // Round to 2 decimals
-      sentiment_avg: Math.round(avgSentiment * 100) / 100,
-      sentiment_positive: sentimentPositive,
-      sentiment_neutral: sentimentNeutral,
-      sentiment_negative: sentimentNegative,
-      is_trending: isTrending,
-      trending_since: isTrending 
-        ? (existingTrend?.is_trending ? existingTrend.trending_since : new Date().toISOString())
-        : null,
-      last_seen_at: new Date().toISOString(),
-      calculated_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    console.log(`📊 ${topic}: 1h=${mentionsLastHour} 6h=${mentionsLast6Hours} 24h=${mentionsLast24Hours} vel=${velocity.toFixed(0)}% ${isTrending ? '🔥 TRENDING' : ''}`);
-
-    const { error: upsertError } = await supabase
-      .from('bluesky_trends')
-      .upsert(trendData, {
-        onConflict: 'topic'
-      });
-
-    if (upsertError) {
-      console.error(`❌ Error upserting trend for "${topic}":`, upsertError);
-    }
-  }
-
-  console.log(`✅ Updated ${topicCounts.size} trends`);
-}

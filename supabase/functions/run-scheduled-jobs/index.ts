@@ -158,6 +158,15 @@ serve(async (req) => {
             itemsCreated = result?.analyzed || 0;
             break;
 
+          case 'calculate_bluesky_trends':
+            const calcTrendsResponse = await supabase.functions.invoke('calculate-bluesky-trends', {
+              body: {}
+            });
+            if (calcTrendsResponse.error) throw new Error(calcTrendsResponse.error.message);
+            result = calcTrendsResponse.data;
+            itemsProcessed = result?.trends_updated || result?.length || 0;
+            break;
+
           case 'correlate_social_news':
             const correlateResponse = await supabase.functions.invoke('correlate-social-news', {
               body: {}

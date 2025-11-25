@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
@@ -26,21 +28,24 @@ const VALID_CATEGORIES = [
 
 const VALID_THREAT_LEVELS = ['critical', 'high', 'medium', 'low'];
 
-// Call Claude API with exponential backoff for rate limits
-async function callClaudeWithBackoff(prompt: string, retryCount = 0): Promise<any> {
+// Call OpenAI (preferred) with exponential backoff for rate limits
+async function callOpenAIWithBackoff(prompt: string, retryCount = 0): Promise<any> {
   const MAX_RETRIES = 5;
   const BASE_DELAY = 1000;
   
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY not configured');
+  }
+  
   try {
-    const response = await fetch(ANTHROPIC_API_URL, {
+    const response = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY || '',
-        'anthropic-version': '2023-06-01'
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'gpt-3.5-turbo-0125',
         max_tokens: 1024,
         response_format: { type: "json_object" },
         messages: [{
@@ -56,7 +61,7 @@ async function callClaudeWithBackoff(prompt: string, retryCount = 0): Promise<an
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
     return await response.json();
@@ -65,12 +70,21 @@ async function callClaudeWithBackoff(prompt: string, retryCount = 0): Promise<an
     if ((error.message?.includes('429') || error.message?.includes('Rate limit')) && retryCount < MAX_RETRIES) {
       // Exponential backoff: 2s, 4s, 8s, 16s, 32s
       const delay = BASE_DELAY * Math.pow(2, retryCount);
-      console.log(`[analyze-articles] Rate limited. Waiting ${delay}ms before retry ${retryCount + 1}/${MAX_RETRIES}`);
+      console.log(`[analyze-articles] OpenAI rate limited. Waiting ${delay}ms before retry ${retryCount + 1}/${MAX_RETRIES}`);
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callClaudeWithBackoff(prompt, retryCount + 1);
+      return callOpenAIWithBackoff(prompt, retryCount + 1);
     }
     throw error;
   }
+}
+
+// Unified helper: hard-prefer OpenAI; if no key, return a clear error
+async function callAIWithBackoff(prompt: string): Promise<{ data: any; model: string }> {
+  if (OPENAI_API_KEY) {
+    const data = await callOpenAIWithBackoff(prompt);
+    return { data, model: 'gpt-3.5-turbo-0125' };
+  }
+  throw new Error('OPENAI_API_KEY not configured; please set it to run analyze-articles');
 }
 
 // Simple hash function for cache keys
@@ -265,7 +279,7 @@ serve(async (req) => {
 
     // Batch size and pacing; can be overridden via request body for backfills
     // Defaults tuned for reasonable throughput while avoiding rate limits
-    let BATCH_SIZE = 25;
+    let BATCH_SIZE = 5;
     let REQUEST_DELAY = 400; // ms between requests
 
     // Allow overrides via request body for backfills
@@ -321,9 +335,10 @@ serve(async (req) => {
         const textToAnalyze = (article.title + '\n\n' + fullContent).substring(0, 4000);
         const contentHash = hashContent(textToAnalyze);
         const promptHash = hashContent('v2-comprehensive-analysis');
+        const preferredModel = OPENAI_API_KEY ? 'gpt-3.5-turbo-0125' : 'claude-3-haiku';
 
         // Check cache
-        const cached = await getCachedAnalysis(supabase, contentHash, 'claude-3-haiku', promptHash);
+        const cached = await getCachedAnalysis(supabase, contentHash, preferredModel, promptHash);
         if (cached) {
           cacheHits++;
           await supabase.from('articles').update({
@@ -370,10 +385,14 @@ Title: ${article.title}
 Source: ${article.source_name}
 Content: ${textToAnalyze}`;
 
-        const data = await callClaudeWithBackoff(prompt);
+        const aiResponse = await callAIWithBackoff(prompt);
+        const modelUsed = aiResponse.model;
+
         const analysis = normalizeAnalysis(
-          data?.content?.[0]?.json ??
-          extractAnalysisJson(data?.content?.[0]?.text ?? '')
+          aiResponse.data?.choices?.[0]?.message?.content
+            ? extractAnalysisJson(aiResponse.data.choices[0].message.content)
+            : aiResponse.data?.content?.[0]?.json ??
+              extractAnalysisJson(aiResponse.data?.content?.[0]?.text ?? '')
         );
         const validation = validateAnalysis(analysis);
         if (!validation.valid) {
@@ -389,7 +408,7 @@ Content: ${textToAnalyze}`;
           continue;
         }
 
-        await cacheAnalysis(supabase, contentHash, 'claude-3-haiku', promptHash, analysis);
+        await cacheAnalysis(supabase, contentHash, modelUsed, promptHash, analysis);
 
         await supabase.from('articles').update({
           affected_groups: analysis.affected_groups || [],
