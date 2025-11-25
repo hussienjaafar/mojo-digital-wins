@@ -3328,6 +3328,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_cache_hit: {
+        Args: { content_hash_param: string }
+        Returns: undefined
+      }
       is_client_admin: { Args: never; Returns: boolean }
       log_admin_action: {
         Args: {
