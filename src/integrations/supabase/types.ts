@@ -555,6 +555,60 @@ export type Database = {
         }
         Relationships: []
       }
+      backfill_status: {
+        Row: {
+          batches_run: number | null
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          estimated_hours_remaining: number | null
+          failed_items: number | null
+          id: string
+          last_batch_at: string | null
+          posts_per_second: number | null
+          processed_items: number | null
+          started_at: string | null
+          status: string | null
+          task_name: string
+          total_items: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          batches_run?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          estimated_hours_remaining?: number | null
+          failed_items?: number | null
+          id?: string
+          last_batch_at?: string | null
+          posts_per_second?: number | null
+          processed_items?: number | null
+          started_at?: string | null
+          status?: string | null
+          task_name: string
+          total_items?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          batches_run?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          estimated_hours_remaining?: number | null
+          failed_items?: number | null
+          id?: string
+          last_batch_at?: string | null
+          posts_per_second?: number | null
+          processed_items?: number | null
+          started_at?: string | null
+          status?: string | null
+          task_name?: string
+          total_items?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       bill_actions: {
         Row: {
           action_code: string | null
@@ -1047,6 +1101,33 @@ export type Database = {
           trending_since?: string | null
           updated_at?: string | null
           velocity?: number | null
+        }
+        Relationships: []
+      }
+      bluesky_velocity_metrics: {
+        Row: {
+          calculation_time_ms: number | null
+          created_at: string | null
+          error_count: number | null
+          id: string
+          topics_processed: number | null
+          trending_detected: number | null
+        }
+        Insert: {
+          calculation_time_ms?: number | null
+          created_at?: string | null
+          error_count?: number | null
+          id?: string
+          topics_processed?: number | null
+          trending_detected?: number | null
+        }
+        Update: {
+          calculation_time_ms?: number | null
+          created_at?: string | null
+          error_count?: number | null
+          id?: string
+          topics_processed?: number | null
+          trending_detected?: number | null
         }
         Relationships: []
       }
@@ -3091,6 +3172,32 @@ export type Database = {
       }
     }
     Views: {
+      backfill_monitoring: {
+        Row: {
+          completion_percentage: number | null
+          hours_remaining_at_current_rate: number | null
+          posts_per_minute: number | null
+          processed: number | null
+          processed_last_day: number | null
+          processed_last_hour: number | null
+          status: string | null
+          unprocessed: number | null
+        }
+        Relationships: []
+      }
+      bluesky_trending_topics: {
+        Row: {
+          "1h": number | null
+          "24h": number | null
+          "6h": number | null
+          calculated_at: string | null
+          sentiment_avg: number | null
+          status: string | null
+          topic: string | null
+          velocity: number | null
+        }
+        Relationships: []
+      }
       mv_daily_metrics_summary: {
         Row: {
           avg_roi_percentage: number | null
@@ -3127,6 +3234,31 @@ export type Database = {
       calculate_next_run:
         | { Args: { cron_schedule: string }; Returns: string }
         | { Args: { cron_expr: string; from_time?: string }; Returns: string }
+      calculate_topic_velocity: {
+        Args: {
+          daily_count: number
+          hourly_count: number
+          six_hour_count: number
+          topic_name: string
+        }
+        Returns: number
+      }
+      count_posts_with_topic: {
+        Args: { time_window?: unknown; topic_name: string }
+        Returns: number
+      }
+      get_backfill_progress: {
+        Args: never
+        Returns: {
+          completion_percentage: number
+          estimated_hours_remaining: number
+          posts_per_second: number
+          processed_items: number
+          status: string
+          task_name: string
+          total_items: number
+        }[]
+      }
       get_briefing_stats: { Args: { target_date?: string }; Returns: Json }
       get_daily_metrics_summary: {
         Args: {
@@ -3217,6 +3349,15 @@ export type Database = {
         Returns: string
       }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
+      update_bluesky_trends: {
+        Args: never
+        Returns: {
+          mentions_24h: number
+          topic_is_trending: boolean
+          topic_name: string
+          topic_velocity: number
+        }[]
+      }
       update_job_after_execution: {
         Args: {
           p_duration_ms: number
