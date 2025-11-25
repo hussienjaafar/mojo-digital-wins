@@ -28,11 +28,12 @@ serve(async (req) => {
     // =========================================================================
     try {
       // Direct signals from articles table; avoid relying on missing RPCs/columns
-      const { data: latestArticles } = await supabase
+      const { data: latestArticle } = await supabase
         .from('articles')
         .select('created_at, published_date, source_name')
         .order('created_at', { ascending: false })
-        .limit(1);
+        .order('published_date', { ascending: false })
+        .maybeSingle();
 
       const { count: totalArticles } = await supabase
         .from('articles')
@@ -55,7 +56,7 @@ serve(async (req) => {
         .eq('is_active', true);
 
       const uniqueSources = new Set(sources?.map(s => s.source_name) || []);
-      const latestTs = latestArticles?.[0]?.created_at || latestArticles?.[0]?.published_date;
+      const latestTs = latestArticle?.created_at || latestArticle?.published_date;
       const recencyMinutes = latestTs
         ? (Date.now() - new Date(latestTs).getTime()) / 60000
         : 9999;
@@ -247,7 +248,12 @@ serve(async (req) => {
 
       const overdueJobs = jobs?.filter(job => {
         const lastRun = job.last_run_at || latestExec[job.id]?.started_at;
-        if (!lastRun) return true;
+        const nextRun = job.next_run_at;
+        if (!lastRun) {
+          // If we've never run but next_run_at is in the future, don't mark overdue yet
+          if (nextRun && new Date(nextRun).getTime() > Date.now()) return false;
+          return true;
+        }
 
         const minutesSinceRun = (Date.now() - new Date(lastRun).getTime()) / 60000;
 
@@ -261,7 +267,11 @@ serve(async (req) => {
         };
 
         const threshold = expectedFrequency[job.cron_expression] || 60;
-        return minutesSinceRun > (threshold * 2); // allow 2x buffer
+        // allow 2x buffer and also tolerate if next_run_at is in the future
+        if (nextRun && new Date(nextRun).getTime() > Date.now()) {
+          return false;
+        }
+        return minutesSinceRun > (threshold * 2);
       }) || [];
 
       results.tests.push({
