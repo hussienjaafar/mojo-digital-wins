@@ -24,10 +24,11 @@ serve(async (req) => {
     console.log(`Scheduler: Running jobs${jobType ? ` (type: ${jobType})` : ''}`);
 
     // Get jobs that are due to run
+    // Treat jobs as active if is_active or is_enabled are true or null (legacy rows)
     let query = supabase
       .from('scheduled_jobs')
       .select('*')
-      .eq('is_active', true);
+      .or('is_active.eq.true,is_active.is.null,is_enabled.eq.true,is_enabled.is.null');
 
     if (jobType) {
       query = query.eq('job_type', jobType);
