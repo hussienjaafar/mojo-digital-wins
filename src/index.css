@@ -95,6 +95,16 @@ All colors MUST be HSL.
     --font-weight-extrabold: 800;
     --font-weight-black: 900;
 
+    /* Severity Colors */
+    --severity-critical: 0 78% 53%;
+    --severity-critical-foreground: 0 0% 100%;
+    --severity-high: 25 95% 53%;
+    --severity-high-foreground: 0 0% 100%;
+    --severity-medium: 45 89% 57%;
+    --severity-medium-foreground: 213 75% 15%;
+    --severity-low: 150 60% 50%;
+    --severity-low-foreground: 0 0% 100%;
+
     /* Line Heights */
     --line-height-tight: 1.25;
     --line-height-snug: 1.375;

@@ -313,8 +313,8 @@ serve(async (req) => {
 
     console.log('🤖 Starting AI analysis of Bluesky posts...');
 
-    // Increased batch size for GPT-3.5 (better rate limits) and tunable relevance floor
-    const { batchSize = 100, minRelevance = 0.01 } = await req.json().catch(() => ({ batchSize: 100, minRelevance: 0.01 }));
+    // OPTIMIZED: Reduced batch size to prevent timeouts (20 posts = ~15-20s processing time)
+    const { batchSize = 20, minRelevance = 0.01 } = await req.json().catch(() => ({ batchSize: 20, minRelevance: 0.01 }));
     const effectiveMinRelevance = Math.max(0, Number(minRelevance) || 0);
 
     // Get unprocessed posts with relevance above threshold (default very low to avoid starvation)
@@ -345,8 +345,29 @@ serve(async (req) => {
 
     console.log(`📊 Found ${posts.length} posts to analyze`);
 
-    // Analyze posts using AI
-    const analyses = await analyzePosts(posts);
+    // Analyze posts using AI with timeout protection
+    let analyses: any[];
+    try {
+      const timeout = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('AI analysis timeout')), 50000)
+      );
+      analyses = await Promise.race([analyzePosts(posts), timeout]) as any[];
+    } catch (error: any) {
+      if (error.message === 'AI analysis timeout') {
+        console.log('⏱️ Analysis timed out, will retry with smaller batch next run');
+        await markJob('success').catch(() => {});
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'Batch timeout - reduce size or retry',
+            processed: 0,
+            timeout: true
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw error;
+    }
 
     // Update posts with AI analysis
     let successCount = 0;

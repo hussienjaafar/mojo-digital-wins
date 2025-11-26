@@ -258,18 +258,30 @@ serve(async (req) => {
     if (body.action === 'fetch' || !body.action) {
       console.log('Fetching state government RSS feeds...');
 
+      // OPTIMIZED: Limit to 3 sources per run to prevent timeout
+      const { limit = 3 } = body;
+      
       const { data: sources, error: sourcesError } = await supabaseClient
         .from('rss_sources')
         .select('*')
         .eq('category', 'state_government')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .order('last_fetched_at', { ascending: true, nullsFirst: true })
+        .limit(limit);
 
       if (sourcesError) throw sourcesError;
 
       let totalProcessed = 0;
       let relevantFound = 0;
+      const startTime = Date.now();
+      const maxDuration = 50000; // 50 seconds max
 
       for (const source of sources || []) {
+        // Check timeout
+        if (Date.now() - startTime > maxDuration) {
+          console.log('⏱️ Approaching timeout, stopping early');
+          break;
+        }
         try {
           // Determine state from source name
           const stateMatch = MONITORED_STATES.find(s =>
@@ -278,9 +290,10 @@ serve(async (req) => {
 
           if (!stateMatch) continue;
 
+          // OPTIMIZED: Reduced timeout to 10s
           const response = await fetch(source.url, {
             headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IntelligenceBot/1.0)' },
-            signal: AbortSignal.timeout(15000)
+            signal: AbortSignal.timeout(10000)
           });
           
           if (!response.ok) {
