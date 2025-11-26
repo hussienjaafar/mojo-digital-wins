@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, memo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { NewsCard } from "./NewsCard";
 import { NewsFilters, FilterState } from "./NewsFilters";
@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { RefreshCw, AlertCircle, Sparkles, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNewsFilters } from "@/contexts/NewsFilterContext";
+import { NewsFeedSkeleton } from "@/components/ui/data-skeleton";
 
 const ARTICLES_PER_PAGE = 50;
 
@@ -419,8 +420,14 @@ export function NewsFeed() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <LoadingSpinner size="lg" label="Loading news feed..." />
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold">News Feed</h2>
+            <p className="text-muted-foreground mt-1">Loading articles...</p>
+          </div>
+        </div>
+        <NewsFeedSkeleton items={10} />
       </div>
     );
   }

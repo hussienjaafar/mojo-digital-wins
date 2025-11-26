@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import {
   Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface IntelligenceHubProps {
   organizationId: string;
@@ -28,7 +29,7 @@ interface HubStats {
   latestTrend?: string;
 }
 
-export const IntelligenceHub = ({ organizationId }: IntelligenceHubProps) => {
+export const IntelligenceHub = memo(({ organizationId }: IntelligenceHubProps) => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<HubStats>({
     watchlistCount: 0,
@@ -169,23 +170,52 @@ export const IntelligenceHub = ({ organizationId }: IntelligenceHubProps) => {
 
   if (isLoading) {
     return (
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="animate-pulse">
+      <div className="space-y-6">
+        <Card>
           <CardHeader>
-            <div className="h-4 bg-muted rounded w-1/3" />
-            <div className="h-3 bg-muted rounded w-2/3 mt-2" />
+            <Skeleton className="h-6 w-48 mb-2" variant="shimmer" />
+            <Skeleton className="h-4 w-64" variant="shimmer" />
           </CardHeader>
           <CardContent>
-            <div className="h-24 bg-muted rounded" />
+            <div className="grid gap-4 md:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      <Skeleton className="h-12 w-12 rounded-xl" variant="shimmer" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-5 w-32" variant="shimmer" />
+                        <Skeleton className="h-4 w-full" variant="shimmer" />
+                        <Skeleton className="h-6 w-16" variant="shimmer" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </CardContent>
         </Card>
-        <Card className="animate-pulse">
+        <Card>
           <CardHeader>
-            <div className="h-4 bg-muted rounded w-1/3" />
-            <div className="h-3 bg-muted rounded w-2/3 mt-2" />
+            <Skeleton className="h-6 w-48 mb-2" variant="shimmer" />
+            <Skeleton className="h-4 w-64" variant="shimmer" />
           </CardHeader>
           <CardContent>
-            <div className="h-24 bg-muted rounded" />
+            <div className="grid gap-4 md:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      <Skeleton className="h-12 w-12 rounded-xl" variant="shimmer" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-5 w-32" variant="shimmer" />
+                        <Skeleton className="h-4 w-full" variant="shimmer" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -320,4 +350,6 @@ export const IntelligenceHub = ({ organizationId }: IntelligenceHubProps) => {
       </Card>
     </div>
   );
-};
+});
+
+IntelligenceHub.displayName = 'IntelligenceHub';
