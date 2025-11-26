@@ -274,14 +274,14 @@ const ExecutiveDashboard = ({ organizationId, startDate, endDate }: Props) => {
         <div className="flex items-center mt-2 text-xs">
           {trend === 'up' && (
             <>
-              <ArrowUpRight className="w-4 h-4 text-green-500 mr-1" />
-              <span className="text-green-500 font-medium">+{Math.abs(change).toFixed(1)}%</span>
+              <ArrowUpRight className="w-4 h-4 text-success mr-1" />
+              <span className="text-success font-medium">+{Math.abs(change).toFixed(1)}%</span>
             </>
           )}
           {trend === 'down' && (
             <>
-              <ArrowDownRight className="w-4 h-4 text-red-500 mr-1" />
-              <span className="text-red-500 font-medium">-{Math.abs(change).toFixed(1)}%</span>
+              <ArrowDownRight className="w-4 h-4 text-destructive mr-1" />
+              <span className="text-destructive font-medium">-{Math.abs(change).toFixed(1)}%</span>
             </>
           )}
           {trend === 'neutral' && (
@@ -320,13 +320,13 @@ const ExecutiveDashboard = ({ organizationId, startDate, endDate }: Props) => {
           <div className="flex items-center gap-2 text-sm">
             {isConnected ? (
               <>
-                <Wifi className="w-4 h-4 text-green-500" />
-                <span className="text-green-500 font-medium">Live</span>
+                <Wifi className="w-4 h-4 text-success" />
+                <span className="text-success font-medium">Live</span>
               </>
             ) : (
               <>
-                <WifiOff className="w-4 h-4 text-red-500" />
-                <span className="text-red-500 font-medium">Offline</span>
+                <WifiOff className="w-4 h-4 text-destructive" />
+                <span className="text-destructive font-medium">Offline</span>
               </>
             )}
           </div>
@@ -406,18 +406,18 @@ const ExecutiveDashboard = ({ organizationId, startDate, endDate }: Props) => {
                   key={alert.id}
                   className={`flex items-start gap-3 p-3 rounded-lg border ${
                     alert.type === 'success'
-                      ? 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800'
+                      ? 'bg-success/5 border-success/20 dark:bg-success/10 dark:border-success/20'
                       : alert.type === 'warning'
-                      ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800'
+                      ? 'bg-warning/5 border-warning/20 dark:bg-warning/10 dark:border-warning/20'
                       : alert.type === 'danger'
-                      ? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
-                      : 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800'
+                      ? 'bg-destructive/5 border-destructive/20 dark:bg-destructive/10 dark:border-destructive/20'
+                      : 'bg-info/5 border-info/20 dark:bg-info/10 dark:border-info/20'
                   }`}
                 >
                   {alert.type === 'success' ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
                   ) : (
-                    <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
                   )}
                   <div className="flex-1">
                     <h4 className="font-semibold text-sm">{alert.title}</h4>
@@ -547,7 +547,7 @@ const ExecutiveDashboard = ({ organizationId, startDate, endDate }: Props) => {
             {transactions.slice(0, 10).map((tx) => (
               <div key={tx.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
                 <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
                   <div>
                     <p className="text-sm font-medium">${Number(tx.amount).toFixed(2)} donation</p>
                     <p className="text-xs text-muted-foreground">

@@ -190,7 +190,7 @@ const ClientActions = () => {
                   <p className="text-sm text-muted-foreground">Pending Actions</p>
                   <p className="text-3xl font-bold">{pendingActions.length}</p>
                 </div>
-                <Lightbulb className="h-8 w-8 text-yellow-500" />
+                <Lightbulb className="h-8 w-8 text-warning" />
               </div>
             </CardContent>
           </Card>
@@ -201,7 +201,7 @@ const ClientActions = () => {
                   <p className="text-sm text-muted-foreground">Used This Week</p>
                   <p className="text-3xl font-bold">{usedActions.length}</p>
                 </div>
-                <Check className="h-8 w-8 text-green-500" />
+                <Check className="h-8 w-8 text-success" />
               </div>
             </CardContent>
           </Card>
@@ -212,7 +212,7 @@ const ClientActions = () => {
                   <p className="text-sm text-muted-foreground">Total Generated</p>
                   <p className="text-3xl font-bold">{actions.length}</p>
                 </div>
-                <MessageSquare className="h-8 w-8 text-blue-500" />
+                <MessageSquare className="h-8 w-8 text-info" />
               </div>
             </CardContent>
           </Card>
@@ -244,10 +244,10 @@ const ClientActions = () => {
                           {action.action_type}
                         </Badge>
                         {action.topic_relevance_score >= 70 && (
-                          <Badge className="bg-green-500">High Relevance</Badge>
+                          <Badge className="bg-success/10 text-success border-success/20">High Relevance</Badge>
                         )}
                         {action.urgency_score >= 70 && (
-                          <Badge className="bg-red-500">Urgent</Badge>
+                          <Badge className="bg-severity-critical/10 text-severity-critical border-severity-critical/20">Urgent</Badge>
                         )}
                       </div>
                       <CardTitle className="text-lg">{action.topic}</CardTitle>
@@ -361,7 +361,7 @@ const ClientActions = () => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">{action.topic}</CardTitle>
-                      <Badge variant="outline" className="bg-green-500/10 text-green-500">
+                      <Badge variant="outline" className="bg-success/10 text-success border-success/20">
                         <Check className="h-3 w-3 mr-1" />
                         Used
                       </Badge>

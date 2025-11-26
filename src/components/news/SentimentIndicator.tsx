@@ -11,20 +11,20 @@ interface SentimentBadgeProps {
 const SENTIMENT_CONFIG = {
   positive: {
     icon: TrendingUp,
-    color: "bg-green-500",
-    textColor: "text-green-700 dark:text-green-400",
+    color: "bg-success",
+    textColor: "text-success",
     label: "Positive"
   },
   neutral: {
     icon: Minus,
-    color: "bg-gray-500",
-    textColor: "text-gray-700 dark:text-gray-400",
+    color: "bg-muted",
+    textColor: "text-muted-foreground",
     label: "Neutral"
   },
   negative: {
     icon: TrendingDown,
-    color: "bg-red-500",
-    textColor: "text-red-700 dark:text-red-400",
+    color: "bg-destructive",
+    textColor: "text-destructive",
     label: "Negative"
   }
 };
@@ -87,15 +87,15 @@ export function SentimentTrendCard({ category, data }: SentimentTrendCardProps) 
           {/* Sentiment Distribution Bar */}
           <div className="w-full h-4 rounded-full overflow-hidden flex">
             <div 
-              className="bg-green-500 h-full transition-all" 
+              className="bg-success h-full transition-all" 
               style={{ width: `${percentages.positive}%` }}
             />
             <div 
-              className="bg-gray-500 h-full transition-all" 
+              className="bg-muted h-full transition-all" 
               style={{ width: `${percentages.neutral}%` }}
             />
             <div 
-              className="bg-red-500 h-full transition-all" 
+              className="bg-destructive h-full transition-all" 
               style={{ width: `${percentages.negative}%` }}
             />
           </div>

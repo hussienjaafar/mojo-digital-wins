@@ -237,7 +237,7 @@ const ClientDemographics = () => {
                   <p className="text-sm text-muted-foreground">Total Revenue</p>
                   <p className="text-3xl font-bold">${stats?.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
                 </div>
-                <DollarSign className="h-8 w-8 text-green-500" />
+                <DollarSign className="h-8 w-8 text-success" />
               </div>
             </CardContent>
           </Card>
@@ -248,7 +248,7 @@ const ClientDemographics = () => {
                   <p className="text-sm text-muted-foreground">Average Donation</p>
                   <p className="text-3xl font-bold">${stats?.averageDonation.toFixed(2)}</p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-blue-500" />
+                <TrendingUp className="h-8 w-8 text-info" />
               </div>
             </CardContent>
           </Card>

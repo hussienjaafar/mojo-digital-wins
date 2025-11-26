@@ -152,22 +152,22 @@ const ClientAlerts = () => {
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
       case "high":
-        return <AlertTriangle className="h-4 w-4 text-red-500" />;
+        return <AlertTriangle className="h-4 w-4 text-severity-high" />;
       case "medium":
-        return <Info className="h-4 w-4 text-yellow-500" />;
+        return <Info className="h-4 w-4 text-severity-medium" />;
       default:
-        return <Info className="h-4 w-4 text-blue-500" />;
+        return <Info className="h-4 w-4 text-info" />;
     }
   };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "high":
-        return "bg-red-500/10 text-red-500 border-red-500/20";
+        return "bg-severity-high/10 text-severity-high border-severity-high/20";
       case "medium":
-        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
+        return "bg-severity-medium/10 text-severity-medium border-severity-medium/20";
       default:
-        return "bg-blue-500/10 text-blue-500 border-blue-500/20";
+        return "bg-info/10 text-info border-info/20";
     }
   };
 
@@ -202,7 +202,7 @@ const ClientAlerts = () => {
                   <p className="text-sm text-muted-foreground">Actionable</p>
                   <p className="text-3xl font-bold">{actionableCount}</p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-green-500" />
+                <TrendingUp className="h-8 w-8 text-success" />
               </div>
             </CardContent>
           </Card>
@@ -213,7 +213,7 @@ const ClientAlerts = () => {
                   <p className="text-sm text-muted-foreground">Watchlist Matches</p>
                   <p className="text-3xl font-bold">{watchlistAlerts.length}</p>
                 </div>
-                <Filter className="h-8 w-8 text-blue-500" />
+                <Filter className="h-8 w-8 text-info" />
               </div>
             </CardContent>
           </Card>
@@ -300,7 +300,7 @@ const ClientAlerts = () => {
                               <Badge className="bg-primary">New</Badge>
                             )}
                             {alert.is_actionable && (
-                              <Badge className="bg-green-500">Actionable</Badge>
+                              <Badge className="bg-success/10 text-success border-success/20">Actionable</Badge>
                             )}
                             <Badge variant="outline" className={getSeverityColor(alert.severity || 'low')}>
                               {getSeverityIcon(alert.severity || 'low')}
@@ -373,7 +373,7 @@ const ClientAlerts = () => {
                               <Badge className="bg-primary">New</Badge>
                             )}
                             {alert.is_actionable && (
-                              <Badge className="bg-green-500">Actionable</Badge>
+                              <Badge className="bg-success/10 text-success border-success/20">Actionable</Badge>
                             )}
                           </div>
                           <CardTitle className="text-lg">{alert.entity_name}</CardTitle>
@@ -414,7 +414,7 @@ const ClientAlerts = () => {
                   <span className="ml-1">{selectedAlert.severity || 'low'}</span>
                 </Badge>
                 {selectedAlert.is_actionable && (
-                  <Badge className="bg-green-500">Actionable (Score: {selectedAlert.actionable_score})</Badge>
+                  <Badge className="bg-success/10 text-success border-success/20">Actionable (Score: {selectedAlert.actionable_score})</Badge>
                 )}
               </div>
 
