@@ -41,28 +41,28 @@ type DonorJourney = {
 const getTouchpointIcon = (type: string) => {
   switch (type) {
     case 'meta_ad_click':
-      return <MousePointerClick className="h-5 w-5 text-blue-500" />;
+      return <MousePointerClick className="h-5 w-5 text-info" />;
     case 'sms_send':
-      return <MessageSquare className="h-5 w-5 text-green-500" />;
+      return <MessageSquare className="h-5 w-5 text-success" />;
     case 'email_open':
     case 'email_click':
-      return <Mail className="h-5 w-5 text-purple-500" />;
+      return <Mail className="h-5 w-5 text-secondary" />;
     default:
-      return <Target className="h-5 w-5 text-gray-500" />;
+      return <Target className="h-5 w-5 text-muted-foreground" />;
   }
 };
 
 const getTouchpointColor = (type: string) => {
   switch (type) {
     case 'meta_ad_click':
-      return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+      return 'bg-info/10 text-info border-info/20';
     case 'sms_send':
-      return 'bg-green-500/10 text-green-500 border-green-500/20';
+      return 'bg-success/10 text-success border-success/20';
     case 'email_open':
     case 'email_click':
-      return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
+      return 'bg-secondary/10 text-secondary border-secondary/20';
     default:
-      return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+      return 'bg-muted/50 text-muted-foreground border-border';
   }
 };
 
@@ -222,17 +222,17 @@ const ClientDonorJourney = () => {
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-500">40%</div>
+                <div className="text-3xl font-bold text-info">40%</div>
                 <div className="text-sm text-muted-foreground">First Touch</div>
                 <p className="text-xs mt-1">Initial awareness</p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-green-500">20%</div>
+                <div className="text-3xl font-bold text-success">20%</div>
                 <div className="text-sm text-muted-foreground">Middle Touches</div>
                 <p className="text-xs mt-1">Nurturing phase</p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-purple-500">40%</div>
+                <div className="text-3xl font-bold text-secondary">40%</div>
                 <div className="text-sm text-muted-foreground">Last Touch</div>
                 <p className="text-xs mt-1">Final conversion</p>
               </div>
@@ -265,8 +265,8 @@ const ClientDonorJourney = () => {
                     </div>
                     <div className="text-right">
                       <div className="flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-green-500" />
-                        <span className="text-2xl font-bold text-green-500">
+                        <DollarSign className="h-5 w-5 text-success" />
+                        <span className="text-2xl font-bold text-success">
                           ${journey.amount.toFixed(2)}
                         </span>
                       </div>
@@ -298,8 +298,8 @@ const ClientDonorJourney = () => {
                                 <Badge variant="outline" className={getTouchpointColor(touchpoint.touchpoint_type)}>
                                   {touchpoint.touchpoint_type.replace('_', ' ')}
                                 </Badge>
-                                {isFirst && <Badge className="bg-blue-500">First Touch (40%)</Badge>}
-                                {isLast && <Badge className="bg-purple-500">Last Touch (40%)</Badge>}
+                                {isFirst && <Badge className="bg-info/10 text-info border-info/20">First Touch (40%)</Badge>}
+                                {isLast && <Badge className="bg-secondary/10 text-secondary border-secondary/20">Last Touch (40%)</Badge>}
                                 {!isFirst && !isLast && <Badge variant="secondary">Middle (20%)</Badge>}
                               </div>
                               <p className="text-sm text-muted-foreground">
@@ -323,11 +323,11 @@ const ClientDonorJourney = () => {
                       })}
                       {/* Final Conversion */}
                       <div className="relative flex items-start gap-4">
-                        <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-green-500 text-white">
+                        <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-success text-success-foreground">
                           <DollarSign className="h-6 w-6" />
                         </div>
                         <div className="flex-1">
-                          <Badge className="bg-green-500 mb-1">Donation</Badge>
+                          <Badge className="bg-success/10 text-success border-success/20 mb-1">Donation</Badge>
                           <p className="text-lg font-bold">${journey.amount.toFixed(2)}</p>
                           <p className="text-sm text-muted-foreground">
                             {format(new Date(journey.transaction_date), 'MMM d, yyyy h:mm a')}

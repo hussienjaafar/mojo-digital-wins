@@ -30,14 +30,14 @@ export function NewsCard({ article }: NewsCardProps) {
 
   const getCategoryColor = (category: string | null) => {
     switch (category) {
-      case 'independent': return 'bg-purple-500/20 text-purple-700 dark:text-purple-300';
-      case 'mainstream': return 'bg-blue-500/20 text-blue-700 dark:text-blue-300';
-      case 'conservative': return 'bg-red-500/20 text-red-700 dark:text-red-300';
-      case 'specialized': return 'bg-green-500/20 text-green-700 dark:text-green-300';
-      case 'government': return 'bg-amber-500/20 text-amber-700 dark:text-amber-300';
-      case 'state_government': return 'bg-orange-500/20 text-orange-700 dark:text-orange-300';
-      case 'civil_rights': return 'bg-teal-500/20 text-teal-700 dark:text-teal-300';
-      default: return 'bg-gray-500/20 text-gray-700 dark:text-gray-300';
+      case 'independent': return 'bg-secondary/20 text-secondary';
+      case 'mainstream': return 'bg-info/20 text-info';
+      case 'conservative': return 'bg-destructive/20 text-destructive';
+      case 'specialized': return 'bg-success/20 text-success';
+      case 'government': return 'bg-warning/20 text-warning';
+      case 'state_government': return 'bg-accent/20 text-accent-foreground';
+      case 'civil_rights': return 'bg-primary/20 text-primary';
+      default: return 'bg-muted/50 text-muted-foreground';
     }
   };
 

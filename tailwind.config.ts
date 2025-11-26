@@ -57,6 +57,33 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Severity tokens
+        severity: {
+          critical: "hsl(var(--severity-critical))",
+          "critical-foreground": "hsl(var(--severity-critical-foreground))",
+          high: "hsl(var(--severity-high))",
+          "high-foreground": "hsl(var(--severity-high-foreground))",
+          medium: "hsl(var(--severity-medium))",
+          "medium-foreground": "hsl(var(--severity-medium-foreground))",
+          low: "hsl(var(--severity-low))",
+          "low-foreground": "hsl(var(--severity-low-foreground))",
+        },
+        // Utility semantic colors
+        success: {
+          DEFAULT: "hsl(150 60% 50%)",
+          foreground: "hsl(0 0% 100%)",
+          light: "hsl(150 60% 95%)",
+        },
+        info: {
+          DEFAULT: "hsl(213 83% 47%)",
+          foreground: "hsl(0 0% 100%)",
+          light: "hsl(213 83% 95%)",
+        },
+        warning: {
+          DEFAULT: "hsl(45 89% 57%)",
+          foreground: "hsl(213 75% 15%)",
+          light: "hsl(45 89% 95%)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

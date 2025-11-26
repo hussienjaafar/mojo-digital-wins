@@ -108,8 +108,8 @@ export const IntelligenceHub = ({ organizationId }: IntelligenceHubProps) => {
       path: "/client-watchlist",
       stat: stats.watchlistCount,
       statLabel: "tracked entities",
-      color: "text-blue-500",
-      bgColor: "bg-blue-500/10",
+      color: "text-info",
+      bgColor: "bg-info/10",
     },
     {
       title: "Bluesky Trends",
@@ -118,8 +118,8 @@ export const IntelligenceHub = ({ organizationId }: IntelligenceHubProps) => {
       path: "/",
       stat: stats.trendingTopics,
       statLabel: "active trends",
-      color: "text-purple-500",
-      bgColor: "bg-purple-500/10",
+      color: "text-secondary",
+      bgColor: "bg-secondary/10",
       subtitle: stats.latestTrend,
     },
     {
@@ -129,8 +129,8 @@ export const IntelligenceHub = ({ organizationId }: IntelligenceHubProps) => {
       path: "/polling-intelligence",
       stat: null,
       statLabel: "latest insights",
-      color: "text-green-500",
-      bgColor: "bg-green-500/10",
+      color: "text-success",
+      bgColor: "bg-success/10",
     },
   ];
 
@@ -142,8 +142,8 @@ export const IntelligenceHub = ({ organizationId }: IntelligenceHubProps) => {
       path: "/client-alerts",
       count: stats.criticalAlerts,
       variant: "destructive" as const,
-      color: "text-red-500",
-      bgColor: "bg-red-500/10",
+      color: "text-severity-critical",
+      bgColor: "bg-severity-critical/10",
     },
     {
       title: "Suggested Actions",
@@ -152,8 +152,8 @@ export const IntelligenceHub = ({ organizationId }: IntelligenceHubProps) => {
       path: "/client-actions",
       count: stats.suggestedActions,
       variant: "secondary" as const,
-      color: "text-blue-500",
-      bgColor: "bg-blue-500/10",
+      color: "text-info",
+      bgColor: "bg-info/10",
     },
     {
       title: "Opportunities",
@@ -162,8 +162,8 @@ export const IntelligenceHub = ({ organizationId }: IntelligenceHubProps) => {
       path: "/client-opportunities",
       count: stats.opportunities,
       variant: "default" as const,
-      color: "text-green-500",
-      bgColor: "bg-green-500/10",
+      color: "text-success",
+      bgColor: "bg-success/10",
     },
   ];
 
