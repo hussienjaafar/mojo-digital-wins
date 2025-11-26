@@ -33,6 +33,7 @@ import ClientPortal from "./components/client/ClientPortal";
 import ClientWatchlist from "./pages/ClientWatchlist";
 import ClientAlerts from "./pages/ClientAlerts";
 import ClientActions from "./pages/ClientActions";
+import ClientOpportunities from "./pages/ClientOpportunities";
 import ClientDemographics from "./pages/ClientDemographics";
 import ClientDonorJourney from "./pages/ClientDonorJourney";
 import PollingIntelligence from "./pages/PollingIntelligence";
@@ -81,6 +82,7 @@ const AppContent = () => {
           <Route path="/client/watchlist" element={<ClientWatchlist />} />
           <Route path="/client/alerts" element={<ClientAlerts />} />
           <Route path="/client/actions" element={<ClientActions />} />
+          <Route path="/client/opportunities" element={<ClientOpportunities />} />
           <Route path="/client/demographics" element={<ClientDemographics />} />
           <Route path="/client/journey" element={<ClientDonorJourney />} />
           <Route path="/client/polling" element={<PollingIntelligence />} />

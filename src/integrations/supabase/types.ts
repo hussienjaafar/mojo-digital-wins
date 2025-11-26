@@ -2240,6 +2240,68 @@ export type Database = {
           },
         ]
       }
+      event_impact_correlations: {
+        Row: {
+          amount_raised_48h_after: number
+          avg_donation_48h_after: number
+          baseline_amount: number
+          baseline_avg_donation: number
+          baseline_donations: number
+          correlation_strength: number
+          created_at: string
+          donations_48h_after: number
+          entity_name: string
+          entity_type: string
+          event_date: string
+          id: string
+          organization_id: string
+          topic_mentions: number | null
+          topic_velocity: number | null
+        }
+        Insert: {
+          amount_raised_48h_after?: number
+          avg_donation_48h_after?: number
+          baseline_amount?: number
+          baseline_avg_donation?: number
+          baseline_donations?: number
+          correlation_strength?: number
+          created_at?: string
+          donations_48h_after?: number
+          entity_name: string
+          entity_type: string
+          event_date: string
+          id?: string
+          organization_id: string
+          topic_mentions?: number | null
+          topic_velocity?: number | null
+        }
+        Update: {
+          amount_raised_48h_after?: number
+          avg_donation_48h_after?: number
+          baseline_amount?: number
+          baseline_avg_donation?: number
+          baseline_donations?: number
+          correlation_strength?: number
+          created_at?: string
+          donations_48h_after?: number
+          entity_name?: string
+          entity_type?: string
+          event_date?: string
+          id?: string
+          organization_id?: string
+          topic_mentions?: number | null
+          topic_velocity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_impact_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       executive_orders: {
         Row: {
           created_at: string
@@ -2332,6 +2394,74 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      fundraising_opportunities: {
+        Row: {
+          created_at: string
+          current_mentions: number | null
+          detected_at: string
+          entity_name: string
+          entity_type: string
+          estimated_value: number | null
+          expires_at: string
+          historical_success_rate: number | null
+          id: string
+          is_active: boolean
+          opportunity_score: number
+          organization_id: string
+          sample_sources: Json | null
+          similar_past_events: number | null
+          time_sensitivity: number | null
+          updated_at: string
+          velocity: number | null
+        }
+        Insert: {
+          created_at?: string
+          current_mentions?: number | null
+          detected_at?: string
+          entity_name: string
+          entity_type: string
+          estimated_value?: number | null
+          expires_at: string
+          historical_success_rate?: number | null
+          id?: string
+          is_active?: boolean
+          opportunity_score: number
+          organization_id: string
+          sample_sources?: Json | null
+          similar_past_events?: number | null
+          time_sensitivity?: number | null
+          updated_at?: string
+          velocity?: number | null
+        }
+        Update: {
+          created_at?: string
+          current_mentions?: number | null
+          detected_at?: string
+          entity_name?: string
+          entity_type?: string
+          estimated_value?: number | null
+          expires_at?: string
+          historical_success_rate?: number | null
+          id?: string
+          is_active?: boolean
+          opportunity_score?: number
+          organization_id?: string
+          sample_sources?: Json | null
+          similar_past_events?: number | null
+          time_sensitivity?: number | null
+          updated_at?: string
+          velocity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fundraising_opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       generated_reports: {
         Row: {
