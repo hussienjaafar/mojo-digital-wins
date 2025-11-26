@@ -94,6 +94,13 @@ serve(async (req) => {
       }
     }
 
+    // Fetch campaign attribution mappings
+    const { data: attributionMappings } = await supabase
+      .from('campaign_attribution')
+      .select('*')
+      .eq('organization_id', organization_id)
+      .not('meta_campaign_id', 'is', null);
+
     // Fetch insights for each campaign
     for (const campaign of campaigns) {
       const insightsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,reach,actions,action_values,cpc,cpm,ctr&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&time_increment=1&access_token=${access_token}`;
@@ -107,6 +114,9 @@ serve(async (req) => {
       }
 
       const insights = insightsData.data || [];
+      
+      // Find attribution mapping for this campaign
+      const mapping = attributionMappings?.find(m => m.meta_campaign_id === campaign.id);
       
       // Store daily metrics
       for (const insight of insights) {
@@ -158,6 +168,39 @@ serve(async (req) => {
 
         if (metricsError) {
           console.error(`Error storing metrics for ${campaign.id} on ${insight.date_start}:`, metricsError);
+        }
+
+        // Create attribution touchpoints for clicks (if mapping exists)
+        if (mapping && parseInt(insight.clicks) > 0) {
+          const clicks = parseInt(insight.clicks);
+          console.log(`Creating ${clicks} attribution touchpoints for campaign ${campaign.id} on ${insight.date_start}`);
+          
+          // Create touchpoints for the clicks (batch insert)
+          // Note: In real implementation, we'd track individual clicks with user IDs
+          // For now, we create aggregate touchpoint markers
+          const { error: touchpointError } = await supabase
+            .from('attribution_touchpoints')
+            .insert({
+              organization_id,
+              touchpoint_type: 'meta_ad_click',
+              occurred_at: `${insight.date_start}T12:00:00Z`, // Midday of the date
+              utm_source: 'meta',
+              utm_medium: 'cpc',
+              utm_campaign: campaign.name || campaign.id,
+              campaign_id: mapping.meta_campaign_id,
+              metadata: {
+                campaign_id: campaign.id,
+                campaign_name: campaign.name,
+                date: insight.date_start,
+                clicks: clicks,
+                impressions: parseInt(insight.impressions) || 0,
+                spend: parseFloat(insight.spend) || 0,
+              }
+            });
+
+          if (touchpointError) {
+            console.error(`Error creating touchpoint for ${campaign.id}:`, touchpointError);
+          }
         }
       }
     }
