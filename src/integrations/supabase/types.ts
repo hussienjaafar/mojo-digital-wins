@@ -2463,6 +2463,62 @@ export type Database = {
           },
         ]
       }
+      generated_campaign_messages: {
+        Row: {
+          actual_performance: number | null
+          context_used: Json | null
+          created_at: string
+          entity_name: string
+          entity_type: string
+          generated_at: string
+          id: string
+          message_approach: string | null
+          message_text: string
+          organization_id: string
+          predicted_performance: number | null
+          variant_number: number | null
+          was_used: boolean | null
+        }
+        Insert: {
+          actual_performance?: number | null
+          context_used?: Json | null
+          created_at?: string
+          entity_name: string
+          entity_type: string
+          generated_at?: string
+          id?: string
+          message_approach?: string | null
+          message_text: string
+          organization_id: string
+          predicted_performance?: number | null
+          variant_number?: number | null
+          was_used?: boolean | null
+        }
+        Update: {
+          actual_performance?: number | null
+          context_used?: Json | null
+          created_at?: string
+          entity_name?: string
+          entity_type?: string
+          generated_at?: string
+          id?: string
+          message_approach?: string | null
+          message_text?: string
+          organization_id?: string
+          predicted_performance?: number | null
+          variant_number?: number | null
+          was_used?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_campaign_messages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generated_reports: {
         Row: {
           completed_at: string | null
@@ -3425,6 +3481,53 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "export_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      send_time_optimizations: {
+        Row: {
+          analyzed_at: string
+          best_days_of_week: string[] | null
+          best_hours_of_day: number[] | null
+          created_at: string
+          daily_performance: Json | null
+          hourly_performance: Json | null
+          id: string
+          optimal_windows: Json | null
+          organization_id: string
+          sample_size: number | null
+        }
+        Insert: {
+          analyzed_at: string
+          best_days_of_week?: string[] | null
+          best_hours_of_day?: number[] | null
+          created_at?: string
+          daily_performance?: Json | null
+          hourly_performance?: Json | null
+          id?: string
+          optimal_windows?: Json | null
+          organization_id: string
+          sample_size?: number | null
+        }
+        Update: {
+          analyzed_at?: string
+          best_days_of_week?: string[] | null
+          best_hours_of_day?: number[] | null
+          created_at?: string
+          daily_performance?: Json | null
+          hourly_performance?: Json | null
+          id?: string
+          optimal_windows?: Json | null
+          organization_id?: string
+          sample_size?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "send_time_optimizations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
         ]
