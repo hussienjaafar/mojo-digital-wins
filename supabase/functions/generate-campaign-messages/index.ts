@@ -90,18 +90,17 @@ Return ONLY a JSON array of ${num_variants} message objects with this structure:
   }
 ]`;
 
-    const aiResponse = await fetch('https://api.lovable.app/v1/ai/chat', {
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`,
       },
       body: JSON.stringify({
-        model: 'openai/gpt-5-mini',
+        model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'user', content: aiPrompt }
         ],
-        temperature: 0.8,
       }),
     });
 
