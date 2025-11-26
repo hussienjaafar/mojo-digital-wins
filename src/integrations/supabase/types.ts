@@ -16,50 +16,178 @@ export type Database = {
     Tables: {
       actblue_transactions: {
         Row: {
+          ab_test_name: string | null
+          ab_test_variation: string | null
+          addr1: string | null
           amount: number
+          city: string | null
+          committee_name: string | null
+          contribution_form: string | null
+          country: string | null
           created_at: string | null
+          custom_fields: Json | null
           donor_email: string | null
           donor_name: string | null
+          employer: string | null
+          entity_id: string | null
+          fec_id: string | null
+          first_name: string | null
           id: string
+          is_express: boolean | null
+          is_mobile: boolean | null
           is_recurring: boolean | null
+          last_name: string | null
+          lineitem_id: number | null
+          occupation: string | null
+          order_number: string | null
           organization_id: string
+          phone: string | null
+          recurring_duration: number | null
+          recurring_period: string | null
           refcode: string | null
+          refcode_custom: string | null
+          refcode2: string | null
           source_campaign: string | null
+          state: string | null
+          text_message_option: string | null
           transaction_date: string
           transaction_id: string
           transaction_type: string | null
+          zip: string | null
         }
         Insert: {
+          ab_test_name?: string | null
+          ab_test_variation?: string | null
+          addr1?: string | null
           amount: number
+          city?: string | null
+          committee_name?: string | null
+          contribution_form?: string | null
+          country?: string | null
           created_at?: string | null
+          custom_fields?: Json | null
           donor_email?: string | null
           donor_name?: string | null
+          employer?: string | null
+          entity_id?: string | null
+          fec_id?: string | null
+          first_name?: string | null
           id?: string
+          is_express?: boolean | null
+          is_mobile?: boolean | null
           is_recurring?: boolean | null
+          last_name?: string | null
+          lineitem_id?: number | null
+          occupation?: string | null
+          order_number?: string | null
           organization_id: string
+          phone?: string | null
+          recurring_duration?: number | null
+          recurring_period?: string | null
           refcode?: string | null
+          refcode_custom?: string | null
+          refcode2?: string | null
           source_campaign?: string | null
+          state?: string | null
+          text_message_option?: string | null
           transaction_date: string
           transaction_id: string
           transaction_type?: string | null
+          zip?: string | null
         }
         Update: {
+          ab_test_name?: string | null
+          ab_test_variation?: string | null
+          addr1?: string | null
           amount?: number
+          city?: string | null
+          committee_name?: string | null
+          contribution_form?: string | null
+          country?: string | null
           created_at?: string | null
+          custom_fields?: Json | null
           donor_email?: string | null
           donor_name?: string | null
+          employer?: string | null
+          entity_id?: string | null
+          fec_id?: string | null
+          first_name?: string | null
           id?: string
+          is_express?: boolean | null
+          is_mobile?: boolean | null
           is_recurring?: boolean | null
+          last_name?: string | null
+          lineitem_id?: number | null
+          occupation?: string | null
+          order_number?: string | null
           organization_id?: string
+          phone?: string | null
+          recurring_duration?: number | null
+          recurring_period?: string | null
           refcode?: string | null
+          refcode_custom?: string | null
+          refcode2?: string | null
           source_campaign?: string | null
+          state?: string | null
+          text_message_option?: string | null
           transaction_date?: string
           transaction_id?: string
           transaction_type?: string | null
+          zip?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_activity_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string | null
+          details: string | null
+          entity_name: string | null
+          id: string
+          is_resolved: boolean | null
+          organization_id: string | null
+          relevance_score: number | null
+          resolved_at: string | null
+          resolved_by: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string | null
+          details?: string | null
+          entity_name?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          organization_id?: string | null
+          relevance_score?: number | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string | null
+          details?: string | null
+          entity_name?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          organization_id?: string | null
+          relevance_score?: number | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          usage_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_activity_alerts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "client_organizations"
@@ -554,6 +682,59 @@ export type Database = {
           total_alerts?: number
         }
         Relationships: []
+      }
+      attribution_touchpoints: {
+        Row: {
+          campaign_id: string | null
+          created_at: string | null
+          donor_email: string | null
+          id: string
+          metadata: Json | null
+          occurred_at: string
+          organization_id: string | null
+          refcode: string | null
+          touchpoint_type: string
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string | null
+          donor_email?: string | null
+          id?: string
+          metadata?: Json | null
+          occurred_at: string
+          organization_id?: string | null
+          refcode?: string | null
+          touchpoint_type: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string | null
+          donor_email?: string | null
+          id?: string
+          metadata?: Json | null
+          occurred_at?: string
+          organization_id?: string | null
+          refcode?: string | null
+          touchpoint_type?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attribution_touchpoints_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       backfill_status: {
         Row: {
@@ -1267,6 +1448,75 @@ export type Database = {
           },
         ]
       }
+      client_entity_alerts: {
+        Row: {
+          actionable_score: number | null
+          alert_type: string
+          created_at: string | null
+          current_mentions: number | null
+          entity_name: string
+          id: string
+          is_actionable: boolean | null
+          is_read: boolean | null
+          organization_id: string | null
+          sample_sources: Json | null
+          severity: string | null
+          suggested_action: string | null
+          triggered_at: string | null
+          velocity: number | null
+          watchlist_id: string | null
+        }
+        Insert: {
+          actionable_score?: number | null
+          alert_type: string
+          created_at?: string | null
+          current_mentions?: number | null
+          entity_name: string
+          id?: string
+          is_actionable?: boolean | null
+          is_read?: boolean | null
+          organization_id?: string | null
+          sample_sources?: Json | null
+          severity?: string | null
+          suggested_action?: string | null
+          triggered_at?: string | null
+          velocity?: number | null
+          watchlist_id?: string | null
+        }
+        Update: {
+          actionable_score?: number | null
+          alert_type?: string
+          created_at?: string | null
+          current_mentions?: number | null
+          entity_name?: string
+          id?: string
+          is_actionable?: boolean | null
+          is_read?: boolean | null
+          organization_id?: string | null
+          sample_sources?: Json | null
+          severity?: string | null
+          suggested_action?: string | null
+          triggered_at?: string | null
+          velocity?: number | null
+          watchlist_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_entity_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_entity_alerts_watchlist_id_fkey"
+            columns: ["watchlist_id"]
+            isOneToOne: false
+            referencedRelation: "entity_watchlist"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_organizations: {
         Row: {
           created_at: string | null
@@ -1582,6 +1832,107 @@ export type Database = {
         }
         Relationships: []
       }
+      donor_demographics: {
+        Row: {
+          address: string | null
+          age: number | null
+          bigquery_id: string | null
+          bigquery_synced_at: string | null
+          city: string | null
+          country: string | null
+          created_at: string | null
+          donation_count: number | null
+          donor_email: string
+          employer: string | null
+          first_donation_date: string | null
+          first_name: string | null
+          gender: string | null
+          id: string
+          is_recurring: boolean | null
+          last_donation_date: string | null
+          last_name: string | null
+          occupation: string | null
+          organization_id: string | null
+          party_affiliation: string | null
+          phone: string | null
+          state: string | null
+          total_donated: number | null
+          updated_at: string | null
+          voter_file_match_date: string | null
+          voter_file_matched: boolean | null
+          voter_score: number | null
+          zip: string | null
+        }
+        Insert: {
+          address?: string | null
+          age?: number | null
+          bigquery_id?: string | null
+          bigquery_synced_at?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          donation_count?: number | null
+          donor_email: string
+          employer?: string | null
+          first_donation_date?: string | null
+          first_name?: string | null
+          gender?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          last_donation_date?: string | null
+          last_name?: string | null
+          occupation?: string | null
+          organization_id?: string | null
+          party_affiliation?: string | null
+          phone?: string | null
+          state?: string | null
+          total_donated?: number | null
+          updated_at?: string | null
+          voter_file_match_date?: string | null
+          voter_file_matched?: boolean | null
+          voter_score?: number | null
+          zip?: string | null
+        }
+        Update: {
+          address?: string | null
+          age?: number | null
+          bigquery_id?: string | null
+          bigquery_synced_at?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          donation_count?: number | null
+          donor_email?: string
+          employer?: string | null
+          first_donation_date?: string | null
+          first_name?: string | null
+          gender?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          last_donation_date?: string | null
+          last_name?: string | null
+          occupation?: string | null
+          organization_id?: string | null
+          party_affiliation?: string | null
+          phone?: string | null
+          state?: string | null
+          total_donated?: number | null
+          updated_at?: string | null
+          voter_file_match_date?: string | null
+          voter_file_matched?: boolean | null
+          voter_score?: number | null
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donor_demographics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_queue: {
         Row: {
           attachments: Json | null
@@ -1730,6 +2081,158 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "email_report_schedules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entity_mentions: {
+        Row: {
+          context_snippet: string | null
+          created_at: string | null
+          entity_name: string
+          entity_type: string | null
+          id: string
+          mentioned_at: string
+          platform_engagement: Json | null
+          sentiment: number | null
+          source_id: string
+          source_title: string | null
+          source_type: string
+          source_url: string | null
+        }
+        Insert: {
+          context_snippet?: string | null
+          created_at?: string | null
+          entity_name: string
+          entity_type?: string | null
+          id?: string
+          mentioned_at: string
+          platform_engagement?: Json | null
+          sentiment?: number | null
+          source_id: string
+          source_title?: string | null
+          source_type: string
+          source_url?: string | null
+        }
+        Update: {
+          context_snippet?: string | null
+          created_at?: string | null
+          entity_name?: string
+          entity_type?: string | null
+          id?: string
+          mentioned_at?: string
+          platform_engagement?: Json | null
+          sentiment?: number | null
+          source_id?: string
+          source_title?: string | null
+          source_type?: string
+          source_url?: string | null
+        }
+        Relationships: []
+      }
+      entity_trends: {
+        Row: {
+          calculated_at: string | null
+          entity_name: string
+          entity_type: string | null
+          first_seen_at: string | null
+          id: string
+          is_trending: boolean | null
+          last_seen_at: string | null
+          mentions_1h: number | null
+          mentions_24h: number | null
+          mentions_6h: number | null
+          mentions_7d: number | null
+          sentiment_avg: number | null
+          sentiment_change: number | null
+          updated_at: string | null
+          velocity: number | null
+        }
+        Insert: {
+          calculated_at?: string | null
+          entity_name: string
+          entity_type?: string | null
+          first_seen_at?: string | null
+          id?: string
+          is_trending?: boolean | null
+          last_seen_at?: string | null
+          mentions_1h?: number | null
+          mentions_24h?: number | null
+          mentions_6h?: number | null
+          mentions_7d?: number | null
+          sentiment_avg?: number | null
+          sentiment_change?: number | null
+          updated_at?: string | null
+          velocity?: number | null
+        }
+        Update: {
+          calculated_at?: string | null
+          entity_name?: string
+          entity_type?: string | null
+          first_seen_at?: string | null
+          id?: string
+          is_trending?: boolean | null
+          last_seen_at?: string | null
+          mentions_1h?: number | null
+          mentions_24h?: number | null
+          mentions_6h?: number | null
+          mentions_7d?: number | null
+          sentiment_avg?: number | null
+          sentiment_change?: number | null
+          updated_at?: string | null
+          velocity?: number | null
+        }
+        Relationships: []
+      }
+      entity_watchlist: {
+        Row: {
+          alert_threshold: number | null
+          aliases: string[] | null
+          created_at: string | null
+          created_by: string | null
+          entity_name: string
+          entity_type: string
+          id: string
+          is_active: boolean | null
+          organization_id: string | null
+          relevance_score: number | null
+          sentiment_alert: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          alert_threshold?: number | null
+          aliases?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          entity_name: string
+          entity_type: string
+          id?: string
+          is_active?: boolean | null
+          organization_id?: string | null
+          relevance_score?: number | null
+          sentiment_alert?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          alert_threshold?: number | null
+          aliases?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          entity_name?: string
+          entity_type?: string
+          id?: string
+          is_active?: boolean | null
+          organization_id?: string | null
+          relevance_score?: number | null
+          sentiment_alert?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_watchlist_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "client_organizations"
@@ -2319,6 +2822,167 @@ export type Database = {
           sentiment?: string | null
           source_id?: string
           source_type?: string
+        }
+        Relationships: []
+      }
+      organization_profiles: {
+        Row: {
+          ai_extracted_data: Json | null
+          created_at: string | null
+          focus_areas: string[] | null
+          id: string
+          key_issues: string[] | null
+          mission_summary: string | null
+          organization_id: string | null
+          related_orgs: string[] | null
+          scraped_at: string | null
+          updated_at: string | null
+          website_url: string | null
+        }
+        Insert: {
+          ai_extracted_data?: Json | null
+          created_at?: string | null
+          focus_areas?: string[] | null
+          id?: string
+          key_issues?: string[] | null
+          mission_summary?: string | null
+          organization_id?: string | null
+          related_orgs?: string[] | null
+          scraped_at?: string | null
+          updated_at?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          ai_extracted_data?: Json | null
+          created_at?: string | null
+          focus_areas?: string[] | null
+          id?: string
+          key_issues?: string[] | null
+          mission_summary?: string | null
+          organization_id?: string | null
+          related_orgs?: string[] | null
+          scraped_at?: string | null
+          updated_at?: string | null
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      polling_alerts: {
+        Row: {
+          alert_type: string
+          change_amount: number | null
+          created_at: string | null
+          current_value: number | null
+          description: string | null
+          id: string
+          is_read: boolean | null
+          poll_type: string
+          previous_value: number | null
+          race_id: string | null
+          severity: string | null
+          state: string | null
+        }
+        Insert: {
+          alert_type: string
+          change_amount?: number | null
+          created_at?: string | null
+          current_value?: number | null
+          description?: string | null
+          id?: string
+          is_read?: boolean | null
+          poll_type: string
+          previous_value?: number | null
+          race_id?: string | null
+          severity?: string | null
+          state?: string | null
+        }
+        Update: {
+          alert_type?: string
+          change_amount?: number | null
+          created_at?: string | null
+          current_value?: number | null
+          description?: string | null
+          id?: string
+          is_read?: boolean | null
+          poll_type?: string
+          previous_value?: number | null
+          race_id?: string | null
+          severity?: string | null
+          state?: string | null
+        }
+        Relationships: []
+      }
+      polling_data: {
+        Row: {
+          candidate_name: string | null
+          created_at: string | null
+          district: string | null
+          fetched_at: string | null
+          field_dates: Json | null
+          id: string
+          issue_name: string | null
+          lead_margin: number | null
+          margin_of_error: number | null
+          poll_date: string | null
+          poll_type: string
+          pollster: string | null
+          race_id: string | null
+          raw_data: Json | null
+          result_value: number | null
+          sample_size: number | null
+          source: string
+          source_url: string | null
+          state: string | null
+        }
+        Insert: {
+          candidate_name?: string | null
+          created_at?: string | null
+          district?: string | null
+          fetched_at?: string | null
+          field_dates?: Json | null
+          id?: string
+          issue_name?: string | null
+          lead_margin?: number | null
+          margin_of_error?: number | null
+          poll_date?: string | null
+          poll_type: string
+          pollster?: string | null
+          race_id?: string | null
+          raw_data?: Json | null
+          result_value?: number | null
+          sample_size?: number | null
+          source: string
+          source_url?: string | null
+          state?: string | null
+        }
+        Update: {
+          candidate_name?: string | null
+          created_at?: string | null
+          district?: string | null
+          fetched_at?: string | null
+          field_dates?: Json | null
+          id?: string
+          issue_name?: string | null
+          lead_margin?: number | null
+          margin_of_error?: number | null
+          poll_date?: string | null
+          poll_type?: string
+          pollster?: string | null
+          race_id?: string | null
+          raw_data?: Json | null
+          result_value?: number | null
+          sample_size?: number | null
+          source?: string
+          source_url?: string | null
+          state?: string | null
         }
         Relationships: []
       }
@@ -2985,6 +3649,75 @@ export type Database = {
           },
         ]
       }
+      suggested_actions: {
+        Row: {
+          action_type: string
+          alert_id: string | null
+          audience_segment: string | null
+          created_at: string | null
+          entity_name: string | null
+          historical_performance: Json | null
+          id: string
+          organization_id: string | null
+          status: string | null
+          suggested_copy: string | null
+          topic_relevance: number | null
+          updated_at: string | null
+          urgency_score: number | null
+          used_at: string | null
+          value_prop: string | null
+        }
+        Insert: {
+          action_type: string
+          alert_id?: string | null
+          audience_segment?: string | null
+          created_at?: string | null
+          entity_name?: string | null
+          historical_performance?: Json | null
+          id?: string
+          organization_id?: string | null
+          status?: string | null
+          suggested_copy?: string | null
+          topic_relevance?: number | null
+          updated_at?: string | null
+          urgency_score?: number | null
+          used_at?: string | null
+          value_prop?: string | null
+        }
+        Update: {
+          action_type?: string
+          alert_id?: string | null
+          audience_segment?: string | null
+          created_at?: string | null
+          entity_name?: string | null
+          historical_performance?: Json | null
+          id?: string
+          organization_id?: string | null
+          status?: string | null
+          suggested_copy?: string | null
+          topic_relevance?: number | null
+          updated_at?: string | null
+          urgency_score?: number | null
+          used_at?: string | null
+          value_prop?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suggested_actions_alert_id_fkey"
+            columns: ["alert_id"]
+            isOneToOne: false
+            referencedRelation: "client_entity_alerts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suggested_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_config: {
         Row: {
           created_at: string | null
@@ -3008,6 +3741,68 @@ export type Database = {
           value?: string
         }
         Relationships: []
+      }
+      transaction_attribution: {
+        Row: {
+          attribution_calculated_at: string | null
+          created_at: string | null
+          donor_email: string | null
+          first_touch_campaign: string | null
+          first_touch_channel: string | null
+          first_touch_weight: number | null
+          id: string
+          last_touch_campaign: string | null
+          last_touch_channel: string | null
+          last_touch_weight: number | null
+          middle_touches: Json | null
+          middle_touches_weight: number | null
+          organization_id: string | null
+          total_touchpoints: number | null
+          transaction_id: string
+        }
+        Insert: {
+          attribution_calculated_at?: string | null
+          created_at?: string | null
+          donor_email?: string | null
+          first_touch_campaign?: string | null
+          first_touch_channel?: string | null
+          first_touch_weight?: number | null
+          id?: string
+          last_touch_campaign?: string | null
+          last_touch_channel?: string | null
+          last_touch_weight?: number | null
+          middle_touches?: Json | null
+          middle_touches_weight?: number | null
+          organization_id?: string | null
+          total_touchpoints?: number | null
+          transaction_id: string
+        }
+        Update: {
+          attribution_calculated_at?: string | null
+          created_at?: string | null
+          donor_email?: string | null
+          first_touch_campaign?: string | null
+          first_touch_channel?: string | null
+          first_touch_weight?: number | null
+          id?: string
+          last_touch_campaign?: string | null
+          last_touch_channel?: string | null
+          last_touch_weight?: number | null
+          middle_touches?: Json | null
+          middle_touches_weight?: number | null
+          organization_id?: string | null
+          total_touchpoints?: number | null
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trending_news_topics: {
         Row: {
@@ -3215,6 +4010,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      watchlist_usage_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          entity_name: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          entity_name?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          entity_name?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watchlist_usage_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       webhook_configs: {
         Row: {
