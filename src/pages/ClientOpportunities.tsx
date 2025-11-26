@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { MagicMomentCard } from "@/components/client/MagicMomentCard";
 import { ClientLayout } from "@/components/client/ClientLayout";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default function ClientOpportunities() {
   const { data: opportunities, isLoading } = useQuery({
@@ -49,15 +50,12 @@ export default function ClientOpportunities() {
         </div>
 
       {opportunities && opportunities.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <TrendingUp className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium mb-2">No Active Opportunities</p>
-            <p className="text-sm text-muted-foreground text-center max-w-md">
-              We're monitoring trends 24/7. When a high-impact moment emerges, it will appear here.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={<Sparkles className="h-12 w-12 text-primary" />}
+          title="AI-Powered Opportunities Coming Soon"
+          description="Our intelligence engine is monitoring news trends, social media, and polling data 24/7. When high-impact fundraising moments emerge, you'll see AI-generated campaign suggestions here with optimal timing recommendations."
+          variant="card"
+        />
       ) : (
         <div className="grid gap-6">
           {opportunities?.map((opp) => {

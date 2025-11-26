@@ -8,8 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { TrendingUp, TrendingDown, AlertTriangle, ArrowLeft, Target, Users } from "lucide-react";
+import { TrendingUp, TrendingDown, AlertTriangle, ArrowLeft, Target, Users, BarChart3 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { EmptyState } from "@/components/ui/empty-state";
 
 import { Database } from "@/integrations/supabase/types";
 
@@ -308,12 +309,12 @@ export default function PollingIntelligence() {
             })}
 
             {Object.keys(racesByState).length === 0 && (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No polling data available for selected races</p>
-                </CardContent>
-              </Card>
+              <EmptyState
+                icon={<BarChart3 className="h-12 w-12 text-primary" />}
+                title="Polling Data Loading"
+                description="We're aggregating polling data from multiple trusted sources. Check back soon for comprehensive race tracking and trend analysis."
+                variant="card"
+              />
             )}
           </TabsContent>
 
@@ -366,12 +367,12 @@ export default function PollingIntelligence() {
             ))}
 
             {pollingAlerts.length === 0 && (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No polling alerts available</p>
-                </CardContent>
-              </Card>
+              <EmptyState
+                icon={<AlertTriangle className="h-12 w-12 text-warning" />}
+                title="No Polling Alerts Yet"
+                description="You'll receive alerts here when significant polling shifts are detected in tracked races. Our system monitors changes every 6 hours."
+                variant="card"
+              />
             )}
           </TabsContent>
 

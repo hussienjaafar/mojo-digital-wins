@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Plus, Trash2, Sparkles, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Plus, Trash2, Sparkles, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Session } from "@supabase/supabase-js";
 import { ClientLayout } from "@/components/client/ClientLayout";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type WatchlistItem = {
   id: string;
@@ -313,19 +314,16 @@ const ClientWatchlist = () => {
 
         {/* Watchlist Items */}
         {watchlist.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No entities in watchlist</h3>
-              <p className="text-muted-foreground text-center mb-4">
-                Start tracking entities relevant to your organization's mission
-              </p>
-              <Button onClick={() => setShowForm(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Entity
-              </Button>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={<Target className="h-12 w-12 text-primary" />}
+            title="Start Your Entity Watchlist"
+            description="Track mentions of key politicians, organizations, policies, and issues in real-time news and social media. Get instant alerts when your entities are trending or mentioned in breaking news."
+            action={{
+              label: "Add Your First Entity",
+              onClick: () => setShowForm(true),
+            }}
+            variant="card"
+          />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {watchlist.map((item) => (
