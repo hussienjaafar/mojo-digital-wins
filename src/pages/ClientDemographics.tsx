@@ -4,10 +4,10 @@ import { supabase } from "@/integrations/supabase/fixed-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, LogOut, MapPin, Briefcase, Users, DollarSign, TrendingUp } from "lucide-react";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { Download, MapPin, Briefcase, Users, DollarSign, TrendingUp } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { ClientLayout } from "@/components/client/ClientLayout";
 
 type Organization = {
   id: string;
@@ -203,59 +203,20 @@ const ClientDemographics = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/client-login');
-  };
-
   if (isLoading || !organization) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground font-medium">Loading demographics...</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
-      {/* Header */}
-      <header className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {organization.logo_url && (
-                <img src={organization.logo_url} alt={organization.name} className="h-10 w-auto" />
-              )}
-              <div>
-                <h1 className="text-2xl font-bold">{organization.name}</h1>
-                <p className="text-sm text-muted-foreground">Donor Demographics</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => navigate('/client/dashboard')}>
-                Dashboard
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/client/journey')}>
-                Donor Journey
-              </Button>
-              <Button variant="outline" onClick={handleExportCSV}>
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-              <ThemeToggle />
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
+    <ClientLayout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">Donor Demographics</h2>
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
@@ -424,8 +385,8 @@ const ClientDemographics = () => {
             </CardContent>
           </Card>
         </div>
-      </main>
-    </div>
+      </div>
+    </ClientLayout>
   );
 };
 
