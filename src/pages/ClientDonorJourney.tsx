@@ -2,14 +2,13 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ArrowRight, DollarSign, Target, MessageSquare, Mail, MousePointerClick } from "lucide-react";
+import { ArrowRight, DollarSign, Target, MessageSquare, Mail, MousePointerClick } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { Session } from "@supabase/supabase-js";
 import { format } from "date-fns";
+import { Session } from "@supabase/supabase-js";
+import { ClientLayout } from "@/components/client/ClientLayout";
 
 type Organization = {
   id: string;
@@ -178,55 +177,14 @@ const ClientDonorJourney = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/client-login');
-  };
-
   if (isLoading || !organization) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground font-medium">Loading donor journeys...</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
-      {/* Header */}
-      <header className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {organization.logo_url && (
-                <img src={organization.logo_url} alt={organization.name} className="h-10 w-auto" />
-              )}
-              <div>
-                <h1 className="text-2xl font-bold">{organization.name}</h1>
-                <p className="text-sm text-muted-foreground">Donor Journey & Attribution</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => navigate('/client/dashboard')}>
-                Dashboard
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/client/demographics')}>
-                Demographics
-              </Button>
-              <ThemeToggle />
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <ClientLayout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h2 className="text-2xl font-bold mb-6">Donor Journey & Attribution</h2>
         {/* Filters */}
         <Card className="mb-6">
           <CardHeader>
@@ -383,8 +341,8 @@ const ClientDonorJourney = () => {
             ))}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </ClientLayout>
   );
 };
 

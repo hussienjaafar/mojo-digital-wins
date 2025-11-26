@@ -1,17 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { TrendingUp, Clock, DollarSign, Copy, CheckCircle2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { TrendingUp } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
-import { formatDistanceToNow } from "date-fns";
 import { MagicMomentCard } from "@/components/client/MagicMomentCard";
+import { ClientLayout } from "@/components/client/ClientLayout";
 
 export default function ClientOpportunities() {
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
   const { data: opportunities, isLoading } = useQuery({
     queryKey: ['fundraising-opportunities'],
     queryFn: async () => {
@@ -39,50 +34,19 @@ export default function ClientOpportunities() {
     refetchInterval: 60000, // Refresh every minute
   });
 
-  const handleCopySuggestion = (opportunityId: string, entityName: string, entityType: string) => {
-    const message = `URGENT: ${entityName} is trending right now. This is our moment to mobilize. Reply YES to donate and show where we stand. Every contribution counts.`;
-    
-    navigator.clipboard.writeText(message);
-    setCopiedId(opportunityId);
-    setTimeout(() => setCopiedId(null), 2000);
-    toast.success("SMS suggestion copied to clipboard");
-  };
-
-  const getSeverityColor = (score: number) => {
-    if (score >= 85) return "destructive";
-    if (score >= 70) return "default";
-    return "secondary";
-  };
-
-  const getSeverityLabel = (score: number) => {
-    if (score >= 85) return "Critical";
-    if (score >= 70) return "High";
-    return "Medium";
-  };
-
   if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="h-24 bg-muted" />
-              <CardContent className="h-32 bg-muted/50" />
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Fundraising Opportunities</h1>
-        <p className="text-muted-foreground">
-          Real-time opportunities based on trending topics and historical performance
-        </p>
-      </div>
+    <ClientLayout>
+      <div className="container mx-auto p-6 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Fundraising Opportunities</h1>
+          <p className="text-muted-foreground">
+            Real-time opportunities based on trending topics and historical performance
+          </p>
+        </div>
 
       {opportunities && opportunities.length === 0 ? (
         <Card>
@@ -135,6 +99,7 @@ export default function ClientOpportunities() {
           })}
         </div>
       )}
-    </div>
+      </div>
+    </ClientLayout>
   );
 }
