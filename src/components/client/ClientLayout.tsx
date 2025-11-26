@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/client/AppSidebar";
 import { useToast } from "@/hooks/use-toast";
+import { SkipNavigation } from "@/components/accessibility/SkipNavigation";
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -108,24 +109,26 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
   }
 
   return (
-    <SidebarProvider defaultOpen={!isMobile}>
-      <div className="min-h-screen w-full flex bg-gradient-to-br from-background via-background to-muted/10">
-        <AppSidebar organizationId={organization.id} />
+    <>
+      <SkipNavigation />
+      <SidebarProvider defaultOpen={!isMobile}>
+        <div className="min-h-screen w-full flex bg-gradient-to-br from-background via-background to-muted/10">
+          <AppSidebar organizationId={organization.id} />
         
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
-          <header className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50 shadow-sm">
+          <header className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50 shadow-sm" role="banner">
             <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6">
               <div className="flex items-center justify-between gap-3">
                 {/* Sidebar Trigger + Logo */}
                 <div className="flex items-center gap-3 sm:gap-6">
-                  <SidebarTrigger />
+                  <SidebarTrigger aria-label="Toggle navigation menu" />
                   {organization.logo_url && (
                     <div className="relative shrink-0">
-                      <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
+                      <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" aria-hidden="true" />
                       <img
                         src={organization.logo_url}
-                        alt={organization.name}
+                        alt={`${organization.name} logo`}
                         className="relative h-10 sm:h-12 w-auto object-contain"
                       />
                     </div>
@@ -138,28 +141,30 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2">
+                <nav className="flex items-center gap-2" aria-label="User actions">
                   <ThemeToggle />
                   <Button
                     variant="ghost"
                     size={isMobile ? "sm" : "default"}
                     onClick={handleLogout}
-                    className="gap-2"
+                    className="gap-2 min-h-[44px]"
+                    aria-label="Log out of your account"
                   >
-                    <LogOut className="h-4 w-4" />
+                    <LogOut className="h-4 w-4" aria-hidden="true" />
                     <span className="hidden sm:inline">Logout</span>
                   </Button>
-                </div>
+                </nav>
               </div>
             </div>
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-auto">
+          <main id="main-content" className="flex-1 overflow-auto" role="main" tabIndex={-1}>
             {children}
           </main>
         </div>
       </div>
     </SidebarProvider>
+    </>
   );
 };

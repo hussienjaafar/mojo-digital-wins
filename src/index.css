@@ -6,6 +6,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import focus styles */
+@import './styles/focus-visible.css';
+@import './styles/accessibility.css';
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

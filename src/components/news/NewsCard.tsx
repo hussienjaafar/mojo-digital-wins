@@ -42,12 +42,13 @@ export function NewsCard({ article }: NewsCardProps) {
   };
 
   return (
-    <Card className="hover:shadow-lg transition-shadow duration-200 overflow-hidden">
+    <Card className="hover:shadow-lg transition-shadow duration-200 overflow-hidden" role="article" aria-labelledby={`article-title-${article.id}`}>
       {article.image_url && (
-        <div className="w-full h-48 overflow-hidden">
+        <div className="w-full h-48 overflow-hidden" role="img" aria-label={`Featured image for ${article.title}`}>
           <img 
             src={article.image_url} 
-            alt={article.title}
+            alt=""
+            role="presentation"
             className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
@@ -76,15 +77,16 @@ export function NewsCard({ article }: NewsCardProps) {
           </div>
         </div>
         
-        <CardTitle className="text-lg leading-tight hover:text-primary transition-colors">
+        <CardTitle id={`article-title-${article.id}`} className="text-lg leading-tight hover:text-primary transition-colors">
           <a 
             href={article.source_url} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="flex items-start gap-2"
+            className="flex items-start gap-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+            aria-label={`Read full article: ${article.title} (opens in new tab)`}
           >
             {article.title}
-            <ExternalLink className="h-4 w-4 flex-shrink-0 mt-1" />
+            <ExternalLink className="h-4 w-4 flex-shrink-0 mt-1" aria-hidden="true" />
           </a>
         </CardTitle>
       </CardHeader>
@@ -92,9 +94,9 @@ export function NewsCard({ article }: NewsCardProps) {
       <CardContent className="space-y-3">
         {/* AI Summary */}
         {article.ai_summary && (
-          <div className="p-3 bg-muted/50 rounded-lg">
+          <div className="p-3 bg-muted/50 rounded-lg" role="region" aria-label="AI-generated summary">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-4 h-4 text-primary" />
+              <Sparkles className="w-4 h-4 text-primary" aria-hidden="true" />
               <span className="text-sm font-medium">AI Summary</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
