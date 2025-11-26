@@ -102,10 +102,10 @@ Return your analysis in JSON format:
       .upsert({
         organization_id: organizationId,
         website_url: websiteUrl,
-        mission: analysis.mission,
+        mission_summary: analysis.mission,
         focus_areas: analysis.focus_areas,
         key_issues: analysis.key_issues,
-        last_scraped_at: new Date().toISOString(),
+        scraped_at: new Date().toISOString(),
       }, {
         onConflict: 'organization_id',
       });
