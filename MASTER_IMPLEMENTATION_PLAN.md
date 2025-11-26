@@ -25,8 +25,12 @@
 - [x] Add `generate-suggested-actions` to scheduled_jobs (every 10 mins)
 - [x] Add `calculate-attribution` to scheduled_jobs (daily at 2 AM)
 - [x] Add `fetch-polling-data` to scheduled_jobs (daily at 8 AM)
+- [x] Add `detect-fundraising-opportunities` to scheduled_jobs (every 15 mins)
+- [x] Add `track-event-impact` to scheduled_jobs (hourly)
 - [x] Deploy all new edge functions
-- [ ] Verify jobs are running via ops dashboard
+- [x] Verify jobs are running via ops dashboard
+- [x] Fix job_type mismatches causing failures
+- [x] Fix analyze-bluesky-posts JSON parsing issue
 
 #### 1.4 Fix Secondary Issues 🟢 COMPLETED
 - [x] Debug and fix `track-state-actions` edge function (6 consecutive failures)
