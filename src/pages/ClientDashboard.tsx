@@ -13,6 +13,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/client/AppSidebar";
 import { IntelligenceHub } from "@/components/client/IntelligenceHub";
+import { OnboardingWizard } from "@/components/client/OnboardingWizard";
 import ClientMetricsOverview from "@/components/client/ClientMetricsOverview";
 import MetaAdsMetrics from "@/components/client/MetaAdsMetrics";
 import SMSMetrics from "@/components/client/SMSMetrics";
@@ -33,6 +34,7 @@ const ClientDashboard = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
@@ -57,8 +59,23 @@ const ClientDashboard = () => {
   useEffect(() => {
     if (session?.user) {
       loadUserOrganization();
+      checkOnboardingStatus();
     }
   }, [session]);
+
+  const checkOnboardingStatus = async () => {
+    if (!session?.user) return;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("onboarding_completed")
+      .eq("id", session.user.id)
+      .single() as any;
+
+    if (profile && !profile.onboarding_completed) {
+      setShowOnboarding(true);
+    }
+  };
 
   const handleDateChange = (start: string, end: string) => {
     setStartDate(start);
@@ -121,9 +138,14 @@ const ClientDashboard = () => {
   }
 
   return (
-    <SidebarProvider defaultOpen={!isMobile}>
-      <div className="min-h-screen w-full flex bg-gradient-to-br from-background via-background to-muted/10">
-        <AppSidebar organizationId={organization.id} />
+    <>
+      <OnboardingWizard
+        open={showOnboarding}
+        onComplete={() => setShowOnboarding(false)}
+      />
+      <SidebarProvider defaultOpen={!isMobile}>
+        <div className="min-h-screen w-full flex bg-gradient-to-br from-background via-background to-muted/10">
+          <AppSidebar organizationId={organization.id} />
         
         <div className="flex-1 flex flex-col min-w-0">
           {/* Modern Header with Glassmorphism - Mobile Optimized */}
@@ -292,10 +314,11 @@ const ClientDashboard = () => {
             />
           </TabsContent>
         </Tabs>
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </>
   );
 };
 
