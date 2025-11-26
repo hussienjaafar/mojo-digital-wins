@@ -7,22 +7,53 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Validation schema for ActBlue webhook payload
+// Enhanced validation schema for ActBlue webhook payload
 const actblueWebhookSchema = z.object({
   event_type: z.string(),
-  contribution: z.object({
-    transaction_id: z.string(),
-    donor: z.object({
-      email: z.string().email().optional(),
-      first_name: z.string().optional(),
-      last_name: z.string().optional(),
+  donor: z.object({
+    firstname: z.string().optional(),
+    lastname: z.string().optional(),
+    addr1: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zip: z.string().optional(),
+    country: z.string().optional(),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
+    employerData: z.object({
+      employer: z.string().optional(),
+      occupation: z.string().optional(),
     }).optional(),
-    amount: z.number(),
-    refcode: z.string().optional(),
-    recurring: z.boolean().optional(),
-    created_at: z.string(),
+  }).optional(),
+  contribution: z.object({
+    createdAt: z.string(),
+    orderNumber: z.string().optional(),
+    contributionForm: z.string().optional(),
+    refcodes: z.object({
+      refcode: z.string().optional(),
+      refcode2: z.string().optional(),
+      refcodeCustom: z.string().optional(),
+    }).optional(),
+    abTestName: z.string().optional(),
+    abTestVariation: z.string().optional(),
+    isMobile: z.boolean().optional(),
+    isExpress: z.boolean().optional(),
+    textMessageOption: z.string().optional(),
+    recurringPeriod: z.string().optional(),
+    recurringDuration: z.number().optional(),
+    customFields: z.array(z.object({
+      label: z.string(),
+      answer: z.string(),
+    })).optional(),
   }),
-  entity_id: z.string(),
+  lineitems: z.array(z.object({
+    lineitemId: z.number(),
+    entityId: z.number(),
+    fecId: z.string().optional().nullable(),
+    committeeName: z.string().optional(),
+    amount: z.string(),
+    paidAt: z.string(),
+  })),
 });
 
 serve(async (req) => {
@@ -60,7 +91,10 @@ serve(async (req) => {
       );
     }
 
-    // Find organization by entity_id
+    // Find organization by entity_id from lineitems
+    const lineitem = payload.lineitems[0];
+    const entityId = lineitem.entityId?.toString();
+    
     const { data: credData, error: credError } = await supabase
       .from('client_api_credentials')
       .select('organization_id, encrypted_credentials')
@@ -83,12 +117,12 @@ serve(async (req) => {
     // Find matching organization by entity_id
     const matchingCred = credData.find((cred: any) => {
       const credentials = cred.encrypted_credentials as any;
-      return credentials.entity_id === payload.entity_id;
+      return credentials.entity_id === entityId;
     });
 
     if (!matchingCred) {
       if (Deno.env.get('ENVIRONMENT') === 'development') {
-        console.error('No organization matches entity_id:', payload.entity_id);
+        console.error('No organization matches entity_id:', entityId);
       }
       return new Response(
         JSON.stringify({ error: 'Organization not found for entity_id' }),
@@ -121,68 +155,153 @@ serve(async (req) => {
     } else if (payload.event_type === 'cancellation') {
       transactionType = 'cancellation';
     }
-
-    // Extract source campaign from refcode (if pattern matches)
+    
+    // Extract refcodes
+    const refcodes = payload.contribution.refcodes || {};
+    const refcode = refcodes.refcode || null;
+    
+    // Extract source campaign from refcode
     let sourceCampaign = null;
-    if (payload.contribution.refcode) {
-      // Try to extract campaign identifier from refcode
-      // Common patterns: "campaign-name", "meta-campaign-123", "sms-abc123"
-      const refcode = payload.contribution.refcode.toLowerCase();
-      if (refcode.includes('meta')) {
-        sourceCampaign = 'meta';
-      } else if (refcode.includes('sms')) {
-        sourceCampaign = 'sms';
-      }
+    if (refcode) {
+      const lowerRefcode = refcode.toLowerCase();
+      if (lowerRefcode.includes('meta')) sourceCampaign = 'meta';
+      else if (lowerRefcode.includes('sms')) sourceCampaign = 'sms';
+      else if (lowerRefcode.includes('email')) sourceCampaign = 'email';
     }
 
-    // Store transaction
-    const donorName = payload.contribution.donor 
-      ? `${payload.contribution.donor.first_name || ''} ${payload.contribution.donor.last_name || ''}`.trim()
+    const donor = payload.donor || {};
+    const donorName = donor.firstname && donor.lastname 
+      ? `${donor.firstname} ${donor.lastname}`.trim() 
       : null;
 
+    // Store enhanced transaction data
     const { error: insertError } = await supabase
       .from('actblue_transactions')
       .insert({
         organization_id,
-        transaction_id: payload.contribution.transaction_id,
-        donor_email: payload.contribution.donor?.email || null,
+        transaction_id: `${lineitem.lineitemId}`,
+        donor_email: donor.email || null,
         donor_name: donorName,
-        amount: payload.contribution.amount,
-        refcode: payload.contribution.refcode || null,
+        first_name: donor.firstname || null,
+        last_name: donor.lastname || null,
+        addr1: donor.addr1 || null,
+        city: donor.city || null,
+        state: donor.state || null,
+        zip: donor.zip || null,
+        country: donor.country || null,
+        phone: donor.phone || null,
+        employer: donor.employerData?.employer || null,
+        occupation: donor.employerData?.occupation || null,
+        amount: parseFloat(lineitem.amount),
+        order_number: payload.contribution.orderNumber || null,
+        contribution_form: payload.contribution.contributionForm || null,
+        refcode: refcode,
+        refcode2: refcodes.refcode2 || null,
+        refcode_custom: refcodes.refcodeCustom || null,
         source_campaign: sourceCampaign,
+        ab_test_name: payload.contribution.abTestName || null,
+        ab_test_variation: payload.contribution.abTestVariation || null,
+        is_mobile: payload.contribution.isMobile || false,
+        is_express: payload.contribution.isExpress || false,
+        text_message_option: payload.contribution.textMessageOption || null,
+        lineitem_id: lineitem.lineitemId,
+        entity_id: lineitem.entityId?.toString() || null,
+        committee_name: lineitem.committeeName || null,
+        fec_id: lineitem.fecId || null,
+        recurring_period: payload.contribution.recurringPeriod || null,
+        recurring_duration: payload.contribution.recurringDuration || null,
+        is_recurring: !!payload.contribution.recurringPeriod,
+        custom_fields: payload.contribution.customFields || [],
         transaction_type: transactionType,
-        is_recurring: payload.contribution.recurring || false,
-        transaction_date: payload.contribution.created_at,
+        transaction_date: lineitem.paidAt,
       });
 
     if (insertError) {
       // If duplicate, update existing record
       if (insertError.code === '23505') {
-        console.log('Transaction already exists, updating:', payload.contribution.transaction_id);
+        console.log('Transaction already exists, updating:', lineitem.lineitemId);
         const { error: updateError } = await supabase
           .from('actblue_transactions')
-          .update({
-            transaction_type: transactionType,
-          })
-          .eq('transaction_id', payload.contribution.transaction_id);
+          .update({ transaction_type: transactionType })
+          .eq('transaction_id', `${lineitem.lineitemId}`);
 
-        if (updateError) {
-          throw updateError;
-        }
+        if (updateError) throw updateError;
       } else {
         throw insertError;
       }
     }
 
-    console.log('ActBlue transaction stored successfully:', payload.contribution.transaction_id);
+    // Track attribution touchpoint
+    if (donor.email && refcode) {
+      await supabase.from('attribution_touchpoints').insert({
+        organization_id,
+        donor_email: donor.email,
+        touchpoint_type: sourceCampaign || 'other',
+        campaign_id: payload.contribution.contributionForm || null,
+        utm_source: refcodes.refcode2 || null,
+        utm_campaign: refcode,
+        refcode: refcode,
+        occurred_at: lineitem.paidAt,
+        metadata: {
+          ab_test: payload.contribution.abTestName,
+          ab_variation: payload.contribution.abTestVariation,
+          is_mobile: payload.contribution.isMobile,
+        },
+      }).then(({ error }) => {
+        if (error) console.error('Error tracking touchpoint:', error);
+      });
 
-    // Trigger ROI calculation for this organization (async)
-    // This could be done via a separate edge function call or database trigger
+      // Update or create donor demographics
+      await supabase.from('donor_demographics')
+        .upsert({
+          organization_id,
+          donor_email: donor.email,
+          first_name: donor.firstname || null,
+          last_name: donor.lastname || null,
+          address: donor.addr1 || null,
+          city: donor.city || null,
+          state: donor.state || null,
+          zip: donor.zip || null,
+          country: donor.country || null,
+          phone: donor.phone || null,
+          employer: donor.employerData?.employer || null,
+          occupation: donor.employerData?.occupation || null,
+          last_donation_date: lineitem.paidAt,
+        }, {
+          onConflict: 'organization_id,donor_email',
+          ignoreDuplicates: false,
+        })
+        .select()
+        .single()
+        .then(async ({ data, error }) => {
+          if (!error && data) {
+            // Update aggregates
+            const { data: txData } = await supabase
+              .from('actblue_transactions')
+              .select('amount')
+              .eq('organization_id', organization_id)
+              .eq('donor_email', donor.email);
+            
+            if (txData) {
+              const total = txData.reduce((sum, tx) => sum + tx.amount, 0);
+              await supabase.from('donor_demographics')
+                .update({
+                  total_donated: total,
+                  donation_count: txData.length,
+                  first_donation_date: data.first_donation_date || lineitem.paidAt,
+                })
+                .eq('id', data.id);
+            }
+          }
+        });
+    }
+
+    console.log('ActBlue transaction stored successfully:', lineitem.lineitemId);
     
     return new Response(
       JSON.stringify({ 
         success: true, 
-        transaction_id: payload.contribution.transaction_id
+        transaction_id: `${lineitem.lineitemId}`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
