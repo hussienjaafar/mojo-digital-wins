@@ -278,7 +278,16 @@ serve(async (req) => {
 
           if (!stateMatch) continue;
 
-          const response = await fetch(source.url);
+          const response = await fetch(source.url, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IntelligenceBot/1.0)' },
+            signal: AbortSignal.timeout(15000)
+          });
+          
+          if (!response.ok) {
+            console.error(`Failed to fetch ${source.name}: ${response.status}`);
+            continue;
+          }
+          
           const text = await response.text();
 
           // Basic RSS parsing

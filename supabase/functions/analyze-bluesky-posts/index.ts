@@ -119,6 +119,47 @@ function normalizeTopic(topic: string): string {
   return TOPIC_NORMALIZATIONS[lower] || topic;
 }
 
+// Helper function for robust JSON parsing
+function tryParseJSON(text: string): any {
+  // Try direct parse
+  try {
+    return JSON.parse(text);
+  } catch (e1) {
+    // Try extracting JSON from markdown
+    const cleaned = text.replace(/```json|```/g, '').trim();
+    try {
+      return JSON.parse(cleaned);
+    } catch (e2) {
+      // Try extracting first JSON array
+      const arrayMatch = text.match(/\[[\s\S]*\]/);
+      if (arrayMatch) {
+        try {
+          return JSON.parse(arrayMatch[0]);
+        } catch (e3) {
+          // Try with light cleanup
+          const normalized = arrayMatch[0]
+            .replace(/\r?\n/g, ' ')
+            .replace(/\u201c|\u201d/g, '"')
+            .replace(/\u2018|\u2019/g, "'")
+            .replace(/,\s*([}\]])/g, '$1');
+          return JSON.parse(normalized);
+        }
+      }
+      // Try extracting first JSON object
+      const objMatch = text.match(/\{[\s\S]*\}/);
+      if (objMatch) {
+        const normalized = objMatch[0]
+          .replace(/\r?\n/g, ' ')
+          .replace(/\u201c|\u201d/g, '"')
+          .replace(/\u2018|\u2019/g, "'")
+          .replace(/,\s*([}\]])/g, '$1');
+        return JSON.parse(normalized);
+      }
+      throw new Error('Could not extract valid JSON from response');
+    }
+  }
+}
+
 // Analyze posts using GPT-3.5-turbo (10x rate limits vs Claude)
 async function analyzePosts(posts: BlueSkyPost[]): Promise<any[]> {
   // Prefer OpenAI for better rate limits
@@ -199,12 +240,23 @@ ${postsText}`;
   const data = await response.json();
   const analysisText = data.choices[0].message.content;
 
-  const jsonMatch = analysisText.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) {
-    throw new Error('No JSON array found in AI response');
+  // Robust JSON parsing with multiple fallback attempts
+  let analyses;
+  try {
+    analyses = tryParseJSON(analysisText);
+  } catch (parseError: any) {
+    console.error('[analyze-bluesky-posts] Failed to parse AI response:', parseError.message);
+    throw new Error(`JSON parse failed: ${parseError.message}`);
   }
 
-  const analyses = JSON.parse(jsonMatch[0]);
+  // Ensure we have an array
+  if (!Array.isArray(analyses)) {
+    if (typeof analyses === 'object' && analyses.results) {
+      analyses = analyses.results; // Sometimes wrapped in { results: [...] }
+    } else {
+      throw new Error('AI response is not an array');
+    }
+  }
 
   // Map analyses back to posts with normalization
   return posts.map((post, i) => {
@@ -339,6 +391,47 @@ serve(async (req) => {
           console.error(`❌ Error updating post ${analysis.id}:`, error);
           errorCount++;
         } else {
+          // Extract and insert entities into entity_mentions
+          const entities: Array<{entity_name: string; entity_type: string; mention_type: string}> = [];
+          
+          // Extract from topics
+          if (analysis.ai_topics) {
+            for (const topic of analysis.ai_topics) {
+              entities.push({
+                entity_name: topic,
+                entity_type: 'topic',
+                mention_type: 'bluesky_post'
+              });
+            }
+          }
+
+          // Extract from affected groups
+          if (analysis.affected_groups) {
+            for (const group of analysis.affected_groups) {
+              entities.push({
+                entity_name: group,
+                entity_type: 'affected_group',
+                mention_type: 'bluesky_post'
+              });
+            }
+          }
+
+          // Insert entity mentions
+          if (entities.length > 0) {
+            const post = posts.find(p => p.id === analysis.id);
+            await supabase.from('entity_mentions').insert(
+              entities.map(e => ({
+                entity_name: e.entity_name,
+                entity_type: e.entity_type,
+                mention_type: e.mention_type,
+                source_id: analysis.id,
+                mentioned_at: post?.created_at || new Date().toISOString(),
+                sentiment_score: analysis.ai_sentiment,
+                relevance_score: validation.confidence
+              }))
+            );
+          }
+          
           successCount++;
         }
       } catch (error) {

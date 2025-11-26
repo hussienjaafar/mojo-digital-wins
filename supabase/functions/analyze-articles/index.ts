@@ -429,6 +429,53 @@ Content: ${textToAnalyze}`;
           updated_at: new Date().toISOString()
         }).eq('id', article.id);
 
+        // Extract and insert entities into entity_mentions
+        const entities: Array<{entity_name: string; entity_type: string; mention_type: string}> = [];
+        
+        // Extract from affected groups
+        if (analysis.affected_groups) {
+          for (const group of analysis.affected_groups) {
+            entities.push({
+              entity_name: group,
+              entity_type: 'affected_group',
+              mention_type: 'article'
+            });
+          }
+        }
+
+        // Extract from relevance category
+        if (analysis.relevance_category) {
+          entities.push({
+            entity_name: analysis.relevance_category,
+            entity_type: 'category',
+            mention_type: 'article'
+          });
+        }
+
+        // Extract from geographic scope
+        if (analysis.geographic_scope) {
+          entities.push({
+            entity_name: analysis.geographic_scope,
+            entity_type: 'location',
+            mention_type: 'article'
+          });
+        }
+
+        // Insert entity mentions
+        if (entities.length > 0) {
+          await supabase.from('entity_mentions').insert(
+            entities.map(e => ({
+              entity_name: e.entity_name,
+              entity_type: e.entity_type,
+              mention_type: e.mention_type,
+              source_id: article.id,
+              mentioned_at: article.published_date,
+              sentiment_score: analysis.sentiment_score,
+              relevance_score: validation.confidence
+            }))
+          );
+        }
+
         analyzed++;
         results.push({ id: article.id, status: 'success' });
 
