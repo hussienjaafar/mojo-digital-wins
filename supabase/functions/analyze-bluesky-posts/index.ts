@@ -392,15 +392,14 @@ serve(async (req) => {
           errorCount++;
         } else {
           // Extract and insert entities into entity_mentions
-          const entities: Array<{entity_name: string; entity_type: string; mention_type: string}> = [];
+          const entities: Array<{entity_name: string; entity_type: string}> = [];
           
           // Extract from topics
           if (analysis.ai_topics) {
             for (const topic of analysis.ai_topics) {
               entities.push({
                 entity_name: topic,
-                entity_type: 'topic',
-                mention_type: 'bluesky_post'
+                entity_type: 'topic'
               });
             }
           }
@@ -410,8 +409,7 @@ serve(async (req) => {
             for (const group of analysis.affected_groups) {
               entities.push({
                 entity_name: group,
-                entity_type: 'affected_group',
-                mention_type: 'bluesky_post'
+                entity_type: 'affected_group'
               });
             }
           }
@@ -423,11 +421,10 @@ serve(async (req) => {
               entities.map(e => ({
                 entity_name: e.entity_name,
                 entity_type: e.entity_type,
-                mention_type: e.mention_type,
+                source_type: 'bluesky_post',
                 source_id: analysis.id,
                 mentioned_at: post?.created_at || new Date().toISOString(),
-                sentiment_score: analysis.ai_sentiment,
-                relevance_score: validation.confidence
+                sentiment: analysis.ai_sentiment
               }))
             );
           }
