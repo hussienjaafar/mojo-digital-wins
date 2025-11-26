@@ -3061,6 +3061,53 @@ export type Database = {
           },
         ]
       }
+      polling_alert_configs: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          notify_email: boolean
+          notify_in_app: boolean
+          organization_id: string
+          poll_type: string
+          state: string | null
+          threshold_percentage: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notify_email?: boolean
+          notify_in_app?: boolean
+          organization_id: string
+          poll_type: string
+          state?: string | null
+          threshold_percentage?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notify_email?: boolean
+          notify_in_app?: boolean
+          organization_id?: string
+          poll_type?: string
+          state?: string | null
+          threshold_percentage?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "polling_alert_configs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       polling_alerts: {
         Row: {
           alert_type: string

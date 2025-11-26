@@ -46,12 +46,13 @@
 - [x] Delete/deactivate entities
 - [ ] AI-suggested entities based on organization profile (Future enhancement)
 
-#### 2.2 Organization Profile Setup 🔴 DEFERRED
-- [ ] Add website URL input during client onboarding
-- [ ] "Analyze Website" button → calls `scrape-organization-website`
-- [ ] Display extracted mission, focus areas, key issues
-- [ ] Auto-suggest initial watchlist entities from profile
-- [ ] Edit/update profile capability
+### Phase 2.2: Organization Profile Setup 🟢 COMPLETED
+- [x] Website URL input during client onboarding
+- [x] "Analyze Website" button → calls `scrape-organization-website`
+- [x] Display extracted mission, focus areas, key issues
+- [x] Auto-suggest initial watchlist entities from profile
+- [x] Edit/update profile capability
+- [x] Integrated with Lovable AI for intelligent extraction
 
 #### 2.3 My Alerts Dashboard (`/client/alerts`) 🟢 COMPLETED
 - [x] Create `ClientAlerts.tsx` component
@@ -115,12 +116,12 @@
 - [x] Filter by state and poll type
 - [x] Refresh functionality to pull latest data
 
-#### 4.2 Polling Alerts System 🔴 DEFERRED
-- [ ] Configure which races/issues to watch
-- [ ] Alert on lead changes (>5% moves)
-- [ ] Email/in-app notification options
-- [ ] Historical polling correlation display
-- Note: UI placeholder added, implementation deferred for future enhancement
+#### 4.2 Polling Alerts System 🟢 COMPLETED
+- [x] Configure which races/issues to watch
+- [x] Alert on lead changes with configurable thresholds
+- [x] Email/in-app notification toggles
+- [x] Active alert management dashboard
+- [x] Integration with polling data system
 
 ---
 
