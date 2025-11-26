@@ -264,6 +264,74 @@ serve(async (req) => {
             itemsCreated = result?.emails_sent || 0;
             break;
 
+          case 'calculate_entity_trends':
+            const entityTrendsResponse = await supabase.functions.invoke('calculate-entity-trends', {
+              body: {}
+            });
+            if (entityTrendsResponse.error) throw new Error(entityTrendsResponse.error.message);
+            result = entityTrendsResponse.data;
+            itemsProcessed = result?.entities_processed || 0;
+            itemsCreated = result?.trends_updated || 0;
+            break;
+
+          case 'match_entity_watchlist':
+            const watchlistResponse = await supabase.functions.invoke('match-entity-watchlist', {
+              body: {}
+            });
+            if (watchlistResponse.error) throw new Error(watchlistResponse.error.message);
+            result = watchlistResponse.data;
+            itemsProcessed = result?.entities_checked || 0;
+            itemsCreated = result?.alerts_created || 0;
+            break;
+
+          case 'generate_suggested_actions':
+            const actionsResponse = await supabase.functions.invoke('generate-suggested-actions', {
+              body: {}
+            });
+            if (actionsResponse.error) throw new Error(actionsResponse.error.message);
+            result = actionsResponse.data;
+            itemsProcessed = result?.alerts_analyzed || 0;
+            itemsCreated = result?.actions_generated || 0;
+            break;
+
+          case 'detect_fundraising_opportunities':
+            const opportunitiesResponse = await supabase.functions.invoke('detect-fundraising-opportunities', {
+              body: {}
+            });
+            if (opportunitiesResponse.error) throw new Error(opportunitiesResponse.error.message);
+            result = opportunitiesResponse.data;
+            itemsProcessed = result?.trends_analyzed || 0;
+            itemsCreated = result?.opportunities_found || 0;
+            break;
+
+          case 'track_event_impact':
+            const impactResponse = await supabase.functions.invoke('track-event-impact', {
+              body: {}
+            });
+            if (impactResponse.error) throw new Error(impactResponse.error.message);
+            result = impactResponse.data;
+            itemsProcessed = result?.events_tracked || 0;
+            break;
+
+          case 'attribution':
+            const attributionResponse = await supabase.functions.invoke('calculate-attribution', {
+              body: {}
+            });
+            if (attributionResponse.error) throw new Error(attributionResponse.error.message);
+            result = attributionResponse.data;
+            itemsProcessed = result?.touchpoints_analyzed || 0;
+            break;
+
+          case 'polling':
+            const pollingResponse = await supabase.functions.invoke('fetch-polling-data', {
+              body: {}
+            });
+            if (pollingResponse.error) throw new Error(pollingResponse.error.message);
+            result = pollingResponse.data;
+            itemsProcessed = result?.polls_fetched || 0;
+            itemsCreated = result?.polls_inserted || 0;
+            break;
+
           default:
             throw new Error(`Unknown job type: ${job.job_type}`);
         }
