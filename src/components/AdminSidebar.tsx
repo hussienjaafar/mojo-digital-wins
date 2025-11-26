@@ -29,6 +29,8 @@ import {
   Landmark,
   Bell,
   Download,
+  TrendingUp,
+  HeartPulse,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import {
@@ -123,6 +125,16 @@ export const navigationGroups: NavigationGroup[] = [
       { title: "Messages", icon: MessageSquare, value: "contacts" },
       { title: "Newsletter", icon: Mail, value: "newsletter" },
       { title: "Blog", icon: PenTool, value: "blog-generator" },
+    ],
+  },
+  {
+    label: "Monitoring",
+    icon: Activity,
+    collapsedByDefault: true,
+    items: [
+      { title: "Activity Alerts", icon: AlertCircle, value: "activity-alerts", requiredRole: 'admin' },
+      { title: "Usage Analytics", icon: TrendingUp, value: "usage-analytics", requiredRole: 'admin' },
+      { title: "Client Health", icon: HeartPulse, value: "client-health", requiredRole: 'admin' },
     ],
   },
   {

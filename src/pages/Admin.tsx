@@ -20,6 +20,9 @@ import CampaignAttributionManager from "@/components/admin/CampaignAttributionMa
 import SyncScheduler from "@/components/admin/SyncScheduler";
 import EmailReportManager from "@/components/admin/EmailReportManager";
 import { DataBackfillPanel } from "@/components/admin/DataBackfillPanel";
+import AdminActivityAlerts from "@/components/admin/AdminActivityAlerts";
+import UsageAnalytics from "@/components/admin/UsageAnalytics";
+import ClientHealthOverview from "@/components/admin/ClientHealthOverview";
 import { DashboardHome } from "@/components/DashboardHome";
 import { NewsFeed } from "@/components/news/NewsFeed";
 import { BillTracker } from "@/components/bills/BillTracker";
@@ -344,6 +347,12 @@ const Admin = () => {
         return <SessionManagement />;
       case "email-reports":
         return <EmailReportManager />;
+      case "activity-alerts":
+        return <AdminActivityAlerts />;
+      case "usage-analytics":
+        return <UsageAnalytics />;
+      case "client-health":
+        return <ClientHealthOverview />;
       default:
         return <AnalyticsDashboard />;
     }
