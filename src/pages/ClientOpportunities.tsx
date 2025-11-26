@@ -7,6 +7,7 @@ import { TrendingUp, Clock, DollarSign, Copy, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { MagicMomentCard } from "@/components/client/MagicMomentCard";
 
 export default function ClientOpportunities() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -95,109 +96,43 @@ export default function ClientOpportunities() {
         </Card>
       ) : (
         <div className="grid gap-6">
-          {opportunities?.map((opp) => (
-            <Card key={opp.id} className="border-l-4" style={{
-              borderLeftColor: opp.opportunity_score >= 85 ? 'hsl(var(--destructive))' : 
-                              opp.opportunity_score >= 70 ? 'hsl(var(--primary))' : 
-                              'hsl(var(--muted))'
-            }}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-2xl">{opp.entity_name}</CardTitle>
-                      <Badge variant={getSeverityColor(opp.opportunity_score)}>
-                        {getSeverityLabel(opp.opportunity_score)}
-                      </Badge>
-                      <Badge variant="outline" className="capitalize">
-                        {opp.entity_type}
-                      </Badge>
-                    </div>
-                    <CardDescription>
-                      Detected {formatDistanceToNow(new Date(opp.detected_at), { addSuffix: true })}
-                    </CardDescription>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold text-primary">
-                      {opp.opportunity_score?.toFixed(0)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Opportunity Score</div>
-                  </div>
-                </div>
-              </CardHeader>
+          {opportunities?.map((opp) => {
+            // Generate AI message context
+            const messageContext = `${opp.entity_name} is trending with ${opp.current_mentions} mentions. Act now to mobilize support.`;
+            const optimalTime = {
+              time: "2-4 PM EST",
+              reason: "Peak donor engagement based on your history"
+            };
 
-              <CardContent className="space-y-4">
-                {/* Key Metrics */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                    <div>
-                      <div className="text-sm text-muted-foreground">Velocity</div>
-                      <div className="font-semibold">{opp.velocity?.toFixed(0)}%</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <Clock className="h-5 w-5 text-primary" />
-                    <div>
-                      <div className="text-sm text-muted-foreground">Time Sensitivity</div>
-                      <div className="font-semibold">{opp.time_sensitivity?.toFixed(0)}%</div>
-                    </div>
-                  </div>
-
-                  {opp.estimated_value && (
-                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                      <DollarSign className="h-5 w-5 text-primary" />
-                      <div>
-                        <div className="text-sm text-muted-foreground">Est. Value (48h)</div>
-                        <div className="font-semibold">${opp.estimated_value.toFixed(0)}</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Historical Context */}
-                {opp.similar_past_events > 0 && (
-                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
-                      <span className="font-medium text-sm">Historical Performance</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Similar events have resulted in fundraising success {opp.similar_past_events} time(s) in the past.
-                      {opp.historical_success_rate && ` Success rate: ${opp.historical_success_rate.toFixed(0)}%`}
-                    </p>
-                  </div>
-                )}
-
-                {/* Action */}
-                <div className="flex items-center justify-between pt-4 border-t">
-                  <div>
-                    <p className="text-sm font-medium mb-1">Suggested SMS Message</p>
-                    <p className="text-xs text-muted-foreground">
-                      {opp.current_mentions} mentions in the last 24 hours
-                    </p>
-                  </div>
-                  <Button 
-                    onClick={() => handleCopySuggestion(opp.id, opp.entity_name, opp.entity_type)}
-                    className="gap-2"
-                  >
-                    {copiedId === opp.id ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4" />
-                        Copy SMS
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+            return (
+              <MagicMomentCard
+                key={opp.id}
+                entityName={opp.entity_name}
+                entityType={opp.entity_type}
+                opportunityScore={opp.opportunity_score || 0}
+                velocity={opp.velocity || 0}
+                estimatedValue={opp.estimated_value}
+                similarPastEvents={opp.similar_past_events || 0}
+                historicalContext={
+                  opp.similar_past_events > 0
+                    ? `Similar events resulted in ${opp.historical_success_rate?.toFixed(0)}% success rate`
+                    : undefined
+                }
+                aiGeneratedMessage={messageContext}
+                messageVariants={[
+                  messageContext,
+                  `URGENT: ${opp.entity_name} needs us NOW. Every voice matters. Reply YES to donate and stand with us.`,
+                  `${opp.entity_name} is making headlines. This is our chance to show strength. Donate now to make an impact.`
+                ]}
+                optimalSendTime={optimalTime}
+                detectedAt={opp.detected_at}
+                onSendMessage={(msg) => {
+                  navigator.clipboard.writeText(msg);
+                  toast.success("Message ready to send to your SMS platform");
+                }}
+              />
+            );
+          })}
         </div>
       )}
     </div>
