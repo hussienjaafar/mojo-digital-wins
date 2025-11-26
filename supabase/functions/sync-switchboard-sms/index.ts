@@ -72,8 +72,17 @@ serve(async (req) => {
 
     console.log(`Found ${campaigns.length} SMS campaigns`);
 
+    // Fetch campaign attribution mappings
+    const { data: attributionMappings } = await supabase
+      .from('campaign_attribution')
+      .select('*')
+      .eq('organization_id', organization_id)
+      .not('switchboard_campaign_id', 'is', null);
+
     // Fetch metrics for each campaign
     for (const campaign of campaigns) {
+      // Find attribution mapping for this campaign
+      const mapping = attributionMappings?.find(m => m.switchboard_campaign_id === campaign.id);
       const metricsUrl = `https://api.oneswitchboard.com/v1/campaigns/${campaign.id}/metrics?start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}`;
       
       const metricsResponse = await fetch(metricsUrl, {
@@ -114,6 +123,37 @@ serve(async (req) => {
 
         if (insertError) {
           console.error(`Error storing SMS metrics for ${campaign.id} on ${metric.date}:`, insertError);
+        }
+
+        // Create attribution touchpoints for SMS sends (if mapping exists)
+        if (mapping && parseInt(metric.messages_delivered) > 0) {
+          const messagesSent = parseInt(metric.messages_delivered);
+          console.log(`Creating touchpoint marker for ${messagesSent} SMS messages from campaign ${campaign.id} on ${metric.date}`);
+          
+          const { error: touchpointError } = await supabase
+            .from('attribution_touchpoints')
+            .insert({
+              organization_id,
+              touchpoint_type: 'sms_delivered',
+              occurred_at: `${metric.date}T12:00:00Z`,
+              utm_source: 'sms',
+              utm_medium: 'switchboard',
+              utm_campaign: campaign.name || campaign.id,
+              campaign_id: mapping.switchboard_campaign_id,
+              refcode: mapping.refcode || null,
+              metadata: {
+                campaign_id: campaign.id,
+                campaign_name: campaign.name || campaign.id,
+                date: metric.date,
+                messages_sent: messagesSent,
+                clicks: parseInt(metric.clicks) || 0,
+                conversions: parseInt(metric.conversions) || 0,
+              }
+            });
+
+          if (touchpointError) {
+            console.error(`Error creating SMS touchpoint for ${campaign.id}:`, touchpointError);
+          }
         }
       }
     }
