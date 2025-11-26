@@ -411,14 +411,14 @@ serve(async (req) => {
 
     console.log('Starting incremental RSS feed fetch...');
     
-    // OPTIMIZATION: Incremental processing - fetch oldest 3 sources ONLY
-    // Skip content fetching to avoid CPU timeout
+    // REAL-TIME: Fetch 30 sources per cycle (all 177 sources covered in ~30 min)
+    // This gives us Twitter-like speed for breaking news detection
     const { data: sources, error: sourcesError } = await supabase
       .from('rss_sources')
       .select('*')
       .eq('is_active', true)
       .order('last_fetched_at', { ascending: true, nullsFirst: true })
-      .limit(3);
+      .limit(30);
 
     if (sourcesError) {
       throw sourcesError;

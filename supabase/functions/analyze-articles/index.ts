@@ -294,11 +294,15 @@ serve(async (req) => {
 
     console.log(`[analyze-articles] Starting analysis (batch: ${BATCH_SIZE}, delay: ${REQUEST_DELAY}ms)...`);
 
-    // Fetch unanalyzed articles
+    // REAL-TIME INTELLIGENCE: Only analyze recent articles (last 24 hours)
+    // Skip backlog - we need fresh intel, not history
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    
     const { data: articles, error: fetchError } = await supabase
       .from('articles')
       .select('id, title, description, content, source_url, source_name, published_date')
       .or('affected_groups.is.null,relevance_category.is.null')
+      .gte('published_date', twentyFourHoursAgo)
       .order('published_date', { ascending: false })
       .limit(BATCH_SIZE);
 

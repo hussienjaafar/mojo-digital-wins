@@ -226,6 +226,44 @@ serve(async (req) => {
             itemsCreated = result?.trendsUpserted || 0;
             break;
 
+          case 'calculate_news_trends':
+            const newsTrendsResponse = await supabase.functions.invoke('calculate-news-trends', {
+              body: {}
+            });
+            if (newsTrendsResponse.error) throw new Error(newsTrendsResponse.error.message);
+            result = newsTrendsResponse.data;
+            itemsProcessed = result?.topics_updated || 0;
+            itemsCreated = result?.trending_count || 0;
+            break;
+
+          case 'detect_spikes':
+            const spikesResponse = await supabase.functions.invoke('detect-spikes', {
+              body: {}
+            });
+            if (spikesResponse.error) throw new Error(spikesResponse.error.message);
+            result = spikesResponse.data;
+            itemsProcessed = result?.spikes_detected || 0;
+            break;
+
+          case 'detect_breaking_news':
+            const breakingNewsResponse = await supabase.functions.invoke('detect-breaking-news', {
+              body: {}
+            });
+            if (breakingNewsResponse.error) throw new Error(breakingNewsResponse.error.message);
+            result = breakingNewsResponse.data;
+            itemsProcessed = result?.clusters_found || 0;
+            break;
+
+          case 'send_spike_alerts':
+            const alertsResponse = await supabase.functions.invoke('send-spike-alerts', {
+              body: {}
+            });
+            if (alertsResponse.error) throw new Error(alertsResponse.error.message);
+            result = alertsResponse.data;
+            itemsProcessed = result?.alerts_processed || 0;
+            itemsCreated = result?.emails_sent || 0;
+            break;
+
           default:
             throw new Error(`Unknown job type: ${job.job_type}`);
         }

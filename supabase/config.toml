@@ -93,3 +93,15 @@ verify_jwt = false
 [functions.calculate-bluesky-trends]
 verify_jwt = false
 
+[functions.calculate-news-trends]
+verify_jwt = false
+
+[functions.detect-spikes]
+verify_jwt = false
+
+[functions.detect-breaking-news]
+verify_jwt = false
+
+[functions.send-spike-alerts]
+verify_jwt = false
+
