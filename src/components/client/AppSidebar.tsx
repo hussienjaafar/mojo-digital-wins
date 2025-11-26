@@ -124,7 +124,7 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
   const isCollapsed = state === "collapsed";
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" role="navigation" aria-label="Main navigation">
       <SidebarContent>
         {sections.map((section) => (
           <SidebarGroup key={section.label}>
@@ -146,13 +146,18 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
                           active && "bg-secondary/10 text-secondary font-medium hover:bg-secondary/20"
                         )}
                       >
-                        <Link to={item.url} className="flex items-center gap-3">
-                          <Icon className={cn("h-5 w-5", active && "text-secondary")} />
+                        <Link 
+                          to={item.url} 
+                          className="flex items-center gap-3"
+                          aria-label={item.badge && item.badge > 0 ? `${item.title} (${item.badge} items)` : item.title}
+                          aria-current={active ? 'page' : undefined}
+                        >
+                          <Icon className={cn("h-5 w-5", active && "text-secondary")} aria-hidden="true" />
                           {!isCollapsed && (
                             <>
                               <span className="flex-1">{item.title}</span>
                               {item.badge !== undefined && item.badge > 0 && (
-                                <Badge variant="destructive" className="ml-auto">
+                                <Badge variant="destructive" className="ml-auto" aria-label={`${item.badge} unread`}>
                                   {item.badge}
                                 </Badge>
                               )}
