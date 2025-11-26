@@ -35,6 +35,7 @@ import ClientAlerts from "./pages/ClientAlerts";
 import ClientActions from "./pages/ClientActions";
 import ClientDemographics from "./pages/ClientDemographics";
 import ClientDonorJourney from "./pages/ClientDonorJourney";
+import PollingIntelligence from "./pages/PollingIntelligence";
 import BillDetail from "./pages/BillDetail";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
@@ -82,6 +83,7 @@ const AppContent = () => {
           <Route path="/client/actions" element={<ClientActions />} />
           <Route path="/client/demographics" element={<ClientDemographics />} />
           <Route path="/client/journey" element={<ClientDonorJourney />} />
+          <Route path="/client/polling" element={<PollingIntelligence />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
