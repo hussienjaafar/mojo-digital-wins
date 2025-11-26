@@ -10,6 +10,8 @@ import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { ClientNavigation } from "@/components/client/ClientNavigation";
+import { IntelligenceHub } from "@/components/client/IntelligenceHub";
 import ClientMetricsOverview from "@/components/client/ClientMetricsOverview";
 import MetaAdsMetrics from "@/components/client/MetaAdsMetrics";
 import SMSMetrics from "@/components/client/SMSMetrics";
@@ -118,64 +120,74 @@ const ClientDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
-      {/* Modern Header with Glassmorphism - Mobile Optimized */}
-      <header className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-            {/* Logo and Title Section - Mobile Responsive */}
-            <div className="flex items-center gap-3 sm:gap-6 w-full sm:w-auto">
-              {organization.logo_url && (
-                <div className="relative shrink-0">
-                  <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
-                  <img
-                    src={organization.logo_url}
-                    alt={organization.name}
-                    className="relative h-10 sm:h-12 md:h-16 w-auto object-contain"
-                  />
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 flex">
+      {/* Unified Navigation Sidebar */}
+      <ClientNavigation />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Modern Header with Glassmorphism - Mobile Optimized */}
+        <header className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50 shadow-sm">
+          <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+              {/* Logo and Title Section - Mobile Responsive */}
+              <div className="flex items-center gap-3 sm:gap-6 w-full sm:w-auto">
+                {organization.logo_url && (
+                  <div className="relative shrink-0">
+                    <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
+                    <img
+                      src={organization.logo_url}
+                      alt={organization.name}
+                      className="relative h-10 sm:h-12 md:h-16 w-auto object-contain"
+                    />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent truncate">
+                    {organization.name}
+                  </h1>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    Campaign Dashboard
+                  </p>
                 </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <h1 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent truncate">
-                  {organization.name}
-                </h1>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 flex items-center gap-2">
-                  <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  Campaign Dashboard
-                </p>
+              </div>
+
+              {/* Action Buttons - Enhanced with Smooth Variant */}
+              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
+                <Button
+                  variant="smooth"
+                  size={isMobile ? "sm" : "default"}
+                  onClick={() => navigate('/client/dashboard/custom')}
+                  className="gap-2 min-h-[44px] min-w-[44px]"
+                  title="Customize Dashboard"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  <span className="hidden md:inline">Customize</span>
+                </Button>
+                <ThemeToggle />
+                <Button
+                  variant="smooth"
+                  size={isMobile ? "sm" : "default"}
+                  onClick={handleLogout}
+                  className="hover:border-destructive/50 hover:text-destructive gap-2 min-h-[44px] min-w-[44px]"
+                  title="Logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">Logout</span>
+                </Button>
               </div>
             </div>
-
-            {/* Action Buttons - Enhanced with Smooth Variant */}
-            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
-              <Button
-                variant="smooth"
-                size={isMobile ? "sm" : "default"}
-                onClick={() => navigate('/client/dashboard/custom')}
-                className="gap-2 min-h-[44px] min-w-[44px]"
-                title="Customize Dashboard"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                <span className="hidden md:inline">Customize</span>
-              </Button>
-              <ThemeToggle />
-              <Button
-                variant="smooth"
-                size={isMobile ? "sm" : "default"}
-                onClick={handleLogout}
-                className="hover:border-destructive/50 hover:text-destructive gap-2 min-h-[44px] min-w-[44px]"
-                title="Logout"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Logout</span>
-              </Button>
-            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
-        {/* Date Range Controls - Enhanced with Smooth Variant */}
+        <main className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 w-full">
+          {/* Intelligence Hub - NEW */}
+          <div className="mb-6 md:mb-8">
+            <IntelligenceHub organizationId={organization.id} />
+          </div>
+
+          {/* Date Range Controls - Enhanced with Smooth Variant */}
         <div className="mb-4 sm:mb-6 md:mb-8">
           <Card variant="smooth" className="animate-fade-in-down">
             <CardContent className="p-3 sm:p-4 md:p-6">
@@ -279,6 +291,7 @@ const ClientDashboard = () => {
           </TabsContent>
         </Tabs>
       </main>
+    </div>
     </div>
   );
 };
