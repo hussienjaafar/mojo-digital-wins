@@ -16,6 +16,7 @@
 - [x] Insert extracted entities into `entity_mentions` table after analysis
 - [x] Modify `analyze-bluesky-posts` to do the same entity extraction
 - [x] Remove hardcoded `VALID_GROUPS` constraint - track ANY entity mentioned
+- [x] Fix entity extraction schema to match database (source_type, sentiment columns)
 - [x] Test entity_mentions is being populated
 
 #### 1.3 Schedule New Edge Functions 🟢 COMPLETED

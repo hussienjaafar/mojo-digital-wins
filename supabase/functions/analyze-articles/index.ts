@@ -430,15 +430,14 @@ Content: ${textToAnalyze}`;
         }).eq('id', article.id);
 
         // Extract and insert entities into entity_mentions
-        const entities: Array<{entity_name: string; entity_type: string; mention_type: string}> = [];
+        const entities: Array<{entity_name: string; entity_type: string}> = [];
         
         // Extract from affected groups
         if (analysis.affected_groups) {
           for (const group of analysis.affected_groups) {
             entities.push({
               entity_name: group,
-              entity_type: 'affected_group',
-              mention_type: 'article'
+              entity_type: 'affected_group'
             });
           }
         }
@@ -447,8 +446,7 @@ Content: ${textToAnalyze}`;
         if (analysis.relevance_category) {
           entities.push({
             entity_name: analysis.relevance_category,
-            entity_type: 'category',
-            mention_type: 'article'
+            entity_type: 'category'
           });
         }
 
@@ -456,8 +454,7 @@ Content: ${textToAnalyze}`;
         if (analysis.geographic_scope) {
           entities.push({
             entity_name: analysis.geographic_scope,
-            entity_type: 'location',
-            mention_type: 'article'
+            entity_type: 'location'
           });
         }
 
@@ -467,11 +464,12 @@ Content: ${textToAnalyze}`;
             entities.map(e => ({
               entity_name: e.entity_name,
               entity_type: e.entity_type,
-              mention_type: e.mention_type,
+              source_type: 'article',
               source_id: article.id,
+              source_title: article.title,
+              source_url: article.source_url,
               mentioned_at: article.published_date,
-              sentiment_score: analysis.sentiment_score,
-              relevance_score: validation.confidence
+              sentiment: analysis.sentiment_score
             }))
           );
         }
