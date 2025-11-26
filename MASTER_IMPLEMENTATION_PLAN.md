@@ -34,47 +34,47 @@
 
 ---
 
-### Phase 2: Client Intelligence UI (Week 2-3) 🔴 PENDING
+### Phase 2: Client Intelligence UI (Week 2-3) 🟢 COMPLETED
 **Goal:** Build client-facing dashboards for watchlist and alerts
 
-#### 2.1 My Watchlist Page (`/client/watchlist`)
-- [ ] Create `EntityWatchlist.tsx` component
-- [ ] Display all tracked entities with relevance scores
-- [ ] Add entity form (name, type, aliases, alert threshold)
-- [ ] AI-suggested entities based on organization profile
-- [ ] Entity types: Organization, Person, Topic, Location, Opposition, Issue
-- [ ] Toggle sentiment alerts per entity
-- [ ] Delete/deactivate entities
+#### 2.1 My Watchlist Page (`/client/watchlist`) 🟢 COMPLETED
+- [x] Create `EntityWatchlist.tsx` component
+- [x] Display all tracked entities with relevance scores
+- [x] Add entity form (name, type, aliases, alert threshold)
+- [x] Entity types: Organization, Person, Topic, Location, Opposition, Issue
+- [x] Toggle sentiment alerts per entity
+- [x] Delete/deactivate entities
+- [ ] AI-suggested entities based on organization profile (Future enhancement)
 
-#### 2.2 Organization Profile Setup
+#### 2.2 Organization Profile Setup 🔴 DEFERRED
 - [ ] Add website URL input during client onboarding
 - [ ] "Analyze Website" button → calls `scrape-organization-website`
 - [ ] Display extracted mission, focus areas, key issues
 - [ ] Auto-suggest initial watchlist entities from profile
 - [ ] Edit/update profile capability
 
-#### 2.3 My Alerts Dashboard (`/client/alerts`)
-- [ ] Create `ClientAlerts.tsx` component
-- [ ] Two tabs: "All Intelligence" | "My Watchlist Alerts"
-- [ ] Filter by: Alert type, Severity, Date range
-- [ ] Highlight actionable alerts (score ≥ 70)
-- [ ] Alert detail modal with AI suggested action
-- [ ] Mark as read/dismissed functionality
+#### 2.3 My Alerts Dashboard (`/client/alerts`) 🟢 COMPLETED
+- [x] Create `ClientAlerts.tsx` component
+- [x] Two tabs: "All Intelligence" | "My Watchlist Alerts"
+- [x] Filter by: Alert type, Severity, Date range
+- [x] Highlight actionable alerts (score ≥ 70)
+- [x] Alert detail modal with AI suggested action
+- [x] Mark as read/dismissed functionality
 
-#### 2.4 Suggested Actions Page (`/client/actions`)
-- [ ] Create `SuggestedActions.tsx` component
-- [ ] List AI-generated SMS/action alert suggestions
-- [ ] Display: Topic, Relevance Score, Urgency Score, Value Prop
-- [ ] **Copy to Clipboard** button for SMS text (160 char limit)
-- [ ] Preview SMS with character count
-- [ ] Track usage (used/dismissed) for billing
-- [ ] Historical performance reference
+#### 2.4 Suggested Actions Page (`/client/actions`) 🟢 COMPLETED
+- [x] Create `SuggestedActions.tsx` component
+- [x] List AI-generated SMS/action alert suggestions
+- [x] Display: Topic, Relevance Score, Urgency Score, Value Prop
+- [x] **Copy to Clipboard** button for SMS text (160 char limit)
+- [x] Preview SMS with character count
+- [x] Track usage (used/dismissed) for billing
+- [x] Historical performance reference
 
-#### 2.5 Add Routes & Navigation
-- [ ] Add `/client/watchlist` route
-- [ ] Add `/client/alerts` route
-- [ ] Add `/client/actions` route
-- [ ] Update ClientPortal navigation sidebar
+#### 2.5 Add Routes & Navigation 🟢 COMPLETED
+- [x] Add `/client/watchlist` route
+- [x] Add `/client/alerts` route
+- [x] Add `/client/actions` route
+- [x] Update navigation with links to new pages
 
 ---
 

@@ -30,6 +30,9 @@ import ClientLogin from "./pages/ClientLogin";
 import ClientDashboard from "./pages/ClientDashboard";
 import ClientDashboardCustom from "./pages/ClientDashboardCustom";
 import ClientPortal from "./components/client/ClientPortal";
+import ClientWatchlist from "./pages/ClientWatchlist";
+import ClientAlerts from "./pages/ClientAlerts";
+import ClientActions from "./pages/ClientActions";
 import BillDetail from "./pages/BillDetail";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
@@ -72,6 +75,9 @@ const AppContent = () => {
           <Route path="/client/dashboard" element={<ClientDashboard />} />
           <Route path="/client/dashboard/custom" element={<ClientDashboardCustom />} />
           <Route path="/client/portal" element={<ClientPortal />} />
+          <Route path="/client/watchlist" element={<ClientWatchlist />} />
+          <Route path="/client/alerts" element={<ClientAlerts />} />
+          <Route path="/client/actions" element={<ClientActions />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
