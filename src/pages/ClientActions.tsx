@@ -227,7 +227,10 @@ const ClientActions = () => {
               <p className="text-muted-foreground text-center mb-4">
                 New AI-generated action suggestions will appear here based on your alerts
               </p>
-              <Button onClick={() => navigate('/client/alerts')}>
+              <Button 
+                onClick={() => navigate('/client/alerts')}
+                className="min-h-[44px]"
+              >
                 View Alerts
               </Button>
             </CardContent>
@@ -319,7 +322,7 @@ const ClientActions = () => {
                   <div className="flex gap-2 pt-4 border-t">
                     <Button
                       onClick={() => handleCopy(action)}
-                      className="flex-1"
+                      className="flex-1 min-h-[44px] active:scale-95 transition-transform"
                       disabled={copiedId === action.id}
                     >
                       {copiedId === action.id ? (
@@ -337,6 +340,7 @@ const ClientActions = () => {
                     <Button
                       variant="outline"
                       onClick={() => handleDismiss(action.id)}
+                      className="min-h-[44px] min-w-[44px] active:scale-95 transition-transform"
                     >
                       Dismiss
                     </Button>
