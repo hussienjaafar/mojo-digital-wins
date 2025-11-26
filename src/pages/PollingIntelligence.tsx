@@ -114,7 +114,7 @@ export default function PollingIntelligence() {
       }
       candidateData[poll.candidate_name].push({
         date: new Date(poll.poll_date).toLocaleDateString(),
-        support: poll.support_percentage,
+        lead_margin: poll.lead_margin,
         pollster: poll.pollster,
       });
     });
@@ -226,7 +226,7 @@ export default function PollingIntelligence() {
               const { candidateData, sortedPolls } = getTrendData(raceName);
               const latestPolls = polls.slice(0, 3);
               const leader = latestPolls.reduce((prev, current) => 
-                prev.support_percentage > current.support_percentage ? prev : current
+                (prev.lead_margin || 0) > (current.lead_margin || 0) ? prev : current
               );
 
               return (
@@ -253,13 +253,13 @@ export default function PollingIntelligence() {
                             <div>
                               <p className="font-medium text-foreground">{poll.candidate_name}</p>
                               <p className="text-xs text-muted-foreground">
-                                {poll.party || 'Independent'} • {poll.pollster}
+                                {poll.pollster}
                               </p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-2xl font-bold" style={{ color: getPartyColor(poll.party || '') }}>
-                              {poll.support_percentage ?? poll.lead_margin ?? 0}%
+                            <p className="text-2xl font-bold text-primary">
+                              {poll.lead_margin !== null ? `+${poll.lead_margin}` : 'N/A'}%
                             </p>
                             <p className="text-xs text-muted-foreground">±{poll.margin_of_error}%</p>
                           </div>
@@ -291,10 +291,10 @@ export default function PollingIntelligence() {
                               <Line
                                 key={candidate}
                                 type="monotone"
-                                dataKey="support_percentage"
+                                dataKey="lead_margin"
                                 data={candidateData[candidate]}
                                 name={candidate}
-                                stroke={getPartyColor(sortedPolls.find(p => p.candidate_name === candidate)?.party || "")}
+                                stroke={idx === 0 ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
                                 strokeWidth={2}
                               />
                             ))}
