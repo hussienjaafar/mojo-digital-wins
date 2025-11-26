@@ -2832,6 +2832,66 @@ export type Database = {
         }
         Relationships: []
       }
+      spike_alerts: {
+        Row: {
+          alert_type: string
+          context_summary: string | null
+          created_at: string | null
+          current_mentions: number
+          detected_at: string | null
+          entity_name: string
+          entity_type: string
+          id: string
+          notification_channels: string[] | null
+          previous_mentions: number
+          related_articles: string[] | null
+          related_posts: string[] | null
+          sent_at: string | null
+          severity: string
+          status: string | null
+          time_window: string
+          velocity_increase: number
+        }
+        Insert: {
+          alert_type: string
+          context_summary?: string | null
+          created_at?: string | null
+          current_mentions: number
+          detected_at?: string | null
+          entity_name: string
+          entity_type: string
+          id?: string
+          notification_channels?: string[] | null
+          previous_mentions: number
+          related_articles?: string[] | null
+          related_posts?: string[] | null
+          sent_at?: string | null
+          severity?: string
+          status?: string | null
+          time_window: string
+          velocity_increase: number
+        }
+        Update: {
+          alert_type?: string
+          context_summary?: string | null
+          created_at?: string | null
+          current_mentions?: number
+          detected_at?: string | null
+          entity_name?: string
+          entity_type?: string
+          id?: string
+          notification_channels?: string[] | null
+          previous_mentions?: number
+          related_articles?: string[] | null
+          related_posts?: string[] | null
+          sent_at?: string | null
+          severity?: string
+          status?: string | null
+          time_window?: string
+          velocity_increase?: number
+        }
+        Relationships: []
+      }
       state_actions: {
         Row: {
           action_type: string
@@ -2946,6 +3006,78 @@ export type Database = {
           key?: string
           updated_at?: string | null
           value?: string
+        }
+        Relationships: []
+      }
+      trending_news_topics: {
+        Row: {
+          calculated_at: string | null
+          first_seen_at: string | null
+          id: string
+          is_trending: boolean | null
+          last_seen_at: string | null
+          mentions_last_24_hours: number | null
+          mentions_last_6_hours: number | null
+          mentions_last_hour: number | null
+          mentions_last_week: number | null
+          peak_at: string | null
+          peak_velocity: number | null
+          related_articles: string[] | null
+          related_bluesky_trends: string[] | null
+          sentiment_avg: number | null
+          sentiment_negative: number | null
+          sentiment_neutral: number | null
+          sentiment_positive: number | null
+          topic: string
+          trending_since: string | null
+          updated_at: string | null
+          velocity: number | null
+        }
+        Insert: {
+          calculated_at?: string | null
+          first_seen_at?: string | null
+          id?: string
+          is_trending?: boolean | null
+          last_seen_at?: string | null
+          mentions_last_24_hours?: number | null
+          mentions_last_6_hours?: number | null
+          mentions_last_hour?: number | null
+          mentions_last_week?: number | null
+          peak_at?: string | null
+          peak_velocity?: number | null
+          related_articles?: string[] | null
+          related_bluesky_trends?: string[] | null
+          sentiment_avg?: number | null
+          sentiment_negative?: number | null
+          sentiment_neutral?: number | null
+          sentiment_positive?: number | null
+          topic: string
+          trending_since?: string | null
+          updated_at?: string | null
+          velocity?: number | null
+        }
+        Update: {
+          calculated_at?: string | null
+          first_seen_at?: string | null
+          id?: string
+          is_trending?: boolean | null
+          last_seen_at?: string | null
+          mentions_last_24_hours?: number | null
+          mentions_last_6_hours?: number | null
+          mentions_last_hour?: number | null
+          mentions_last_week?: number | null
+          peak_at?: string | null
+          peak_velocity?: number | null
+          related_articles?: string[] | null
+          related_bluesky_trends?: string[] | null
+          sentiment_avg?: number | null
+          sentiment_negative?: number | null
+          sentiment_neutral?: number | null
+          sentiment_positive?: number | null
+          topic?: string
+          trending_since?: string | null
+          updated_at?: string | null
+          velocity?: number | null
         }
         Relationships: []
       }
