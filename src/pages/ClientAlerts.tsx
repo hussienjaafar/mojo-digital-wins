@@ -228,11 +228,11 @@ const ClientAlerts = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label className="text-sm font-medium mb-2 block">Alert Type</label>
                 <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger>
+                  <SelectTrigger className="min-h-[44px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -247,7 +247,7 @@ const ClientAlerts = () => {
               <div className="flex-1">
                 <label className="text-sm font-medium mb-2 block">Severity</label>
                 <Select value={filterSeverity} onValueChange={setFilterSeverity}>
-                  <SelectTrigger>
+                  <SelectTrigger className="min-h-[44px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -264,9 +264,11 @@ const ClientAlerts = () => {
 
         {/* Alerts List */}
         <Tabs defaultValue="all" className="w-full">
-          <TabsList>
-            <TabsTrigger value="all">All Intelligence ({filteredAlerts.length})</TabsTrigger>
-            <TabsTrigger value="watchlist">
+          <TabsList className="h-auto">
+            <TabsTrigger value="all" className="min-h-[44px] px-4">
+              All Intelligence ({filteredAlerts.length})
+            </TabsTrigger>
+            <TabsTrigger value="watchlist" className="min-h-[44px] px-4">
               My Watchlist ({watchlistAlerts.length})
             </TabsTrigger>
           </TabsList>
@@ -351,7 +353,10 @@ const ClientAlerts = () => {
                     <p className="text-muted-foreground text-center mb-4">
                       Add entities to your watchlist to start receiving alerts
                     </p>
-                    <Button onClick={() => navigate('/client/watchlist')}>
+                    <Button 
+                      onClick={() => navigate('/client/watchlist')}
+                      className="min-h-[44px]"
+                    >
                       Manage Watchlist
                     </Button>
                   </CardContent>
@@ -442,12 +447,16 @@ const ClientAlerts = () => {
                 <Button onClick={() => {
                   markAsRead(selectedAlert.id);
                   setSelectedAlert(null);
-                }} className="flex-1">
+                }} className="flex-1 min-h-[44px] active:scale-95 transition-transform">
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Mark as Read
                 </Button>
                 {selectedAlert.is_actionable && (
-                  <Button variant="secondary" onClick={() => navigate('/client/actions')} className="flex-1">
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => navigate('/client/actions')} 
+                    className="flex-1 min-h-[44px] active:scale-95 transition-transform"
+                  >
                     View Actions
                   </Button>
                 )}

@@ -219,7 +219,10 @@ const ClientWatchlist = () => {
                   Track organizations, people, topics, and issues relevant to your mission
                 </CardDescription>
               </div>
-              <Button onClick={() => setShowForm(!showForm)}>
+              <Button 
+                onClick={() => setShowForm(!showForm)}
+                className="min-h-[44px]"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Entity
               </Button>
@@ -245,7 +248,7 @@ const ClientWatchlist = () => {
                     value={formData.entity_type}
                     onValueChange={(value) => setFormData({ ...formData, entity_type: value })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="min-h-[44px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -298,10 +301,17 @@ const ClientWatchlist = () => {
                     </Label>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setShowForm(false)}>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowForm(false)}
+                      className="min-h-[44px]"
+                    >
                       Cancel
                     </Button>
-                    <Button onClick={handleAddEntity}>
+                    <Button 
+                      onClick={handleAddEntity}
+                      className="min-h-[44px]"
+                    >
                       <Sparkles className="h-4 w-4 mr-2" />
                       Add to Watchlist
                     </Button>
@@ -368,6 +378,7 @@ const ClientWatchlist = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => toggleSentimentAlerts(item.id, item.sentiment_alerts_enabled)}
+                        className="min-h-[44px] active:scale-95 transition-transform"
                       >
                         {item.sentiment_alerts_enabled ? (
                           <>
@@ -383,9 +394,10 @@ const ClientWatchlist = () => {
                       </Button>
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => handleDeleteEntity(item.id)}
-                        className="text-destructive hover:text-destructive"
+                        className="text-destructive hover:text-destructive min-h-[44px] min-w-[44px] active:scale-95 transition-transform"
+                        aria-label="Delete entity"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

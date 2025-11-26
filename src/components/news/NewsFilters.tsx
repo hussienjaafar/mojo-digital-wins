@@ -95,11 +95,17 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
           variant={showFilters ? "default" : "outline"}
           size="icon"
           onClick={() => setShowFilters(!showFilters)}
+          className="min-h-[44px] min-w-[44px] active:scale-95 transition-transform"
         >
           <Filter className="h-4 w-4" />
         </Button>
         {hasActiveFilters && (
-          <Button variant="ghost" size="icon" onClick={clearFilters}>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={clearFilters}
+            className="min-h-[44px] min-w-[44px] active:scale-95 transition-transform"
+          >
             <X className="h-4 w-4" />
           </Button>
         )}
@@ -237,57 +243,75 @@ export function NewsFilters({ categories, sources, onFilterChange }: NewsFilters
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm text-muted-foreground">Active filters:</span>
           {filters.search && (
-            <Badge variant="secondary">
+            <Badge variant="secondary" className="py-2">
               Search: {filters.search}
-              <X 
-                className="h-3 w-3 ml-1 cursor-pointer" 
+              <button
+                className="ml-2 min-h-[24px] min-w-[24px] inline-flex items-center justify-center rounded active:scale-95 transition-transform"
                 onClick={() => updateFilters({ search: '' })}
-              />
+                aria-label="Remove search filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </Badge>
           )}
           {filters.affectedGroup !== 'all' && (
-            <Badge variant="secondary">
+            <Badge variant="secondary" className="py-2">
               {filters.affectedGroup.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              <X
-                className="h-3 w-3 ml-1 cursor-pointer"
+              <button
+                className="ml-2 min-h-[24px] min-w-[24px] inline-flex items-center justify-center rounded active:scale-95 transition-transform"
                 onClick={() => updateFilters({ affectedGroup: 'all' })}
-              />
+                aria-label="Remove affected group filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </Badge>
           )}
           {filters.relevanceCategory !== 'all' && (
-            <Badge variant="secondary">
+            <Badge variant="secondary" className="py-2">
               {filters.relevanceCategory.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              <X
-                className="h-3 w-3 ml-1 cursor-pointer"
+              <button
+                className="ml-2 min-h-[24px] min-w-[24px] inline-flex items-center justify-center rounded active:scale-95 transition-transform"
                 onClick={() => updateFilters({ relevanceCategory: 'all' })}
-              />
+                aria-label="Remove relevance category filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </Badge>
           )}
           {filters.category !== 'all' && (
-            <Badge variant="secondary">
+            <Badge variant="secondary" className="py-2">
               {filters.category}
-              <X
-                className="h-3 w-3 ml-1 cursor-pointer"
+              <button
+                className="ml-2 min-h-[24px] min-w-[24px] inline-flex items-center justify-center rounded active:scale-95 transition-transform"
                 onClick={() => updateFilters({ category: 'all' })}
-              />
+                aria-label="Remove category filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </Badge>
           )}
           {filters.geographicScope !== 'all' && (
-            <Badge variant="secondary">
+            <Badge variant="secondary" className="py-2">
               {filters.geographicScope.charAt(0).toUpperCase() + filters.geographicScope.slice(1)}
-              <X
-                className="h-3 w-3 ml-1 cursor-pointer"
+              <button
+                className="ml-2 min-h-[24px] min-w-[24px] inline-flex items-center justify-center rounded active:scale-95 transition-transform"
                 onClick={() => updateFilters({ geographicScope: 'all' })}
-              />
+                aria-label="Remove geographic scope filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </Badge>
           )}
           {filters.tags.map(tag => (
-            <Badge key={tag} variant="secondary">
+            <Badge key={tag} variant="secondary" className="py-2">
               {tag}
-              <X 
-                className="h-3 w-3 ml-1 cursor-pointer" 
+              <button
+                className="ml-2 min-h-[24px] min-w-[24px] inline-flex items-center justify-center rounded active:scale-95 transition-transform"
                 onClick={() => handleTagsChange(filters.tags.filter(t => t !== tag))}
-              />
+                aria-label={`Remove ${tag} tag`}
+              >
+                <X className="h-3 w-3" />
+              </button>
             </Badge>
           ))}
         </div>
