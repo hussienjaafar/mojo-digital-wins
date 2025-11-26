@@ -34,9 +34,9 @@ import ClientWatchlist from "./pages/ClientWatchlist";
 import ClientAlerts from "./pages/ClientAlerts";
 import ClientActions from "./pages/ClientActions";
 import ClientOpportunities from "./pages/ClientOpportunities";
+import PollingIntelligence from "./pages/PollingIntelligence";
 import ClientDemographics from "./pages/ClientDemographics";
 import ClientDonorJourney from "./pages/ClientDonorJourney";
-import PollingIntelligence from "./pages/PollingIntelligence";
 import BillDetail from "./pages/BillDetail";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
@@ -83,6 +83,7 @@ const AppContent = () => {
           <Route path="/client/alerts" element={<ClientAlerts />} />
           <Route path="/client/actions" element={<ClientActions />} />
           <Route path="/client/opportunities" element={<ClientOpportunities />} />
+          <Route path="/client/polling" element={<PollingIntelligence />} />
           <Route path="/client/demographics" element={<ClientDemographics />} />
           <Route path="/client/journey" element={<ClientDonorJourney />} />
           <Route path="/client/polling" element={<PollingIntelligence />} />
