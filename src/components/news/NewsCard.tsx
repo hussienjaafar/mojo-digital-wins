@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Calendar, Sparkles } from "lucide-react";
@@ -23,7 +24,7 @@ interface NewsCardProps {
   };
 }
 
-export function NewsCard({ article }: NewsCardProps) {
+export const NewsCard = memo(function NewsCard({ article }: NewsCardProps) {
   if (article.is_duplicate) {
     return null;
   }
@@ -129,4 +130,4 @@ export function NewsCard({ article }: NewsCardProps) {
       </CardContent>
     </Card>
   );
-}
+});
