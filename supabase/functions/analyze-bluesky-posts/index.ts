@@ -208,8 +208,8 @@ ${postsText}`;
     ? {
         model: 'gpt-3.5-turbo-1106', // Fast, cheap, 10x Claude rate limits
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        response_format: { type: "json_object" } // Ensures JSON response
+        temperature: 0.3
+        // Removed response_format to allow array responses
       }
     : {
         model: 'google/gemini-2.0-flash', // Fallback
