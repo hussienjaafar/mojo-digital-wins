@@ -5,12 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, TrendingUp, DollarSign, Users, Target, Calendar, LayoutGrid } from "lucide-react";
+import { LogOut, TrendingUp, DollarSign, Users, Target, Calendar, LayoutGrid, Menu } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { ClientNavigation } from "@/components/client/ClientNavigation";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/client/AppSidebar";
 import { IntelligenceHub } from "@/components/client/IntelligenceHub";
 import ClientMetricsOverview from "@/components/client/ClientMetricsOverview";
 import MetaAdsMetrics from "@/components/client/MetaAdsMetrics";
@@ -120,18 +121,19 @@ const ClientDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 flex">
-      {/* Unified Navigation Sidebar */}
-      <ClientNavigation />
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Modern Header with Glassmorphism - Mobile Optimized */}
-        <header className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50 shadow-sm">
+    <SidebarProvider defaultOpen={!isMobile}>
+      <div className="min-h-screen w-full flex bg-gradient-to-br from-background via-background to-muted/10">
+        <AppSidebar organizationId={organization.id} />
+        
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Modern Header with Glassmorphism - Mobile Optimized */}
+          <header className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50 shadow-sm">
           <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-              {/* Logo and Title Section - Mobile Responsive */}
+              {/* Sidebar Trigger + Logo and Title Section - Mobile Responsive */}
               <div className="flex items-center gap-3 sm:gap-6 w-full sm:w-auto">
+                <SidebarTrigger className="shrink-0" />
+                
                 {organization.logo_url && (
                   <div className="relative shrink-0">
                     <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
@@ -290,9 +292,10 @@ const ClientDashboard = () => {
             />
           </TabsContent>
         </Tabs>
-      </main>
+        </main>
+      </div>
     </div>
-    </div>
+    </SidebarProvider>
   );
 };
 
