@@ -4610,6 +4610,15 @@ export type Database = {
           topic_velocity: number
         }[]
       }
+      update_bluesky_trends_optimized: {
+        Args: { batch_limit?: number }
+        Returns: {
+          mentions_24h: number
+          topic_is_trending: boolean
+          topic_name: string
+          topic_velocity: number
+        }[]
+      }
       update_job_after_execution: {
         Args: {
           p_duration_ms: number

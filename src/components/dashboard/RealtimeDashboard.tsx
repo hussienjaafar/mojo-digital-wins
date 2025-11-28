@@ -56,9 +56,9 @@ export const RealtimeDashboard = () => {
                     className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                   >
                     <div className="flex-1">
-                      <p className="font-medium">{trend.topic}</p>
+                      <p className="font-medium">{trend.entity_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {trend.mentions_last_hour || 0} mentions in last hour
+                        {trend.mentions_1h || 0} mentions in last hour
                       </p>
                     </div>
                     <Badge
@@ -101,9 +101,9 @@ export const RealtimeDashboard = () => {
                       key={alert.id}
                       className="p-3 rounded-lg border border-destructive/50 bg-destructive/5"
                     >
-                      <p className="font-medium text-sm">{alert.title}</p>
+                      <p className="font-medium text-sm">{alert.entity_name}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {alert.message}
+                        {alert.alert_type}
                       </p>
                       <p className="text-xs text-muted-foreground mt-2">
                         {new Date(alert.created_at).toLocaleTimeString()}
