@@ -72,10 +72,10 @@ serve(async (req) => {
 
       trends.push({
         entity_name: entityName,
-        mentions_last_hour: mentions1h,
-        mentions_last_6_hours: mentions6h,
-        mentions_last_24_hours: mentions24h,
-        mentions_last_7_days: mentions7d,
+        mentions_1h: mentions1h,
+        mentions_6h: mentions6h,
+        mentions_24h: mentions24h,
+        mentions_7d: mentions7d,
         velocity,
         sentiment_avg: avgSentiment,
         first_seen_at: firstSeen,

@@ -28,7 +28,7 @@ serve(async (req) => {
       .from('client_entity_alerts')
       .select(`
         *,
-        entity_watchlist(entity_type, tags),
+        entity_watchlist(entity_type),
         client_organizations(name, slug)
       `)
       .eq('is_actionable', true)

@@ -314,6 +314,34 @@
 
 ---
 
+## 🔧 POST-AUDIT FIXES (Day 6)
+
+### Critical Bug Fixes ✅ DEPLOYED
+
+**Date:** 2025-11-28 (Post-Audit)
+
+#### Bug #1: Entity Trends Column Mismatch ✅ FIXED
+- **File:** `supabase/functions/calculate-entity-trends/index.ts`
+- **Issue:** Function was inserting `mentions_last_hour`, `mentions_last_6_hours`, etc. but table expects `mentions_1h`, `mentions_6h`, etc.
+- **Fix:** Updated column names to match table schema (lines 73-84)
+- **Status:** ✅ Deployed and awaiting next scheduled run
+
+#### Bug #2: Suggested Actions Invalid Column ✅ FIXED  
+- **File:** `supabase/functions/generate-suggested-actions/index.ts`
+- **Issue:** Function was querying non-existent `tags` column from `entity_watchlist` table
+- **Fix:** Removed `tags` from select query (lines 26-38)
+- **Status:** ✅ Deployed and awaiting high-score alerts
+
+**Impact:** Intelligence pipeline should now populate all destination tables:
+- `entity_trends` → Will start populating every 15 minutes
+- `client_entity_alerts` → Will start generating when entity trends match watchlist
+- `suggested_actions` → Will generate for actionable alerts
+- Frontend → Will display live data once pipeline runs
+
+**Next Steps:** Monitor scheduled job executions and verify data flow
+
+---
+
 ## 🎯 SUCCESS CRITERIA
 
 ### Technical
