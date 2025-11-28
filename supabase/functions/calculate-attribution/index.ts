@@ -18,14 +18,13 @@ serve(async (req) => {
 
     console.log('Starting attribution calculation...');
 
-    // Get transactions without attribution (last 30 days)
+    // Get transactions from last 30 days that haven't been attributed yet
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     
     const { data: transactions, error: txError } = await supabase
       .from('actblue_transactions')
       .select('*')
       .gte('transaction_date', thirtyDaysAgo)
-      .is('attribution_calculated', null)
       .order('transaction_date', { ascending: false })
       .limit(100);
 
@@ -34,8 +33,21 @@ serve(async (req) => {
     console.log(`Processing ${transactions?.length || 0} transactions`);
 
     let attributionsCreated = 0;
+    let attributionsUpdated = 0;
 
     for (const transaction of transactions || []) {
+      // Check if attribution already exists
+      const { data: existingAttribution } = await supabase
+        .from('transaction_attribution')
+        .select('id')
+        .eq('transaction_id', transaction.transaction_id)
+        .single();
+
+      if (existingAttribution) {
+        console.log(`Attribution already exists for transaction ${transaction.transaction_id}`);
+        continue;
+      }
+
       // Find all touchpoints for this donor (email-based)
       const { data: touchpoints, error: touchpointsError } = await supabase
         .from('attribution_touchpoints')
@@ -52,98 +64,82 @@ serve(async (req) => {
 
       if (!touchpoints || touchpoints.length === 0) {
         // No touchpoints found - mark as direct/organic
-        await supabase
+        const { error: attrError } = await supabase
           .from('transaction_attribution')
           .insert({
-            transaction_id: transaction.id,
+            transaction_id: transaction.transaction_id,
             organization_id: transaction.organization_id,
-            touchpoint_id: null,
-            attribution_weight: 1.0,
-            attribution_type: 'organic',
+            donor_email: transaction.donor_email,
+            first_touch_channel: 'organic',
+            first_touch_campaign: null,
+            first_touch_weight: 1.0,
+            last_touch_channel: 'organic',
+            last_touch_campaign: null,
+            last_touch_weight: 0,
+            middle_touches: [],
+            middle_touches_weight: 0,
+            total_touchpoints: 0,
+            attribution_calculated_at: new Date().toISOString(),
           });
 
-        await supabase
-          .from('actblue_transactions')
-          .update({ attribution_calculated: true })
-          .eq('id', transaction.id);
+        if (attrError) {
+          console.error(`Error inserting organic attribution for ${transaction.id}:`, attrError);
+          continue;
+        }
 
         attributionsCreated++;
         continue;
       }
 
       // Multi-touch attribution: 40-20-40 model
-      const attributions = [];
+      const firstTouch = touchpoints[0];
+      const lastTouch = touchpoints[touchpoints.length - 1];
+      const middleTouches = touchpoints.slice(1, -1);
       
-      if (touchpoints.length === 1) {
-        // Only one touchpoint - gets 100%
-        attributions.push({
-          transaction_id: transaction.id,
-          organization_id: transaction.organization_id,
-          touchpoint_id: touchpoints[0].id,
-          attribution_weight: 1.0,
-          attribution_type: 'single_touch',
-        });
-      } else {
-        // First touch: 40%
-        attributions.push({
-          transaction_id: transaction.id,
-          organization_id: transaction.organization_id,
-          touchpoint_id: touchpoints[0].id,
-          attribution_weight: 0.4,
-          attribution_type: 'first_touch',
-        });
+      const attributionData: any = {
+        transaction_id: transaction.transaction_id,
+        organization_id: transaction.organization_id,
+        donor_email: transaction.donor_email,
+        first_touch_channel: firstTouch.touchpoint_type,
+        first_touch_campaign: firstTouch.campaign_id,
+        first_touch_weight: 0.4,
+        last_touch_channel: lastTouch.touchpoint_type,
+        last_touch_campaign: lastTouch.campaign_id,
+        last_touch_weight: touchpoints.length > 1 ? 0.4 : 0.6,
+        middle_touches: middleTouches.map(tp => ({
+          channel: tp.touchpoint_type,
+          campaign: tp.campaign_id,
+          utm_source: tp.utm_source,
+          utm_medium: tp.utm_medium,
+          occurred_at: tp.occurred_at,
+          weight: touchpoints.length > 2 ? 0.2 / middleTouches.length : 0
+        })),
+        middle_touches_weight: touchpoints.length > 2 ? 0.2 : 0,
+        total_touchpoints: touchpoints.length,
+        attribution_calculated_at: new Date().toISOString(),
+      };
 
-        // Last touch: 40%
-        attributions.push({
-          transaction_id: transaction.id,
-          organization_id: transaction.organization_id,
-          touchpoint_id: touchpoints[touchpoints.length - 1].id,
-          attribution_weight: 0.4,
-          attribution_type: 'last_touch',
-        });
-
-        // Middle touches: 20% divided equally
-        const middleTouches = touchpoints.slice(1, -1);
-        if (middleTouches.length > 0) {
-          const middleWeight = 0.2 / middleTouches.length;
-          for (const touchpoint of middleTouches) {
-            attributions.push({
-              transaction_id: transaction.id,
-              organization_id: transaction.organization_id,
-              touchpoint_id: touchpoint.id,
-              attribution_weight: middleWeight,
-              attribution_type: 'middle_touch',
-            });
-          }
-        }
-      }
-
-      // Insert attributions
+      // Insert attribution
       const { error: attrError } = await supabase
         .from('transaction_attribution')
-        .insert(attributions);
+        .insert(attributionData);
 
       if (attrError) {
         console.error(`Error inserting attribution for ${transaction.id}:`, attrError);
         continue;
       }
 
-      // Mark transaction as attributed
-      await supabase
-        .from('actblue_transactions')
-        .update({ attribution_calculated: true })
-        .eq('id', transaction.id);
-
       attributionsCreated++;
     }
 
-    console.log(`Attribution calculation complete. Processed ${attributionsCreated} transactions`);
+    console.log(`Attribution calculation complete. Created ${attributionsCreated} new attributions, updated ${attributionsUpdated}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        transactionsProcessed: attributionsCreated,
-        totalTransactions: transactions?.length || 0
+        attributionsCreated,
+        attributionsUpdated,
+        totalTransactionsProcessed: transactions?.length || 0
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
