@@ -85,7 +85,7 @@ serve(async (req) => {
         related_articles: trend.related_articles || [],
         related_posts: blueskyTrend ? [blueskyTrend.id] : [],
         status: 'pending',
-        notification_channels: severity === 'critical' ? ['email', 'webhook', 'push'] : ['webhook'],
+        notification_channels: severity === 'critical' ? ['email', 'webhook', 'push'] : ['email'],
         detected_at: new Date().toISOString()
       };
 

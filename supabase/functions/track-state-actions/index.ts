@@ -195,20 +195,17 @@ serve(async (req) => {
       const { data, error } = await supabaseClient
         .from('state_actions')
         .insert({
-          state_code,
-          state_name,
+          state: state_name || state_code,
           action_type,
           title,
           description,
           source_url,
-          official_name,
-          official_title,
-          action_date,
+          sponsor: official_name || official_title,
+          introduced_date: action_date,
           relevance_score: score,
           threat_level: level,
-          auto_tags: matchedKeywords,
-          affected_organizations: affectedOrgs,
-          is_processed: false,
+          tags: matchedKeywords,
+          status: 'active'
         })
         .select()
         .single();
@@ -335,19 +332,17 @@ serve(async (req) => {
             await supabaseClient
               .from('state_actions')
               .upsert({
-                state_code: stateMatch.code,
-                state_name: stateMatch.name,
+                state: stateMatch.name,
                 action_type: 'announcement',
                 title: title.substring(0, 500),
                 description: description.replace(/<[^>]*>/g, '').substring(0, 1000),
                 source_url: link,
-                official_title: 'Governor',
-                action_date: pubDate ? new Date(pubDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                sponsor: 'Governor',
+                introduced_date: pubDate ? new Date(pubDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                 relevance_score: score,
                 threat_level: level,
-                auto_tags: matchedKeywords,
-                affected_organizations: affectedOrgs,
-                is_processed: false,
+                tags: matchedKeywords,
+                status: 'active'
               }, {
                 onConflict: 'source_url'
               });

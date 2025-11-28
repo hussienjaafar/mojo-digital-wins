@@ -468,9 +468,9 @@ serve(async (req) => {
 
     console.log(`✅ Processed ${successCount} posts, ${validationFailedCount} validation failed, ${errorCount} errors`);
 
-    // FIXED: Use new database function to update trends
+    // FIXED: Use optimized database function with batch processing
     const { data: trendResults, error: trendError } = await supabase
-      .rpc('update_bluesky_trends');
+      .rpc('update_bluesky_trends_optimized', { batch_limit: 50 });
 
     if (trendError) {
       console.error('❌ Error updating trends:', trendError);
