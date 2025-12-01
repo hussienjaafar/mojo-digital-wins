@@ -2981,6 +2981,7 @@ export type Database = {
           id: string
           mention_context: string
           mentioned_at: string
+          organization_abbrev: string | null
           organization_name: string
           relevance_score: number | null
           sentiment: string | null
@@ -2992,6 +2993,7 @@ export type Database = {
           id?: string
           mention_context: string
           mentioned_at: string
+          organization_abbrev?: string | null
           organization_name: string
           relevance_score?: number | null
           sentiment?: string | null
@@ -3003,6 +3005,7 @@ export type Database = {
           id?: string
           mention_context?: string
           mentioned_at?: string
+          organization_abbrev?: string | null
           organization_name?: string
           relevance_score?: number | null
           sentiment?: string | null
