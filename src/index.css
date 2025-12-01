@@ -16,99 +16,36 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Light Mode - Rewardifi Inspired */
-    --background: 0 0% 98%;
-    --foreground: 220 25% 10%;
-
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
-    --card-foreground: 220 25% 10%;
-
+    --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 25% 10%;
-
-    --primary: 217 91% 60%; /* Rewardifi Blue */
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 220 15% 95%;
-    --secondary-foreground: 220 25% 10%;
-
-    --muted: 220 15% 96%;
-    --muted-foreground: 220 10% 45%;
-
-    --accent: 217 91% 60%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
-
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 217 91% 60%;
-
-    --radius: 12px;
-
-    /* Rewardifi Brand Colors */
-    --blue-bright: 217 91% 60%;
-    --blue-dark: 217 91% 50%;
-    --purple-accent: 250 75% 60%;
-    --green-success: 142 71% 45%;
-    --orange-warning: 38 92% 50%;
-
-    /* Chart Colors - Vibrant & Distinct */
-    --chart-1: 217 91% 60%; /* Primary Blue */
-    --chart-2: 142 71% 45%; /* Green */
-    --chart-3: 250 75% 60%; /* Purple */
-    --chart-4: 38 92% 50%; /* Orange */
-    --chart-5: 340 82% 52%; /* Pink */
-
-    /* Gradients - SaaS Modern */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(250 75% 60%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 15% 99%) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(217 91% 50%) 100%);
-    --gradient-subtle: linear-gradient(180deg, transparent 0%, hsl(217 91% 60% / 0.05) 100%);
-
-    /* Shadows - Clean & Professional */
-    --shadow-xs: 0 1px 2px hsl(220 25% 10% / 0.05);
-    --shadow-sm: 0 2px 4px hsl(220 25% 10% / 0.08);
-    --shadow-md: 0 4px 12px hsl(220 25% 10% / 0.1);
-    --shadow-lg: 0 8px 24px hsl(220 25% 10% / 0.12);
-    --shadow-xl: 0 16px 48px hsl(220 25% 10% / 0.15);
-    --shadow-glow: 0 0 32px hsl(217 91% 60% / 0.3);
-    --shadow-card: 0 2px 8px hsl(220 25% 10% / 0.08), 0 1px 2px hsl(220 25% 10% / 0.04);
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
     
-    /* Transitions */
-    --transition-base: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-elegant: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-
-    /* Typography Scale */
-    --font-size-xs: 0.75rem;
-    --font-size-sm: 0.875rem;
-    --font-size-base: 1rem;
-    --font-size-lg: 1.125rem;
-    --font-size-xl: 1.25rem;
-    --font-size-2xl: 1.5rem;
-    --font-size-3xl: 1.875rem;
-    --font-size-4xl: 2.25rem;
-    --font-size-5xl: 3rem;
-    --font-size-6xl: 3.75rem;
-    --font-size-7xl: 4.5rem;
-
-    /* Font Weights */
-    --font-weight-light: 300;
-    --font-weight-normal: 400;
-    --font-weight-medium: 500;
-    --font-weight-semibold: 600;
-    --font-weight-bold: 700;
-    --font-weight-extrabold: 800;
-    --font-weight-black: 900;
-
     /* Severity Colors */
     --severity-critical: 0 78% 53%;
     --severity-critical-foreground: 0 0% 100%;
@@ -118,105 +55,47 @@ All colors MUST be HSL.
     --severity-medium-foreground: 213 75% 15%;
     --severity-low: 150 60% 50%;
     --severity-low-foreground: 0 0% 100%;
-
-    /* Line Heights */
-    --line-height-tight: 1.25;
-    --line-height-snug: 1.375;
-    --line-height-normal: 1.5;
-    --line-height-relaxed: 1.625;
-    --line-height-loose: 2;
-
-    /* Letter Spacing */
-    --letter-spacing-tighter: -0.05em;
-    --letter-spacing-tight: -0.025em;
-    --letter-spacing-normal: 0;
-    --letter-spacing-wide: 0.025em;
-    --letter-spacing-wider: 0.05em;
   }
 
   .dark {
-    /* Dark Mode - Rewardifi Inspired (True Dark) */
-    --background: 220 25% 6%;
-    --foreground: 0 0% 98%;
-
-    --card: 220 20% 10%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 220 20% 8%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 217 91% 60%; /* Keep bright blue in dark mode */
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 220 15% 18%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 220 15% 15%;
-    --muted-foreground: 220 10% 65%;
-
-    --accent: 217 91% 60%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
-
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-
-    --border: 220 15% 20%;
-    --input: 220 15% 15%;
-    --ring: 217 91% 60%;
-
-    /* Rewardifi Brand Colors - Dark Mode */
-    --blue-bright: 217 91% 60%;
-    --blue-dark: 217 91% 50%;
-    --purple-accent: 250 75% 60%;
-    --green-success: 142 71% 45%;
-    --orange-warning: 38 92% 50%;
-
-    /* Chart Colors - Same as light for consistency */
-    --chart-1: 217 91% 60%;
-    --chart-2: 142 71% 45%;
-    --chart-3: 250 75% 60%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 340 82% 52%;
-
-    /* Gradients - Dark Mode */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(250 75% 60%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(220 20% 10%) 0%, hsl(220 20% 12%) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(217 91% 50%) 100%);
-    --gradient-subtle: linear-gradient(180deg, transparent 0%, hsl(217 91% 60% / 0.1) 100%);
-
-    /* Shadows - Dark Mode */
-    --shadow-xs: 0 1px 2px hsl(0 0% 0% / 0.3);
-    --shadow-sm: 0 2px 4px hsl(0 0% 0% / 0.4);
-    --shadow-md: 0 4px 12px hsl(0 0% 0% / 0.5);
-    --shadow-lg: 0 8px 24px hsl(0 0% 0% / 0.6);
-    --shadow-xl: 0 16px 48px hsl(0 0% 0% / 0.7);
-    --shadow-glow: 0 0 32px hsl(217 91% 60% / 0.5);
-    --shadow-card: 0 2px 8px hsl(0 0% 0% / 0.5), 0 1px 2px hsl(0 0% 0% / 0.3);
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
-    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    overflow-x: hidden;
-  }
-
-  html {
-    overflow-x: hidden;
   }
 
   /* Activist Typography - Bebas Neue for headlines */
