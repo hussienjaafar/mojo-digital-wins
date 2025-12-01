@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Key, Plus, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import { Key, Plus, CheckCircle2, XCircle, RefreshCw, Settings } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Organization = {
@@ -186,7 +186,32 @@ const APICredentialsManager = () => {
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading credentials...</div>;
+    return (
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+            <Settings className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">API Credentials</h2>
+            <p className="text-sm portal-text-secondary">Loading platform connections...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="portal-skeleton h-8 w-8 rounded" />
+              <div className="portal-skeleton h-5 w-32" />
+              <div className="portal-skeleton h-4 w-full" />
+              <div className="flex gap-2 mt-4">
+                <div className="portal-skeleton h-8 w-24" />
+                <div className="portal-skeleton h-8 w-20" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

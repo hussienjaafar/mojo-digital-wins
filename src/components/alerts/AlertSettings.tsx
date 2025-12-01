@@ -16,6 +16,7 @@ import {
   Building2,
   Save,
   RefreshCw,
+  Shield,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -156,14 +157,27 @@ export function AlertSettings() {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-6 bg-muted rounded w-1/3"></div>
-            <div className="h-32 bg-muted rounded"></div>
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+            <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Alert Settings</h2>
+            <p className="text-sm portal-text-secondary">Loading configuration...</p>
+          </div>
+        </div>
+        <div className="portal-card p-6">
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} style={{ animationDelay: `${i * 50}ms` }} className="portal-animate-fade-in">
+                <div className="portal-skeleton h-6 w-1/3 mb-2" />
+                <div className="portal-skeleton h-16 w-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     );
   }
 

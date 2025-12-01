@@ -131,7 +131,31 @@ const ClientUserManager = () => {
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading users...</div>;
+    return (
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+            <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Client Users</h2>
+            <p className="text-sm portal-text-secondary">Loading user accounts...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="portal-card p-4 flex items-center gap-4" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="portal-skeleton h-10 w-10 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <div className="portal-skeleton h-5 w-48" />
+                <div className="portal-skeleton h-4 w-32" />
+              </div>
+              <div className="portal-skeleton h-8 w-20 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

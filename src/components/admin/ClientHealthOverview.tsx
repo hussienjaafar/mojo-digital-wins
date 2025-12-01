@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle, XCircle, AlertCircle, RefreshCw, Eye, Calendar } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, RefreshCw, Eye, Calendar, Activity } from "lucide-react";
 
 interface ClientHealth {
   id: string;
@@ -113,12 +113,26 @@ export default function ClientHealthOverview() {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-sm text-muted-foreground">Loading client health...</p>
-        </CardContent>
-      </Card>
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950">
+            <Activity className="h-6 w-6 text-green-600 dark:text-green-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Client Health</h2>
+            <p className="text-sm portal-text-secondary">Loading health metrics...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="portal-skeleton h-6 w-32" />
+              <div className="portal-skeleton h-10 w-20" />
+              <div className="portal-skeleton h-4 w-full" />
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 
