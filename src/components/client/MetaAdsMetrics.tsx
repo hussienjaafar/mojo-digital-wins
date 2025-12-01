@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { logger } from "@/lib/logger";
+import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
+import { NoDataEmptyState } from "@/components/portal/PortalEmptyState";
 
 type Props = {
   organizationId: string;
@@ -101,9 +102,28 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
     }
   };
 
-  if (isLoading) {
-    return <div className="text-center py-8">Loading Meta Ads data...</div>;
-  }
+  const tableData = campaigns.map(campaign => {
+    const metric = metrics[campaign.campaign_id] || {
+      impressions: 0,
+      clicks: 0,
+      spend: 0,
+      conversions: 0,
+      cpc: 0,
+      ctr: 0,
+    };
+    
+    return {
+      campaign_id: campaign.campaign_id,
+      campaign_name: campaign.campaign_name || campaign.campaign_id,
+      status: campaign.status,
+      impressions: metric.impressions,
+      clicks: metric.clicks,
+      spend: metric.spend,
+      ctr: metric.ctr,
+      cpc: metric.cpc,
+      conversions: metric.conversions,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -112,70 +132,80 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
           <CardTitle>Campaign Performance</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Campaign</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Impressions</TableHead>
-                <TableHead className="text-right">Clicks</TableHead>
-                <TableHead className="text-right">Spend</TableHead>
-                <TableHead className="text-right">CTR</TableHead>
-                <TableHead className="text-right">CPC</TableHead>
-                <TableHead className="text-right">Conversions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {campaigns.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
-                    No campaigns found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                campaigns.map(campaign => {
-                  const metric = metrics[campaign.campaign_id] || {
-                    impressions: 0,
-                    clicks: 0,
-                    spend: 0,
-                    conversions: 0,
-                    cpc: 0,
-                    ctr: 0,
-                  };
-                  return (
-                    <TableRow key={campaign.campaign_id}>
-                      <TableCell className="font-medium">
-                        {campaign.campaign_name || campaign.campaign_id}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={campaign.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                          {campaign.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {metric.impressions.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {metric.clicks.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        ${metric.spend.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {metric.ctr.toFixed(2)}%
-                      </TableCell>
-                      <TableCell className="text-right">
-                        ${metric.cpc.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {metric.conversions}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+          <PortalTable
+            data={tableData}
+            columns={[
+              {
+                key: "campaign_name",
+                label: "Campaign",
+                sortable: true,
+                render: (value) => <span className="font-medium">{value}</span>,
+              },
+              {
+                key: "status",
+                label: "Status",
+                mobileLabel: "Status",
+                render: (value) => (
+                  <Badge variant={value === 'ACTIVE' ? 'default' : 'secondary'}>
+                    {value}
+                  </Badge>
+                ),
+              },
+              {
+                key: "impressions",
+                label: "Impressions",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.number,
+              },
+              {
+                key: "clicks",
+                label: "Clicks",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.number,
+                hiddenOnMobile: true,
+              },
+              {
+                key: "spend",
+                label: "Spend",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.currency,
+              },
+              {
+                key: "ctr",
+                label: "CTR",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.percentage,
+                hiddenOnMobile: true,
+              },
+              {
+                key: "cpc",
+                label: "CPC",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.currency,
+                hiddenOnMobile: true,
+              },
+              {
+                key: "conversions",
+                label: "Conversions",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.number,
+              },
+            ]}
+            keyExtractor={(row) => row.campaign_id}
+            isLoading={isLoading}
+            emptyMessage="No Meta campaigns found"
+            emptyAction={
+              <p className="text-sm portal-text-muted">
+                Connect your Meta Ads account to see campaign data
+              </p>
+            }
+          />
         </CardContent>
       </Card>
     </div>

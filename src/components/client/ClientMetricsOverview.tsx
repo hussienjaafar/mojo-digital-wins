@@ -5,6 +5,8 @@ import { TrendingUp, DollarSign, Users, Target } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { logger } from "@/lib/logger";
 import { CurrencyChartTooltip, PercentageChartTooltip } from "@/components/charts/CustomChartTooltip";
+import { PortalSkeleton } from "@/components/portal/PortalSkeleton";
+import { NoDataEmptyState } from "@/components/portal/PortalEmptyState";
 
 type Props = {
   organizationId: string;
@@ -62,7 +64,24 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
   ];
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading metrics...</div>;
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <PortalSkeleton key={i} variant="metric" className={`portal-delay-${i * 100}`} />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <PortalSkeleton variant="chart" />
+          <PortalSkeleton variant="chart" />
+        </div>
+        <PortalSkeleton variant="chart" />
+      </div>
+    );
+  }
+
+  if (metrics.length === 0) {
+    return <NoDataEmptyState onRefresh={loadMetrics} />;
   }
 
   return (

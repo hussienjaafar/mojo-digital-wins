@@ -98,7 +98,7 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
   const isCollapsed = state === "collapsed";
 
   return (
-    <Sidebar collapsible="icon" role="navigation" aria-label="Main navigation">
+    <Sidebar collapsible="icon" role="navigation" aria-label="Main navigation" className="portal-sidebar">
       <SidebarContent>
         {sections.map((section) => (
           <SidebarGroup key={section.label}>
@@ -116,22 +116,33 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
                       <SidebarMenuButton
                         asChild
                         className={cn(
-                          "hover:bg-muted/50",
+                          "hover:bg-muted/50 transition-all duration-300 min-h-[44px]",
                           active && "bg-secondary/10 text-secondary font-medium hover:bg-secondary/20"
                         )}
+                        tooltip={isCollapsed ? item.title : undefined}
                       >
                         <Link 
                           to={item.url} 
-                          className="flex items-center gap-3"
+                          className="flex items-center gap-3 transition-all duration-300"
                           aria-label={item.badge && item.badge > 0 ? `${item.title} (${item.badge} items)` : item.title}
                           aria-current={active ? 'page' : undefined}
                         >
-                          <Icon className={cn("h-5 w-5", active && "text-secondary")} aria-hidden="true" />
+                          <Icon 
+                            className={cn(
+                              "h-5 w-5 transition-all duration-300", 
+                              active && "text-secondary scale-110"
+                            )} 
+                            aria-hidden="true" 
+                          />
                           {!isCollapsed && (
                             <>
                               <span className="flex-1">{item.title}</span>
                               {item.badge !== undefined && item.badge > 0 && (
-                                <Badge variant="destructive" className="ml-auto" aria-label={`${item.badge} unread`}>
+                                <Badge 
+                                  variant="destructive" 
+                                  className="ml-auto animate-pulse" 
+                                  aria-label={`${item.badge} unread`}
+                                >
                                   {item.badge}
                                 </Badge>
                               )}

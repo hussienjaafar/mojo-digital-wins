@@ -18,6 +18,7 @@ import { ClientDashboardMetrics } from "@/components/client/ClientDashboardMetri
 import { ConsolidatedChannelMetrics } from "@/components/client/ConsolidatedChannelMetrics";
 import SyncControls from "@/components/client/SyncControls";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
+import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
 
 type Organization = {
   id: string;
@@ -189,8 +190,9 @@ const ClientDashboard = () => {
                   variant="smooth"
                   size={isMobile ? "sm" : "default"}
                   onClick={() => navigate('/client/dashboard/custom')}
-                  className="gap-2 min-h-[44px] min-w-[44px]"
+                  className="gap-2 min-h-[44px] min-w-[44px] transition-all duration-300 hover:scale-105 active:scale-95"
                   title="Customize Dashboard"
+                  aria-label="Customize Dashboard"
                 >
                   <LayoutGrid className="h-4 w-4" />
                   <span className="hidden md:inline">Customize</span>
@@ -200,8 +202,9 @@ const ClientDashboard = () => {
                   variant="smooth"
                   size={isMobile ? "sm" : "default"}
                   onClick={handleLogout}
-                  className="hover:border-destructive/50 hover:text-destructive gap-2 min-h-[44px] min-w-[44px]"
+                  className="hover:border-destructive/50 hover:text-destructive gap-2 min-h-[44px] min-w-[44px] transition-all duration-300 hover:scale-105 active:scale-95"
                   title="Logout"
+                  aria-label="Logout"
                 >
                   <LogOut className="h-4 w-4" />
                   <span className="hidden sm:inline">Logout</span>
@@ -213,51 +216,53 @@ const ClientDashboard = () => {
 
         <main className="portal-scrollbar flex-1 overflow-auto">
           <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 w-full">
-            {/* HERO: Intelligence Hub - MOVED TO TOP */}
-            <div className="mb-8 md:mb-10">
-              <IntelligenceHubRedesigned organizationId={organization.id} />
-            </div>
-
-            {/* AT A GLANCE: Campaign Snapshot */}
-            <div className="mb-6 md:mb-8">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Campaign Snapshot</h2>
-                  <p className="text-sm portal-text-secondary mt-1">Key performance indicators</p>
-                </div>
-                {/* Inline Date Range - Compact */}
-                <div className="flex items-center gap-2">
-                  <DateRangeSelector
-                    startDate={startDate}
-                    endDate={endDate}
-                    onDateChange={handleDateChange}
-                  />
-                </div>
+            <PortalErrorBoundary>
+              {/* HERO: Intelligence Hub - MOVED TO TOP */}
+              <div className="mb-8 md:mb-10">
+                <IntelligenceHubRedesigned organizationId={organization.id} />
               </div>
-              <ClientDashboardMetrics
-                organizationId={organization.id}
-                startDate={startDate}
-                endDate={endDate}
-              />
-            </div>
 
-        {/* DEEP DIVE: Campaign Performance Details - Expandable Sections */}
-        <div className="mb-6">
-          <div className="mb-4">
-            <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Campaign Performance</h2>
-            <p className="text-sm portal-text-secondary mt-1">Expand any channel for detailed insights</p>
-          </div>
-          <ConsolidatedChannelMetrics
-            organizationId={organization.id}
-            startDate={startDate}
-            endDate={endDate}
-          />
-        </div>
+              {/* AT A GLANCE: Campaign Snapshot */}
+              <div className="mb-6 md:mb-8">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Campaign Snapshot</h2>
+                    <p className="text-sm portal-text-secondary mt-1">Key performance indicators</p>
+                  </div>
+                  {/* Inline Date Range - Compact */}
+                  <div className="flex items-center gap-2">
+                    <DateRangeSelector
+                      startDate={startDate}
+                      endDate={endDate}
+                      onDateChange={handleDateChange}
+                    />
+                  </div>
+                </div>
+                <ClientDashboardMetrics
+                  organizationId={organization.id}
+                  startDate={startDate}
+                  endDate={endDate}
+                />
+              </div>
 
-        {/* Sync Controls - Compact Footer */}
-        <div className="mt-8">
-          <SyncControls organizationId={organization.id} />
-        </div>
+              {/* DEEP DIVE: Campaign Performance Details - Expandable Sections */}
+              <div className="mb-6">
+                <div className="mb-4">
+                  <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Campaign Performance</h2>
+                  <p className="text-sm portal-text-secondary mt-1">Expand any channel for detailed insights</p>
+                </div>
+                <ConsolidatedChannelMetrics
+                  organizationId={organization.id}
+                  startDate={startDate}
+                  endDate={endDate}
+                />
+              </div>
+
+              {/* Sync Controls - Compact Footer */}
+              <div className="mt-8">
+                <SyncControls organizationId={organization.id} />
+              </div>
+            </PortalErrorBoundary>
           </div>
         </main>
         </div>
