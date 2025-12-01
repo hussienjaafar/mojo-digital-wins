@@ -218,13 +218,20 @@ Return JSON array:
           continue;
         }
 
-        // Parse AI response (it might return an object with topics array or just an array)
+        // Parse AI response with robust JSON extraction
         let extractedTopics: ExtractedTopic[] = [];
         try {
-          const parsed = JSON.parse(content);
+          // Remove markdown code blocks if present
+          const cleanedContent = content
+            .replace(/```json\s*/g, '')
+            .replace(/```\s*/g, '')
+            .trim();
+          
+          const parsed = JSON.parse(cleanedContent);
           extractedTopics = Array.isArray(parsed) ? parsed : (parsed.topics || []);
         } catch (e) {
           console.error('Failed to parse AI response:', e);
+          console.error('Raw content:', content.substring(0, 200));
           continue;
         }
 
