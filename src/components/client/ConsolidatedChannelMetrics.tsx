@@ -73,13 +73,13 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
             {/* Section Header - Clickable */}
             <button
               onClick={() => toggleSection(section.id)}
-              className="w-full px-4 sm:px-6 py-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
+              className="w-full px-4 sm:px-6 py-4 flex items-center justify-between hover:bg-muted/50 transition-all duration-300 group"
               aria-expanded={isExpanded}
               aria-controls={`section-${section.id}`}
             >
               <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                <div className="portal-card p-2 shrink-0">
-                  <Icon className="h-5 w-5 text-primary" aria-hidden="true" />
+                <div className="portal-card p-2 shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/10">
+                  <Icon className="h-5 w-5 text-primary transition-all duration-300 group-hover:text-primary" aria-hidden="true" />
                 </div>
                 <div className="text-left min-w-0 flex-1">
                   <h3 className="text-base sm:text-lg font-semibold portal-text-primary">
@@ -92,9 +92,9 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
               </div>
               <div className="shrink-0 ml-4">
                 {isExpanded ? (
-                  <ChevronDown className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                  <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-300 group-hover:text-primary" aria-hidden="true" />
                 ) : (
-                  <ChevronRight className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                  <ChevronRight className="h-5 w-5 text-muted-foreground transition-all duration-300 group-hover:translate-x-1 group-hover:text-primary" aria-hidden="true" />
                 )}
               </div>
             </button>

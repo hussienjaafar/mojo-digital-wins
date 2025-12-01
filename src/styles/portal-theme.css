@@ -67,6 +67,24 @@
   --portal-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --portal-transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --portal-transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --portal-transition-elegant: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* === PORTAL TYPOGRAPHY === */
+  --portal-font-size-xs: 0.75rem;   /* 12px */
+  --portal-font-size-sm: 0.875rem;  /* 14px */
+  --portal-font-size-base: 1rem;    /* 16px */
+  --portal-font-size-lg: 1.125rem;  /* 18px */
+  --portal-font-size-xl: 1.25rem;   /* 20px */
+  --portal-font-size-2xl: 1.5rem;   /* 24px */
+  --portal-font-size-3xl: 1.875rem; /* 30px */
+  --portal-font-size-4xl: 2.25rem;  /* 36px */
+  
+  /* === PORTAL Z-INDEX SCALE === */
+  --portal-z-base: 1;
+  --portal-z-elevated: 10;
+  --portal-z-sticky: 100;
+  --portal-z-modal: 1000;
+  --portal-z-tooltip: 1100;
 }
 
 /* === PORTAL LAYOUT CLASSES === */
@@ -98,6 +116,12 @@
   background: hsl(var(--portal-bg-tertiary));
   border-color: hsl(var(--portal-border-hover));
   box-shadow: var(--portal-shadow-md);
+  transform: translateY(-2px);
+}
+
+.portal-card:active {
+  transform: translateY(0);
+  box-shadow: var(--portal-shadow-sm);
 }
 
 .portal-card-glass {
@@ -169,6 +193,12 @@
 .portal-metric:hover {
   border-color: hsl(var(--portal-accent-blue));
   box-shadow: var(--portal-shadow-glow);
+  transform: translateY(-4px) scale(1.02);
+  cursor: pointer;
+}
+
+.portal-metric:active {
+  transform: translateY(-2px) scale(1.01);
 }
 
 .portal-metric-value {
@@ -416,6 +446,125 @@
   color: hsl(var(--portal-text-primary));
 }
 
+/* === PORTAL ANIMATIONS === */
+@keyframes portal-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes portal-slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes portal-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes portal-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes portal-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px hsl(var(--portal-accent-blue) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(var(--portal-accent-blue) / 0.5);
+  }
+}
+
+.portal-animate-fade-in {
+  animation: portal-fade-in 0.4s ease-out;
+}
+
+.portal-animate-slide-in-left {
+  animation: portal-slide-in-left 0.4s ease-out;
+}
+
+.portal-animate-slide-in-right {
+  animation: portal-slide-in-right 0.4s ease-out;
+}
+
+.portal-animate-scale-in {
+  animation: portal-scale-in 0.3s ease-out;
+}
+
+.portal-animate-pulse-glow {
+  animation: portal-pulse-glow 2s ease-in-out infinite;
+}
+
+/* Staggered animation delays */
+.portal-delay-100 { animation-delay: 100ms; }
+.portal-delay-200 { animation-delay: 200ms; }
+.portal-delay-300 { animation-delay: 300ms; }
+.portal-delay-400 { animation-delay: 400ms; }
+
+/* === PORTAL MICRO-INTERACTIONS === */
+.portal-interactive {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.portal-interactive::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: hsl(var(--portal-accent-blue) / 0.1);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s ease, height 0.6s ease;
+}
+
+.portal-interactive:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* === LOADING STATES === */
+.portal-loading-pulse {
+  animation: portal-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes portal-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 /* === RESPONSIVE UTILITIES === */
 @media (max-width: 768px) {
   .portal-card {
@@ -424,5 +573,40 @@
   
   .portal-metric-value {
     font-size: 1.5rem;
+  }
+  
+  .portal-header {
+    position: sticky;
+    top: 0;
+    z-index: var(--portal-z-sticky);
+  }
+  
+  /* Improve touch targets on mobile */
+  .portal-btn-primary,
+  .portal-btn-secondary {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .portal-sidebar-item {
+    min-height: 44px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .portal-card,
+  .portal-metric,
+  .portal-btn-primary,
+  .portal-btn-secondary,
+  .portal-interactive,
+  *[class*="portal-animate"] {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  .portal-card:hover,
+  .portal-metric:hover {
+    transform: none;
   }
 }
