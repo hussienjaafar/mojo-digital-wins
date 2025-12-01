@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL") || "hussein@ryzeup.io";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -215,7 +216,7 @@ const handler = async (req: Request): Promise<Response> => {
             "Authorization": `Bearer ${RESEND_API_KEY}`,
           },
           body: JSON.stringify({
-            from: "Client Portal <onboarding@resend.dev>",
+            from: `Client Portal <${SENDER_EMAIL}>`,
             to: [email],
             subject: `Welcome to ${org?.name || 'Client Portal'}`,
             html: htmlContent,
