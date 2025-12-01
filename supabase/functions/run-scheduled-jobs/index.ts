@@ -63,7 +63,7 @@ serve(async (req) => {
             status: 'running',
           })
           .select('id')
-          .single();
+          .maybeSingle();
 
         executionId = execution?.id;
 
@@ -216,15 +216,8 @@ serve(async (req) => {
             itemsCreated = result?.postsCollected || 0;
             break;
 
-          case 'calculate_bluesky_trends':
-            const trendsResponse = await supabase.functions.invoke('calculate-bluesky-trends', {
-              body: {}
-            });
-            if (trendsResponse.error) throw new Error(trendsResponse.error.message);
-            result = trendsResponse.data;
-            itemsProcessed = result?.topicsProcessed || 0;
-            itemsCreated = result?.trendsUpserted || 0;
-            break;
+          // REMOVED: Duplicate case for calculate_bluesky_trends
+          // This case is already handled at line 161-168
 
           case 'calculate_news_trends':
             const newsTrendsResponse = await supabase.functions.invoke('calculate-news-trends', {

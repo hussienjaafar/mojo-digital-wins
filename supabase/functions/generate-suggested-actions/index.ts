@@ -45,19 +45,23 @@ serve(async (req) => {
 
     for (const alert of alerts || []) {
       // Get organization profile for context
-      const { data: orgProfile } = await supabase
+      const { data: orgProfile, error: profileError } = await supabase
         .from('organization_profiles')
         .select('mission, focus_areas, key_issues')
         .eq('organization_id', alert.organization_id)
-        .single();
+        .maybeSingle();
 
-      // Build context for AI
+      if (profileError) {
+        console.error(`Error fetching profile for org ${alert.organization_id}:`, profileError);
+      }
+
+      // Build context for AI with fallbacks for missing profile
       const context = {
         entityName: alert.entity_name,
         entityType: alert.entity_watchlist?.entity_type,
         orgName: alert.client_organizations?.name,
-        mission: orgProfile?.mission,
-        focusAreas: orgProfile?.focus_areas,
+        mission: orgProfile?.mission || 'Political advocacy',
+        focusAreas: orgProfile?.focus_areas || ['Policy advocacy'],
         velocity: alert.velocity,
         mentions: alert.current_mentions,
         sentiment: alert.sample_sources?.[0]?.context,

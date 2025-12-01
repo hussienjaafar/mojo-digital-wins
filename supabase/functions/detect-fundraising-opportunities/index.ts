@@ -33,13 +33,12 @@ serve(async (req) => {
     let totalOpportunities = 0;
 
     for (const org of orgs) {
-      // Get current trending entities for this org
+      // Get current trending entities globally (entity_trends has no organization_id)
       const { data: trendingEntities } = await supabase
         .from('entity_trends')
         .select('*')
-        .eq('organization_id', org.id)
-        .gte('trend_window_start', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
         .gt('velocity', 30)
+        .eq('is_trending', true)
         .order('velocity', { ascending: false })
         .limit(10);
 

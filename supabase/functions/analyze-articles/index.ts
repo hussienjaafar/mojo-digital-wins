@@ -458,9 +458,9 @@ Content: ${textToAnalyze}`;
           });
         }
 
-        // Insert entity mentions
+        // Insert entity mentions with deduplication
         if (entities.length > 0) {
-          await supabase.from('entity_mentions').insert(
+          const { error: mentionError } = await supabase.from('entity_mentions').upsert(
             entities.map(e => ({
               entity_name: e.entity_name,
               entity_type: e.entity_type,
@@ -470,8 +470,16 @@ Content: ${textToAnalyze}`;
               source_url: article.source_url,
               mentioned_at: article.published_date,
               sentiment: analysis.sentiment_score
-            }))
+            })),
+            {
+              onConflict: 'entity_name,source_id,source_type',
+              ignoreDuplicates: false  // Update sentiment if entity mention already exists
+            }
           );
+
+          if (mentionError) {
+            console.error(`Error inserting entity mentions for article ${article.id}:`, mentionError);
+          }
         }
 
         analyzed++;
