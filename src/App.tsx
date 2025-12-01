@@ -44,6 +44,8 @@ import BillDetail from "./pages/BillDetail";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
 
+import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
+
 const queryClient = new QueryClient();
 
 const AppContent = () => {
@@ -103,13 +105,15 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="light" storageKey="molitico-ui-theme">
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </TooltipProvider>
+      <ImpersonationProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </TooltipProvider>
+      </ImpersonationProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

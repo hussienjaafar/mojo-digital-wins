@@ -9,7 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Users, Mail } from "lucide-react";
+import { UserPlus, Users, Mail, Eye } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
 
 type Organization = {
   id: string;
@@ -27,6 +29,8 @@ type ClientUser = {
 
 const ClientUserManager = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { setImpersonation } = useImpersonation();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [users, setUsers] = useState<ClientUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -133,6 +137,12 @@ const ClientUserManager = () => {
 
   const getOrganizationName = (orgId: string) => {
     return organizations.find(o => o.id === orgId)?.name || 'Unknown';
+  };
+
+  const handleViewPortal = (user: ClientUser) => {
+    const orgName = getOrganizationName(user.organization_id);
+    setImpersonation(user.id, user.full_name, user.organization_id, orgName);
+    navigate('/client/dashboard');
   };
 
   if (isLoading) {
@@ -283,12 +293,13 @@ const ClientUserManager = () => {
               <TableHead>Role</TableHead>
               <TableHead>Last Login</TableHead>
               <TableHead>Created</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
                   No users yet. Create your first one!
                 </TableCell>
               </TableRow>
@@ -309,6 +320,17 @@ const ClientUserManager = () => {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {new Date(user.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewPortal(user)}
+                      className="hover:bg-blue-50 dark:hover:bg-blue-950"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View Portal
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
