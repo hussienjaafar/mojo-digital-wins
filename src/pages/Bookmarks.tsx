@@ -83,7 +83,7 @@ export default function Bookmarks() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 portal-animate-fade-in">
       <div className="mb-8">
         <Button variant="ghost" asChild className="mb-4">
           <Link to="/admin">
@@ -94,9 +94,9 @@ export default function Bookmarks() {
         <div className="flex items-center gap-3">
           <Bookmark className="w-8 h-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold">My Bookmarks</h1>
-            <p className="text-muted-foreground">
-              {bookmarks.length} saved {bookmarks.length === 1 ? 'article' : 'articles'}
+            <h1 className="text-3xl font-bold portal-text-primary">My Bookmarks</h1>
+            <p className="portal-text-secondary">
+              <span className="font-semibold portal-text-primary">{bookmarks.length}</span> saved {bookmarks.length === 1 ? 'article' : 'articles'}
             </p>
           </div>
         </div>

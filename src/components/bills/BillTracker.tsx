@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LoadingCard } from "@/components/ui/loading-spinner";
-import { RefreshCw, Search } from "lucide-react";
+import { RefreshCw, Search, ScrollText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export function BillTracker() {
@@ -119,7 +119,33 @@ export function BillTracker() {
   };
 
   if (loading) {
-    return <LoadingCard />;
+    return (
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+            <ScrollText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Bill Tracker</h2>
+            <p className="text-sm portal-text-secondary">Loading congressional bills...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1 space-y-2">
+                  <div className="portal-skeleton h-5 w-32" />
+                  <div className="portal-skeleton h-6 w-full" />
+                  <div className="portal-skeleton h-4 w-2/3" />
+                </div>
+                <div className="portal-skeleton h-8 w-24 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
