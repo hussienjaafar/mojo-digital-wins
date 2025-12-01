@@ -108,10 +108,10 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
 
   if (isLoading || !organization) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="portal-theme portal-bg min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground font-medium">Loading...</p>
+          <div className="w-16 h-16 border-4 border-t-transparent rounded-full animate-spin mx-auto" style={{ borderColor: 'hsl(var(--portal-accent-blue))' }} />
+          <p className="portal-text-secondary font-medium">Loading...</p>
         </div>
       </div>
     );
@@ -121,13 +121,13 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
     <>
       <SkipNavigation />
       <SidebarProvider defaultOpen={!isMobile}>
-        <div className="min-h-screen w-full flex bg-gradient-to-br from-background via-background to-muted/10">
+        <div className="portal-theme min-h-screen w-full flex portal-bg">
           <AppSidebar organizationId={organization.id} />
         
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
-          <header className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50 shadow-sm" role="banner">
-            <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6">
+          <header className="portal-header" role="banner">
+            <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-4">
               <div className="flex items-center justify-between gap-3">
                 {/* Sidebar Trigger + Logo */}
                 <div className="flex items-center gap-3 sm:gap-6">
@@ -143,7 +143,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
                     </div>
                   )}
                   <div className="min-w-0">
-                    <h1 className="text-lg sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent truncate">
+                    <h1 className="text-lg sm:text-2xl font-bold tracking-tight portal-text-primary truncate">
                       {organization.name}
                     </h1>
                   </div>

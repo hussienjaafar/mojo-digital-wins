@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Settings as SettingsIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
+// Settings page for MARKETING SITE - NOT a portal page
+// Keep original styling, do not apply portal theme
 export default function Settings() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
