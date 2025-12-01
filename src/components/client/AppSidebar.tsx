@@ -84,38 +84,12 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
 
   const sections = [
     {
-      label: "Overview",
+      label: "Main",
       items: [
         { title: "Dashboard", url: "/client-dashboard", icon: Home },
-      ],
-    },
-    {
-      label: "Intelligence Hub",
-      items: [
-        { title: "News Feed", url: "/", icon: Activity },
-        { title: "Entity Watchlist", url: "/client-watchlist", icon: Eye },
-        { title: "Polling Intelligence", url: "/polling-intelligence", icon: BarChart3 },
-        { title: "Polling Alerts", url: "/client-polling-alerts", icon: Bell },
-      ],
-    },
-    {
-      label: "Alerts & Actions",
-      items: [
-        { title: "Critical Alerts", url: "/client-alerts", icon: Bell, badge: stats.alerts },
-        { title: "Suggested Actions", url: "/client-actions", icon: Target, badge: stats.actions },
-        { title: "Opportunities", url: "/client-opportunities", icon: DollarSign, badge: stats.opportunities },
-      ],
-    },
-    {
-      label: "Performance",
-      items: [
-        { title: "Demographics", url: "/client-demographics", icon: UserCircle },
-        { title: "Donor Journey", url: "/client-donor-journey", icon: TrendingUp },
-      ],
-    },
-    {
-      label: "Settings",
-      items: [
+        { title: "Intelligence", url: "/", icon: Activity },
+        { title: "Watchlist", url: "/client-watchlist", icon: Eye },
+        { title: "Alerts", url: "/client-alerts", icon: Bell, badge: stats.alerts },
         { title: "Profile", url: "/client-profile", icon: Settings },
       ],
     },

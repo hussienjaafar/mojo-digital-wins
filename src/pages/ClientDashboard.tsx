@@ -2,23 +2,20 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, TrendingUp, DollarSign, Users, Target, Calendar, LayoutGrid, Menu } from "lucide-react";
+import { LogOut, LayoutGrid } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/client/AppSidebar";
-import { IntelligenceHub } from "@/components/client/IntelligenceHub";
+import { IntelligenceHubRedesigned } from "@/components/client/IntelligenceHubRedesigned";
 import { OnboardingWizard } from "@/components/client/OnboardingWizard";
 import { ClientDashboardMetrics } from "@/components/client/ClientDashboardMetrics";
-import ClientMetricsOverview from "@/components/client/ClientMetricsOverview";
-import MetaAdsMetrics from "@/components/client/MetaAdsMetrics";
-import SMSMetrics from "@/components/client/SMSMetrics";
-import DonationMetrics from "@/components/client/DonationMetrics";
+import { ConsolidatedChannelMetrics } from "@/components/client/ConsolidatedChannelMetrics";
 import SyncControls from "@/components/client/SyncControls";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 
@@ -218,7 +215,7 @@ const ClientDashboard = () => {
           <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 w-full">
             {/* HERO: Intelligence Hub - MOVED TO TOP */}
             <div className="mb-8 md:mb-10">
-              <IntelligenceHub organizationId={organization.id} />
+              <IntelligenceHubRedesigned organizationId={organization.id} />
             </div>
 
             {/* AT A GLANCE: Campaign Snapshot */}
@@ -244,80 +241,17 @@ const ClientDashboard = () => {
               />
             </div>
 
-        {/* DEEP DIVE: Campaign Performance Details - Collapsible */}
+        {/* DEEP DIVE: Campaign Performance Details - Expandable Sections */}
         <div className="mb-6">
           <div className="mb-4">
             <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Campaign Performance</h2>
-            <p className="text-sm portal-text-secondary mt-1">Detailed breakdown by channel</p>
+            <p className="text-sm portal-text-secondary mt-1">Expand any channel for detailed insights</p>
           </div>
-          <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
-            <div className="relative -mx-3 sm:mx-0">
-              <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent px-3 sm:px-0">
-                <TabsList className="bg-card/50 backdrop-blur border border-border/50 p-1 sm:p-1.5 h-auto gap-1 sm:gap-2 inline-flex w-auto min-w-full sm:min-w-0">
-                  <TabsTrigger
-                    value="overview"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
-                  >
-                    <TrendingUp className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Overview</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="meta"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
-                  >
-                    <Target className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Meta Ads</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="sms"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
-                  >
-                    <Users className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">SMS</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="donations"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
-                  >
-                    <DollarSign className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Donations</span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-            </div>
-
-          <TabsContent value="overview">
-            <ClientMetricsOverview 
-              organizationId={organization.id} 
-              startDate={startDate} 
-              endDate={endDate} 
-            />
-          </TabsContent>
-
-          <TabsContent value="meta">
-            <MetaAdsMetrics 
-              organizationId={organization.id} 
-              startDate={startDate} 
-              endDate={endDate} 
-            />
-          </TabsContent>
-
-          <TabsContent value="sms">
-            <SMSMetrics 
-              organizationId={organization.id} 
-              startDate={startDate} 
-              endDate={endDate} 
-            />
-          </TabsContent>
-
-          <TabsContent value="donations">
-            <DonationMetrics 
-              organizationId={organization.id} 
-              startDate={startDate} 
-              endDate={endDate} 
-            />
-          </TabsContent>
-          </Tabs>
+          <ConsolidatedChannelMetrics
+            organizationId={organization.id}
+            startDate={startDate}
+            endDate={endDate}
+          />
         </div>
 
         {/* Sync Controls - Compact Footer */}
