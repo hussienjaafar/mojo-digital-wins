@@ -139,14 +139,30 @@ export function CriticalAlerts() {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-muted rounded w-1/3"></div>
-            <div className="h-20 bg-muted rounded"></div>
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950">
+            <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Critical Alerts</h2>
+            <p className="text-sm portal-text-secondary">Loading high-priority items...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="flex gap-3">
+                <div className="portal-skeleton h-10 w-10 rounded" />
+                <div className="flex-1 space-y-2">
+                  <div className="portal-skeleton h-5 w-3/4" />
+                  <div className="portal-skeleton h-4 w-full" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 

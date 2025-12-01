@@ -145,14 +145,26 @@ export function DailyBriefing() {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-6 bg-muted rounded w-1/3"></div>
-            <div className="h-32 bg-muted rounded"></div>
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+            <Calendar className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 dark:text-blue-400" />
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold portal-text-primary">Daily Briefing</h2>
+            <p className="text-sm sm:text-base portal-text-secondary">Loading today's briefing...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 100}ms` }}>
+              <div className="portal-skeleton h-6 w-32" />
+              <div className="portal-skeleton h-4 w-full" />
+              <div className="portal-skeleton h-4 w-3/4" />
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 

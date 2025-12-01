@@ -131,7 +131,32 @@ const ClientOrganizationManager = () => {
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading organizations...</div>;
+    return (
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+            <Building2 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Client Organizations</h2>
+            <p className="text-sm portal-text-secondary">Loading organizations...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="portal-skeleton h-12 w-12 rounded-lg" />
+              <div className="portal-skeleton h-6 w-3/4" />
+              <div className="portal-skeleton h-4 w-full" />
+              <div className="flex gap-2 mt-4">
+                <div className="portal-skeleton h-8 w-20" />
+                <div className="portal-skeleton h-8 w-20" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
