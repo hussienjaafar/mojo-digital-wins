@@ -420,25 +420,42 @@ export function NewsFeed() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 portal-animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold">News Feed</h2>
-            <p className="text-muted-foreground mt-1">Loading articles...</p>
+            <h2 className="text-3xl font-bold portal-text-primary">News Feed</h2>
+            <p className="portal-text-secondary mt-1">Loading articles...</p>
           </div>
         </div>
-        <NewsFeedSkeleton items={10} />
+        <div className="grid grid-cols-1 gap-4">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="flex gap-3">
+                <div className="portal-skeleton h-24 w-32 rounded shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="portal-skeleton h-5 w-3/4" />
+                  <div className="portal-skeleton h-4 w-full" />
+                  <div className="portal-skeleton h-4 w-2/3" />
+                  <div className="flex gap-2 mt-2">
+                    <div className="portal-skeleton h-6 w-16 rounded-full" />
+                    <div className="portal-skeleton h-6 w-16 rounded-full" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 portal-animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold">News Feed</h2>
-          <p className="text-muted-foreground mt-1">
-            Showing {articles.length} of {totalCount.toLocaleString()} {totalCount === 1 ? 'article' : 'articles'}
+          <h2 className="text-3xl font-bold portal-text-primary">News Feed</h2>
+          <p className="portal-text-secondary mt-1">
+            Showing <span className="font-semibold portal-text-primary">{articles.length}</span> of <span className="font-semibold portal-text-primary">{totalCount.toLocaleString()}</span> {totalCount === 1 ? 'article' : 'articles'}
             {hasMore && ' • Scroll for more'}
           </p>
         </div>

@@ -219,8 +219,24 @@ export function DashboardHome() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-lg text-muted-foreground">Loading dashboard...</div>
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 100}ms` }}>
+              <div className="portal-skeleton h-8 w-8 rounded-lg" />
+              <div className="portal-skeleton h-4 w-24" />
+              <div className="portal-skeleton h-8 w-32" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="portal-card p-6">
+            <div className="portal-skeleton h-64 rounded" />
+          </div>
+          <div className="portal-card p-6">
+            <div className="portal-skeleton h-64 rounded" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -263,108 +279,108 @@ export function DashboardHome() {
         />
       </div>
 
-      {/* Key Metrics Grid - Redesigned with Semantic Colors */}
+      {/* Key Metrics Grid - Enhanced with Portal Styling */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Revenue - Green */}
-        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '0ms' }}>
+        <Card variant="elevated" className="portal-card portal-animate-fade-in hover:scale-[1.02] transition-transform duration-300" style={{ animationDelay: '0ms' }}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950">
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950 transition-all duration-300">
                 <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
               </div>
               {stats.revenueChange > 0 ? (
-                <div className="flex items-center text-xs font-medium text-green-600 dark:text-green-400">
+                <div className="flex items-center text-xs font-medium text-green-600 dark:text-green-400 portal-animate-scale-in">
                   <ArrowUpRight className="h-3 w-3 mr-1" />
                   +{stats.revenueChange}%
                 </div>
               ) : (
-                <div className="flex items-center text-xs font-medium text-red-600 dark:text-red-400">
+                <div className="flex items-center text-xs font-medium text-red-600 dark:text-red-400 portal-animate-scale-in">
                   <ArrowDownRight className="h-3 w-3 mr-1" />
                   {stats.revenueChange}%
                 </div>
               )}
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
-              <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+              <p className="text-sm font-medium portal-text-secondary">Total Revenue</p>
+              <div className="text-3xl font-bold text-green-600 dark:text-green-400 tabular-nums">
                 {formatCurrency(stats.totalRevenue)}
               </div>
-              <p className="text-xs text-muted-foreground">from last month</p>
+              <p className="text-xs portal-text-secondary">from last month</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Active Clients - Blue */}
-        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '50ms' }}>
+        <Card variant="elevated" className="portal-card portal-animate-fade-in hover:scale-[1.02] transition-transform duration-300" style={{ animationDelay: '50ms' }}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950 transition-all duration-300">
                 <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
               {stats.clientChange > 0 && (
-                <div className="flex items-center text-xs font-medium text-green-600 dark:text-green-400">
+                <div className="flex items-center text-xs font-medium text-green-600 dark:text-green-400 portal-animate-scale-in">
                   <ArrowUpRight className="h-3 w-3 mr-1" />
                   +{stats.clientChange}%
                 </div>
               )}
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Active Clients</p>
-              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+              <p className="text-sm font-medium portal-text-secondary">Active Clients</p>
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 tabular-nums">
                 {stats.activeClients}
               </div>
-              <p className="text-xs text-muted-foreground">of {stats.totalClients} total</p>
+              <p className="text-xs portal-text-secondary">of {stats.totalClients} total</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Average ROI - Purple */}
-        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+        <Card variant="elevated" className="portal-card portal-animate-fade-in hover:scale-[1.02] transition-transform duration-300" style={{ animationDelay: '100ms' }}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
-              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950 transition-all duration-300">
                 <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Average ROI</p>
-              <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+              <p className="text-sm font-medium portal-text-secondary">Average ROI</p>
+              <div className="text-3xl font-bold text-purple-600 dark:text-purple-400 tabular-nums">
                 {stats.avgROI.toFixed(1)}%
               </div>
-              <p className="text-xs text-muted-foreground">Return on investment</p>
+              <p className="text-xs portal-text-secondary">Return on investment</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Total Donations - Orange */}
-        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '150ms' }}>
+        <Card variant="elevated" className="portal-card portal-animate-fade-in hover:scale-[1.02] transition-transform duration-300" style={{ animationDelay: '150ms' }}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
-              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950 transition-all duration-300">
                 <Users className="h-5 w-5 text-orange-600 dark:text-orange-400" />
               </div>
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Total Donations</p>
-              <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+              <p className="text-sm font-medium portal-text-secondary">Total Donations</p>
+              <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 tabular-nums">
                 {formatNumber(stats.totalDonations)}
               </div>
-              <p className="text-xs text-muted-foreground">Across all campaigns</p>
+              <p className="text-xs portal-text-secondary">Across all campaigns</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Demo Organization Card - Redesigned */}
-      <Card variant="gradient" className="animate-fade-in bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-800">
+      {/* Demo Organization Card - Enhanced */}
+      <Card variant="gradient" className="portal-card portal-animate-fade-in bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-800">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
               <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <CardTitle className="text-xl">Demo Organization</CardTitle>
-              <CardDescription className="text-sm">
+              <CardTitle className="text-xl portal-text-primary">Demo Organization</CardTitle>
+              <CardDescription className="text-sm portal-text-secondary">
                 Progressive Victory Fund • Sample Data
               </CardDescription>
             </div>
@@ -372,31 +388,31 @@ export function DashboardHome() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 bg-background rounded-lg border space-y-1">
+            <div className="p-4 portal-bg-elevated rounded-lg border portal-border space-y-1 hover:scale-[1.02] transition-transform duration-300">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <div className="text-xs font-medium text-muted-foreground">Funds Raised</div>
+                <div className="text-xs font-medium portal-text-secondary">Funds Raised</div>
               </div>
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">$245,750</div>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400 tabular-nums">$245,750</div>
             </div>
-            <div className="p-4 bg-background rounded-lg border space-y-1">
+            <div className="p-4 portal-bg-elevated rounded-lg border portal-border space-y-1 hover:scale-[1.02] transition-transform duration-300">
               <div className="flex items-center gap-2">
                 <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <div className="text-xs font-medium text-muted-foreground">Ad Spend</div>
+                <div className="text-xs font-medium portal-text-secondary">Ad Spend</div>
               </div>
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">$18,500</div>
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 tabular-nums">$18,500</div>
             </div>
-            <div className="p-4 bg-background rounded-lg border space-y-1">
+            <div className="p-4 portal-bg-elevated rounded-lg border portal-border space-y-1 hover:scale-[1.02] transition-transform duration-300">
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                <div className="text-xs font-medium text-muted-foreground">ROI</div>
+                <div className="text-xs font-medium portal-text-secondary">ROI</div>
               </div>
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">1,228%</div>
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 tabular-nums">1,228%</div>
             </div>
           </div>
           <Button
             onClick={() => navigate('/admin/client-view/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d')}
-            className="w-full min-h-[44px]"
+            className="w-full min-h-[44px] hover:scale-[1.02] transition-all duration-300"
             size="lg"
           >
             View Full Dashboard →
