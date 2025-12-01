@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ const getCongressGovUrl = (billNumber: string, billType: string, congress: numbe
 export default function BillDetail() {
   const { billNumber } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [bill, setBill] = useState<any>(null);
   const [actions, setActions] = useState<any[]>([]);
   const [fullText, setFullText] = useState<string>("");
@@ -77,9 +79,18 @@ export default function BillDetail() {
         .from('bills')
         .select('*')
         .eq('bill_number', billNumber)
-        .single();
+        .maybeSingle();
 
       if (billError) throw billError;
+      if (!bill) {
+        toast({
+          title: "Error",
+          description: "Bill not found",
+          variant: "destructive",
+        });
+        navigate('/');
+        return;
+      }
       setBill(billData);
 
       // Fetch actions

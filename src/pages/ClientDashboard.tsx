@@ -70,7 +70,7 @@ const ClientDashboard = () => {
       .from("profiles")
       .select("onboarding_completed")
       .eq("id", session.user.id)
-      .single() as any;
+      .maybeSingle() as any;
 
     if (profile && !profile.onboarding_completed) {
       setShowOnboarding(true);
@@ -88,7 +88,7 @@ const ClientDashboard = () => {
         .from('client_users')
         .select('organization_id')
         .eq('id', session?.user?.id)
-        .single();
+        .maybeSingle();
 
       if (userError) throw userError;
       if (!clientUser) {
@@ -105,9 +105,18 @@ const ClientDashboard = () => {
         .from('client_organizations')
         .select('*')
         .eq('id', clientUser.organization_id)
-        .single();
+        .maybeSingle();
 
       if (orgError) throw orgError;
+      if (!org) {
+        toast({
+          title: "Error",
+          description: "Organization not found",
+          variant: "destructive",
+        });
+        navigate('/');
+        return;
+      }
       setOrganization(org);
     } catch (error: any) {
       toast({

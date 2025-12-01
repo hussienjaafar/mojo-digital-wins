@@ -59,7 +59,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
         .from('client_users')
         .select('organization_id')
         .eq('id', session?.user?.id)
-        .single();
+        .maybeSingle();
 
       if (userError) throw userError;
       if (!clientUser) {
@@ -76,9 +76,18 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
         .from('client_organizations')
         .select('*')
         .eq('id', clientUser.organization_id)
-        .single();
+        .maybeSingle();
 
       if (orgError) throw orgError;
+      if (!org) {
+        toast({
+          title: "Error",
+          description: "Organization not found",
+          variant: "destructive",
+        });
+        navigate('/');
+        return;
+      }
       setOrganization(org);
     } catch (error: any) {
       toast({

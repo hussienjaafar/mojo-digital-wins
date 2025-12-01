@@ -169,7 +169,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
 
     // Handle manual state action submission
     if (body.action === 'add') {
