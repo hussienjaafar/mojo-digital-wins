@@ -13,51 +13,34 @@ interface ClientDashboardMetricsProps {
 
 export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: ClientDashboardMetricsProps) => {
   // Mock data for demo - would be fetched from API
-  const topMetrics = [
-    {
-      label: "Purchase Rate",
-      value: "15",
-      progress: 50,
-      trend: { value: 20, isPositive: true, label: "Last Week" },
-      subtitle: "This Month",
-    },
-    {
-      label: "Rewards Purchase",
-      value: "17",
-      progress: 67,
-      trend: { value: 65, isPositive: true, label: "Rewarded" },
-      subtitle: "This Month",
-    },
-  ];
-
   const kpiCards = [
     {
-      label: "Total Revenue",
-      value: "$124.5K",
-      icon: DollarSign,
+      label: "Engagement Rate",
+      value: "68%",
+      icon: TrendingUp,
       trend: { value: 12.5, isPositive: true },
       subtitle: "vs. last month",
     },
     {
-      label: "Active Campaigns",
-      value: "23",
-      icon: Target,
+      label: "Donor Conversion",
+      value: "3.4%",
+      icon: DollarSign,
       trend: { value: 8.2, isPositive: true },
-      subtitle: "Currently running",
+      subtitle: "30-day average",
     },
     {
-      label: "New Donors",
+      label: "Active Supporters",
       value: "1,284",
       icon: Users,
       trend: { value: 15.3, isPositive: true },
-      subtitle: "This quarter",
+      subtitle: "Growing monthly",
     },
     {
-      label: "Conversion Rate",
-      value: "3.42%",
-      icon: TrendingUp,
+      label: "Campaign Reach",
+      value: "42.3K",
+      icon: Target,
       trend: { value: 2.1, isPositive: false },
-      subtitle: "Last 30 days",
+      subtitle: "Total impressions",
     },
   ];
 
@@ -82,22 +65,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
 
   return (
     <div className="space-y-6">
-      {/* Top Large Metrics with Circular Progress */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {topMetrics.map((metric, index) => (
-          <PortalMetric
-            key={index}
-            label={metric.label}
-            value={metric.value}
-            trend={metric.trend}
-            progress={metric.progress}
-            subtitle={metric.subtitle}
-            variant="large"
-          />
-        ))}
-      </div>
-
-      {/* KPI Cards Row */}
+      {/* KPI Cards Row - Simplified 4-card layout */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpiCards.map((metric, index) => (
           <PortalMetric

@@ -167,22 +167,21 @@ const ClientDashboard = () => {
                 <SidebarTrigger className="shrink-0" />
                 
                 {organization.logo_url && (
-                  <div className="relative shrink-0">
-                    <div className="absolute inset-0 blur-xl rounded-full" style={{ background: 'hsl(var(--portal-accent-blue) / 0.2)' }} />
+                  <div className="shrink-0">
                     <img
                       src={organization.logo_url}
                       alt={organization.name}
-                      className="relative h-10 sm:h-12 md:h-14 w-auto object-contain"
+                      className="h-10 sm:h-12 md:h-14 w-auto object-contain"
                     />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-tight portal-text-primary truncate">
+                  <h1 className="text-lg sm:text-2xl font-bold tracking-tight portal-text-primary truncate">
                     {organization.name}
                   </h1>
                   <p className="text-xs sm:text-sm portal-text-secondary mt-0.5 sm:mt-1 flex items-center gap-2">
                     <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: 'hsl(var(--portal-success))' }} />
-                    Campaign Dashboard
+                    Live Dashboard
                   </p>
                 </div>
               </div>
@@ -217,16 +216,26 @@ const ClientDashboard = () => {
 
         <main className="portal-scrollbar flex-1 overflow-auto">
           <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 w-full">
-            {/* Intelligence Hub */}
-            <div className="mb-6 md:mb-8">
+            {/* HERO: Intelligence Hub - MOVED TO TOP */}
+            <div className="mb-8 md:mb-10">
               <IntelligenceHub organizationId={organization.id} />
             </div>
 
-            {/* Modern Metrics Grid - Rewardifi Style */}
+            {/* AT A GLANCE: Campaign Snapshot */}
             <div className="mb-6 md:mb-8">
-              <div className="mb-4">
-                <h2 className="text-xl sm:text-2xl font-bold portal-text-primary">Performance Overview</h2>
-                <p className="text-sm portal-text-secondary mt-1">Track your key metrics in real-time</p>
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Campaign Snapshot</h2>
+                  <p className="text-sm portal-text-secondary mt-1">Key performance indicators</p>
+                </div>
+                {/* Inline Date Range - Compact */}
+                <div className="flex items-center gap-2">
+                  <DateRangeSelector
+                    startDate={startDate}
+                    endDate={endDate}
+                    onDateChange={handleDateChange}
+                  />
+                </div>
               </div>
               <ClientDashboardMetrics
                 organizationId={organization.id}
@@ -235,76 +244,47 @@ const ClientDashboard = () => {
               />
             </div>
 
-          {/* Date Range Controls - Enhanced with Smooth Variant */}
-        <div className="mb-4 sm:mb-6 md:mb-8">
-          <Card variant="smooth" className="animate-fade-in-down">
-            <CardContent className="p-3 sm:p-4 md:p-6">
-              <div className="flex flex-col gap-4 sm:gap-6">
-                {/* Title Section */}
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="p-2 sm:p-3 bg-primary/10 rounded-xl shrink-0">
-                    <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-base sm:text-lg font-semibold text-foreground">Campaign Performance</h2>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 hidden sm:block">
-                      Track your metrics and ROI in real-time
-                    </p>
-                  </div>
-                </div>
-                {/* Date Range Selector */}
-                <div className="w-full">
-                  <DateRangeSelector
-                    startDate={startDate}
-                    endDate={endDate}
-                    onDateChange={handleDateChange}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sync Controls */}
-        <SyncControls organizationId={organization.id} />
-
-        {/* Modern Tabs with Better Styling - Mobile Optimized */}
-        <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6 md:space-y-8">
-          {/* Scrollable tabs on mobile */}
-          <div className="relative -mx-3 sm:mx-0">
-            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent px-3 sm:px-0">
-              <TabsList className="bg-card/50 backdrop-blur border border-border/50 p-1 sm:p-1.5 h-auto gap-1 sm:gap-2 inline-flex w-auto min-w-full sm:min-w-0">
-                <TabsTrigger
-                  value="overview"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
-                >
-                  <TrendingUp className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Overview</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="meta"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
-                >
-                  <Target className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Meta Ads</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="sms"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
-                >
-                  <Users className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">SMS Campaigns</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="donations"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
-                >
-                  <DollarSign className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Donations</span>
-                </TabsTrigger>
-              </TabsList>
-            </div>
+        {/* DEEP DIVE: Campaign Performance Details - Collapsible */}
+        <div className="mb-6">
+          <div className="mb-4">
+            <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Campaign Performance</h2>
+            <p className="text-sm portal-text-secondary mt-1">Detailed breakdown by channel</p>
           </div>
+          <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
+            <div className="relative -mx-3 sm:mx-0">
+              <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent px-3 sm:px-0">
+                <TabsList className="bg-card/50 backdrop-blur border border-border/50 p-1 sm:p-1.5 h-auto gap-1 sm:gap-2 inline-flex w-auto min-w-full sm:min-w-0">
+                  <TabsTrigger
+                    value="overview"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
+                  >
+                    <TrendingUp className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Overview</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="meta"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
+                  >
+                    <Target className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Meta Ads</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="sms"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
+                  >
+                    <Users className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">SMS</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="donations"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium text-xs sm:text-sm whitespace-nowrap"
+                  >
+                    <DollarSign className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Donations</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+            </div>
 
           <TabsContent value="overview">
             <ClientMetricsOverview 
@@ -337,7 +317,13 @@ const ClientDashboard = () => {
               endDate={endDate} 
             />
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        </div>
+
+        {/* Sync Controls - Compact Footer */}
+        <div className="mt-8">
+          <SyncControls organizationId={organization.id} />
+        </div>
           </div>
         </main>
         </div>

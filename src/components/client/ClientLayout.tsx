@@ -133,12 +133,11 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
                 <div className="flex items-center gap-3 sm:gap-6">
                   <SidebarTrigger aria-label="Toggle navigation menu" />
                   {organization.logo_url && (
-                    <div className="relative shrink-0">
-                      <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" aria-hidden="true" />
+                    <div className="shrink-0">
                       <img
                         src={organization.logo_url}
                         alt={`${organization.name} logo`}
-                        className="relative h-10 sm:h-12 w-auto object-contain"
+                        className="h-10 sm:h-12 w-auto object-contain"
                       />
                     </div>
                   )}

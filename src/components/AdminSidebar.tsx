@@ -89,15 +89,10 @@ export const navigationGroups: NavigationGroup[] = [
     icon: AlertTriangle,
     items: [
       { title: "Daily Briefing", icon: Calendar, value: "daily-briefing" },
+      { title: "News & Trends", icon: Newspaper, value: "news" },
+      { title: "Analytics", icon: BarChart3, value: "content-analytics" },
       { title: "Critical Alerts", icon: AlertTriangle, value: "critical-alerts" },
-      { title: "Executive Orders", icon: Shield, value: "executive-orders" },
-      { title: "State Actions", icon: Landmark, value: "state-actions" },
-      { title: "News", icon: Newspaper, value: "news" },
       { title: "Bills", icon: ScrollText, value: "bills" },
-      { title: "News Pulse", icon: BarChart3, value: "content-analytics" },
-      { title: "Bookmarks", icon: Bookmark, value: "bookmarks" },
-      { title: "Reports", icon: Download, value: "reports" },
-      { title: "Alert Settings", icon: Bell, value: "alert-settings" },
     ],
   },
   {
@@ -106,47 +101,17 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { title: "Organizations", icon: Building2, value: "clients" },
       { title: "Users", icon: Users, value: "client-users" },
-      { title: "Reports", icon: Mail, value: "email-reports" },
+      { title: "Health Monitoring", icon: HeartPulse, value: "client-health", requiredRole: 'admin' },
     ],
   },
   {
-    label: "Marketing",
-    icon: GitBranch,
-    items: [
-      { title: "Campaigns", icon: GitBranch, value: "attribution" },
-      { title: "API Keys", icon: Key, value: "api-credentials", requiredRole: 'admin' },
-      { title: "Sync Schedule", icon: Calendar, value: "scheduler", requiredRole: 'admin' },
-    ],
-  },
-  {
-    label: "Content",
-    icon: PenTool,
-    items: [
-      { title: "Messages", icon: MessageSquare, value: "contacts" },
-      { title: "Newsletter", icon: Mail, value: "newsletter" },
-      { title: "Blog", icon: PenTool, value: "blog-generator" },
-    ],
-  },
-  {
-    label: "Monitoring",
-    icon: Activity,
-    collapsedByDefault: true,
-    items: [
-      { title: "Activity Alerts", icon: AlertCircle, value: "activity-alerts", requiredRole: 'admin' },
-      { title: "Usage Analytics", icon: TrendingUp, value: "usage-analytics", requiredRole: 'admin' },
-      { title: "Client Health", icon: HeartPulse, value: "client-health", requiredRole: 'admin' },
-    ],
-  },
-  {
-    label: "Admin",
+    label: "System",
     icon: Shield,
     collapsedByDefault: true,
     items: [
-      { title: "Ops", icon: Activity, value: "scheduler", requiredRole: 'admin' },
-      { title: "Users", icon: UserCog, value: "users", requiredRole: 'admin' },
-      { title: "Invites", icon: Shield, value: "invite-codes", requiredRole: 'admin' },
-      { title: "Sessions", icon: Activity, value: "sessions", requiredRole: 'admin' },
-      { title: "Audit Log", icon: FileText, value: "audit-logs", requiredRole: 'admin' },
+      { title: "Operations", icon: Activity, value: "scheduler", requiredRole: 'admin' },
+      { title: "API & Credentials", icon: Key, value: "api-credentials", requiredRole: 'admin' },
+      { title: "Audit Logs", icon: FileText, value: "audit-logs", requiredRole: 'admin' },
     ],
   },
 ];
