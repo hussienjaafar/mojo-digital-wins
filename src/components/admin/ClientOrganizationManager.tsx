@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, Settings, Users, Eye } from "lucide-react";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
+import { Building2, Plus, Settings, Users, Eye, LogIn } from "lucide-react";
 
 type Organization = {
   id: string;
@@ -24,6 +25,7 @@ type Organization = {
 const ClientOrganizationManager = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { setImpersonation } = useImpersonation();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -125,6 +127,38 @@ const ClientOrganizationManager = () => {
       toast({
         title: "Error",
         description: error.message || "Failed to update organization",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewPortal = async (org: Organization) => {
+    try {
+      // Get the first user from this organization
+      const { data: users, error } = await (supabase as any)
+        .from('client_users')
+        .select('id, full_name')
+        .eq('organization_id', org.id)
+        .limit(1);
+
+      if (error) throw error;
+
+      if (!users || users.length === 0) {
+        toast({
+          title: "No Users",
+          description: "This organization has no users yet. Create a user first.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const user = users[0];
+      setImpersonation(user.id, user.full_name, org.id, org.name);
+      navigate('/client/dashboard');
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to access portal",
         variant: "destructive",
       });
     }
@@ -292,6 +326,14 @@ const ClientOrganizationManager = () => {
                       >
                         <Eye className="h-4 w-4 mr-2" />
                         View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => handleViewPortal(org)}
+                      >
+                        <LogIn className="h-4 w-4 mr-2" />
+                        View Portal
                       </Button>
                       <Button
                         size="sm"
