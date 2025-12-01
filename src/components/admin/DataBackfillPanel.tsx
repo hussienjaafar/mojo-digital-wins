@@ -46,13 +46,13 @@ export function DataBackfillPanel() {
   };
 
   return (
-    <Card>
+    <Card className="hover-scale transition-all duration-300">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 portal-text-primary">
           <Database className="h-5 w-5" />
           Data Quality Backfill
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="portal-text-secondary">
           Reanalyze existing articles to populate demographic and policy category filters
         </CardDescription>
       </CardHeader>

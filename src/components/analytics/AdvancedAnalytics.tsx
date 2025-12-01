@@ -219,15 +219,15 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 animate-fade-in">
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
-            <Card key={i}>
+            <Card key={i} className="animate-pulse">
               <CardHeader className="space-y-0 pb-2">
-                <div className="h-4 w-24 bg-muted rounded animate-pulse" />
+                <div className="h-4 w-24 bg-muted rounded" />
               </CardHeader>
               <CardContent>
-                <div className="h-8 w-32 bg-muted rounded animate-pulse" />
+                <div className="h-8 w-32 bg-muted rounded" />
               </CardContent>
             </Card>
           ))}
@@ -237,13 +237,13 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Key Metrics */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="hover-scale transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium portal-text-primary">Total Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 portal-text-secondary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
