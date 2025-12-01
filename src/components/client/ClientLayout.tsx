@@ -10,7 +10,6 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/client/AppSidebar";
 import { useToast } from "@/hooks/use-toast";
 import { SkipNavigation } from "@/components/accessibility/SkipNavigation";
-import "@/styles/dashboard-theme.css";
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -122,7 +121,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
     <>
       <SkipNavigation />
       <SidebarProvider defaultOpen={!isMobile}>
-        <div className="dashboard-theme min-h-screen w-full flex bg-background">
+        <div className="min-h-screen w-full flex bg-gradient-to-br from-background via-background to-muted/10">
           <AppSidebar organizationId={organization.id} />
         
         <div className="flex-1 flex flex-col min-w-0">
