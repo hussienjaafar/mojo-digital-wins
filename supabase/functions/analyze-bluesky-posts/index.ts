@@ -435,10 +435,10 @@ serve(async (req) => {
             }
           }
 
-          // Insert entity mentions
+          // Insert entity mentions with deduplication
           if (entities.length > 0) {
             const post = posts.find(p => p.id === analysis.id);
-            await supabase.from('entity_mentions').insert(
+            const { error: mentionError } = await supabase.from('entity_mentions').upsert(
               entities.map(e => ({
                 entity_name: e.entity_name,
                 entity_type: e.entity_type,
@@ -446,8 +446,16 @@ serve(async (req) => {
                 source_id: analysis.id,
                 mentioned_at: post?.created_at || new Date().toISOString(),
                 sentiment: analysis.ai_sentiment
-              }))
+              })),
+              {
+                onConflict: 'entity_name,source_id,source_type',
+                ignoreDuplicates: false  // Update sentiment if mention already exists
+              }
             );
+
+            if (mentionError) {
+              console.error(`Error inserting entity mentions for post ${analysis.id}:`, mentionError);
+            }
           }
           
           successCount++;

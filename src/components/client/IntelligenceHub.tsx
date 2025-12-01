@@ -84,7 +84,7 @@ export const IntelligenceHub = memo(({ organizationId }: IntelligenceHubProps) =
         .from('fundraising_opportunities')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
-        .eq('status', 'active');
+        .eq('is_active', true);
 
       setStats({
         watchlistCount: watchlistCount || 0,
