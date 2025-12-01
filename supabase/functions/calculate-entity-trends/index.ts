@@ -70,6 +70,9 @@ serve(async (req) => {
       const firstSeen = new Date(Math.min(...timestamps)).toISOString();
       const lastSeen = new Date(Math.max(...timestamps)).toISOString();
 
+      // Determine if trending: velocity > 50% AND meaningful volume OR high recent activity
+      const isTrending = (velocity > 50 && mentions24h >= 3) || mentions6h >= 5;
+
       trends.push({
         entity_name: entityName,
         mentions_1h: mentions1h,
@@ -77,10 +80,12 @@ serve(async (req) => {
         mentions_24h: mentions24h,
         mentions_7d: mentions7d,
         velocity,
+        is_trending: isTrending,
         sentiment_avg: avgSentiment,
         first_seen_at: firstSeen,
         last_seen_at: lastSeen,
         calculated_at: now.toISOString(),
+        updated_at: now.toISOString(),
       });
     }
 
