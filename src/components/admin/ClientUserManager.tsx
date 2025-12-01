@@ -31,9 +31,9 @@ const ClientUserManager = () => {
   const [users, setUsers] = useState<ClientUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
-    password: "",
     full_name: "",
     organization_id: "",
     role: "viewer",
@@ -78,51 +78,56 @@ const ClientUserManager = () => {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    try {
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/client-login`,
-        },
+    if (!formData.email || !formData.full_name || !formData.organization_id) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
       });
+      return;
+    }
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("Failed to create user");
+    setIsCreating(true);
+    try {
+      // Generate a temporary password
+      const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase() + "!1";
 
-      // Create client user profile
-      const { error: profileError } = await (supabase as any)
-        .from('client_users')
-        .insert([{
-          id: authData.user.id,
+      // Call edge function to create user
+      const { data, error } = await supabase.functions.invoke('create-client-user', {
+        body: {
+          email: formData.email,
           full_name: formData.full_name,
           organization_id: formData.organization_id,
           role: formData.role,
-        }]);
+          password: tempPassword,
+        }
+      });
 
-      if (profileError) throw profileError;
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Failed to create user");
 
       toast({
         title: "Success",
-        description: "Client user created successfully",
+        description: "User created successfully. Welcome email sent with login credentials.",
       });
 
       setShowCreateDialog(false);
       setFormData({
         email: "",
-        password: "",
         full_name: "",
         organization_id: "",
         role: "viewer",
       });
       loadData();
     } catch (error: any) {
+      console.error('Error creating user:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create user",
         variant: "destructive",
       });
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -207,20 +212,14 @@ const ClientUserManager = () => {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Temporary Password *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="••••••••"
-                    required
-                    minLength={6}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    User should change this on first login
-                  </p>
+                <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start gap-2">
+                    <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <div className="text-xs text-blue-900 dark:text-blue-100">
+                      <p className="font-medium mb-1">Automated Setup</p>
+                      <p>A temporary password will be auto-generated and sent to the user via email with login instructions.</p>
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="organization">Organization *</Label>
@@ -258,10 +257,17 @@ const ClientUserManager = () => {
                   </Select>
                 </div>
                 <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowCreateDialog(false)}
+                    disabled={isCreating}
+                  >
                     Cancel
                   </Button>
-                  <Button type="submit">Create User</Button>
+                  <Button type="submit" disabled={isCreating}>
+                    {isCreating ? "Creating..." : "Create User"}
+                  </Button>
                 </div>
               </form>
             </DialogContent>

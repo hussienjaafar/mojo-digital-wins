@@ -1,5 +1,8 @@
 project_id = "nuclmzoasgydubdshtab"
 
+[functions.create-client-user]
+verify_jwt = false
+
 [functions.calculate-entity-trends]
 verify_jwt = false
 
