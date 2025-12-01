@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { MagicMomentCard } from "@/components/client/MagicMomentCard";
@@ -50,12 +51,57 @@ export default function ClientOpportunities() {
         </div>
 
       {opportunities && opportunities.length === 0 ? (
-        <EmptyState
-          icon={<Sparkles className="h-12 w-12 text-primary" />}
-          title="AI-Powered Opportunities Coming Soon"
-          description="Our intelligence engine is monitoring news trends, social media, and polling data 24/7. When high-impact fundraising moments emerge, you'll see AI-generated campaign suggestions here with optimal timing recommendations."
-          variant="card"
-        />
+        <div className="space-y-6">
+          <EmptyState
+            icon={<Sparkles className="h-12 w-12 text-primary" />}
+            title="AI-Powered Opportunities"
+            description="Our intelligence engine monitors news trends, social media, and polling data 24/7. When high-impact fundraising moments emerge, you'll see AI-generated campaign suggestions here."
+            variant="card"
+          />
+          
+          {/* Sample Opportunity Cards */}
+          <div className="grid gap-6">
+            <Card className="border-dashed opacity-75">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <Badge variant="secondary" className="mb-2">DEMO OPPORTUNITY</Badge>
+                    <h3 className="text-xl font-bold">Climate Action Bill Trending</h3>
+                    <p className="text-sm text-muted-foreground mt-1">Detected 45 minutes ago</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-3xl font-bold text-primary">87</div>
+                    <p className="text-xs text-muted-foreground">Opportunity Score</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Velocity:</span>
+                    <span className="font-medium">12.4 mentions/hour</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Similar Past Events:</span>
+                    <span className="font-medium">3 (avg. $8.4K raised)</span>
+                  </div>
+                  <div className="bg-muted p-3 rounded-lg">
+                    <p className="text-sm font-medium mb-1">AI-Generated Message:</p>
+                    <p className="text-sm text-muted-foreground italic">
+                      "Climate Action Bill is making headlines RIGHT NOW. This is our moment to show strength. Reply YES to donate and stand with us."
+                    </p>
+                  </div>
+                  <div className="bg-success/10 p-3 rounded-lg border border-success/20">
+                    <p className="text-sm font-medium text-success mb-1">Optimal Send Time</p>
+                    <p className="text-xs text-muted-foreground">Today, 2-4 PM EST • Peak donor engagement window</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <p className="text-center text-sm text-muted-foreground">
+            Live opportunities will appear here when our AI detects high-impact moments
+          </p>
+        </div>
       ) : (
         <div className="grid gap-6">
           {opportunities?.map((opp) => {

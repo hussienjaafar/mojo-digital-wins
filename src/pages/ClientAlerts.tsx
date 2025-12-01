@@ -220,48 +220,81 @@ const ClientAlerts = () => {
           </Card>
         </div>
 
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">Alert Type</label>
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="min-h-[44px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="watchlist_match">Watchlist Match</SelectItem>
-                    <SelectItem value="velocity_spike">Velocity Spike</SelectItem>
-                    <SelectItem value="sentiment_change">Sentiment Change</SelectItem>
-                    <SelectItem value="trending">Trending</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">Severity</label>
-                <Select value={filterSeverity} onValueChange={setFilterSeverity}>
-                  <SelectTrigger className="min-h-[44px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Severities</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Inline Pill Filters */}
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium portal-text-secondary">Filter:</span>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={filterType === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterType("all")}
+              className="min-h-[36px]"
+            >
+              All
+            </Button>
+            <Button
+              variant={filterType === "watchlist_match" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterType("watchlist_match")}
+              className="min-h-[36px]"
+            >
+              Watchlist
+            </Button>
+            <Button
+              variant={filterType === "velocity_spike" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterType("velocity_spike")}
+              className="min-h-[36px]"
+            >
+              Velocity Spike
+            </Button>
+            <Button
+              variant={filterType === "trending" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterType("trending")}
+              className="min-h-[36px]"
+            >
+              Trending
+            </Button>
+          </div>
+          
+          <div className="w-px h-6 bg-border mx-2" />
+          
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={filterSeverity === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterSeverity("all")}
+              className="min-h-[36px]"
+            >
+              All Severity
+            </Button>
+            <Button
+              variant={filterSeverity === "high" ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => setFilterSeverity("high")}
+              className="min-h-[36px]"
+            >
+              High
+            </Button>
+            <Button
+              variant={filterSeverity === "medium" ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setFilterSeverity("medium")}
+              className="min-h-[36px]"
+            >
+              Medium
+            </Button>
+            <Button
+              variant={filterSeverity === "low" ? "outline" : "outline"}
+              size="sm"
+              onClick={() => setFilterSeverity("low")}
+              className="min-h-[36px] opacity-60"
+            >
+              Low
+            </Button>
+          </div>
+        </div>
 
         {/* Alerts List */}
         <Tabs defaultValue="all" className="w-full">
@@ -287,10 +320,12 @@ const ClientAlerts = () => {
                   </CardContent>
                 </Card>
               ) : (
-                filteredAlerts.map((alert) => (
+                filteredAlerts.map((alert) => {
+                  const severityColor = alert.severity === 'high' ? 'border-l-severity-high' : alert.severity === 'medium' ? 'border-l-severity-medium' : 'border-l-info';
+                  return (
                   <Card 
                     key={alert.id} 
-                    className={`cursor-pointer hover:shadow-lg transition-shadow ${
+                    className={`cursor-pointer hover:shadow-lg transition-shadow border-l-4 ${severityColor} ${
                       !alert.is_read ? 'border-primary' : ''
                     }`}
                     onClick={() => setSelectedAlert(alert)}
@@ -339,7 +374,8 @@ const ClientAlerts = () => {
                       </div>
                     </CardContent>
                   </Card>
-                ))
+                  );
+                })
               )}
             </div>
           </TabsContent>
@@ -363,10 +399,12 @@ const ClientAlerts = () => {
                   </CardContent>
                 </Card>
               ) : (
-                watchlistAlerts.map((alert) => (
+                watchlistAlerts.map((alert) => {
+                  const severityColor = alert.severity === 'high' ? 'border-l-severity-high' : alert.severity === 'medium' ? 'border-l-severity-medium' : 'border-l-info';
+                  return (
                   <Card 
                     key={alert.id}
-                    className={`cursor-pointer hover:shadow-lg transition-shadow ${
+                    className={`cursor-pointer hover:shadow-lg transition-shadow border-l-4 ${severityColor} ${
                       !alert.is_read ? 'border-primary' : ''
                     }`}
                     onClick={() => setSelectedAlert(alert)}
@@ -398,7 +436,8 @@ const ClientAlerts = () => {
                       </p>
                     </CardContent>
                   </Card>
-                ))
+                  );
+                })
               )}
             </div>
           </TabsContent>
