@@ -1,0 +1,130 @@
+/* Dashboard-specific design system */
+/* Applied only to client portal and admin dashboard pages */
+
+.dashboard-theme {
+  /* Rewardifi-inspired color system */
+  --background: 220 17% 7%;
+  --foreground: 210 40% 98%;
+  
+  --card: 220 15% 10%;
+  --card-foreground: 210 40% 98%;
+  
+  --popover: 220 15% 12%;
+  --popover-foreground: 210 40% 98%;
+  
+  --primary: 217 91% 60%;
+  --primary-foreground: 210 40% 98%;
+  --primary-hover: 217 91% 55%;
+  
+  --secondary: 220 15% 15%;
+  --secondary-foreground: 210 40% 98%;
+  --secondary-hover: 220 15% 18%;
+  
+  --muted: 220 15% 15%;
+  --muted-foreground: 215 20% 65%;
+  
+  --accent: 217 91% 60%;
+  --accent-foreground: 210 40% 98%;
+  
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  
+  --success: 142 76% 36%;
+  --success-foreground: 210 40% 98%;
+  
+  --warning: 38 92% 50%;
+  --warning-foreground: 222 47% 11%;
+  
+  --border: 220 15% 20%;
+  --input: 220 15% 20%;
+  --ring: 217 91% 60%;
+  
+  /* Neutrals */
+  --neutral-50: 210 40% 98%;
+  --neutral-100: 214 32% 91%;
+  --neutral-200: 213 27% 84%;
+  --neutral-300: 212 24% 74%;
+  --neutral-400: 215 20% 65%;
+  --neutral-500: 215 16% 47%;
+  --neutral-600: 215 19% 35%;
+  --neutral-700: 215 25% 27%;
+  --neutral-800: 217 33% 17%;
+  --neutral-900: 220 15% 10%;
+  
+  /* Chart colors */
+  --chart-1: 217 91% 60%;
+  --chart-2: 142 76% 36%;
+  --chart-3: 38 92% 50%;
+  --chart-4: 271 91% 65%;
+  --chart-5: 340 82% 52%;
+  
+  /* Chart semantic colors */
+  --chart-positive: 142 76% 36%;
+  --chart-negative: 0 84% 60%;
+  --chart-neutral: 215 20% 65%;
+  --chart-highlight: 217 91% 60%;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-elevated: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-glow: 0 0 20px rgb(var(--primary) / 0.3);
+  
+  --radius: 12px;
+}
+
+.dashboard-theme.light {
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  
+  --primary: 217 91% 60%;
+  --primary-foreground: 210 40% 98%;
+  --primary-hover: 217 91% 55%;
+  
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --secondary-hover: 210 40% 92%;
+  
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  
+  --success: 142 71% 45%;
+  --success-foreground: 210 40% 98%;
+  
+  --warning: 38 92% 50%;
+  --warning-foreground: 222 47% 11%;
+  
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 217 91% 60%;
+  
+  --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-elevated: 0 10px 15px -3px rgb(0 0 0 / 0.15), 0 4px 6px -4px rgb(0 0 0 / 0.15);
+}
+
+/* Typography enhancements for dashboards */
+.dashboard-theme h1,
+.dashboard-theme h2,
+.dashboard-theme h3 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-theme {
+  font-feature-settings: "rlig" 1, "calt" 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
