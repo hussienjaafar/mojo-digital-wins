@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Link2, Plus, Trash2 } from "lucide-react";
+import { Link2, Plus, Trash2, Target } from "lucide-react";
 import { logger } from "@/lib/logger";
 
 type Organization = {
@@ -180,7 +180,31 @@ const CampaignAttributionManager = () => {
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading attributions...</div>;
+    return (
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+            <Target className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Campaign Attribution</h2>
+            <p className="text-sm portal-text-secondary">Loading attribution mappings...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1 space-y-2">
+                  <div className="portal-skeleton h-5 w-40" />
+                  <div className="portal-skeleton h-4 w-full" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

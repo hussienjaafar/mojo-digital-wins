@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, CheckCircle, Eye, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, CheckCircle, Eye, TrendingUp, Users, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ActivityAlert {
@@ -124,12 +124,30 @@ export default function AdminActivityAlerts() {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-sm text-muted-foreground">Loading alerts...</p>
-        </CardContent>
-      </Card>
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
+            <Activity className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Activity Alerts</h2>
+            <p className="text-sm portal-text-secondary">Loading recent activity...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1 space-y-2">
+                  <div className="portal-skeleton h-5 w-48" />
+                  <div className="portal-skeleton h-4 w-full" />
+                </div>
+                <div className="portal-skeleton h-6 w-20 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 

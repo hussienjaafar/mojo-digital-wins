@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, TrendingUp, Users, AlertCircle, Database } from "lucide-react";
+import { Activity, TrendingUp, Users, AlertCircle, Database, BarChart3 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 interface UsageStats {
@@ -146,12 +146,25 @@ export default function UsageAnalytics() {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-sm text-muted-foreground">Loading analytics...</p>
-        </CardContent>
-      </Card>
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+            <BarChart3 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Usage Analytics</h2>
+            <p className="text-sm portal-text-secondary">Loading usage data...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="portal-skeleton h-6 w-32" />
+              <div className="portal-skeleton h-32 w-full rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 

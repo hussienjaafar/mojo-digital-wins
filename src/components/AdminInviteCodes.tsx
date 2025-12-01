@@ -285,7 +285,30 @@ export const AdminInviteCodes = () => {
   };
 
   if (isLoading) {
-    return <div className="flex justify-center p-8">Loading...</div>;
+    return (
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
+            <Mail className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Invite Codes</h2>
+            <p className="text-sm portal-text-secondary">Loading invite codes...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="portal-card p-4 flex items-center justify-between" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="flex-1 space-y-2">
+                <div className="portal-skeleton h-5 w-40" />
+                <div className="portal-skeleton h-4 w-24" />
+              </div>
+              <div className="portal-skeleton h-8 w-20 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

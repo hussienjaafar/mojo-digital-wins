@@ -430,17 +430,26 @@ export const EnhancedContactManagement = () => {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Contact Management</CardTitle>
-          <CardDescription>Loading submissions...</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+            <Mail className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Contact Management</h2>
+            <p className="text-sm portal-text-secondary">Loading submissions...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="portal-skeleton h-5 w-48" />
+              <div className="portal-skeleton h-4 w-full" />
+              <div className="portal-skeleton h-4 w-2/3" />
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 

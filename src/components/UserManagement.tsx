@@ -201,17 +201,30 @@ export const UserManagement = () => {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>User Management</CardTitle>
-          <CardDescription>Loading users...</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+            <UsersIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">User Management</h2>
+            <p className="text-sm portal-text-secondary">Loading users...</p>
+          </div>
+        </div>
+        <div className="portal-card p-6">
+          <div className="space-y-3">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 portal-animate-fade-in" style={{ animationDelay: `${i * 50}ms` }}>
+                <div className="portal-skeleton h-10 w-10 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="portal-skeleton h-4 w-2/3" />
+                  <div className="portal-skeleton h-3 w-1/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     );
   }
 

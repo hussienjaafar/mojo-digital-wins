@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Eye } from "lucide-react";
+import { AlertCircle, Eye, FileText } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -72,17 +72,30 @@ export const AuditLogs = () => {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Audit Logs</CardTitle>
-          <CardDescription>Loading audit logs...</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="space-y-6 portal-animate-fade-in">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+            <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Audit Logs</h2>
+            <p className="text-sm portal-text-secondary">Loading activity logs...</p>
+          </div>
+        </div>
+        <div className="portal-card p-6">
+          <div className="space-y-3">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 portal-animate-fade-in" style={{ animationDelay: `${i * 50}ms` }}>
+                <div className="portal-skeleton h-10 w-10 rounded" />
+                <div className="flex-1 space-y-2">
+                  <div className="portal-skeleton h-4 w-3/4" />
+                  <div className="portal-skeleton h-3 w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     );
   }
 
