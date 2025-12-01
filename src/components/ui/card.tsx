@@ -4,16 +4,17 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const cardVariants = cva(
-  "rounded-lg transition-all duration-300",
+  "rounded-xl transition-all duration-300",
   {
     variants: {
       variant: {
-        default: "border bg-card text-card-foreground shadow-sm hover:shadow-md",
-        glass: "backdrop-blur-xl bg-white/10 dark:bg-white/5 border border-white/20 shadow-lg hover:shadow-xl hover:bg-white/15 dark:hover:bg-white/10",
-        elevated: "bg-card text-card-foreground shadow-md hover:shadow-xl hover:-translate-y-1 border border-border/50",
-        gradient: "bg-gradient-to-br from-card via-card to-card/80 text-card-foreground shadow-lg hover:shadow-xl border border-primary/10 hover:border-primary/20",
-        smooth: "bg-card/50 backdrop-blur-sm text-card-foreground border border-border/30 hover:border-border/60 hover:bg-card/70 shadow-sm hover:shadow-md",
-        outline: "border-2 border-primary/20 bg-transparent hover:border-primary/40 hover:bg-primary/5",
+        default: "bg-card text-card-foreground border border-border shadow-[var(--shadow-card)] hover:shadow-md",
+        elevated: "bg-card text-card-foreground shadow-md hover:shadow-lg hover:-translate-y-0.5 border border-border/50",
+        glass: "backdrop-blur-xl bg-card/60 border border-border/50 shadow-sm hover:shadow-md hover:bg-card/80",
+        gradient: "bg-gradient-to-br from-card to-muted/30 text-card-foreground border border-border shadow-md hover:shadow-lg",
+        smooth: "bg-muted/50 text-foreground border-0 shadow-none hover:bg-muted/70",
+        outline: "border-2 border-border bg-transparent hover:border-primary/40 hover:bg-primary/5",
+        primary: "bg-primary/10 border border-primary/20 text-foreground hover:bg-primary/20 hover:border-primary/30",
       },
     },
     defaultVariants: {
