@@ -68,21 +68,22 @@ export default {
           low: "hsl(var(--severity-low))",
           "low-foreground": "hsl(var(--severity-low-foreground))",
         },
+        // Chart colors for data visualization
+        chart: {
+          "1": "hsl(var(--chart-1))",
+          "2": "hsl(var(--chart-2))",
+          "3": "hsl(var(--chart-3))",
+          "4": "hsl(var(--chart-4))",
+          "5": "hsl(var(--chart-5))",
+        },
         // Utility semantic colors
         success: {
-          DEFAULT: "hsl(150 60% 50%)",
-          foreground: "hsl(0 0% 100%)",
-          light: "hsl(150 60% 95%)",
-        },
-        info: {
-          DEFAULT: "hsl(213 83% 47%)",
-          foreground: "hsl(0 0% 100%)",
-          light: "hsl(213 83% 95%)",
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
         },
         warning: {
-          DEFAULT: "hsl(45 89% 57%)",
-          foreground: "hsl(213 75% 15%)",
-          light: "hsl(45 89% 95%)",
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
         },
       },
       borderRadius: {

@@ -16,61 +16,71 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 213 75% 15%;
+    /* Light Mode - Rewardifi Inspired */
+    --background: 0 0% 98%;
+    --foreground: 220 25% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 213 75% 15%;
+    --card-foreground: 220 25% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 213 75% 15%;
+    --popover-foreground: 220 25% 10%;
 
-    --primary: 213 75% 15%;
+    --primary: 217 91% 60%; /* Rewardifi Blue */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 213 83% 47%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 220 15% 95%;
+    --secondary-foreground: 220 25% 10%;
 
-    --muted: 213 20% 95%;
-    --muted-foreground: 213 25% 40%;
+    --muted: 220 15% 96%;
+    --muted-foreground: 220 10% 45%;
 
-    --accent: 45 89% 57%;
-    --accent-foreground: 213 75% 15%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 78% 53%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 213 20% 90%;
-    --input: 213 20% 90%;
-    --ring: 213 83% 47%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
 
-    /* Progressive brand colors */
-    --navy: 213 75% 15%;
-    --blue: 213 83% 47%;
-    --red: 0 78% 53%;
-    --yellow: 45 89% 57%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 60%;
 
-    /* Gradients - Movement Power */
-    --gradient-hero: linear-gradient(135deg, hsl(213 75% 15%) 0%, hsl(213 83% 47%) 50%, hsl(0 78% 53%) 100%);
-    --gradient-power: linear-gradient(120deg, hsl(213 75% 12%) 0%, hsl(213 83% 47%) 50%, hsl(213 75% 15%) 100%);
-    --gradient-accent: linear-gradient(90deg, hsl(213 83% 47%) 0%, hsl(0 78% 53%) 100%);
-    --gradient-urgent: linear-gradient(135deg, hsl(0 78% 53%) 0%, hsl(0 85% 45%) 100%);
-    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(213 20% 98%) 100%);
-    --gradient-diagonal: linear-gradient(135deg, hsl(213 75% 15%) 0%, hsl(213 83% 47%) 100%);
-    --gradient-overlay: linear-gradient(180deg, hsl(213 75% 15% / 0.9) 0%, hsl(213 75% 15% / 0.7) 100%);
+    --radius: 12px;
 
-    /* Shadows - Bold Impact */
-    --shadow-sm: 0 2px 8px hsl(213 75% 15% / 0.1);
-    --shadow-md: 0 4px 16px hsl(213 75% 15% / 0.15);
-    --shadow-lg: 0 8px 32px hsl(213 75% 15% / 0.2);
-    --shadow-xl: 0 12px 48px hsl(213 75% 15% / 0.25);
-    --shadow-elegant: 0 10px 40px hsl(213 75% 15% / 0.12);
-    --shadow-glow: 0 0 30px hsl(213 83% 47% / 0.3);
-    --shadow-glow-red: 0 0 40px hsl(0 78% 53% / 0.4);
-    --shadow-brutal: 8px 8px 0px hsl(0 78% 53%);
-    --shadow-inset: inset 0 2px 8px hsl(213 75% 15% / 0.1);
+    /* Rewardifi Brand Colors */
+    --blue-bright: 217 91% 60%;
+    --blue-dark: 217 91% 50%;
+    --purple-accent: 250 75% 60%;
+    --green-success: 142 71% 45%;
+    --orange-warning: 38 92% 50%;
+
+    /* Chart Colors - Vibrant & Distinct */
+    --chart-1: 217 91% 60%; /* Primary Blue */
+    --chart-2: 142 71% 45%; /* Green */
+    --chart-3: 250 75% 60%; /* Purple */
+    --chart-4: 38 92% 50%; /* Orange */
+    --chart-5: 340 82% 52%; /* Pink */
+
+    /* Gradients - SaaS Modern */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(250 75% 60%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 15% 99%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(217 91% 50%) 100%);
+    --gradient-subtle: linear-gradient(180deg, transparent 0%, hsl(217 91% 60% / 0.05) 100%);
+
+    /* Shadows - Clean & Professional */
+    --shadow-xs: 0 1px 2px hsl(220 25% 10% / 0.05);
+    --shadow-sm: 0 2px 4px hsl(220 25% 10% / 0.08);
+    --shadow-md: 0 4px 12px hsl(220 25% 10% / 0.1);
+    --shadow-lg: 0 8px 24px hsl(220 25% 10% / 0.12);
+    --shadow-xl: 0 16px 48px hsl(220 25% 10% / 0.15);
+    --shadow-glow: 0 0 32px hsl(217 91% 60% / 0.3);
+    --shadow-card: 0 2px 8px hsl(220 25% 10% / 0.08), 0 1px 2px hsl(220 25% 10% / 0.04);
     
     /* Transitions */
     --transition-base: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -125,61 +135,69 @@ All colors MUST be HSL.
   }
 
   .dark {
-    /* True dark backgrounds for proper dark mode */
-    --background: 220 15% 8%;
+    /* Dark Mode - Rewardifi Inspired (True Dark) */
+    --background: 220 25% 6%;
     --foreground: 0 0% 98%;
 
-    --card: 220 15% 12%;
+    --card: 220 20% 10%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 220 15% 10%;
+    --popover: 220 20% 8%;
     --popover-foreground: 0 0% 98%;
 
-    /* Desaturated primary for dark mode - less vibrant */
-    --primary: 213 40% 45%;
+    --primary: 217 91% 60%; /* Keep bright blue in dark mode */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 20%;
+    --secondary: 220 15% 18%;
     --secondary-foreground: 0 0% 98%;
 
-    --muted: 220 15% 18%;
-    --muted-foreground: 220 10% 75%;
+    --muted: 220 15% 15%;
+    --muted-foreground: 220 10% 65%;
 
-    --accent: 45 70% 55%;
-    --accent-foreground: 220 15% 10%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 65% 55%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 25%;
-    --input: 220 15% 20%;
-    --ring: 213 40% 55%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
 
-    /* Progressive brand colors - dark mode adjusted (desaturated) */
-    --navy: 213 40% 50%;
-    --blue: 213 40% 50%;
-    --red: 0 65% 55%;
-    --yellow: 45 70% 60%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
 
-    /* Gradients - Dark Mode Optimized with dark backgrounds */
-    --gradient-hero: linear-gradient(135deg, hsl(220 15% 10%) 0%, hsl(220 15% 15%) 50%, hsl(220 15% 12%) 100%);
-    --gradient-power: linear-gradient(120deg, hsl(220 15% 8%) 0%, hsl(220 15% 14%) 50%, hsl(220 15% 10%) 100%);
-    --gradient-accent: linear-gradient(90deg, hsl(213 40% 45%) 0%, hsl(0 65% 55%) 100%);
-    --gradient-urgent: linear-gradient(135deg, hsl(0 65% 55%) 0%, hsl(0 70% 50%) 100%);
-    --gradient-subtle: linear-gradient(180deg, hsl(220 15% 8%) 0%, hsl(220 15% 12%) 100%);
-    --gradient-diagonal: linear-gradient(135deg, hsl(220 15% 10%) 0%, hsl(213 40% 40%) 100%);
-    --gradient-overlay: linear-gradient(180deg, hsl(220 15% 8% / 0.95) 0%, hsl(220 15% 8% / 0.85) 100%);
+    --border: 220 15% 20%;
+    --input: 220 15% 15%;
+    --ring: 217 91% 60%;
 
-    /* Shadows - Dark Mode Optimized */
-    --shadow-sm: 0 2px 8px hsl(0 0% 0% / 0.5);
-    --shadow-md: 0 4px 16px hsl(0 0% 0% / 0.6);
-    --shadow-lg: 0 8px 32px hsl(0 0% 0% / 0.7);
-    --shadow-xl: 0 12px 48px hsl(0 0% 0% / 0.8);
-    --shadow-elegant: 0 10px 40px hsl(0 0% 0% / 0.6);
-    --shadow-glow: 0 0 30px hsl(213 40% 50% / 0.3);
-    --shadow-glow-red: 0 0 40px hsl(0 65% 55% / 0.4);
-    --shadow-brutal: 8px 8px 0px hsl(0 65% 45%);
-    --shadow-inset: inset 0 2px 8px hsl(0 0% 0% / 0.4);
+    /* Rewardifi Brand Colors - Dark Mode */
+    --blue-bright: 217 91% 60%;
+    --blue-dark: 217 91% 50%;
+    --purple-accent: 250 75% 60%;
+    --green-success: 142 71% 45%;
+    --orange-warning: 38 92% 50%;
+
+    /* Chart Colors - Same as light for consistency */
+    --chart-1: 217 91% 60%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 250 75% 60%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 340 82% 52%;
+
+    /* Gradients - Dark Mode */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(250 75% 60%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(220 20% 10%) 0%, hsl(220 20% 12%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(217 91% 50%) 100%);
+    --gradient-subtle: linear-gradient(180deg, transparent 0%, hsl(217 91% 60% / 0.1) 100%);
+
+    /* Shadows - Dark Mode */
+    --shadow-xs: 0 1px 2px hsl(0 0% 0% / 0.3);
+    --shadow-sm: 0 2px 4px hsl(0 0% 0% / 0.4);
+    --shadow-md: 0 4px 12px hsl(0 0% 0% / 0.5);
+    --shadow-lg: 0 8px 24px hsl(0 0% 0% / 0.6);
+    --shadow-xl: 0 16px 48px hsl(0 0% 0% / 0.7);
+    --shadow-glow: 0 0 32px hsl(217 91% 60% / 0.5);
+    --shadow-card: 0 2px 8px hsl(0 0% 0% / 0.5), 0 1px 2px hsl(0 0% 0% / 0.3);
   }
 }
 
