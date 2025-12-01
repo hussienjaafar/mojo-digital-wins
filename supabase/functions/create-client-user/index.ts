@@ -36,32 +36,57 @@ const handler = async (req: Request): Promise<Response> => {
       }
     });
 
-    // Create user via admin API
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Auto-confirm the email
-      user_metadata: {
-        full_name
+    // Check if user already exists
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email === email);
+
+    let userId: string;
+
+    if (existingUser) {
+      console.log("User already exists in auth:", existingUser.id);
+      
+      // Check if they already have a client_users record
+      const { data: existingClientUser } = await supabaseAdmin
+        .from('client_users')
+        .select('id')
+        .eq('id', existingUser.id)
+        .single();
+
+      if (existingClientUser) {
+        throw new Error("A client user with this email already exists");
       }
-    });
 
-    if (authError) {
-      console.error("Auth error:", authError);
-      throw new Error(`Failed to create user: ${authError.message}`);
+      userId = existingUser.id;
+      console.log("Reusing existing auth user for client_users record");
+    } else {
+      // Create new user via admin API
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // Auto-confirm the email
+        user_metadata: {
+          full_name
+        }
+      });
+
+      if (authError) {
+        console.error("Auth error:", authError);
+        throw new Error(`Failed to create user: ${authError.message}`);
+      }
+
+      if (!authData.user) {
+        throw new Error("User creation succeeded but no user data returned");
+      }
+
+      userId = authData.user.id;
+      console.log("User created in auth:", userId);
     }
-
-    if (!authData.user) {
-      throw new Error("User creation succeeded but no user data returned");
-    }
-
-    console.log("User created in auth:", authData.user.id);
 
     // Create client_users record
     const { error: clientUserError } = await supabaseAdmin
       .from('client_users')
       .insert({
-        id: authData.user.id,
+        id: userId,
         full_name,
         organization_id,
         role
@@ -69,8 +94,10 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (clientUserError) {
       console.error("Client user error:", clientUserError);
-      // Try to clean up the auth user if client_users insert fails
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      // Only try to clean up if we created a new user
+      if (!existingUser) {
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+      }
       throw new Error(`Failed to create client user record: ${clientUserError.message}`);
     }
 
@@ -211,8 +238,8 @@ const handler = async (req: Request): Promise<Response> => {
       JSON.stringify({ 
         success: true,
         user: {
-          id: authData.user.id,
-          email: authData.user.email
+          id: userId,
+          email: email
         },
         message: "Client user created successfully" 
       }),
