@@ -43,6 +43,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { LiveRegionProvider } from "@/components/accessibility";
 import { NewsFilterProvider, useNewsFilters } from "@/contexts/NewsFilterContext";
 import OpsPanel from "@/components/admin/OpsPanel";
+import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
 
 type ContactSubmission = {
   id: string;
@@ -362,8 +363,9 @@ const Admin = () => {
     <LiveRegionProvider>
       <NewsFilterProvider>
         <AdminContent setActiveTab={setActiveTab} />
-        <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarChange}>
-          <div className="portal-theme min-h-screen flex w-full portal-bg">
+        <PortalErrorBoundary>
+          <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarChange}>
+            <div className="portal-theme min-h-screen flex w-full portal-bg">
             <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
           <div className="flex-1 flex flex-col min-w-0">
@@ -387,21 +389,21 @@ const Admin = () => {
                     )}
                   </div>
 
-                  {/* Actions - responsive */}
-                  <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                    <ThemeToggle />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleSignOut}
-                      className="gap-2 min-h-[44px] min-w-[44px] hover:text-destructive"
-                      title="Sign Out"
-                      aria-label="Sign out"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span className="hidden sm:inline">Sign Out</span>
-                    </Button>
-                  </div>
+              {/* Actions - responsive */}
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                <ThemeToggle />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="gap-2 min-h-[44px] min-w-[44px] hover:text-destructive transition-all duration-300"
+                  title="Sign Out"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </Button>
+              </div>
                 </div>
               </div>
             </header>
@@ -409,18 +411,23 @@ const Admin = () => {
             {/* Main content - mobile optimized padding */}
             <main
               id="main-content"
-              className="flex-1 overflow-auto"
+              className="flex-1 overflow-auto portal-scrollbar"
               role="main"
               aria-label={`${getCurrentSectionTitle()} content`}
               tabIndex={-1}
             >
               <div className="p-3 sm:p-4 md:p-6 lg:p-8 max-w-[1800px] mx-auto">
-                {renderContent()}
+                <PortalErrorBoundary>
+                  <div className="portal-animate-fade-in">
+                    {renderContent()}
+                  </div>
+                </PortalErrorBoundary>
               </div>
             </main>
           </div>
         </div>
-      </SidebarProvider>
+        </SidebarProvider>
+        </PortalErrorBoundary>
       </NewsFilterProvider>
     </LiveRegionProvider>
   );

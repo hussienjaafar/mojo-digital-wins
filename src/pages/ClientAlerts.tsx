@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { format } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import { ClientLayout } from "@/components/client/ClientLayout";
+import { PortalEmptyState } from "@/components/portal/PortalEmptyState";
 
 type Alert = {
   id: string;
@@ -310,15 +311,11 @@ const ClientAlerts = () => {
           <TabsContent value="all" className="mt-6">
             <div className="space-y-4">
               {filteredAlerts.length === 0 ? (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <Bell className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No alerts</h3>
-                    <p className="text-muted-foreground text-center">
-                      You're all caught up! New alerts will appear here.
-                    </p>
-                  </CardContent>
-                </Card>
+                <PortalEmptyState
+                  icon={Bell}
+                  title="No alerts"
+                  description="You're all caught up! New alerts will appear here when relevant activity is detected."
+                />
               ) : (
                 filteredAlerts.map((alert) => {
                   const severityColor = alert.severity === 'high' ? 'border-l-severity-high' : alert.severity === 'medium' ? 'border-l-severity-medium' : 'border-l-info';

@@ -6,7 +6,7 @@ import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { MagicMomentCard } from "@/components/client/MagicMomentCard";
 import { ClientLayout } from "@/components/client/ClientLayout";
-import { EmptyState } from "@/components/ui/empty-state";
+import { PortalEmptyState } from "@/components/portal/PortalEmptyState";
 
 export default function ClientOpportunities() {
   const { data: opportunities, isLoading } = useQuery({
@@ -52,11 +52,10 @@ export default function ClientOpportunities() {
 
       {opportunities && opportunities.length === 0 ? (
         <div className="space-y-6">
-          <EmptyState
-            icon={<Sparkles className="h-12 w-12 text-primary" />}
+          <PortalEmptyState
+            icon={Sparkles}
             title="AI-Powered Opportunities"
             description="Our intelligence engine monitors news trends, social media, and polling data 24/7. When high-impact fundraising moments emerge, you'll see AI-generated campaign suggestions here."
-            variant="card"
           />
           
           {/* Sample Opportunity Cards */}

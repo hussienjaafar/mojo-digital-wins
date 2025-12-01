@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { format } from "date-fns";
 import { logger } from "@/lib/logger";
+import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
+import { NoResultsEmptyState } from "@/components/portal/PortalEmptyState";
 
 type Props = {
   organizationId: string;
@@ -78,10 +79,6 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const avgDonation = filteredTransactions.length > 0 ? totalAmount / filteredTransactions.length : 0;
   const recurringCount = filteredTransactions.filter(t => t.is_recurring).length;
 
-  if (isLoading) {
-    return <div className="text-center py-8">Loading donation data...</div>;
-  }
-
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
@@ -135,54 +132,72 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Donor</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Refcode</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Recurring</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTransactions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    No transactions found
-                  </TableCell>
-                </TableRow>
+          <PortalTable
+            data={filteredTransactions.slice(0, 100)}
+            columns={[
+              {
+                key: "transaction_date",
+                label: "Date",
+                sortable: true,
+                render: (value) => format(new Date(value), 'MMM d, yyyy'),
+              },
+              {
+                key: "donor_name",
+                label: "Donor",
+                sortable: true,
+                render: (value) => <span className="font-medium">{value}</span>,
+              },
+              {
+                key: "amount",
+                label: "Amount",
+                sortable: true,
+                className: "text-right",
+                render: (value) => PortalTableRenderers.currency(Number(value)),
+              },
+              {
+                key: "transaction_type",
+                label: "Type",
+                mobileLabel: "Type",
+                render: (value) => (
+                  <Badge variant={value === 'donation' ? 'default' : 'secondary'}>
+                    {value}
+                  </Badge>
+                ),
+              },
+              {
+                key: "refcode",
+                label: "Refcode",
+                className: "text-sm text-muted-foreground",
+                render: (value) => value || '-',
+                hiddenOnMobile: true,
+              },
+              {
+                key: "source_campaign",
+                label: "Source",
+                className: "text-sm text-muted-foreground",
+                render: (value) => value || '-',
+                hiddenOnMobile: true,
+              },
+              {
+                key: "is_recurring",
+                label: "Recurring",
+                mobileLabel: "Recurring",
+                render: (value) => value ? <Badge variant="outline">Recurring</Badge> : null,
+              },
+            ]}
+            keyExtractor={(row) => row.id}
+            isLoading={isLoading}
+            emptyMessage={searchTerm ? "No transactions match your search" : "No transactions found"}
+            emptyAction={
+              searchTerm ? (
+                <NoResultsEmptyState onClear={() => setSearchTerm("")} />
               ) : (
-                filteredTransactions.slice(0, 100).map(transaction => (
-                  <TableRow key={transaction.id}>
-                    <TableCell>
-                      {format(new Date(transaction.transaction_date), 'MMM d, yyyy')}
-                    </TableCell>
-                    <TableCell className="font-medium">{transaction.donor_name}</TableCell>
-                    <TableCell>${Number(transaction.amount).toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Badge variant={transaction.transaction_type === 'donation' ? 'default' : 'secondary'}>
-                        {transaction.transaction_type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {transaction.refcode || '-'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {transaction.source_campaign || '-'}
-                    </TableCell>
-                    <TableCell>
-                      {transaction.is_recurring && (
-                        <Badge variant="outline">Recurring</Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                <p className="text-sm portal-text-muted">
+                  Transactions will appear here once donations are received
+                </p>
+              )
+            }
+          />
         </CardContent>
       </Card>
     </div>
