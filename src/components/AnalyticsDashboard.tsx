@@ -134,8 +134,19 @@ export const AnalyticsDashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <p className="text-muted-foreground">Loading analytics...</p>
+      <div className="space-y-4 animate-fade-in">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="space-y-0 pb-2">
+                <div className="h-4 w-24 bg-muted rounded" />
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 w-32 bg-muted rounded" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
@@ -148,35 +159,35 @@ export const AnalyticsDashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="hover-scale transition-all duration-300">
           <CardHeader className="pb-2">
-            <CardDescription>Total Submissions</CardDescription>
-            <CardTitle className="text-3xl">{submissions.length}</CardTitle>
+            <CardDescription className="portal-text-secondary">Total Submissions</CardDescription>
+            <CardTitle className="text-3xl portal-text-primary">{submissions.length}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
+        <Card className="hover-scale transition-all duration-300">
           <CardHeader className="pb-2">
-            <CardDescription>Resolved</CardDescription>
-            <CardTitle className="text-3xl">
+            <CardDescription className="portal-text-secondary">Resolved</CardDescription>
+            <CardTitle className="text-3xl portal-text-primary">
               {statusData.find(s => s.name === 'Resolved')?.value || 0}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
+        <Card className="hover-scale transition-all duration-300">
           <CardHeader className="pb-2">
-            <CardDescription>In Progress</CardDescription>
-            <CardTitle className="text-3xl">
+            <CardDescription className="portal-text-secondary">In Progress</CardDescription>
+            <CardTitle className="text-3xl portal-text-primary">
               {statusData.find(s => s.name === 'In Progress')?.value || 0}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
+        <Card className="hover-scale transition-all duration-300">
           <CardHeader className="pb-2">
-            <CardDescription>Urgent Priority</CardDescription>
-            <CardTitle className="text-3xl">
+            <CardDescription className="portal-text-secondary">Urgent Priority</CardDescription>
+            <CardTitle className="text-3xl portal-text-primary">
               {priorityData.find(p => p.name === 'Urgent')?.value || 0}
             </CardTitle>
           </CardHeader>
@@ -186,10 +197,10 @@ export const AnalyticsDashboard = () => {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Submission Trends */}
-        <Card>
+        <Card className="hover-scale transition-all duration-300">
           <CardHeader>
-            <CardTitle>Submission Trends (Last 30 Days)</CardTitle>
-            <CardDescription>Daily submission volume over time</CardDescription>
+            <CardTitle className="portal-text-primary">Submission Trends (Last 30 Days)</CardTitle>
+            <CardDescription className="portal-text-secondary">Daily submission volume over time</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px]">
@@ -217,10 +228,10 @@ export const AnalyticsDashboard = () => {
         </Card>
 
         {/* Campaign Performance */}
-        <Card>
+        <Card className="hover-scale transition-all duration-300">
           <CardHeader>
-            <CardTitle>Campaign Performance</CardTitle>
-            <CardDescription>Top 10 campaigns by submission count</CardDescription>
+            <CardTitle className="portal-text-primary">Campaign Performance</CardTitle>
+            <CardDescription className="portal-text-secondary">Top 10 campaigns by submission count</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px]">
@@ -245,10 +256,10 @@ export const AnalyticsDashboard = () => {
         </Card>
 
         {/* Priority Distribution */}
-        <Card>
+        <Card className="hover-scale transition-all duration-300">
           <CardHeader>
-            <CardTitle>Priority Distribution</CardTitle>
-            <CardDescription>Breakdown by priority level</CardDescription>
+            <CardTitle className="portal-text-primary">Priority Distribution</CardTitle>
+            <CardDescription className="portal-text-secondary">Breakdown by priority level</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px]">
@@ -280,10 +291,10 @@ export const AnalyticsDashboard = () => {
         </Card>
 
         {/* Status Completion Rates */}
-        <Card>
+        <Card className="hover-scale transition-all duration-300">
           <CardHeader>
-            <CardTitle>Status Breakdown</CardTitle>
-            <CardDescription>Current status distribution</CardDescription>
+            <CardTitle className="portal-text-primary">Status Breakdown</CardTitle>
+            <CardDescription className="portal-text-secondary">Current status distribution</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px]">

@@ -211,12 +211,12 @@ export default function OpsPanel() {
   }, [backfillStats]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex flex-wrap gap-4 items-stretch">
-        <Card className="min-w-[280px] flex-1">
+        <Card className="min-w-[280px] flex-1 hover-scale transition-all duration-300">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4" /> Articles Pending</CardTitle>
-            <CardDescription>Needs AI analysis (target: {'>'}80% in 10m)</CardDescription>
+            <CardTitle className="text-base flex items-center gap-2 portal-text-primary"><Activity className="h-4 w-4" /> Articles Pending</CardTitle>
+            <CardDescription className="portal-text-secondary">Needs AI analysis (target: {'>'}80% in 10m)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-end justify-between gap-4">
@@ -227,10 +227,10 @@ export default function OpsPanel() {
           </CardContent>
         </Card>
 
-        <Card className="min-w-[280px] flex-1">
+        <Card className="min-w-[280px] flex-1 hover-scale transition-all duration-300">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><Server className="h-4 w-4" /> Bluesky Pending</CardTitle>
-            <CardDescription>Queued for processing (target: {'<'} 2h backlog)</CardDescription>
+            <CardTitle className="text-base flex items-center gap-2 portal-text-primary"><Server className="h-4 w-4" /> Bluesky Pending</CardTitle>
+            <CardDescription className="portal-text-secondary">Queued for processing (target: {'<'} 2h backlog)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-end justify-between gap-4">
@@ -248,10 +248,10 @@ export default function OpsPanel() {
           </CardContent>
         </Card>
 
-        <Card className="min-w-[220px]">
+        <Card className="min-w-[220px] hover-scale transition-all duration-300">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4" /> Jobs</CardTitle>
-            <CardDescription>Active schedules</CardDescription>
+            <CardTitle className="text-base flex items-center gap-2 portal-text-primary"><Clock className="h-4 w-4" /> Jobs</CardTitle>
+            <CardDescription className="portal-text-secondary">Active schedules</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{jobs.filter(j => isActive(j)).length}</div>
@@ -278,10 +278,10 @@ export default function OpsPanel() {
         </Button>
       </div>
 
-      <Card>
+      <Card className="hover-scale transition-all duration-300">
         <CardHeader>
-          <CardTitle>Scheduled Jobs</CardTitle>
-          <CardDescription>Last run status and upcoming schedules</CardDescription>
+          <CardTitle className="portal-text-primary">Scheduled Jobs</CardTitle>
+          <CardDescription className="portal-text-secondary">Last run status and upcoming schedules</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -326,10 +326,10 @@ export default function OpsPanel() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hover-scale transition-all duration-300">
         <CardHeader>
-          <CardTitle>Recent Failures</CardTitle>
-          <CardDescription>Last 10 entries from job_failures</CardDescription>
+          <CardTitle className="portal-text-primary">Recent Failures</CardTitle>
+          <CardDescription className="portal-text-secondary">Last 10 entries from job_failures</CardDescription>
         </CardHeader>
         <CardContent>
           {failures.length === 0 ? (

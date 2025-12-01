@@ -194,18 +194,33 @@ export function StateActions() {
   const states = [...new Set(actions.map(a => a.state_code))].sort();
 
   if (loading) {
-    return <LoadingCard />;
+    return (
+      <div className="space-y-4 animate-fade-in">
+        {[...Array(3)].map((_, i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader>
+              <div className="h-6 w-3/4 bg-muted rounded" />
+              <div className="h-4 w-1/2 bg-muted rounded mt-2" />
+            </CardHeader>
+            <CardContent>
+              <div className="h-4 w-full bg-muted rounded" />
+              <div className="h-4 w-5/6 bg-muted rounded mt-2" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold flex items-center gap-2">
+          <h2 className="text-3xl font-bold flex items-center gap-2 portal-text-primary">
             <Building2 className="h-7 w-7" />
             State Actions
           </h2>
-          <p className="text-muted-foreground mt-1">
+          <p className="portal-text-secondary mt-1">
             Tracking {filteredActions.length} state-level actions
           </p>
         </div>
@@ -393,7 +408,7 @@ export function StateActions() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {filteredActions.map((action) => (
-            <Card key={action.id} className={`${
+            <Card key={action.id} className={`hover-scale transition-all duration-300 ${
               action.threat_level === 'critical' ? 'border-red-300 bg-red-50/30' :
               action.threat_level === 'high' ? 'border-orange-300 bg-orange-50/30' : ''
             }`}>
