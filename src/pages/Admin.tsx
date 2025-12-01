@@ -252,10 +252,10 @@ const Admin = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="portal-theme portal-bg min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground font-medium">Loading your dashboard...</p>
+          <div className="w-16 h-16 border-4 border-t-transparent rounded-full animate-spin mx-auto" style={{ borderColor: 'hsl(var(--portal-accent-blue))' }} />
+          <p className="portal-text-secondary font-medium">Loading your dashboard...</p>
         </div>
       </div>
     );
@@ -363,12 +363,12 @@ const Admin = () => {
       <NewsFilterProvider>
         <AdminContent setActiveTab={setActiveTab} />
         <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarChange}>
-          <div className="min-h-screen flex w-full bg-background">
+          <div className="portal-theme min-h-screen flex w-full portal-bg">
             <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
           <div className="flex-1 flex flex-col min-w-0">
             {/* Mobile-optimized header with breadcrumb */}
-            <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <header className="portal-header">
               <div className="flex flex-col">
                 <div className="flex h-14 sm:h-16 items-center gap-2 sm:gap-4 px-3 sm:px-6">
                   {/* Mobile menu trigger - always visible */}
@@ -376,12 +376,12 @@ const Admin = () => {
 
                   {/* Title - responsive sizing */}
                   <div className="flex-1 min-w-0">
-                    <h1 className="text-base sm:text-lg md:text-xl font-bold tracking-tight truncate">
+                    <h1 className="text-base sm:text-lg md:text-xl font-bold tracking-tight truncate portal-text-primary">
                       Admin Dashboard
                     </h1>
                     {/* Mobile breadcrumb - shows current section */}
                     {isMobile && (
-                      <p className="text-xs text-muted-foreground truncate" aria-live="polite">
+                      <p className="text-xs portal-text-secondary truncate" aria-live="polite">
                         {getCurrentSectionTitle()}
                       </p>
                     )}

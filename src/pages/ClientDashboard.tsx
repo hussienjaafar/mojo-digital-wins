@@ -14,6 +14,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/client/AppSidebar";
 import { IntelligenceHub } from "@/components/client/IntelligenceHub";
 import { OnboardingWizard } from "@/components/client/OnboardingWizard";
+import { ClientDashboardMetrics } from "@/components/client/ClientDashboardMetrics";
 import ClientMetricsOverview from "@/components/client/ClientMetricsOverview";
 import MetaAdsMetrics from "@/components/client/MetaAdsMetrics";
 import SMSMetrics from "@/components/client/SMSMetrics";
@@ -137,10 +138,10 @@ const ClientDashboard = () => {
 
   if (isLoading || !organization) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="portal-theme portal-bg min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground font-medium">Loading your dashboard...</p>
+          <div className="w-16 h-16 border-4 border-t-transparent rounded-full animate-spin mx-auto" style={{ borderColor: 'hsl(var(--portal-accent-blue))' }} />
+          <p className="portal-text-secondary font-medium">Loading your dashboard...</p>
         </div>
       </div>
     );
@@ -153,34 +154,34 @@ const ClientDashboard = () => {
         onComplete={() => setShowOnboarding(false)}
       />
       <SidebarProvider defaultOpen={!isMobile}>
-        <div className="min-h-screen w-full flex bg-gradient-to-br from-background via-background to-muted/10">
+        <div className="portal-theme min-h-screen w-full flex portal-bg">
           <AppSidebar organizationId={organization.id} />
         
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Modern Header with Glassmorphism - Mobile Optimized */}
-          <header className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50 shadow-sm">
-          <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6">
+          {/* Modern Header - Portal Style */}
+          <header className="portal-header">
+          <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-              {/* Sidebar Trigger + Logo and Title Section - Mobile Responsive */}
+              {/* Sidebar Trigger + Logo and Title Section */}
               <div className="flex items-center gap-3 sm:gap-6 w-full sm:w-auto">
                 <SidebarTrigger className="shrink-0" />
                 
                 {organization.logo_url && (
                   <div className="relative shrink-0">
-                    <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
+                    <div className="absolute inset-0 blur-xl rounded-full" style={{ background: 'hsl(var(--portal-accent-blue) / 0.2)' }} />
                     <img
                       src={organization.logo_url}
                       alt={organization.name}
-                      className="relative h-10 sm:h-12 md:h-16 w-auto object-contain"
+                      className="relative h-10 sm:h-12 md:h-14 w-auto object-contain"
                     />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent truncate">
+                  <h1 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-tight portal-text-primary truncate">
                     {organization.name}
                   </h1>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 flex items-center gap-2">
-                    <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <p className="text-xs sm:text-sm portal-text-secondary mt-0.5 sm:mt-1 flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: 'hsl(var(--portal-success))' }} />
                     Campaign Dashboard
                   </p>
                 </div>
@@ -214,11 +215,25 @@ const ClientDashboard = () => {
           </div>
         </header>
 
-        <main className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 w-full">
-          {/* Intelligence Hub - NEW */}
-          <div className="mb-6 md:mb-8">
-            <IntelligenceHub organizationId={organization.id} />
-          </div>
+        <main className="portal-scrollbar flex-1 overflow-auto">
+          <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 w-full">
+            {/* Intelligence Hub */}
+            <div className="mb-6 md:mb-8">
+              <IntelligenceHub organizationId={organization.id} />
+            </div>
+
+            {/* Modern Metrics Grid - Rewardifi Style */}
+            <div className="mb-6 md:mb-8">
+              <div className="mb-4">
+                <h2 className="text-xl sm:text-2xl font-bold portal-text-primary">Performance Overview</h2>
+                <p className="text-sm portal-text-secondary mt-1">Track your key metrics in real-time</p>
+              </div>
+              <ClientDashboardMetrics
+                organizationId={organization.id}
+                startDate={startDate}
+                endDate={endDate}
+              />
+            </div>
 
           {/* Date Range Controls - Enhanced with Smooth Variant */}
         <div className="mb-4 sm:mb-6 md:mb-8">
@@ -323,7 +338,8 @@ const ClientDashboard = () => {
             />
           </TabsContent>
         </Tabs>
-          </main>
+          </div>
+        </main>
         </div>
       </div>
       </SidebarProvider>
