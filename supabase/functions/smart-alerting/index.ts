@@ -205,6 +205,19 @@ serve(async (req) => {
       // Build org mention batch inserts
       const mentionsToInsert: any[] = [];
       const alertsToInsert: any[] = [];
+      
+      // OPTIMIZED: Batch check existing mentions ONCE before processing
+      const articleIds = (todayArticles || []).map(a => a.id);
+      const { data: existingMentions } = await supabase
+        .from('organization_mentions')
+        .select('source_id, organization_abbrev')
+        .eq('source_type', 'article')
+        .in('source_id', articleIds);
+      
+      // Create lookup set for O(1) existence checks
+      const existingSet = new Set(
+        (existingMentions || []).map(m => `${m.source_id}_${m.organization_abbrev}`)
+      );
 
       for (const article of todayArticles || []) {
         const text = `${article.title} ${article.description || ''}`.toLowerCase();
@@ -212,16 +225,9 @@ serve(async (req) => {
         for (const org of TRACKED_ORGANIZATIONS) {
           const matched = org.variants.some(v => text.includes(v));
           if (matched) {
-            // Check if already tracked
-            const { data: existing } = await supabase
-              .from('organization_mentions')
-              .select('id')
-              .eq('source_type', 'article')
-              .eq('source_id', article.id)
-              .eq('organization_abbrev', org.abbrev)
-              .maybeSingle();
-
-            if (!existing) {
+            // O(1) existence check using Set
+            const key = `${article.id}_${org.abbrev}`;
+            if (!existingSet.has(key)) {
               mentionsToInsert.push({
                 organization_name: org.full,
                 organization_abbrev: org.abbrev,
