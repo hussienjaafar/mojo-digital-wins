@@ -9,20 +9,21 @@
 /* Portal-specific class wrapper */
 .portal-theme {
   /* === PORTAL COLOR SYSTEM === */
-  /* Clean dark backgrounds - Rewardifi style */
-  --portal-bg-primary: 220 15% 8%;           /* #0A0A0A - Deep black */
-  --portal-bg-secondary: 220 15% 12%;        /* #141414 - Card background */
-  --portal-bg-tertiary: 220 15% 16%;         /* #1E1E1E - Elevated surfaces */
-  --portal-bg-elevated: 220 15% 20%;         /* #242424 - Hover states */
+  /* Rewardifi-style ultra-dark backgrounds */
+  --portal-bg-primary: 0 0% 7%;              /* #121212 - Ultra deep black */
+  --portal-bg-secondary: 0 0% 10%;           /* #1A1A1A - Card background */
+  --portal-bg-tertiary: 0 0% 13%;            /* #212121 - Elevated surfaces */
+  --portal-bg-elevated: 0 0% 16%;            /* #292929 - Hover states */
   
-  /* Clean borders and dividers */
-  --portal-border: 220 10% 25%;              /* #333333 - Subtle borders */
-  --portal-border-hover: 220 10% 35%;        /* Hover state borders */
+  /* Subtle borders - barely visible */
+  --portal-border: 0 0% 18%;                 /* #2E2E2E - Very subtle borders */
+  --portal-border-hover: 0 0% 25%;           /* Hover state borders */
   
-  /* Blue accent - modern SaaS */
-  --portal-accent-blue: 213 100% 50%;        /* #0066FF - Primary blue */
-  --portal-accent-blue-hover: 213 100% 60%;  /* Hover state */
-  --portal-accent-blue-light: 213 100% 96%;  /* Light backgrounds */
+  /* Bright blue accent - Rewardifi style */
+  --portal-accent-blue: 213 100% 58%;        /* #0D84FF - Vibrant blue */
+  --portal-accent-blue-hover: 213 100% 65%;  /* Hover state */
+  --portal-accent-blue-light: 213 100% 95%;  /* Light backgrounds */
+  --portal-accent-blue-glow: 213 100% 58% / 0.25; /* Glow effect */
   
   /* Success/Error/Warning - clean and professional */
   --portal-success: 150 60% 50%;
@@ -36,15 +37,17 @@
   --portal-text-muted: 220 10% 50%;          /* #808080 - Muted text */
   
   /* === PORTAL GRADIENTS === */
-  --portal-gradient-card: linear-gradient(135deg, hsl(220 15% 12%) 0%, hsl(220 15% 14%) 100%);
-  --portal-gradient-accent: linear-gradient(135deg, hsl(213 100% 50%) 0%, hsl(213 100% 60%) 100%);
-  --portal-gradient-subtle: linear-gradient(180deg, hsl(220 15% 8%) 0%, hsl(220 15% 12%) 100%);
+  --portal-gradient-card: linear-gradient(135deg, hsl(0 0% 10%) 0%, hsl(0 0% 12%) 100%);
+  --portal-gradient-accent: linear-gradient(135deg, hsl(213 100% 58%) 0%, hsl(213 100% 68%) 100%);
+  --portal-gradient-subtle: linear-gradient(180deg, hsl(0 0% 7%) 0%, hsl(0 0% 10%) 100%);
+  --portal-gradient-progress: conic-gradient(from 0deg, hsl(213 100% 58%) 0%, hsl(213 100% 58%) var(--progress, 50%), transparent var(--progress, 50%), transparent 100%);
   
   /* === PORTAL SHADOWS === */
-  --portal-shadow-sm: 0 2px 8px hsl(0 0% 0% / 0.3);
-  --portal-shadow-md: 0 4px 16px hsl(0 0% 0% / 0.4);
-  --portal-shadow-lg: 0 8px 32px hsl(0 0% 0% / 0.5);
-  --portal-shadow-glow: 0 0 24px hsl(213 100% 50% / 0.3);
+  --portal-shadow-sm: 0 2px 12px hsl(0 0% 0% / 0.5);
+  --portal-shadow-md: 0 4px 20px hsl(0 0% 0% / 0.6);
+  --portal-shadow-lg: 0 8px 40px hsl(0 0% 0% / 0.7);
+  --portal-shadow-glow: 0 0 32px hsl(213 100% 58% / 0.4);
+  --portal-shadow-glow-strong: 0 0 48px hsl(213 100% 58% / 0.5);
   
   /* === PORTAL SPACING === */
   --portal-space-xs: 0.5rem;    /* 8px */
