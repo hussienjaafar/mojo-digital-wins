@@ -16,7 +16,8 @@ import {
   Archive,
   CheckCircle2,
   AlertCircle,
-  Flag
+  Flag,
+  Mail
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { format } from "date-fns";
