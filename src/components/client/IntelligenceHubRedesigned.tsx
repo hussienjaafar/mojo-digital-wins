@@ -84,11 +84,25 @@ export function IntelligenceHubRedesigned({ organizationId }: Props) {
 
   if (isLoading) {
     return (
-      <Card className="animate-pulse">
-        <CardContent className="p-6 sm:p-8">
-          <div className="h-48 bg-muted rounded" />
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Card className="portal-animate-fade-in">
+          <CardContent className="p-6 sm:p-8">
+            <div className="space-y-3">
+              <div className="h-6 w-48 portal-skeleton rounded" />
+              <div className="h-4 w-full portal-skeleton rounded" />
+              <div className="h-4 w-3/4 portal-skeleton rounded" />
+            </div>
+          </CardContent>
+        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card className="portal-animate-fade-in portal-delay-100">
+            <CardContent className="p-6 h-48 portal-skeleton rounded" />
+          </Card>
+          <Card className="portal-animate-fade-in portal-delay-200">
+            <CardContent className="p-6 h-48 portal-skeleton rounded" />
+          </Card>
+        </div>
+      </div>
     );
   }
 

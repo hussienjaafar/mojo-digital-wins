@@ -1,6 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
 import { PortalCircularProgress } from "./PortalCircularProgress";
 
 interface PortalMetricProps {
@@ -30,11 +30,11 @@ export const PortalMetric: React.FC<PortalMetricProps> = ({
 }) => {
   if (variant === "large" && progress !== undefined) {
     return (
-      <div className={cn("portal-metric", className)}>
+      <div className={cn("portal-metric portal-interactive group", className)}>
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <h3 className="text-lg font-semibold portal-text-primary mb-1">{label}</h3>
-            <div className="portal-metric-value text-4xl mb-2">{value}</div>
+            <h3 className="text-lg font-semibold portal-text-primary mb-1 transition-all duration-300 group-hover:text-[hsl(var(--portal-accent-blue))]">{label}</h3>
+            <div className="portal-metric-value text-4xl mb-2 transition-all duration-300 group-hover:scale-105">{value}</div>
             {subtitle && (
               <p className="text-sm portal-text-muted">{subtitle}</p>
             )}
@@ -42,11 +42,11 @@ export const PortalMetric: React.FC<PortalMetricProps> = ({
               <div className="mt-3 flex items-center gap-2">
                 <div
                   className={cn(
-                    "portal-badge text-xs font-semibold",
+                    "portal-badge text-xs font-semibold transition-all duration-300 group-hover:scale-105",
                     trend.isPositive ? "portal-badge-success" : "portal-badge-error"
                   )}
                 >
-                  {trend.isPositive ? "↑" : "↓"} {Math.abs(trend.value)}%
+                  {trend.isPositive ? <TrendingUp className="h-3 w-3 inline-block" /> : <TrendingDown className="h-3 w-3 inline-block" />} {Math.abs(trend.value)}%
                 </div>
                 {trend.label && (
                   <span className="text-xs portal-text-secondary">{trend.label}</span>
@@ -61,27 +61,32 @@ export const PortalMetric: React.FC<PortalMetricProps> = ({
   }
 
   return (
-    <div className={cn("portal-metric", className)}>
+    <div className={cn("portal-metric portal-interactive group portal-animate-fade-in", className)}>
       <div className="flex items-start justify-between mb-3">
-        <span className="portal-metric-label">{label}</span>
+        <span className="portal-metric-label transition-colors duration-300 group-hover:text-[hsl(var(--portal-accent-blue))]">{label}</span>
         {Icon && (
-          <div className="p-2 rounded-lg" style={{ background: 'hsl(var(--portal-accent-blue) / 0.1)' }}>
-            <Icon className="h-4 w-4" style={{ color: 'hsl(var(--portal-accent-blue))' }} />
+          <div className="p-2 rounded-lg transition-all duration-300 group-hover:scale-110 group-hover:rotate-3" style={{ background: 'hsl(var(--portal-accent-blue) / 0.1)' }}>
+            <Icon className="h-4 w-4 transition-colors duration-300" style={{ color: 'hsl(var(--portal-accent-blue))' }} />
           </div>
         )}
       </div>
       
       <div className="flex items-end justify-between">
-        <div className="portal-metric-value">{value}</div>
+        <div className="portal-metric-value transition-all duration-300 group-hover:scale-105">{value}</div>
         
         {trend && (
           <div
             className={cn(
-              "portal-badge text-xs",
+              "portal-badge text-xs flex items-center gap-1 transition-all duration-300 group-hover:scale-105",
               trend.isPositive ? "portal-badge-success" : "portal-badge-error"
             )}
           >
-            {trend.isPositive ? "↑" : "↓"} {Math.abs(trend.value)}%
+            {trend.isPositive ? (
+              <TrendingUp className="h-3 w-3 animate-pulse" />
+            ) : (
+              <TrendingDown className="h-3 w-3 animate-pulse" />
+            )}
+            {Math.abs(trend.value)}%
           </div>
         )}
       </div>

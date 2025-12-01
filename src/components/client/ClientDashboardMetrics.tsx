@@ -65,7 +65,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards Row - Simplified 4-card layout */}
+      {/* KPI Cards Row - Simplified 4-card layout with staggered animations */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpiCards.map((metric, index) => (
           <PortalMetric
@@ -75,6 +75,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
             icon={metric.icon}
             trend={metric.trend}
             subtitle={metric.subtitle}
+            className={`portal-delay-${index * 100}`}
           />
         ))}
       </div>
@@ -82,7 +83,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Loyalty Order Analysis - Large Chart */}
-        <PortalCard className="lg:col-span-2">
+        <PortalCard className="lg:col-span-2 portal-animate-slide-in-left">
           <PortalCardHeader>
             <PortalCardTitle>Loyalty driven order analysis</PortalCardTitle>
             <div className="flex items-center gap-6 mt-3">
@@ -123,7 +124,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         </PortalCard>
 
         {/* Total Reviews Card */}
-        <PortalCard>
+        <PortalCard className="portal-animate-slide-in-right portal-delay-100">
           <PortalCardHeader>
             <div className="flex items-center gap-2 mb-4">
               <div className="p-2 rounded-lg bg-[#FFB020] flex items-center justify-center">
@@ -169,7 +170,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       {/* Bottom Row - Bar Chart and Profit Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Rewards Utilization */}
-        <PortalCard className="lg:col-span-2">
+        <PortalCard className="lg:col-span-2 portal-animate-fade-in portal-delay-200">
           <PortalCardHeader>
             <PortalCardTitle>Rewards Utilization</PortalCardTitle>
           </PortalCardHeader>
@@ -179,7 +180,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         </PortalCard>
 
         {/* Sales Report / Total Profit */}
-        <PortalCard>
+        <PortalCard className="portal-animate-scale-in portal-delay-300">
           <PortalCardHeader>
             <PortalCardTitle>Sales Report</PortalCardTitle>
             <p className="text-sm portal-text-muted mt-1">Quarterly Sales Performance Analysis</p>
