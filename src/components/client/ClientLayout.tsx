@@ -10,6 +10,8 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/client/AppSidebar";
 import { useToast } from "@/hooks/use-toast";
 import { SkipNavigation } from "@/components/accessibility/SkipNavigation";
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -25,6 +27,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { impersonatedOrgId, isImpersonating } = useImpersonation();
   const [session, setSession] = useState<Session | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,50 +35,58 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      if (!session) {
+      // Allow access if impersonating (admin is logged in)
+      if (!session && !isImpersonating) {
         navigate("/client-login");
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (!session) {
+      // Allow access if impersonating (admin is logged in)
+      if (!session && !isImpersonating) {
         navigate("/client-login");
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, isImpersonating]);
 
   useEffect(() => {
-    if (session?.user) {
+    if (session?.user || isImpersonating) {
       loadUserOrganization();
     }
-  }, [session]);
+  }, [session, impersonatedOrgId, isImpersonating]);
 
   const loadUserOrganization = async () => {
     try {
-      const { data: clientUser, error: userError } = await (supabase as any)
-        .from('client_users')
-        .select('organization_id')
-        .eq('id', session?.user?.id)
-        .maybeSingle();
+      let orgId = impersonatedOrgId;
 
-      if (userError) throw userError;
-      if (!clientUser) {
-        toast({
-          title: "Error",
-          description: "You don't have access to a client organization",
-          variant: "destructive",
-        });
-        navigate('/');
-        return;
+      // If not impersonating, get user's organization
+      if (!isImpersonating) {
+        const { data: clientUser, error: userError } = await (supabase as any)
+          .from('client_users')
+          .select('organization_id')
+          .eq('id', session?.user?.id)
+          .maybeSingle();
+
+        if (userError) throw userError;
+        if (!clientUser) {
+          toast({
+            title: "Error",
+            description: "You don't have access to a client organization",
+            variant: "destructive",
+          });
+          navigate('/');
+          return;
+        }
+        orgId = clientUser.organization_id;
       }
 
       const { data: org, error: orgError } = await (supabase as any)
         .from('client_organizations')
         .select('*')
-        .eq('id', clientUser.organization_id)
+        .eq('id', orgId)
         .maybeSingle();
 
       if (orgError) throw orgError;
@@ -125,6 +136,9 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
           <AppSidebar organizationId={organization.id} />
         
         <div className="flex-1 flex flex-col min-w-0">
+          {/* Impersonation Banner */}
+          <ImpersonationBanner />
+          
           {/* Header */}
           <header className="portal-header" role="banner">
             <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-4">
