@@ -84,7 +84,7 @@ const ClientAlerts = () => {
         .from('client_users')
         .select('organization_id')
         .eq('id', session?.user?.id)
-        .single();
+        .maybeSingle();
 
       if (!clientUser) throw new Error("Organization not found");
 
@@ -92,8 +92,9 @@ const ClientAlerts = () => {
         .from('client_organizations')
         .select('*')
         .eq('id', clientUser.organization_id)
-        .single();
+        .maybeSingle();
 
+      if (!org) throw new Error("Organization not found");
       setOrganization(org);
 
       // Load alerts

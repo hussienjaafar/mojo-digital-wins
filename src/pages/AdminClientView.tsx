@@ -98,9 +98,18 @@ const AdminClientView = () => {
         .from('client_organizations')
         .select('*')
         .eq('id', organizationId)
-        .single();
+        .maybeSingle();
 
       if (orgError) throw orgError;
+      if (!org) {
+        toast({
+          title: "Error",
+          description: "Organization not found",
+          variant: "destructive",
+        });
+        navigate('/admin');
+        return;
+      }
       setOrganization(org);
     } catch (error: any) {
       toast({

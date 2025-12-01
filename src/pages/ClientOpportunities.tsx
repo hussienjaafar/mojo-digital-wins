@@ -18,7 +18,7 @@ export default function ClientOpportunities() {
         .from('client_users')
         .select('organization_id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (!clientUser) throw new Error('Client user not found');
 

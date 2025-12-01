@@ -82,7 +82,7 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
       .from("client_users")
       .select("organization_id")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
     if (clientUser) {
       await supabase.from("entity_watchlist").insert({
