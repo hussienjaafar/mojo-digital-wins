@@ -84,6 +84,33 @@ export default {
           foreground: "hsl(213 75% 15%)",
           light: "hsl(45 89% 95%)",
         },
+        // Portal theme colors - for client dashboard
+        portal: {
+          bg: {
+            DEFAULT: "hsl(var(--portal-bg-primary))",
+            primary: "hsl(var(--portal-bg-primary))",
+            secondary: "hsl(var(--portal-bg-secondary))",
+            tertiary: "hsl(var(--portal-bg-tertiary))",
+            elevated: "hsl(var(--portal-bg-elevated))",
+          },
+          border: {
+            DEFAULT: "hsl(var(--portal-border))",
+            hover: "hsl(var(--portal-border-hover))",
+          },
+          accent: {
+            blue: "hsl(var(--portal-accent-blue))",
+            "blue-hover": "hsl(var(--portal-accent-blue-hover))",
+          },
+          text: {
+            primary: "hsl(var(--portal-text-primary))",
+            secondary: "hsl(var(--portal-text-secondary))",
+            muted: "hsl(var(--portal-text-muted))",
+          },
+          success: "hsl(var(--portal-success))",
+          error: "hsl(var(--portal-error))",
+          warning: "hsl(var(--portal-warning))",
+          info: "hsl(var(--portal-info))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
