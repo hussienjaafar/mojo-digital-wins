@@ -348,7 +348,7 @@ const Contact = () => {
                       <Button 
                         type="submit" 
                         size="lg" 
-                        className="w-full shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-300 min-h-12"
+                        className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-300 min-h-12 font-semibold"
                         disabled={isSubmitting}
                       >
                         {isSubmitting ? "Sending..." : "Send Message"}

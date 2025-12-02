@@ -369,10 +369,10 @@ const CaseStudyDetail = () => {
               Let's build your winning campaign strategy together.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" asChild className="text-lg">
+              <Button size="lg" asChild className="text-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground">
                 <Link to="/contact">Start Your Campaign</Link>
               </Button>
-              <Button size="lg" variant="outline" asChild className="text-lg">
+              <Button size="lg" variant="outline" asChild className="text-lg dark:border-accent dark:text-accent dark:hover:bg-accent dark:hover:text-accent-foreground">
                 <Link to="/case-studies">View More Case Studies</Link>
               </Button>
             </div>
