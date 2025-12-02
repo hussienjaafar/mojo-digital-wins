@@ -4,7 +4,6 @@ import { format, subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -21,9 +20,9 @@ interface DateRangeSelectorProps {
 
 const presets = [
   { label: "Today", days: 0 },
-  { label: "Last 7 Days", days: 7 },
-  { label: "Last 30 Days", days: 30 },
-  { label: "Last 90 Days", days: 90 },
+  { label: "7D", days: 7 },
+  { label: "30D", days: 30 },
+  { label: "90D", days: 90 },
 ];
 
 export function DateRangeSelector({
@@ -62,71 +61,59 @@ export function DateRangeSelector({
 
   const getDisplayText = () => {
     if (selectedPreset === "custom" && customRange?.from && customRange?.to) {
-      return (
-        <>
-          {format(customRange.from, "LLL dd, y")} -{" "}
-          {format(customRange.to, "LLL dd, y")}
-        </>
-      );
+      return `${format(customRange.from, "MMM d")} - ${format(customRange.to, "MMM d")}`;
     }
-    if (selectedPreset === "custom") {
-      return "Select date range";
-    }
-    const preset = presets.find((p) => p.days === selectedPreset);
-    return preset?.label || "Last 30 Days";
+    return "Custom";
   };
 
   return (
-    <div className={cn("flex flex-col gap-3", className)}>
-      {/* Preset Buttons */}
-      <div className="flex flex-wrap gap-2">
+    <div className={cn("flex items-center gap-1.5", className)}>
+      {/* Preset Buttons - Portal Style */}
+      <div className="flex items-center gap-1 p-1 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
         {presets.map((preset) => (
-          <Button
+          <button
             key={preset.label}
-            variant={selectedPreset === preset.days ? "default" : "outline"}
-            size="sm"
             onClick={() => handlePresetClick(preset.days)}
-            className="text-sm"
-          >
-            {preset.label}
-          </Button>
-        ))}
-        <Button
-          variant={selectedPreset === "custom" ? "default" : "outline"}
-          size="sm"
-          onClick={handleCustomClick}
-          className="text-sm"
-        >
-          Custom Range
-        </Button>
-      </div>
-
-      {/* Custom Date Picker */}
-      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
             className={cn(
-              "justify-start text-left font-normal w-full sm:w-auto",
-              selectedPreset !== "custom" && "opacity-0 h-0 p-0 overflow-hidden"
+              "px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200",
+              selectedPreset === preset.days
+                ? "bg-[hsl(var(--portal-accent-blue))] text-white shadow-sm"
+                : "text-[hsl(var(--portal-text-secondary))] hover:text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-tertiary))]"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            <span className="text-sm">{getDisplayText()}</span>
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="range"
-            defaultMonth={customRange?.from}
-            selected={customRange}
-            onSelect={handleCustomRangeSelect}
-            numberOfMonths={isMobile ? 1 : 2}
-            className="pointer-events-auto"
-            disabled={(date) => date > new Date()}
-          />
-        </PopoverContent>
-      </Popover>
+            {preset.label}
+          </button>
+        ))}
+        
+        {/* Custom Date Picker */}
+        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+          <PopoverTrigger asChild>
+            <button
+              onClick={handleCustomClick}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1.5",
+                selectedPreset === "custom"
+                  ? "bg-[hsl(var(--portal-accent-blue))] text-white shadow-sm"
+                  : "text-[hsl(var(--portal-text-secondary))] hover:text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-tertiary))]"
+              )}
+            >
+              <CalendarIcon className="h-3 w-3" />
+              <span>{selectedPreset === "custom" ? getDisplayText() : "Custom"}</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0 portal-card" align="end">
+            <Calendar
+              mode="range"
+              defaultMonth={customRange?.from}
+              selected={customRange}
+              onSelect={handleCustomRangeSelect}
+              numberOfMonths={isMobile ? 1 : 2}
+              className="pointer-events-auto"
+              disabled={(date) => date > new Date()}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }

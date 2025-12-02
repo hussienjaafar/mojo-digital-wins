@@ -1,9 +1,12 @@
+import { useState, useEffect, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/fixed-client";
 import { PortalMetric } from "@/components/portal/PortalMetric";
 import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardContent } from "@/components/portal/PortalCard";
 import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
-import { PortalCircularProgress } from "@/components/portal/PortalCircularProgress";
-import { TrendingUp, DollarSign, Users, Target, Star } from "lucide-react";
+import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare } from "lucide-react";
+import { format, parseISO, eachDayOfInterval } from "date-fns";
+import { logger } from "@/lib/logger";
 
 interface ClientDashboardMetricsProps {
   organizationId: string;
@@ -11,65 +14,205 @@ interface ClientDashboardMetricsProps {
   endDate: string;
 }
 
+interface DonationData {
+  amount: number;
+  donor_email: string;
+  is_recurring: boolean;
+  transaction_date: string;
+  refcode: string | null;
+}
+
+interface MetaData {
+  date: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+}
+
+interface SMSData {
+  date: string;
+  messages_sent: number;
+  conversions: number;
+  cost: number;
+  amount_raised: number;
+}
+
 export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: ClientDashboardMetricsProps) => {
-  // Mock data for demo - would be fetched from API
-  const kpiCards = [
+  const [donations, setDonations] = useState<DonationData[]>([]);
+  const [metaMetrics, setMetaMetrics] = useState<MetaData[]>([]);
+  const [smsMetrics, setSmsMetrics] = useState<SMSData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadAllData();
+  }, [organizationId, startDate, endDate]);
+
+  const loadAllData = async () => {
+    setIsLoading(true);
+    try {
+      // Load donations (ActBlue)
+      const { data: donationData } = await (supabase as any)
+        .from('actblue_transactions')
+        .select('amount, donor_email, is_recurring, transaction_date, refcode')
+        .eq('organization_id', organizationId)
+        .gte('transaction_date', startDate)
+        .lte('transaction_date', endDate);
+      
+      setDonations(donationData || []);
+
+      // Load Meta Ads metrics
+      const { data: metaData } = await (supabase as any)
+        .from('meta_ad_metrics')
+        .select('date, spend, impressions, clicks, conversions')
+        .eq('organization_id', organizationId)
+        .gte('date', startDate)
+        .lte('date', endDate);
+      
+      setMetaMetrics(metaData || []);
+
+      // Load SMS metrics
+      const { data: smsData } = await (supabase as any)
+        .from('sms_campaign_metrics')
+        .select('date, messages_sent, conversions, cost, amount_raised')
+        .eq('organization_id', organizationId)
+        .gte('date', startDate)
+        .lte('date', endDate);
+      
+      setSmsMetrics(smsData || []);
+    } catch (error) {
+      logger.error('Failed to load dashboard metrics', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Calculate KPIs
+  const kpis = useMemo(() => {
+    const totalRaised = donations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    const uniqueDonors = new Set(donations.map(d => d.donor_email)).size;
+    const recurringDonors = donations.filter(d => d.is_recurring).length;
+    const recurringPercentage = donations.length > 0 ? (recurringDonors / donations.length) * 100 : 0;
+    
+    const totalMetaSpend = metaMetrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
+    const totalSMSCost = smsMetrics.reduce((sum, s) => sum + Number(s.cost || 0), 0);
+    const totalSpend = totalMetaSpend + totalSMSCost;
+    
+    const roi = totalSpend > 0 ? totalRaised / totalSpend : 0;
+    
+    const totalImpressions = metaMetrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
+    const totalClicks = metaMetrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
+    const avgDonation = donations.length > 0 ? totalRaised / donations.length : 0;
+
+    return {
+      totalRaised,
+      uniqueDonors,
+      recurringPercentage,
+      roi,
+      totalSpend,
+      totalImpressions,
+      totalClicks,
+      avgDonation,
+      donationCount: donations.length,
+    };
+  }, [donations, metaMetrics, smsMetrics]);
+
+  // Build time series data for charts
+  const timeSeriesData = useMemo(() => {
+    const days = eachDayOfInterval({
+      start: parseISO(startDate),
+      end: parseISO(endDate),
+    });
+
+    return days.map(day => {
+      const dayStr = format(day, 'yyyy-MM-dd');
+      const dayLabel = format(day, 'MMM d');
+      
+      const dayDonations = donations.filter(d => d.transaction_date?.startsWith(dayStr));
+      const dayMeta = metaMetrics.filter(m => m.date === dayStr);
+      const daySms = smsMetrics.filter(s => s.date === dayStr);
+
+      return {
+        name: dayLabel,
+        donations: dayDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0),
+        metaSpend: dayMeta.reduce((sum, m) => sum + Number(m.spend || 0), 0),
+        smsSpend: daySms.reduce((sum, s) => sum + Number(s.cost || 0), 0),
+      };
+    });
+  }, [donations, metaMetrics, smsMetrics, startDate, endDate]);
+
+  // Channel breakdown for bar chart
+  const channelBreakdown = useMemo(() => {
+    const metaConversions = metaMetrics.reduce((sum, m) => sum + (m.conversions || 0), 0);
+    const smsConversions = smsMetrics.reduce((sum, s) => sum + (s.conversions || 0), 0);
+    const directDonations = donations.filter(d => !d.refcode).length;
+
+    return [
+      { name: "Meta Ads", value: metaConversions, label: `${metaConversions}` },
+      { name: "SMS", value: smsConversions, label: `${smsConversions}` },
+      { name: "Direct", value: directDonations, label: `${directDonations}` },
+    ];
+  }, [donations, metaMetrics, smsMetrics]);
+
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
+    return `$${value.toFixed(0)}`;
+  };
+
+  const heroKpis = [
     {
-      label: "Engagement Rate",
-      value: "68%",
-      icon: TrendingUp,
-      trend: { value: 12.5, isPositive: true },
-      subtitle: "vs. last month",
-    },
-    {
-      label: "Donor Conversion",
-      value: "3.4%",
+      label: "Total Raised",
+      value: formatCurrency(kpis.totalRaised),
       icon: DollarSign,
-      trend: { value: 8.2, isPositive: true },
-      subtitle: "30-day average",
+      trend: { value: 0, isPositive: true },
+      subtitle: `${kpis.donationCount} donations`,
     },
     {
-      label: "Active Supporters",
-      value: "1,284",
+      label: "Unique Donors",
+      value: kpis.uniqueDonors.toLocaleString(),
       icon: Users,
-      trend: { value: 15.3, isPositive: true },
-      subtitle: "Growing monthly",
+      trend: { value: 0, isPositive: true },
+      subtitle: `Avg: ${formatCurrency(kpis.avgDonation)}`,
     },
     {
-      label: "Campaign Reach",
-      value: "42.3K",
-      icon: Target,
-      trend: { value: 2.1, isPositive: false },
-      subtitle: "Total impressions",
+      label: "Overall ROI",
+      value: `${kpis.roi.toFixed(1)}x`,
+      icon: TrendingUp,
+      trend: { value: 0, isPositive: kpis.roi >= 1 },
+      subtitle: `Spend: ${formatCurrency(kpis.totalSpend)}`,
+    },
+    {
+      label: "Recurring Rate",
+      value: `${kpis.recurringPercentage.toFixed(0)}%`,
+      icon: Repeat,
+      trend: { value: 0, isPositive: true },
+      subtitle: "Monthly sustainers",
     },
   ];
 
-  const lineChartData = [
-    { name: "2022-08", loyalty: 500, new: 200, repeated: 850 },
-    { name: "2022-09", loyalty: 400, new: 450, repeated: 520 },
-    { name: "2022-10", loyalty: 200, new: 380, repeated: 450 },
-    { name: "2022-11", loyalty: 900, new: 450, repeated: 380 },
-    { name: "2022-12", loyalty: 450, new: 750, repeated: 480 },
-    { name: "2023-01", loyalty: 850, new: 350, repeated: 850 },
-    { name: "2023-02", loyalty: 350, new: 800, repeated: 350 },
-    { name: "2023-03", loyalty: 850, new: 250, repeated: 900 },
-  ];
-
-  const barChartData = [
-    { name: "Jan", value: 20, label: "20%" },
-    { name: "Feb", value: 30, label: "30%" },
-    { name: "Mar", value: 25, label: "25%" },
-    { name: "Apr", value: 50, label: "50%" },
-    { name: "May", value: 65, label: "65%" },
-  ];
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="portal-card p-6 animate-pulse">
+              <div className="h-4 w-24 bg-[hsl(var(--portal-bg-elevated))] rounded mb-3" />
+              <div className="h-8 w-20 bg-[hsl(var(--portal-bg-elevated))] rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards Row - Simplified 4-card layout with staggered animations */}
+      {/* Hero KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpiCards.map((metric, index) => (
+        {heroKpis.map((metric, index) => (
           <PortalMetric
-            key={index}
+            key={metric.label}
             label={metric.label}
             value={metric.value}
             icon={metric.icon}
@@ -80,126 +223,145 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         ))}
       </div>
 
-      {/* Charts Section */}
+      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Loyalty Order Analysis - Large Chart */}
+        {/* Fundraising Trend - Main Chart */}
         <PortalCard className="lg:col-span-2 portal-animate-slide-in-left">
           <PortalCardHeader>
-            <PortalCardTitle>Loyalty driven order analysis</PortalCardTitle>
+            <PortalCardTitle>Fundraising Performance</PortalCardTitle>
             <div className="flex items-center gap-6 mt-3">
               <div className="flex items-center gap-2">
-                <div className="text-2xl font-bold portal-text-primary">$ 541.00</div>
+                <div className="text-2xl font-bold portal-text-primary">{formatCurrency(kpis.totalRaised)}</div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-[#0D84FF]"></div>
-                  <span className="text-xs portal-text-muted">Loyalty</span>
+                  <div className="w-2 h-2 rounded-full bg-[#10B981]" />
+                  <span className="text-xs portal-text-muted">Donations</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="text-2xl font-bold portal-text-primary">$ 324.76</div>
+                <div className="text-2xl font-bold portal-text-primary">{formatCurrency(kpis.totalSpend)}</div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-[#FF6B6B]"></div>
-                  <span className="text-xs portal-text-muted">New</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="text-2xl font-bold portal-text-primary">$ 376.34</div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-[#A78BFA]"></div>
-                  <span className="text-xs portal-text-muted">Repeated</span>
+                  <div className="w-2 h-2 rounded-full bg-[#0D84FF]" />
+                  <span className="text-xs portal-text-muted">Meta Spend</span>
                 </div>
               </div>
             </div>
           </PortalCardHeader>
           <PortalCardContent>
             <PortalLineChart
-              data={lineChartData}
+              data={timeSeriesData}
               lines={[
-                { dataKey: "loyalty", stroke: "#0D84FF", name: "Loyalty Orders" },
-                { dataKey: "new", stroke: "#FF6B6B", name: "New Orders" },
-                { dataKey: "repeated", stroke: "#A78BFA", name: "Repeat Orders" },
+                { dataKey: "donations", stroke: "#10B981", name: "Donations" },
+                { dataKey: "metaSpend", stroke: "#0D84FF", name: "Meta Spend" },
+                { dataKey: "smsSpend", stroke: "#A78BFA", name: "SMS Spend" },
               ]}
               height={280}
             />
           </PortalCardContent>
         </PortalCard>
 
-        {/* Total Reviews Card */}
+        {/* Channel Performance Summary */}
         <PortalCard className="portal-animate-slide-in-right portal-delay-100">
           <PortalCardHeader>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 rounded-lg bg-[#FFB020] flex items-center justify-center">
-                <Star className="h-5 w-5 text-white fill-white" />
-              </div>
-              <div className="text-3xl font-bold portal-text-primary">70</div>
-            </div>
-            <PortalCardTitle className="text-base">Total Reviews</PortalCardTitle>
+            <PortalCardTitle>Channel Performance</PortalCardTitle>
+            <p className="text-sm portal-text-muted mt-1">Conversions by source</p>
           </PortalCardHeader>
           <PortalCardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm portal-text-muted">Excellent</span>
-                <span className="text-sm font-semibold portal-text-primary">50%</span>
+              {/* Meta Ads */}
+              <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                <div className="p-2 rounded-lg bg-[#0D84FF]/10">
+                  <Target className="h-4 w-4 text-[#0D84FF]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium portal-text-primary">Meta Ads</p>
+                  <p className="text-xs portal-text-muted">
+                    {formatCurrency(metaMetrics.reduce((s, m) => s + Number(m.spend || 0), 0))} spent
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold portal-text-primary">
+                    {metaMetrics.reduce((s, m) => s + (m.conversions || 0), 0)}
+                  </p>
+                  <p className="text-xs portal-text-muted">conversions</p>
+                </div>
               </div>
-              <div className="h-2 w-full bg-portal-bg-elevated rounded-full overflow-hidden">
-                <div className="h-full w-1/2 bg-[#0D84FF] rounded-full" 
-                     style={{ boxShadow: "0 0 8px hsl(var(--portal-accent-blue) / 0.6)" }}></div>
+
+              {/* SMS */}
+              <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                <div className="p-2 rounded-lg bg-[#A78BFA]/10">
+                  <MessageSquare className="h-4 w-4 text-[#A78BFA]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium portal-text-primary">SMS Campaigns</p>
+                  <p className="text-xs portal-text-muted">
+                    {smsMetrics.reduce((s, m) => s + (m.messages_sent || 0), 0).toLocaleString()} sent
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold portal-text-primary">
+                    {smsMetrics.reduce((s, m) => s + (m.conversions || 0), 0)}
+                  </p>
+                  <p className="text-xs portal-text-muted">conversions</p>
+                </div>
               </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm portal-text-muted">Good</span>
-                <span className="text-sm font-semibold portal-text-primary">78%</span>
-              </div>
-              <div className="h-2 w-full bg-portal-bg-elevated rounded-full overflow-hidden">
-                <div className="h-full w-[78%] bg-[#0D84FF] rounded-full"
-                     style={{ boxShadow: "0 0 8px hsl(var(--portal-accent-blue) / 0.6)" }}></div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm portal-text-muted">Poor</span>
-                <span className="text-sm font-semibold portal-text-primary">30%</span>
-              </div>
-              <div className="h-2 w-full bg-portal-bg-elevated rounded-full overflow-hidden">
-                <div className="h-full w-[30%] bg-[#0D84FF] rounded-full"
-                     style={{ boxShadow: "0 0 8px hsl(var(--portal-accent-blue) / 0.6)" }}></div>
+
+              {/* Direct */}
+              <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                <div className="p-2 rounded-lg bg-[#10B981]/10">
+                  <DollarSign className="h-4 w-4 text-[#10B981]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium portal-text-primary">Direct Donations</p>
+                  <p className="text-xs portal-text-muted">No attribution</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold portal-text-primary">
+                    {donations.filter(d => !d.refcode).length}
+                  </p>
+                  <p className="text-xs portal-text-muted">donations</p>
+                </div>
               </div>
             </div>
           </PortalCardContent>
         </PortalCard>
       </div>
 
-      {/* Bottom Row - Bar Chart and Profit Card */}
+      {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Rewards Utilization */}
+        {/* Conversion Sources Bar Chart */}
         <PortalCard className="lg:col-span-2 portal-animate-fade-in portal-delay-200">
           <PortalCardHeader>
-            <PortalCardTitle>Rewards Utilization</PortalCardTitle>
+            <PortalCardTitle>Conversion Sources</PortalCardTitle>
           </PortalCardHeader>
           <PortalCardContent>
-            <PortalBarChart data={barChartData} height={240} />
+            <PortalBarChart data={channelBreakdown} height={200} />
           </PortalCardContent>
         </PortalCard>
 
-        {/* Sales Report / Total Profit */}
+        {/* Quick Stats */}
         <PortalCard className="portal-animate-scale-in portal-delay-300">
           <PortalCardHeader>
-            <PortalCardTitle>Sales Report</PortalCardTitle>
-            <p className="text-sm portal-text-muted mt-1">Quarterly Sales Performance Analysis</p>
+            <PortalCardTitle>Campaign Health</PortalCardTitle>
+            <p className="text-sm portal-text-muted mt-1">Key efficiency metrics</p>
           </PortalCardHeader>
-          <PortalCardContent className="flex flex-col items-center justify-center py-8">
-            <PortalCircularProgress value={68} size="lg" showLabel={false} />
-            <div className="mt-6 text-center">
-              <div className="text-3xl font-bold portal-text-primary">$2,119.54</div>
-              <div className="text-sm portal-text-muted mt-1">Total Profit</div>
+          <PortalCardContent className="space-y-4">
+            <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
+              <span className="text-sm portal-text-muted">Average Donation</span>
+              <span className="text-sm font-semibold portal-text-primary">{formatCurrency(kpis.avgDonation)}</span>
             </div>
-            <div className="w-full mt-6 pt-6 border-t border-portal-border grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <div className="text-sm portal-text-muted">Monthly Profit</div>
-                <div className="text-lg font-semibold portal-text-primary mt-1">$ 1,654.54</div>
-              </div>
-              <div className="text-center">
-                <div className="text-sm portal-text-muted">Yearly Profit</div>
-                <div className="text-lg font-semibold portal-text-primary mt-1">$ 8,732.87</div>
-              </div>
+            <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
+              <span className="text-sm portal-text-muted">Total Impressions</span>
+              <span className="text-sm font-semibold portal-text-primary">{kpis.totalImpressions.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
+              <span className="text-sm portal-text-muted">Total Clicks</span>
+              <span className="text-sm font-semibold portal-text-primary">{kpis.totalClicks.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm portal-text-muted">Cost Per Donor</span>
+              <span className="text-sm font-semibold portal-text-primary">
+                {kpis.uniqueDonors > 0 ? formatCurrency(kpis.totalSpend / kpis.uniqueDonors) : '$0'}
+              </span>
             </div>
           </PortalCardContent>
         </PortalCard>
