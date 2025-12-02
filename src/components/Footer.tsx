@@ -164,7 +164,7 @@ const Footer = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isSubmitting}
                 />
-                <Button variant="cta" size="default" className="w-full" type="submit" disabled={isSubmitting}>
+                <Button variant="default" size="default" className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold" type="submit" disabled={isSubmitting}>
                   {isSubmitting ? "Subscribing..." : "Subscribe"}
                 </Button>
               </form>

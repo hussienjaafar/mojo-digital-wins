@@ -82,7 +82,7 @@ const Navigation = () => {
               variant="default" 
               size="default" 
               asChild
-              className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold rounded-lg px-6 shadow-[0_4px_16px_rgba(20,100,217,0.4)] hover:shadow-[0_6px_24px_rgba(20,100,217,0.6)] hover:scale-[1.03] transition-all duration-300"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold rounded-lg px-6 shadow-[0_4px_16px_hsl(var(--destructive)/0.4)] hover:shadow-[0_6px_24px_hsl(var(--destructive)/0.6)] hover:scale-[1.03] transition-all duration-300"
             >
               <Link to="/contact">Work With Us</Link>
             </Button>
@@ -154,7 +154,7 @@ const Navigation = () => {
                 variant="default" 
                 size="lg"
                 asChild
-                className="w-full min-h-[52px] bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold text-base shadow-lg"
+                className="w-full min-h-[52px] bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold text-base shadow-lg"
               >
                 <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)}>
                   Work With Us

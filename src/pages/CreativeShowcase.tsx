@@ -53,7 +53,7 @@ const CreativeShowcase = () => {
               Let's build a campaign that stands out, raises more, and delivers results.
             </p>
             <Link to="/contact">
-              <Button size="lg" variant="secondary" className="text-lg px-8 shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all duration-300">
+              <Button size="lg" className="text-lg px-8 shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all duration-300 bg-destructive hover:bg-destructive/90 text-destructive-foreground">
                 Start Your Campaign
               </Button>
             </Link>
