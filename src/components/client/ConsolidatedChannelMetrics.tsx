@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Target, MessageSquare, DollarSign, TrendingUp } from "lucide-react";
+import { ChevronDown, ChevronRight, Target, MessageSquare, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PortalCard } from "@/components/portal/PortalCard";
-import ClientMetricsOverview from "./ClientMetricsOverview";
 import MetaAdsMetrics from "./MetaAdsMetrics";
 import SMSMetrics from "./SMSMetrics";
 import DonationMetrics from "./DonationMetrics";
@@ -13,10 +12,10 @@ type Props = {
   endDate: string;
 };
 
-type ChannelSection = "overview" | "meta" | "sms" | "donations";
+type ChannelSection = "meta" | "sms" | "donations";
 
 export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate }: Props) {
-  const [expandedSections, setExpandedSections] = useState<Set<ChannelSection>>(new Set(["overview"]));
+  const [expandedSections, setExpandedSections] = useState<Set<ChannelSection>>(new Set());
 
   const toggleSection = (section: ChannelSection) => {
     setExpandedSections(prev => {
@@ -32,19 +31,11 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
 
   const sections = [
     {
-      id: "overview" as ChannelSection,
-      title: "All Channels Overview",
-      icon: TrendingUp,
-      description: "Aggregated performance across all marketing channels",
-      color: "#10B981",
-      component: <ClientMetricsOverview organizationId={organizationId} startDate={startDate} endDate={endDate} />,
-    },
-    {
       id: "meta" as ChannelSection,
       title: "Meta Ads",
       icon: Target,
       description: "Facebook & Instagram advertising performance",
-      color: "#0D84FF",
+      color: "hsl(var(--portal-accent-blue))",
       component: <MetaAdsMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />,
     },
     {
@@ -52,7 +43,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
       title: "SMS Campaigns",
       icon: MessageSquare,
       description: "Text message campaign metrics and engagement",
-      color: "#A78BFA",
+      color: "hsl(var(--portal-accent-purple))",
       component: <SMSMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />,
     },
     {
@@ -60,7 +51,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
       title: "Donations",
       icon: DollarSign,
       description: "Transaction history and donor insights",
-      color: "#F59E0B",
+      color: "hsl(var(--portal-success))",
       component: <DonationMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />,
     },
   ];
