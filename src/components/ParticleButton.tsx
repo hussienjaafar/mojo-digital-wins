@@ -143,9 +143,10 @@ export const ParticleButton = ({
     size === "default" && "px-6 h-10 text-base",
     size === "lg" && "px-8 h-12 text-base",
     size === "xl" && "px-10 h-14 text-lg",
-    // Variant styles
-    variant === "default" && "bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-[0_4px_20px_rgba(20,100,217,0.4)] hover:shadow-[0_6px_30px_rgba(20,100,217,0.7)]",
-    variant === "outline" && "border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary hover:shadow-[0_4px_20px_rgba(255,255,255,0.3)]",
+    // Variant styles - using destructive (red) for primary CTA prominence in both modes
+    variant === "default" && "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-[0_4px_20px_hsl(var(--destructive)/0.4)] hover:shadow-[0_6px_30px_hsl(var(--destructive)/0.6)]",
+    // Outline variant with better dark mode visibility
+    variant === "outline" && "border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary dark:border-accent dark:text-accent dark:hover:bg-accent dark:hover:text-accent-foreground hover:shadow-[0_4px_20px_rgba(255,255,255,0.3)] dark:hover:shadow-[0_4px_20px_hsl(var(--accent)/0.4)]",
     className
   );
 
