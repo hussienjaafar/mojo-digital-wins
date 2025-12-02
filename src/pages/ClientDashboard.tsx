@@ -222,11 +222,11 @@ const ClientDashboard = () => {
                 <IntelligenceHubRedesigned organizationId={organization.id} />
               </div>
 
-              {/* AT A GLANCE: Campaign Snapshot */}
+              {/* AT A GLANCE: Performance Overview */}
               <div className="mb-6 md:mb-8">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Campaign Snapshot</h2>
+                    <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Performance Overview</h2>
                     <p className="text-sm portal-text-secondary mt-1">Key performance indicators</p>
                   </div>
                   {/* Inline Date Range - Compact */}
@@ -245,11 +245,11 @@ const ClientDashboard = () => {
                 />
               </div>
 
-              {/* DEEP DIVE: Campaign Performance Details - Expandable Sections */}
+              {/* DEEP DIVE: Channel Details - Expandable Sections */}
               <div className="mb-6">
                 <div className="mb-4">
-                  <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Campaign Performance</h2>
-                  <p className="text-sm portal-text-secondary mt-1">Expand any channel for detailed insights</p>
+                  <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Channel Details</h2>
+                  <p className="text-sm portal-text-secondary mt-1">Expand for detailed channel insights</p>
                 </div>
                 <ConsolidatedChannelMetrics
                   organizationId={organization.id}
