@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/fixed-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PortalCard, PortalCardContent, PortalCardHeader, PortalCardTitle } from "@/components/portal/PortalCard";
+import { PortalMetric } from "@/components/portal/PortalMetric";
 import { logger } from "@/lib/logger";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
+import { MessageSquare, CheckCircle, DollarSign, Target } from "lucide-react";
 
 type Props = {
   organizationId: string;
@@ -43,7 +45,6 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
       if (error) throw error;
 
-      // Aggregate by campaign
       const aggregated: Record<string, SMSMetric> = {};
       data?.forEach(metric => {
         if (!aggregated[metric.campaign_id]) {
@@ -82,52 +83,47 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const totalRaised = campaigns.reduce((sum, m) => sum + m.amount_raised, 0);
   const totalCost = campaigns.reduce((sum, m) => sum + m.cost, 0);
   const totalSent = campaigns.reduce((sum, m) => sum + m.messages_sent, 0);
+  const totalDelivered = campaigns.reduce((sum, m) => sum + m.messages_delivered, 0);
   const totalConversions = campaigns.reduce((sum, m) => sum + m.conversions, 0);
+  const deliveryRate = totalSent > 0 ? (totalDelivered / totalSent) * 100 : 0;
+  const conversionRate = totalDelivered > 0 ? (totalConversions / totalDelivered) * 100 : 0;
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Messages Sent</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalSent.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Conversions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalConversions}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Amount Raised</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalRaised.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Cost</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalCost.toLocaleString()}</div>
-          </CardContent>
-        </Card>
+      {/* Summary KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <PortalMetric
+          label="Messages Sent"
+          value={totalSent.toLocaleString()}
+          icon={MessageSquare}
+          subtitle={`${deliveryRate.toFixed(1)}% delivered`}
+        />
+        <PortalMetric
+          label="Conversions"
+          value={totalConversions.toLocaleString()}
+          icon={Target}
+          subtitle={`${conversionRate.toFixed(2)}% rate`}
+        />
+        <PortalMetric
+          label="Amount Raised"
+          value={`$${totalRaised.toLocaleString()}`}
+          icon={DollarSign}
+          subtitle="From SMS campaigns"
+        />
+        <PortalMetric
+          label="Total Cost"
+          value={`$${totalCost.toLocaleString()}`}
+          icon={CheckCircle}
+          subtitle={totalConversions > 0 ? `$${(totalCost / totalConversions).toFixed(2)} per conv.` : 'N/A'}
+        />
       </div>
 
       {/* Campaign Details Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Campaign Details</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <PortalCard>
+        <PortalCardHeader>
+          <PortalCardTitle>Campaign Details</PortalCardTitle>
+        </PortalCardHeader>
+        <PortalCardContent>
           <PortalTable
             data={campaigns}
             columns={[
@@ -135,7 +131,7 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
                 key: "campaign_name",
                 label: "Campaign",
                 sortable: true,
-                render: (value) => <span className="font-medium">{value}</span>,
+                render: (value) => <span className="font-medium portal-text-primary">{value}</span>,
               },
               {
                 key: "messages_sent",
@@ -208,8 +204,8 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
               </p>
             }
           />
-        </CardContent>
-      </Card>
+        </PortalCardContent>
+      </PortalCard>
     </div>
   );
 };
