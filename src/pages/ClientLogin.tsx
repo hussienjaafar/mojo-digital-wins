@@ -75,21 +75,21 @@ const ClientLogin = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-      <Card className="w-full max-w-md border-border/50 backdrop-blur">
+    <div className="portal-theme min-h-screen flex items-center justify-center bg-gradient-to-br from-[hsl(var(--portal-bg-primary))] via-[hsl(var(--portal-bg-secondary))] to-[hsl(var(--portal-accent-blue)/0.1)] p-4">
+      <Card className="w-full max-w-md border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] backdrop-blur shadow-lg">
         <CardHeader className="space-y-2 text-center">
-          <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-            <BarChart3 className="w-6 h-6 text-primary" />
+          <div className="mx-auto w-12 h-12 rounded-full bg-[hsl(var(--portal-accent-blue)/0.1)] flex items-center justify-center mb-2">
+            <BarChart3 className="w-6 h-6 text-[hsl(var(--portal-accent-blue))]" />
           </div>
-          <CardTitle className="text-2xl">Client Portal</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl text-[hsl(var(--portal-text-primary))]">Client Portal</CardTitle>
+          <CardDescription className="text-[hsl(var(--portal-text-secondary))]">
             Access your campaign metrics and analytics
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-[hsl(var(--portal-text-primary))]">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -98,10 +98,11 @@ const ClientLogin = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
+                className="bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] placeholder:text-[hsl(var(--portal-text-muted))]"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-[hsl(var(--portal-text-primary))]">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -111,6 +112,7 @@ const ClientLogin = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isLoading}
+                  className="bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] placeholder:text-[hsl(var(--portal-text-muted))]"
                 />
                 <Button
                   type="button"
@@ -120,14 +122,14 @@ const ClientLogin = () => {
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    <EyeOff className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
                   ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
+                    <Eye className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
                   )}
                 </Button>
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white" disabled={isLoading}>
               {isLoading ? "Logging in..." : "Log In"}
             </Button>
           </form>
