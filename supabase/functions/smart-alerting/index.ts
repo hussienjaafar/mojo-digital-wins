@@ -284,8 +284,46 @@ serve(async (req) => {
       })();
       const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      // Get briefing stats (now looks at last 24 hours)
-      const { data: stats } = await supabase.rpc('get_briefing_stats', { target_date: today });
+      // Get briefing stats - use direct queries as fallback if RPC returns empty
+      const { data: stats, error: statsError } = await supabase.rpc('get_briefing_stats', { target_date: today });
+      
+      // CRITICAL FIX: If stats are all zeros, query directly
+      let effectiveStats = stats;
+      if (!stats || (stats?.articles?.total === 0 && stats?.bills?.total === 0)) {
+        console.log('RPC returned empty stats, querying directly...');
+        
+        // Direct query for articles
+        const { count: articleTotal } = await supabase
+          .from('articles')
+          .select('*', { count: 'exact', head: true })
+          .gte('published_date', last24Hours);
+        
+        const { count: articleCritical } = await supabase
+          .from('articles')
+          .select('*', { count: 'exact', head: true })
+          .gte('published_date', last24Hours)
+          .eq('threat_level', 'critical');
+          
+        const { count: articleHigh } = await supabase
+          .from('articles')
+          .select('*', { count: 'exact', head: true })
+          .gte('published_date', last24Hours)
+          .eq('threat_level', 'high');
+        
+        // Direct query for bills
+        const { count: billTotal } = await supabase
+          .from('bills')
+          .select('*', { count: 'exact', head: true })
+          .or(`latest_action_date.gte.${last24Hours},introduced_date.gte.${last24Hours}`);
+        
+        effectiveStats = {
+          articles: { total: articleTotal || 0, critical: articleCritical || 0, high: articleHigh || 0, medium: 0, low: 0 },
+          bills: { total: billTotal || 0, critical: 0, high: 0, medium: 0, low: 0 },
+          executive_orders: { total: 0, critical: 0, high: 0, medium: 0, low: 0 },
+          state_actions: { total: 0, critical: 0, high: 0, medium: 0, low: 0 }
+        };
+        console.log('Direct query stats:', JSON.stringify(effectiveStats));
+      }
 
       // Get top critical/high/medium items from last 24 hours
       const { data: criticalArticles } = await supabase
@@ -335,30 +373,30 @@ serve(async (req) => {
         if (mention.threat_level === 'high') orgSummary[mention.organization_abbrev].high++;
       }
 
-      // Calculate totals
+      // Calculate totals - FIXED: Use effectiveStats instead of stats
       const totalCritical =
-        (stats?.articles?.critical || 0) +
-        (stats?.bills?.critical || 0) +
-        (stats?.executive_orders?.critical || 0) +
-        (stats?.state_actions?.critical || 0);
+        (effectiveStats?.articles?.critical || 0) +
+        (effectiveStats?.bills?.critical || 0) +
+        (effectiveStats?.executive_orders?.critical || 0) +
+        (effectiveStats?.state_actions?.critical || 0);
 
       const totalHigh =
-        (stats?.articles?.high || 0) +
-        (stats?.bills?.high || 0) +
-        (stats?.executive_orders?.high || 0) +
-        (stats?.state_actions?.high || 0);
+        (effectiveStats?.articles?.high || 0) +
+        (effectiveStats?.bills?.high || 0) +
+        (effectiveStats?.executive_orders?.high || 0) +
+        (effectiveStats?.state_actions?.high || 0);
 
       // Log what we found
       console.log(`Found ${criticalArticles?.length || 0} articles, ${criticalBills?.length || 0} bills, ${criticalStateActions?.length || 0} state actions`);
-      console.log(`Stats:`, JSON.stringify(stats));
+      console.log(`Stats:`, JSON.stringify(effectiveStats));
 
-      // Prepare briefing data
+      // Prepare briefing data - FIXED: Use effectiveStats
       const briefingData = {
         briefing_date: today,
-        total_articles: stats?.articles?.total || 0,
-        total_bills: stats?.bills?.total || 0,
-        total_executive_orders: stats?.executive_orders?.total || 0,
-        total_state_actions: stats?.state_actions?.total || 0,
+        total_articles: effectiveStats?.articles?.total || 0,
+        total_bills: effectiveStats?.bills?.total || 0,
+        total_executive_orders: effectiveStats?.executive_orders?.total || 0,
+        total_state_actions: effectiveStats?.state_actions?.total || 0,
         critical_count: totalCritical,
         high_count: totalHigh,
         medium_count: 0, // Calculate if needed

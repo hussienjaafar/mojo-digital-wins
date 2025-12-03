@@ -313,8 +313,8 @@ serve(async (req) => {
 
     console.log('🤖 Starting AI analysis of Bluesky posts...');
 
-    // OPTIMIZED: Reduced batch size to prevent timeouts (20 posts = ~15-20s processing time)
-    const { batchSize = 20, minRelevance = 0.01 } = await req.json().catch(() => ({ batchSize: 20, minRelevance: 0.01 }));
+    // INCREASED: Batch size from 20 to 50 for higher throughput (GPT-3.5 handles this well)
+    const { batchSize = 50, minRelevance = 0.01 } = await req.json().catch(() => ({ batchSize: 50, minRelevance: 0.01 }));
     const effectiveMinRelevance = Math.max(0, Number(minRelevance) || 0);
 
     // Get unprocessed posts with relevance above threshold (default very low to avoid starvation)
@@ -436,13 +436,14 @@ serve(async (req) => {
           }
 
           // Insert entity mentions with deduplication
+          // CRITICAL FIX: Changed source_type from 'bluesky_post' to 'bluesky' to match constraint
           if (entities.length > 0) {
             const post = posts.find(p => p.id === analysis.id);
             const { error: mentionError } = await supabase.from('entity_mentions').upsert(
               entities.map(e => ({
                 entity_name: e.entity_name,
                 entity_type: e.entity_type,
-                source_type: 'bluesky_post',
+                source_type: 'bluesky',  // FIXED: Was 'bluesky_post', constraint requires 'bluesky'
                 source_id: analysis.id,
                 mentioned_at: post?.created_at || new Date().toISOString(),
                 sentiment: analysis.ai_sentiment
@@ -476,9 +477,19 @@ serve(async (req) => {
 
     console.log(`✅ Processed ${successCount} posts, ${validationFailedCount} validation failed, ${errorCount} errors`);
 
-    // FIXED: Use optimized database function with batch processing
-    const { data: trendResults, error: trendError } = await supabase
-      .rpc('update_bluesky_trends_optimized', { batch_limit: 50 });
+    // FIXED: Reduced batch_limit from 50 to 20 to prevent statement timeout
+    let trendResults: any[] | null = null;
+    let trendError: any = null;
+    
+    try {
+      const result = await supabase
+        .rpc('update_bluesky_trends_optimized', { batch_limit: 20 });
+      trendResults = result.data;
+      trendError = result.error;
+    } catch (e) {
+      console.error('❌ Trends calculation timed out, will retry next run');
+      trendError = e;
+    }
 
     if (trendError) {
       console.error('❌ Error updating trends:', trendError);
