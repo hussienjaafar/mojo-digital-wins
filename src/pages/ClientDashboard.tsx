@@ -110,47 +110,76 @@ const ClientDashboard = () => {
 
   const loadUserOrganizations = async () => {
     try {
-      // Fetch all organizations the user has access to
-      const { data: clientUserData, error: userError } = await (supabase as any)
-        .from('client_users')
-        .select(`
-          organization_id,
-          role,
-          client_organizations (
-            id,
-            name,
-            logo_url
-          )
-        `)
-        .eq('id', session?.user?.id);
+      // Check if user is admin FIRST - admins get access to ALL organizations
+      const { data: isAdminUser } = await supabase.rpc("has_role", {
+        _user_id: session?.user?.id,
+        _role: "admin",
+      });
 
-      if (userError) throw userError;
-      if (!clientUserData || clientUserData.length === 0) {
-        toast({
-          title: "Error",
-          description: "You don't have access to a client organization",
-          variant: "destructive",
-        });
-        navigate('/');
-        return;
+      if (isAdminUser) {
+        // Admin gets access to ALL organizations
+        const { data: allOrgs, error: orgError } = await supabase
+          .from('client_organizations')
+          .select('id, name, logo_url')
+          .eq('is_active', true)
+          .order('name');
+
+        if (orgError) throw orgError;
+        
+        if (!allOrgs || allOrgs.length === 0) {
+          toast({
+            title: "No Organizations",
+            description: "No client organizations exist yet",
+            variant: "destructive",
+          });
+          navigate('/admin');
+          return;
+        }
+
+        const orgs: Organization[] = allOrgs.map(org => ({
+          id: org.id,
+          name: org.name,
+          logo_url: org.logo_url,
+          role: 'admin',
+        }));
+        
+        setOrganizations(orgs);
+        const savedOrgId = localStorage.getItem('selectedOrganizationId');
+        const savedOrg = orgs.find(org => org.id === savedOrgId);
+        setOrganization(savedOrg || orgs[0]);
+      } else {
+        // Non-admin: check client_users table
+        const { data: clientUserData, error: userError } = await (supabase as any)
+          .from('client_users')
+          .select(`
+            organization_id,
+            role,
+            client_organizations (
+              id,
+              name,
+              logo_url
+            )
+          `)
+          .eq('id', session?.user?.id);
+
+        if (userError) throw userError;
+        if (!clientUserData || clientUserData.length === 0) {
+          navigate('/access-denied?from=client');
+          return;
+        }
+
+        const orgs: Organization[] = clientUserData.map((item: any) => ({
+          id: item.client_organizations.id,
+          name: item.client_organizations.name,
+          logo_url: item.client_organizations.logo_url,
+          role: item.role,
+        }));
+        
+        setOrganizations(orgs);
+        const savedOrgId = localStorage.getItem('selectedOrganizationId');
+        const savedOrg = orgs.find(org => org.id === savedOrgId);
+        setOrganization(savedOrg || orgs[0]);
       }
-
-      // Map to organization format with role
-      const orgs: Organization[] = clientUserData.map((item: any) => ({
-        id: item.client_organizations.id,
-        name: item.client_organizations.name,
-        logo_url: item.client_organizations.logo_url,
-        role: item.role,
-      }));
-      
-      setOrganizations(orgs);
-
-      // Check for saved organization preference
-      const savedOrgId = localStorage.getItem('selectedOrganizationId');
-      const savedOrg = orgs.find(org => org.id === savedOrgId);
-      
-      // Use saved org or default to first
-      setOrganization(savedOrg || orgs[0]);
     } catch (error: any) {
       toast({
         title: "Error",
