@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, parseISO, differenceInDays } from "date-fns";
-import { Building2, DollarSign, AlertTriangle, RefreshCw, Users, LayoutGrid } from "lucide-react";
+import { Building2, DollarSign, AlertTriangle, RefreshCw, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,7 +9,8 @@ import { toast } from "sonner";
 import { ClientCard, ClientCardData } from "./ClientCard";
 import { ClientSortFilter, SortOption, FilterOption } from "./ClientSortFilter";
 import { AdminAlertsBanner } from "./AdminAlertsBanner";
-import { NewsIntelligencePanel } from "./NewsIntelligencePanel";
+import { TrendingTopicsWidget } from "./TrendingTopicsWidget";
+import { HighImpactNewsWidget } from "./HighImpactNewsWidget";
 import { GlobalAlertsTimeline } from "./GlobalAlertsTimeline";
 import { CustomizableDashboard, WidgetConfig } from "@/components/dashboard/CustomizableDashboard";
 import { useNavigate } from "react-router-dom";
@@ -43,7 +44,6 @@ export function AdminDashboardHome() {
     needsAttention: 0,
     criticalAlerts: 0,
   });
-  const [isCustomizing, setIsCustomizing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("revenue");
@@ -253,21 +253,27 @@ export function AdminDashboardHome() {
     }).format(value);
   };
 
-  // Widget configurations for customizable dashboard
+  // Widget configurations for customizable dashboard - stable references
   const dashboardWidgets: WidgetConfig[] = useMemo(() => [
     {
-      id: "news-intelligence",
-      title: "News Intelligence",
-      component: <NewsIntelligencePanel showDragHandle={isCustomizing} />,
-      defaultLayout: { x: 0, y: 0, w: 6, h: 4, minW: 4, minH: 3 },
+      id: "trending-topics",
+      title: "Trending Topics",
+      component: <TrendingTopicsWidget showDragHandle />,
+      defaultLayout: { x: 0, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
+    },
+    {
+      id: "high-impact-news",
+      title: "High-Impact News",
+      component: <HighImpactNewsWidget showDragHandle />,
+      defaultLayout: { x: 4, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
     },
     {
       id: "alerts-timeline",
       title: "Alerts Timeline",
-      component: <GlobalAlertsTimeline showDragHandle={isCustomizing} />,
-      defaultLayout: { x: 6, y: 0, w: 6, h: 4, minW: 4, minH: 3 },
+      component: <GlobalAlertsTimeline showDragHandle />,
+      defaultLayout: { x: 8, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
     },
-  ], [isCustomizing]);
+  ], []);
 
   if (loading) {
     return (
@@ -295,21 +301,10 @@ export function AdminDashboardHome() {
           <h1 className="text-2xl font-bold text-foreground">Client Monitoring Center</h1>
           <p className="text-muted-foreground">Monitor performance and health across all organizations</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={isCustomizing ? "default" : "outline"}
-            size="sm"
-            onClick={() => setIsCustomizing(!isCustomizing)}
-            className="gap-2"
-          >
-            <LayoutGrid className="h-4 w-4" />
-            {isCustomizing ? "Done Editing" : "Customize"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2">
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2">
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Summary Stats */}
@@ -378,18 +373,11 @@ export function AdminDashboardHome() {
         onDismiss={handleDismissAlert}
       />
 
-      {/* Customizable Dashboard Area */}
-      {isCustomizing ? (
-        <CustomizableDashboard
-          storageKey="admin-dashboard-layout"
-          widgets={dashboardWidgets}
-        />
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <NewsIntelligencePanel />
-          <GlobalAlertsTimeline />
-        </div>
-      )}
+      {/* Customizable Dashboard Area - Always visible */}
+      <CustomizableDashboard
+        storageKey="admin-dashboard-layout"
+        widgets={dashboardWidgets}
+      />
 
       {/* Clients Section */}
       <div className="space-y-4">
