@@ -6,8 +6,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Spike detection threshold (300% increase = 3x growth)
-const SPIKE_THRESHOLD = 300;
+// Lower spike detection threshold (150% increase = 2.5x growth) - more useful for clients
+const SPIKE_THRESHOLD = 150;
+
+// Minimum mentions required for a spike to be considered significant
+const MIN_MENTIONS_FOR_SPIKE = 3;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,41 +23,47 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    console.log('[detect-spikes] Starting spike detection...');
+    console.log(`[detect-spikes] Starting spike detection (threshold: ${SPIKE_THRESHOLD}%, min mentions: ${MIN_MENTIONS_FOR_SPIKE})...`);
 
-    // Get currently trending topics with high velocity
+    // Get currently trending topics with meaningful velocity
     const { data: trends, error: trendsError } = await supabase
       .from('trending_news_topics')
       .select('*')
       .gte('velocity', SPIKE_THRESHOLD)
-      .order('velocity', { ascending: false });
+      .gte('mentions_last_hour', MIN_MENTIONS_FOR_SPIKE)
+      .order('velocity', { ascending: false })
+      .limit(20);
 
-    if (trendsError) throw trendsError;
+    if (trendsError) {
+      console.error('[detect-spikes] Error fetching trends:', trendsError);
+      throw trendsError;
+    }
 
-    console.log(`[detect-spikes] Found ${trends?.length || 0} potential spikes`);
+    console.log(`[detect-spikes] Found ${trends?.length || 0} potential topic spikes`);
 
-    const spikesDetected = [];
+    const spikesDetected: string[] = [];
+    const skipped: string[] = [];
 
     for (const trend of trends || []) {
-      // Check if we already alerted for this spike in last hour
+      // Check if we already alerted for this spike in last 2 hours (longer cooldown)
       const { data: existingAlert } = await supabase
         .from('spike_alerts')
         .select('id')
         .eq('entity_type', 'topic')
         .eq('entity_name', trend.topic)
-        .gte('detected_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+        .gte('detected_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
         .maybeSingle();
 
       if (existingAlert) {
-        console.log(`[detect-spikes] Already alerted for ${trend.topic} in last hour, skipping`);
+        skipped.push(trend.topic);
         continue;
       }
 
       // Calculate severity based on velocity and mention count
       let severity = 'medium';
-      if (trend.velocity >= 500 && trend.mentions_last_hour >= 10) {
+      if (trend.velocity >= 400 && trend.mentions_last_hour >= 8) {
         severity = 'critical';
-      } else if (trend.velocity >= 400 || trend.mentions_last_hour >= 7) {
+      } else if (trend.velocity >= 250 || trend.mentions_last_hour >= 5) {
         severity = 'high';
       }
 
@@ -76,9 +85,9 @@ serve(async (req) => {
         alert_type: 'topic_spike',
         entity_type: 'topic',
         entity_name: trend.topic,
-        previous_mentions: trend.mentions_last_6_hours - trend.mentions_last_hour,
-        current_mentions: trend.mentions_last_hour,
-        velocity_increase: trend.velocity,
+        previous_mentions: Math.max(0, (trend.mentions_last_6_hours || 0) - (trend.mentions_last_hour || 0)),
+        current_mentions: trend.mentions_last_hour || 0,
+        velocity_increase: trend.velocity || 0,
         time_window: '1h',
         severity,
         context_summary: contextSummary,
@@ -86,7 +95,8 @@ serve(async (req) => {
         related_posts: blueskyTrend ? [blueskyTrend.id] : [],
         status: 'pending',
         notification_channels: severity === 'critical' ? ['email', 'webhook', 'push'] : ['email'],
-        detected_at: new Date().toISOString()
+        detected_at: new Date().toISOString(),
+        retry_count: 0
       };
 
       const { error: insertError } = await supabase
@@ -97,7 +107,7 @@ serve(async (req) => {
         console.error(`[detect-spikes] Error creating alert for ${trend.topic}:`, insertError);
       } else {
         spikesDetected.push(trend.topic);
-        console.log(`[detect-spikes] ✅ Created ${severity} alert for "${trend.topic}"`);
+        console.log(`[detect-spikes] ✅ Created ${severity} alert for "${trend.topic}" (${Math.round(trend.velocity)}% velocity)`);
       }
     }
 
@@ -122,48 +132,57 @@ serve(async (req) => {
         }
       }
 
-      // Alert if org mentioned 5+ times in last hour
+      // Alert if org mentioned 4+ times in last hour (lowered from 5)
       for (const [org, data] of orgMentions) {
-        if (data.count >= 5) {
+        if (data.count >= 4) {
           const { data: existingOrgAlert } = await supabase
             .from('spike_alerts')
             .select('id')
             .eq('entity_type', 'organization')
             .eq('entity_name', org)
-            .gte('detected_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+            .gte('detected_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
             .maybeSingle();
 
           if (!existingOrgAlert) {
+            const severity = data.count >= 8 ? 'critical' : data.count >= 6 ? 'high' : 'medium';
+            
             await supabase.from('spike_alerts').insert({
               alert_type: 'organization_mention',
               entity_type: 'organization',
               entity_name: org,
               previous_mentions: 0,
               current_mentions: data.count,
-              velocity_increase: 500,
+              velocity_increase: data.count * 100, // Estimated velocity
               time_window: '1h',
-              severity: data.count >= 10 ? 'critical' : 'high',
+              severity,
               context_summary: `"${org}" mentioned ${data.count} times in last hour across multiple sources`,
-              related_articles: data.articles,
+              related_articles: data.articles.slice(0, 10), // Limit to 10 articles
               status: 'pending',
-              notification_channels: ['email', 'webhook'],
-              detected_at: new Date().toISOString()
+              notification_channels: severity === 'critical' ? ['email', 'webhook'] : ['email'],
+              detected_at: new Date().toISOString(),
+              retry_count: 0
             });
 
             spikesDetected.push(`${org} (org)`);
-            console.log(`[detect-spikes] ✅ Created alert for org "${org}"`);
+            console.log(`[detect-spikes] ✅ Created ${severity} alert for org "${org}" (${data.count} mentions)`);
           }
         }
       }
     }
 
-    console.log(`[detect-spikes] ✅ Detected ${spikesDetected.length} total spikes`);
+    if (skipped.length > 0) {
+      console.log(`[detect-spikes] Skipped ${skipped.length} topics (already alerted within 2h)`);
+    }
+    
+    console.log(`[detect-spikes] ✅ Complete: ${spikesDetected.length} new spikes detected`);
 
     return new Response(
       JSON.stringify({
         success: true,
         spikes_detected: spikesDetected.length,
         spikes: spikesDetected,
+        skipped: skipped.length,
+        threshold: SPIKE_THRESHOLD,
         timestamp: new Date().toISOString()
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

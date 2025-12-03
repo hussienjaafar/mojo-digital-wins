@@ -4092,10 +4092,12 @@ export type Database = {
           entity_name: string
           entity_type: string
           id: string
+          last_error: string | null
           notification_channels: string[] | null
           previous_mentions: number
           related_articles: string[] | null
           related_posts: string[] | null
+          retry_count: number | null
           sent_at: string | null
           severity: string
           status: string | null
@@ -4111,10 +4113,12 @@ export type Database = {
           entity_name: string
           entity_type: string
           id?: string
+          last_error?: string | null
           notification_channels?: string[] | null
           previous_mentions: number
           related_articles?: string[] | null
           related_posts?: string[] | null
+          retry_count?: number | null
           sent_at?: string | null
           severity?: string
           status?: string | null
@@ -4130,10 +4134,12 @@ export type Database = {
           entity_name?: string
           entity_type?: string
           id?: string
+          last_error?: string | null
           notification_channels?: string[] | null
           previous_mentions?: number
           related_articles?: string[] | null
           related_posts?: string[] | null
+          retry_count?: number | null
           sent_at?: string | null
           severity?: string
           status?: string | null
