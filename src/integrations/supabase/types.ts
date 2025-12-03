@@ -2801,41 +2801,50 @@ export type Database = {
       }
       job_failures: {
         Row: {
+          context: Json | null
           context_data: Json | null
           created_at: string | null
           error_message: string | null
           error_stack: string | null
           function_name: string
           id: string
+          is_resolved: boolean | null
           job_name: string | null
           last_retry_at: string | null
           max_retries: number | null
+          next_retry_at: string | null
           resolved_at: string | null
           retry_count: number | null
         }
         Insert: {
+          context?: Json | null
           context_data?: Json | null
           created_at?: string | null
           error_message?: string | null
           error_stack?: string | null
           function_name: string
           id?: string
+          is_resolved?: boolean | null
           job_name?: string | null
           last_retry_at?: string | null
           max_retries?: number | null
+          next_retry_at?: string | null
           resolved_at?: string | null
           retry_count?: number | null
         }
         Update: {
+          context?: Json | null
           context_data?: Json | null
           created_at?: string | null
           error_message?: string | null
           error_stack?: string | null
           function_name?: string
           id?: string
+          is_resolved?: boolean | null
           job_name?: string | null
           last_retry_at?: string | null
           max_retries?: number | null
+          next_retry_at?: string | null
           resolved_at?: string | null
           retry_count?: number | null
         }
@@ -4379,6 +4388,36 @@ export type Database = {
         }
         Relationships: []
       }
+      system_health_metrics: {
+        Row: {
+          component: string | null
+          id: string
+          measured_at: string | null
+          metadata: Json | null
+          metric_name: string
+          metric_unit: string | null
+          metric_value: number | null
+        }
+        Insert: {
+          component?: string | null
+          id?: string
+          measured_at?: string | null
+          metadata?: Json | null
+          metric_name: string
+          metric_unit?: string | null
+          metric_value?: number | null
+        }
+        Update: {
+          component?: string | null
+          id?: string
+          measured_at?: string | null
+          metadata?: Json | null
+          metric_name?: string
+          metric_unit?: string | null
+          metric_value?: number | null
+        }
+        Relationships: []
+      }
       transaction_attribution: {
         Row: {
           attribution_calculated_at: string | null
@@ -5034,6 +5073,15 @@ export type Database = {
         }
         Returns: string
       }
+      log_job_failure: {
+        Args: {
+          p_context?: Json
+          p_error_message: string
+          p_error_stack?: string
+          p_function_name: string
+        }
+        Returns: string
+      }
       log_login_attempt: {
         Args: {
           _email: string
@@ -5046,6 +5094,10 @@ export type Database = {
       refresh_daily_group_sentiment: { Args: never; Returns: undefined }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
       refresh_unified_trends: { Args: never; Returns: undefined }
+      resolve_job_failure: {
+        Args: { p_failure_id: string }
+        Returns: undefined
+      }
       update_bluesky_trends: {
         Args: never
         Returns: {
@@ -5070,6 +5122,15 @@ export type Database = {
           p_error?: string
           p_job_id: string
           p_status: string
+        }
+        Returns: undefined
+      }
+      update_processing_checkpoint: {
+        Args: {
+          p_checkpoint_data?: Json
+          p_function_name: string
+          p_last_processed_id?: string
+          p_records_processed?: number
         }
         Returns: undefined
       }

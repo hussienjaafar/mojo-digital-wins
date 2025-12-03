@@ -156,6 +156,7 @@ serve(async (req) => {
 
     const mentionsByEntity = new Map<string, any[]>();
     for (const mention of recentMentions || []) {
+      if (!mention.entity_name) continue; // Skip null entity names
       const key = mention.entity_name.toLowerCase();
       if (!mentionsByEntity.has(key)) mentionsByEntity.set(key, []);
       mentionsByEntity.get(key)!.push(mention);
@@ -168,7 +169,9 @@ serve(async (req) => {
       .gte('created_at', new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString());
 
     const recentAlertKeys = new Set(
-      (recentAlerts || []).map(a => `${a.organization_id}-${a.entity_name.toLowerCase()}-${a.alert_type}`)
+      (recentAlerts || [])
+        .filter(a => a.entity_name) // Filter out null entity names
+        .map(a => `${a.organization_id}-${a.entity_name.toLowerCase()}-${a.alert_type}`)
     );
 
     const alerts: any[] = [];
@@ -176,15 +179,22 @@ serve(async (req) => {
     const now = new Date().toISOString();
 
     for (const watchItem of watchlistItems || []) {
+      // Skip watchlist items with no entity name
+      if (!watchItem.entity_name) {
+        console.warn(`Skipping watchlist item ${watchItem.id} - no entity_name`);
+        continue;
+      }
+
       // Build list of terms to match (entity name + aliases + synonyms)
       const termsToMatch = [
         watchItem.entity_name,
         ...(watchItem.aliases || []),
         ...expandWithSynonyms(watchItem.entity_name),
-      ].map(t => t.toLowerCase());
+      ].filter(t => t).map(t => t.toLowerCase()); // Filter nulls before toLowerCase
 
       // Match against entity_trends
       for (const trend of entityTrends || []) {
+        if (!trend.entity_name) continue; // Skip null trend names
         const trendNameLower = trend.entity_name.toLowerCase();
         
         // Check for fuzzy matches
@@ -257,15 +267,17 @@ serve(async (req) => {
 
       // Check unified trends for cross-source breakthroughs
       for (const unified of unifiedTrends || []) {
+        if (!unified.topic) continue; // Skip null topics
         const unifiedNameLower = unified.topic.toLowerCase();
         
         let bestMatch = 0;
         for (const term of termsToMatch) {
+          if (!term) continue;
           bestMatch = Math.max(bestMatch, stringSimilarity(term, unifiedNameLower));
         }
 
         if (bestMatch >= SIMILARITY_THRESHOLD && unified.is_breakthrough) {
-          const alertKey = `${watchItem.organization_id}-${watchItem.entity_name.toLowerCase()}-cross_source_breakthrough`;
+          const alertKey = `${watchItem.organization_id}-${(watchItem.entity_name || '').toLowerCase()}-cross_source_breakthrough`;
           if (recentAlertKeys.has(alertKey)) continue;
 
           const score = Math.min(100, (unified.unified_score || 50) + 20);
