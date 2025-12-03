@@ -3774,11 +3774,14 @@ export type Database = {
       }
       scheduled_jobs: {
         Row: {
+          circuit_failure_threshold: number | null
+          circuit_opened_at: string | null
           consecutive_failures: number | null
           created_at: string
           endpoint: string
           id: string
           is_active: boolean | null
+          is_circuit_open: boolean | null
           job_name: string
           job_type: string
           last_error: string | null
@@ -3791,11 +3794,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          circuit_failure_threshold?: number | null
+          circuit_opened_at?: string | null
           consecutive_failures?: number | null
           created_at?: string
           endpoint: string
           id?: string
           is_active?: boolean | null
+          is_circuit_open?: boolean | null
           job_name: string
           job_type: string
           last_error?: string | null
@@ -3808,11 +3814,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          circuit_failure_threshold?: number | null
+          circuit_opened_at?: string | null
           consecutive_failures?: number | null
           created_at?: string
           endpoint?: string
           id?: string
           is_active?: boolean | null
+          is_circuit_open?: boolean | null
           job_name?: string
           job_type?: string
           last_error?: string | null
@@ -5188,6 +5197,7 @@ export type Database = {
       refresh_daily_group_sentiment: { Args: never; Returns: undefined }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
       refresh_unified_trends: { Args: never; Returns: undefined }
+      reset_circuit_breaker: { Args: { job_id: string }; Returns: undefined }
       resolve_job_failure: {
         Args: { p_failure_id: string }
         Returns: undefined

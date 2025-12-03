@@ -67,7 +67,7 @@ export function TeamManagement() {
         .from("client_users")
         .select("organization_id, role")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (!clientUser) return;
 

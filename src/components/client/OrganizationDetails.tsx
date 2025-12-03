@@ -38,7 +38,7 @@ export function OrganizationDetails() {
         .from("client_users")
         .select("organization_id")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (!clientUser) return;
 
@@ -46,9 +46,10 @@ export function OrganizationDetails() {
         .from("client_organizations")
         .select("*")
         .eq("id", clientUser.organization_id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) return;
 
       setOrganization(data);
       setFormData({

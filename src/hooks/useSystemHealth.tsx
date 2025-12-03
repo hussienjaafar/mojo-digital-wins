@@ -39,6 +39,9 @@ export interface ScheduledJob {
   last_run_duration_ms: number | null;
   consecutive_failures: number;
   next_run_at: string | null;
+  is_circuit_open: boolean | null;
+  circuit_opened_at: string | null;
+  circuit_failure_threshold: number | null;
 }
 
 export const useSystemHealth = () => {
@@ -101,8 +104,9 @@ export const useSystemHealth = () => {
   }, [fetchHealth]);
 
   // Calculate stats
-  const activeJobs = jobs.filter(j => j.is_active);
+  const activeJobs = jobs.filter(j => j.is_active && j.is_circuit_open !== true);
   const failingJobs = jobs.filter(j => j.consecutive_failures > 0);
+  const circuitOpenJobs = jobs.filter(j => j.is_circuit_open === true);
   const recentFailures = recentExecutions.filter(e => e.status === 'failed');
   const recentSuccesses = recentExecutions.filter(e => e.status === 'success');
   
@@ -126,6 +130,7 @@ export const useSystemHealth = () => {
       totalJobs: jobs.length,
       activeJobs: activeJobs.length,
       failingJobs: failingJobs.length,
+      circuitOpenJobs: circuitOpenJobs.length,
       unresolvedFailures: failures.length,
       recentExecutions: recentExecutions.length,
       successRate: Math.round(successRate),

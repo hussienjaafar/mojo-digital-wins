@@ -50,9 +50,10 @@ export default function ClientSettings() {
         .from("client_users")
         .select("full_name, role, created_at, last_login_at")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!clientUser) return;
 
       setUserProfile({
         full_name: clientUser.full_name || "",
