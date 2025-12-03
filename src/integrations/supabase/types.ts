@@ -1864,6 +1864,51 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_group_sentiment: {
+        Row: {
+          affected_group: string
+          article_count: number | null
+          avg_sentiment: number | null
+          change_percentage: number | null
+          created_at: string | null
+          date: string
+          id: string
+          previous_avg_sentiment: number | null
+          sentiment_trend: string | null
+          social_post_count: number | null
+          top_sources: string[] | null
+          top_topics: string[] | null
+        }
+        Insert: {
+          affected_group: string
+          article_count?: number | null
+          avg_sentiment?: number | null
+          change_percentage?: number | null
+          created_at?: string | null
+          date: string
+          id?: string
+          previous_avg_sentiment?: number | null
+          sentiment_trend?: string | null
+          social_post_count?: number | null
+          top_sources?: string[] | null
+          top_topics?: string[] | null
+        }
+        Update: {
+          affected_group?: string
+          article_count?: number | null
+          avg_sentiment?: number | null
+          change_percentage?: number | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          previous_avg_sentiment?: number | null
+          sentiment_trend?: string | null
+          social_post_count?: number | null
+          top_sources?: string[] | null
+          top_topics?: string[] | null
+        }
+        Relationships: []
+      }
       detected_anomalies: {
         Row: {
           alert_sent: boolean | null
@@ -4396,6 +4441,63 @@ export type Database = {
           },
         ]
       }
+      trend_anomalies: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          affected_groups: string[] | null
+          anomaly_type: string
+          context: Json | null
+          created_at: string | null
+          current_value: number
+          detected_at: string | null
+          deviation_percentage: number | null
+          expected_value: number
+          id: string
+          is_acknowledged: boolean | null
+          severity: string | null
+          source_type: string | null
+          topic: string
+          z_score: number
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          affected_groups?: string[] | null
+          anomaly_type: string
+          context?: Json | null
+          created_at?: string | null
+          current_value: number
+          detected_at?: string | null
+          deviation_percentage?: number | null
+          expected_value: number
+          id?: string
+          is_acknowledged?: boolean | null
+          severity?: string | null
+          source_type?: string | null
+          topic: string
+          z_score: number
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          affected_groups?: string[] | null
+          anomaly_type?: string
+          context?: Json | null
+          created_at?: string | null
+          current_value?: number
+          detected_at?: string | null
+          deviation_percentage?: number | null
+          expected_value?: number
+          id?: string
+          is_acknowledged?: boolean | null
+          severity?: string | null
+          source_type?: string | null
+          topic?: string
+          z_score?: number
+        }
+        Relationships: []
+      }
       trending_news_topics: {
         Row: {
           calculated_at: string | null
@@ -4779,6 +4881,17 @@ export type Database = {
           },
         ]
       }
+      mv_group_sentiment_daily: {
+        Row: {
+          article_count: number | null
+          avg_sentiment: number | null
+          categories: string[] | null
+          date: string | null
+          group_name: string | null
+          sources: string[] | null
+        }
+        Relationships: []
+      }
       mv_unified_trends: {
         Row: {
           avg_sentiment: number | null
@@ -4808,6 +4921,10 @@ export type Database = {
       calculate_next_run:
         | { Args: { cron_schedule: string }; Returns: string }
         | { Args: { cron_expr: string; from_time?: string }; Returns: string }
+      calculate_sentiment_trend: {
+        Args: { current_sentiment: number; previous_sentiment: number }
+        Returns: string
+      }
       calculate_topic_velocity: {
         Args: {
           daily_count: number
@@ -4926,6 +5043,7 @@ export type Database = {
         }
         Returns: string
       }
+      refresh_daily_group_sentiment: { Args: never; Returns: undefined }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
       refresh_unified_trends: { Args: never; Returns: undefined }
       update_bluesky_trends: {

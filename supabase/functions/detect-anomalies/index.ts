@@ -160,13 +160,57 @@ serve(async (req) => {
       }
     }
 
-    // Insert anomalies and create alerts
+    // Insert anomalies into both tables
     if (anomalies.length > 0) {
+      // Legacy table (detected_anomalies)
       const { error: insertError } = await supabase
         .from('detected_anomalies')
         .insert(anomalies);
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.warn('[detect-anomalies] Error inserting to detected_anomalies:', insertError);
+      }
+
+      // New table (trend_anomalies) with deduplication
+      const recentCutoff = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+      const { data: existingAnomalies } = await supabase
+        .from('trend_anomalies')
+        .select('topic, anomaly_type')
+        .gte('detected_at', recentCutoff);
+
+      const existingKeys = new Set(
+        (existingAnomalies || []).map(a => `${a.topic}-${a.anomaly_type}`)
+      );
+
+      const newTrendAnomalies = anomalies
+        .filter(a => !existingKeys.has(`${a.entity_name}-${a.anomaly_type}`))
+        .map(a => ({
+          topic: a.entity_name,
+          anomaly_type: a.anomaly_type === 'topic_velocity' ? 'velocity_spike' : 
+                       a.anomaly_type === 'mention_spike' ? 'volume_surge' : 
+                       a.anomaly_type,
+          current_value: a.current_value,
+          expected_value: a.baseline_value,
+          z_score: a.z_score,
+          deviation_percentage: a.baseline_value !== 0 
+            ? ((a.current_value - a.baseline_value) / Math.abs(a.baseline_value)) * 100 
+            : null,
+          source_type: a.entity_type === 'topic' ? 'social' : 'combined',
+          severity: a.severity,
+          context: a.metadata
+        }));
+
+      if (newTrendAnomalies.length > 0) {
+        const { error: trendError } = await supabase
+          .from('trend_anomalies')
+          .insert(newTrendAnomalies);
+        
+        if (trendError) {
+          console.warn('[detect-anomalies] Error inserting to trend_anomalies:', trendError);
+        } else {
+          console.log(`[detect-anomalies] Inserted ${newTrendAnomalies.length} to trend_anomalies`);
+        }
+      }
 
       // Create alerts for critical/high severity anomalies
       const criticalAnomalies = anomalies.filter(a => 
@@ -190,6 +234,14 @@ serve(async (req) => {
         await supabase.from('alert_queue').insert(alerts);
         console.log(`[detect-anomalies] Created ${alerts.length} alerts`);
       }
+    }
+    
+    // Also refresh group sentiment
+    try {
+      await supabase.rpc('refresh_daily_group_sentiment');
+      console.log('[detect-anomalies] Refreshed daily group sentiment');
+    } catch (e) {
+      console.warn('[detect-anomalies] Could not refresh group sentiment:', e);
     }
 
     console.log(`[detect-anomalies] Detected ${anomalies.length} anomalies`);
