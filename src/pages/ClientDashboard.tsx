@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, LayoutGrid, ChevronDown, ChevronUp, BarChart3, Building2 } from "lucide-react";
+import { LogOut, LayoutGrid, ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
+import { RoleSwitcher } from "@/components/RoleSwitcher";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -241,6 +242,7 @@ const ClientDashboard = () => {
 
               {/* Action Buttons - Enhanced with Smooth Variant */}
               <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
+                <RoleSwitcher />
                 <Button
                   variant="smooth"
                   size={isMobile ? "sm" : "default"}

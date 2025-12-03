@@ -39,6 +39,7 @@ import { AdminSidebar, navigationGroups } from "@/components/AdminSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogOut } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
+import { RoleSwitcher } from "@/components/RoleSwitcher";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LiveRegionProvider } from "@/components/accessibility";
 import { NewsFilterProvider, useNewsFilters } from "@/contexts/NewsFilterContext";
@@ -165,14 +166,14 @@ const Admin = () => {
       });
 
       if (error || !data) {
-        navigate('/');
+        navigate('/access-denied?from=admin');
         return;
       }
 
       setIsAdmin(true);
       fetchSubmissions();
     } catch (error) {
-      navigate('/');
+      navigate('/access-denied?from=admin');
     } finally {
       setIsLoading(false);
     }
@@ -391,6 +392,7 @@ const Admin = () => {
 
               {/* Actions - responsive */}
               <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                <RoleSwitcher />
                 <ThemeToggle />
                 <Button
                   variant="ghost"

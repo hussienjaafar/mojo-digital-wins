@@ -44,6 +44,7 @@ import ClientIntelligence from "./pages/ClientIntelligence";
 import BillDetail from "./pages/BillDetail";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
+import AccessDenied from "./pages/AccessDenied";
 
 import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 
@@ -97,6 +98,7 @@ const AppContent = () => {
           <Route path="/client/polling-alerts" element={<ClientPollingAlerts />} />
           <Route path="/client/settings" element={<ClientSettings />} />
           <Route path="/client/intelligence" element={<ClientIntelligence />} />
+          <Route path="/access-denied" element={<AccessDenied />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
