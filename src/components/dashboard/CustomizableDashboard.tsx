@@ -60,7 +60,7 @@ export function CustomizableDashboard({
   // Load saved layout from localStorage
   useEffect(() => {
     const savedLayout = localStorage.getItem(storageKey);
-    const savedWidgets = localStorage.getItem(`${storageKey}-widgets`);
+    const savedWidgetIds = localStorage.getItem(`${storageKey}-widgets`);
     
     if (savedLayout) {
       setLayouts(JSON.parse(savedLayout));
@@ -73,11 +73,19 @@ export function CustomizableDashboard({
       setLayouts({ lg: defaultLayouts });
     }
 
-    if (savedWidgets) {
-      const parsedWidgets = JSON.parse(savedWidgets);
-      setWidgets(parsedWidgets);
+    if (savedWidgetIds) {
+      // Reconstruct widgets from saved IDs (not full objects with React components)
+      const parsedIds: string[] = JSON.parse(savedWidgetIds);
+      const allWidgets = [...initialWidgets, ...availableWidgets];
+      const reconstructedWidgets = parsedIds
+        .map(id => allWidgets.find(w => w.id === id))
+        .filter((w): w is WidgetConfig => w !== undefined);
+      
+      if (reconstructedWidgets.length > 0) {
+        setWidgets(reconstructedWidgets);
+      }
     }
-  }, [storageKey, initialWidgets]);
+  }, [storageKey, initialWidgets, availableWidgets]);
 
   const handleLayoutChange = (currentLayout: Layout[], allLayouts: { lg?: Layout[] }) => {
     if (allLayouts.lg) {
@@ -91,11 +99,16 @@ export function CustomizableDashboard({
     const newLayouts = { lg: layout as DashboardLayout[] };
     setLayouts(newLayouts);
     localStorage.setItem(storageKey, JSON.stringify(newLayouts));
+    // Save widget IDs only (not full objects with React components)
+    const widgetIds = widgets.map(w => w.id);
+    localStorage.setItem(`${storageKey}-widgets`, JSON.stringify(widgetIds));
   };
 
   const saveLayout = () => {
     localStorage.setItem(storageKey, JSON.stringify(layouts));
-    localStorage.setItem(`${storageKey}-widgets`, JSON.stringify(widgets));
+    // Save widget IDs only (not full objects with React components)
+    const widgetIds = widgets.map(w => w.id);
+    localStorage.setItem(`${storageKey}-widgets`, JSON.stringify(widgetIds));
     toast.success("Dashboard layout saved!");
     setIsEditMode(false);
   };
