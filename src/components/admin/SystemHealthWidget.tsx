@@ -81,20 +81,26 @@ export function SystemHealthWidget({ showDragHandle = false }: SystemHealthWidge
       </CardHeader>
       <CardContent className="pt-0 space-y-4">
         {/* Health Overview */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <div className="text-center p-2 rounded-lg bg-muted/50">
             <div className="text-lg font-bold text-green-500">{stats.activeJobs}</div>
-            <div className="text-[10px] text-muted-foreground">Active Jobs</div>
+            <div className="text-[10px] text-muted-foreground">Active</div>
           </div>
           <div className="text-center p-2 rounded-lg bg-muted/50">
             <div className="text-lg font-bold">{stats.successRate}%</div>
-            <div className="text-[10px] text-muted-foreground">Success Rate</div>
+            <div className="text-[10px] text-muted-foreground">Success</div>
           </div>
           <div className="text-center p-2 rounded-lg bg-muted/50">
             <div className={`text-lg font-bold ${stats.failingJobs > 0 ? 'text-orange-500' : 'text-green-500'}`}>
               {stats.failingJobs}
             </div>
             <div className="text-[10px] text-muted-foreground">Failing</div>
+          </div>
+          <div className="text-center p-2 rounded-lg bg-muted/50">
+            <div className={`text-lg font-bold ${(stats as any).circuitOpenJobs > 0 ? 'text-destructive' : 'text-green-500'}`}>
+              {(stats as any).circuitOpenJobs || 0}
+            </div>
+            <div className="text-[10px] text-muted-foreground">Circuits</div>
           </div>
         </div>
 

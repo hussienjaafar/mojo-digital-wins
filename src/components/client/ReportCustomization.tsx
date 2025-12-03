@@ -94,9 +94,10 @@ const ReportCustomization = ({ scheduleId, onSave }: Props) => {
         .from("email_report_schedules")
         .select("*")
         .eq("id", scheduleId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error("Schedule not found");
 
       setSchedule(data);
       setConfig(data.report_config || config);

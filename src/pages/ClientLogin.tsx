@@ -30,7 +30,7 @@ const ClientLogin = () => {
       .from('client_users')
       .select('organization_id')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (data) {
       navigate('/client/dashboard');

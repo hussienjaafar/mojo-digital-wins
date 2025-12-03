@@ -67,7 +67,7 @@ const ClientDemographics = () => {
         .from('client_users')
         .select('organization_id')
         .eq('id', session?.user?.id)
-        .single();
+        .maybeSingle();
 
       if (!clientUser) throw new Error("Organization not found");
 
@@ -75,7 +75,7 @@ const ClientDemographics = () => {
         .from('client_organizations')
         .select('*')
         .eq('id', clientUser.organization_id)
-        .single();
+        .maybeSingle();
 
       setOrganization(org);
 
@@ -162,7 +162,7 @@ const ClientDemographics = () => {
         .from('client_users')
         .select('organization_id')
         .eq('id', session?.user?.id)
-        .single();
+        .maybeSingle();
 
       const { data: transactions } = await (supabase as any)
         .from('actblue_transactions')

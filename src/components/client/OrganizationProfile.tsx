@@ -46,7 +46,7 @@ export default function OrganizationProfile() {
         .from("client_users")
         .select("organization_id")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (!clientUser) return;
 
@@ -89,7 +89,7 @@ export default function OrganizationProfile() {
         .from("client_users")
         .select("organization_id")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (!clientUser) throw new Error("Organization not found");
 
@@ -151,7 +151,7 @@ export default function OrganizationProfile() {
         .from("client_users")
         .select("organization_id")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (!clientUser) return;
 

@@ -52,7 +52,7 @@ export function NotificationSettings() {
             email_frequency: 'instant'
           })
           .select()
-          .single();
+          .maybeSingle();
 
         if (insertError) throw insertError;
         data = newPrefs;
