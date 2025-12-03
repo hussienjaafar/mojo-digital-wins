@@ -12,6 +12,7 @@ import { AdminAlertsBanner } from "./AdminAlertsBanner";
 import { TrendingTopicsWidget } from "./TrendingTopicsWidget";
 import { HighImpactNewsWidget } from "./HighImpactNewsWidget";
 import { GlobalAlertsTimeline } from "./GlobalAlertsTimeline";
+import { GlobalCreativeInsightsWidget } from "./GlobalCreativeInsightsWidget";
 import { CustomizableDashboard, WidgetConfig } from "@/components/dashboard/CustomizableDashboard";
 import { useNavigate } from "react-router-dom";
 
@@ -259,19 +260,25 @@ export function AdminDashboardHome() {
       id: "trending-topics",
       title: "Trending Topics",
       component: <TrendingTopicsWidget showDragHandle />,
-      defaultLayout: { x: 0, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
+      defaultLayout: { x: 0, y: 0, w: 3, h: 4, minW: 3, minH: 3 },
     },
     {
       id: "high-impact-news",
       title: "High-Impact News",
       component: <HighImpactNewsWidget showDragHandle />,
-      defaultLayout: { x: 4, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
+      defaultLayout: { x: 3, y: 0, w: 3, h: 4, minW: 3, minH: 3 },
     },
     {
       id: "alerts-timeline",
       title: "Alerts Timeline",
       component: <GlobalAlertsTimeline showDragHandle />,
-      defaultLayout: { x: 8, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
+      defaultLayout: { x: 6, y: 0, w: 3, h: 4, minW: 3, minH: 3 },
+    },
+    {
+      id: "creative-insights",
+      title: "Creative Insights",
+      component: <GlobalCreativeInsightsWidget showDragHandle />,
+      defaultLayout: { x: 9, y: 0, w: 3, h: 4, minW: 3, minH: 3 },
     },
   ], []);
 
