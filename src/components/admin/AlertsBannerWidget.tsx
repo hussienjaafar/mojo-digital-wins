@@ -103,15 +103,15 @@ export function AlertsBannerWidget({ showDragHandle }: Props) {
   }
 
   return (
-    <div className="portal-card h-full flex flex-col">
-      <div className={`p-4 border-b border-[hsl(var(--portal-border))] ${showDragHandle ? 'cursor-move' : ''}`}>
+    <div className="portal-card portal-widget-red h-full flex flex-col">
+      <div className={`p-4 border-b border-[hsl(var(--portal-border))] portal-widget-header-red ${showDragHandle ? 'cursor-move' : ''}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {showDragHandle && (
               <GripVertical className="h-5 w-5 portal-text-secondary" />
             )}
-            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-red)/0.1)]">
-              <Bell className="h-5 w-5 text-[hsl(var(--portal-accent-red))]" />
+            <div className="portal-widget-icon portal-widget-icon-red">
+              <Bell className="h-5 w-5" />
             </div>
             <div>
               <h3 className="text-base font-semibold portal-text-primary">Active Alerts</h3>

@@ -57,14 +57,16 @@ export function HighImpactNewsWidget({ showDragHandle = false }: HighImpactNewsW
   };
 
   return (
-    <div className="portal-card h-full flex flex-col">
-      <div className={`p-4 pb-2 flex-shrink-0 ${showDragHandle ? "cursor-move" : ""}`}>
-        <div className="flex items-center gap-2">
+    <div className="portal-card portal-widget-orange h-full flex flex-col">
+      <div className={`p-4 pb-3 flex-shrink-0 portal-widget-header-orange ${showDragHandle ? "cursor-move" : ""}`}>
+        <div className="flex items-center gap-3">
           {showDragHandle && (
             <GripVertical className="h-4 w-4 portal-text-secondary" />
           )}
-          <Newspaper className="h-4 w-4 text-[hsl(var(--portal-accent-red))]" />
-          <h3 className="text-sm font-medium portal-text-primary">High-Impact News</h3>
+          <div className="portal-widget-icon portal-widget-icon-orange">
+            <Newspaper className="h-4 w-4" />
+          </div>
+          <h3 className="text-sm font-semibold portal-text-primary">High-Impact News</h3>
         </div>
       </div>
       <div className="p-4 pt-0 flex-1 min-h-0">

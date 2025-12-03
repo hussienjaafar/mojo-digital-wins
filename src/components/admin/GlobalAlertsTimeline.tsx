@@ -124,20 +124,22 @@ export function GlobalAlertsTimeline({ showDragHandle = false }: GlobalAlertsTim
   };
 
   return (
-    <div className="portal-card h-full flex flex-col">
-      <div className={`p-4 pb-3 flex-shrink-0 ${showDragHandle ? 'cursor-move' : ''}`}>
+    <div className="portal-card portal-widget-amber h-full flex flex-col">
+      <div className={`p-4 pb-3 flex-shrink-0 portal-widget-header-amber ${showDragHandle ? 'cursor-move' : ''}`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {showDragHandle && (
               <GripVertical className="h-4 w-4 portal-text-secondary" />
             )}
-            <Bell className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
-            <h3 className="text-lg font-semibold portal-text-primary">Alerts Timeline</h3>
-            {alerts.length > 0 && (
-              <span className="portal-badge portal-badge-error ml-2">
-                {alerts.length} unread
-              </span>
-            )}
+            <div className="portal-widget-icon portal-widget-icon-amber">
+              <Bell className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold portal-text-primary">Alerts Timeline</h3>
+              {alerts.length > 0 && (
+                <p className="text-xs portal-text-secondary">{alerts.length} unread alerts</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
