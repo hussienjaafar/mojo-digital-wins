@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, parseISO, differenceInDays } from "date-fns";
-import { Building2, DollarSign, AlertTriangle, RefreshCw, Users } from "lucide-react";
+import { Building2, DollarSign, AlertTriangle, RefreshCw, Users, Newspaper } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { ClientCard, ClientCardData } from "./ClientCard";
 import { ClientSortFilter, SortOption, FilterOption } from "./ClientSortFilter";
 import { AdminAlertsBanner } from "./AdminAlertsBanner";
+import { NewsIntelligencePanel } from "./NewsIntelligencePanel";
+import { GlobalAlertsTimeline } from "./GlobalAlertsTimeline";
 import { useNavigate } from "react-router-dom";
 
 interface SummaryStats {
@@ -359,6 +361,12 @@ export function AdminDashboardHome() {
         onViewAll={() => navigate("/admin?tab=ops")}
         onDismiss={handleDismissAlert}
       />
+
+      {/* News Intelligence & Alerts Timeline */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <NewsIntelligencePanel />
+        <GlobalAlertsTimeline />
+      </div>
 
       {/* Clients Section */}
       <div className="space-y-4">
