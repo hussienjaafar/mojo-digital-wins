@@ -137,3 +137,45 @@ verify_jwt = false
 
 [functions.backfill-creative-analysis]
 verify_jwt = false
+
+[functions.detect-anomalies]
+verify_jwt = false
+
+[functions.aggregate-sentiment]
+verify_jwt = false
+
+[functions.ops-alerts]
+verify_jwt = false
+
+[functions.run-diagnostics]
+verify_jwt = false
+
+[functions.track-attribution-touchpoint]
+verify_jwt = false
+
+[functions.track-event-impact]
+verify_jwt = false
+
+[functions.detect-fundraising-opportunities]
+verify_jwt = false
+
+[functions.generate-campaign-messages]
+verify_jwt = false
+
+[functions.optimize-send-timing]
+verify_jwt = false
+
+[functions.backfill-bluesky-posts]
+verify_jwt = false
+
+[functions.cleanup-old-cache]
+verify_jwt = false
+
+[functions.backfill-analysis]
+verify_jwt = false
+
+[functions.reset-client-password]
+verify_jwt = false
+
+[functions.generate-report]
+verify_jwt = true

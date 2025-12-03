@@ -220,10 +220,11 @@ serve(async (req) => {
             else if (score >= 60) severity = 'high';
             else if (score >= 40) severity = 'medium';
 
-            let alertType = 'volume_spike';
+            // Map to valid alert types from check constraint
+            let alertType = 'spike'; // default
             if (trend.velocity > 200) alertType = 'trending_spike';
-            if (Math.abs(trend.sentiment_change || 0) > 0.3) alertType = 'sentiment_shift';
-            if (trend.is_trending && trend.velocity > 100) alertType = 'breaking_trend';
+            else if (Math.abs(trend.sentiment_change || 0) > 0.3) alertType = 'sentiment_shift';
+            else if (trend.is_trending && trend.velocity > 100) alertType = 'breaking';
 
             const alertKey = `${watchItem.organization_id}-${watchItem.entity_name.toLowerCase()}-${alertType}`;
             if (recentAlertKeys.has(alertKey)) continue;
@@ -277,7 +278,7 @@ serve(async (req) => {
         }
 
         if (bestMatch >= SIMILARITY_THRESHOLD && unified.is_breakthrough) {
-          const alertKey = `${watchItem.organization_id}-${(watchItem.entity_name || '').toLowerCase()}-cross_source_breakthrough`;
+          const alertKey = `${watchItem.organization_id}-${(watchItem.entity_name || '').toLowerCase()}-breaking`;
           if (recentAlertKeys.has(alertKey)) continue;
 
           const score = Math.min(100, (unified.unified_score || 50) + 20);
@@ -287,7 +288,7 @@ serve(async (req) => {
               organization_id: watchItem.organization_id,
               watchlist_id: watchItem.id,
               entity_name: watchItem.entity_name,
-              alert_type: 'cross_source_breakthrough',
+              alert_type: 'breaking', // cross-source breakthrough mapped to 'breaking'
               severity: score >= 80 ? 'critical' : score >= 60 ? 'high' : 'medium',
               is_actionable: true,
               actionable_score: score,

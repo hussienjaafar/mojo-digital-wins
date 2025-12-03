@@ -1517,6 +1517,41 @@ export type Database = {
           },
         ]
       }
+      client_onboarding_status: {
+        Row: {
+          completed_at: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string
+          step_completed: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id: string
+          step_completed: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string
+          step_completed?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_onboarding_status_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_organizations: {
         Row: {
           created_at: string | null
@@ -2882,6 +2917,65 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      magic_moment_cards: {
+        Row: {
+          action_label: string | null
+          action_url: string | null
+          card_type: string
+          created_at: string | null
+          description: string | null
+          dismissed_at: string | null
+          dismissed_by: string | null
+          expires_at: string | null
+          id: string
+          is_dismissed: boolean | null
+          metadata: Json | null
+          organization_id: string
+          priority: string | null
+          title: string
+        }
+        Insert: {
+          action_label?: string | null
+          action_url?: string | null
+          card_type?: string
+          created_at?: string | null
+          description?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_dismissed?: boolean | null
+          metadata?: Json | null
+          organization_id: string
+          priority?: string | null
+          title: string
+        }
+        Update: {
+          action_label?: string | null
+          action_url?: string | null
+          card_type?: string
+          created_at?: string | null
+          description?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_dismissed?: boolean | null
+          metadata?: Json | null
+          organization_id?: string
+          priority?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "magic_moment_cards_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meta_ad_metrics: {
         Row: {
