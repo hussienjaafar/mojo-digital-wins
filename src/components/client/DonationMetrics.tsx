@@ -9,9 +9,9 @@ import { format, subDays, parseISO } from "date-fns";
 import { logger } from "@/lib/logger";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
 import { NoResultsEmptyState } from "@/components/portal/PortalEmptyState";
-import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { ResponsiveLineChart, ResponsiveBarChart, ResponsivePieChart } from "@/components/charts";
+import { formatCurrency } from "@/lib/chart-formatters";
 
 type Props = {
   organizationId: string;
@@ -342,13 +342,13 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
             </PortalCardTitle>
           </PortalCardHeader>
           <PortalCardContent>
-            <PortalLineChart
+            <ResponsiveLineChart
               data={dailyTrend}
               lines={[
-                { dataKey: "Amount", stroke: "hsl(var(--portal-success))", name: "Amount ($)" },
-                { dataKey: "Donations", stroke: "hsl(var(--portal-accent-blue))", name: "# Donations" },
+                { dataKey: "Amount", name: "Amount", color: "hsl(var(--portal-success))", valueType: "currency" },
+                { dataKey: "Donations", name: "Donations", color: "hsl(var(--portal-accent-blue))", valueType: "number" },
               ]}
-              height={250}
+              valueType="currency"
             />
           </PortalCardContent>
         </PortalCard>
@@ -366,36 +366,12 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
               </PortalCardTitle>
             </PortalCardHeader>
             <PortalCardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <RechartsPie>
-                  <Pie
-                    data={attributionData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    labelLine={false}
-                  >
-                    {attributionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--portal-bg-tertiary))",
-                      border: "1px solid hsl(var(--portal-border))",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: number, name: string, props: any) => [
-                      `$${value.toLocaleString()} (${props.payload.count} donations)`,
-                      props.payload.fullName,
-                    ]}
-                  />
-                </RechartsPie>
-              </ResponsiveContainer>
+              <ResponsivePieChart
+                data={attributionData}
+                valueType="currency"
+                innerRadius={45}
+                colors={CHART_COLORS}
+              />
             </PortalCardContent>
           </PortalCard>
         )}
@@ -409,25 +385,13 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
             </PortalCardTitle>
           </PortalCardHeader>
           <PortalCardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={giftSizeData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--portal-border))" opacity={0.3} />
-                <XAxis dataKey="name" tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 11 }} />
-                <YAxis tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--portal-bg-tertiary))",
-                    border: "1px solid hsl(var(--portal-border))",
-                    borderRadius: "8px",
-                  }}
-                  formatter={(value: number, name: string) => [
-                    name === 'count' ? `${value} donations` : `$${value.toLocaleString()}`,
-                    name === 'count' ? 'Count' : 'Amount',
-                  ]}
-                />
-                <Bar dataKey="count" fill="hsl(var(--portal-accent-blue))" name="Count" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ResponsiveBarChart
+              data={giftSizeData}
+              bars={[
+                { dataKey: "count", name: "Donations", color: "hsl(var(--portal-accent-blue))" },
+              ]}
+              valueType="number"
+            />
           </PortalCardContent>
         </PortalCard>
       </div>
