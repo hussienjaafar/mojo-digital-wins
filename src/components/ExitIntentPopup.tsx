@@ -72,14 +72,14 @@ export const ExitIntentPopup = () => {
         </button>
 
         {/* Header with gradient */}
-        <div className="bg-gradient-to-br from-secondary via-primary to-destructive p-8 text-white relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
+        <div className="bg-gradient-to-br from-secondary via-primary to-destructive p-8 text-primary-foreground relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--primary-foreground)/0.1),transparent_50%)]" />
           <div className="relative z-10">
             <DialogHeader>
               <DialogTitle className="font-bebas text-4xl md:text-5xl leading-tight mb-3">
                 Quick Question...
               </DialogTitle>
-              <DialogDescription className="text-white/90 text-lg leading-relaxed">
+              <DialogDescription className="text-primary-foreground/90 text-lg leading-relaxed">
                 Would 30 minutes on the phone help you figure out your fundraising strategy?
               </DialogDescription>
             </DialogHeader>

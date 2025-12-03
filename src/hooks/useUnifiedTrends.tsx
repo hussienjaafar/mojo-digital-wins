@@ -93,28 +93,28 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
 export const getSourceTypeBadgeClass = (sourceType: string): string => {
   switch (sourceType) {
     case 'news':
-      return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      return 'bg-status-info/20 text-status-info border-status-info/30';
     case 'social':
-      return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+      return 'bg-secondary/20 text-secondary border-secondary/30';
     case 'entity':
-      return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      return 'bg-status-warning/20 text-status-warning border-status-warning/30';
     default:
-      return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      return 'bg-status-neutral/20 text-status-neutral border-status-neutral/30';
   }
 };
 
 // Helper to format velocity with color
 export const getVelocityColor = (score: number): string => {
-  if (score >= 200) return 'text-red-400';
-  if (score >= 100) return 'text-orange-400';
-  if (score >= 50) return 'text-yellow-400';
-  return 'text-blue-400';
+  if (score >= 200) return 'text-destructive';
+  if (score >= 100) return 'text-severity-high';
+  if (score >= 50) return 'text-status-warning';
+  return 'text-status-info';
 };
 
 // Helper to format sentiment
 export const formatSentiment = (sentiment: number | null): { label: string; color: string } => {
   if (sentiment === null) return { label: 'N/A', color: 'text-muted-foreground' };
-  if (sentiment > 0.3) return { label: 'Positive', color: 'text-green-400' };
-  if (sentiment < -0.3) return { label: 'Negative', color: 'text-red-400' };
-  return { label: 'Neutral', color: 'text-yellow-400' };
+  if (sentiment > 0.3) return { label: 'Positive', color: 'text-status-success' };
+  if (sentiment < -0.3) return { label: 'Negative', color: 'text-destructive' };
+  return { label: 'Neutral', color: 'text-status-warning' };
 };
