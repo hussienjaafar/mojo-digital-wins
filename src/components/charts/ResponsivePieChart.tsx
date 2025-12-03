@@ -111,7 +111,7 @@ export function ResponsivePieChart({
         fill="white"
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={isMobile ? 10 : 12}
+        fontSize={isMobile ? 11 : 12}
         fontWeight={600}
       >
         {`${(percent * 100).toFixed(0)}%`}
@@ -168,7 +168,7 @@ export function ResponsivePieChart({
               verticalAlign={isMobile ? "bottom" : "middle"}
               align={isMobile ? "center" : "right"}
               wrapperStyle={{
-                fontSize: isMobile ? 10 : 12,
+                fontSize: isMobile ? 11 : 12,
                 paddingLeft: isMobile ? 0 : 16,
               }}
               iconSize={isMobile ? 8 : 10}

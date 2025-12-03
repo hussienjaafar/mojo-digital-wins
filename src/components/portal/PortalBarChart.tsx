@@ -38,7 +38,7 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
             top: 8, 
             right: isMobile ? 8 : 16, 
             bottom: isMobile ? 8 : 4, 
-            left: isMobile ? -12 : 0 
+            left: isMobile ? 0 : 0 
           }}
         >
           <CartesianGrid 
@@ -49,7 +49,7 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
           />
           <XAxis
             dataKey="name"
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 10 : 11 }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 11 : 12 }}
             tickLine={false}
             axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
             angle={isMobile ? -45 : 0}
@@ -58,11 +58,11 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
             interval={0}
           />
           <YAxis
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 10 : 11 }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 11 : 12 }}
             tickLine={false}
             axisLine={false}
             tickFormatter={getYAxisFormatter(valueType)}
-            width={isMobile ? 45 : 55}
+            width={isMobile ? 55 : 65}
           />
           <Tooltip
             content={<ResponsiveChartTooltip valueType={valueType} />}

@@ -250,11 +250,12 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
             <PortalLineChart
               data={timeSeriesData}
               lines={[
-                { dataKey: "donations", stroke: "#10B981", name: "Donations" },
-                { dataKey: "metaSpend", stroke: "#0D84FF", name: "Meta Spend" },
-                { dataKey: "smsSpend", stroke: "#A78BFA", name: "SMS Spend" },
+                { dataKey: "donations", stroke: "#10B981", name: "Donations", valueType: "currency" },
+                { dataKey: "metaSpend", stroke: "#0D84FF", name: "Meta Spend", valueType: "currency" },
+                { dataKey: "smsSpend", stroke: "#A78BFA", name: "SMS Spend", valueType: "currency" },
               ]}
               height={280}
+              valueType="currency"
             />
           </PortalCardContent>
         </PortalCard>
@@ -334,7 +335,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
             <PortalCardTitle>Conversion Sources</PortalCardTitle>
           </PortalCardHeader>
           <PortalCardContent>
-            <PortalBarChart data={channelBreakdown} height={200} />
+            <PortalBarChart data={channelBreakdown} height={200} valueType="number" />
           </PortalCardContent>
         </PortalCard>
 

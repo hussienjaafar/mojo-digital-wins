@@ -56,10 +56,13 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
       component: <MetaAdsMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />,
       getSummary: () => {
         if (summaries.meta.isLoading) return null;
+        const roasDisplay = summaries.meta.hasConversionValueData 
+          ? `${summaries.meta.roas.toFixed(1)}x` 
+          : 'N/A';
         return [
           { label: "Spend", value: formatCurrency(summaries.meta.spend) },
           { label: "Conv", value: formatNumber(summaries.meta.conversions) },
-          { label: "ROAS", value: `${summaries.meta.roas.toFixed(1)}x`, highlight: summaries.meta.roas >= 2 },
+          { label: "ROAS", value: roasDisplay, highlight: summaries.meta.roas >= 2 },
         ];
       },
     },
