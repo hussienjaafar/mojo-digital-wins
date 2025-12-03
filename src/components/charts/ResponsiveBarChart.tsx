@@ -75,6 +75,10 @@ export function ResponsiveBarChart({
   const chartHeight = height || (isMobile ? 200 : 280);
   
   const isVertical = layout === "vertical";
+  
+  // Only rotate when there are many items or long labels
+  const needsRotation = isMobile && (chartData.length > 4 || 
+    chartData.some(d => String(d[xAxisKey] || '').length > 10));
 
   return (
     <div className={`w-full ${className}`} style={{ height: chartHeight }}>
@@ -133,9 +137,9 @@ export function ResponsiveBarChart({
                 }}
                 tickLine={false}
                 axisLine={{ stroke: "hsl(var(--border))", opacity: 0.5 }}
-                angle={isMobile ? -45 : 0}
-                textAnchor={isMobile ? "end" : "middle"}
-                height={isMobile ? 60 : 30}
+                angle={needsRotation ? -45 : 0}
+                textAnchor={needsRotation ? "end" : "middle"}
+                height={needsRotation ? 60 : 30}
                 interval={isMobile ? 0 : "equidistantPreserveStart"}
               />
               <YAxis
