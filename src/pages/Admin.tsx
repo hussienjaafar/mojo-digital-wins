@@ -23,7 +23,7 @@ import { DataBackfillPanel } from "@/components/admin/DataBackfillPanel";
 import AdminActivityAlerts from "@/components/admin/AdminActivityAlerts";
 import UsageAnalytics from "@/components/admin/UsageAnalytics";
 import ClientHealthOverview from "@/components/admin/ClientHealthOverview";
-import { DashboardHome } from "@/components/DashboardHome";
+import { AdminDashboardHome } from "@/components/admin/AdminDashboardHome";
 import { NewsFeed } from "@/components/news/NewsFeed";
 import { BillTracker } from "@/components/bills/BillTracker";
 import Analytics from "@/pages/Analytics";
@@ -273,7 +273,7 @@ const Admin = () => {
   const renderContent = () => {
     switch (activeTab) {
       case "analytics":
-        return <DashboardHome />;
+        return <AdminDashboardHome />;
       case "daily-briefing":
         return <DailyBriefing />;
       case "critical-alerts":
