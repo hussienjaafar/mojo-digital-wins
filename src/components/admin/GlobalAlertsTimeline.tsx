@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
-import { Bell, Clock, Building2, Lightbulb, X, Eye } from "lucide-react";
+import { Bell, Clock, Building2, Lightbulb, X, Eye, GripVertical } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -21,7 +21,11 @@ interface TimelineAlert {
   is_read: boolean;
 }
 
-export function GlobalAlertsTimeline() {
+interface GlobalAlertsTimelineProps {
+  showDragHandle?: boolean;
+}
+
+export function GlobalAlertsTimeline({ showDragHandle = false }: GlobalAlertsTimelineProps) {
   const [alerts, setAlerts] = useState<TimelineAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -33,7 +37,6 @@ export function GlobalAlertsTimeline() {
   const fetchAlerts = async () => {
     setLoading(true);
     
-    // Fetch alerts with organization info
     const { data: alertsData } = await supabase
       .from('client_entity_alerts')
       .select(`
@@ -51,7 +54,6 @@ export function GlobalAlertsTimeline() {
       .limit(20);
 
     if (alertsData) {
-      // Fetch organization names
       const orgIds = [...new Set(alertsData.map(a => a.organization_id).filter(Boolean))];
       const { data: orgs } = await supabase
         .from('client_organizations')
@@ -124,10 +126,13 @@ export function GlobalAlertsTimeline() {
   };
 
   return (
-    <Card className="border-border/50">
-      <CardHeader className="pb-3">
+    <Card className="border-border/50 h-full flex flex-col">
+      <CardHeader className={`pb-3 flex-shrink-0 ${showDragHandle ? 'cursor-move' : ''}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            {showDragHandle && (
+              <GripVertical className="h-4 w-4 text-muted-foreground" />
+            )}
             <Bell className="h-5 w-5 text-primary" />
             <CardTitle className="text-lg">Alerts Timeline</CardTitle>
             {alerts.length > 0 && (
@@ -138,7 +143,7 @@ export function GlobalAlertsTimeline() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="pt-0 flex-1 min-h-0">
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
@@ -151,7 +156,7 @@ export function GlobalAlertsTimeline() {
             <p>No unread alerts</p>
           </div>
         ) : (
-          <ScrollArea className="h-[320px] pr-4">
+          <ScrollArea className="h-full max-h-[400px] pr-2">
             <div className="space-y-3">
               {alerts.map((alert) => {
                 const styles = getSeverityStyles(alert.severity);
@@ -160,9 +165,9 @@ export function GlobalAlertsTimeline() {
                     key={alert.id}
                     className={`p-3 rounded-lg bg-muted/30 border-l-4 ${styles.border} hover:bg-muted/50 transition-colors`}
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1.5">
                           <Badge variant="outline" className={`text-xs ${styles.badge}`}>
                             {alert.severity}
                           </Badge>
@@ -170,28 +175,30 @@ export function GlobalAlertsTimeline() {
                             {getAlertTypeLabel(alert.alert_type)}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Building2 className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-sm font-medium">{alert.organization_name}</span>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <span className="text-sm font-medium break-words">{alert.organization_name}</span>
+                          </div>
                           <span className="text-xs text-muted-foreground">•</span>
-                          <span className="text-sm text-primary font-medium">{alert.entity_name}</span>
+                          <span className="text-sm text-primary font-medium break-words">{alert.entity_name}</span>
                         </div>
                         {alert.suggested_action && (
-                          <div className="flex items-start gap-1 mt-2">
-                            <Lightbulb className="h-3 w-3 text-warning mt-0.5 flex-shrink-0" />
-                            <p className="text-xs text-muted-foreground line-clamp-2">
+                          <div className="flex items-start gap-1.5 mt-2 p-2 bg-warning/5 rounded border border-warning/20">
+                            <Lightbulb className="h-3.5 w-3.5 text-warning mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-muted-foreground leading-relaxed">
                               {alert.suggested_action}
                             </p>
                           </div>
                         )}
-                        <div className="flex items-center gap-1 mt-2">
+                        <div className="flex items-center gap-1.5 mt-2">
                           <Clock className="h-3 w-3 text-muted-foreground" />
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(alert.triggered_at), { addSuffix: true })}
                           </span>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1 flex-shrink-0">
                         <Button
                           variant="ghost"
                           size="icon"

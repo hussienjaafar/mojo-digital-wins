@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, parseISO, differenceInDays } from "date-fns";
-import { Building2, DollarSign, AlertTriangle, RefreshCw, Users, Newspaper } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Building2, DollarSign, AlertTriangle, RefreshCw, Users, LayoutGrid } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { ClientSortFilter, SortOption, FilterOption } from "./ClientSortFilter";
 import { AdminAlertsBanner } from "./AdminAlertsBanner";
 import { NewsIntelligencePanel } from "./NewsIntelligencePanel";
 import { GlobalAlertsTimeline } from "./GlobalAlertsTimeline";
+import { CustomizableDashboard, WidgetConfig } from "@/components/dashboard/CustomizableDashboard";
 import { useNavigate } from "react-router-dom";
 
 interface SummaryStats {
@@ -42,6 +43,7 @@ export function AdminDashboardHome() {
     needsAttention: 0,
     criticalAlerts: 0,
   });
+  const [isCustomizing, setIsCustomizing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("revenue");
@@ -53,7 +55,6 @@ export function AdminDashboardHome() {
       const fourteenDaysAgo = subDays(today, 14);
       const sevenDaysAgo = subDays(today, 7);
 
-      // Fetch all data in parallel
       const [orgsResult, usersResult, metricsResult, alertsResult, credentialsResult] = await Promise.all([
         supabase.from("client_organizations").select("id, name, slug, logo_url, is_active"),
         supabase.from("client_users").select("organization_id, last_login_at"),
@@ -70,9 +71,7 @@ export function AdminDashboardHome() {
       const alertsData = alertsResult.data || [];
       const credentials = credentialsResult.data || [];
 
-      // Process clients
       const clientData: ClientCardData[] = orgs.map((org) => {
-        // User data
         const orgUsers = users.filter((u) => u.organization_id === org.id);
         const lastLogin = orgUsers
           .map((u) => u.last_login_at)
@@ -81,7 +80,6 @@ export function AdminDashboardHome() {
           .reverse()[0] || null;
         const isStale = lastLogin ? differenceInDays(today, parseISO(lastLogin)) > 7 : true;
 
-        // Metrics - current 7 days vs previous 7 days
         const orgMetrics = metrics.filter((m) => m.organization_id === org.id);
         const current7Days = orgMetrics.filter((m) => parseISO(m.date) >= sevenDaysAgo);
         const previous7Days = orgMetrics.filter((m) => parseISO(m.date) < sevenDaysAgo && parseISO(m.date) >= fourteenDaysAgo);
@@ -102,14 +100,12 @@ export function AdminDashboardHome() {
         const calcChange = (current: number, previous: number) =>
           previous > 0 ? ((current - previous) / previous) * 100 : current > 0 ? 100 : 0;
 
-        // Daily revenue for sparkline (last 7 days)
         const dailyRevenue = Array.from({ length: 7 }, (_, i) => {
           const date = subDays(today, 6 - i).toISOString().split("T")[0];
           const dayMetric = orgMetrics.find((m) => m.date === date);
           return dayMetric?.total_funds_raised || 0;
         });
 
-        // Alerts for this org
         const orgAlerts = alertsData.filter((a) => a.organization_id === org.id);
         const highestSeverity = orgAlerts.reduce<"critical" | "high" | "medium" | "low" | null>((highest, alert) => {
           const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
@@ -118,7 +114,6 @@ export function AdminDashboardHome() {
           return severityOrder[alertSev] > severityOrder[highest] ? alertSev : highest;
         }, null);
 
-        // Integrations
         const orgCreds = credentials.filter((c) => c.organization_id === org.id);
         const integrations = orgCreds.map((c) => ({
           platform: c.platform === "meta_ads" ? "Meta" : c.platform === "switchboard_sms" ? "SMS" : c.platform,
@@ -149,7 +144,6 @@ export function AdminDashboardHome() {
         };
       });
 
-      // Process alerts with org names
       const alertsWithOrgNames: AlertData[] = alertsData.map((alert) => {
         const org = orgs.find((o) => o.id === alert.organization_id);
         return {
@@ -163,7 +157,6 @@ export function AdminDashboardHome() {
         };
       });
 
-      // Calculate summary
       const activeCount = clientData.filter((c) => c.isActive).length;
       const totalRev = clientData.reduce((sum, c) => sum + c.revenue, 0);
       const needsAttentionCount = clientData.filter((c) => c.isStale || c.integrations.some((i) => i.status === "failed")).length;
@@ -208,17 +201,14 @@ export function AdminDashboardHome() {
     }
   };
 
-  // Filter and sort clients
   const filteredClients = useMemo(() => {
     let result = [...clients];
 
-    // Search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter((c) => c.name.toLowerCase().includes(query));
     }
 
-    // Filter
     switch (filterBy) {
       case "active":
         result = result.filter((c) => c.isActive);
@@ -231,7 +221,6 @@ export function AdminDashboardHome() {
         break;
     }
 
-    // Sort
     result.sort((a, b) => {
       switch (sortBy) {
         case "revenue":
@@ -264,6 +253,22 @@ export function AdminDashboardHome() {
     }).format(value);
   };
 
+  // Widget configurations for customizable dashboard
+  const dashboardWidgets: WidgetConfig[] = useMemo(() => [
+    {
+      id: "news-intelligence",
+      title: "News Intelligence",
+      component: <NewsIntelligencePanel showDragHandle={isCustomizing} />,
+      defaultLayout: { x: 0, y: 0, w: 6, h: 4, minW: 4, minH: 3 },
+    },
+    {
+      id: "alerts-timeline",
+      title: "Alerts Timeline",
+      component: <GlobalAlertsTimeline showDragHandle={isCustomizing} />,
+      defaultLayout: { x: 6, y: 0, w: 6, h: 4, minW: 4, minH: 3 },
+    },
+  ], [isCustomizing]);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -290,10 +295,21 @@ export function AdminDashboardHome() {
           <h1 className="text-2xl font-bold text-foreground">Client Monitoring Center</h1>
           <p className="text-muted-foreground">Monitor performance and health across all organizations</p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2">
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={isCustomizing ? "default" : "outline"}
+            size="sm"
+            onClick={() => setIsCustomizing(!isCustomizing)}
+            className="gap-2"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            {isCustomizing ? "Done Editing" : "Customize"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Summary Stats */}
@@ -362,11 +378,18 @@ export function AdminDashboardHome() {
         onDismiss={handleDismissAlert}
       />
 
-      {/* News Intelligence & Alerts Timeline */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <NewsIntelligencePanel />
-        <GlobalAlertsTimeline />
-      </div>
+      {/* Customizable Dashboard Area */}
+      {isCustomizing ? (
+        <CustomizableDashboard
+          storageKey="admin-dashboard-layout"
+          widgets={dashboardWidgets}
+        />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <NewsIntelligencePanel />
+          <GlobalAlertsTimeline />
+        </div>
+      )}
 
       {/* Clients Section */}
       <div className="space-y-4">
