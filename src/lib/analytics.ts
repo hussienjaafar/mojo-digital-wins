@@ -174,10 +174,15 @@ export function groupByPeriod<T>(
   period: 'day' | 'week' | 'month',
   aggregator: (items: T[]) => any
 ): any[] {
+  if (!data || data.length === 0) return [];
+  
   const groups = new Map<string, T[]>();
   
   data.forEach(item => {
-    const date = parseISO(item[dateField] as string);
+    const dateValue = item[dateField] as string;
+    if (!dateValue) return; // Skip items with undefined/null date
+    
+    const date = parseISO(dateValue);
     let key: string;
     
     if (period === 'day') {
