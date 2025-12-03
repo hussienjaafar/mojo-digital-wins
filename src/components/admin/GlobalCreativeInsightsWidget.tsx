@@ -143,11 +143,11 @@ export function GlobalCreativeInsightsWidget({ showDragHandle }: Props) {
 
   return (
     <div className="portal-card h-full flex flex-col">
-      <div className="p-4 border-b border-[hsl(var(--portal-border))]">
+      <div className={`p-4 border-b border-[hsl(var(--portal-border))] ${showDragHandle ? 'cursor-move' : ''}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {showDragHandle && (
-              <GripVertical className="h-5 w-5 portal-text-secondary cursor-grab active:cursor-grabbing" />
+              <GripVertical className="h-5 w-5 portal-text-secondary" />
             )}
             <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]">
               <Lightbulb className="h-5 w-5 text-[hsl(var(--portal-accent-purple))]" />
