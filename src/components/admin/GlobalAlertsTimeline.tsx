@@ -156,7 +156,7 @@ export function GlobalAlertsTimeline({ showDragHandle = false }: GlobalAlertsTim
             <p>No unread alerts</p>
           </div>
         ) : (
-          <ScrollArea className="h-full max-h-[400px] pr-2">
+          <ScrollArea className="h-full pr-2">
             <div className="space-y-3">
               {alerts.map((alert) => {
                 const styles = getSeverityStyles(alert.severity);
