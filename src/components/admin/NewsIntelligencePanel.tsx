@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
-import { TrendingUp, Newspaper, ChevronDown, ChevronUp, ExternalLink, Flame, AlertTriangle } from "lucide-react";
+import { TrendingUp, Newspaper, ChevronDown, ChevronUp, ExternalLink, Flame, AlertTriangle, GripVertical } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface TrendingTopic {
@@ -25,7 +25,11 @@ interface BreakingNewsItem {
   source_url: string;
 }
 
-export function NewsIntelligencePanel() {
+interface NewsIntelligencePanelProps {
+  showDragHandle?: boolean;
+}
+
+export function NewsIntelligencePanel({ showDragHandle = false }: NewsIntelligencePanelProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [trendingTopics, setTrendingTopics] = useState<TrendingTopic[]>([]);
   const [breakingNews, setBreakingNews] = useState<BreakingNewsItem[]>([]);
@@ -38,7 +42,6 @@ export function NewsIntelligencePanel() {
   const fetchData = async () => {
     setLoading(true);
     
-    // Fetch trending topics
     const { data: topics } = await supabase
       .from('bluesky_trends')
       .select('id, topic, velocity, mentions_last_24_hours, sentiment_avg, is_trending')
@@ -46,7 +49,6 @@ export function NewsIntelligencePanel() {
       .order('velocity', { ascending: false })
       .limit(6);
 
-    // Fetch high-impact news (last 24 hours)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     
@@ -72,21 +74,24 @@ export function NewsIntelligencePanel() {
   const getThreatBadge = (level: string) => {
     switch (level) {
       case 'critical':
-        return <Badge variant="destructive" className="text-xs">Critical</Badge>;
+        return <Badge variant="destructive" className="text-xs flex-shrink-0">Critical</Badge>;
       case 'high':
-        return <Badge className="bg-warning/20 text-warning border-warning/30 text-xs">High</Badge>;
+        return <Badge className="bg-warning/20 text-warning border-warning/30 text-xs flex-shrink-0">High</Badge>;
       default:
-        return <Badge variant="secondary" className="text-xs">{level}</Badge>;
+        return <Badge variant="secondary" className="text-xs flex-shrink-0">{level}</Badge>;
     }
   };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="border-border/50">
+      <Card className="border-border/50 h-full flex flex-col">
         <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors pb-3">
+          <CardHeader className={`hover:bg-muted/50 transition-colors pb-3 flex-shrink-0 ${showDragHandle ? 'cursor-move' : 'cursor-pointer'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
+                {showDragHandle && (
+                  <GripVertical className="h-4 w-4 text-muted-foreground" />
+                )}
                 <Newspaper className="h-5 w-5 text-primary" />
                 <CardTitle className="text-lg">News Intelligence</CardTitle>
                 <Badge variant="outline" className="ml-2">
@@ -102,7 +107,7 @@ export function NewsIntelligencePanel() {
           </CardHeader>
         </CollapsibleTrigger>
         
-        <CollapsibleContent>
+        <CollapsibleContent className="flex-1">
           <CardContent className="pt-0">
             {loading ? (
               <div className="grid md:grid-cols-2 gap-6">
@@ -132,20 +137,20 @@ export function NewsIntelligencePanel() {
                       trendingTopics.map((topic) => (
                         <div
                           key={topic.id}
-                          className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                          className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                         >
-                          <div className="flex items-center gap-2">
-                            <Flame className={`h-4 w-4 ${getVelocityColor(topic.velocity || 0)}`} />
-                            <span className="text-sm font-medium truncate max-w-[180px]">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <Flame className={`h-4 w-4 flex-shrink-0 ${getVelocityColor(topic.velocity || 0)}`} />
+                            <span className="text-sm font-medium break-words leading-snug">
                               {topic.topic}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             <span className={`text-xs font-mono ${getVelocityColor(topic.velocity || 0)}`}>
                               {Math.round(topic.velocity || 0)}↑
                             </span>
-                            <span className="text-xs text-muted-foreground">
-                              {topic.mentions_last_24_hours || 0} mentions
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {topic.mentions_last_24_hours || 0}
                             </span>
                           </div>
                         </div>
@@ -167,12 +172,12 @@ export function NewsIntelligencePanel() {
                       breakingNews.map((item) => (
                         <div
                           key={item.id}
-                          className="p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                          className="p-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                         >
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium line-clamp-2">{item.title}</p>
-                              <div className="flex items-center gap-2 mt-1">
+                              <p className="text-sm font-medium leading-snug mb-1.5">{item.title}</p>
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span className="text-xs text-muted-foreground">
                                   {item.source_name}
                                 </span>
@@ -182,7 +187,7 @@ export function NewsIntelligencePanel() {
                                 </span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 flex-shrink-0">
                               {getThreatBadge(item.threat_level)}
                               <Button
                                 variant="ghost"
