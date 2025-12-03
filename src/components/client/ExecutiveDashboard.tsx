@@ -22,24 +22,20 @@ import {
 } from "lucide-react";
 import { useRealtimeMetrics } from "@/hooks/useRealtimeMetrics";
 import { 
-  LineChart, 
-  Line, 
-  AreaChart,
-  Area,
-  BarChart, 
+  ComposedChart,
   Bar, 
+  Line,
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
   Legend, 
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  ComposedChart
 } from "recharts";
 import { format, subDays, parseISO } from "date-fns";
+import { ResponsiveBarChart, ResponsivePieChart, ResponsiveChartTooltip } from "@/components/charts";
+import { formatCurrency, getYAxisFormatter } from "@/lib/chart-formatters";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type Props = {
   organizationId: string;
@@ -437,32 +433,41 @@ const ExecutiveDashboard = ({ organizationId, startDate, endDate }: Props) => {
           <CardDescription>Revenue vs Marketing Spend (Last 30 Days)</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-80">
+          <div className="h-64 sm:h-80">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={performanceTimeline}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} vertical={false} />
                 <XAxis 
                   dataKey="date" 
                   tickFormatter={(value) => format(parseISO(value), 'MMM d')}
-                  className="text-xs"
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickLine={false}
+                  axisLine={{ stroke: "hsl(var(--border))", opacity: 0.5 }}
                 />
-                <YAxis className="text-xs" />
+                <YAxis 
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={getYAxisFormatter('currency')}
+                />
                 <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))' 
-                  }}
+                  content={<ResponsiveChartTooltip valueType="currency" />}
+                  cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }}
                 />
-                <Legend />
-                <Bar dataKey="metaSpend" fill={COLORS[0]} name="Meta Ads Spend" />
-                <Bar dataKey="smsSpend" fill={COLORS[1]} name="SMS Spend" />
+                <Legend 
+                  wrapperStyle={{ fontSize: 11 }}
+                  iconSize={10}
+                />
+                <Bar dataKey="metaSpend" fill={COLORS[0]} name="Meta Ads Spend" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="smsSpend" fill={COLORS[1]} name="SMS Spend" radius={[4, 4, 0, 0]} />
                 <Line 
                   type="monotone" 
                   dataKey="revenue" 
                   stroke={COLORS[2]} 
-                  strokeWidth={3}
+                  strokeWidth={2.5}
                   name="Revenue"
-                  dot={{ fill: COLORS[2], r: 4 }}
+                  dot={false}
+                  activeDot={{ fill: COLORS[2], r: 5, strokeWidth: 2 }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
@@ -479,25 +484,16 @@ const ExecutiveDashboard = ({ organizationId, startDate, endDate }: Props) => {
               <CardDescription>Multi-touch attribution by platform</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={attributionData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="name" className="text-xs" />
-                    <YAxis className="text-xs" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))' 
-                      }}
-                    />
-                    <Legend />
-                    <Bar dataKey="firstTouch" fill={COLORS[0]} name="First Touch" />
-                    <Bar dataKey="lastTouch" fill={COLORS[1]} name="Last Touch" />
-                    <Bar dataKey="linear" fill={COLORS[2]} name="Linear" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <ResponsiveBarChart
+                data={attributionData}
+                bars={[
+                  { dataKey: "firstTouch", name: "First Touch", color: COLORS[0], valueType: "currency" },
+                  { dataKey: "lastTouch", name: "Last Touch", color: COLORS[1], valueType: "currency" },
+                  { dataKey: "linear", name: "Linear", color: COLORS[2], valueType: "currency" },
+                ]}
+                valueType="currency"
+                height={256}
+              />
             </CardContent>
           </Card>
 
@@ -507,27 +503,12 @@ const ExecutiveDashboard = ({ organizationId, startDate, endDate }: Props) => {
               <CardDescription>Revenue attribution breakdown</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={attributionData}
-                      dataKey="linear"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label
-                    >
-                      {attributionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              <ResponsivePieChart
+                data={attributionData.map(d => ({ name: d.name, value: d.linear }))}
+                valueType="currency"
+                colors={COLORS}
+                height={256}
+              />
             </CardContent>
           </Card>
         </div>

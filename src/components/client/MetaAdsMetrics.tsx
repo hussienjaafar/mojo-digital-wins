@@ -5,11 +5,11 @@ import { PortalMetric } from "@/components/portal/PortalMetric";
 import { PortalBadge } from "@/components/portal/PortalBadge";
 import { logger } from "@/lib/logger";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
-import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { Target, MousePointer, Eye, DollarSign, TrendingUp, TrendingDown, Filter, BarChart3 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, subDays, parseISO } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts";
+import { ResponsiveLineChart, ResponsiveBarChart } from "@/components/charts";
+import { formatCurrency } from "@/lib/chart-formatters";
 
 type Props = {
   organizationId: string;
@@ -347,13 +347,13 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
             </PortalCardTitle>
           </PortalCardHeader>
           <PortalCardContent>
-            <PortalLineChart
+            <ResponsiveLineChart
               data={trendChartData}
               lines={[
-                { dataKey: "Spend", stroke: CHART_COLORS.spend, name: "Spend ($)" },
-                { dataKey: "Conversions", stroke: CHART_COLORS.conversions, name: "Conversions" },
+                { dataKey: "Spend", name: "Spend", color: CHART_COLORS.spend, valueType: "currency" },
+                { dataKey: "Conversions", name: "Conversions", color: CHART_COLORS.conversions, valueType: "number" },
               ]}
-              height={250}
+              valueType="currency"
             />
           </PortalCardContent>
         </PortalCard>
@@ -369,28 +369,14 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
             </PortalCardTitle>
           </PortalCardHeader>
           <PortalCardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={campaignBreakdownData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--portal-border))" opacity={0.3} />
-                <XAxis dataKey="name" tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 11 }} />
-                <YAxis yAxisId="left" tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 11 }} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--portal-bg-tertiary))",
-                    border: "1px solid hsl(var(--portal-border))",
-                    borderRadius: "8px",
-                  }}
-                  formatter={(value: number, name: string) => [
-                    name === 'spend' ? `$${value.toLocaleString()}` : value.toLocaleString(),
-                    name === 'spend' ? 'Spend' : 'Conversions'
-                  ]}
-                />
-                <Legend />
-                <Bar yAxisId="left" dataKey="spend" fill={CHART_COLORS.spend} name="Spend" radius={[4, 4, 0, 0]} />
-                <Bar yAxisId="right" dataKey="conversions" fill={CHART_COLORS.conversions} name="Conversions" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ResponsiveBarChart
+              data={campaignBreakdownData}
+              bars={[
+                { dataKey: "spend", name: "Spend", color: CHART_COLORS.spend, valueType: "currency" },
+                { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.conversions, valueType: "number" },
+              ]}
+              valueType="currency"
+            />
           </PortalCardContent>
         </PortalCard>
       )}

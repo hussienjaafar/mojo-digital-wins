@@ -4,12 +4,12 @@ import { PortalCard, PortalCardContent, PortalCardHeader, PortalCardTitle } from
 import { PortalMetric } from "@/components/portal/PortalMetric";
 import { logger } from "@/lib/logger";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
-import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { MessageSquare, CheckCircle, DollarSign, Target, TrendingUp, TrendingDown, Filter, BarChart3, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, subDays, parseISO } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts";
 import { PortalBadge } from "@/components/portal/PortalBadge";
+import { ResponsiveLineChart, ResponsiveBarChart } from "@/components/charts";
+import { formatCurrency, formatRatio } from "@/lib/chart-formatters";
 
 type Props = {
   organizationId: string;
@@ -309,13 +309,13 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
             </PortalCardTitle>
           </PortalCardHeader>
           <PortalCardContent>
-            <PortalLineChart
+            <ResponsiveLineChart
               data={trendChartData}
               lines={[
-                { dataKey: "Sent", stroke: CHART_COLORS.sent, name: "Messages Sent" },
-                { dataKey: "Conversions", stroke: CHART_COLORS.conversions, name: "Conversions" },
+                { dataKey: "Sent", name: "Messages Sent", color: CHART_COLORS.sent, valueType: "number" },
+                { dataKey: "Conversions", name: "Conversions", color: CHART_COLORS.conversions, valueType: "number" },
               ]}
-              height={250}
+              valueType="number"
             />
           </PortalCardContent>
         </PortalCard>
@@ -331,30 +331,13 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
             </PortalCardTitle>
           </PortalCardHeader>
           <PortalCardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={roiComparisonData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--portal-border))" opacity={0.3} />
-                <XAxis dataKey="name" tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 11 }} />
-                <YAxis tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--portal-bg-tertiary))",
-                    border: "1px solid hsl(var(--portal-border))",
-                    borderRadius: "8px",
-                  }}
-                  formatter={(value: number, name: string) => [
-                    name === 'roi' ? `${value.toFixed(2)}x` : `$${value.toLocaleString()}`,
-                    name === 'roi' ? 'ROI' : name === 'raised' ? 'Raised' : 'Cost'
-                  ]}
-                />
-                <Legend />
-                <Bar dataKey="roi" fill={CHART_COLORS.conversions} name="ROI" radius={[4, 4, 0, 0]}>
-                  {roiComparisonData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.roi >= 2 ? CHART_COLORS.conversions : "hsl(var(--portal-text-muted))"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <ResponsiveBarChart
+              data={roiComparisonData}
+              bars={[
+                { dataKey: "roi", name: "ROI", color: CHART_COLORS.conversions, valueType: "ratio" },
+              ]}
+              valueType="ratio"
+            />
           </PortalCardContent>
         </PortalCard>
       )}
