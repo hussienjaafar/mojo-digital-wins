@@ -68,21 +68,35 @@ export default {
           low: "hsl(var(--severity-low))",
           "low-foreground": "hsl(var(--severity-low-foreground))",
         },
-        // Utility semantic colors
-        success: {
-          DEFAULT: "hsl(150 60% 50%)",
-          foreground: "hsl(0 0% 100%)",
-          light: "hsl(150 60% 95%)",
-        },
-        info: {
-          DEFAULT: "hsl(213 83% 47%)",
-          foreground: "hsl(0 0% 100%)",
-          light: "hsl(213 83% 95%)",
-        },
-        warning: {
-          DEFAULT: "hsl(45 89% 57%)",
-          foreground: "hsl(213 75% 15%)",
-          light: "hsl(45 89% 95%)",
+        // Overlay
+        overlay: "hsl(var(--overlay) / <alpha-value>)",
+        // Status colors (semantic)
+        status: {
+          success: {
+            DEFAULT: "hsl(var(--status-success))",
+            foreground: "hsl(var(--status-success-foreground))",
+            muted: "hsl(var(--status-success-muted))",
+          },
+          warning: {
+            DEFAULT: "hsl(var(--status-warning))",
+            foreground: "hsl(var(--status-warning-foreground))",
+            muted: "hsl(var(--status-warning-muted))",
+          },
+          error: {
+            DEFAULT: "hsl(var(--status-error))",
+            foreground: "hsl(var(--status-error-foreground))",
+            muted: "hsl(var(--status-error-muted))",
+          },
+          info: {
+            DEFAULT: "hsl(var(--status-info))",
+            foreground: "hsl(var(--status-info-foreground))",
+            muted: "hsl(var(--status-info-muted))",
+          },
+          neutral: {
+            DEFAULT: "hsl(var(--status-neutral))",
+            foreground: "hsl(var(--status-neutral-foreground))",
+            muted: "hsl(var(--status-neutral-muted))",
+          },
         },
         // Portal theme colors - for client dashboard
         portal: {

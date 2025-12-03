@@ -110,6 +110,26 @@ All colors MUST be HSL.
     --severity-low: 150 60% 50%;
     --severity-low-foreground: 0 0% 100%;
 
+    /* Overlay */
+    --overlay: 0 0% 0%;
+
+    /* Status colors for badges/alerts */
+    --status-success: 150 60% 40%;
+    --status-success-foreground: 0 0% 100%;
+    --status-success-muted: 150 60% 95%;
+    --status-warning: 45 89% 50%;
+    --status-warning-foreground: 213 75% 15%;
+    --status-warning-muted: 45 89% 95%;
+    --status-error: 0 78% 53%;
+    --status-error-foreground: 0 0% 100%;
+    --status-error-muted: 0 78% 95%;
+    --status-info: 213 83% 47%;
+    --status-info-foreground: 0 0% 100%;
+    --status-info-muted: 213 83% 95%;
+    --status-neutral: 213 20% 50%;
+    --status-neutral-foreground: 0 0% 100%;
+    --status-neutral-muted: 213 20% 95%;
+
     /* Line Heights */
     --line-height-tight: 1.25;
     --line-height-snug: 1.375;
@@ -181,6 +201,26 @@ All colors MUST be HSL.
     --shadow-glow-red: 0 0 40px hsl(0 65% 55% / 0.4);
     --shadow-brutal: 8px 8px 0px hsl(0 65% 45%);
     --shadow-inset: inset 0 2px 8px hsl(0 0% 0% / 0.4);
+
+    /* Overlay - dark mode */
+    --overlay: 0 0% 0%;
+
+    /* Status colors - dark mode adjusted */
+    --status-success: 150 70% 50%;
+    --status-success-foreground: 0 0% 100%;
+    --status-success-muted: 150 70% 15%;
+    --status-warning: 45 95% 55%;
+    --status-warning-foreground: 220 15% 10%;
+    --status-warning-muted: 45 95% 15%;
+    --status-error: 0 75% 60%;
+    --status-error-foreground: 0 0% 100%;
+    --status-error-muted: 0 75% 15%;
+    --status-info: 213 100% 60%;
+    --status-info-foreground: 0 0% 100%;
+    --status-info-muted: 213 100% 15%;
+    --status-neutral: 220 10% 60%;
+    --status-neutral-foreground: 0 0% 100%;
+    --status-neutral-muted: 220 10% 20%;
   }
 }
 

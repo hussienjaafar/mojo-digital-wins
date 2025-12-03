@@ -30,10 +30,10 @@ interface StateAction extends StateActionRow {
 }
 
 const threatLevelColors: Record<string, string> = {
-  critical: 'bg-red-100 text-red-800 border-red-300',
-  high: 'bg-orange-100 text-orange-800 border-orange-300',
-  medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  low: 'bg-gray-100 text-gray-800 border-gray-300',
+  critical: 'bg-severity-critical/10 text-severity-critical border-severity-critical/30',
+  high: 'bg-severity-high/10 text-severity-high border-severity-high/30',
+  medium: 'bg-severity-medium/10 text-severity-medium border-severity-medium/30',
+  low: 'bg-status-neutral-muted text-status-neutral border-status-neutral/30',
 };
 
 const actionTypeLabels: Record<string, string> = {

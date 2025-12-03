@@ -46,7 +46,7 @@ export const FunnelChart = memo(({ title, description, stages }: Props) => {
                       backgroundColor: stage.color,
                     }}
                   >
-                    <div className={`${isMobile ? 'p-3' : 'p-4'} flex items-center justify-between text-white`}>
+                    <div className={`${isMobile ? 'p-3' : 'p-4'} flex items-center justify-between text-primary-foreground`}>
                       <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>{stage.name}</span>
                       <span className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold tabular-nums`}>
                         {formatNumber(stage.value)}

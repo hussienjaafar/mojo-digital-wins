@@ -13,19 +13,19 @@ import { ArrowLeft, Users, Calendar, FileText, Activity, ExternalLink } from "lu
 import { format } from "date-fns";
 
 const STATUS_STEPS = {
-  'introduced': { label: 'Introduced', progress: 10, color: 'bg-blue-500' },
-  'in_committee': { label: 'In Committee', progress: 30, color: 'bg-yellow-500' },
-  'passed_house': { label: 'Passed House', progress: 50, color: 'bg-orange-500' },
-  'passed_senate': { label: 'Passed Senate', progress: 50, color: 'bg-orange-500' },
-  'passed_both': { label: 'Passed Both Chambers', progress: 75, color: 'bg-green-500' },
-  'enacted': { label: 'Enacted', progress: 100, color: 'bg-emerald-600' },
-  'vetoed': { label: 'Vetoed', progress: 100, color: 'bg-red-500' },
+  'introduced': { label: 'Introduced', progress: 10, color: 'bg-status-info' },
+  'in_committee': { label: 'In Committee', progress: 30, color: 'bg-status-warning' },
+  'passed_house': { label: 'Passed House', progress: 50, color: 'bg-severity-high' },
+  'passed_senate': { label: 'Passed Senate', progress: 50, color: 'bg-severity-high' },
+  'passed_both': { label: 'Passed Both Chambers', progress: 75, color: 'bg-status-success' },
+  'enacted': { label: 'Enacted', progress: 100, color: 'bg-status-success' },
+  'vetoed': { label: 'Vetoed', progress: 100, color: 'bg-destructive' },
 };
 
 const PARTY_COLORS: Record<string, string> = {
-  'D': 'bg-blue-600',
-  'R': 'bg-red-600',
-  'I': 'bg-purple-600',
+  'D': 'bg-status-info',
+  'R': 'bg-destructive',
+  'I': 'bg-secondary',
 };
 
 // Generate Congress.gov URL from bill data
@@ -330,7 +330,7 @@ export default function BillDetail() {
                     <div className="flex gap-2">
                       {bill.sponsor_party && (
                         <Badge 
-                          className={`${PARTY_COLORS[bill.sponsor_party]} text-white border-0`}
+                          className={`${PARTY_COLORS[bill.sponsor_party]} text-primary-foreground border-0`}
                         >
                           {bill.sponsor_party}
                         </Badge>
@@ -360,7 +360,7 @@ export default function BillDetail() {
                         {Object.entries(bill.cosponsor_party_breakdown).map(([party, count]) => (
                           <Badge
                             key={party}
-                            className={`${PARTY_COLORS[party]} text-white border-0`}
+                            className={`${PARTY_COLORS[party]} text-primary-foreground border-0`}
                           >
                             {party}: {count as number}
                           </Badge>
