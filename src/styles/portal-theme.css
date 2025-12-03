@@ -494,6 +494,122 @@
   color: hsl(var(--portal-text-primary));
 }
 
+/* === PORTAL WIDGET COLOR VARIANTS === */
+/* Color-coded widgets for better visual distinction */
+
+.portal-widget-red {
+  border-left: 4px solid hsl(var(--portal-error));
+}
+
+.portal-widget-blue {
+  border-left: 4px solid hsl(var(--portal-accent-blue));
+}
+
+.portal-widget-purple {
+  border-left: 4px solid 270 70% 55%;
+}
+
+.portal-widget-teal {
+  border-left: 4px solid 180 60% 45%;
+}
+
+.portal-widget-orange {
+  border-left: 4px solid hsl(var(--portal-warning));
+}
+
+.portal-widget-amber {
+  border-left: 4px solid 45 95% 50%;
+}
+
+/* Widget header tinted backgrounds */
+.portal-widget-header-red {
+  background: hsl(var(--portal-error) / 0.05);
+}
+
+.portal-widget-header-blue {
+  background: hsl(var(--portal-accent-blue) / 0.05);
+}
+
+.portal-widget-header-purple {
+  background: hsl(270 70% 55% / 0.05);
+}
+
+.portal-widget-header-teal {
+  background: hsl(180 60% 45% / 0.05);
+}
+
+.portal-widget-header-orange {
+  background: hsl(var(--portal-warning) / 0.05);
+}
+
+.portal-widget-header-amber {
+  background: hsl(45 95% 50% / 0.05);
+}
+
+/* Dark mode adjustments for widget headers */
+.dark .portal-widget-header-red {
+  background: hsl(var(--portal-error) / 0.1);
+}
+
+.dark .portal-widget-header-blue {
+  background: hsl(var(--portal-accent-blue) / 0.1);
+}
+
+.dark .portal-widget-header-purple {
+  background: hsl(270 70% 55% / 0.1);
+}
+
+.dark .portal-widget-header-teal {
+  background: hsl(180 60% 45% / 0.1);
+}
+
+.dark .portal-widget-header-orange {
+  background: hsl(var(--portal-warning) / 0.1);
+}
+
+.dark .portal-widget-header-amber {
+  background: hsl(45 95% 50% / 0.1);
+}
+
+/* Widget icon containers */
+.portal-widget-icon {
+  padding: 0.625rem;
+  border-radius: var(--portal-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portal-widget-icon-red {
+  background: hsl(var(--portal-error) / 0.1);
+  color: hsl(var(--portal-error));
+}
+
+.portal-widget-icon-blue {
+  background: hsl(var(--portal-accent-blue) / 0.1);
+  color: hsl(var(--portal-accent-blue));
+}
+
+.portal-widget-icon-purple {
+  background: hsl(270 70% 55% / 0.1);
+  color: hsl(270 70% 55%);
+}
+
+.portal-widget-icon-teal {
+  background: hsl(180 60% 45% / 0.1);
+  color: hsl(180 60% 45%);
+}
+
+.portal-widget-icon-orange {
+  background: hsl(var(--portal-warning) / 0.1);
+  color: hsl(var(--portal-warning));
+}
+
+.portal-widget-icon-amber {
+  background: hsl(45 95% 50% / 0.1);
+  color: hsl(45 95% 50%);
+}
+
 /* === PORTAL ANIMATIONS === */
 @keyframes portal-fade-in {
   from {
