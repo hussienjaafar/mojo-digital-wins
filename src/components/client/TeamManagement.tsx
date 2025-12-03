@@ -91,8 +91,20 @@ export function TeamManagement() {
     }
   };
 
+  const generateTempPassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    let password = "";
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
   const handleInvite = async () => {
-    if (!organizationId) return;
+    if (!organizationId) {
+      toast.error("Organization not found");
+      return;
+    }
 
     if (!inviteForm.email || !inviteForm.full_name) {
       toast.error("Please fill in all fields");
@@ -101,12 +113,15 @@ export function TeamManagement() {
 
     setInviting(true);
     try {
+      const tempPassword = generateTempPassword();
+      
       const { data, error } = await supabase.functions.invoke("create-client-user", {
         body: {
           email: inviteForm.email,
-          fullName: inviteForm.full_name,
-          organizationId,
+          full_name: inviteForm.full_name,
+          organization_id: organizationId,
           role: inviteForm.role,
+          password: tempPassword,
         },
       });
 
