@@ -51,7 +51,7 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
             top: 8, 
             right: isMobile ? 8 : 16, 
             bottom: isMobile ? 8 : 4, 
-            left: isMobile ? -16 : 0 
+            left: isMobile ? 0 : 0 
           }}
         >
           <CartesianGrid 
@@ -62,20 +62,20 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
           />
           <XAxis
             dataKey="name"
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 10 : 11 }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 11 : 12 }}
             tickLine={false}
             axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
             angle={isMobile ? -45 : 0}
             textAnchor={isMobile ? "end" : "middle"}
-            height={isMobile ? 50 : 30}
+            height={isMobile ? 55 : 30}
             interval={isMobile ? "preserveStartEnd" : "equidistantPreserveStart"}
           />
           <YAxis
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 10 : 11 }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 11 : 12 }}
             tickLine={false}
             axisLine={false}
             tickFormatter={getYAxisFormatter(valueType)}
-            width={isMobile ? 45 : 55}
+            width={isMobile ? 55 : 65}
           />
           <Tooltip
             content={
@@ -90,7 +90,7 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
             verticalAlign={isMobile ? "bottom" : "top"}
             align={isMobile ? "center" : "right"}
             wrapperStyle={{
-              fontSize: isMobile ? 10 : 12,
+              fontSize: isMobile ? 11 : 12,
               paddingTop: isMobile ? 8 : 0,
               paddingBottom: isMobile ? 0 : 8,
             }}

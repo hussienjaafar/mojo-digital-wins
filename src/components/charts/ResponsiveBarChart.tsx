@@ -85,7 +85,7 @@ export function ResponsiveBarChart({
           margin={{
             top: 8,
             right: isMobile ? 8 : 16,
-            left: isMobile ? -12 : 0,
+            left: isMobile ? 0 : 0,
             bottom: isMobile ? 8 : 4,
           }}
         >
@@ -104,7 +104,7 @@ export function ResponsiveBarChart({
               <XAxis
                 type="number"
                 tick={{ 
-                  fontSize: isMobile ? 10 : 11, 
+                  fontSize: isMobile ? 11 : 12, 
                   fill: "hsl(var(--muted-foreground))" 
                 }}
                 tickLine={false}
@@ -115,12 +115,12 @@ export function ResponsiveBarChart({
                 type="category"
                 dataKey={xAxisKey}
                 tick={{ 
-                  fontSize: isMobile ? 10 : 11, 
+                  fontSize: isMobile ? 11 : 12, 
                   fill: "hsl(var(--muted-foreground))" 
                 }}
                 tickLine={false}
                 axisLine={false}
-                width={isMobile ? 70 : 90}
+                width={isMobile ? 75 : 90}
               />
             </>
           ) : (
@@ -128,7 +128,7 @@ export function ResponsiveBarChart({
               <XAxis
                 dataKey={xAxisKey}
                 tick={{ 
-                  fontSize: isMobile ? 10 : 11, 
+                  fontSize: isMobile ? 11 : 12, 
                   fill: "hsl(var(--muted-foreground))" 
                 }}
                 tickLine={false}
@@ -140,13 +140,13 @@ export function ResponsiveBarChart({
               />
               <YAxis
                 tick={{ 
-                  fontSize: isMobile ? 10 : 11, 
+                  fontSize: isMobile ? 11 : 12, 
                   fill: "hsl(var(--muted-foreground))" 
                 }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={getYAxisFormatter(valueType)}
-                width={isMobile ? 45 : 55}
+                width={isMobile ? 55 : 65}
               />
             </>
           )}
@@ -166,7 +166,7 @@ export function ResponsiveBarChart({
               verticalAlign={isMobile ? "bottom" : "top"}
               align={isMobile ? "center" : "right"}
               wrapperStyle={{
-                fontSize: isMobile ? 10 : 12,
+                fontSize: isMobile ? 11 : 12,
                 paddingTop: isMobile ? 8 : 0,
                 paddingBottom: isMobile ? 0 : 8,
               }}

@@ -78,7 +78,7 @@ export function ResponsiveLineChart({
           margin={{
             top: 8,
             right: isMobile ? 8 : 16,
-            left: isMobile ? -16 : 0,
+            left: isMobile ? 0 : 0,
             bottom: isMobile ? 8 : 4,
           }}
         >
@@ -94,26 +94,26 @@ export function ResponsiveLineChart({
           <XAxis
             dataKey={xAxisKey}
             tick={{ 
-              fontSize: isMobile ? 10 : 11, 
+              fontSize: isMobile ? 11 : 12, 
               fill: "hsl(var(--muted-foreground))" 
             }}
             tickLine={false}
             axisLine={{ stroke: "hsl(var(--border))", opacity: 0.5 }}
             angle={isMobile ? -45 : 0}
             textAnchor={isMobile ? "end" : "middle"}
-            height={isMobile ? 50 : 30}
+            height={isMobile ? 55 : 30}
             interval={isMobile ? "preserveStartEnd" : "equidistantPreserveStart"}
           />
           
           <YAxis
             tick={{ 
-              fontSize: isMobile ? 10 : 11, 
+              fontSize: isMobile ? 11 : 12, 
               fill: "hsl(var(--muted-foreground))" 
             }}
             tickLine={false}
             axisLine={false}
             tickFormatter={getYAxisFormatter(valueType)}
-            width={isMobile ? 45 : 55}
+            width={isMobile ? 55 : 65}
           />
           
           <Tooltip
@@ -131,7 +131,7 @@ export function ResponsiveLineChart({
               verticalAlign={isMobile ? "bottom" : "top"}
               align={isMobile ? "center" : "right"}
               wrapperStyle={{
-                fontSize: isMobile ? 10 : 12,
+                fontSize: isMobile ? 11 : 12,
                 paddingTop: isMobile ? 8 : 0,
                 paddingBottom: isMobile ? 0 : 8,
               }}

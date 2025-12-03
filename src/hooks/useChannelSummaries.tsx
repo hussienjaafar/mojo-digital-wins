@@ -6,6 +6,7 @@ export type ChannelSummary = {
     spend: number;
     conversions: number;
     roas: number;
+    hasConversionValueData: boolean;
     isLoading: boolean;
   };
   sms: {
@@ -24,7 +25,7 @@ export type ChannelSummary = {
 
 export function useChannelSummaries(organizationId: string, startDate: string, endDate: string): ChannelSummary {
   const [summary, setSummary] = useState<ChannelSummary>({
-    meta: { spend: 0, conversions: 0, roas: 0, isLoading: true },
+    meta: { spend: 0, conversions: 0, roas: 0, hasConversionValueData: false, isLoading: true },
     sms: { sent: 0, raised: 0, roi: 0, isLoading: true },
     donations: { total: 0, donors: 0, avgDonation: 0, isLoading: true },
   });
@@ -45,11 +46,12 @@ export function useChannelSummaries(organizationId: string, startDate: string, e
         const metaSpend = metaData?.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0) || 0;
         const metaConversions = metaData?.reduce((sum: number, m: any) => sum + (m.conversions || 0), 0) || 0;
         const metaValue = metaData?.reduce((sum: number, m: any) => sum + Number(m.conversion_value || 0), 0) || 0;
-        const metaRoas = metaSpend > 0 ? metaValue / metaSpend : 0;
+        const hasConversionValueData = metaValue > 0;
+        const metaRoas = metaSpend > 0 && metaValue > 0 ? metaValue / metaSpend : 0;
 
         setSummary(prev => ({
           ...prev,
-          meta: { spend: metaSpend, conversions: metaConversions, roas: metaRoas, isLoading: false },
+          meta: { spend: metaSpend, conversions: metaConversions, roas: metaRoas, hasConversionValueData, isLoading: false },
         }));
       } catch (error) {
         setSummary(prev => ({ ...prev, meta: { ...prev.meta, isLoading: false } }));
