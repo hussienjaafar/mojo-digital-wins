@@ -390,7 +390,7 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
             data={revenueForecast}
             lines={[]}
             showForecast
-            yAxisFormatter={(value) => `$${value.toLocaleString()}`}
+            valueType="currency"
           />
         </TabsContent>
 
@@ -404,7 +404,7 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
               previousKey="previousRevenue"
               currentLabel="Current Period"
               previousLabel="Previous Period"
-              yAxisFormatter={(value) => `$${value.toLocaleString()}`}
+              valueType="currency"
             />
             
             <ComparisonChart
@@ -415,7 +415,7 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
               previousKey="previousSpend"
               currentLabel="Current Period"
               previousLabel="Previous Period"
-              yAxisFormatter={(value) => `$${value.toLocaleString()}`}
+              valueType="currency"
             />
           </div>
         </TabsContent>

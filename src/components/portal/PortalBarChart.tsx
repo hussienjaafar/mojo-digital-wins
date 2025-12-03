@@ -1,6 +1,9 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { ResponsiveChartTooltip } from "@/components/charts/ResponsiveChartTooltip";
+import { getYAxisFormatter, ValueType } from "@/lib/chart-formatters";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DataPoint {
   name: string;
@@ -13,47 +16,68 @@ interface PortalBarChartProps {
   height?: number;
   barColor?: string;
   className?: string;
+  valueType?: ValueType;
 }
 
 export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   data,
-  height = 250,
+  height,
   barColor = "hsl(var(--portal-accent-blue))",
   className,
+  valueType = "number",
 }) => {
+  const isMobile = useIsMobile();
+  const chartHeight = height || (isMobile ? 200 : 250);
+
   return (
-    <div className={cn("w-full", className)}>
-      <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={data} margin={{ top: 20, right: 20, bottom: 5, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--portal-border))" opacity={0.2} />
+    <div className={cn("w-full", className)} style={{ height: chartHeight }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart 
+          data={data} 
+          margin={{ 
+            top: 8, 
+            right: isMobile ? 8 : 16, 
+            bottom: isMobile ? 8 : 4, 
+            left: isMobile ? -12 : 0 
+          }}
+        >
+          <CartesianGrid 
+            strokeDasharray="3 3" 
+            stroke="hsl(var(--portal-border))" 
+            opacity={0.3}
+            vertical={false}
+          />
           <XAxis
             dataKey="name"
-            stroke="hsl(var(--portal-text-muted))"
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 12 }}
-            axisLine={{ stroke: "hsl(var(--portal-border))" }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 10 : 11 }}
+            tickLine={false}
+            axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
+            angle={isMobile ? -45 : 0}
+            textAnchor={isMobile ? "end" : "middle"}
+            height={isMobile ? 60 : 30}
+            interval={0}
           />
           <YAxis
-            stroke="hsl(var(--portal-text-muted))"
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 12 }}
-            axisLine={{ stroke: "hsl(var(--portal-border))" }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 10 : 11 }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={getYAxisFormatter(valueType)}
+            width={isMobile ? 45 : 55}
           />
           <Tooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--portal-bg-tertiary))",
-              border: "1px solid hsl(var(--portal-border))",
-              borderRadius: "8px",
-              color: "hsl(var(--portal-text-primary))",
-            }}
-            cursor={{ fill: "hsl(var(--portal-bg-elevated) / 0.3)" }}
+            content={<ResponsiveChartTooltip valueType={valueType} />}
+            cursor={{ fill: "hsl(var(--portal-bg-elevated))", opacity: 0.3 }}
           />
-          <Bar dataKey="value" fill={barColor} radius={[8, 8, 0, 0]}>
+          <Bar 
+            dataKey="value" 
+            fill={barColor} 
+            radius={[4, 4, 0, 0]}
+            maxBarSize={isMobile ? 30 : 50}
+          >
             {data.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
                 fill={barColor}
-                style={{
-                  filter: "drop-shadow(0 0 6px hsl(var(--portal-accent-blue) / 0.4))",
-                }}
               />
             ))}
           </Bar>

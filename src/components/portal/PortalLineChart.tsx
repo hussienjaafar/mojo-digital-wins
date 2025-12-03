@@ -1,6 +1,9 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { ResponsiveChartTooltip } from "@/components/charts/ResponsiveChartTooltip";
+import { getYAxisFormatter, ValueType } from "@/lib/chart-formatters";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DataPoint {
   name: string;
@@ -13,44 +16,85 @@ interface PortalLineChartProps {
     dataKey: string;
     stroke: string;
     name: string;
+    valueType?: ValueType;
   }>;
   height?: number;
   className?: string;
+  valueType?: ValueType;
 }
 
 export const PortalLineChart: React.FC<PortalLineChartProps> = ({
   data,
   lines,
-  height = 300,
+  height,
   className,
+  valueType = "number",
 }) => {
+  const isMobile = useIsMobile();
+  const chartHeight = height || (isMobile ? 200 : 280);
+
+  // Build value types map for tooltip
+  const valueTypes = React.useMemo(() => {
+    const types: Record<string, ValueType> = {};
+    lines.forEach((line) => {
+      types[line.dataKey] = line.valueType || valueType;
+    });
+    return types;
+  }, [lines, valueType]);
+
   return (
-    <div className={cn("w-full", className)}>
-      <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--portal-border))" opacity={0.3} />
+    <div className={cn("w-full", className)} style={{ height: chartHeight }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart 
+          data={data} 
+          margin={{ 
+            top: 8, 
+            right: isMobile ? 8 : 16, 
+            bottom: isMobile ? 8 : 4, 
+            left: isMobile ? -16 : 0 
+          }}
+        >
+          <CartesianGrid 
+            strokeDasharray="3 3" 
+            stroke="hsl(var(--portal-border))" 
+            opacity={0.4} 
+            vertical={false}
+          />
           <XAxis
             dataKey="name"
-            stroke="hsl(var(--portal-text-muted))"
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 12 }}
-            axisLine={{ stroke: "hsl(var(--portal-border))" }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 10 : 11 }}
+            tickLine={false}
+            axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
+            angle={isMobile ? -45 : 0}
+            textAnchor={isMobile ? "end" : "middle"}
+            height={isMobile ? 50 : 30}
+            interval={isMobile ? "preserveStartEnd" : "equidistantPreserveStart"}
           />
           <YAxis
-            stroke="hsl(var(--portal-text-muted))"
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 12 }}
-            axisLine={{ stroke: "hsl(var(--portal-border))" }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 10 : 11 }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={getYAxisFormatter(valueType)}
+            width={isMobile ? 45 : 55}
           />
           <Tooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--portal-bg-tertiary))",
-              border: "1px solid hsl(var(--portal-border))",
-              borderRadius: "8px",
-              color: "hsl(var(--portal-text-primary))",
-            }}
-            labelStyle={{ color: "hsl(var(--portal-text-secondary))" }}
+            content={
+              <ResponsiveChartTooltip 
+                valueType={valueType} 
+                valueTypes={valueTypes}
+              />
+            }
+            cursor={{ stroke: "hsl(var(--portal-text-muted))", strokeOpacity: 0.3 }}
           />
           <Legend
-            wrapperStyle={{ color: "hsl(var(--portal-text-secondary))" }}
+            verticalAlign={isMobile ? "bottom" : "top"}
+            align={isMobile ? "center" : "right"}
+            wrapperStyle={{
+              fontSize: isMobile ? 10 : 12,
+              paddingTop: isMobile ? 8 : 0,
+              paddingBottom: isMobile ? 0 : 8,
+            }}
+            iconSize={isMobile ? 8 : 10}
             iconType="circle"
           />
           {lines.map((line) => (
@@ -59,10 +103,10 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
               type="monotone"
               dataKey={line.dataKey}
               stroke={line.stroke}
-              strokeWidth={2}
+              strokeWidth={isMobile ? 2 : 2.5}
               name={line.name}
-              dot={{ r: 4, fill: line.stroke }}
-              activeDot={{ r: 6 }}
+              dot={!isMobile}
+              activeDot={{ r: isMobile ? 4 : 5, strokeWidth: 2, fill: line.stroke }}
             />
           ))}
         </LineChart>
