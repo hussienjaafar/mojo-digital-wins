@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -50,26 +48,26 @@ export function HighImpactNewsWidget({ showDragHandle = false }: HighImpactNewsW
   const getThreatBadge = (level: string | null) => {
     switch (level) {
       case "critical":
-        return <Badge variant="destructive" className="text-xs">Critical</Badge>;
+        return <span className="portal-badge portal-badge-error text-xs">Critical</span>;
       case "high":
-        return <Badge className="bg-warning text-warning-foreground text-xs">High</Badge>;
+        return <span className="portal-badge portal-badge-warning text-xs">High</span>;
       default:
         return null;
     }
   };
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className={`flex-shrink-0 pb-2 ${showDragHandle ? "cursor-move" : ""}`}>
+    <div className="portal-card h-full flex flex-col">
+      <div className={`p-4 pb-2 flex-shrink-0 ${showDragHandle ? "cursor-move" : ""}`}>
         <div className="flex items-center gap-2">
           {showDragHandle && (
-            <GripVertical className="h-4 w-4 text-muted-foreground" />
+            <GripVertical className="h-4 w-4 portal-text-secondary" />
           )}
-          <Newspaper className="h-4 w-4 text-destructive" />
-          <CardTitle className="text-sm font-medium">High-Impact News</CardTitle>
+          <Newspaper className="h-4 w-4 text-[hsl(var(--portal-accent-red))]" />
+          <h3 className="text-sm font-medium portal-text-primary">High-Impact News</h3>
         </div>
-      </CardHeader>
-      <CardContent className="flex-1 min-h-0 pt-0">
+      </div>
+      <div className="p-4 pt-0 flex-1 min-h-0">
         {loading ? (
           <div className="space-y-3">
             {[...Array(4)].map((_, i) => (
@@ -77,24 +75,24 @@ export function HighImpactNewsWidget({ showDragHandle = false }: HighImpactNewsW
             ))}
           </div>
         ) : news.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
+          <p className="text-sm portal-text-secondary text-center py-4">
             No high-impact news at this time
           </p>
         ) : (
-          <ScrollArea className="h-full pr-2">
+          <ScrollArea className="h-full pr-2 portal-scrollbar">
             <div className="space-y-3">
               {news.map((item) => (
                 <div
                   key={item.id}
-                  className="p-3 rounded-md border border-border/50 hover:border-border transition-colors"
+                  className="p-3 rounded-md border border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-strong))] transition-colors bg-[hsl(var(--portal-bg-elevated))]"
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <h4 className="text-sm font-medium line-clamp-2 flex-1" title={item.title}>
+                    <h4 className="text-sm font-medium portal-text-primary line-clamp-2 flex-1" title={item.title}>
                       {item.title}
                     </h4>
                     {getThreatBadge(item.threat_level)}
                   </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between text-xs portal-text-secondary">
                     <span className="truncate max-w-[50%]">{item.source_name}</span>
                     <div className="flex items-center gap-2">
                       <span>
@@ -117,7 +115,7 @@ export function HighImpactNewsWidget({ showDragHandle = false }: HighImpactNewsW
             </div>
           </ScrollArea>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

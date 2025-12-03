@@ -1,6 +1,5 @@
 import { AlertTriangle, Bell, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 
 interface Alert {
@@ -25,13 +24,13 @@ export function AdminAlertsBanner({ alerts, onViewAll, onDismiss }: AdminAlertsB
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "critical":
-        return "bg-destructive text-destructive-foreground";
+        return "portal-badge-error";
       case "high":
-        return "bg-orange-500 text-white";
+        return "bg-[hsl(var(--portal-accent-orange))] text-white";
       case "medium":
-        return "bg-yellow-500 text-black";
+        return "portal-badge-warning";
       default:
-        return "bg-muted text-muted-foreground";
+        return "bg-[hsl(var(--portal-bg-elevated))] portal-text-secondary";
     }
   };
 
@@ -43,40 +42,40 @@ export function AdminAlertsBanner({ alerts, onViewAll, onDismiss }: AdminAlertsB
   };
 
   return (
-    <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+    <div className="rounded-lg border border-[hsl(var(--portal-accent-red)/0.3)] bg-[hsl(var(--portal-accent-red)/0.05)] p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-destructive" />
-          <h3 className="font-semibold text-foreground">Alerts Requiring Attention</h3>
-          <Badge variant="destructive" className="text-xs">
+          <AlertTriangle className="h-5 w-5 text-[hsl(var(--portal-accent-red))]" />
+          <h3 className="font-semibold portal-text-primary">Alerts Requiring Attention</h3>
+          <span className="portal-badge portal-badge-error text-xs">
             {alerts.length}
-          </Badge>
+          </span>
         </div>
-        <Button variant="ghost" size="sm" onClick={onViewAll} className="gap-1">
+        <Button variant="ghost" size="sm" onClick={onViewAll} className="gap-1 portal-btn-secondary">
           View All
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
       
-      <div className="space-y-2 max-h-32 overflow-y-auto">
+      <div className="space-y-2 max-h-32 overflow-y-auto portal-scrollbar">
         {alerts.slice(0, 5).map((alert) => (
           <div
             key={alert.id}
-            className="flex items-center justify-between gap-3 p-2 rounded-md bg-background/50 group"
+            className="flex items-center justify-between gap-3 p-2 rounded-md bg-[hsl(var(--portal-bg-primary)/0.5)] group"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <Badge className={`${getSeverityColor(alert.severity)} gap-1 shrink-0`}>
+              <span className={`${getSeverityColor(alert.severity)} portal-badge gap-1 shrink-0`}>
                 {getSeverityIcon(alert.severity)}
                 {alert.severity}
-              </Badge>
+              </span>
               <span className="text-sm truncate">
-                <span className="font-medium">{alert.entityName}</span>
-                <span className="text-muted-foreground"> {alert.alertType} </span>
-                <span className="text-muted-foreground">@ {alert.organizationName}</span>
+                <span className="font-medium portal-text-primary">{alert.entityName}</span>
+                <span className="portal-text-secondary"> {alert.alertType} </span>
+                <span className="portal-text-secondary">@ {alert.organizationName}</span>
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs portal-text-secondary">
                 {formatDistanceToNow(new Date(alert.triggeredAt), { addSuffix: true })}
               </span>
               <Button

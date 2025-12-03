@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TrendingUp, GripVertical } from "lucide-react";
@@ -44,23 +42,23 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
   };
 
   const getVelocityColor = (velocity: number) => {
-    if (velocity >= 50) return "text-destructive";
-    if (velocity >= 20) return "text-warning";
-    return "text-primary";
+    if (velocity >= 50) return "text-[hsl(var(--portal-accent-red))]";
+    if (velocity >= 20) return "text-[hsl(var(--portal-accent-orange))]";
+    return "text-[hsl(var(--portal-accent-blue))]";
   };
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className={`flex-shrink-0 pb-2 ${showDragHandle ? "cursor-move" : ""}`}>
+    <div className="portal-card h-full flex flex-col">
+      <div className={`p-4 pb-2 flex-shrink-0 ${showDragHandle ? "cursor-move" : ""}`}>
         <div className="flex items-center gap-2">
           {showDragHandle && (
-            <GripVertical className="h-4 w-4 text-muted-foreground" />
+            <GripVertical className="h-4 w-4 portal-text-secondary" />
           )}
-          <TrendingUp className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium">Trending Topics</CardTitle>
+          <TrendingUp className="h-4 w-4 text-[hsl(var(--portal-accent-blue))]" />
+          <h3 className="text-sm font-medium portal-text-primary">Trending Topics</h3>
         </div>
-      </CardHeader>
-      <CardContent className="flex-1 min-h-0 pt-0">
+      </div>
+      <div className="p-4 pt-0 flex-1 min-h-0">
         {loading ? (
           <div className="space-y-2">
             {[...Array(5)].map((_, i) => (
@@ -68,24 +66,24 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
             ))}
           </div>
         ) : topics.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
+          <p className="text-sm portal-text-secondary text-center py-4">
             No trending topics at this time
           </p>
         ) : (
-          <ScrollArea className="h-full pr-2">
+          <ScrollArea className="h-full pr-2 portal-scrollbar">
             <div className="space-y-2">
               {topics.map((topic) => (
                 <div
                   key={topic.id}
-                  className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors"
+                  className="flex items-center justify-between p-2 rounded-md bg-[hsl(var(--portal-bg-elevated))] hover:bg-[hsl(var(--portal-bg-hover))] transition-colors"
                 >
-                  <span className="text-sm font-medium truncate max-w-[60%]" title={topic.topic}>
+                  <span className="text-sm font-medium portal-text-primary truncate max-w-[60%]" title={topic.topic}>
                     {topic.topic}
                   </span>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Badge variant="outline" className="text-xs">
+                    <span className="portal-badge-info portal-badge text-xs">
                       {topic.mentions_last_hour || 0}
-                    </Badge>
+                    </span>
                     <span className={`text-xs font-semibold ${getVelocityColor(topic.velocity)}`}>
                       +{topic.velocity?.toFixed(0) || 0}%
                     </span>
@@ -95,7 +93,7 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
             </div>
           </ScrollArea>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
