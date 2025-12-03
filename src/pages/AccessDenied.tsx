@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Shield, Home, LayoutDashboard, Settings } from "lucide-react";
+import { Shield, Home, LayoutDashboard, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUserRoles } from "@/hooks/useUserRoles";
+import { supabase } from "@/integrations/supabase/client";
 
 const AccessDenied = () => {
   const navigate = useNavigate();
@@ -32,6 +32,11 @@ const AccessDenied = () => {
   };
 
   const { title, description } = getMessage();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/");
+  };
 
   return (
     <div className="portal-theme portal-bg min-h-screen flex items-center justify-center p-4">
@@ -82,6 +87,16 @@ const AccessDenied = () => {
               </Button>
             </div>
           )}
+          <div className="pt-4 border-t border-border">
+            <Button
+              variant="ghost"
+              className="w-full gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4" />
+              Sign Out & Switch Account
+            </Button>
+          </div>
           <p className="text-sm text-center portal-text-secondary mt-4">
             Need access? Contact your administrator.
           </p>
