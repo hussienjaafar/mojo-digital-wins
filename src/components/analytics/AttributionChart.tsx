@@ -6,12 +6,14 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   Cell,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ResponsiveChartTooltip } from '@/components/charts/ResponsiveChartTooltip';
+import { getYAxisFormatter, formatNumber } from '@/lib/chart-formatters';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type AttributionModel = 'firstTouch' | 'lastTouch' | 'linear' | 'positionBased' | 'timeDecay';
 
@@ -46,7 +48,10 @@ const MODEL_DESCRIPTIONS = {
 };
 
 export const AttributionChart = memo(({ title, description, data }: Props) => {
-  const renderChart = (model: AttributionModel, modelLabel: string) => {
+  const isMobile = useIsMobile();
+  const chartHeight = isMobile ? 220 : 300;
+
+  const renderChart = (model: AttributionModel) => {
     const chartData = data.map(item => ({
       name: item.touchpoint,
       value: item[model],
@@ -55,38 +60,58 @@ export const AttributionChart = memo(({ title, description, data }: Props) => {
 
     return (
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs sm:text-sm text-muted-foreground">
           {MODEL_DESCRIPTIONS[model]}
         </p>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData} layout="horizontal">
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis type="number" className="text-xs" />
-            <YAxis type="category" dataKey="name" className="text-xs" width={100} />
-            <Tooltip
-              content={({ active, payload }) => {
-                if (!active || !payload?.[0]) return null;
-                return (
-                  <div className="bg-card border rounded-lg p-3 shadow-lg">
-                    <p className="font-medium">{payload[0].payload.name}</p>
-                    <p className="text-sm text-muted-foreground">{payload[0].payload.platform}</p>
-                    <p className="text-sm font-medium mt-1">
-                      {payload[0].value?.toLocaleString()} conversions
-                    </p>
-                  </div>
-                );
-              }}
-            />
-            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        <div style={{ height: chartHeight }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart 
+              data={chartData} 
+              layout="horizontal"
+              margin={{ top: 8, right: isMobile ? 8 : 16, bottom: 4, left: isMobile ? -12 : 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} vertical={false} />
+              <XAxis 
+                type="number" 
+                tick={{ fontSize: isMobile ? 10 : 11, fill: "hsl(var(--muted-foreground))" }}
+                tickLine={false}
+                axisLine={{ stroke: "hsl(var(--border))", opacity: 0.5 }}
+                tickFormatter={getYAxisFormatter('number')}
+              />
+              <YAxis 
+                type="category" 
+                dataKey="name" 
+                tick={{ fontSize: isMobile ? 10 : 11, fill: "hsl(var(--muted-foreground))" }}
+                tickLine={false}
+                axisLine={false}
+                width={isMobile ? 70 : 100} 
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.[0]) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="portal-chart-tooltip">
+                      <p className="font-medium text-sm">{data.name}</p>
+                      <p className="text-xs text-muted-foreground">{data.platform}</p>
+                      <p className="text-sm font-semibold mt-1 tabular-nums">
+                        {formatNumber(data.value)} conversions
+                      </p>
+                    </div>
+                  );
+                }}
+              />
+              <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={isMobile ? 20 : 30}>
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
 
         {/* Platform summary */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 border-t">
           {Array.from(new Set(data.map(d => d.platform))).map(platform => {
             const platformTotal = data
               .filter(d => d.platform === platform)
@@ -94,7 +119,7 @@ export const AttributionChart = memo(({ title, description, data }: Props) => {
             
             return (
               <div key={platform} className="text-center">
-                <div className="text-xl font-bold">{platformTotal.toLocaleString()}</div>
+                <div className="text-lg sm:text-xl font-bold tabular-nums">{formatNumber(platformTotal)}</div>
                 <div className="text-xs text-muted-foreground capitalize">{platform}</div>
               </div>
             );
@@ -106,34 +131,38 @@ export const AttributionChart = memo(({ title, description, data }: Props) => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base sm:text-lg">{title}</CardTitle>
+        {description && <CardDescription className="text-xs sm:text-sm">{description}</CardDescription>}
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0">
         <Tabs defaultValue="linear" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className={`grid w-full ${isMobile ? 'grid-cols-3' : 'grid-cols-5'}`}>
             <TabsTrigger value="linear" className="text-xs">Linear</TabsTrigger>
             <TabsTrigger value="firstTouch" className="text-xs">First</TabsTrigger>
             <TabsTrigger value="lastTouch" className="text-xs">Last</TabsTrigger>
-            <TabsTrigger value="positionBased" className="text-xs">Position</TabsTrigger>
-            <TabsTrigger value="timeDecay" className="text-xs">Decay</TabsTrigger>
+            {!isMobile && (
+              <>
+                <TabsTrigger value="positionBased" className="text-xs">Position</TabsTrigger>
+                <TabsTrigger value="timeDecay" className="text-xs">Decay</TabsTrigger>
+              </>
+            )}
           </TabsList>
           
           <TabsContent value="linear" className="mt-4">
-            {renderChart('linear', 'Linear Attribution')}
+            {renderChart('linear')}
           </TabsContent>
           <TabsContent value="firstTouch" className="mt-4">
-            {renderChart('firstTouch', 'First Touch Attribution')}
+            {renderChart('firstTouch')}
           </TabsContent>
           <TabsContent value="lastTouch" className="mt-4">
-            {renderChart('lastTouch', 'Last Touch Attribution')}
+            {renderChart('lastTouch')}
           </TabsContent>
           <TabsContent value="positionBased" className="mt-4">
-            {renderChart('positionBased', 'Position-Based Attribution')}
+            {renderChart('positionBased')}
           </TabsContent>
           <TabsContent value="timeDecay" className="mt-4">
-            {renderChart('timeDecay', 'Time Decay Attribution')}
+            {renderChart('timeDecay')}
           </TabsContent>
         </Tabs>
       </CardContent>
