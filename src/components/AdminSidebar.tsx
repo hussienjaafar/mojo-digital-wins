@@ -432,7 +432,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
       <Sidebar 
         ref={sidebarRef}
         className={cn(
-          "border-r border-border bg-background shadow-md",
+          "portal-sidebar border-r border-[hsl(var(--portal-border))]",
           "transition-all duration-500 ease-in-out",
           isEffectivelyExpanded ? "w-64" : "w-16",
           isMobile && open && "animate-slide-in-right"
@@ -443,7 +443,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         onTouchEnd={isMobile ? handleTouchEnd as any : undefined}
         aria-expanded={isEffectivelyExpanded}
       >
-      <SidebarContent className="py-6 px-2 scrollbar-thin scrollbar-thumb-primary/20 hover:scrollbar-thumb-primary/40 scrollbar-track-transparent" role="navigation" aria-label="Admin navigation">
+      <SidebarContent className="py-6 px-2 portal-scrollbar" role="navigation" aria-label="Admin navigation">
         {/* Mobile refresh indicator */}
         {isMobile && isRefreshing && (
           <div className="px-4 pb-2">
@@ -501,10 +501,10 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
           
           const groupLabel = (
             <SidebarGroupLabel className={cn(
-              "text-muted-foreground text-sm font-bold tracking-wider uppercase",
-              "px-4 py-2 mb-2 bg-muted/30 rounded-md border-b border-border/50",
+              "portal-text-secondary text-sm font-bold tracking-wider uppercase",
+              "px-4 py-2 mb-2 bg-[hsl(var(--portal-bg-elevated))] rounded-md border-b border-[hsl(var(--portal-border))]",
               "flex items-center justify-between cursor-pointer",
-              "hover:bg-muted/50 transition-colors",
+              "hover:bg-[hsl(var(--portal-bg-hover))] transition-colors",
               "group",
               groupOpacity
             )}>
@@ -568,10 +568,10 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                                       "relative w-full min-h-[48px] group",
                                       collapsed ? 'justify-center px-0' : 'justify-start px-4',
                                       "gap-3 py-3 rounded-lg transition-all duration-200",
-                                      "hover:bg-accent hover:text-accent-foreground hover:scale-[1.02] active:scale-[0.98]",
+                                      "hover:bg-[hsl(var(--portal-bg-hover))] hover:scale-[1.02] active:scale-[0.98]",
                                       activeTab === item.value 
-                                        ? 'bg-gradient-to-r from-primary/90 to-primary text-primary-foreground font-semibold shadow-lg border-l-4 border-primary-foreground/50' 
-                                        : 'text-foreground hover:font-medium hover:shadow-sm'
+                                        ? 'bg-gradient-to-r from-[hsl(var(--portal-accent-blue))] to-[hsl(var(--portal-accent-purple))] text-white font-semibold shadow-lg border-l-4 border-white/50' 
+                                        : 'portal-text-primary hover:font-medium hover:shadow-sm'
                                     )}
                                   >
                                     <div className="relative">
@@ -632,10 +632,10 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         })}
 
         {/* Theme Toggle - Fixed at bottom */}
-        <div className="mt-auto pt-4 border-t border-border">
+        <div className="mt-auto pt-4 border-t border-[hsl(var(--portal-border))]">
           <div className="px-4 py-3 flex items-center justify-between">
             {isEffectivelyExpanded && (
-              <span className="text-sm font-medium text-muted-foreground">Theme</span>
+              <span className="text-sm font-medium portal-text-secondary">Theme</span>
             )}
             <ThemeToggle />
           </div>

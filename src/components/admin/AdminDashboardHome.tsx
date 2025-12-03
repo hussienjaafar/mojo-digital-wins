@@ -298,10 +298,10 @@ export function AdminDashboardHome() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Client Monitoring Center</h1>
-          <p className="text-muted-foreground">Monitor performance and health across all organizations</p>
+          <h1 className="text-2xl font-bold portal-text-primary">Client Monitoring Center</h1>
+          <p className="portal-text-secondary">Monitor performance and health across all organizations</p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2">
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2 portal-btn-secondary">
           <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
           Refresh
         </Button>
@@ -309,61 +309,53 @@ export function AdminDashboardHome() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Building2 className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Active Clients</p>
-                <p className="text-2xl font-bold">{summary.activeClients}</p>
-              </div>
+        <div className="portal-metric">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
+              <Building2 className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-sm portal-text-secondary">Active Clients</p>
+              <p className="text-2xl font-bold portal-text-primary">{summary.activeClients}</p>
+            </div>
+          </div>
+        </div>
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <DollarSign className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Revenue (7d)</p>
-                <p className="text-2xl font-bold">{formatCurrency(summary.totalRevenue)}</p>
-              </div>
+        <div className="portal-metric">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-green)/0.1)]">
+              <DollarSign className="h-5 w-5 text-[hsl(var(--portal-accent-green))]" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-sm portal-text-secondary">Total Revenue (7d)</p>
+              <p className="text-2xl font-bold portal-text-primary">{formatCurrency(summary.totalRevenue)}</p>
+            </div>
+          </div>
+        </div>
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-500/10">
-                <Users className="h-5 w-5 text-orange-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Needs Attention</p>
-                <p className="text-2xl font-bold">{summary.needsAttention}</p>
-              </div>
+        <div className="portal-metric">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-orange)/0.1)]">
+              <Users className="h-5 w-5 text-[hsl(var(--portal-accent-orange))]" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-sm portal-text-secondary">Needs Attention</p>
+              <p className="text-2xl font-bold portal-text-primary">{summary.needsAttention}</p>
+            </div>
+          </div>
+        </div>
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-destructive/10">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Critical Alerts</p>
-                <p className="text-2xl font-bold">{summary.criticalAlerts}</p>
-              </div>
+        <div className="portal-metric">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-red)/0.1)]">
+              <AlertTriangle className="h-5 w-5 text-[hsl(var(--portal-accent-red))]" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-sm portal-text-secondary">Critical Alerts</p>
+              <p className="text-2xl font-bold portal-text-primary">{summary.criticalAlerts}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Alerts Banner */}
@@ -382,10 +374,10 @@ export function AdminDashboardHome() {
       {/* Clients Section */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <h2 className="text-lg font-semibold portal-text-primary flex items-center gap-2">
             <Building2 className="h-5 w-5" />
             Clients
-            <span className="text-sm font-normal text-muted-foreground">({filteredClients.length})</span>
+            <span className="text-sm font-normal portal-text-secondary">({filteredClients.length})</span>
           </h2>
           <ClientSortFilter
             searchQuery={searchQuery}
@@ -398,15 +390,13 @@ export function AdminDashboardHome() {
         </div>
 
         {filteredClients.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No clients found</h3>
-              <p className="text-muted-foreground">
-                {searchQuery ? "Try adjusting your search or filters" : "Add your first client organization to get started"}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="portal-card py-12 text-center">
+            <Building2 className="h-12 w-12 mx-auto portal-text-secondary mb-4" />
+            <h3 className="text-lg font-semibold portal-text-primary mb-2">No clients found</h3>
+            <p className="portal-text-secondary">
+              {searchQuery ? "Try adjusting your search or filters" : "Add your first client organization to get started"}
+            </p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredClients.map((client) => (
