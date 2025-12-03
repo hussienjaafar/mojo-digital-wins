@@ -67,15 +67,18 @@ export function DateRangeSelector({
   };
 
   return (
-    <div className={cn("flex items-center gap-1.5", className)}>
-      {/* Preset Buttons - Portal Style */}
-      <div className="flex items-center gap-1 p-1 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+    <div className={cn("flex items-center gap-1.5 max-w-full", className)}>
+      {/* Preset Buttons - Portal Style with mobile scroll */}
+      <div 
+        className="flex items-center gap-1 p-1 rounded-lg overflow-x-auto scrollbar-hide flex-shrink-0" 
+        style={{ background: 'hsl(var(--portal-bg-elevated))' }}
+      >
         {presets.map((preset) => (
           <button
             key={preset.label}
             onClick={() => handlePresetClick(preset.days)}
             className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200",
+              "px-2 sm:px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap flex-shrink-0",
               selectedPreset === preset.days
                 ? "bg-[hsl(var(--portal-accent-blue))] text-white shadow-sm"
                 : "text-[hsl(var(--portal-text-secondary))] hover:text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-tertiary))]"
@@ -85,23 +88,30 @@ export function DateRangeSelector({
           </button>
         ))}
         
-        {/* Custom Date Picker */}
+        {/* Custom Date Picker - Icon only on mobile */}
         <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
           <PopoverTrigger asChild>
             <button
               onClick={handleCustomClick}
               className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1.5",
+                "px-2 sm:px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 flex-shrink-0",
                 selectedPreset === "custom"
                   ? "bg-[hsl(var(--portal-accent-blue))] text-white shadow-sm"
                   : "text-[hsl(var(--portal-text-secondary))] hover:text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-tertiary))]"
               )}
             >
               <CalendarIcon className="h-3 w-3" />
-              <span>{selectedPreset === "custom" ? getDisplayText() : "Custom"}</span>
+              <span className="hidden sm:inline">
+                {selectedPreset === "custom" ? getDisplayText() : "Custom"}
+              </span>
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0 portal-card" align="end">
+          <PopoverContent 
+            className="w-auto p-0 portal-card z-50" 
+            align="end"
+            side={isMobile ? "bottom" : "bottom"}
+            sideOffset={8}
+          >
             <Calendar
               mode="range"
               defaultMonth={customRange?.from}
