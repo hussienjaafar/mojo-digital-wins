@@ -1638,6 +1638,89 @@ export type Database = {
           },
         ]
       }
+      creative_performance_learnings: {
+        Row: {
+          avg_amount_raised: number | null
+          avg_click_rate: number | null
+          avg_conversion_rate: number | null
+          avg_roas: number | null
+          calculated_at: string | null
+          call_to_action: string | null
+          channel: string
+          confidence_level: number | null
+          created_at: string | null
+          effectiveness_score: number | null
+          emotional_appeal: string | null
+          id: string
+          optimal_day: number | null
+          optimal_hour: number | null
+          organization_id: string | null
+          period_end: string | null
+          period_start: string | null
+          sample_size: number | null
+          tone: string | null
+          topic: string | null
+          updated_at: string | null
+          urgency_level: string | null
+        }
+        Insert: {
+          avg_amount_raised?: number | null
+          avg_click_rate?: number | null
+          avg_conversion_rate?: number | null
+          avg_roas?: number | null
+          calculated_at?: string | null
+          call_to_action?: string | null
+          channel: string
+          confidence_level?: number | null
+          created_at?: string | null
+          effectiveness_score?: number | null
+          emotional_appeal?: string | null
+          id?: string
+          optimal_day?: number | null
+          optimal_hour?: number | null
+          organization_id?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          sample_size?: number | null
+          tone?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          urgency_level?: string | null
+        }
+        Update: {
+          avg_amount_raised?: number | null
+          avg_click_rate?: number | null
+          avg_conversion_rate?: number | null
+          avg_roas?: number | null
+          calculated_at?: string | null
+          call_to_action?: string | null
+          channel?: string
+          confidence_level?: number | null
+          created_at?: string | null
+          effectiveness_score?: number | null
+          emotional_appeal?: string | null
+          id?: string
+          optimal_day?: number | null
+          optimal_hour?: number | null
+          organization_id?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          sample_size?: number | null
+          tone?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          urgency_level?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_performance_learnings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_aggregated_metrics: {
         Row: {
           calculated_at: string | null
@@ -2897,6 +2980,122 @@ export type Database = {
           },
         ]
       }
+      meta_creative_insights: {
+        Row: {
+          ad_id: string | null
+          ai_model_used: string | null
+          analysis_confidence: number | null
+          analyzed_at: string | null
+          audio_transcript: string | null
+          call_to_action_type: string | null
+          campaign_id: string
+          clicks: number | null
+          conversion_value: number | null
+          conversions: number | null
+          created_at: string | null
+          creative_id: string | null
+          creative_type: string | null
+          ctr: number | null
+          description: string | null
+          emotional_appeal: string | null
+          headline: string | null
+          id: string
+          impressions: number | null
+          key_themes: string[] | null
+          organization_id: string
+          primary_text: string | null
+          roas: number | null
+          sentiment_label: string | null
+          sentiment_score: number | null
+          spend: number | null
+          thumbnail_url: string | null
+          tone: string | null
+          topic: string | null
+          transcript_confidence: number | null
+          updated_at: string | null
+          urgency_level: string | null
+          video_url: string | null
+        }
+        Insert: {
+          ad_id?: string | null
+          ai_model_used?: string | null
+          analysis_confidence?: number | null
+          analyzed_at?: string | null
+          audio_transcript?: string | null
+          call_to_action_type?: string | null
+          campaign_id: string
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          creative_id?: string | null
+          creative_type?: string | null
+          ctr?: number | null
+          description?: string | null
+          emotional_appeal?: string | null
+          headline?: string | null
+          id?: string
+          impressions?: number | null
+          key_themes?: string[] | null
+          organization_id: string
+          primary_text?: string | null
+          roas?: number | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          spend?: number | null
+          thumbnail_url?: string | null
+          tone?: string | null
+          topic?: string | null
+          transcript_confidence?: number | null
+          updated_at?: string | null
+          urgency_level?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          ad_id?: string | null
+          ai_model_used?: string | null
+          analysis_confidence?: number | null
+          analyzed_at?: string | null
+          audio_transcript?: string | null
+          call_to_action_type?: string | null
+          campaign_id?: string
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          creative_id?: string | null
+          creative_type?: string | null
+          ctr?: number | null
+          description?: string | null
+          emotional_appeal?: string | null
+          headline?: string | null
+          id?: string
+          impressions?: number | null
+          key_themes?: string[] | null
+          organization_id?: string
+          primary_text?: string | null
+          roas?: number | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          spend?: number | null
+          thumbnail_url?: string | null
+          tone?: string | null
+          topic?: string | null
+          transcript_confidence?: number | null
+          updated_at?: string | null
+          urgency_level?: string | null
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_creative_insights_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           created_at: string | null
@@ -3748,6 +3947,104 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sms_campaign_metrics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_creative_insights: {
+        Row: {
+          ai_model_used: string | null
+          amount_raised: number | null
+          analysis_confidence: number | null
+          analyzed_at: string | null
+          call_to_action: string | null
+          campaign_id: string
+          campaign_name: string | null
+          click_rate: number | null
+          clicks: number | null
+          conversion_rate: number | null
+          conversions: number | null
+          created_at: string | null
+          id: string
+          key_themes: string[] | null
+          message_text: string
+          messages_delivered: number | null
+          messages_sent: number | null
+          organization_id: string
+          send_date: string | null
+          send_day_of_week: number | null
+          send_hour: number | null
+          sentiment_label: string | null
+          sentiment_score: number | null
+          tone: string | null
+          topic: string | null
+          updated_at: string | null
+          urgency_level: string | null
+        }
+        Insert: {
+          ai_model_used?: string | null
+          amount_raised?: number | null
+          analysis_confidence?: number | null
+          analyzed_at?: string | null
+          call_to_action?: string | null
+          campaign_id: string
+          campaign_name?: string | null
+          click_rate?: number | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          id?: string
+          key_themes?: string[] | null
+          message_text: string
+          messages_delivered?: number | null
+          messages_sent?: number | null
+          organization_id: string
+          send_date?: string | null
+          send_day_of_week?: number | null
+          send_hour?: number | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          tone?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          urgency_level?: string | null
+        }
+        Update: {
+          ai_model_used?: string | null
+          amount_raised?: number | null
+          analysis_confidence?: number | null
+          analyzed_at?: string | null
+          call_to_action?: string | null
+          campaign_id?: string
+          campaign_name?: string | null
+          click_rate?: number | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          id?: string
+          key_themes?: string[] | null
+          message_text?: string
+          messages_delivered?: number | null
+          messages_sent?: number | null
+          organization_id?: string
+          send_date?: string | null
+          send_day_of_week?: number | null
+          send_hour?: number | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          tone?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          urgency_level?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_creative_insights_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "client_organizations"
