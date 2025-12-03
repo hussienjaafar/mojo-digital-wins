@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/fixed-client";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, TrendingUp, Eye, Clock, ExternalLink, ChevronRight } from "lucide-react";
+import { AlertTriangle, TrendingUp, Eye, Clock, ExternalLink, ChevronRight, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 type Props = {
   organizationId: string;
@@ -37,48 +38,68 @@ export function IntelligenceHubRedesigned({ organizationId }: Props) {
   const [trendingTopics, setTrendingTopics] = useState<Trend[]>([]);
   const [watchlistCount, setWatchlistCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadIntelligence();
-  }, [organizationId]);
-
-  const loadIntelligence = async () => {
-    setIsLoading(true);
+  const loadIntelligence = useCallback(async () => {
     try {
       // Load critical alerts
-      const { data: alerts } = await (supabase as any)
+      const { data: alerts, error: alertsError } = await supabase
         .from("client_entity_alerts")
         .select("*")
         .eq("organization_id", organizationId)
         .in("severity", ["critical", "high"])
         .eq("is_read", false)
-        .order("triggered_at", { ascending: false })
+        .order("triggered_at", { ascending: false, nullsFirst: false })
         .limit(3);
 
+      if (alertsError) {
+        console.error("Error loading alerts:", alertsError);
+      }
       setCriticalAlerts(alerts || []);
 
-      // Load trending topics
-      const { data: trends } = await (supabase as any)
+      // Load trending topics from bluesky_trends
+      const { data: trends, error: trendsError } = await supabase
         .from("bluesky_trends")
-        .select("*")
+        .select("topic, mentions_last_hour, velocity, sentiment_avg, is_trending")
         .eq("is_trending", true)
-        .order("velocity", { ascending: false })
+        .order("velocity", { ascending: false, nullsFirst: false })
         .limit(5);
 
+      if (trendsError) {
+        console.error("Error loading trends:", trendsError);
+      }
       setTrendingTopics(trends || []);
 
-      // Count watchlist items
-      const { count } = await (supabase as any)
+      // Count watchlist items for this organization
+      const { count, error: countError } = await supabase
         .from("entity_watchlist")
         .select("*", { count: "exact", head: true })
         .eq("organization_id", organizationId)
         .eq("is_active", true);
 
+      if (countError) {
+        console.error("Error counting watchlist:", countError);
+      }
       setWatchlistCount(count || 0);
     } catch (error) {
       console.error("Failed to load intelligence:", error);
+    }
+  }, [organizationId]);
+
+  useEffect(() => {
+    setIsLoading(true);
+    loadIntelligence().finally(() => setIsLoading(false));
+  }, [loadIntelligence]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadIntelligence();
+      toast.success("Intelligence data refreshed");
+    } catch {
+      toast.error("Failed to refresh data");
     } finally {
-      setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -134,17 +155,28 @@ export function IntelligenceHubRedesigned({ organizationId }: Props) {
                 </p>
               </div>
             </div>
-            {hasCriticalSignals && (
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
-                size="sm"
-                onClick={() => navigate("/client-alerts")}
-                className="gap-2"
+                size="icon"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="h-8 w-8"
               >
-                View All
-                <ChevronRight className="h-4 w-4" />
+                <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
               </Button>
-            )}
+              {hasCriticalSignals && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate("/client-alerts")}
+                  className="gap-2"
+                >
+                  View All
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
