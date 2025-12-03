@@ -12,6 +12,18 @@ interface MetaCredentials {
   business_manager_id?: string;
 }
 
+interface AdCreative {
+  id: string;
+  name?: string;
+  primary_text?: string;
+  headline?: string;
+  description?: string;
+  call_to_action_type?: string;
+  video_id?: string;
+  thumbnail_url?: string;
+  creative_type?: string;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -101,8 +113,177 @@ serve(async (req) => {
       .eq('organization_id', organization_id)
       .not('meta_campaign_id', 'is', null);
 
-    // Fetch insights for each campaign
+    // Track creative insights synced
+    let creativesProcessed = 0;
+
+    // Fetch insights and creatives for each campaign
     for (const campaign of campaigns) {
+      // ========== PHASE 2: Fetch Ad Creatives ==========
+      try {
+        console.log(`Fetching ads and creatives for campaign ${campaign.id}`);
+        
+        // Fetch ads with creative information
+        const adsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/ads?fields=id,name,creative{id,name,object_story_spec,asset_feed_spec,video_id,thumbnail_url,effective_object_story_id}&access_token=${access_token}`;
+        
+        const adsResponse = await fetch(adsUrl);
+        const adsData = await adsResponse.json();
+        
+        if (!adsData.error && adsData.data) {
+          const ads = adsData.data || [];
+          console.log(`Found ${ads.length} ads for campaign ${campaign.id}`);
+          
+          for (const ad of ads) {
+            const creative = ad.creative;
+            if (!creative) continue;
+            
+            // Extract creative content
+            let primaryText = '';
+            let headline = '';
+            let description = '';
+            let callToActionType = '';
+            let videoId = creative.video_id || null;
+            let thumbnailUrl = creative.thumbnail_url || null;
+            let creativeType = 'unknown';
+            
+            // Parse object_story_spec for standard creatives
+            if (creative.object_story_spec) {
+              const spec = creative.object_story_spec;
+              
+              // Link ad
+              if (spec.link_data) {
+                primaryText = spec.link_data.message || '';
+                headline = spec.link_data.name || '';
+                description = spec.link_data.description || '';
+                callToActionType = spec.link_data.call_to_action?.type || '';
+                creativeType = spec.link_data.video_id ? 'video' : 'image';
+                videoId = spec.link_data.video_id || videoId;
+              }
+              
+              // Video ad
+              if (spec.video_data) {
+                primaryText = spec.video_data.message || '';
+                headline = spec.video_data.title || '';
+                description = spec.video_data.link_description || '';
+                callToActionType = spec.video_data.call_to_action?.type || '';
+                creativeType = 'video';
+                videoId = spec.video_data.video_id || videoId;
+                thumbnailUrl = spec.video_data.image_url || thumbnailUrl;
+              }
+              
+              // Photo ad
+              if (spec.photo_data) {
+                primaryText = spec.photo_data.caption || '';
+                creativeType = 'image';
+              }
+            }
+            
+            // Parse asset_feed_spec for dynamic creatives
+            if (creative.asset_feed_spec) {
+              const feedSpec = creative.asset_feed_spec;
+              creativeType = 'dynamic';
+              
+              // Get first body text
+              if (feedSpec.bodies && feedSpec.bodies.length > 0) {
+                primaryText = feedSpec.bodies.map((b: any) => b.text).join(' | ');
+              }
+              
+              // Get first title
+              if (feedSpec.titles && feedSpec.titles.length > 0) {
+                headline = feedSpec.titles.map((t: any) => t.text).join(' | ');
+              }
+              
+              // Get first description
+              if (feedSpec.descriptions && feedSpec.descriptions.length > 0) {
+                description = feedSpec.descriptions.map((d: any) => d.text).join(' | ');
+              }
+              
+              // Get call to action
+              if (feedSpec.call_to_action_types && feedSpec.call_to_action_types.length > 0) {
+                callToActionType = feedSpec.call_to_action_types[0];
+              }
+              
+              // Check for videos
+              if (feedSpec.videos && feedSpec.videos.length > 0) {
+                creativeType = 'video';
+                videoId = feedSpec.videos[0].video_id || videoId;
+              }
+            }
+            
+            // Only store if we have some creative content
+            if (primaryText || headline || description || videoId) {
+              // Fetch ad-level insights for performance metrics
+              const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad.id}/insights?fields=impressions,clicks,spend,actions,action_values,ctr&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
+              
+              let impressions = 0, clicks = 0, spend = 0, conversions = 0, conversionValue = 0, ctr = 0;
+              
+              try {
+                const adInsightsResponse = await fetch(adInsightsUrl);
+                const adInsightsData = await adInsightsResponse.json();
+                
+                if (!adInsightsData.error && adInsightsData.data && adInsightsData.data.length > 0) {
+                  const insight = adInsightsData.data[0];
+                  impressions = parseInt(insight.impressions) || 0;
+                  clicks = parseInt(insight.clicks) || 0;
+                  spend = parseFloat(insight.spend) || 0;
+                  ctr = parseFloat(insight.ctr) || 0;
+                  
+                  if (insight.actions) {
+                    const convAction = insight.actions.find((a: any) => 
+                      a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+                    );
+                    if (convAction) conversions = parseInt(convAction.value) || 0;
+                  }
+                  
+                  if (insight.action_values) {
+                    const valueAction = insight.action_values.find((a: any) => 
+                      a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+                    );
+                    if (valueAction) conversionValue = parseFloat(valueAction.value) || 0;
+                  }
+                }
+              } catch (insightErr) {
+                console.error(`Error fetching insights for ad ${ad.id}:`, insightErr);
+              }
+              
+              // Store creative insight
+              const { error: creativeError } = await supabase
+                .from('meta_creative_insights')
+                .upsert({
+                  organization_id,
+                  campaign_id: campaign.id,
+                  ad_id: ad.id,
+                  creative_id: creative.id,
+                  primary_text: primaryText || null,
+                  headline: headline || null,
+                  description: description || null,
+                  call_to_action_type: callToActionType || null,
+                  video_url: videoId ? `https://www.facebook.com/video.php?v=${videoId}` : null,
+                  thumbnail_url: thumbnailUrl,
+                  creative_type: creativeType,
+                  impressions,
+                  clicks,
+                  spend,
+                  conversions,
+                  conversion_value: conversionValue,
+                  ctr,
+                  roas: spend > 0 ? conversionValue / spend : 0,
+                }, {
+                  onConflict: 'organization_id,campaign_id,ad_id'
+                });
+              
+              if (creativeError) {
+                console.error(`Error storing creative insight for ad ${ad.id}:`, creativeError);
+              } else {
+                creativesProcessed++;
+              }
+            }
+          }
+        }
+      } catch (creativeErr) {
+        console.error(`Error fetching creatives for campaign ${campaign.id}:`, creativeErr);
+      }
+      
+      // ========== Original: Fetch campaign-level insights ==========
       const insightsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,reach,actions,action_values,cpc,cpm,ctr&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&time_increment=1&access_token=${access_token}`;
       
       const insightsResponse = await fetch(insightsUrl);
@@ -175,15 +356,12 @@ serve(async (req) => {
           const clicks = parseInt(insight.clicks);
           console.log(`Creating ${clicks} attribution touchpoints for campaign ${campaign.id} on ${insight.date_start}`);
           
-          // Create touchpoints for the clicks (batch insert)
-          // Note: In real implementation, we'd track individual clicks with user IDs
-          // For now, we create aggregate touchpoint markers
           const { error: touchpointError } = await supabase
             .from('attribution_touchpoints')
             .insert({
               organization_id,
               touchpoint_type: 'meta_ad_click',
-              occurred_at: `${insight.date_start}T12:00:00Z`, // Midday of the date
+              occurred_at: `${insight.date_start}T12:00:00Z`,
               utm_source: 'meta',
               utm_medium: 'cpc',
               utm_campaign: campaign.name || campaign.id,
@@ -215,12 +393,13 @@ serve(async (req) => {
       .eq('organization_id', organization_id)
       .eq('platform', 'meta');
 
-    console.log('Meta Ads sync completed successfully');
+    console.log(`Meta Ads sync completed successfully. Creatives processed: ${creativesProcessed}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         campaigns: campaigns.length,
+        creatives_processed: creativesProcessed,
         message: 'Meta Ads sync completed successfully'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

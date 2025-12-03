@@ -79,10 +79,95 @@ serve(async (req) => {
       .eq('organization_id', organization_id)
       .not('switchboard_campaign_id', 'is', null);
 
-    // Fetch metrics for each campaign
+    // Track creative insights synced
+    let creativesProcessed = 0;
+
+    // Fetch metrics and message content for each campaign
     for (const campaign of campaigns) {
       // Find attribution mapping for this campaign
       const mapping = attributionMappings?.find(m => m.switchboard_campaign_id === campaign.id);
+      
+      // ========== PHASE 2: Fetch Message Content ==========
+      try {
+        console.log(`Fetching message content for campaign ${campaign.id}`);
+        
+        // Try to fetch message templates/content from Switchboard
+        // Note: Endpoint may vary based on actual Switchboard API
+        const messagesUrl = `https://api.oneswitchboard.com/v1/campaigns/${campaign.id}/messages?account_id=${account_id}`;
+        
+        const messagesResponse = await fetch(messagesUrl, {
+          headers: {
+            'Authorization': `Bearer ${api_key}`,
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (messagesResponse.ok) {
+          const messagesData = await messagesResponse.json();
+          const messages = messagesData.messages || messagesData.data || messagesData.templates || [];
+          
+          console.log(`Found ${messages.length} message templates for campaign ${campaign.id}`);
+          
+          // Process each unique message template
+          for (const message of messages) {
+            const messageText = message.body || message.text || message.content || message.message_text || '';
+            
+            if (messageText) {
+              // Extract send timing if available
+              const sendDate = message.sent_at || message.scheduled_at || message.send_date;
+              const sendDateObj = sendDate ? new Date(sendDate) : null;
+              
+              // Get message-specific metrics if available
+              const messageMetrics = {
+                messages_sent: parseInt(message.messages_sent || message.sent_count || 0),
+                messages_delivered: parseInt(message.messages_delivered || message.delivered_count || 0),
+                clicks: parseInt(message.clicks || message.click_count || 0),
+                conversions: parseInt(message.conversions || message.conversion_count || 0),
+                amount_raised: parseFloat(message.amount_raised || message.revenue || 0),
+              };
+              
+              // Store in sms_creative_insights
+              const { error: creativeError } = await supabase
+                .from('sms_creative_insights')
+                .upsert({
+                  organization_id,
+                  campaign_id: campaign.id,
+                  campaign_name: campaign.name || campaign.id,
+                  message_text: messageText,
+                  send_hour: sendDateObj ? sendDateObj.getUTCHours() : null,
+                  send_day_of_week: sendDateObj ? sendDateObj.getUTCDay() : null,
+                  send_date: sendDateObj ? sendDateObj.toISOString().split('T')[0] : null,
+                  messages_sent: messageMetrics.messages_sent,
+                  messages_delivered: messageMetrics.messages_delivered,
+                  clicks: messageMetrics.clicks,
+                  conversions: messageMetrics.conversions,
+                  amount_raised: messageMetrics.amount_raised,
+                  click_rate: messageMetrics.messages_delivered > 0 
+                    ? (messageMetrics.clicks / messageMetrics.messages_delivered) * 100 
+                    : null,
+                  conversion_rate: messageMetrics.clicks > 0 
+                    ? (messageMetrics.conversions / messageMetrics.clicks) * 100 
+                    : null,
+                }, {
+                  onConflict: 'organization_id,campaign_id,message_text'
+                });
+              
+              if (creativeError) {
+                console.error(`Error storing SMS creative insight for campaign ${campaign.id}:`, creativeError);
+              } else {
+                creativesProcessed++;
+              }
+            }
+          }
+        } else {
+          console.log(`Could not fetch message content for campaign ${campaign.id} - API may not support this endpoint`);
+        }
+      } catch (messageErr) {
+        console.error(`Error fetching messages for campaign ${campaign.id}:`, messageErr);
+        // Continue with metrics sync even if message fetch fails
+      }
+      
+      // ========== Original: Fetch campaign metrics ==========
       const metricsUrl = `https://api.oneswitchboard.com/v1/campaigns/${campaign.id}/metrics?start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}`;
       
       const metricsResponse = await fetch(metricsUrl, {
@@ -168,12 +253,13 @@ serve(async (req) => {
       .eq('organization_id', organization_id)
       .eq('platform', 'switchboard');
 
-    console.log('Switchboard SMS sync completed successfully');
+    console.log(`Switchboard SMS sync completed successfully. Creatives processed: ${creativesProcessed}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         campaigns: campaigns.length,
+        creatives_processed: creativesProcessed,
         message: 'Switchboard SMS sync completed successfully'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
