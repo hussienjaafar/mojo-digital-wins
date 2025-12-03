@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import "./dashboard-grid.css";
+
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
 export interface DashboardLayout extends Layout {
@@ -77,10 +79,18 @@ export function CustomizableDashboard({
     }
   }, [storageKey, initialWidgets]);
 
-  const handleLayoutChange = (currentLayout: Layout[]) => {
-    const newLayouts = { lg: currentLayout as DashboardLayout[] };
+  const handleLayoutChange = (currentLayout: Layout[], allLayouts: { lg?: Layout[] }) => {
+    if (allLayouts.lg) {
+      const newLayouts = { lg: allLayouts.lg as DashboardLayout[] };
+      setLayouts(newLayouts);
+      onLayoutChange?.(allLayouts.lg as DashboardLayout[]);
+    }
+  };
+
+  const handleDragResizeStop = (layout: Layout[]) => {
+    const newLayouts = { lg: layout as DashboardLayout[] };
     setLayouts(newLayouts);
-    onLayoutChange?.(currentLayout as DashboardLayout[]);
+    localStorage.setItem(storageKey, JSON.stringify(newLayouts));
   };
 
   const saveLayout = () => {
@@ -210,12 +220,17 @@ export function CustomizableDashboard({
           layouts={layouts}
           breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
           cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
-          rowHeight={100}
+          rowHeight={80}
           onLayoutChange={handleLayoutChange}
+          onDragStop={handleDragResizeStop}
+          onResizeStop={handleDragResizeStop}
           isDraggable={isEditMode}
           isResizable={isEditMode}
           draggableHandle=".cursor-move"
-          margin={[16, 16]}
+          margin={[12, 12]}
+          compactType="vertical"
+          preventCollision={false}
+          useCSSTransforms={true}
         >
         {widgets.map((widget) => (
           <div key={widget.id} className="transition-all hover:scale-[1.01]">

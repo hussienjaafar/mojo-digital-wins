@@ -7,6 +7,12 @@
 .react-grid-item {
   transition: all 0.2s ease;
   transition-property: left, top, width, height;
+  overflow: hidden;
+}
+
+.react-grid-item > div {
+  height: 100%;
+  width: 100%;
 }
 
 .react-grid-item img {
@@ -18,18 +24,19 @@
   position: absolute;
   width: 20px;
   height: 20px;
+  z-index: 10;
 }
 
 .react-grid-item > .react-resizable-handle::after {
   content: "";
   position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 5px;
-  height: 5px;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
   border-right: 2px solid hsl(var(--primary));
   border-bottom: 2px solid hsl(var(--primary));
-  opacity: 0;
+  opacity: 0.3;
   transition: opacity 0.2s ease;
 }
 
