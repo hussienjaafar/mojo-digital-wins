@@ -134,3 +134,6 @@ verify_jwt = false
 
 [functions.calculate-creative-learnings]
 verify_jwt = false
+
+[functions.backfill-creative-analysis]
+verify_jwt = false
