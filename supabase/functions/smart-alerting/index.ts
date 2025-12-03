@@ -6,6 +6,95 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+
+// Generate AI executive summary and key takeaways
+async function generateAISummary(briefingData: {
+  critical_count: number;
+  high_count: number;
+  total_articles: number;
+  total_bills: number;
+  top_critical_items: any[];
+  orgSummary: Record<string, any>;
+}): Promise<{ executive_summary: string; key_takeaways: string[] }> {
+  if (!LOVABLE_API_KEY) {
+    console.log('No LOVABLE_API_KEY, skipping AI summary generation');
+    return {
+      executive_summary: '',
+      key_takeaways: []
+    };
+  }
+
+  const topItems = briefingData.top_critical_items.slice(0, 10);
+  const orgMentions = Object.entries(briefingData.orgSummary)
+    .map(([org, data]: [string, any]) => `${org}: ${data.total} mentions (${data.critical} critical)`)
+    .join(', ');
+
+  const prompt = `You are an intelligence analyst providing a daily briefing for advocacy organizations focused on Arab American, Muslim American, and civil rights issues.
+
+TODAY'S DATA:
+- Critical alerts: ${briefingData.critical_count}
+- High priority alerts: ${briefingData.high_count}
+- Total articles analyzed: ${briefingData.total_articles}
+- Bills tracked: ${briefingData.total_bills}
+- Organization mentions: ${orgMentions || 'None today'}
+
+TOP ITEMS:
+${topItems.map((item, i) => `${i + 1}. [${item.threat_level?.toUpperCase()}] ${item.title} (${item.type})`).join('\n')}
+
+Generate:
+1. A 2-3 sentence executive summary highlighting the most important developments and their implications
+2. 3-5 key takeaways as bullet points (actionable insights for advocacy staff)
+
+Respond in JSON format:
+{
+  "executive_summary": "...",
+  "key_takeaways": ["...", "...", "..."]
+}`;
+
+  try {
+    const response = await fetch(LOVABLE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'You are a concise intelligence analyst. Respond only with valid JSON.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 500,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('AI API error:', response.status, await response.text());
+      return { executive_summary: '', key_takeaways: [] };
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    
+    // Parse JSON from response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        executive_summary: parsed.executive_summary || '',
+        key_takeaways: Array.isArray(parsed.key_takeaways) ? parsed.key_takeaways : []
+      };
+    }
+
+    return { executive_summary: '', key_takeaways: [] };
+  } catch (error) {
+    console.error('Error generating AI summary:', error);
+    return { executive_summary: '', key_takeaways: [] };
+  }
+}
+
 // Organizations to track
 const TRACKED_ORGANIZATIONS = [
   { abbrev: 'CAIR', full: 'Council on American-Islamic Relations', variants: ['cair', 'council on american-islamic relations'] },
@@ -396,7 +485,26 @@ serve(async (req) => {
       console.log(`Found ${criticalArticles?.length || 0} articles, ${criticalBills?.length || 0} bills, ${criticalStateActions?.length || 0} state actions`);
       console.log(`Stats:`, JSON.stringify(effectiveStats));
 
-      // Prepare briefing data - FIXED: Use effectiveStats
+      // Prepare top critical items
+      const topCriticalItems = [
+        ...(criticalArticles || []).map(a => ({ type: 'article', ...a })),
+        ...(criticalBills || []).map(b => ({ type: 'bill', ...b })),
+        ...(criticalStateActions || []).map(s => ({ type: 'state_action', ...s })),
+      ];
+
+      // Generate AI executive summary and key takeaways
+      console.log('Generating AI executive summary...');
+      const aiSummary = await generateAISummary({
+        critical_count: totalCritical,
+        high_count: totalHigh,
+        total_articles: effectiveStats?.articles?.total || 0,
+        total_bills: effectiveStats?.bills?.total || 0,
+        top_critical_items: topCriticalItems,
+        orgSummary,
+      });
+      console.log(`AI summary generated: ${aiSummary.executive_summary ? 'yes' : 'no'}, takeaways: ${aiSummary.key_takeaways.length}`);
+
+      // Prepare briefing data - FIXED: Use effectiveStats + AI summary
       const briefingData = {
         briefing_date: today,
         total_articles: effectiveStats?.articles?.total || 0,
@@ -405,14 +513,12 @@ serve(async (req) => {
         total_state_actions: effectiveStats?.state_actions?.total || 0,
         critical_count: totalCritical,
         high_count: totalHigh,
-        medium_count: 0, // Calculate if needed
-        top_critical_items: [
-          ...(criticalArticles || []).map(a => ({ type: 'article', ...a })),
-          ...(criticalBills || []).map(b => ({ type: 'bill', ...b })),
-          ...(criticalStateActions || []).map(s => ({ type: 'state_action', ...s })),
-        ],
+        medium_count: 0,
+        top_critical_items: topCriticalItems,
         breaking_news_clusters: (breakingNews || []).map(b => b.id),
         organization_mentions: orgSummary,
+        executive_summary: aiSummary.executive_summary || null,
+        key_takeaways: aiSummary.key_takeaways.length > 0 ? aiSummary.key_takeaways : null,
         updated_at: new Date().toISOString(),
       };
 
