@@ -66,21 +66,21 @@ serve(async (req) => {
 
           totalPolls++;
 
-          // Extract relevant data (schema may vary, adjust as needed)
+          // Extract relevant data - matching actual table columns
           const pollData = {
             poll_type: pollSource.type,
-            source: poll.pollster || poll.sponsor || 'FiveThirtyEight',
+            pollster: poll.pollster || poll.sponsor || 'FiveThirtyEight',
             race_id: poll.race_id || `${pollSource.type}_${poll.state || 'national'}`,
             state: poll.state || null,
             district: poll.district || null,
             candidate_name: poll.candidate_name || poll.answer || null,
-            candidate_party: poll.party || null,
-            poll_result: parseFloat(poll.pct) || null,
+            result_value: parseFloat(poll.pct) || null,
             poll_date: poll.end_date || poll.created_at || new Date().toISOString().split('T')[0],
             sample_size: parseInt(poll.sample_size) || null,
             margin_of_error: parseFloat(poll.margin_of_error) || null,
-            url: poll.url || null,
-            additional_data: poll,
+            source_url: poll.url || null,
+            source: 'FiveThirtyEight',
+            fetched_at: new Date().toISOString(),
           };
 
           // Check if poll already exists
@@ -98,13 +98,16 @@ serve(async (req) => {
               .from('polling_data')
               .insert(pollData);
 
-            if (!insertError) {
+            if (insertError) {
+              console.error(`Insert error for ${pollData.race_id}:`, insertError);
+            } else {
               newPolls++;
+              console.log(`Inserted poll: ${pollData.race_id} - ${pollData.candidate_name}`);
 
               // Check for significant changes (if we have historical data)
               const { data: previousPoll } = await supabase
                 .from('polling_data')
-                .select('poll_result')
+                .select('result_value')
                 .eq('race_id', pollData.race_id)
                 .eq('candidate_name', pollData.candidate_name)
                 .lt('poll_date', pollData.poll_date)
@@ -112,21 +115,24 @@ serve(async (req) => {
                 .limit(1)
                 .single();
 
-              if (previousPoll && pollData.poll_result) {
-                const change = pollData.poll_result - previousPoll.poll_result;
+              if (previousPoll && pollData.result_value) {
+                const change = pollData.result_value - previousPoll.result_value;
                 if (Math.abs(change) > 5) {
                   alerts.push({
                     alert_type: 'significant_change',
                     race_id: pollData.race_id,
                     candidate_name: pollData.candidate_name,
-                    previous_result: previousPoll.poll_result,
-                    new_result: pollData.poll_result,
+                    previous_result: previousPoll.result_value,
+                    new_result: pollData.result_value,
                     change_amount: change,
                     poll_date: pollData.poll_date,
                   });
                 }
               }
             }
+          } else {
+            // Log when poll already exists (for debugging)
+            if (i < 5) console.log(`Poll exists: ${pollData.race_id} - ${pollData.candidate_name} on ${pollData.poll_date}`);
           }
         }
 

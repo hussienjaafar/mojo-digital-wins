@@ -64,28 +64,33 @@ serve(async (req) => {
 
     // =================================================================
     // 1. DETECT BREAKING NEWS (Multiple sources reporting same story)
+    // OPTIMIZED: Limited to 50 articles and early exit to prevent CPU timeout
     // =================================================================
     if (action === 'full' || action === 'breaking_news') {
       console.log('Detecting breaking news clusters...');
 
-      // Get recent articles (last 6 hours)
-      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+      // OPTIMIZED: Only get critical/high articles from last 3 hours, limit to 50
+      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
       const { data: recentArticles } = await supabase
         .from('articles')
         .select('id, title, description, source_name, threat_level, affected_organizations, published_date')
-        .gte('published_date', sixHoursAgo)
-        .order('published_date', { ascending: false });
+        .gte('published_date', threeHoursAgo)
+        .in('threat_level', ['critical', 'high'])
+        .order('published_date', { ascending: false })
+        .limit(50);
 
       const clusters: Map<string, any> = new Map();
       const processed = new Set<string>();
+      const maxClusters = 10; // Early exit after finding enough clusters
 
       for (const article of recentArticles || []) {
         if (processed.has(article.id)) continue;
+        if (clusters.size >= maxClusters) break; // Early exit
 
         const clusterArticles = [article];
         const clusterSources = new Set([article.source_name]);
 
-        // Find similar articles
+        // Find similar articles - OPTIMIZED: Only compare with unprocessed
         for (const other of recentArticles || []) {
           if (other.id === article.id || processed.has(other.id)) continue;
 
@@ -183,8 +188,9 @@ serve(async (req) => {
 
     // =================================================================
     // 2. TRACK ORGANIZATION MENTIONS
+    // OPTIMIZED: Skip if action is 'daily_briefing' to speed up briefing generation
     // =================================================================
-    if (action === 'full' || action === 'org_mentions') {
+    if (action === 'org_mentions' || (action === 'full' && !localDate)) {
       console.log('Tracking organization mentions...');
 
       let mentionsFound = 0;
