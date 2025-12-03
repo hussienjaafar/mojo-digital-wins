@@ -16,6 +16,7 @@ import { ClientDashboardMetrics } from "@/components/client/ClientDashboardMetri
 import { ConsolidatedChannelMetrics } from "@/components/client/ConsolidatedChannelMetrics";
 import SyncControls from "@/components/client/SyncControls";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
+import { PortalSectionHeader } from "@/components/portal/PortalSectionHeader";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
 import { OrganizationSelector } from "@/components/client/OrganizationSelector";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -314,20 +315,16 @@ const ClientDashboard = () => {
             <PortalErrorBoundary>
               {/* AT A GLANCE: Performance Overview */}
               <div className="mb-6 md:mb-8">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Performance Overview</h2>
-                    <p className="text-sm portal-text-secondary mt-1">Key performance indicators</p>
-                  </div>
-                  {/* Inline Date Range - Compact */}
-                  <div className="flex items-center gap-2">
-                    <DateRangeSelector
-                      startDate={startDate}
-                      endDate={endDate}
-                      onDateChange={handleDateChange}
-                    />
-                  </div>
-                </div>
+                <PortalSectionHeader
+                  title="Performance Overview"
+                  subtitle="Key performance indicators"
+                >
+                  <DateRangeSelector
+                    startDate={startDate}
+                    endDate={endDate}
+                    onDateChange={handleDateChange}
+                  />
+                </PortalSectionHeader>
                 <ClientDashboardMetrics
                   organizationId={organization.id}
                   startDate={startDate}
@@ -337,10 +334,10 @@ const ClientDashboard = () => {
 
               {/* DEEP DIVE: Channel Details - Expandable Sections */}
               <div className="mb-6">
-                <div className="mb-4">
-                  <h2 className="text-lg sm:text-xl font-bold portal-text-primary">Channel Details</h2>
-                  <p className="text-sm portal-text-secondary mt-1">Expand for detailed channel insights</p>
-                </div>
+                <PortalSectionHeader
+                  title="Channel Details"
+                  subtitle="Expand for detailed channel insights"
+                />
                 <ConsolidatedChannelMetrics
                   organizationId={organization.id}
                   startDate={startDate}

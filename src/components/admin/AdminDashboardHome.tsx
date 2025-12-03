@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, parseISO, differenceInDays } from "date-fns";
-import { Building2, DollarSign, AlertTriangle, RefreshCw, Users } from "lucide-react";
+import { Building2, DollarSign, AlertTriangle, RefreshCw, Users, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { GlobalCreativeInsightsWidget } from "./GlobalCreativeInsightsWidget";
 import { AlertsBannerWidget } from "./AlertsBannerWidget";
 import { ClientsOverviewWidget } from "./ClientsOverviewWidget";
 import { CustomizableDashboard, WidgetConfig } from "@/components/dashboard/CustomizableDashboard";
+import { PortalSectionHeader } from "@/components/portal/PortalSectionHeader";
 
 interface SummaryStats {
   activeClients: number;
@@ -162,16 +163,17 @@ export function AdminDashboardHome() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold portal-text-primary">Client Monitoring Center</h1>
-          <p className="portal-text-secondary">Monitor performance and health across all organizations</p>
-        </div>
+      <PortalSectionHeader
+        title="Client Monitoring Center"
+        subtitle="Monitor performance and health across all organizations"
+        icon={LayoutDashboard}
+        iconColor="blue"
+      >
         <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2 portal-btn-secondary">
           <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
           Refresh
         </Button>
-      </div>
+      </PortalSectionHeader>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
