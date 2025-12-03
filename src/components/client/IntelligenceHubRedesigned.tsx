@@ -169,7 +169,7 @@ export function IntelligenceHubRedesigned({ organizationId }: Props) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => navigate("/client-alerts")}
+                  onClick={() => navigate("/client/alerts")}
                   className="gap-2"
                 >
                   View All
@@ -186,7 +186,7 @@ export function IntelligenceHubRedesigned({ organizationId }: Props) {
                 <div
                   key={alert.id}
                   className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors cursor-pointer"
-                  onClick={() => navigate("/client-alerts")}
+                  onClick={() => navigate("/client/alerts")}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -219,7 +219,7 @@ export function IntelligenceHubRedesigned({ organizationId }: Props) {
               <Button
                 variant="link"
                 size="sm"
-                onClick={() => navigate("/client-alerts")}
+                onClick={() => navigate("/client/alerts")}
                 className="mt-2"
               >
                 View alert history
@@ -300,7 +300,7 @@ export function IntelligenceHubRedesigned({ organizationId }: Props) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate("/client-watchlist")}
+                onClick={() => navigate("/client/watchlist")}
                 className="gap-2"
               >
                 Manage Watchlist

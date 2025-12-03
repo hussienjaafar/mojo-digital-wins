@@ -87,10 +87,11 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
       label: "Main",
       items: [
         { title: "Dashboard", url: "/client/dashboard", icon: Home },
-        { title: "Intelligence", url: "/client/dashboard", icon: Activity },
+        { title: "Intelligence", url: "/client/intelligence", icon: Activity },
         { title: "Watchlist", url: "/client/watchlist", icon: Eye },
         { title: "Alerts", url: "/client/alerts", icon: Bell, badge: stats.alerts },
         { title: "Profile", url: "/client/profile", icon: Settings },
+        { title: "Settings", url: "/client/settings", icon: UserCircle },
       ],
     },
   ];
