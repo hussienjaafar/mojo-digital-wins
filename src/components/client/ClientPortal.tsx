@@ -1,3 +1,8 @@
+/**
+ * @deprecated This component is deprecated. Use ClientDashboard (/client/dashboard) instead.
+ * The route /client/portal now redirects to /client/dashboard.
+ * This file is kept for reference during the transition period.
+ */
 import { lazy, Suspense, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
