@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Newspaper, ExternalLink, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -68,7 +69,7 @@ export function HighImpactNewsWidget({ showDragHandle = false }: HighImpactNewsW
           <CardTitle className="text-sm font-medium">High-Impact News</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 overflow-auto min-h-0 pt-0">
+      <CardContent className="flex-1 min-h-0 pt-0">
         {loading ? (
           <div className="space-y-3">
             {[...Array(4)].map((_, i) => (
@@ -80,39 +81,41 @@ export function HighImpactNewsWidget({ showDragHandle = false }: HighImpactNewsW
             No high-impact news at this time
           </p>
         ) : (
-          <div className="space-y-3">
-            {news.map((item) => (
-              <div
-                key={item.id}
-                className="p-3 rounded-md border border-border/50 hover:border-border transition-colors"
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h4 className="text-sm font-medium line-clamp-2 flex-1" title={item.title}>
-                    {item.title}
-                  </h4>
-                  {getThreatBadge(item.threat_level)}
-                </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="truncate max-w-[50%]">{item.source_name}</span>
-                  <div className="flex items-center gap-2">
-                    <span>
-                      {formatDistanceToNow(new Date(item.published_date), { addSuffix: true })}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      asChild
-                    >
-                      <a href={item.source_url} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    </Button>
+          <ScrollArea className="h-full pr-2">
+            <div className="space-y-3">
+              {news.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-3 rounded-md border border-border/50 hover:border-border transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h4 className="text-sm font-medium line-clamp-2 flex-1" title={item.title}>
+                      {item.title}
+                    </h4>
+                    {getThreatBadge(item.threat_level)}
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="truncate max-w-[50%]">{item.source_name}</span>
+                    <div className="flex items-center gap-2">
+                      <span>
+                        {formatDistanceToNow(new Date(item.published_date), { addSuffix: true })}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        asChild
+                      >
+                        <a href={item.source_url} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </ScrollArea>
         )}
       </CardContent>
     </Card>

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { TrendingUp, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -59,7 +60,7 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
           <CardTitle className="text-sm font-medium">Trending Topics</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 overflow-auto min-h-0 pt-0">
+      <CardContent className="flex-1 min-h-0 pt-0">
         {loading ? (
           <div className="space-y-2">
             {[...Array(5)].map((_, i) => (
@@ -71,26 +72,28 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
             No trending topics at this time
           </p>
         ) : (
-          <div className="space-y-2">
-            {topics.map((topic) => (
-              <div
-                key={topic.id}
-                className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors"
-              >
-                <span className="text-sm font-medium truncate max-w-[60%]" title={topic.topic}>
-                  {topic.topic}
-                </span>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Badge variant="outline" className="text-xs">
-                    {topic.mentions_last_hour || 0}
-                  </Badge>
-                  <span className={`text-xs font-semibold ${getVelocityColor(topic.velocity)}`}>
-                    +{topic.velocity?.toFixed(0) || 0}%
+          <ScrollArea className="h-full pr-2">
+            <div className="space-y-2">
+              {topics.map((topic) => (
+                <div
+                  key={topic.id}
+                  className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors"
+                >
+                  <span className="text-sm font-medium truncate max-w-[60%]" title={topic.topic}>
+                    {topic.topic}
                   </span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge variant="outline" className="text-xs">
+                      {topic.mentions_last_hour || 0}
+                    </Badge>
+                    <span className={`text-xs font-semibold ${getVelocityColor(topic.velocity)}`}>
+                      +{topic.velocity?.toFixed(0) || 0}%
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </ScrollArea>
         )}
       </CardContent>
     </Card>

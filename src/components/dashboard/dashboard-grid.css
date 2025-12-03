@@ -13,6 +13,17 @@
 .react-grid-item > div {
   height: 100%;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure cards and scroll areas fill their containers */
+.react-grid-item .h-full {
+  height: 100% !important;
+}
+
+.react-grid-item [data-radix-scroll-area-viewport] {
+  height: 100% !important;
 }
 
 .react-grid-item img {
