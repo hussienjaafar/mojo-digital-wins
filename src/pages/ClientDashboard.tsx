@@ -1,15 +1,13 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, LayoutGrid, ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
-import { RoleSwitcher } from "@/components/RoleSwitcher";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { LogOut, ChevronDown, ChevronUp, BarChart3, Sun, Moon } from "lucide-react";
+import { format, subDays } from "date-fns";
 import { Session } from "@supabase/supabase-js";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/components/ThemeProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/client/AppSidebar";
@@ -21,6 +19,7 @@ import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
 import { OrganizationSelector } from "@/components/client/OrganizationSelector";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Lazy load Advanced Analytics for performance
 const AdvancedAnalytics = lazy(() => import("@/components/analytics/AdvancedAnalytics"));
@@ -55,6 +54,7 @@ const ClientDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { theme, setTheme } = useTheme();
   const [session, setSession] = useState<Session | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -231,74 +231,83 @@ const ClientDashboard = () => {
           <AppSidebar organizationId={organization.id} />
         
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Modern Header - Portal Style */}
-          <header className="portal-header">
-          <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-              {/* Sidebar Trigger + Logo and Title Section */}
-              <div className="flex items-center gap-3 sm:gap-6 w-full sm:w-auto">
-                <SidebarTrigger className="shrink-0" />
-                
-                {organization.logo_url && (
-                  <div className="shrink-0">
+          {/* Clean Modern Header */}
+          <header className="portal-header-clean">
+            <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-3">
+              <div className="flex items-center justify-between gap-4">
+                {/* Left: Sidebar Trigger + Organization */}
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                  <SidebarTrigger className="portal-icon-btn shrink-0" />
+                  
+                  {organization.logo_url && (
                     <img
                       src={organization.logo_url}
                       alt={organization.name}
-                      className="h-10 sm:h-12 md:h-14 w-auto object-contain"
+                      className="h-8 sm:h-10 w-auto object-contain shrink-0"
                     />
+                  )}
+                  
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-base sm:text-lg font-semibold portal-text-primary truncate">
+                        {organization.name}
+                      </h1>
+                      {organizations.length > 1 && (
+                        <OrganizationSelector
+                          organizations={organizations}
+                          selectedId={organization.id}
+                          onSelect={handleOrganizationChange}
+                        />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="portal-status-dot" />
+                      <span className="text-xs portal-text-muted">Live</span>
+                    </div>
                   </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-lg sm:text-2xl font-bold tracking-tight portal-text-primary truncate">
-                      {organization.name}
-                    </h1>
-                    {/* Multi-org selector */}
-                    {organizations.length > 1 && (
-                      <OrganizationSelector
-                        organizations={organizations}
-                        selectedId={organization.id}
-                        onSelect={handleOrganizationChange}
-                      />
-                    )}
-                  </div>
-                  <p className="text-xs sm:text-sm portal-text-secondary mt-0.5 sm:mt-1 flex items-center gap-2">
-                    <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: 'hsl(var(--portal-success))' }} />
-                    Live Dashboard
-                  </p>
                 </div>
-              </div>
 
-              {/* Action Buttons - Enhanced with Smooth Variant */}
-              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
-                <RoleSwitcher />
-                <Button
-                  variant="smooth"
-                  size={isMobile ? "sm" : "default"}
-                  onClick={() => navigate('/client/dashboard/custom')}
-                  className="gap-2 min-h-[44px] min-w-[44px] transition-all duration-300 hover:scale-105 active:scale-95"
-                  title="Customize Dashboard"
-                  aria-label="Customize Dashboard"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  <span className="hidden md:inline">Customize</span>
-                </Button>
-                <ThemeToggle />
-                <Button
-                  variant="smooth"
-                  size={isMobile ? "sm" : "default"}
-                  onClick={handleLogout}
-                  className="hover:border-destructive/50 hover:text-destructive gap-2 min-h-[44px] min-w-[44px] transition-all duration-300 hover:scale-105 active:scale-95"
-                  title="Logout"
-                  aria-label="Logout"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="hidden sm:inline">Logout</span>
-                </Button>
+                {/* Right: Icon Actions */}
+                <TooltipProvider delayDuration={300}>
+                  <div className="portal-header-actions">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                          className="portal-icon-btn"
+                          aria-label="Toggle theme"
+                        >
+                          {theme === "dark" ? (
+                            <Sun className="h-[18px] w-[18px]" />
+                          ) : (
+                            <Moon className="h-[18px] w-[18px]" />
+                          )}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p>Toggle theme</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={handleLogout}
+                          className="portal-icon-btn portal-icon-btn-danger"
+                          aria-label="Logout"
+                        >
+                          <LogOut className="h-[18px] w-[18px]" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p>Logout</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
 
         <main className="portal-scrollbar flex-1 overflow-auto">
           <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 w-full">
