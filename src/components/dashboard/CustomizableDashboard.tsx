@@ -3,6 +3,7 @@ import { Responsive, WidthProvider, Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LayoutGrid, RotateCcw, Save, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -11,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import "./dashboard-grid.css";
 
@@ -56,6 +58,7 @@ export function CustomizableDashboard({
   const [widgets, setWidgets] = useState<WidgetConfig[]>(initialWidgets);
   const [layouts, setLayouts] = useState<{ lg: DashboardLayout[] }>({ lg: [] });
   const [isEditMode, setIsEditMode] = useState(false);
+  const isMobile = useIsMobile();
 
   // Load saved layout from localStorage
   useEffect(() => {
@@ -146,6 +149,20 @@ export function CustomizableDashboard({
     toast.success(`${widget.title} added!`);
   };
 
+  // Mobile: Render stacked cards instead of grid
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        {/* Mobile-friendly stacked layout */}
+        {widgets.map((widget) => (
+          <div key={widget.id} className="w-full">
+            {widget.component}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Control Bar - Subtle when not editing */}
@@ -162,7 +179,7 @@ export function CustomizableDashboard({
           </Button>
         </div>
       ) : (
-        <div className="flex items-center justify-between p-2 bg-muted/50 border border-border/50 rounded-lg">
+        <div className="flex items-center justify-between p-2 bg-muted/50 border border-border/50 rounded-lg flex-wrap gap-2">
           <span className="text-sm text-muted-foreground flex items-center gap-2">
             <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
             Drag widgets to rearrange

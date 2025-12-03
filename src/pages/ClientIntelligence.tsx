@@ -181,13 +181,15 @@ export default function ClientIntelligence() {
                   <Badge variant="destructive">{criticalCount} Critical</Badge>
                 )}
               </div>
-              <Tabs value={alertFilter} onValueChange={setAlertFilter} className="w-auto">
-                <TabsList className="h-8">
-                  <TabsTrigger value="all" className="text-xs px-2 h-6">All ({alerts.length})</TabsTrigger>
-                  <TabsTrigger value="critical" className="text-xs px-2 h-6">Critical</TabsTrigger>
-                  <TabsTrigger value="high" className="text-xs px-2 h-6">High</TabsTrigger>
-                  <TabsTrigger value="medium" className="text-xs px-2 h-6">Medium</TabsTrigger>
-                </TabsList>
+            <Tabs value={alertFilter} onValueChange={setAlertFilter} className="w-auto max-w-full">
+                <div className="overflow-x-auto -mx-2 px-2 scrollbar-hide">
+                  <TabsList className="h-9 inline-flex w-auto min-w-max">
+                    <TabsTrigger value="all" className="text-xs px-3 h-7 min-w-[44px]">All ({alerts.length})</TabsTrigger>
+                    <TabsTrigger value="critical" className="text-xs px-3 h-7 min-w-[44px]">Critical</TabsTrigger>
+                    <TabsTrigger value="high" className="text-xs px-3 h-7 min-w-[44px]">High</TabsTrigger>
+                    <TabsTrigger value="medium" className="text-xs px-3 h-7 min-w-[44px]">Medium</TabsTrigger>
+                  </TabsList>
+                </div>
               </Tabs>
             </div>
           </CardHeader>
