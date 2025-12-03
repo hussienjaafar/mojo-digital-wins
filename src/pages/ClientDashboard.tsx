@@ -12,7 +12,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/client/AppSidebar";
-import { IntelligenceHubRedesigned } from "@/components/client/IntelligenceHubRedesigned";
 import { OnboardingWizard } from "@/components/client/OnboardingWizard";
 import { ClientDashboardMetrics } from "@/components/client/ClientDashboardMetrics";
 import { ConsolidatedChannelMetrics } from "@/components/client/ConsolidatedChannelMetrics";
@@ -273,11 +272,6 @@ const ClientDashboard = () => {
         <main className="portal-scrollbar flex-1 overflow-auto">
           <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 w-full">
             <PortalErrorBoundary>
-              {/* HERO: Intelligence Hub - MOVED TO TOP */}
-              <div className="mb-8 md:mb-10">
-                <IntelligenceHubRedesigned organizationId={organization.id} />
-              </div>
-
               {/* AT A GLANCE: Performance Overview */}
               <div className="mb-6 md:mb-8">
                 <div className="mb-4 flex items-center justify-between">
