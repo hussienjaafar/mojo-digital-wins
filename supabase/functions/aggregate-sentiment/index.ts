@@ -146,6 +146,33 @@ serve(async (req) => {
 
     console.log(`[aggregate-sentiment] Created ${snapshots.length} sentiment snapshots`);
 
+    // Also populate the daily_group_sentiment table
+    const dailySentimentData = [];
+    for (const [group, stats] of combinedAgg.entries()) {
+      const avgSentiment = (stats.pos - stats.neg) / stats.total;
+      dailySentimentData.push({
+        date: today,
+        affected_group: group,
+        avg_sentiment: avgSentiment,
+        article_count: newsAgg.get(group)?.total || 0,
+        social_post_count: blueskyAgg.get(group)?.total || 0,
+      });
+    }
+
+    if (dailySentimentData.length > 0) {
+      const { error: dailyError } = await supabase
+        .from('daily_group_sentiment')
+        .upsert(dailySentimentData, {
+          onConflict: 'date,affected_group'
+        });
+      
+      if (dailyError) {
+        console.warn('[aggregate-sentiment] Error upserting daily_group_sentiment:', dailyError);
+      } else {
+        console.log(`[aggregate-sentiment] Updated ${dailySentimentData.length} daily group sentiment records`);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
