@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UserPlus, Users, Mail, Eye, Edit, Trash2, Key, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -33,6 +34,7 @@ const ClientUserManager = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { setImpersonation } = useImpersonation();
+  const isMobile = useIsMobile();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [users, setUsers] = useState<ClientUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -294,10 +296,67 @@ const ClientUserManager = () => {
     );
   }
 
+  // Mobile card renderer for users
+  const renderMobileUserCard = (user: ClientUser) => (
+    <Card key={user.id} className="overflow-hidden">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium">{user.full_name}</p>
+            <p className="text-xs text-muted-foreground">{getOrganizationName(user.organization_id)}</p>
+          </div>
+          <Badge variant="outline">{user.role}</Badge>
+        </div>
+        
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Last login: {user.last_login_at ? new Date(user.last_login_at).toLocaleDateString() : 'Never'}</span>
+          <span>Created: {new Date(user.created_at).toLocaleDateString()}</span>
+        </div>
+        
+        <div className="flex items-center justify-between pt-2 border-t">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleViewPortal(user)}
+            className="hover:bg-blue-50 dark:hover:bg-blue-950"
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            View Portal
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleEditClick(user)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit User
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                <Key className="h-4 w-4 mr-2" />
+                Reset Password
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => handleDeleteClick(user)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete User
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
@@ -309,12 +368,12 @@ const ClientUserManager = () => {
           </div>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <UserPlus className="w-4 h-4 mr-2" />
                 Add User
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Create Client User</DialogTitle>
                 <DialogDescription>
@@ -406,85 +465,99 @@ const ClientUserManager = () => {
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Organization</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Last Login</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        {/* Mobile Card View */}
+        {isMobile ? (
+          <div className="space-y-3">
             {users.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  No users yet. Create your first one!
-                </TableCell>
-              </TableRow>
+              <p className="text-center text-muted-foreground py-8">
+                No users yet. Create your first one!
+              </p>
             ) : (
-              users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.full_name}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {getOrganizationName(user.organization_id)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{user.role}</Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {user.last_login_at
-                      ? new Date(user.last_login_at).toLocaleDateString()
-                      : 'Never'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewPortal(user)}
-                        className="hover:bg-blue-50 dark:hover:bg-blue-950"
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Portal
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditClick(user)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit User
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleResetPassword(user)}>
-                            <Key className="h-4 w-4 mr-2" />
-                            Reset Password
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => handleDeleteClick(user)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete User
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+              users.map(renderMobileUserCard)
+            )}
+          </div>
+        ) : (
+          /* Desktop Table View */
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Organization</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Last Login</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    No users yet. Create your first one!
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{user.full_name}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {getOrganizationName(user.organization_id)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{user.role}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {user.last_login_at
+                        ? new Date(user.last_login_at).toLocaleDateString()
+                        : 'Never'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewPortal(user)}
+                          className="hover:bg-blue-50 dark:hover:bg-blue-950"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View Portal
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditClick(user)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit User
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                              <Key className="h-4 w-4 mr-2" />
+                              Reset Password
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteClick(user)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete User
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
 
       {/* Edit User Dialog */}

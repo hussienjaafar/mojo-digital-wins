@@ -10,7 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
-import { Building2, Plus, Settings, Users, Eye, LogIn } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Building2, Plus, Eye, LogIn, MoreVertical } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type Organization = {
   id: string;
@@ -26,6 +28,7 @@ const ClientOrganizationManager = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { setImpersonation } = useImpersonation();
+  const isMobile = useIsMobile();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -193,10 +196,62 @@ const ClientOrganizationManager = () => {
     );
   }
 
+  // Mobile card renderer
+  const renderMobileCard = (org: Organization) => (
+    <Card key={org.id} className="overflow-hidden">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {org.logo_url && (
+              <img src={org.logo_url} alt={org.name} className="w-10 h-10 rounded" />
+            )}
+            <div>
+              <p className="font-medium">{org.name}</p>
+              <p className="text-xs text-muted-foreground">{org.slug}</p>
+            </div>
+          </div>
+          <Badge variant={org.is_active ? "default" : "secondary"}>
+            {org.is_active ? "Active" : "Inactive"}
+          </Badge>
+        </div>
+        
+        {org.primary_contact_email && (
+          <p className="text-sm text-muted-foreground">{org.primary_contact_email}</p>
+        )}
+        
+        <div className="flex items-center justify-between pt-2 border-t">
+          <span className="text-xs text-muted-foreground">
+            Created {new Date(org.created_at).toLocaleDateString()}
+          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => navigate(`/admin/client-view/${org.id}`)}>
+                <Eye className="h-4 w-4 mr-2" />
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleViewPortal(org)}>
+                <LogIn className="h-4 w-4 mr-2" />
+                View Portal
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toggleActive(org.id, org.is_active)}>
+                {org.is_active ? "Deactivate" : "Activate"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="w-5 h-5" />
@@ -208,12 +263,12 @@ const ClientOrganizationManager = () => {
           </div>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="w-4 h-4 mr-2" />
                 New Organization
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Create New Organization</DialogTitle>
                 <DialogDescription>
@@ -276,79 +331,93 @@ const ClientOrganizationManager = () => {
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Organization</TableHead>
-              <TableHead>Slug</TableHead>
-              <TableHead>Contact Email</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        {/* Mobile Card View */}
+        {isMobile ? (
+          <div className="space-y-3">
             {organizations.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  No organizations yet. Create your first one!
-                </TableCell>
-              </TableRow>
+              <p className="text-center text-muted-foreground py-8">
+                No organizations yet. Create your first one!
+              </p>
             ) : (
-              organizations.map((org) => (
-                <TableRow key={org.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {org.logo_url && (
-                        <img src={org.logo_url} alt={org.name} className="w-8 h-8 rounded" />
-                      )}
-                      {org.name}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{org.slug}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {org.primary_contact_email || '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={org.is_active ? "default" : "secondary"}>
-                      {org.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(org.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex gap-2 justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate(`/admin/client-view/${org.id}`)}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={() => handleViewPortal(org)}
-                      >
-                        <LogIn className="h-4 w-4 mr-2" />
-                        View Portal
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={org.is_active ? "destructive" : "default"}
-                        onClick={() => toggleActive(org.id, org.is_active)}
-                      >
-                        {org.is_active ? "Deactivate" : "Activate"}
-                      </Button>
-                    </div>
+              organizations.map(renderMobileCard)
+            )}
+          </div>
+        ) : (
+          /* Desktop Table View */
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Organization</TableHead>
+                <TableHead>Slug</TableHead>
+                <TableHead>Contact Email</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {organizations.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    No organizations yet. Create your first one!
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                organizations.map((org) => (
+                  <TableRow key={org.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {org.logo_url && (
+                          <img src={org.logo_url} alt={org.name} className="w-8 h-8 rounded" />
+                        )}
+                        {org.name}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{org.slug}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {org.primary_contact_email || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={org.is_active ? "default" : "secondary"}>
+                        {org.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(org.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(`/admin/client-view/${org.id}`)}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => handleViewPortal(org)}
+                        >
+                          <LogIn className="h-4 w-4 mr-2" />
+                          View Portal
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={org.is_active ? "destructive" : "default"}
+                          onClick={() => toggleActive(org.id, org.is_active)}
+                        >
+                          {org.is_active ? "Deactivate" : "Activate"}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
     </Card>
   );
