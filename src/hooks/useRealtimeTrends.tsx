@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -7,10 +7,11 @@ type EntityTrend = Database['public']['Tables']['entity_trends']['Row'];
 export const useRealtimeTrends = () => {
   const [trends, setTrends] = useState<EntityTrend[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
 
-  useEffect(() => {
-    // Initial fetch from entity_trends (real-time enabled)
-    const fetchTrends = async () => {
+  const fetchTrends = useCallback(async () => {
+    setIsLoading(true);
+    try {
       const { data, error } = await supabase
         .from('entity_trends')
         .select('*')
@@ -19,15 +20,25 @@ export const useRealtimeTrends = () => {
         .order('mentions_24h', { ascending: false })
         .limit(15);
 
-      if (data && !error) {
+      if (error) {
+        console.error('Error fetching trends:', error);
+        return;
+      }
+
+      if (data) {
         setTrends(data);
       }
+    } catch (err) {
+      console.error('Failed to fetch trends:', err);
+    } finally {
       setIsLoading(false);
-    };
+    }
+  }, []);
 
+  useEffect(() => {
     fetchTrends();
 
-    // Subscribe to realtime changes on entity_trends (realtime enabled)
+    // Subscribe to realtime changes on entity_trends
     const channel = supabase
       .channel('entity_trends_realtime')
       .on(
@@ -45,19 +56,31 @@ export const useRealtimeTrends = () => {
             setTrends((prev) => [payload.new as EntityTrend, ...prev].slice(0, 15));
           } else if (payload.eventType === 'UPDATE') {
             setTrends((prev) =>
-              prev.map((t) => (t.id === payload.new.id ? payload.new as EntityTrend : t))
+              prev.map((t) => (t.id === (payload.new as EntityTrend).id ? payload.new as EntityTrend : t))
             );
           } else if (payload.eventType === 'DELETE') {
-            setTrends((prev) => prev.filter((t) => t.id !== payload.old.id));
+            setTrends((prev) => prev.filter((t) => t.id !== (payload.old as EntityTrend).id));
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Trends channel status:', status);
+        if (status === 'SUBSCRIBED') {
+          setConnectionStatus('connected');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setConnectionStatus('disconnected');
+          // Attempt reconnection after 5 seconds
+          setTimeout(() => {
+            console.log('🔄 Attempting to reconnect trends channel...');
+            channel.subscribe();
+          }, 5000);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchTrends]);
 
-  return { trends, isLoading };
+  return { trends, isLoading, connectionStatus, refresh: fetchTrends };
 };
