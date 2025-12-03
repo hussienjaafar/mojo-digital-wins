@@ -29,7 +29,7 @@ import AdminClientView from "./pages/AdminClientView";
 import ClientLogin from "./pages/ClientLogin";
 import ClientDashboard from "./pages/ClientDashboard";
 import ClientDashboardCustom from "./pages/ClientDashboardCustom";
-import ClientPortal from "./components/client/ClientPortal";
+import { Navigate } from "react-router-dom";
 import ClientWatchlist from "./pages/ClientWatchlist";
 import ClientAlerts from "./pages/ClientAlerts";
 import ClientActions from "./pages/ClientActions";
@@ -83,7 +83,8 @@ const AppContent = () => {
           <Route path="/client-login" element={<ClientLogin />} />
           <Route path="/client/dashboard" element={<ClientDashboard />} />
           <Route path="/client/dashboard/custom" element={<ClientDashboardCustom />} />
-          <Route path="/client/portal" element={<ClientPortal />} />
+          {/* Redirect legacy portal route to consolidated dashboard */}
+          <Route path="/client/portal" element={<Navigate to="/client/dashboard" replace />} />
           <Route path="/client/watchlist" element={<ClientWatchlist />} />
           <Route path="/client/alerts" element={<ClientAlerts />} />
           <Route path="/client/actions" element={<ClientActions />} />

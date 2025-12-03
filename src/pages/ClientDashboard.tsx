@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, LayoutGrid } from "lucide-react";
+import { LogOut, LayoutGrid, ChevronDown, ChevronUp, BarChart3, Building2 } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -19,12 +19,37 @@ import { ConsolidatedChannelMetrics } from "@/components/client/ConsolidatedChan
 import SyncControls from "@/components/client/SyncControls";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
+import { OrganizationSelector } from "@/components/client/OrganizationSelector";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Lazy load Advanced Analytics for performance
+const AdvancedAnalytics = lazy(() => import("@/components/analytics/AdvancedAnalytics"));
 
 type Organization = {
   id: string;
   name: string;
   logo_url: string | null;
+  role?: string;
 };
+
+const AdvancedAnalyticsSkeleton = () => (
+  <div className="space-y-4 animate-pulse">
+    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      {[...Array(4)].map((_, i) => (
+        <Card key={i}>
+          <CardHeader className="space-y-0 pb-2">
+            <Skeleton className="h-4 w-24" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-3 w-20" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+    <Skeleton className="h-96 w-full" />
+  </div>
+);
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
@@ -32,8 +57,10 @@ const ClientDashboard = () => {
   const isMobile = useIsMobile();
   const [session, setSession] = useState<Session | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
@@ -57,7 +84,7 @@ const ClientDashboard = () => {
 
   useEffect(() => {
     if (session?.user) {
-      loadUserOrganization();
+      loadUserOrganizations();
       checkOnboardingStatus();
     }
   }, [session]);
@@ -81,16 +108,24 @@ const ClientDashboard = () => {
     setEndDate(end);
   };
 
-  const loadUserOrganization = async () => {
+  const loadUserOrganizations = async () => {
     try {
-      const { data: clientUser, error: userError } = await (supabase as any)
+      // Fetch all organizations the user has access to
+      const { data: clientUserData, error: userError } = await (supabase as any)
         .from('client_users')
-        .select('organization_id')
-        .eq('id', session?.user?.id)
-        .maybeSingle();
+        .select(`
+          organization_id,
+          role,
+          client_organizations (
+            id,
+            name,
+            logo_url
+          )
+        `)
+        .eq('id', session?.user?.id);
 
       if (userError) throw userError;
-      if (!clientUser) {
+      if (!clientUserData || clientUserData.length === 0) {
         toast({
           title: "Error",
           description: "You don't have access to a client organization",
@@ -100,32 +135,43 @@ const ClientDashboard = () => {
         return;
       }
 
-      const { data: org, error: orgError } = await (supabase as any)
-        .from('client_organizations')
-        .select('*')
-        .eq('id', clientUser.organization_id)
-        .maybeSingle();
+      // Map to organization format with role
+      const orgs: Organization[] = clientUserData.map((item: any) => ({
+        id: item.client_organizations.id,
+        name: item.client_organizations.name,
+        logo_url: item.client_organizations.logo_url,
+        role: item.role,
+      }));
+      
+      setOrganizations(orgs);
 
-      if (orgError) throw orgError;
-      if (!org) {
-        toast({
-          title: "Error",
-          description: "Organization not found",
-          variant: "destructive",
-        });
-        navigate('/');
-        return;
-      }
-      setOrganization(org);
+      // Check for saved organization preference
+      const savedOrgId = localStorage.getItem('selectedOrganizationId');
+      const savedOrg = orgs.find(org => org.id === savedOrgId);
+      
+      // Use saved org or default to first
+      setOrganization(savedOrg || orgs[0]);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to load organization",
+        description: error.message || "Failed to load organizations",
         variant: "destructive",
       });
       navigate('/');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOrganizationChange = (newOrgId: string) => {
+    const newOrg = organizations.find(org => org.id === newOrgId);
+    if (newOrg) {
+      setOrganization(newOrg);
+      localStorage.setItem('selectedOrganizationId', newOrgId);
+      toast({
+        title: "Organization switched",
+        description: `Now viewing ${newOrg.name}`,
+      });
     }
   };
 
@@ -174,9 +220,19 @@ const ClientDashboard = () => {
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-lg sm:text-2xl font-bold tracking-tight portal-text-primary truncate">
-                    {organization.name}
-                  </h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-lg sm:text-2xl font-bold tracking-tight portal-text-primary truncate">
+                      {organization.name}
+                    </h1>
+                    {/* Multi-org selector */}
+                    {organizations.length > 1 && (
+                      <OrganizationSelector
+                        organizations={organizations}
+                        selectedId={organization.id}
+                        onSelect={handleOrganizationChange}
+                      />
+                    )}
+                  </div>
                   <p className="text-xs sm:text-sm portal-text-secondary mt-0.5 sm:mt-1 flex items-center gap-2">
                     <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: 'hsl(var(--portal-success))' }} />
                     Live Dashboard
@@ -256,6 +312,39 @@ const ClientDashboard = () => {
                   startDate={startDate}
                   endDate={endDate}
                 />
+              </div>
+
+              {/* ADVANCED: Attribution, Forecasting, LTV/CAC */}
+              <div className="mb-6">
+                <Collapsible open={showAdvancedAnalytics} onOpenChange={setShowAdvancedAnalytics}>
+                  <CollapsibleTrigger asChild>
+                    <button className="w-full flex items-center justify-between p-4 rounded-lg border border-border/50 hover:border-border transition-colors bg-card/50">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg" style={{ background: 'hsl(var(--portal-accent-purple) / 0.1)' }}>
+                          <BarChart3 className="h-5 w-5" style={{ color: 'hsl(var(--portal-accent-purple))' }} />
+                        </div>
+                        <div className="text-left">
+                          <h3 className="font-semibold portal-text-primary">Advanced Analytics</h3>
+                          <p className="text-sm portal-text-secondary">Attribution models, LTV/CAC, forecasting & comparisons</p>
+                        </div>
+                      </div>
+                      {showAdvancedAnalytics ? (
+                        <ChevronUp className="h-5 w-5 portal-text-secondary" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 portal-text-secondary" />
+                      )}
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-4">
+                    <Suspense fallback={<AdvancedAnalyticsSkeleton />}>
+                      <AdvancedAnalytics
+                        organizationId={organization.id}
+                        startDate={startDate}
+                        endDate={endDate}
+                      />
+                    </Suspense>
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
 
               {/* Sync Controls - Compact Footer */}

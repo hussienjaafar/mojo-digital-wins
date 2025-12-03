@@ -25,7 +25,7 @@ type Organization = {
   id: string;
   name: string;
   logo_url: string | null;
-  role: string;
+  role?: string;
 };
 
 type Props = {
@@ -69,9 +69,11 @@ export const OrganizationSelector = ({
           </Avatar>
           <div className="flex-1 text-left">
             <div className="font-medium">{org.name}</div>
-            <div className="text-xs text-muted-foreground capitalize">
-              {org.role}
-            </div>
+            {org.role && (
+              <div className="text-xs text-muted-foreground capitalize">
+                {org.role}
+              </div>
+            )}
           </div>
           {selectedId === org.id && (
             <Check className="h-4 w-4 text-primary" />
@@ -97,9 +99,11 @@ export const OrganizationSelector = ({
         {!isMobile && (
           <div className="flex flex-col">
             <span className="text-sm font-medium">{organizations[0].name}</span>
-            <span className="text-xs text-muted-foreground capitalize">
-              {organizations[0].role}
-            </span>
+            {organizations[0].role && (
+              <span className="text-xs text-muted-foreground capitalize">
+                {organizations[0].role}
+              </span>
+            )}
           </div>
         )}
       </div>
