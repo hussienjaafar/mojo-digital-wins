@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Responsive, WidthProvider, Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -59,9 +59,13 @@ export function CustomizableDashboard({
   const [layouts, setLayouts] = useState<{ lg: DashboardLayout[] }>({ lg: [] });
   const [isEditMode, setIsEditMode] = useState(false);
   const isMobile = useIsMobile();
+  const isInitialized = useRef(false);
 
-  // Load saved layout from localStorage
+  // Load saved layout from localStorage - only on mount
   useEffect(() => {
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
     const savedLayout = localStorage.getItem(storageKey);
     const savedWidgetIds = localStorage.getItem(`${storageKey}-widgets`);
     
@@ -88,7 +92,7 @@ export function CustomizableDashboard({
         setWidgets(reconstructedWidgets);
       }
     }
-  }, [storageKey, initialWidgets, availableWidgets]);
+  }, [storageKey]); // Only depend on storageKey, not widget arrays
 
   const handleLayoutChange = (currentLayout: Layout[], allLayouts: { lg?: Layout[] }) => {
     if (allLayouts.lg) {

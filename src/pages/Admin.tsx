@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/fixed-client";
 import { Button } from "@/components/ui/button";
 import { UserManagement } from "@/components/UserManagement";
@@ -97,6 +97,7 @@ const Admin = () => {
     localStorage.setItem('admin-sidebar-open', JSON.stringify(open));
   };
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -105,16 +106,24 @@ const Admin = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
-  // Load active tab from localStorage on mount, default to "analytics"
+  // Load active tab from URL params first, then localStorage, default to "analytics"
   const [activeTab, setActiveTab] = useState<string>(() => {
+    const urlTab = new URLSearchParams(window.location.search).get('tab');
+    if (urlTab) return urlTab;
     const savedTab = localStorage.getItem('admin-active-tab');
-    console.log('Initializing activeTab from localStorage:', savedTab || 'analytics (default)');
     return savedTab || "analytics";
   });
 
+  // Sync URL tab param with activeTab
+  useEffect(() => {
+    const urlTab = searchParams.get('tab');
+    if (urlTab && urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [searchParams]);
+
   // Save active tab to localStorage whenever it changes
   useEffect(() => {
-    console.log('Saving activeTab to localStorage:', activeTab);
     localStorage.setItem('admin-active-tab', activeTab);
   }, [activeTab]);
 
