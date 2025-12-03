@@ -4779,6 +4779,26 @@ export type Database = {
           },
         ]
       }
+      mv_unified_trends: {
+        Row: {
+          avg_sentiment: number | null
+          avg_velocity: number | null
+          id: number | null
+          is_breakthrough: boolean | null
+          last_updated: string | null
+          max_velocity: number | null
+          name: string | null
+          normalized_name: string | null
+          refreshed_at: string | null
+          source_count: number | null
+          source_types: string[] | null
+          sources: string[] | null
+          total_mentions_1h: number | null
+          total_mentions_24h: number | null
+          unified_score: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       calculate_bluesky_trend_velocity: {
@@ -4907,6 +4927,7 @@ export type Database = {
         Returns: string
       }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
+      refresh_unified_trends: { Args: never; Returns: undefined }
       update_bluesky_trends: {
         Args: never
         Returns: {
