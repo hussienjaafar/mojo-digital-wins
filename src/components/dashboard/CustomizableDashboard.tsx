@@ -148,83 +148,69 @@ export function CustomizableDashboard({
 
   return (
     <div className="space-y-4">
-      {/* Control Bar */}
-      <div className="flex items-center justify-between p-4 bg-card/50 backdrop-blur border border-border/50 rounded-lg shadow-sm">
-        <div className="flex items-center gap-3">
-          <LayoutGrid className="h-5 w-5 text-primary" />
-          <div>
-            <h3 className="font-semibold text-foreground">Customize Dashboard</h3>
-            <p className="text-sm text-muted-foreground">
-              {isEditMode ? (
-                <span className="flex items-center gap-2">
-                  <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
-                  Drag widgets to rearrange
-                </span>
-              ) : (
-                "Click edit to customize layout"
-              )}
-            </p>
-          </div>
+      {/* Control Bar - Subtle when not editing */}
+      {!isEditMode ? (
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsEditMode(true)}
+            className="gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Edit Layout
+          </Button>
         </div>
-        
-        <div className="flex items-center gap-2">
-          {availableWidgets.length > 0 && isEditMode && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add Widget
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                {availableWidgets
-                  .filter((w) => !widgets.find((widget) => widget.id === w.id))
-                  .map((widget) => (
-                    <DropdownMenuItem
-                      key={widget.id}
-                      onClick={() => addWidget(widget)}
-                    >
-                      {widget.title}
-                    </DropdownMenuItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          
-          {isEditMode ? (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resetLayout}
-                className="gap-2 hover:border-destructive/50 hover:text-destructive transition-colors"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Reset
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={saveLayout}
-                className="gap-2 shadow-md hover:shadow-lg transition-all"
-              >
-                <Save className="h-4 w-4" />
-                Save Layout
-              </Button>
-            </>
-          ) : (
+      ) : (
+        <div className="flex items-center justify-between p-2 bg-muted/50 border border-border/50 rounded-lg">
+          <span className="text-sm text-muted-foreground flex items-center gap-2">
+            <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
+            Drag widgets to rearrange
+          </span>
+          <div className="flex items-center gap-2">
+            {availableWidgets.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 h-8">
+                    <Plus className="h-3.5 w-3.5" />
+                    Add
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {availableWidgets
+                    .filter((w) => !widgets.find((widget) => widget.id === w.id))
+                    .map((widget) => (
+                      <DropdownMenuItem
+                        key={widget.id}
+                        onClick={() => addWidget(widget)}
+                      >
+                        {widget.title}
+                      </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetLayout}
+              className="gap-1.5 h-8 text-muted-foreground hover:text-destructive"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset
+            </Button>
             <Button
               variant="default"
               size="sm"
-              onClick={() => setIsEditMode(true)}
-              className="gap-2"
+              onClick={saveLayout}
+              className="gap-1.5 h-8"
             >
-              <LayoutGrid className="h-4 w-4" />
-              Edit Layout
+              <Save className="h-3.5 w-3.5" />
+              Save
             </Button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Dashboard Grid with edit mode indicator */}
       <div className={`relative ${isEditMode ? 'ring-2 ring-primary/20 ring-offset-2 rounded-lg p-1' : ''}`}>
