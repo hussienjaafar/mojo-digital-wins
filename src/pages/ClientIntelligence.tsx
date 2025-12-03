@@ -1,4 +1,4 @@
-import { useState, useCallback, lazy, Suspense } from "react";
+import { useState, useCallback, useEffect, lazy, Suspense } from "react";
 import { ClientLayout } from "@/components/client/ClientLayout";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { useRealtimeAlerts } from "@/hooks/useRealtimeAlerts";
@@ -12,7 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CreativeInsights } from "@/components/client/CreativeInsights";
-import { 
+import { CreativeDataImport } from "@/components/client/CreativeDataImport";
+import {
   Activity, 
   AlertTriangle, 
   TrendingUp, 
@@ -52,6 +53,8 @@ export default function ClientIntelligence() {
   const [watchlistCount, setWatchlistCount] = useState(0);
   const [alertFilter, setAlertFilter] = useState<string>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasCreativeData, setHasCreativeData] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   // Fetch recent news and watchlist count
   const loadAdditionalData = useCallback(async () => {
@@ -68,13 +71,26 @@ export default function ClientIntelligence() {
       if (articles) setRecentNews(articles);
 
       // Fetch watchlist count
-      const { count } = await (supabase as any)
-        .from('client_entity_watchlist')
+      const { count: watchCount } = await supabase
+        .from('entity_watchlist')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
         .eq('is_active', true);
       
-      setWatchlistCount(count || 0);
+      setWatchlistCount(watchCount || 0);
+
+      // Check if org has creative data
+      const { count: smsCount } = await supabase
+        .from('sms_creative_insights')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId);
+      
+      const { count: metaCount } = await supabase
+        .from('meta_creative_insights')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId);
+
+      setHasCreativeData((smsCount || 0) > 0 || (metaCount || 0) > 0);
     } catch (error) {
       console.error('Error loading intelligence data:', error);
     } finally {
@@ -83,9 +99,9 @@ export default function ClientIntelligence() {
   }, [organizationId]);
 
   // Initial load
-  useState(() => {
+  useEffect(() => {
     loadAdditionalData();
-  });
+  }, [loadAdditionalData]);
 
   const handleRefreshAll = async () => {
     setIsRefreshing(true);
@@ -338,7 +354,51 @@ export default function ClientIntelligence() {
 
         {/* Creative Insights */}
         {organizationId && (
-          <CreativeInsights organizationId={organizationId} />
+          <>
+            {!hasCreativeData && !showImport ? (
+              <Card className="border-dashed">
+                <CardContent className="py-8 text-center">
+                  <div className="p-3 rounded-full bg-primary/10 w-fit mx-auto mb-4">
+                    <Zap className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Unlock Creative Intelligence</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto mb-4">
+                    Import your SMS and Meta ad data to get AI-powered insights on what messaging works best for your audience.
+                  </p>
+                  <Button onClick={() => setShowImport(true)} className="gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Import Campaign Data
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : showImport ? (
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => setShowImport(false)}>
+                    Cancel Import
+                  </Button>
+                </div>
+                <CreativeDataImport 
+                  organizationId={organizationId} 
+                  onImportComplete={() => {
+                    setShowImport(false);
+                    setHasCreativeData(true);
+                    loadAdditionalData();
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Import More Data
+                  </Button>
+                </div>
+                <CreativeInsights organizationId={organizationId} />
+              </div>
+            )}
+          </>
         )}
 
         {/* Sentiment Analysis */}

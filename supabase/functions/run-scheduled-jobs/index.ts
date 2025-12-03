@@ -333,6 +333,36 @@ serve(async (req) => {
             itemsProcessed = 1;
             break;
 
+          case 'analyze_sms_creatives':
+            const smsCreativeResponse = await supabase.functions.invoke('analyze-sms-creatives', {
+              body: { batch_size: 20 }
+            });
+            if (smsCreativeResponse.error) throw new Error(smsCreativeResponse.error.message);
+            result = smsCreativeResponse.data;
+            itemsProcessed = result?.total || 0;
+            itemsCreated = result?.analyzed || 0;
+            break;
+
+          case 'analyze_meta_creatives':
+            const metaCreativeResponse = await supabase.functions.invoke('analyze-meta-creatives', {
+              body: { batch_size: 15 }
+            });
+            if (metaCreativeResponse.error) throw new Error(metaCreativeResponse.error.message);
+            result = metaCreativeResponse.data;
+            itemsProcessed = result?.total || 0;
+            itemsCreated = result?.analyzed || 0;
+            break;
+
+          case 'calculate_creative_learnings':
+            const learningsResponse = await supabase.functions.invoke('calculate-creative-learnings', {
+              body: {}
+            });
+            if (learningsResponse.error) throw new Error(learningsResponse.error.message);
+            result = learningsResponse.data;
+            itemsProcessed = result?.creatives_analyzed || 0;
+            itemsCreated = result?.learnings_created || 0;
+            break;
+
           default:
             throw new Error(`Unknown job type: ${job.job_type}`);
         }
