@@ -28,6 +28,9 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
 }) => {
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 200 : 250);
+  
+  // Only rotate when there are many items or long labels
+  const needsRotation = isMobile && (data.length > 4 || data.some(d => d.name.length > 10));
 
   return (
     <div className={cn("w-full", className)} style={{ height: chartHeight }}>
@@ -37,8 +40,8 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
           margin={{ 
             top: 8, 
             right: isMobile ? 8 : 16, 
-            bottom: isMobile ? 8 : 4, 
-            left: isMobile ? 0 : 0 
+            bottom: needsRotation ? 8 : 4, 
+            left: 0 
           }}
         >
           <CartesianGrid 
@@ -52,9 +55,9 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
             tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 11 : 12 }}
             tickLine={false}
             axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
-            angle={isMobile ? -45 : 0}
-            textAnchor={isMobile ? "end" : "middle"}
-            height={isMobile ? 60 : 30}
+            angle={needsRotation ? -45 : 0}
+            textAnchor={needsRotation ? "end" : "middle"}
+            height={needsRotation ? 60 : 30}
             interval={0}
           />
           <YAxis
