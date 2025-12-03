@@ -126,3 +126,11 @@ verify_jwt = false
 [functions.send-spike-alerts]
 verify_jwt = false
 
+[functions.analyze-sms-creatives]
+verify_jwt = false
+
+[functions.analyze-meta-creatives]
+verify_jwt = false
+
+[functions.calculate-creative-learnings]
+verify_jwt = false
