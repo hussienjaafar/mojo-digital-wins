@@ -203,7 +203,6 @@ serve(async (req) => {
           sponsor: official_name || official_title,
           introduced_date: action_date,
           relevance_score: score,
-          threat_level: level,
           tags: matchedKeywords,
           status: 'active'
         })
@@ -340,7 +339,6 @@ serve(async (req) => {
                 sponsor: 'Governor',
                 introduced_date: pubDate ? new Date(pubDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                 relevance_score: score,
-                threat_level: level,
                 tags: matchedKeywords,
                 status: 'active'
               }, {

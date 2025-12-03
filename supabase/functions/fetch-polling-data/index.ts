@@ -79,14 +79,14 @@ serve(async (req) => {
             sample_size: parseInt(poll.sample_size) || null,
             margin_of_error: parseFloat(poll.margin_of_error) || null,
             source_url: poll.url || null,
-            source: 'FiveThirtyEight',
+            source: 'fivethirtyeight',
             fetched_at: new Date().toISOString(),
           };
 
           // Check if poll already exists
           const { data: existing } = await supabase
             .from('polling_data')
-            .select('id, poll_result')
+            .select('id, result_value')
             .eq('race_id', pollData.race_id)
             .eq('candidate_name', pollData.candidate_name)
             .eq('poll_date', pollData.poll_date)

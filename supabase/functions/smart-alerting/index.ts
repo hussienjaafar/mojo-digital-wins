@@ -451,12 +451,12 @@ serve(async (req) => {
     if (action === 'full' || action === 'process_queue') {
       console.log('Processing alert queue...');
 
-      // Get unprocessed alerts
+      // Get pending alerts (status = 'pending')
       const { data: alerts } = await supabase
         .from('alert_queue')
         .select('*')
-        .eq('processed', false)
-        .order('priority', { ascending: true }) // critical first
+        .eq('status', 'pending')
+        .order('severity', { ascending: true }) // critical first
         .order('created_at', { ascending: true })
         .limit(50);
 
@@ -469,7 +469,7 @@ serve(async (req) => {
           .select('user_id, alert_threshold, immediate_critical_alerts, watched_organizations');
 
         // Filter by threshold
-        if (alert.priority === 'critical') {
+        if (alert.severity === 'critical') {
           userQuery = userQuery.eq('immediate_critical_alerts', true);
         }
 
@@ -481,17 +481,17 @@ serve(async (req) => {
           // Check if user's threshold allows this alert
           const thresholds = ['critical', 'high', 'medium', 'low'];
           const userThresholdIndex = thresholds.indexOf(user.alert_threshold);
-          const alertIndex = thresholds.indexOf(alert.priority);
+          const alertIndex = thresholds.indexOf(alert.severity);
 
           if (alertIndex <= userThresholdIndex) {
             notifications.push({
               user_id: user.user_id,
               title: alert.title,
               message: alert.message,
-              priority: alert.priority,
-              source_type: alert.source_type,
-              source_id: alert.source_id,
-              link: alert.metadata?.url || null,
+              priority: alert.severity,
+              source_type: alert.alert_type,
+              source_id: alert.id,
+              link: alert.data?.url || null,
             });
           }
         }
@@ -501,10 +501,10 @@ serve(async (req) => {
           notificationsSent += notifications.length;
         }
 
-        // Mark alert as processed
+        // Mark alert as sent
         await supabase
           .from('alert_queue')
-          .update({ processed: true, processed_at: new Date().toISOString() })
+          .update({ status: 'sent', sent_at: new Date().toISOString() })
           .eq('id', alert.id);
       }
 
