@@ -494,6 +494,74 @@
   color: hsl(var(--portal-text-primary));
 }
 
+/* === PORTAL ICON BUTTONS === */
+/* Clean, subtle icon buttons for header actions */
+
+.portal-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--portal-radius-sm);
+  color: hsl(var(--portal-text-secondary));
+  cursor: pointer;
+  transition: all var(--portal-transition-fast);
+}
+
+.portal-icon-btn:hover {
+  background: hsl(var(--portal-bg-elevated));
+  color: hsl(var(--portal-text-primary));
+  border-color: hsl(var(--portal-border));
+}
+
+.portal-icon-btn:active {
+  background: hsl(var(--portal-bg-tertiary));
+}
+
+.portal-icon-btn:focus-visible {
+  outline: 2px solid hsl(var(--portal-accent-blue));
+  outline-offset: 2px;
+}
+
+.portal-icon-btn-danger:hover {
+  background: hsl(var(--portal-error) / 0.1);
+  color: hsl(var(--portal-error));
+  border-color: hsl(var(--portal-error) / 0.3);
+}
+
+/* Portal header clean styling */
+.portal-header-clean {
+  background: hsl(var(--portal-bg-secondary));
+  border-bottom: 1px solid hsl(var(--portal-border));
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.portal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Status indicator - simplified */
+.portal-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(var(--portal-success));
+  animation: portal-pulse 2s ease-in-out infinite;
+}
+
+@keyframes portal-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* === PORTAL WIDGET COLOR VARIANTS === */
 /* Color-coded widgets for better visual distinction */
 
