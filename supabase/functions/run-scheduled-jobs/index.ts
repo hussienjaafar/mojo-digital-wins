@@ -325,6 +325,14 @@ serve(async (req) => {
             itemsCreated = result?.polls_inserted || 0;
             break;
 
+          case 'refresh_unified_trends':
+            // Refresh the unified trends materialized view
+            const { error: refreshError } = await supabase.rpc('refresh_unified_trends');
+            if (refreshError) throw new Error(refreshError.message);
+            result = { success: true, message: 'Unified trends view refreshed' };
+            itemsProcessed = 1;
+            break;
+
           default:
             throw new Error(`Unknown job type: ${job.job_type}`);
         }
