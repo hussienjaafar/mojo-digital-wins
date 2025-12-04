@@ -2254,6 +2254,48 @@ export type Database = {
           },
         ]
       }
+      entity_aliases: {
+        Row: {
+          canonical_name: string
+          confidence_score: number | null
+          created_at: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json | null
+          raw_name: string
+          resolution_method: string
+          source: string | null
+          updated_at: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          canonical_name: string
+          confidence_score?: number | null
+          created_at?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          raw_name: string
+          resolution_method?: string
+          source?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          canonical_name?: string
+          confidence_score?: number | null
+          created_at?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          raw_name?: string
+          resolution_method?: string
+          source?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Relationships: []
+      }
       entity_mentions: {
         Row: {
           context_snippet: string | null

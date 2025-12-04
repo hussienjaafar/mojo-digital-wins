@@ -194,3 +194,6 @@ verify_jwt = false
 
 [functions.calculate-trend-clusters]
 verify_jwt = false
+
+[functions.entity-resolver]
+verify_jwt = false

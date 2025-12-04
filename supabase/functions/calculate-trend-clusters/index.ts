@@ -444,29 +444,55 @@ serve(async (req) => {
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('Calculating cross-source trend clusters with entity classification...');
+    console.log('Calculating cross-source trend clusters with hybrid entity resolution...');
+    
+    // Load entity aliases from database (hybrid resolution system)
+    const dbAliases = new Map<string, string>();
+    const { data: aliasData, error: aliasError } = await supabase
+      .from('entity_aliases')
+      .select('raw_name, canonical_name')
+      .order('usage_count', { ascending: false });
+    
+    if (aliasData && !aliasError) {
+      for (const alias of aliasData) {
+        dbAliases.set(alias.raw_name.toLowerCase(), alias.canonical_name);
+      }
+      console.log(`Loaded ${dbAliases.size} entity aliases from database`);
+    } else {
+      console.log('Using hardcoded aliases only (db load failed):', aliasError?.message);
+    }
     
     const topicMap = new Map<string, TopicData>();
     const hashtagMap = new Map<string, TopicData>(); // Separate map for hashtags
+    const unresolvedEntities = new Set<string>(); // Track entities for potential resolution
     const now = new Date();
     const hour1Ago = new Date(now.getTime() - 60 * 60 * 1000);
     const hours6Ago = new Date(now.getTime() - 6 * 60 * 60 * 1000);
     const hours24Ago = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     
-    // Helper to normalize topic names with aliasing
+    // Hybrid topic normalization: DB aliases > Hardcoded aliases > Standard normalization
     const normalizeTopic = (topic: string): string => {
       if (!topic || typeof topic !== 'string') return '';
       const trimmed = topic.trim();
       const lowerTrimmed = trimmed.toLowerCase();
       
-      // Check for alias FIRST (before any other processing)
+      // Priority 1: Check database aliases (most up-to-date)
+      if (dbAliases.has(lowerTrimmed)) {
+        return dbAliases.get(lowerTrimmed)!;
+      }
+      
+      // Priority 2: Check hardcoded aliases (fallback)
       if (TOPIC_ALIASES[lowerTrimmed]) {
         return TOPIC_ALIASES[lowerTrimmed];
       }
       
-      // Check if hashtag maps to a base topic
+      // Priority 3: Check hashtag mappings
       if (trimmed.startsWith('#')) {
         const hashLower = lowerTrimmed;
+        // Check DB for hashtag
+        if (dbAliases.has(hashLower)) {
+          return dbAliases.get(hashLower)!;
+        }
         if (HASHTAG_TO_TOPIC[hashLower]) {
           return HASHTAG_TO_TOPIC[hashLower];
         }
@@ -482,10 +508,18 @@ serve(async (req) => {
         .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join(' ');
       
-      // Check alias again after normalization
+      // Check DB and hardcoded aliases after normalization
       const normalizedLower = normalized.toLowerCase();
+      if (dbAliases.has(normalizedLower)) {
+        return dbAliases.get(normalizedLower)!;
+      }
       if (TOPIC_ALIASES[normalizedLower]) {
         return TOPIC_ALIASES[normalizedLower];
+      }
+      
+      // Track unresolved entity for potential future resolution
+      if (normalized.length >= 3 && /^[A-Z]/.test(normalized)) {
+        unresolvedEntities.add(normalized);
       }
       
       return normalized;
@@ -1094,6 +1128,17 @@ serve(async (req) => {
       status: 'completed'
     });
 
+    // Log unresolved entities for future alias addition
+    if (unresolvedEntities.size > 0) {
+      console.log(`Found ${unresolvedEntities.size} unresolved entities (potential future aliases):`);
+      const topUnresolved = Array.from(unresolvedEntities)
+        .filter(e => topicMap.has(e) && (topicMap.get(e)?.total_count || 0) >= 5)
+        .slice(0, 20);
+      if (topUnresolved.length > 0) {
+        console.log('High-volume unresolved:', topUnresolved.join(', '));
+      }
+    }
+
     const result = {
       success: true,
       total_topics: topicMap.size,
@@ -1101,6 +1146,8 @@ serve(async (req) => {
       clusters_updated: clustersUpdated,
       breaking_topics: breakingCount,
       entity_distribution: entityTypeCounts,
+      db_aliases_loaded: dbAliases.size,
+      unresolved_entities: unresolvedEntities.size,
       duration_ms: Date.now() - startTime
     };
     
