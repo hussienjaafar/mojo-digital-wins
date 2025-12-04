@@ -3,8 +3,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, Flame, RefreshCw, Newspaper, Users, ArrowUpRight, ChevronRight } from "lucide-react";
-import { useUnifiedTrends, getSpikeRatioColor, formatSpikeRatio } from "@/hooks/useUnifiedTrends";
+import { TrendingUp, Flame, RefreshCw, Newspaper, Users, ArrowUpRight, ChevronRight, Target } from "lucide-react";
+import { useUnifiedTrends, getSpikeRatioColor, formatSpikeRatio, UnifiedTrend } from "@/hooks/useUnifiedTrends";
 import { cn } from "@/lib/utils";
 
 interface UnifiedTrendingPanelProps {
@@ -56,17 +56,30 @@ export function UnifiedTrendingPanel({ onTopicClick }: UnifiedTrendingPanelProps
     return 'Trending';
   };
 
-  const getContextSnippet = (trend: any) => {
+  const getContextSnippet = (trend: UnifiedTrend) => {
     const mentions = trend.total_mentions_24h;
     const sources = getSourceLabel(trend.source_types);
     
+    // If we have a sample headline, use it for context
+    if (trend.sampleHeadline) {
+      const truncated = trend.sampleHeadline.length > 60 
+        ? trend.sampleHeadline.substring(0, 60) + '...'
+        : trend.sampleHeadline;
+      return `"${truncated}"`;
+    }
+    
+    // Build descriptive context based on metrics
     if (trend.spike_ratio >= 3) {
       return `Surging ${trend.spike_ratio.toFixed(1)}x above baseline • ${mentions} mentions in ${sources.toLowerCase()}`;
     }
     if (trend.spike_ratio >= 2) {
       return `Trending up ${trend.spike_ratio.toFixed(1)}x • ${mentions} mentions across ${sources.toLowerCase()}`;
     }
-    return `${mentions} mentions in ${sources.toLowerCase()} • Updated ${formatTime(trend.last_updated)} ago`;
+    
+    // Sentiment-based context
+    const sentiment = trend.avg_sentiment || 0;
+    const sentimentLabel = sentiment > 0.2 ? 'positive' : sentiment < -0.2 ? 'negative' : 'neutral';
+    return `${mentions} mentions • ${sentimentLabel} sentiment • ${sources}`;
   };
 
   return (
@@ -159,11 +172,17 @@ export function UnifiedTrendingPanel({ onTopicClick }: UnifiedTrendingPanelProps
                       {getContextSnippet(trend)}
                     </p>
                     
-                    <div className="flex items-center gap-3 mt-2">
+                    <div className="flex items-center gap-2 flex-wrap mt-2">
                       {getSourceIcon(trend.source_types)}
                       <span className="text-xs text-muted-foreground">
                         {getSourceLabel(trend.source_types)}
                       </span>
+                      {trend.matchesWatchlist && (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium">
+                          <Target className="h-3 w-3" />
+                          Watchlist
+                        </span>
+                      )}
                       {trend.source_count >= 2 && (
                         <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
                           Cross-platform
