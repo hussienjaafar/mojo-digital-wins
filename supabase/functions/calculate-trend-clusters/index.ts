@@ -721,6 +721,38 @@ const TOPIC_ALIASES: Record<string, string> = {
   'american': '__SKIP__',
   'breaking': '__SKIP__',
   'just': '__SKIP__',
+  
+  // TWO-WORD FRAGMENTS (common bot spam patterns)
+  'the trump': '__SKIP__',
+  'the house': '__SKIP__',
+  'the white': '__SKIP__',
+  'the new': '__SKIP__',
+  'the supreme': '__SKIP__',
+  'the article': '__SKIP__',
+  'the united': '__SKIP__',
+  'the republicans': '__SKIP__',
+  'the democrats': '__SKIP__',
+  'the president': '__SKIP__',
+  'and trump': '__SKIP__',
+  'if trump': '__SKIP__',
+  'when trump': '__SKIP__',
+  'president donald': '__SKIP__',
+  'trump admin': '__SKIP__',
+  'details here': '__SKIP__',
+  'snow depth': '__SKIP__',
+  'climate report': '__SKIP__',
+  'missing link': '__SKIP__',
+  'administration': '__SKIP__', // too generic without context
+  'the administration': '__SKIP__',
+  'click here': '__SKIP__',
+  'read more': '__SKIP__',
+  'learn more': '__SKIP__',
+  'watch now': '__SKIP__',
+  'live now': '__SKIP__',
+  'breaking news': '__SKIP__',
+  'just in': '__SKIP__',
+  'news update': '__SKIP__',
+  'update here': '__SKIP__',
 };
 
 // Hashtag to base topic mapping (for merging hashtag counts into main topics)
@@ -1142,6 +1174,28 @@ serve(async (req) => {
       if (!topic || typeof topic !== 'string') return '';
       const trimmed = topic.trim();
       const lowerTrimmed = trimmed.toLowerCase();
+      
+      // Quick fragment pattern checks (before alias lookups)
+      // Skip very short topics (likely fragments)
+      if (trimmed.length < 3) return '';
+      
+      // Skip topics that start with articles/conjunctions followed by 1-2 words (common bot spam)
+      // E.g., "The United", "The Republicans", "And Trump", "If Trump", "When Trump"
+      const words = trimmed.split(/\s+/);
+      const firstWordLower = words[0]?.toLowerCase();
+      if (words.length <= 2 && ['the', 'and', 'a', 'an', 'if', 'when', 'but', 'or', 'so', 'as', 'to', 'for', 'in', 'on', 'at', 'by', 'with', 'from'].includes(firstWordLower)) {
+        return '';
+      }
+      
+      // Skip generic spam patterns
+      if (/^(details|click|read|learn|watch|live|update|snow|climate|weather|missing)\s+(here|now|more|depth|report|link)$/i.test(trimmed)) {
+        return '';
+      }
+      
+      // Skip topics that look like sentence fragments (contain common sentence starters)
+      if (/^(this|that|these|those|what|where|why|how|who)\s+/i.test(trimmed) && words.length <= 3) {
+        return '';
+      }
       
       // Priority 1: Check database aliases (most up-to-date)
       if (dbAliases.has(lowerTrimmed)) {
