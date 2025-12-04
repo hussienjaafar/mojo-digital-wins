@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, Flame, GripVertical, RefreshCw, Newspaper, Users, ArrowUpRight } from "lucide-react";
+import { TrendingUp, Flame, GripVertical, RefreshCw, Newspaper, Users, ArrowUpRight, Zap, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUnifiedTrends, getSpikeRatioColor, formatSpikeRatio } from "@/hooks/useUnifiedTrends";
 import { cn } from "@/lib/utils";
@@ -105,7 +105,8 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
                   className={cn(
                     "flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer group",
                     "bg-[hsl(var(--portal-bg-elevated))] hover:bg-[hsl(var(--portal-bg-hover))]",
-                    trend.is_breakthrough && trend.spike_ratio >= 3 && "ring-1 ring-orange-500/30 bg-orange-500/5"
+                    trend.is_breaking && "ring-1 ring-red-500/40 bg-red-500/5",
+                    !trend.is_breaking && trend.is_breakthrough && trend.spike_ratio >= 3 && "ring-1 ring-orange-500/30 bg-orange-500/5"
                   )}
                 >
                   {/* Rank */}
@@ -121,15 +122,24 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      {trend.is_breakthrough && trend.spike_ratio >= 3 && (
+                      {trend.is_breaking && (
+                        <Zap className="h-3.5 w-3.5 text-red-500 animate-pulse" />
+                      )}
+                      {!trend.is_breaking && trend.is_breakthrough && trend.spike_ratio >= 3 && (
                         <Flame className="h-3.5 w-3.5 text-orange-400 animate-pulse" />
                       )}
-                      {trend.spike_ratio >= 2 && trend.spike_ratio < 3 && (
+                      {!trend.is_breaking && trend.spike_ratio >= 2 && trend.spike_ratio < 3 && (
                         <ArrowUpRight className="h-3.5 w-3.5 text-yellow-400" />
                       )}
                       <span className="text-sm font-semibold portal-text-primary truncate group-hover:text-primary transition-colors" title={trend.name}>
                         {trend.name}
                       </span>
+                      {trend.entity_type === 'person' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-medium">Person</span>
+                      )}
+                      {trend.entity_type === 'event' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 font-medium">Event</span>
+                      )}
                     </div>
                     
                     <div className="flex items-center gap-2 mt-1">
@@ -142,10 +152,23 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
                       </span>
                     </div>
                     
+                    {/* Related Topics - "Trending with" */}
+                    {trend.related_topics && trend.related_topics.length > 0 && (
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <Link className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                        <span className="text-[10px] text-muted-foreground">
+                          Trending with:{" "}
+                          <span className="text-foreground/70">
+                            {trend.related_topics.slice(0, 3).join(", ")}
+                          </span>
+                        </span>
+                      </div>
+                    )}
+                    
                     {trend.spike_ratio >= 2 && (
                       <div className="mt-1">
                         <span className={cn("text-xs font-medium", getSpikeRatioColor(trend.spike_ratio))}>
-                          {formatSpikeRatio(trend.spike_ratio)}
+                          {trend.is_breaking ? "🔴 BREAKING" : formatSpikeRatio(trend.spike_ratio)}
                           {trend.baseline_hourly > 0 && (
                             <span className="text-muted-foreground font-normal ml-1">
                               ({trend.spike_ratio.toFixed(1)}x baseline)
