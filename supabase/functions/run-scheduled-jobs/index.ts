@@ -363,6 +363,45 @@ serve(async (req) => {
             itemsCreated = result?.learnings_created || 0;
             break;
 
+          case 'fetch_google_news':
+            const googleNewsResponse = await supabase.functions.invoke('fetch-google-news', {
+              body: {}
+            });
+            if (googleNewsResponse.error) throw new Error(googleNewsResponse.error.message);
+            result = googleNewsResponse.data;
+            itemsProcessed = result?.fetched || 0;
+            itemsCreated = result?.inserted || 0;
+            break;
+
+          case 'fetch_reddit_posts':
+            const redditResponse = await supabase.functions.invoke('fetch-reddit-posts', {
+              body: {}
+            });
+            if (redditResponse.error) throw new Error(redditResponse.error.message);
+            result = redditResponse.data;
+            itemsProcessed = result?.fetched || 0;
+            itemsCreated = result?.inserted || 0;
+            break;
+
+          case 'batch_analyze_content':
+            const batchAnalyzeResponse = await supabase.functions.invoke('batch-analyze-content', {
+              body: {}
+            });
+            if (batchAnalyzeResponse.error) throw new Error(batchAnalyzeResponse.error.message);
+            result = batchAnalyzeResponse.data;
+            itemsProcessed = result?.processed || 0;
+            break;
+
+          case 'calculate_trend_clusters':
+            const trendClustersResponse = await supabase.functions.invoke('calculate-trend-clusters', {
+              body: {}
+            });
+            if (trendClustersResponse.error) throw new Error(trendClustersResponse.error.message);
+            result = trendClustersResponse.data;
+            itemsProcessed = result?.topics_processed || 0;
+            itemsCreated = result?.clusters_created || 0;
+            break;
+
           default:
             throw new Error(`Unknown job type: ${job.job_type}`);
         }
