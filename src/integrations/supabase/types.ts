@@ -5523,11 +5523,28 @@ export type Database = {
         Args: { mentions_1h: number; mentions_24h: number; mentions_6h: number }
         Returns: number
       }
+      count_keyword_mentions: {
+        Args: { search_keyword: string; time_window?: unknown }
+        Returns: {
+          bluesky_count: number
+          news_count: number
+          rss_count: number
+          total_count: number
+        }[]
+      }
       count_posts_with_topic: {
         Args: { time_window?: unknown; topic_name: string }
         Returns: number
       }
       deduplicate_topic_name: { Args: { topic_name: string }; Returns: string }
+      discover_trending_keywords: {
+        Args: { min_frequency?: number; time_window?: unknown }
+        Returns: {
+          frequency: number
+          keyword: string
+          source_type: string
+        }[]
+      }
       get_backfill_progress: {
         Args: never
         Returns: {
