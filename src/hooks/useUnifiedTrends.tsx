@@ -16,6 +16,10 @@ export interface UnifiedTrend {
   source_count: number;
   last_updated: string;
   unified_score: number;
+  // Enhanced context
+  matchesWatchlist?: boolean;
+  watchlistEntity?: string;
+  sampleHeadline?: string;
 }
 
 interface UseUnifiedTrendsOptions {
@@ -35,6 +39,7 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     setError(null);
     
     try {
+      // Fetch trends and watchlist in parallel
       let query = supabase
         .from('mv_unified_trends')
         .select('*')
@@ -45,15 +50,51 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
         query = query.eq('is_breakthrough', true);
       }
 
-      const { data, error: queryError } = await query;
+      const [trendsResult, watchlistResult, headlinesResult] = await Promise.all([
+        query,
+        supabase.from('entity_watchlist').select('entity_name'),
+        // Get sample headlines for context
+        supabase.from('articles')
+          .select('title, tags')
+          .gte('published_date', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+          .order('published_date', { ascending: false })
+          .limit(100)
+      ]);
 
-      if (queryError) {
-        console.error('Error fetching unified trends:', queryError);
-        setError(queryError.message);
+      if (trendsResult.error) {
+        console.error('Error fetching unified trends:', trendsResult.error);
+        setError(trendsResult.error.message);
         return;
       }
 
-      setTrends((data || []) as UnifiedTrend[]);
+      const watchlistEntities = (watchlistResult.data || []).map((w: any) => w.entity_name?.toLowerCase() || '');
+      const headlines = headlinesResult.data || [];
+
+      // Enrich trends with watchlist matches and sample headlines
+      const enrichedTrends = (trendsResult.data || []).map((trend: any) => {
+        const trendNameLower = trend.name?.toLowerCase() || '';
+        const normalizedLower = trend.normalized_name?.toLowerCase() || '';
+        
+        // Check watchlist match
+        const matchedEntity = watchlistEntities.find((entity: string) => 
+          entity && (trendNameLower.includes(entity) || entity.includes(trendNameLower) || normalizedLower.includes(entity))
+        );
+        
+        // Find a sample headline mentioning this topic
+        const matchingHeadline = headlines.find((article: any) => 
+          article.title?.toLowerCase().includes(trendNameLower) ||
+          (article.tags && article.tags.some((tag: string) => tag?.toLowerCase().includes(trendNameLower)))
+        );
+
+        return {
+          ...trend,
+          matchesWatchlist: !!matchedEntity,
+          watchlistEntity: matchedEntity || null,
+          sampleHeadline: matchingHeadline?.title || null,
+        } as UnifiedTrend;
+      });
+
+      setTrends(enrichedTrends);
     } catch (err) {
       console.error('Failed to fetch unified trends:', err);
       setError('Failed to load trends');
