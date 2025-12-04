@@ -2760,6 +2760,77 @@ export type Database = {
         }
         Relationships: []
       }
+      google_news_articles: {
+        Row: {
+          ai_processed: boolean | null
+          ai_sentiment: number | null
+          ai_sentiment_label: string | null
+          ai_topics: string[] | null
+          created_at: string | null
+          description: string | null
+          duplicate_of: string | null
+          id: string
+          is_duplicate: boolean | null
+          published_at: string
+          relevance_score: number | null
+          source_name: string
+          source_url: string | null
+          title: string
+          title_hash: string | null
+          updated_at: string | null
+          url: string
+          url_hash: string | null
+        }
+        Insert: {
+          ai_processed?: boolean | null
+          ai_sentiment?: number | null
+          ai_sentiment_label?: string | null
+          ai_topics?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          duplicate_of?: string | null
+          id?: string
+          is_duplicate?: boolean | null
+          published_at: string
+          relevance_score?: number | null
+          source_name: string
+          source_url?: string | null
+          title: string
+          title_hash?: string | null
+          updated_at?: string | null
+          url: string
+          url_hash?: string | null
+        }
+        Update: {
+          ai_processed?: boolean | null
+          ai_sentiment?: number | null
+          ai_sentiment_label?: string | null
+          ai_topics?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          duplicate_of?: string | null
+          id?: string
+          is_duplicate?: boolean | null
+          published_at?: string
+          relevance_score?: number | null
+          source_name?: string
+          source_url?: string | null
+          title?: string
+          title_hash?: string | null
+          updated_at?: string | null
+          url?: string
+          url_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_news_articles_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "google_news_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       government_announcements: {
         Row: {
           agency: string
@@ -3590,6 +3661,48 @@ export type Database = {
         }
         Relationships: []
       }
+      processing_batches: {
+        Row: {
+          ai_tokens_used: number | null
+          batch_type: string
+          clusters_created: number | null
+          completed_at: string | null
+          duplicates_removed: number | null
+          id: string
+          items_count: number | null
+          processing_time_ms: number | null
+          started_at: string | null
+          status: string | null
+          unique_items: number | null
+        }
+        Insert: {
+          ai_tokens_used?: number | null
+          batch_type: string
+          clusters_created?: number | null
+          completed_at?: string | null
+          duplicates_removed?: number | null
+          id?: string
+          items_count?: number | null
+          processing_time_ms?: number | null
+          started_at?: string | null
+          status?: string | null
+          unique_items?: number | null
+        }
+        Update: {
+          ai_tokens_used?: number | null
+          batch_type?: string
+          clusters_created?: number | null
+          completed_at?: string | null
+          duplicates_removed?: number | null
+          id?: string
+          items_count?: number | null
+          processing_time_ms?: number | null
+          started_at?: string | null
+          status?: string | null
+          unique_items?: number | null
+        }
+        Relationships: []
+      }
       processing_checkpoints: {
         Row: {
           function_name: string
@@ -3671,6 +3784,81 @@ export type Database = {
           id?: string
           p256dh?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      reddit_posts: {
+        Row: {
+          ai_processed: boolean | null
+          ai_sentiment: number | null
+          ai_sentiment_label: string | null
+          ai_topics: string[] | null
+          author: string | null
+          created_at: string | null
+          created_utc: string
+          downvotes: number | null
+          id: string
+          is_duplicate: boolean | null
+          num_comments: number | null
+          permalink: string | null
+          reddit_id: string
+          relevance_score: number | null
+          score: number | null
+          selftext: string | null
+          subreddit: string
+          title: string
+          title_hash: string | null
+          updated_at: string | null
+          upvotes: number | null
+          url: string | null
+        }
+        Insert: {
+          ai_processed?: boolean | null
+          ai_sentiment?: number | null
+          ai_sentiment_label?: string | null
+          ai_topics?: string[] | null
+          author?: string | null
+          created_at?: string | null
+          created_utc: string
+          downvotes?: number | null
+          id?: string
+          is_duplicate?: boolean | null
+          num_comments?: number | null
+          permalink?: string | null
+          reddit_id: string
+          relevance_score?: number | null
+          score?: number | null
+          selftext?: string | null
+          subreddit: string
+          title: string
+          title_hash?: string | null
+          updated_at?: string | null
+          upvotes?: number | null
+          url?: string | null
+        }
+        Update: {
+          ai_processed?: boolean | null
+          ai_sentiment?: number | null
+          ai_sentiment_label?: string | null
+          ai_topics?: string[] | null
+          author?: string | null
+          created_at?: string | null
+          created_utc?: string
+          downvotes?: number | null
+          id?: string
+          is_duplicate?: boolean | null
+          num_comments?: number | null
+          permalink?: string | null
+          reddit_id?: string
+          relevance_score?: number | null
+          score?: number | null
+          selftext?: string | null
+          subreddit?: string
+          title?: string
+          title_hash?: string | null
+          updated_at?: string | null
+          upvotes?: number | null
+          url?: string | null
         }
         Relationships: []
       }
@@ -4700,6 +4888,105 @@ export type Database = {
         }
         Relationships: []
       }
+      trend_clusters: {
+        Row: {
+          article_ids: string[] | null
+          bluesky_count: number | null
+          bluesky_ids: string[] | null
+          cluster_summary: string | null
+          cluster_title: string
+          created_at: string | null
+          cross_source_score: number | null
+          dominant_sentiment: string | null
+          entity_co_occurrences: Json | null
+          first_seen_at: string | null
+          google_news_count: number | null
+          google_news_ids: string[] | null
+          id: string
+          is_trending: boolean | null
+          key_entities: string[] | null
+          last_activity_at: string | null
+          mentions_last_24h: number | null
+          mentions_last_6h: number | null
+          mentions_last_hour: number | null
+          momentum: string | null
+          peak_at: string | null
+          reddit_count: number | null
+          reddit_ids: string[] | null
+          rss_count: number | null
+          sentiment_score: number | null
+          source_distribution: Json | null
+          total_mentions: number | null
+          trending_since: string | null
+          updated_at: string | null
+          velocity_score: number | null
+        }
+        Insert: {
+          article_ids?: string[] | null
+          bluesky_count?: number | null
+          bluesky_ids?: string[] | null
+          cluster_summary?: string | null
+          cluster_title: string
+          created_at?: string | null
+          cross_source_score?: number | null
+          dominant_sentiment?: string | null
+          entity_co_occurrences?: Json | null
+          first_seen_at?: string | null
+          google_news_count?: number | null
+          google_news_ids?: string[] | null
+          id?: string
+          is_trending?: boolean | null
+          key_entities?: string[] | null
+          last_activity_at?: string | null
+          mentions_last_24h?: number | null
+          mentions_last_6h?: number | null
+          mentions_last_hour?: number | null
+          momentum?: string | null
+          peak_at?: string | null
+          reddit_count?: number | null
+          reddit_ids?: string[] | null
+          rss_count?: number | null
+          sentiment_score?: number | null
+          source_distribution?: Json | null
+          total_mentions?: number | null
+          trending_since?: string | null
+          updated_at?: string | null
+          velocity_score?: number | null
+        }
+        Update: {
+          article_ids?: string[] | null
+          bluesky_count?: number | null
+          bluesky_ids?: string[] | null
+          cluster_summary?: string | null
+          cluster_title?: string
+          created_at?: string | null
+          cross_source_score?: number | null
+          dominant_sentiment?: string | null
+          entity_co_occurrences?: Json | null
+          first_seen_at?: string | null
+          google_news_count?: number | null
+          google_news_ids?: string[] | null
+          id?: string
+          is_trending?: boolean | null
+          key_entities?: string[] | null
+          last_activity_at?: string | null
+          mentions_last_24h?: number | null
+          mentions_last_6h?: number | null
+          mentions_last_hour?: number | null
+          momentum?: string | null
+          peak_at?: string | null
+          reddit_count?: number | null
+          reddit_ids?: string[] | null
+          rss_count?: number | null
+          sentiment_score?: number | null
+          source_distribution?: Json | null
+          total_mentions?: number | null
+          trending_since?: string | null
+          updated_at?: string | null
+          velocity_score?: number | null
+        }
+        Relationships: []
+      }
       trending_news_topics: {
         Row: {
           calculated_at: string | null
@@ -5119,6 +5406,15 @@ export type Database = {
         Args: { topic_name: string }
         Returns: number
       }
+      calculate_cross_source_score: {
+        Args: {
+          bluesky_count: number
+          google_count: number
+          reddit_count: number
+          rss_count: number
+        }
+        Returns: number
+      }
       calculate_next_run:
         | { Args: { cron_schedule: string }; Returns: string }
         | { Args: { cron_expr: string; from_time?: string }; Returns: string }
@@ -5134,6 +5430,10 @@ export type Database = {
           six_hour_count: number
           topic_name: string
         }
+        Returns: number
+      }
+      calculate_trend_velocity_v2: {
+        Args: { mentions_1h: number; mentions_24h: number; mentions_6h: number }
         Returns: number
       }
       count_posts_with_topic: {
