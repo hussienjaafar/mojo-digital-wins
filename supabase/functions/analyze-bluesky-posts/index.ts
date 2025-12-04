@@ -6,13 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// CRITICAL FIX: Switch to OpenAI GPT-3.5-turbo for 10x rate limits
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
-
-// Fallback to Lovable AI if OpenAI not configured
+// Use Lovable AI Gateway
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
 const VALID_GROUPS = [
   'muslim_american', 'arab_american', 'lgbtq', 'immigrants', 'refugees',
@@ -27,36 +23,102 @@ const VALID_CATEGORIES = [
   'lgbtq_rights', 'foreign_policy', 'climate', 'economy', 'politics', 'other'
 ];
 
-// Data validation function
-function validateAnalysis(analysis: any): { valid: boolean; errors: string[]; confidence: number } {
-  const errors: string[] = [];
-  let confidence = 1.0;
+// Topic normalization map - maps variations to canonical forms
+const TOPIC_NORMALIZATIONS: Record<string, string> = {
+  'donald trump': 'Donald Trump',
+  'trump': 'Donald Trump',
+  'president trump': 'Donald Trump',
+  'joe biden': 'Joe Biden',
+  'biden': 'Joe Biden',
+  'president biden': 'Joe Biden',
+  'netanyahu': 'Benjamin Netanyahu',
+  'benjamin netanyahu': 'Benjamin Netanyahu',
+  'israel': 'Israel',
+  'palestine': 'Palestine',
+  'gaza': 'Gaza',
+  'gaza strip': 'Gaza',
+  'west bank': 'West Bank',
+  'un': 'United Nations',
+  'united nations': 'United Nations',
+  'ice': 'ICE',
+  'immigration and customs enforcement': 'ICE',
+  'epa': 'EPA',
+  'fbi': 'FBI',
+  'cia': 'CIA',
+  'nato': 'NATO',
+  'nyc': 'New York City',
+  'new york city': 'New York City',
+  'dc': 'Washington DC',
+  'washington dc': 'Washington DC',
+};
 
-  if (!analysis.affected_groups || !Array.isArray(analysis.affected_groups)) {
-    errors.push('Missing or invalid affected_groups');
-    return { valid: false, errors, confidence: 0 };
+// Evergreen topics that should NEVER be extracted as trending topics
+const EVERGREEN_BLOCKLIST = new Set([
+  // Generic categories
+  'politics', 'economy', 'government', 'healthcare', 'education', 'immigration',
+  'climate', 'technology', 'security', 'military', 'foreign policy', 'civil rights',
+  'human rights', 'criminal justice', 'voting rights', 'religious freedom', 'lgbtq rights',
+  // Actions/descriptions
+  'debate', 'reform', 'crisis', 'investigation', 'legislation', 'announcement',
+  'controversy', 'tensions', 'policy', 'strategy', 'approach', 'movement', 'issues',
+  'challenges', 'administration', 'campaign', 'election',
+  // Demographics (these go in affected_groups, not topics)
+  'workers', 'immigrants', 'refugees', 'veterans', 'seniors', 'youth', 'women',
+  'disabled', 'general_public', 'muslim_american', 'arab_american', 'black_american',
+  'latino_hispanic', 'asian_american', 'indigenous', 'lgbtq',
+]);
+
+function normalizeTopic(topic: string): string {
+  const lower = topic.toLowerCase();
+  return TOPIC_NORMALIZATIONS[lower] || topic;
+}
+
+function isValidProperNoun(topic: string): boolean {
+  const lower = topic.toLowerCase();
+  const words = lower.split(/\s+/);
+  
+  // Must be 1-4 words
+  if (words.length > 4 || words.length === 0) return false;
+  
+  // Must start with capital letter
+  if (topic[0] !== topic[0].toUpperCase()) return false;
+  
+  // Must not be in blocklist
+  if (EVERGREEN_BLOCKLIST.has(lower)) return false;
+  
+  // Must not contain blocklist words
+  for (const word of words) {
+    if (EVERGREEN_BLOCKLIST.has(word)) return false;
   }
+  
+  return true;
+}
 
-  const invalidGroups = analysis.affected_groups.filter(
-    (g: string) => !VALID_GROUPS.includes(g)
-  );
-  if (invalidGroups.length > 0) {
-    errors.push(`Invalid groups: ${invalidGroups.join(', ')}`);
-    confidence -= 0.3;
+// Helper function for robust JSON parsing
+function tryParseJSON(text: string): any {
+  try {
+    return JSON.parse(text);
+  } catch (e1) {
+    const cleaned = text.replace(/```json|```/g, '').trim();
+    try {
+      return JSON.parse(cleaned);
+    } catch (e2) {
+      const arrayMatch = text.match(/\[[\s\S]*\]/);
+      if (arrayMatch) {
+        try {
+          return JSON.parse(arrayMatch[0]);
+        } catch (e3) {
+          const normalized = arrayMatch[0]
+            .replace(/\r?\n/g, ' ')
+            .replace(/\u201c|\u201d/g, '"')
+            .replace(/\u2018|\u2019/g, "'")
+            .replace(/,\s*([}\]])/g, '$1');
+          return JSON.parse(normalized);
+        }
+      }
+      throw new Error('Could not extract valid JSON from response');
+    }
   }
-
-  if (analysis.relevance_category && !VALID_CATEGORIES.includes(analysis.relevance_category)) {
-    errors.push(`Invalid category: ${analysis.relevance_category}`);
-    confidence -= 0.2;
-  }
-
-  if (analysis.sentiment !== null && (analysis.sentiment < -1 || analysis.sentiment > 1)) {
-    errors.push('Sentiment out of range [-1, 1]');
-    confidence -= 0.2;
-  }
-
-  const valid = errors.length === 0 || confidence >= 0.5;
-  return { valid, errors, confidence: Math.max(0, confidence) };
 }
 
 interface BlueSkyPost {
@@ -66,181 +128,73 @@ interface BlueSkyPost {
   created_at: string;
 }
 
-// Topic normalization map
-const TOPIC_NORMALIZATIONS: Record<string, string> = {
-  // Political figures
-  'donald trump': 'Donald Trump',
-  'trump': 'Donald Trump',
-  'joe biden': 'Joe Biden',
-  'biden': 'Joe Biden',
-  'netanyahu': 'Benjamin Netanyahu',
-  'benjamin netanyahu': 'Benjamin Netanyahu',
-
-  // Regions & conflicts
-  'israel': 'Israel',
-  'palestine': 'Palestine',
-  'gaza': 'Gaza',
-  'west bank': 'West Bank',
-  'middle east': 'Middle East',
-
-  // Organizations
-  'un': 'United Nations',
-  'united nations': 'United Nations',
-  'ice': 'ICE',
-  'gop': 'Republican Party',
-  'republican party': 'Republican Party',
-  'democratic party': 'Democratic Party',
-
-  // Cities
-  'nyc': 'New York City',
-  'new york city': 'New York City',
-  'dc': 'Washington DC',
-  'washington dc': 'Washington DC',
-
-  // Issues
-  'climate change': 'Climate Change',
-  'climate crisis': 'Climate Change',
-  'human rights': 'Human Rights',
-  'civil rights': 'Civil Rights',
-  'lgbtq rights': 'LGBTQ Rights',
-  'lgbtq': 'LGBTQ Rights',
-  'immigration': 'Immigration',
-  'surveillance': 'Surveillance',
-  'privacy': 'Privacy',
-  'genocide': 'Genocide',
-  'humanitarian crisis': 'Humanitarian Crisis',
-  'occupation': 'Occupation',
-  'israel-palestine conflict': 'Israel-Palestine Conflict',
-  'palestinian conflict': 'Israel-Palestine Conflict',
-};
-
-function normalizeTopic(topic: string): string {
-  const lower = topic.toLowerCase();
-  return TOPIC_NORMALIZATIONS[lower] || topic;
-}
-
-// Helper function for robust JSON parsing
-function tryParseJSON(text: string): any {
-  // Try direct parse
-  try {
-    return JSON.parse(text);
-  } catch (e1) {
-    // Try extracting JSON from markdown
-    const cleaned = text.replace(/```json|```/g, '').trim();
-    try {
-      return JSON.parse(cleaned);
-    } catch (e2) {
-      // Try extracting first JSON array
-      const arrayMatch = text.match(/\[[\s\S]*\]/);
-      if (arrayMatch) {
-        try {
-          return JSON.parse(arrayMatch[0]);
-        } catch (e3) {
-          // Try with light cleanup
-          const normalized = arrayMatch[0]
-            .replace(/\r?\n/g, ' ')
-            .replace(/\u201c|\u201d/g, '"')
-            .replace(/\u2018|\u2019/g, "'")
-            .replace(/,\s*([}\]])/g, '$1');
-          return JSON.parse(normalized);
-        }
-      }
-      // Try extracting first JSON object
-      const objMatch = text.match(/\{[\s\S]*\}/);
-      if (objMatch) {
-        const normalized = objMatch[0]
-          .replace(/\r?\n/g, ' ')
-          .replace(/\u201c|\u201d/g, '"')
-          .replace(/\u2018|\u2019/g, "'")
-          .replace(/,\s*([}\]])/g, '$1');
-        return JSON.parse(normalized);
-      }
-      throw new Error('Could not extract valid JSON from response');
-    }
-  }
-}
-
-// Analyze posts using GPT-3.5-turbo (10x rate limits vs Claude)
+// FIXED: Extract proper nouns ONLY, like Twitter trending
 async function analyzePosts(posts: BlueSkyPost[]): Promise<any[]> {
-  // Prefer OpenAI for better rate limits
-  const useOpenAI = !!OPENAI_API_KEY;
-  const apiKey = useOpenAI ? OPENAI_API_KEY : LOVABLE_API_KEY;
-  const apiUrl = useOpenAI ? OPENAI_API_URL : LOVABLE_API_URL;
-
-  if (!apiKey) {
-    throw new Error('No API key configured (OPENAI_API_KEY or LOVABLE_API_KEY)');
+  if (!LOVABLE_API_KEY) {
+    throw new Error('LOVABLE_API_KEY not configured');
   }
 
-  // Prepare batch analysis prompt
   const postsText = posts.map((p, i) =>
     `[${i}] @${p.author_handle}: ${p.text}`
   ).join('\n\n');
 
-  const prompt = `Analyze these Bluesky posts comprehensively. Extract:
+  // CRITICAL FIX: New prompt that extracts proper nouns only, matching extract-trending-topics
+  const prompt = `Analyze these Bluesky posts. Extract ONLY proper nouns (names) - NOT themes or categories.
 
-1. **topics**: Array of 1-5 specific topics (e.g., "immigration policy", "lgbtq rights", "climate legislation")
-2. **affected_groups**: Which communities are discussed? Use standardized labels:
-   - muslim_american, arab_american, jewish_american, christian
-   - lgbtq, transgender, women, reproductive_rights
-   - black_american, latino_hispanic, asian_american, indigenous
-   - immigrants, refugees, asylum_seekers
-   - disabled, seniors, youth, veterans, workers
-3. **relevance_category**: Primary category (civil_rights, immigration, healthcare, education, climate, economy, foreign_policy, criminal_justice, etc.)
-4. **sentiment**: Overall sentiment (-1.0 to 1.0, where -1 is very negative, 0 neutral, 1 positive)
+${postsText}
+
+For EACH post, extract:
+
+1. **topics**: Array of 1-4 PROPER NOUNS only. Ask: WHO? WHERE? WHAT specific thing?
+   EXTRACT: People ("Donald Trump"), Places ("Gaza"), Organizations ("FBI"), Bills ("HR 1234"), Events ("Super Bowl")
+   DO NOT EXTRACT: Categories ("immigration"), Actions ("debate"), Descriptions ("crisis")
+
+2. **affected_groups**: Which communities are discussed? Use ONLY these labels:
+   muslim_american, arab_american, lgbtq, immigrants, refugees, black_american, 
+   latino_hispanic, asian_american, indigenous, women, youth, seniors, disabled, veterans, workers, general_public
+
+3. **relevance_category**: Primary category (civil_rights, immigration, healthcare, education, climate, economy, foreign_policy, criminal_justice, politics, other)
+
+4. **sentiment**: -1.0 to 1.0 (negative to positive)
+
 5. **sentiment_label**: "positive", "neutral", or "negative"
 
-Return ONLY a JSON array with this exact structure:
-[
-  {
-    "index": 0,
-    "topics": ["immigration reform", "border security"],
-    "affected_groups": ["immigrants", "latino_hispanic"],
-    "relevance_category": "immigration",
-    "sentiment": -0.4,
-    "sentiment_label": "negative"
-  }
-]
+VALIDATION RULES for topics:
+- Must be a proper noun (would have a Wikipedia page)
+- Must be 1-4 words max
+- Must start with capital letter
+- NOT a theme/category/action word
+- NOT a news publisher
 
-Posts:
-${postsText}`;
+Return JSON array:
+[{"index": 0, "topics": ["Pete Hegseth", "Pentagon"], "affected_groups": ["veterans"], "relevance_category": "politics", "sentiment": -0.3, "sentiment_label": "negative"}]`;
 
-  const requestBody = useOpenAI
-    ? {
-        model: 'gpt-3.5-turbo-1106', // Fast, cheap, 10x Claude rate limits
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3
-        // Removed response_format to allow array responses
-      }
-    : {
-        model: 'google/gemini-2.0-flash', // Fallback
-        messages: [{ role: 'user', content: prompt }]
-      };
-
-  const response = await fetch(apiUrl, {
+  const response = await fetch(AI_GATEWAY_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(requestBody)
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { role: 'system', content: 'You extract ONLY proper nouns from social posts - names of people, places, organizations, events. NOT themes, categories, or generic terms. Think: WHO, WHERE, WHAT specific thing.' },
+        { role: 'user', content: prompt }
+      ]
+    })
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-
-    // Handle rate limits gracefully
     if (response.status === 429) {
-      console.log('⚠️ Rate limit hit, will retry later');
+      console.log('⚠️ Rate limit hit');
       throw new Error('RATE_LIMIT');
     }
-
-    throw new Error(`AI API error: ${response.status} - ${errorText}`);
+    throw new Error(`AI API error: ${response.status}`);
   }
 
   const data = await response.json();
   const analysisText = data.choices[0].message.content;
 
-  // Robust JSON parsing with multiple fallback attempts
   let analyses;
   try {
     analyses = tryParseJSON(analysisText);
@@ -249,33 +203,45 @@ ${postsText}`;
     throw new Error(`JSON parse failed: ${parseError.message}`);
   }
 
-  // Ensure we have an array
   if (!Array.isArray(analyses)) {
     if (typeof analyses === 'object' && analyses.results) {
-      analyses = analyses.results; // Sometimes wrapped in { results: [...] }
+      analyses = analyses.results;
     } else {
       throw new Error('AI response is not an array');
     }
   }
 
-  // Map analyses back to posts with normalization
+  // Map and validate topics
   return posts.map((post, i) => {
     const analysis = analyses.find((a: any) => a.index === i) || {
       topics: [],
       affected_groups: [],
-      relevance_category: 'general',
+      relevance_category: 'other',
       sentiment: 0,
       sentiment_label: 'neutral'
     };
 
-    // Normalize topics
-    const normalizedTopics = analysis.topics.map((t: string) => normalizeTopic(t));
+    // CRITICAL: Filter and normalize topics to proper nouns only
+    const validTopics = (analysis.topics || [])
+      .map((t: string) => normalizeTopic(t))
+      .filter((t: string) => isValidProperNoun(t));
+
+    // Validate affected_groups
+    const validGroups = (analysis.affected_groups || [])
+      .filter((g: string) => VALID_GROUPS.includes(g));
+
+    // Validate category
+    const category = VALID_CATEGORIES.includes(analysis.relevance_category) 
+      ? analysis.relevance_category 
+      : 'other';
+
+    console.log(`Post ${i}: Extracted ${validTopics.length} proper nouns: ${validTopics.join(', ')}`);
 
     return {
       id: post.id,
-      ai_topics: normalizedTopics,
-      affected_groups: analysis.affected_groups,
-      relevance_category: analysis.relevance_category,
+      ai_topics: validTopics,
+      affected_groups: validGroups,
+      relevance_category: category,
       ai_sentiment: analysis.sentiment,
       ai_sentiment_label: analysis.sentiment_label,
       ai_processed: true,
@@ -294,35 +260,30 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Best-effort status updates for ops dashboard
+    // Best-effort status updates
     const markJob = async (status: 'running' | 'success' | 'failed') => {
-      const nextRun = status === 'success'
-        ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
-        : null;
       await supabase
         .from('scheduled_jobs')
         .update({
           last_run_status: status,
           last_run_at: new Date().toISOString(),
-          ...(nextRun ? { next_run_at: nextRun } : {})
+          ...(status === 'success' ? { next_run_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() } : {})
         })
         .eq('job_type', 'analyze_bluesky');
     };
 
     await markJob('running').catch(() => {});
 
-    console.log('🤖 Starting AI analysis of Bluesky posts...');
+    console.log('🤖 Starting AI analysis of Bluesky posts (proper nouns only)...');
 
-    // INCREASED: Batch size from 20 to 50 for higher throughput (GPT-3.5 handles this well)
-    const { batchSize = 50, minRelevance = 0.01 } = await req.json().catch(() => ({ batchSize: 50, minRelevance: 0.01 }));
-    const effectiveMinRelevance = Math.max(0, Number(minRelevance) || 0);
+    const { batchSize = 30, minRelevance = 0.01 } = await req.json().catch(() => ({ batchSize: 30, minRelevance: 0.01 }));
 
-    // Get unprocessed posts with relevance above threshold (default very low to avoid starvation)
+    // Get unprocessed posts
     const { data: posts, error: fetchError } = await supabase
       .from('bluesky_posts')
       .select('id, text, author_handle, created_at')
       .eq('ai_processed', false)
-      .gte('ai_relevance_score', effectiveMinRelevance)
+      .gte('ai_relevance_score', Math.max(0, minRelevance))
       .order('created_at', { ascending: false })
       .limit(batchSize);
 
@@ -334,18 +295,14 @@ serve(async (req) => {
     if (!posts || posts.length === 0) {
       await markJob('success').catch(() => {});
       return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'No unprocessed posts found',
-          processed: 0
-        }),
+        JSON.stringify({ success: true, message: 'No unprocessed posts found', processed: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     console.log(`📊 Found ${posts.length} posts to analyze`);
 
-    // Analyze posts using AI with timeout protection
+    // Analyze with timeout
     let analyses: any[];
     try {
       const timeout = new Promise<never>((_, reject) => 
@@ -354,44 +311,22 @@ serve(async (req) => {
       analyses = await Promise.race([analyzePosts(posts), timeout]) as any[];
     } catch (error: any) {
       if (error.message === 'AI analysis timeout') {
-        console.log('⏱️ Analysis timed out, will retry with smaller batch next run');
+        console.log('⏱️ Analysis timed out');
         await markJob('success').catch(() => {});
         return new Response(
-          JSON.stringify({
-            success: true,
-            message: 'Batch timeout - reduce size or retry',
-            processed: 0,
-            timeout: true
-          }),
+          JSON.stringify({ success: true, message: 'Timeout', processed: 0, timeout: true }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       throw error;
     }
 
-    // Update posts with AI analysis
+    // Update posts
     let successCount = 0;
     let errorCount = 0;
-    let validationFailedCount = 0;
 
     for (const analysis of analyses) {
       try {
-        // Validate analysis
-        const validation = validateAnalysis(analysis);
-
-        if (!validation.valid && validation.confidence < 0.5) {
-          console.log(`Post ${analysis.id} failed validation:`, validation.errors);
-          validationFailedCount++;
-
-          await supabase.from('bluesky_posts').update({
-            validation_passed: false,
-            validation_errors: validation.errors,
-            ai_confidence_score: validation.confidence
-          }).eq('id', analysis.id);
-
-          continue;
-        }
-
         const { error } = await supabase
           .from('bluesky_posts')
           .update({
@@ -400,11 +335,9 @@ serve(async (req) => {
             relevance_category: analysis.relevance_category,
             ai_sentiment: analysis.ai_sentiment,
             ai_sentiment_label: analysis.ai_sentiment_label,
-            ai_confidence_score: validation.confidence,
-            validation_passed: true,
-            validation_errors: validation.errors.length > 0 ? validation.errors : null,
             ai_processed: true,
-            ai_processed_at: analysis.ai_processed_at
+            ai_processed_at: analysis.ai_processed_at,
+            validation_passed: true
           })
           .eq('id', analysis.id);
 
@@ -412,53 +345,23 @@ serve(async (req) => {
           console.error(`❌ Error updating post ${analysis.id}:`, error);
           errorCount++;
         } else {
-          // Extract and insert entities into entity_mentions
-          const entities: Array<{entity_name: string; entity_type: string}> = [];
-          
-          // Extract from topics
-          if (analysis.ai_topics) {
-            for (const topic of analysis.ai_topics) {
-              entities.push({
-                entity_name: topic,
-                entity_type: 'topic'
-              });
-            }
-          }
-
-          // Extract from affected groups
-          if (analysis.affected_groups) {
-            for (const group of analysis.affected_groups) {
-              entities.push({
-                entity_name: group,
-                entity_type: 'affected_group'
-              });
-            }
-          }
-
-          // Insert entity mentions with deduplication
-          // CRITICAL FIX: Changed source_type from 'bluesky_post' to 'bluesky' to match constraint
-          if (entities.length > 0) {
+          // Insert entity mentions for proper noun topics only
+          if (analysis.ai_topics && analysis.ai_topics.length > 0) {
             const post = posts.find(p => p.id === analysis.id);
-            const { error: mentionError } = await supabase.from('entity_mentions').upsert(
-              entities.map(e => ({
-                entity_name: e.entity_name,
-                entity_type: e.entity_type,
-                source_type: 'bluesky',  // FIXED: Was 'bluesky_post', constraint requires 'bluesky'
-                source_id: analysis.id,
-                mentioned_at: post?.created_at || new Date().toISOString(),
-                sentiment: analysis.ai_sentiment
-              })),
-              {
-                onConflict: 'entity_name,source_id,source_type',
-                ignoreDuplicates: false  // Update sentiment if mention already exists
-              }
-            );
+            const mentions = analysis.ai_topics.map((topic: string) => ({
+              entity_name: topic,
+              entity_type: 'topic',
+              source_type: 'bluesky',
+              source_id: analysis.id,
+              mentioned_at: post?.created_at || new Date().toISOString(),
+              sentiment: analysis.ai_sentiment
+            }));
 
-            if (mentionError) {
-              console.error(`Error inserting entity mentions for post ${analysis.id}:`, mentionError);
-            }
+            await supabase.from('entity_mentions').upsert(mentions, {
+              onConflict: 'entity_name,source_id,source_type',
+              ignoreDuplicates: false
+            });
           }
-          
           successCount++;
         }
       } catch (error) {
@@ -475,68 +378,40 @@ serve(async (req) => {
       updated_at: new Date().toISOString()
     });
 
-    console.log(`✅ Processed ${successCount} posts, ${validationFailedCount} validation failed, ${errorCount} errors`);
+    console.log(`✅ Processed ${successCount} posts, ${errorCount} errors`);
 
-    // FIXED: Reduced batch_limit from 50 to 20 to prevent statement timeout
+    // Update trends
     let trendResults: any[] | null = null;
-    let trendError: any = null;
-    
     try {
-      const result = await supabase
-        .rpc('update_bluesky_trends_optimized', { batch_limit: 20 });
+      const result = await supabase.rpc('update_bluesky_trends_optimized', { batch_limit: 20 });
       trendResults = result.data;
-      trendError = result.error;
+      if (result.error) console.error('Trends update error:', result.error);
     } catch (e) {
-      console.error('❌ Trends calculation timed out, will retry next run');
-      trendError = e;
+      console.error('Trends calculation failed:', e);
     }
 
-    if (trendError) {
-      console.error('❌ Error updating trends:', trendError);
-    } else {
-      console.log(`✅ Updated ${trendResults?.length || 0} trends with proper velocity calculations`);
+    // Refresh unified trends view (best effort)
+    try {
+      await supabase.rpc('refresh_materialized_view', { view_name: 'mv_unified_trends' });
+    } catch (e) {
+      console.log('Materialized view refresh skipped:', e);
     }
-
-    // Record performance metrics
-    await supabase.from('bluesky_velocity_metrics').insert({
-      topics_processed: trendResults?.length || 0,
-      trending_detected: trendResults?.filter((t: any) => t.is_trending).length || 0,
-      error_count: trendError ? 1 : 0
-    });
-
-    const responseBody = {
-      success: true,
-      processed: successCount,
-      validationFailed: validationFailedCount,
-      errors: errorCount,
-      dataQuality: successCount > 0 ? (successCount / (successCount + validationFailedCount)).toFixed(2) : 0,
-      topics_extracted: analyses.flatMap(a => a.ai_topics || []).length,
-      trends_updated: trendResults?.length || 0,
-      trending_detected: trendResults?.filter((t: any) => t.is_trending).length || 0
-    };
 
     await markJob('success').catch(() => {});
 
     return new Response(
-      JSON.stringify(responseBody),
+      JSON.stringify({
+        success: true,
+        processed: successCount,
+        errors: errorCount,
+        topics_extracted: analyses.flatMap(a => a.ai_topics || []).length,
+        trends_updated: trendResults?.length || 0
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
     console.error('Error in analyze-bluesky-posts:', error);
-    try {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-      await supabase
-        .from('scheduled_jobs')
-        .update({
-          last_run_status: 'failed',
-          last_run_at: new Date().toISOString()
-        })
-        .eq('job_type', 'analyze_bluesky');
-    } catch (_err) {}
     return new Response(
       JSON.stringify({ error: error?.message || 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

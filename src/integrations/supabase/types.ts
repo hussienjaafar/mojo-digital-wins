@@ -2465,6 +2465,27 @@ export type Database = {
           },
         ]
       }
+      evergreen_topics: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          topic: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          topic: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          topic?: string
+        }
+        Relationships: []
+      }
       executive_orders: {
         Row: {
           created_at: string
@@ -5196,6 +5217,10 @@ export type Database = {
       }
       refresh_daily_group_sentiment: { Args: never; Returns: undefined }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
+      refresh_materialized_view: {
+        Args: { view_name: string }
+        Returns: undefined
+      }
       refresh_unified_trends: { Args: never; Returns: undefined }
       reset_circuit_breaker: { Args: { job_id: string }; Returns: undefined }
       resolve_job_failure: {
