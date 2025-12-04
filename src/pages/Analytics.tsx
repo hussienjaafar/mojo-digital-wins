@@ -120,7 +120,7 @@ export default function Analytics() {
   // Topic content sheet state
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTopic, setSheetTopic] = useState<string>("");
-  const { isLoading: sheetLoading, content: sheetContent, fetchTopicContent } = useTopicContent();
+  const { isLoading: sheetLoading, content: sheetContent, fetchTopicContent, addToWatchlist } = useTopicContent();
   const navigate = useNavigate();
 
   // Error handling utility: Parse error and return user-friendly message
@@ -1206,6 +1206,7 @@ export default function Analytics() {
         topic={sheetTopic}
         isLoading={sheetLoading}
         content={sheetContent}
+        onAddToWatchlist={addToWatchlist}
       />
     </div>
   );
