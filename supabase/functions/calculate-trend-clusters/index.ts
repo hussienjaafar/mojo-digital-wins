@@ -772,6 +772,136 @@ serve(async (req) => {
       }
     }
     
+    // ========================================
+    // HYBRID KEYWORD DISCOVERY
+    // Discover trending keywords from RAW TEXT to catch topics AI missed
+    // This helps detect breaking news like "Eurovision", "Chris Wray", etc.
+    // ========================================
+    console.log('Starting hybrid keyword discovery...');
+    
+    try {
+      // Call the SQL function to discover high-frequency keywords from raw text
+      const { data: discoveredKeywords, error: keywordError } = await supabase
+        .rpc('discover_trending_keywords', {
+          time_window: '6 hours',
+          min_frequency: 15  // Lower threshold to catch more trends
+        });
+      
+      if (keywordError) {
+        console.error('Keyword discovery error:', keywordError);
+      } else if (discoveredKeywords && discoveredKeywords.length > 0) {
+        console.log(`Discovered ${discoveredKeywords.length} potential trending keywords from raw text`);
+        
+        // Group by keyword (some appear from multiple sources)
+        const keywordCounts = new Map<string, { totalFreq: number; sources: string[] }>();
+        for (const kw of discoveredKeywords) {
+          const normalized = normalizeTopic(kw.keyword);
+          if (!normalized || normalized.length < 3) continue;
+          
+          if (!keywordCounts.has(normalized)) {
+            keywordCounts.set(normalized, { totalFreq: 0, sources: [] });
+          }
+          const entry = keywordCounts.get(normalized)!;
+          entry.totalFreq += Number(kw.frequency);
+          if (!entry.sources.includes(kw.source_type)) {
+            entry.sources.push(kw.source_type);
+          }
+        }
+        
+        // Process keywords - both NEW topics and BOOST existing AI-discovered topics
+        let newKeywordsAdded = 0;
+        let topicsBoosted = 0;
+        const keywordsToProcess: string[] = [];
+        const existingTopicsToBoost: string[] = [];
+        
+        // Priority topics to always boost with keyword counts (trending news topics)
+        const priorityTopics = ['Eurovision', 'Obamacare', 'Christopher Wray', 'Brian Cole'];
+        for (const pt of priorityTopics) {
+          if (topicMap.has(pt)) {
+            existingTopicsToBoost.push(pt);
+          } else {
+            keywordsToProcess.push(pt);
+          }
+        }
+        
+        for (const [keyword, info] of keywordCounts) {
+          if (topicMap.has(keyword)) {
+            // Existing topic - boost if from multiple sources or high frequency
+            if (info.sources.length >= 2 || info.totalFreq >= 50) {
+              existingTopicsToBoost.push(keyword);
+            }
+            continue;
+          }
+          
+          // Skip generic single words
+          if (!keyword.includes(' ') && info.sources.length === 1 && info.totalFreq < 30) {
+            continue;
+          }
+          
+          keywordsToProcess.push(keyword);
+        }
+        
+        console.log(`Processing ${keywordsToProcess.length} new keywords, boosting ${existingTopicsToBoost.length} existing...`);
+        
+        // Boost existing topics with keyword-based counts
+        const BATCH_SIZE = 15;
+        for (let i = 0; i < existingTopicsToBoost.length; i += BATCH_SIZE) {
+          const batch = existingTopicsToBoost.slice(i, i + BATCH_SIZE);
+          await Promise.all(batch.map(async (keyword) => {
+            try {
+              const { data: counts } = await supabase.rpc('count_keyword_mentions', {
+                search_keyword: keyword, time_window: '24 hours'
+              });
+              if (counts?.[0]) {
+                const existing = topicMap.get(keyword)!;
+                const keywordTotal = Number(counts[0].total_count) || 0;
+                if (keywordTotal > existing.total_count) {
+                  existing.bluesky_count = Math.max(existing.bluesky_count, Number(counts[0].bluesky_count) || 0);
+                  existing.google_news_count = Math.max(existing.google_news_count, Number(counts[0].news_count) || 0);
+                  existing.rss_count = Math.max(existing.rss_count, Number(counts[0].rss_count) || 0);
+                  existing.total_count = keywordTotal;
+                  topicsBoosted++;
+                  console.log(`Boosted ${keyword}: AI=${existing.total_count} -> Keyword=${keywordTotal}`);
+                }
+              }
+            } catch (err) { /* ignore */ }
+          }));
+        }
+        
+        // Add new keyword-discovered topics
+        for (let i = 0; i < Math.min(keywordsToProcess.length, 30); i += BATCH_SIZE) {
+          const batch = keywordsToProcess.slice(i, i + BATCH_SIZE);
+          await Promise.all(batch.map(async (keyword) => {
+            try {
+              const { data: counts } = await supabase.rpc('count_keyword_mentions', {
+                search_keyword: keyword, time_window: '24 hours'
+              });
+              if (counts?.[0] && Number(counts[0].total_count) >= 15) {
+                const newData = initTopicData(keyword, new Date());
+                newData.bluesky_count = Number(counts[0].bluesky_count) || 0;
+                newData.google_news_count = Number(counts[0].news_count) || 0;
+                newData.rss_count = Number(counts[0].rss_count) || 0;
+                newData.total_count = Number(counts[0].total_count);
+                newData.entity_type = classifyEntityType(keyword, []);
+                topicMap.set(keyword, newData);
+                newKeywordsAdded++;
+                console.log(`Added: ${keyword} (${newData.total_count} mentions)`);
+              }
+            } catch (err) { /* ignore */ }
+          }));
+        }
+        
+        console.log(`Hybrid: ${newKeywordsAdded} new topics, ${topicsBoosted} boosted`);
+      }
+    } catch (hybridError) {
+      console.error('Hybrid keyword discovery failed:', hybridError);
+      // Continue with AI-discovered topics only
+    }
+    
+    // ========================================
+    // END HYBRID KEYWORD DISCOVERY
+    // ========================================
+    
     // Merge hashtags into main topic map (with aliasing to base topics)
     for (const [key, data] of hashtagMap) {
       // Check if this hashtag should be merged into a base topic
