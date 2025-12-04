@@ -8,26 +8,47 @@ const corsHeaders = {
 
 // Local keyword extraction (no AI needed)
 const POLITICAL_KEYWORDS = {
-  entities: [
-    'trump', 'biden', 'harris', 'desantis', 'pence', 'pelosi', 'mcconnell',
-    'schumer', 'ocasio-cortez', 'aoc', 'gaetz', 'greene', 'cruz', 'sanders',
-    'warren', 'buttigieg', 'newsom', 'abbott', 'supreme court', 'congress',
-    'senate', 'house', 'white house', 'pentagon', 'doj', 'fbi', 'cia'
+  // Named entities (people) - highest specificity
+  persons: [
+    'trump', 'biden', 'harris', 'obama', 'pence', 'desantis', 'newsom',
+    'pelosi', 'mcconnell', 'schumer', 'cruz', 'sanders', 'warren', 'aoc',
+    'ocasio-cortez', 'gaetz', 'greene', 'boebert', 'jordan', 'mccarthy',
+    'kash patel', 'brian cole', 'jack smith', 'merrick garland', 'alito',
+    'kavanaugh', 'gorsuch', 'barrett', 'sotomayor', 'kagan', 'jackson',
+    'musk', 'zuckerberg', 'buttigieg', 'tuberville', 'vance', 'ramaswamy'
   ],
+  // Organizations - high specificity
+  organizations: [
+    'fbi', 'doj', 'cia', 'nsa', 'dhs', 'ice', 'cbp', 'atf', 'dea',
+    'supreme court', 'congress', 'senate', 'house', 'white house',
+    'pentagon', 'state department', 'treasury', 'federal reserve',
+    'nato', 'democratic party', 'republican party', 'gop', 'dnc', 'rnc'
+  ],
+  // Event indicators - mark headlines as events
+  events: [
+    'arrested', 'arrest', 'indicted', 'indictment', 'verdict', 'ruling',
+    'shooting', 'bombing', 'explosion', 'crash', 'fire', 'attack',
+    'resignation', 'fired', 'dies', 'death', 'killed', 'murder',
+    'election', 'primary', 'debate', 'rally', 'protest', 'riot',
+    'hearing', 'testimony', 'trial', 'sentencing', 'appeal', 'subpoena',
+    'summit', 'meeting', 'conference', 'speech', 'announcement',
+    'scandal', 'leak', 'breach', 'hack', 'exposed', 'reveals'
+  ],
+  // General topics - lower specificity
   topics: [
     'immigration', 'border', 'abortion', 'healthcare', 'climate', 'gun',
-    'economy', 'inflation', 'jobs', 'taxes', 'election', 'voting', 'ballot',
-    'impeachment', 'indictment', 'trial', 'verdict', 'ruling', 'executive order',
-    'legislation', 'bill', 'law', 'policy', 'rights', 'discrimination',
-    'protest', 'rally', 'campaign', 'debate', 'poll', 'approval rating'
+    'economy', 'inflation', 'jobs', 'taxes', 'voting', 'ballot',
+    'impeachment', 'executive order', 'legislation', 'bill', 'law',
+    'policy', 'rights', 'discrimination', 'campaign', 'poll', 'approval'
   ],
   sentiment_positive: [
     'victory', 'win', 'success', 'breakthrough', 'progress', 'bipartisan',
-    'agreement', 'support', 'approval', 'praise', 'celebrate'
+    'agreement', 'support', 'approval', 'praise', 'celebrate', 'unanimous'
   ],
   sentiment_negative: [
     'crisis', 'scandal', 'controversy', 'attack', 'threat', 'failure',
-    'reject', 'oppose', 'condemn', 'criticize', 'backlash', 'outrage'
+    'reject', 'oppose', 'condemn', 'criticize', 'backlash', 'outrage',
+    'chaos', 'disaster', 'collapse', 'corruption', 'fraud', 'abuse'
   ]
 };
 
@@ -43,37 +64,93 @@ interface AnalysisResult {
   sentiment: number;
   sentiment_label: string;
   relevance_score: number;
+  hashtags: string[];
+  entity_types: Record<string, string>; // topic -> entity_type
 }
 
-// Local analysis without AI
+// Extract hashtags from text
+function extractHashtags(text: string): string[] {
+  const hashtags: string[] = [];
+  const hashtagRegex = /#[A-Za-z][A-Za-z0-9_]{2,30}/g;
+  const matches = text.match(hashtagRegex);
+  if (matches) {
+    for (const match of matches) {
+      const normalized = match.toLowerCase();
+      if (!hashtags.includes(normalized)) {
+        hashtags.push(normalized);
+      }
+    }
+  }
+  return hashtags;
+}
+
+// Local analysis with entity type classification
 function analyzeContentLocally(title: string, description?: string): AnalysisResult {
   const text = `${title} ${description || ''}`.toLowerCase();
   const topics: string[] = [];
+  const entityTypes: Record<string, string> = {};
   let positiveScore = 0;
   let negativeScore = 0;
   let relevanceScore = 0;
+  let hasEventIndicator = false;
   
-  // Extract entities
-  for (const entity of POLITICAL_KEYWORDS.entities) {
-    if (text.includes(entity)) {
-      // Normalize entity names for topics
-      const normalized = entity.charAt(0).toUpperCase() + entity.slice(1);
+  // Check for event indicators first
+  for (const indicator of POLITICAL_KEYWORDS.events) {
+    if (text.includes(indicator)) {
+      hasEventIndicator = true;
+      break;
+    }
+  }
+  
+  // Extract persons (highest priority)
+  for (const person of POLITICAL_KEYWORDS.persons) {
+    if (text.includes(person)) {
+      // Proper case the name
+      const normalized = person.split(' ')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
       if (!topics.includes(normalized)) {
         topics.push(normalized);
+        entityTypes[normalized] = hasEventIndicator ? 'event' : 'person';
+      }
+      relevanceScore += 0.2;
+    }
+  }
+  
+  // Extract organizations
+  for (const org of POLITICAL_KEYWORDS.organizations) {
+    if (text.includes(org)) {
+      const normalized = org.toUpperCase() === org 
+        ? org.toUpperCase() 
+        : org.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      if (!topics.includes(normalized)) {
+        topics.push(normalized);
+        entityTypes[normalized] = 'organization';
       }
       relevanceScore += 0.15;
     }
   }
   
-  // Extract topics
+  // Extract general topics
   for (const topic of POLITICAL_KEYWORDS.topics) {
     if (text.includes(topic)) {
       const normalized = topic.charAt(0).toUpperCase() + topic.slice(1);
       if (!topics.includes(normalized)) {
         topics.push(normalized);
+        entityTypes[normalized] = 'category';
       }
       relevanceScore += 0.1;
     }
+  }
+  
+  // Extract hashtags as topics
+  const hashtags = extractHashtags(`${title} ${description || ''}`);
+  for (const hashtag of hashtags) {
+    if (!topics.includes(hashtag)) {
+      topics.push(hashtag);
+      entityTypes[hashtag] = 'hashtag';
+    }
+    relevanceScore += 0.15;
   }
   
   // Simple sentiment analysis
@@ -94,10 +171,12 @@ function analyzeContentLocally(title: string, description?: string): AnalysisRes
                          sentiment < -0.2 ? 'negative' : 'neutral';
   
   return {
-    topics: topics.slice(0, 5), // Max 5 topics
+    topics: topics.slice(0, 8), // Max 8 topics
     sentiment: Math.round(sentiment * 100) / 100,
     sentiment_label: sentimentLabel,
-    relevance_score: Math.min(relevanceScore, 1)
+    relevance_score: Math.min(relevanceScore, 1),
+    hashtags,
+    entity_types: entityTypes
   };
 }
 
@@ -118,8 +197,8 @@ async function analyzeClusterWithAI(
         messages: [
           {
             role: 'system',
-            content: `You are a political news analyst. Extract the core narrative from headlines.
-Output JSON only: {"summary": "2-sentence summary of the story", "topics": ["Topic1", "Topic2", "Topic3"]}`
+            content: `You are a political news analyst. Extract specific named entities and events.
+Output JSON only: {"summary": "2-sentence summary with specific names/events", "topics": ["PersonName", "OrganizationName", "SpecificEvent"]}`
           },
           {
             role: 'user',
@@ -190,10 +269,11 @@ serve(async (req) => {
 
     const { source_type, batch_size = 100 } = await req.json().catch(() => ({}));
     
-    console.log(`Batch analyzing content, source: ${source_type || 'all'}, batch: ${batch_size}`);
+    console.log(`Batch analyzing content with entity classification, source: ${source_type || 'all'}, batch: ${batch_size}`);
     
     let processedCount = 0;
     let clustersCreated = 0;
+    let hashtagsExtracted = 0;
     
     // Process Google News
     if (!source_type || source_type === 'google_news') {
@@ -205,7 +285,7 @@ serve(async (req) => {
         .limit(batch_size);
       
       if (newsItems && newsItems.length > 0) {
-        console.log(`Processing ${newsItems.length} Google News items locally...`);
+        console.log(`Processing ${newsItems.length} Google News items...`);
         
         for (const item of newsItems) {
           const analysis = analyzeContentLocally(item.title, item.description);
@@ -218,16 +298,18 @@ serve(async (req) => {
               ai_sentiment: analysis.sentiment,
               ai_sentiment_label: analysis.sentiment_label,
               relevance_score: analysis.relevance_score,
+              extracted_hashtags: analysis.hashtags,
               updated_at: new Date().toISOString()
             })
             .eq('id', item.id);
           
           processedCount++;
+          hashtagsExtracted += analysis.hashtags.length;
         }
       }
     }
     
-    // Process Reddit posts
+    // Process Reddit posts (keeping for future)
     if (!source_type || source_type === 'reddit') {
       const { data: redditItems } = await supabase
         .from('reddit_posts')
@@ -237,7 +319,7 @@ serve(async (req) => {
         .limit(batch_size);
       
       if (redditItems && redditItems.length > 0) {
-        console.log(`Processing ${redditItems.length} Reddit posts locally...`);
+        console.log(`Processing ${redditItems.length} Reddit posts...`);
         
         for (const item of redditItems) {
           const analysis = analyzeContentLocally(item.title, item.selftext);
@@ -259,6 +341,41 @@ serve(async (req) => {
       }
     }
     
+    // Process RSS articles  
+    if (!source_type || source_type === 'rss') {
+      const { data: rssItems } = await supabase
+        .from('articles')
+        .select('id, title, description')
+        .is('extracted_topics', null)
+        .order('published_date', { ascending: false })
+        .limit(batch_size);
+      
+      if (rssItems && rssItems.length > 0) {
+        console.log(`Processing ${rssItems.length} RSS articles...`);
+        
+        for (const item of rssItems) {
+          const analysis = analyzeContentLocally(item.title, item.description);
+          
+          await supabase
+            .from('articles')
+            .update({
+              extracted_topics: analysis.topics.map(t => ({
+                topic: t,
+                entity_type: analysis.entity_types[t] || 'category'
+              })),
+              sentiment_score: analysis.sentiment,
+              sentiment_label: analysis.sentiment_label,
+              extracted_hashtags: analysis.hashtags,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', item.id);
+          
+          processedCount++;
+          hashtagsExtracted += analysis.hashtags.length;
+        }
+      }
+    }
+    
     // Log batch stats
     await supabase.from('processing_batches').insert({
       batch_type: source_type || 'batch_analyze',
@@ -275,6 +392,7 @@ serve(async (req) => {
       success: true,
       processed: processedCount,
       clusters_created: clustersCreated,
+      hashtags_extracted: hashtagsExtracted,
       ai_tokens_used: 0,
       duration_ms: Date.now() - startTime
     };
