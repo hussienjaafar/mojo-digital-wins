@@ -30,127 +30,674 @@ interface TopicData {
 // Maps variations to canonical names
 // Use '__SKIP__' to mark fragment words that should be ignored
 const TOPIC_ALIASES: Record<string, string> = {
-  // Trump variations
+  // ==========================================
+  // POLITICAL FIGURES - CURRENT ADMINISTRATION
+  // ==========================================
   'trump': 'Donald Trump',
   '#trump': 'Donald Trump',
   '#donaldtrump': 'Donald Trump',
   'president trump': 'Donald Trump',
   'former president trump': 'Donald Trump',
   'trump administration': 'Donald Trump',
+  'donald j trump': 'Donald Trump',
+  'donald j. trump': 'Donald Trump',
+  'potus': 'Donald Trump',
+  '#potus': 'Donald Trump',
   
-  // MAGA (keep as related to Trump but separate concept)
   'maga': 'MAGA',
   '#maga': 'MAGA',
+  'make america great again': 'MAGA',
   
-  // Biden variations
   'biden': 'Joe Biden',
   '#biden': 'Joe Biden',
   '#joebiden': 'Joe Biden',
   'president biden': 'Joe Biden',
   'biden administration': 'Joe Biden',
+  'joseph biden': 'Joe Biden',
+  'joe': '__SKIP__', // fragment
   
-  // Harris variations
   'harris': 'Kamala Harris',
   '#harris': 'Kamala Harris',
   '#kamalaharris': 'Kamala Harris',
   'vp harris': 'Kamala Harris',
   'vice president harris': 'Kamala Harris',
+  'kamala': 'Kamala Harris',
   
-  // Musk variations
+  'vance': 'JD Vance',
+  '#vance': 'JD Vance',
+  '#jdvance': 'JD Vance',
+  'jd vance': 'JD Vance',
+  'j.d. vance': 'JD Vance',
+  
+  // ==========================================
+  // TRUMP CABINET & NOMINEES
+  // ==========================================
   'musk': 'Elon Musk',
   '#musk': 'Elon Musk',
   '#elonmusk': 'Elon Musk',
+  'elon': 'Elon Musk',
   
-  // Supreme Court variations
+  'hegseth': 'Pete Hegseth',
+  '#hegseth': 'Pete Hegseth',
+  '#petehegseth': 'Pete Hegseth',
+  
+  'kash patel': 'Kash Patel',
+  '#kashpatel': 'Kash Patel',
+  'patel': 'Kash Patel',
+  
+  'wray': 'Christopher Wray',
+  '#wray': 'Christopher Wray',
+  'chris wray': 'Christopher Wray',
+  'christopher wray': 'Christopher Wray',
+  
+  'rubio': 'Marco Rubio',
+  '#rubio': 'Marco Rubio',
+  'marco rubio': 'Marco Rubio',
+  
+  'bondi': 'Pam Bondi',
+  '#bondi': 'Pam Bondi',
+  'pam bondi': 'Pam Bondi',
+  
+  'burgum': 'Doug Burgum',
+  'doug burgum': 'Doug Burgum',
+  
+  'noem': 'Kristi Noem',
+  '#noem': 'Kristi Noem',
+  'kristi noem': 'Kristi Noem',
+  
+  'ratcliffe': 'John Ratcliffe',
+  'john ratcliffe': 'John Ratcliffe',
+  
+  'lee zeldin': 'Lee Zeldin',
+  'zeldin': 'Lee Zeldin',
+  
+  'vivek': 'Vivek Ramaswamy',
+  'ramaswamy': 'Vivek Ramaswamy',
+  'vivek ramaswamy': 'Vivek Ramaswamy',
+  '#vivek': 'Vivek Ramaswamy',
+  
+  // ==========================================
+  // CONGRESSIONAL LEADERS
+  // ==========================================
+  'pelosi': 'Nancy Pelosi',
+  '#pelosi': 'Nancy Pelosi',
+  'nancy pelosi': 'Nancy Pelosi',
+  
+  'mcconnell': 'Mitch McConnell',
+  '#mcconnell': 'Mitch McConnell',
+  'mitch mcconnell': 'Mitch McConnell',
+  
+  'schumer': 'Chuck Schumer',
+  '#schumer': 'Chuck Schumer',
+  'chuck schumer': 'Chuck Schumer',
+  
+  'johnson': 'Mike Johnson',
+  '#mikejohnson': 'Mike Johnson',
+  'mike johnson': 'Mike Johnson',
+  'speaker johnson': 'Mike Johnson',
+  
+  'hakeem jeffries': 'Hakeem Jeffries',
+  'jeffries': 'Hakeem Jeffries',
+  
+  'thune': 'John Thune',
+  'john thune': 'John Thune',
+  
+  // ==========================================
+  // OTHER NOTABLE POLITICIANS
+  // ==========================================
+  'desantis': 'Ron DeSantis',
+  '#desantis': 'Ron DeSantis',
+  'ron desantis': 'Ron DeSantis',
+  
+  'newsom': 'Gavin Newsom',
+  '#newsom': 'Gavin Newsom',
+  'gavin newsom': 'Gavin Newsom',
+  
+  'pence': 'Mike Pence',
+  '#pence': 'Mike Pence',
+  'mike pence': 'Mike Pence',
+  
+  'obama': 'Barack Obama',
+  '#obama': 'Barack Obama',
+  'barack obama': 'Barack Obama',
+  
+  'aoc': 'Alexandria Ocasio-Cortez',
+  '#aoc': 'Alexandria Ocasio-Cortez',
+  'ocasio-cortez': 'Alexandria Ocasio-Cortez',
+  'ocasio cortez': 'Alexandria Ocasio-Cortez',
+  'alexandria ocasio-cortez': 'Alexandria Ocasio-Cortez',
+  
+  'bernie': 'Bernie Sanders',
+  'sanders': 'Bernie Sanders',
+  '#berniesanders': 'Bernie Sanders',
+  'bernie sanders': 'Bernie Sanders',
+  
+  'warren': 'Elizabeth Warren',
+  '#warren': 'Elizabeth Warren',
+  'elizabeth warren': 'Elizabeth Warren',
+  
+  'cruz': 'Ted Cruz',
+  '#cruz': 'Ted Cruz',
+  'ted cruz': 'Ted Cruz',
+  
+  'gaetz': 'Matt Gaetz',
+  '#gaetz': 'Matt Gaetz',
+  'matt gaetz': 'Matt Gaetz',
+  
+  'mtg': 'Marjorie Taylor Greene',
+  'greene': 'Marjorie Taylor Greene',
+  '#mtg': 'Marjorie Taylor Greene',
+  'marjorie taylor greene': 'Marjorie Taylor Greene',
+  
+  'boebert': 'Lauren Boebert',
+  '#boebert': 'Lauren Boebert',
+  'lauren boebert': 'Lauren Boebert',
+  
+  'jordan': 'Jim Jordan',
+  'jim jordan': 'Jim Jordan',
+  
+  'fetterman': 'John Fetterman',
+  'john fetterman': 'John Fetterman',
+  
+  'manchin': 'Joe Manchin',
+  'joe manchin': 'Joe Manchin',
+  
+  'sinema': 'Kyrsten Sinema',
+  'kyrsten sinema': 'Kyrsten Sinema',
+  
+  'walz': 'Tim Walz',
+  '#walz': 'Tim Walz',
+  'tim walz': 'Tim Walz',
+  'governor walz': 'Tim Walz',
+  
+  // ==========================================
+  // SUPREME COURT JUSTICES
+  // ==========================================
   'scotus': 'Supreme Court',
   '#scotus': 'Supreme Court',
   '#supremecourt': 'Supreme Court',
+  'supreme court of the united states': 'Supreme Court',
   
-  // Government agencies (normalize casing)
+  'alito': 'Samuel Alito',
+  'samuel alito': 'Samuel Alito',
+  'justice alito': 'Samuel Alito',
+  
+  'thomas': 'Clarence Thomas',
+  'clarence thomas': 'Clarence Thomas',
+  'justice thomas': 'Clarence Thomas',
+  
+  'roberts': 'John Roberts',
+  'john roberts': 'John Roberts',
+  'chief justice roberts': 'John Roberts',
+  
+  'kavanaugh': 'Brett Kavanaugh',
+  'brett kavanaugh': 'Brett Kavanaugh',
+  'justice kavanaugh': 'Brett Kavanaugh',
+  
+  'gorsuch': 'Neil Gorsuch',
+  'neil gorsuch': 'Neil Gorsuch',
+  'justice gorsuch': 'Neil Gorsuch',
+  
+  'barrett': 'Amy Coney Barrett',
+  'amy coney barrett': 'Amy Coney Barrett',
+  'justice barrett': 'Amy Coney Barrett',
+  
+  'sotomayor': 'Sonia Sotomayor',
+  'sonia sotomayor': 'Sonia Sotomayor',
+  'justice sotomayor': 'Sonia Sotomayor',
+  
+  'kagan': 'Elena Kagan',
+  'elena kagan': 'Elena Kagan',
+  'justice kagan': 'Elena Kagan',
+  
+  'ketanji': 'Ketanji Brown Jackson',
+  'ketanji brown jackson': 'Ketanji Brown Jackson',
+  'justice jackson': 'Ketanji Brown Jackson',
+  
+  // ==========================================
+  // INTERNATIONAL LEADERS
+  // ==========================================
+  'putin': 'Vladimir Putin',
+  '#putin': 'Vladimir Putin',
+  'vladimir putin': 'Vladimir Putin',
+  
+  'zelensky': 'Volodymyr Zelensky',
+  '#zelensky': 'Volodymyr Zelensky',
+  'volodymyr zelensky': 'Volodymyr Zelensky',
+  
+  'netanyahu': 'Benjamin Netanyahu',
+  '#netanyahu': 'Benjamin Netanyahu',
+  'benjamin netanyahu': 'Benjamin Netanyahu',
+  'bibi': 'Benjamin Netanyahu',
+  
+  'xi': 'Xi Jinping',
+  'xi jinping': 'Xi Jinping',
+  '#xijinping': 'Xi Jinping',
+  
+  'trudeau': 'Justin Trudeau',
+  '#trudeau': 'Justin Trudeau',
+  'justin trudeau': 'Justin Trudeau',
+  
+  'macron': 'Emmanuel Macron',
+  '#macron': 'Emmanuel Macron',
+  'emmanuel macron': 'Emmanuel Macron',
+  
+  'starmer': 'Keir Starmer',
+  'keir starmer': 'Keir Starmer',
+  
+  'modi': 'Narendra Modi',
+  '#modi': 'Narendra Modi',
+  'narendra modi': 'Narendra Modi',
+  
+  'milei': 'Javier Milei',
+  '#milei': 'Javier Milei',
+  'javier milei': 'Javier Milei',
+  
+  'erdogan': 'Recep Erdogan',
+  'recep erdogan': 'Recep Erdogan',
+  
+  'orban': 'Viktor Orban',
+  'viktor orban': 'Viktor Orban',
+  
+  'lula': 'Lula da Silva',
+  'lula da silva': 'Lula da Silva',
+  
+  // ==========================================
+  // GOVERNMENT AGENCIES & BODIES
+  // ==========================================
   'fbi': 'FBI',
   '#fbi': 'FBI',
+  'federal bureau of investigation': 'FBI',
+  
   'doj': 'DOJ',
   '#doj': 'DOJ',
+  'department of justice': 'DOJ',
+  'justice department': 'DOJ',
+  
   'cia': 'CIA',
   '#cia': 'CIA',
+  'central intelligence agency': 'CIA',
+  
   'ice': 'ICE',
   '#ice': 'ICE',
+  'immigration and customs enforcement': 'ICE',
+  
   'dhs': 'DHS',
   '#dhs': 'DHS',
+  'department of homeland security': 'DHS',
+  'homeland security': 'DHS',
   
-  // Congress variations
+  'nsa': 'NSA',
+  '#nsa': 'NSA',
+  'national security agency': 'NSA',
+  
+  'cbp': 'CBP',
+  'customs and border protection': 'CBP',
+  'border patrol': 'CBP',
+  
+  'atf': 'ATF',
+  'bureau of alcohol tobacco firearms': 'ATF',
+  
+  'dea': 'DEA',
+  'drug enforcement administration': 'DEA',
+  
+  'irs': 'IRS',
+  '#irs': 'IRS',
+  'internal revenue service': 'IRS',
+  
+  'cdc': 'CDC',
+  '#cdc': 'CDC',
+  'centers for disease control': 'CDC',
+  
+  'fda': 'FDA',
+  '#fda': 'FDA',
+  'food and drug administration': 'FDA',
+  
+  'epa': 'EPA',
+  '#epa': 'EPA',
+  'environmental protection agency': 'EPA',
+  
+  'sec': 'SEC',
+  '#sec': 'SEC',
+  'securities and exchange commission': 'SEC',
+  
+  'fcc': 'FCC',
+  'federal communications commission': 'FCC',
+  
+  'ftc': 'FTC',
+  'federal trade commission': 'FTC',
+  
+  'fema': 'FEMA',
+  '#fema': 'FEMA',
+  'federal emergency management agency': 'FEMA',
+  
+  'nasa': 'NASA',
+  '#nasa': 'NASA',
+  'national aeronautics': 'NASA',
+  
+  'doge': 'DOGE',
+  '#doge': 'DOGE',
+  'department of government efficiency': 'DOGE',
+  
+  // ==========================================
+  // LEGISLATIVE BODIES
+  // ==========================================
   '#congress': 'Congress',
+  'us congress': 'Congress',
+  'u.s. congress': 'Congress',
+  
   '#senate': 'Senate',
+  'us senate': 'Senate',
+  'u.s. senate': 'Senate',
+  
   '#house': 'House',
   'house of representatives': 'House',
+  'us house': 'House',
   
-  // GOP/Republican variations
+  '#whitehouse': 'White House',
+  'the white house': 'White House',
+  'whitehouse': 'White House',
+  
+  // ==========================================
+  // POLITICAL PARTIES & MOVEMENTS
+  // ==========================================
   'gop': 'Republican Party',
   '#gop': 'Republican Party',
   'republicans': 'Republican Party',
   '#republicans': 'Republican Party',
   'republican': 'Republican Party',
+  'rnc': 'Republican Party',
   
-  // Democratic Party variations
   'democrats': 'Democratic Party',
   '#democrats': 'Democratic Party',
   'democrat': 'Democratic Party',
   '#democrat': 'Democratic Party',
+  'dnc': 'Democratic Party',
+  'dems': 'Democratic Party',
   
-  // White House
-  '#whitehouse': 'White House',
-  'the white house': 'White House',
-  'whitehouse': 'White House',
+  // ==========================================
+  // CIVIL RIGHTS & ADVOCACY ORGANIZATIONS
+  // ==========================================
+  'cair': 'CAIR',
+  '#cair': 'CAIR',
+  'council on american-islamic relations': 'CAIR',
   
-  // Key figures
-  'desantis': 'Ron DeSantis',
-  '#desantis': 'Ron DeSantis',
-  'newsom': 'Gavin Newsom',
-  '#newsom': 'Gavin Newsom',
-  'pence': 'Mike Pence',
-  '#pence': 'Mike Pence',
-  'obama': 'Barack Obama',
-  '#obama': 'Barack Obama',
-  'pelosi': 'Nancy Pelosi',
-  '#pelosi': 'Nancy Pelosi',
-  'mcconnell': 'Mitch McConnell',
-  '#mcconnell': 'Mitch McConnell',
-  'schumer': 'Chuck Schumer',
-  '#schumer': 'Chuck Schumer',
+  'mpac': 'MPAC',
+  'muslim public affairs council': 'MPAC',
   
-  // Current news figures
-  'hegseth': 'Pete Hegseth',
-  '#hegseth': 'Pete Hegseth',
-  'kash patel': 'Kash Patel',
-  '#kashpatel': 'Kash Patel',
-  'wray': 'Christopher Wray',
-  '#wray': 'Christopher Wray',
-  'chris wray': 'Christopher Wray',
-  'brian cole': 'Brian Cole',
-  '#briancole': 'Brian Cole',
+  'adc': 'ADC',
+  'american-arab anti-discrimination committee': 'ADC',
   
-  // Israel/Gaza related
+  'aclu': 'ACLU',
+  '#aclu': 'ACLU',
+  'american civil liberties union': 'ACLU',
+  
+  'naacp': 'NAACP',
+  '#naacp': 'NAACP',
+  
+  'splc': 'Southern Poverty Law Center',
+  'southern poverty law center': 'Southern Poverty Law Center',
+  
+  'adl': 'Anti-Defamation League',
+  'anti-defamation league': 'Anti-Defamation League',
+  
+  'hrc': 'Human Rights Campaign',
+  'human rights campaign': 'Human Rights Campaign',
+  
+  'planned parenthood': 'Planned Parenthood',
+  '#plannedparenthood': 'Planned Parenthood',
+  
+  'nra': 'NRA',
+  '#nra': 'NRA',
+  'national rifle association': 'NRA',
+  
+  'aipac': 'AIPAC',
+  '#aipac': 'AIPAC',
+  
+  'blm': 'Black Lives Matter',
+  '#blm': 'Black Lives Matter',
+  '#blacklivesmatter': 'Black Lives Matter',
+  'black lives matter': 'Black Lives Matter',
+  
+  // ==========================================
+  // INTERNATIONAL ORGANIZATIONS
+  // ==========================================
+  'un': 'United Nations',
+  '#un': 'United Nations',
+  'united nations': 'United Nations',
+  
+  'nato': 'NATO',
+  '#nato': 'NATO',
+  'north atlantic treaty organization': 'NATO',
+  
+  'eu': 'European Union',
+  '#eu': 'European Union',
+  'european union': 'European Union',
+  
+  'who': 'WHO',
+  '#who': 'WHO',
+  'world health organization': 'WHO',
+  
+  'imf': 'IMF',
+  'international monetary fund': 'IMF',
+  
+  'icc': 'International Criminal Court',
+  'international criminal court': 'International Criminal Court',
+  
+  'hamas': 'Hamas',
+  '#hamas': 'Hamas',
+  
+  'hezbollah': 'Hezbollah',
+  '#hezbollah': 'Hezbollah',
+  
+  // ==========================================
+  // INTERNATIONAL LOCATIONS
+  // ==========================================
   '#israel': 'Israel',
   '#gaza': 'Gaza',
   '#palestine': 'Palestine',
-  '#hamas': 'Hamas',
   '#ceasefire': 'Ceasefire',
+  'west bank': 'West Bank',
   
-  // Ukraine/Russia related
   '#ukraine': 'Ukraine',
   '#russia': 'Russia',
-  '#putin': 'Vladimir Putin',
-  'putin': 'Vladimir Putin',
-  'zelensky': 'Volodymyr Zelensky',
-  '#zelensky': 'Volodymyr Zelensky',
   
-  // Events
+  '#china': 'China',
+  'prc': 'China',
+  
+  '#taiwan': 'Taiwan',
+  
+  '#iran': 'Iran',
+  
+  '#syria': 'Syria',
+  
+  // ==========================================
+  // US CITIES & REGIONS
+  // ==========================================
+  'dc': 'Washington DC',
+  'washington dc': 'Washington DC',
+  'washington d.c.': 'Washington DC',
+  
+  'nyc': 'New York City',
+  'new york city': 'New York City',
+  '#nyc': 'New York City',
+  
+  'la': 'Los Angeles',
+  'los angeles': 'Los Angeles',
+  '#la': 'Los Angeles',
+  
+  'sf': 'San Francisco',
+  'san francisco': 'San Francisco',
+  
+  'chicago': 'Chicago',
+  '#chicago': 'Chicago',
+  
+  'miami': 'Miami',
+  '#miami': 'Miami',
+  
+  'atlanta': 'Atlanta',
+  '#atlanta': 'Atlanta',
+  
+  'seattle': 'Seattle',
+  '#seattle': 'Seattle',
+  
+  'denver': 'Denver',
+  '#denver': 'Denver',
+  
+  'phoenix': 'Phoenix',
+  '#phoenix': 'Phoenix',
+  
+  'houston': 'Houston',
+  '#houston': 'Houston',
+  
+  'austin': 'Austin',
+  '#austin': 'Austin',
+  
+  // ==========================================
+  // NOTABLE EVENTS & CASES
+  // ==========================================
+  'jan 6': 'January 6th',
+  'january 6': 'January 6th',
+  'january 6th': 'January 6th',
+  '#january6': 'January 6th',
+  '#jan6': 'January 6th',
+  'capitol riot': 'January 6th',
+  'capitol attack': 'January 6th',
+  
+  'roe v wade': 'Roe v. Wade',
+  'roe v. wade': 'Roe v. Wade',
+  '#roevwade': 'Roe v. Wade',
+  'dobbs': 'Dobbs Decision',
+  'dobbs decision': 'Dobbs Decision',
+  
+  // ==========================================
+  // LEGISLATION & POLICY
+  // ==========================================
+  'title ix': 'Title IX',
+  '#titleix': 'Title IX',
+  'title 9': 'Title IX',
+  
+  'ada': 'Americans with Disabilities Act',
+  'americans with disabilities act': 'Americans with Disabilities Act',
+  
+  'patriot act': 'USA PATRIOT Act',
+  'usa patriot act': 'USA PATRIOT Act',
+  
+  'aca': 'Affordable Care Act',
+  'affordable care act': 'Affordable Care Act',
+  'obamacare': 'Affordable Care Act',
+  '#obamacare': 'Affordable Care Act',
+  
+  'dream act': 'DREAM Act',
+  '#dreamact': 'DREAM Act',
+  'daca': 'DACA',
+  '#daca': 'DACA',
+  
+  // ==========================================
+  // TECH COMPANIES & FIGURES
+  // ==========================================
+  'zuckerberg': 'Mark Zuckerberg',
+  'mark zuckerberg': 'Mark Zuckerberg',
+  '#zuckerberg': 'Mark Zuckerberg',
+  
+  'bezos': 'Jeff Bezos',
+  'jeff bezos': 'Jeff Bezos',
+  
+  'tim cook': 'Tim Cook',
+  'cook': '__SKIP__', // too generic
+  
+  'sundar pichai': 'Sundar Pichai',
+  'pichai': 'Sundar Pichai',
+  
+  'meta': 'Meta',
+  '#meta': 'Meta',
+  'facebook': 'Meta',
+  '#facebook': 'Meta',
+  
+  'twitter': 'X/Twitter',
+  '#twitter': 'X/Twitter',
+  'x.com': 'X/Twitter',
+  
+  'google': 'Google',
+  '#google': 'Google',
+  'alphabet': 'Google',
+  
+  'amazon': 'Amazon',
+  '#amazon': 'Amazon',
+  
+  'apple': 'Apple',
+  '#apple': 'Apple',
+  
+  'tesla': 'Tesla',
+  '#tesla': 'Tesla',
+  
+  'spacex': 'SpaceX',
+  '#spacex': 'SpaceX',
+  
+  'tiktok': 'TikTok',
+  '#tiktok': 'TikTok',
+  
+  'openai': 'OpenAI',
+  '#openai': 'OpenAI',
+  'chatgpt': 'OpenAI',
+  '#chatgpt': 'OpenAI',
+  
+  // ==========================================
+  // MEDIA ORGANIZATIONS
+  // ==========================================
+  'fox news': 'Fox News',
+  '#foxnews': 'Fox News',
+  'fox': '__SKIP__', // fragment
+  
+  'cnn': 'CNN',
+  '#cnn': 'CNN',
+  
+  'msnbc': 'MSNBC',
+  '#msnbc': 'MSNBC',
+  
+  'nyt': 'New York Times',
+  'new york times': 'New York Times',
+  '#nytimes': 'New York Times',
+  
+  'wapo': 'Washington Post',
+  'washington post': 'Washington Post',
+  '#washingtonpost': 'Washington Post',
+  
+  'wsj': 'Wall Street Journal',
+  'wall street journal': 'Wall Street Journal',
+  
+  'npr': 'NPR',
+  '#npr': 'NPR',
+  
+  'bbc': 'BBC',
+  '#bbc': 'BBC',
+  
+  'reuters': 'Reuters',
+  '#reuters': 'Reuters',
+  
+  'ap': 'Associated Press',
+  'associated press': 'Associated Press',
+  
+  // ==========================================
+  // EVENTS & ENTERTAINMENT
+  // ==========================================
   'eurovision': 'Eurovision Song Contest',
   '#eurovision': 'Eurovision Song Contest',
   'eurovision song contest': 'Eurovision Song Contest',
   
-  // === FRAGMENT WORDS TO SKIP ===
-  // These single words are parts of longer phrases and should be ignored
+  'super bowl': 'Super Bowl',
+  '#superbowl': 'Super Bowl',
+  
+  'oscars': 'Academy Awards',
+  '#oscars': 'Academy Awards',
+  'academy awards': 'Academy Awards',
+  
+  'grammys': 'Grammy Awards',
+  '#grammys': 'Grammy Awards',
+  
+  // ==========================================
+  // FRAGMENT WORDS TO SKIP
+  // ==========================================
   'york': '__SKIP__',
   'white': '__SKIP__',
   'supreme': '__SKIP__',
@@ -167,6 +714,13 @@ const TOPIC_ALIASES: Record<string, string> = {
   'south': '__SKIP__',
   'east': '__SKIP__',
   'west': '__SKIP__',
+  'united': '__SKIP__',
+  'states': '__SKIP__',
+  'federal': '__SKIP__',
+  'national': '__SKIP__',
+  'american': '__SKIP__',
+  'breaking': '__SKIP__',
+  'just': '__SKIP__',
 };
 
 // Hashtag to base topic mapping (for merging hashtag counts into main topics)
