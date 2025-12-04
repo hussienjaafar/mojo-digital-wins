@@ -7,13 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { format, subDays } from "date-fns";
-import { Download, RefreshCw, Activity, WifiOff, AlertCircle, Target, TrendingUp, Newspaper, Users } from "lucide-react";
+import { Download, RefreshCw, Activity, WifiOff, AlertCircle, Target, TrendingUp, TrendingDown, Newspaper, Users, ArrowUp, ArrowDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNewsFilters } from "@/contexts/NewsFilterContext";
 import { useTopicContent } from "@/hooks/useTopicContent";
 import { useUnifiedTrends } from "@/hooks/useUnifiedTrends";
 import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
+
+interface MetricWithComparison {
+  current: number;
+  previous: number;
+  change: number; // percentage
+}
 
 export default function Analytics() {
   const { setSearchTerm, navigateToTab } = useNewsFilters();
@@ -55,11 +62,17 @@ export default function Analytics() {
     to: new Date(),
   });
   
-  const [contextualMetrics, setContextualMetrics] = useState({
-    watchlistMentions: 0,
-    criticalWatchlistItems: 0,
-    newTodayCount: 0,
-    socialMentions: 0,
+  // Metrics with comparison
+  const [metrics, setMetrics] = useState<{
+    watchlistMentions: MetricWithComparison;
+    criticalItems: MetricWithComparison;
+    newArticles: MetricWithComparison;
+    socialPosts: MetricWithComparison;
+  }>({
+    watchlistMentions: { current: 0, previous: 0, change: 0 },
+    criticalItems: { current: 0, previous: 0, change: 0 },
+    newArticles: { current: 0, previous: 0, change: 0 },
+    socialPosts: { current: 0, previous: 0, change: 0 },
   });
   
   const [loading, setLoading] = useState(true);
@@ -92,6 +105,12 @@ export default function Analytics() {
       return { message: "Server error. Please try again later.", type: 'server', retryable: true };
     }
     return { message: error.message || "An unexpected error occurred.", type: 'unknown', retryable: true };
+  };
+
+  // Calculate percentage change
+  const calculateChange = (current: number, previous: number): number => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - previous) / previous) * 100);
   };
 
   // Detect online/offline status
@@ -163,44 +182,98 @@ export default function Analytics() {
     setIsStale(false);
 
     try {
-      // Fetch contextual metrics in parallel
-      const [watchlistResult, todayArticlesResult, socialCountResult] = await Promise.all([
+      // Define time periods
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      // Fetch all data in parallel
+      const [
+        watchlistResult,
+        todayArticlesResult,
+        yesterdayArticlesResult,
+        todaySocialResult,
+        yesterdaySocialResult
+      ] = await Promise.all([
         supabase.from('entity_watchlist').select('entity_name'),
         supabase
           .from('articles')
           .select('id, title, threat_level, content')
-          .gte('published_date', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
+          .gte('published_date', today.toISOString()),
+        supabase
+          .from('articles')
+          .select('id, title, threat_level, content')
+          .gte('published_date', yesterday.toISOString())
+          .lt('published_date', today.toISOString()),
         supabase
           .from('bluesky_posts')
           .select('*', { count: 'exact', head: true })
-          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+          .gte('created_at', today.toISOString()),
+        supabase
+          .from('bluesky_posts')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', yesterday.toISOString())
+          .lt('created_at', today.toISOString())
       ]);
 
       setLoadingProgress(60);
 
       const watchlistEntities = (watchlistResult.data || []).map(w => w.entity_name?.toLowerCase() || '');
       const todayArticles = todayArticlesResult.data || [];
+      const yesterdayArticles = yesterdayArticlesResult.data || [];
       
-      // Calculate watchlist mentions in today's articles
-      const watchlistMentions = todayArticles.filter(a => 
+      // Calculate today's watchlist mentions
+      const todayWatchlistMentions = todayArticles.filter(a => 
         watchlistEntities.some(entity => 
           entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
         )
       ).length;
 
-      // Critical watchlist items
-      const criticalWatchlistItems = todayArticles.filter(a => 
+      // Calculate yesterday's watchlist mentions
+      const yesterdayWatchlistMentions = yesterdayArticles.filter(a => 
+        watchlistEntities.some(entity => 
+          entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
+        )
+      ).length;
+
+      // Critical items today
+      const todayCritical = todayArticles.filter(a => 
         (a.threat_level === 'critical' || a.threat_level === 'high') &&
         watchlistEntities.some(entity => 
           entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
         )
       ).length;
 
-      setContextualMetrics({
-        watchlistMentions,
-        criticalWatchlistItems,
-        newTodayCount: todayArticles.length,
-        socialMentions: socialCountResult.count || 0,
+      // Critical items yesterday
+      const yesterdayCritical = yesterdayArticles.filter(a => 
+        (a.threat_level === 'critical' || a.threat_level === 'high') &&
+        watchlistEntities.some(entity => 
+          entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
+        )
+      ).length;
+
+      setMetrics({
+        watchlistMentions: {
+          current: todayWatchlistMentions,
+          previous: yesterdayWatchlistMentions,
+          change: calculateChange(todayWatchlistMentions, yesterdayWatchlistMentions)
+        },
+        criticalItems: {
+          current: todayCritical,
+          previous: yesterdayCritical,
+          change: calculateChange(todayCritical, yesterdayCritical)
+        },
+        newArticles: {
+          current: todayArticles.length,
+          previous: yesterdayArticles.length,
+          change: calculateChange(todayArticles.length, yesterdayArticles.length)
+        },
+        socialPosts: {
+          current: todaySocialResult.count || 0,
+          previous: yesterdaySocialResult.count || 0,
+          change: calculateChange(todaySocialResult.count || 0, yesterdaySocialResult.count || 0)
+        }
       });
 
       setLoadingProgress(100);
@@ -238,6 +311,24 @@ export default function Analytics() {
       setSheetOpen(true);
       fetchTopicContent(alert.entity, ['news', 'social']);
     }
+  };
+
+  // Render change indicator
+  const ChangeIndicator = ({ change, inverse = false }: { change: number; inverse?: boolean }) => {
+    if (change === 0) return null;
+    
+    const isPositive = inverse ? change < 0 : change > 0;
+    const Icon = change > 0 ? ArrowUp : ArrowDown;
+    
+    return (
+      <span className={cn(
+        "inline-flex items-center text-xs font-medium",
+        isPositive ? "text-green-600" : change < 0 ? "text-red-600" : "text-muted-foreground"
+      )}>
+        <Icon className="h-3 w-3 mr-0.5" />
+        {Math.abs(change)}%
+      </span>
+    );
   };
 
   return (
@@ -346,82 +437,114 @@ export default function Analytics() {
       {/* Priority Alerts - Top of page for watchlist items */}
       <PriorityAlertsPanel onAlertClick={handleAlertClick} />
 
-      {/* Contextual Metrics - Meaningful stats instead of vanity metrics */}
+      {/* Contextual Metrics with Comparison */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between">
               <div className="p-2 rounded-lg bg-primary/10">
                 <Target className="h-5 w-5 text-primary" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-primary">{contextualMetrics.watchlistMentions}</p>
-                <p className="text-xs text-muted-foreground">Watchlist mentions today</p>
-              </div>
+              <ChangeIndicator change={metrics.watchlistMentions.change} />
+            </div>
+            <div className="mt-3">
+              <p className="text-2xl font-bold text-primary">{metrics.watchlistMentions.current}</p>
+              <p className="text-xs text-muted-foreground">Watchlist mentions today</p>
+              {metrics.watchlistMentions.previous > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  vs {metrics.watchlistMentions.previous} yesterday
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        <Card className={contextualMetrics.criticalWatchlistItems > 0 
-          ? "bg-gradient-to-br from-red-500/5 to-red-500/10 border-red-500/20" 
-          : "bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20"
-        }>
+        <Card className={cn(
+          "bg-gradient-to-br border-l-4",
+          metrics.criticalItems.current > 0 
+            ? "from-red-500/5 to-red-500/10 border-red-500 border-red-500/20" 
+            : "from-green-500/5 to-green-500/10 border-green-500 border-green-500/20"
+        )}>
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${contextualMetrics.criticalWatchlistItems > 0 ? "bg-red-500/10" : "bg-green-500/10"}`}>
-                <AlertCircle className={`h-5 w-5 ${contextualMetrics.criticalWatchlistItems > 0 ? "text-red-500" : "text-green-500"}`} />
+            <div className="flex items-center justify-between">
+              <div className={cn(
+                "p-2 rounded-lg",
+                metrics.criticalItems.current > 0 ? "bg-red-500/10" : "bg-green-500/10"
+              )}>
+                <AlertCircle className={cn(
+                  "h-5 w-5",
+                  metrics.criticalItems.current > 0 ? "text-red-500" : "text-green-500"
+                )} />
               </div>
-              <div>
-                <p className={`text-2xl font-bold ${contextualMetrics.criticalWatchlistItems > 0 ? "text-red-500" : "text-green-500"}`}>
-                  {contextualMetrics.criticalWatchlistItems}
-                </p>
-                <p className="text-xs text-muted-foreground">Critical items to review</p>
-              </div>
+              <ChangeIndicator change={metrics.criticalItems.change} inverse />
+            </div>
+            <div className="mt-3">
+              <p className={cn(
+                "text-2xl font-bold",
+                metrics.criticalItems.current > 0 ? "text-red-500" : "text-green-500"
+              )}>
+                {metrics.criticalItems.current}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {metrics.criticalItems.current > 0 ? "Critical items to review" : "All clear - no critical items"}
+              </p>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-blue-500/5 to-blue-500/10 border-blue-500/20">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between">
               <div className="p-2 rounded-lg bg-blue-500/10">
                 <Newspaper className="h-5 w-5 text-blue-500" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-blue-500">{contextualMetrics.newTodayCount}</p>
-                <p className="text-xs text-muted-foreground">New articles today</p>
-              </div>
+              <ChangeIndicator change={metrics.newArticles.change} />
+            </div>
+            <div className="mt-3">
+              <p className="text-2xl font-bold text-blue-500">{metrics.newArticles.current}</p>
+              <p className="text-xs text-muted-foreground">New articles today</p>
+              {metrics.newArticles.previous > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  vs {metrics.newArticles.previous} yesterday
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-purple-500/20">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between">
               <div className="p-2 rounded-lg bg-purple-500/10">
                 <Users className="h-5 w-5 text-purple-500" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-purple-500">{contextualMetrics.socialMentions.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Social posts (24h)</p>
-              </div>
+              <ChangeIndicator change={metrics.socialPosts.change} />
+            </div>
+            <div className="mt-3">
+              <p className="text-2xl font-bold text-purple-500">{metrics.socialPosts.current.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">Social posts today</p>
+              {metrics.socialPosts.previous > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  vs {metrics.socialPosts.previous.toLocaleString()} yesterday
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Quick Stats Bar */}
-      <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 text-sm">
+      <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 text-sm flex-wrap">
         <span className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-orange-500" />
           <strong>{trendStats.breakthroughs}</strong> rising fast
         </span>
-        <span className="text-muted-foreground">•</span>
+        <span className="text-muted-foreground hidden sm:inline">•</span>
         <span className="flex items-center gap-2">
           <Target className="h-4 w-4 text-primary" />
-          <strong>{trendStats.watchlistMatches}</strong> match your watchlist
+          <strong>{trendStats.watchlistMatches}</strong> match watchlist
         </span>
-        <span className="text-muted-foreground">•</span>
+        <span className="text-muted-foreground hidden sm:inline">•</span>
         <span className="flex items-center gap-2">
           <Newspaper className="h-4 w-4 text-green-500" />
           <strong>{trendStats.multiSourceTrends}</strong> cross-platform
