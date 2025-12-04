@@ -25,10 +25,28 @@ export interface UnifiedTrend {
 interface UseUnifiedTrendsOptions {
   limit?: number;
   breakthroughOnly?: boolean;
+  excludeEvergreen?: boolean;
 }
 
+// Common evergreen terms that should be filtered out
+const EVERGREEN_PATTERNS = [
+  'white house',
+  'congress',
+  'president',
+  'senate',
+  'house of representatives',
+  'supreme court',
+  'federal government',
+  'washington',
+  'united states',
+  'america',
+  'government',
+  'politics',
+  'economy',
+];
+
 export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
-  const { limit = 10, breakthroughOnly = false } = options;
+  const { limit = 10, breakthroughOnly = false, excludeEvergreen = true } = options;
   
   const [trends, setTrends] = useState<UnifiedTrend[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,18 +57,18 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     setError(null);
     
     try {
-      // Fetch trends and watchlist in parallel
+      // Fetch trends, watchlist, and evergreen topics in parallel
       let query = supabase
         .from('mv_unified_trends')
         .select('*')
         .order('unified_score', { ascending: false })
-        .limit(limit);
+        .limit(limit + 20); // Fetch extra to account for filtering
 
       if (breakthroughOnly) {
         query = query.eq('is_breakthrough', true);
       }
 
-      const [trendsResult, watchlistResult, headlinesResult] = await Promise.all([
+      const [trendsResult, watchlistResult, headlinesResult, evergreenResult] = await Promise.all([
         query,
         supabase.from('entity_watchlist').select('entity_name'),
         // Get sample headlines for context
@@ -58,7 +76,9 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
           .select('title, tags')
           .gte('published_date', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
           .order('published_date', { ascending: false })
-          .limit(100)
+          .limit(100),
+        // Get evergreen topics from database
+        supabase.from('evergreen_topics').select('topic')
       ]);
 
       if (trendsResult.error) {
@@ -69,30 +89,54 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
 
       const watchlistEntities = (watchlistResult.data || []).map((w: any) => w.entity_name?.toLowerCase() || '');
       const headlines = headlinesResult.data || [];
+      
+      // Combine database evergreen with hardcoded patterns
+      const dbEvergreen = (evergreenResult.data || []).map((e: any) => e.topic?.toLowerCase() || '');
+      const allEvergreenPatterns = [...new Set([...EVERGREEN_PATTERNS, ...dbEvergreen])];
 
-      // Enrich trends with watchlist matches and sample headlines
-      const enrichedTrends = (trendsResult.data || []).map((trend: any) => {
-        const trendNameLower = trend.name?.toLowerCase() || '';
-        const normalizedLower = trend.normalized_name?.toLowerCase() || '';
-        
-        // Check watchlist match
-        const matchedEntity = watchlistEntities.find((entity: string) => 
-          entity && (trendNameLower.includes(entity) || entity.includes(trendNameLower) || normalizedLower.includes(entity))
-        );
-        
-        // Find a sample headline mentioning this topic
-        const matchingHeadline = headlines.find((article: any) => 
-          article.title?.toLowerCase().includes(trendNameLower) ||
-          (article.tags && article.tags.some((tag: string) => tag?.toLowerCase().includes(trendNameLower)))
-        );
+      // Filter and enrich trends
+      let enrichedTrends = (trendsResult.data || [])
+        .filter((trend: any) => {
+          // Skip filtering if excludeEvergreen is false
+          if (!excludeEvergreen) return true;
+          
+          const trendNameLower = trend.name?.toLowerCase() || '';
+          const normalizedLower = trend.normalized_name?.toLowerCase() || '';
+          
+          // Check if this is an evergreen topic
+          const isEvergreen = allEvergreenPatterns.some(pattern => 
+            trendNameLower === pattern || 
+            normalizedLower === pattern ||
+            trendNameLower.includes(pattern) && trendNameLower.length < pattern.length + 5
+          );
+          
+          return !isEvergreen;
+        })
+        .map((trend: any) => {
+          const trendNameLower = trend.name?.toLowerCase() || '';
+          const normalizedLower = trend.normalized_name?.toLowerCase() || '';
+          
+          // Check watchlist match
+          const matchedEntity = watchlistEntities.find((entity: string) => 
+            entity && (trendNameLower.includes(entity) || entity.includes(trendNameLower) || normalizedLower.includes(entity))
+          );
+          
+          // Find a sample headline mentioning this topic
+          const matchingHeadline = headlines.find((article: any) => 
+            article.title?.toLowerCase().includes(trendNameLower) ||
+            (article.tags && article.tags.some((tag: string) => tag?.toLowerCase().includes(trendNameLower)))
+          );
 
-        return {
-          ...trend,
-          matchesWatchlist: !!matchedEntity,
-          watchlistEntity: matchedEntity || null,
-          sampleHeadline: matchingHeadline?.title || null,
-        } as UnifiedTrend;
-      });
+          return {
+            ...trend,
+            matchesWatchlist: !!matchedEntity,
+            watchlistEntity: matchedEntity || null,
+            sampleHeadline: matchingHeadline?.title || null,
+          } as UnifiedTrend;
+        });
+
+      // Limit after filtering
+      enrichedTrends = enrichedTrends.slice(0, limit);
 
       setTrends(enrichedTrends);
     } catch (err) {
@@ -101,7 +145,7 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     } finally {
       setIsLoading(false);
     }
-  }, [limit, breakthroughOnly]);
+  }, [limit, breakthroughOnly, excludeEvergreen]);
 
   useEffect(() => {
     fetchTrends();
@@ -116,6 +160,7 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     breakthroughs: trends.filter(t => t.is_breakthrough).length,
     multiSourceTrends: trends.filter(t => t.source_count >= 2).length,
     avgSentiment: trends.reduce((acc, t) => acc + (t.avg_sentiment || 0), 0) / trends.length || 0,
+    watchlistMatches: trends.filter(t => t.matchesWatchlist).length,
   };
 
   return { trends, isLoading, error, stats, refresh: fetchTrends };

@@ -47,17 +47,23 @@ export const useTopicContent = () => {
       let trendingStarted: string | null = null;
       let isOnWatchlist = false;
 
+      // Normalize topic for case-insensitive matching
+      const topicLower = topic.toLowerCase();
+      const topicPattern = `%${topicLower}%`;
+
       // Fetch trending info, watchlist check, and content in parallel
       const [trendingResult, watchlistResult] = await Promise.all([
+        // Use ilike for case-insensitive match
         supabase
           .from('bluesky_trends')
           .select('trending_since, sentiment_positive, sentiment_neutral, sentiment_negative, sentiment_avg')
-          .eq('topic', topic)
+          .ilike('topic', topicPattern)
+          .limit(1)
           .maybeSingle(),
         supabase
           .from('entity_watchlist')
           .select('id')
-          .ilike('entity_name', `%${topic}%`)
+          .ilike('entity_name', topicPattern)
           .limit(1)
       ]);
 
@@ -73,12 +79,13 @@ export const useTopicContent = () => {
 
       isOnWatchlist = (watchlistResult.data?.length || 0) > 0;
 
-      // If source includes 'news', fetch from trending_topics -> articles
+      // If source includes 'news', fetch articles
       if (sourceTypes.includes('news')) {
+        // Strategy 1: Get from trending_topics table (case-insensitive)
         const { data: trendingData } = await supabase
           .from('trending_topics')
           .select('article_ids')
-          .eq('topic', topic)
+          .ilike('topic', topicPattern)
           .order('hour_timestamp', { ascending: false })
           .limit(1);
 
@@ -102,21 +109,21 @@ export const useTopicContent = () => {
           }
         }
 
-        // Also search articles by topic in extracted_topics or title
-        if (results.length < 5) {
+        // Strategy 2: Direct search in articles by title, description, content, and tags
+        if (results.length < 10) {
           const { data: searchArticles } = await supabase
             .from('articles')
-            .select('id, title, description, source_url, source_name, published_date, sentiment_label, affected_groups, affected_organizations')
-            .or(`title.ilike.%${topic}%,description.ilike.%${topic}%`)
+            .select('id, title, description, source_url, source_name, published_date, sentiment_label, affected_groups, affected_organizations, tags')
+            .or(`title.ilike.${topicPattern},description.ilike.${topicPattern},content.ilike.${topicPattern}`)
             .order('published_date', { ascending: false })
-            .limit(10);
+            .limit(20);
 
           if (searchArticles) {
             const existingIds = new Set(results.map(r => r.id));
             const newArticles = searchArticles.filter(a => !existingIds.has(a.id));
             results.push(...newArticles.map(a => ({ ...a, type: 'news' as const })));
             
-            // More related entities
+            // Extract more related entities
             if (relatedEntities.length < 5) {
               const entities = new Set<string>(relatedEntities);
               newArticles.forEach(a => {
@@ -127,14 +134,31 @@ export const useTopicContent = () => {
             }
           }
         }
+
+        // Strategy 3: Search by tags array containing the topic
+        if (results.length < 5) {
+          const { data: taggedArticles } = await supabase
+            .from('articles')
+            .select('id, title, description, source_url, source_name, published_date, sentiment_label, affected_groups, affected_organizations')
+            .contains('tags', [topicLower])
+            .order('published_date', { ascending: false })
+            .limit(10);
+
+          if (taggedArticles) {
+            const existingIds = new Set(results.map(r => r.id));
+            const newArticles = taggedArticles.filter(a => !existingIds.has(a.id));
+            results.push(...newArticles.map(a => ({ ...a, type: 'news' as const })));
+          }
+        }
       }
 
       // If source includes 'social', fetch from bluesky_posts
       if (sourceTypes.includes('social')) {
+        // Strategy 1: Search by ai_topics array
         const { data: posts } = await supabase
           .from('bluesky_posts')
           .select('id, text, author_handle, created_at, post_uri, ai_sentiment_label')
-          .contains('ai_topics', [topic])
+          .or(`text.ilike.${topicPattern}`)
           .order('created_at', { ascending: false })
           .limit(15);
 
@@ -151,19 +175,24 @@ export const useTopicContent = () => {
           })));
         }
 
-        // Also try searching by text if no exact topic match
-        if (socialResults.length < 3) {
-          const { data: searchPosts } = await supabase
+        // Strategy 2: Search by ai_topics array containing the topic
+        if (socialResults.length < 5) {
+          const { data: topicPosts } = await supabase
             .from('bluesky_posts')
-            .select('id, text, author_handle, created_at, post_uri, ai_sentiment_label')
-            .ilike('text', `%${topic}%`)
+            .select('id, text, author_handle, created_at, post_uri, ai_sentiment_label, ai_topics')
+            .not('ai_topics', 'is', null)
             .order('created_at', { ascending: false })
-            .limit(10);
+            .limit(50);
 
-          if (searchPosts) {
+          if (topicPosts) {
             const existingIds = new Set(socialResults.map(r => r.id));
-            const newPosts = searchPosts.filter(p => !existingIds.has(p.id));
-            socialResults.push(...newPosts.map(p => ({
+            // Filter posts that have matching topics (case-insensitive)
+            const matchingPosts = topicPosts.filter(p => 
+              !existingIds.has(p.id) && 
+              p.ai_topics?.some((t: string) => t.toLowerCase().includes(topicLower))
+            );
+            
+            socialResults.push(...matchingPosts.slice(0, 10).map(p => ({
               id: p.id,
               title: p.text?.substring(0, 200) || 'No content',
               description: `@${p.author_handle || 'unknown'}`,
