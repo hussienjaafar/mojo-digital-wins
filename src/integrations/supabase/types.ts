@@ -544,6 +544,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           duplicate_of: string | null
+          extracted_hashtags: string[] | null
           extracted_topics: Json | null
           geographic_scope: string | null
           hash_signature: string | null
@@ -579,6 +580,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           duplicate_of?: string | null
+          extracted_hashtags?: string[] | null
           extracted_topics?: Json | null
           geographic_scope?: string | null
           hash_signature?: string | null
@@ -614,6 +616,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           duplicate_of?: string | null
+          extracted_hashtags?: string[] | null
           extracted_topics?: Json | null
           geographic_scope?: string | null
           hash_signature?: string | null
@@ -2769,6 +2772,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           duplicate_of: string | null
+          extracted_hashtags: string[] | null
           id: string
           is_duplicate: boolean | null
           published_at: string
@@ -2789,6 +2793,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           duplicate_of?: string | null
+          extracted_hashtags?: string[] | null
           id?: string
           is_duplicate?: boolean | null
           published_at: string
@@ -2809,6 +2814,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           duplicate_of?: string | null
+          extracted_hashtags?: string[] | null
           id?: string
           is_duplicate?: boolean | null
           published_at?: string
@@ -4899,10 +4905,14 @@ export type Database = {
           cross_source_score: number | null
           dominant_sentiment: string | null
           entity_co_occurrences: Json | null
+          entity_type: string | null
           first_seen_at: string | null
           google_news_count: number | null
           google_news_ids: string[] | null
+          hashtags: string[] | null
           id: string
+          is_breaking: boolean | null
+          is_hashtag: boolean | null
           is_trending: boolean | null
           key_entities: string[] | null
           last_activity_at: string | null
@@ -4913,9 +4923,11 @@ export type Database = {
           peak_at: string | null
           reddit_count: number | null
           reddit_ids: string[] | null
+          related_topics: string[] | null
           rss_count: number | null
           sentiment_score: number | null
           source_distribution: Json | null
+          specificity_score: number | null
           total_mentions: number | null
           trending_since: string | null
           updated_at: string | null
@@ -4931,10 +4943,14 @@ export type Database = {
           cross_source_score?: number | null
           dominant_sentiment?: string | null
           entity_co_occurrences?: Json | null
+          entity_type?: string | null
           first_seen_at?: string | null
           google_news_count?: number | null
           google_news_ids?: string[] | null
+          hashtags?: string[] | null
           id?: string
+          is_breaking?: boolean | null
+          is_hashtag?: boolean | null
           is_trending?: boolean | null
           key_entities?: string[] | null
           last_activity_at?: string | null
@@ -4945,9 +4961,11 @@ export type Database = {
           peak_at?: string | null
           reddit_count?: number | null
           reddit_ids?: string[] | null
+          related_topics?: string[] | null
           rss_count?: number | null
           sentiment_score?: number | null
           source_distribution?: Json | null
+          specificity_score?: number | null
           total_mentions?: number | null
           trending_since?: string | null
           updated_at?: string | null
@@ -4963,10 +4981,14 @@ export type Database = {
           cross_source_score?: number | null
           dominant_sentiment?: string | null
           entity_co_occurrences?: Json | null
+          entity_type?: string | null
           first_seen_at?: string | null
           google_news_count?: number | null
           google_news_ids?: string[] | null
+          hashtags?: string[] | null
           id?: string
+          is_breaking?: boolean | null
+          is_hashtag?: boolean | null
           is_trending?: boolean | null
           key_entities?: string[] | null
           last_activity_at?: string | null
@@ -4977,9 +4999,11 @@ export type Database = {
           peak_at?: string | null
           reddit_count?: number | null
           reddit_ids?: string[] | null
+          related_topics?: string[] | null
           rss_count?: number | null
           sentiment_score?: number | null
           source_distribution?: Json | null
+          specificity_score?: number | null
           total_mentions?: number | null
           trending_since?: string | null
           updated_at?: string | null
