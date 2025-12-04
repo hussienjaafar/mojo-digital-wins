@@ -182,3 +182,15 @@ verify_jwt = false
 
 [functions.generate-report]
 verify_jwt = true
+
+[functions.fetch-google-news]
+verify_jwt = false
+
+[functions.fetch-reddit-posts]
+verify_jwt = false
+
+[functions.batch-analyze-content]
+verify_jwt = false
+
+[functions.calculate-trend-clusters]
+verify_jwt = false
