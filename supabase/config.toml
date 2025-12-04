@@ -66,6 +66,9 @@ verify_jwt = false
 [functions.generate-ai-summary]
 verify_jwt = false
 
+[functions.generate-daily-briefing]
+verify_jwt = false
+
 [functions.detect-duplicates]
 verify_jwt = false
 

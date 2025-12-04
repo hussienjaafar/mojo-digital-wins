@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { UnifiedTrendingPanel } from "@/components/analytics/UnifiedTrendingPanel";
 import { TopicContentSheet } from "@/components/analytics/TopicContentSheet";
 import { PriorityAlertsPanel } from "@/components/analytics/PriorityAlertsPanel";
+import { TodaysBriefing } from "@/components/analytics/TodaysBriefing";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
@@ -434,8 +435,11 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* Priority Alerts - Top of page for watchlist items */}
-      <PriorityAlertsPanel onAlertClick={handleAlertClick} />
+      {/* Today's AI Briefing + Priority Alerts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <TodaysBriefing />
+        <PriorityAlertsPanel onAlertClick={handleAlertClick} />
+      </div>
 
       {/* Contextual Metrics with Comparison */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
