@@ -733,16 +733,22 @@ const TOPIC_ALIASES: Record<string, string> = {
   'the republicans': '__SKIP__',
   'the democrats': '__SKIP__',
   'the president': '__SKIP__',
+  'the government': '__SKIP__',
+  'the people': '__SKIP__',
+  'the country': '__SKIP__',
   'and trump': '__SKIP__',
   'if trump': '__SKIP__',
   'when trump': '__SKIP__',
+  'but trump': '__SKIP__',
+  'that trump': '__SKIP__',
   'president donald': '__SKIP__',
   'trump admin': '__SKIP__',
   'details here': '__SKIP__',
   'snow depth': '__SKIP__',
+  'trace snow': '__SKIP__',
   'climate report': '__SKIP__',
   'missing link': '__SKIP__',
-  'administration': '__SKIP__', // too generic without context
+  'administration': '__SKIP__',
   'the administration': '__SKIP__',
   'click here': '__SKIP__',
   'read more': '__SKIP__',
@@ -753,6 +759,16 @@ const TOPIC_ALIASES: Record<string, string> = {
   'just in': '__SKIP__',
   'news update': '__SKIP__',
   'update here': '__SKIP__',
+  
+  // GENERIC LOCATION/REGION TERMS (need more context)
+  'middle east': '__SKIP__',
+  'america': '__SKIP__', // too vague
+  
+  // Generic role titles (need specific person name)
+  'attorney general': '__SKIP__',
+  'defense secretary': '__SKIP__',
+  'national guard': '__SKIP__',
+  'eurovision song': '__SKIP__',
 };
 
 // Hashtag to base topic mapping (for merging hashtag counts into main topics)
