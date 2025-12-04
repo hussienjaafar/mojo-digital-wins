@@ -13,9 +13,9 @@ interface UnifiedTrendingPanelProps {
 }
 
 export function UnifiedTrendingPanel({ onTopicClick }: UnifiedTrendingPanelProps) {
-  const { trends, isLoading, stats, refresh } = useUnifiedTrends({ limit: 15 });
+  const { trends, isLoading, stats, refresh } = useUnifiedTrends({ limit: 35 });
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>("relevant");
+  const [activeTab, setActiveTab] = useState<string>("general");
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
