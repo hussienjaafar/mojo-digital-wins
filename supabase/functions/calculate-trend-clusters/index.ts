@@ -690,28 +690,53 @@ serve(async (req) => {
         }
       }
       
-      // Get counts for velocity at multiple time windows
+      // Get counts for velocity at multiple time windows (include BOTH Google News AND RSS articles)
       const mins15Ago = new Date(now.getTime() - 15 * 60 * 1000);
       
-      const [result15m, result1h, result6h, existingCluster] = await Promise.all([
+      const [newsResult15m, rssResult15m, newsResult1h, rssResult1h, newsResult6h, rssResult6h, existingCluster] = await Promise.all([
+        // Google News counts
         supabase
           .from('google_news_articles')
           .select('id', { count: 'exact', head: true })
           .eq('ai_processed', true)
           .contains('ai_topics', [topicData.topic])
           .gte('published_at', mins15Ago.toISOString()),
+        // RSS article counts (15m)
+        supabase
+          .from('articles')
+          .select('id', { count: 'exact', head: true })
+          .eq('topics_extracted', true)
+          .gte('published_date', mins15Ago.toISOString())
+          .or(`tags.cs.{${topicData.topic}},title.ilike.%${topicData.topic}%`),
+        // Google News 1h
         supabase
           .from('google_news_articles')
           .select('id', { count: 'exact', head: true })
           .eq('ai_processed', true)
           .contains('ai_topics', [topicData.topic])
           .gte('published_at', hour1Ago.toISOString()),
+        // RSS 1h
+        supabase
+          .from('articles')
+          .select('id', { count: 'exact', head: true })
+          .eq('topics_extracted', true)
+          .gte('published_date', hour1Ago.toISOString())
+          .or(`tags.cs.{${topicData.topic}},title.ilike.%${topicData.topic}%`),
+        // Google News 6h
         supabase
           .from('google_news_articles')
           .select('id', { count: 'exact', head: true })
           .eq('ai_processed', true)
           .contains('ai_topics', [topicData.topic])
           .gte('published_at', hours6Ago.toISOString()),
+        // RSS 6h
+        supabase
+          .from('articles')
+          .select('id', { count: 'exact', head: true })
+          .eq('topics_extracted', true)
+          .gte('published_date', hours6Ago.toISOString())
+          .or(`tags.cs.{${topicData.topic}},title.ilike.%${topicData.topic}%`),
+        // Existing cluster
         supabase
           .from('trend_clusters')
           .select('velocity_score')
@@ -719,9 +744,10 @@ serve(async (req) => {
           .maybeSingle()
       ]);
       
-      const mentions15m = result15m.count || 0;
-      const mentions1h = result1h.count || 0;
-      const mentions6h = result6h.count || 0;
+      // Sum counts from both Google News AND RSS
+      const mentions15m = (newsResult15m.count || 0) + (rssResult15m.count || 0);
+      const mentions1h = (newsResult1h.count || 0) + (rssResult1h.count || 0);
+      const mentions6h = (newsResult6h.count || 0) + (rssResult6h.count || 0);
       const mentions24h = topicData.total_count;
       const previousVelocity = existingCluster.data?.velocity_score ?? null;
       

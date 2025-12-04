@@ -45,21 +45,17 @@ interface UseUnifiedTrendsOptions {
   excludeEvergreen?: boolean;
 }
 
-// Common evergreen terms that should be filtered out
+// Common evergreen terms that should be filtered out (only truly generic ones)
+// Allow specific orgs like FBI, DOJ, Pentagon when they have high volume
 const EVERGREEN_PATTERNS = [
-  'white house',
-  'congress',
-  'president',
-  'senate',
-  'house of representatives',
-  'supreme court',
   'federal government',
-  'washington',
   'united states',
   'america',
   'government',
   'politics',
   'economy',
+  'breaking news',
+  'news update',
 ];
 
 // Calculate weighted unified score with source authority and volume-gated spike bonuses
@@ -132,13 +128,13 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     
     try {
       // Fetch from trend_clusters directly for better source-weighted scoring
+      // Remove broken is_trending filter - rely on volume + source weighting instead
       const [clustersResult, watchlistResult, headlinesResult, evergreenResult] = await Promise.all([
         supabase.from('trend_clusters')
           .select('*')
-          .eq('is_trending', true)
-          .gte('mentions_last_24h', 5) // Minimum volume threshold
-          .order('updated_at', { ascending: false })
-          .limit(limit + 30), // Fetch extra for filtering
+          .gte('mentions_last_24h', 3) // Lower threshold to get more topics
+          .order('mentions_last_24h', { ascending: false }) // Order by volume
+          .limit(limit + 50), // Fetch extra for filtering
         supabase.from('entity_watchlist').select('entity_name'),
         supabase.from('articles')
           .select('title, tags')
@@ -165,9 +161,22 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
           if (!excludeEvergreen) return true;
           
           const trendNameLower = trend.cluster_title?.toLowerCase() || '';
+          const totalMentions = trend.mentions_last_24h || 0;
+          const sourceCount = [
+            (trend.google_news_count || 0) > 0,
+            (trend.reddit_count || 0) > 0,
+            (trend.bluesky_count || 0) > 0,
+            (trend.rss_count || 0) > 0
+          ].filter(Boolean).length;
+          
+          // Allow high-volume cross-source topics even if they match evergreen patterns
+          if (totalMentions >= 20 && sourceCount >= 2) {
+            return true;
+          }
+          
           const isEvergreen = allEvergreenPatterns.some(pattern => 
             trendNameLower === pattern || 
-            trendNameLower.includes(pattern) && trendNameLower.length < pattern.length + 5
+            (trendNameLower.includes(pattern) && trendNameLower.length < pattern.length + 5)
           );
           
           return !isEvergreen;
