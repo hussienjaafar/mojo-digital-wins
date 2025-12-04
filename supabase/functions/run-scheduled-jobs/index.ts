@@ -373,16 +373,6 @@ serve(async (req) => {
             itemsCreated = result?.inserted || 0;
             break;
 
-          case 'fetch_reddit_posts':
-            const redditResponse = await supabase.functions.invoke('fetch-reddit-posts', {
-              body: {}
-            });
-            if (redditResponse.error) throw new Error(redditResponse.error.message);
-            result = redditResponse.data;
-            itemsProcessed = result?.fetched || 0;
-            itemsCreated = result?.inserted || 0;
-            break;
-
           case 'batch_analyze_content':
             const batchAnalyzeResponse = await supabase.functions.invoke('batch-analyze-content', {
               body: {}

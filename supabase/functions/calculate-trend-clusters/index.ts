@@ -230,7 +230,7 @@ serve(async (req) => {
           : (item.extracted_topics as any)?.topics || [];
           
         for (const topic of topics) {
-          const topicStr = typeof topic === 'string' ? topic : topic?.name || '';
+          const topicStr = typeof topic === 'string' ? topic : topic?.topic || topic?.name || '';
           const normalized = normalizeTopic(topicStr);
           if (!normalized || normalized.length < 3) continue;
           
