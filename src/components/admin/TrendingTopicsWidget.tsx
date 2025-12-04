@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, Flame, GripVertical, RefreshCw, Newspaper, Users, ArrowUpRight, Zap, Link, Rocket, TrendingDown } from "lucide-react";
+import { TrendingUp, Flame, GripVertical, RefreshCw, Newspaper, Users, ArrowUpRight, Zap, Link, Rocket, TrendingDown, Hash, Radio, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUnifiedTrends, getSpikeRatioColor, formatSpikeRatio } from "@/hooks/useUnifiedTrends";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface TrendingTopicsWidgetProps {
   showDragHandle?: boolean;
@@ -20,7 +21,7 @@ const TREND_STAGE_CONFIG: Record<string, { label: string; color: string; icon?: 
 };
 
 export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsWidgetProps) {
-  const { trends, isLoading, stats, refresh } = useUnifiedTrends({ limit: 10 });
+  const { trends, isLoading, stats, refresh } = useUnifiedTrends({ limit: 30 });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -185,6 +186,36 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
                       </span>
                     </div>
                     
+                    {/* Source Distribution Badges */}
+                    {trend.source_distribution && Object.keys(trend.source_distribution).length > 0 && (
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        {(trend.source_distribution.google_news || 0) > 0 && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">
+                            <Newspaper className="h-2.5 w-2.5" />
+                            {trend.source_distribution.google_news}
+                          </span>
+                        )}
+                        {(trend.source_distribution.reddit || 0) > 0 && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400">
+                            <Users className="h-2.5 w-2.5" />
+                            {trend.source_distribution.reddit}
+                          </span>
+                        )}
+                        {(trend.source_distribution.bluesky || 0) > 0 && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400">
+                            <Hash className="h-2.5 w-2.5" />
+                            {trend.source_distribution.bluesky}
+                          </span>
+                        )}
+                        {(trend.source_distribution.rss || 0) > 0 && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">
+                            <Radio className="h-2.5 w-2.5" />
+                            {trend.source_distribution.rss}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Related Topics - "Trending with" */}
                     {trend.related_topics && trend.related_topics.length > 0 && (
                       <div className="flex items-center gap-1.5 mt-1.5">
@@ -196,6 +227,23 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
                           </span>
                         </span>
                       </div>
+                    )}
+                    
+                    {/* Summary tooltip */}
+                    {trend.cluster_summary && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1 mt-1.5 cursor-help">
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-[10px] text-muted-foreground line-clamp-1">
+                              {trend.cluster_summary}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          <p className="text-xs">{trend.cluster_summary}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                     
                     {trend.spike_ratio >= 2 && (
