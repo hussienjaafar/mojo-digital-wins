@@ -28,6 +28,7 @@ interface TopicData {
 
 // Topic aliasing system to unify variations
 // Maps variations to canonical names
+// Use '__SKIP__' to mark fragment words that should be ignored
 const TOPIC_ALIASES: Record<string, string> = {
   // Trump variations
   'trump': 'Donald Trump',
@@ -142,6 +143,30 @@ const TOPIC_ALIASES: Record<string, string> = {
   'putin': 'Vladimir Putin',
   'zelensky': 'Volodymyr Zelensky',
   '#zelensky': 'Volodymyr Zelensky',
+  
+  // Events
+  'eurovision': 'Eurovision Song Contest',
+  '#eurovision': 'Eurovision Song Contest',
+  'eurovision song contest': 'Eurovision Song Contest',
+  
+  // === FRAGMENT WORDS TO SKIP ===
+  // These single words are parts of longer phrases and should be ignored
+  'york': '__SKIP__',
+  'white': '__SKIP__',
+  'supreme': '__SKIP__',
+  'department': '__SKIP__',
+  'new': '__SKIP__',
+  'san': '__SKIP__',
+  'los': '__SKIP__',
+  'las': '__SKIP__',
+  'mount': '__SKIP__',
+  'saint': '__SKIP__',
+  'fort': '__SKIP__',
+  'port': '__SKIP__',
+  'north': '__SKIP__',
+  'south': '__SKIP__',
+  'east': '__SKIP__',
+  'west': '__SKIP__',
 };
 
 // Hashtag to base topic mapping (for merging hashtag counts into main topics)
@@ -242,6 +267,94 @@ const US_STATES = new Set([
   'west virginia', 'wisconsin', 'wyoming', 'dc', 'washington dc'
 ]);
 
+// Known countries for location classification
+const COUNTRIES = new Set([
+  'ukraine', 'russia', 'israel', 'gaza', 'palestine', 'china', 'iran', 'syria',
+  'venezuela', 'canada', 'mexico', 'germany', 'france', 'spain', 'italy',
+  'japan', 'india', 'brazil', 'australia', 'uk', 'united kingdom', 'ireland',
+  'netherlands', 'rwanda', 'lebanon', 'yemen', 'iraq', 'afghanistan', 'taiwan',
+  'korea', 'egypt', 'turkey', 'poland', 'romania', 'hungary', 'greece', 'portugal',
+  'sweden', 'norway', 'denmark', 'finland', 'switzerland', 'austria', 'belgium',
+  'cuba', 'haiti', 'jamaica', 'colombia', 'peru', 'chile', 'argentina',
+  'philippines', 'indonesia', 'vietnam', 'thailand', 'malaysia', 'singapore',
+  'pakistan', 'bangladesh', 'nigeria', 'kenya', 'ethiopia', 'sudan', 'libya'
+]);
+
+// Known acronyms that are always valid as single words
+const KNOWN_ACRONYMS = new Set([
+  'FBI', 'CIA', 'DOJ', 'ICE', 'NATO', 'EU', 'UN', 'CDC', 'FDA', 'EPA', 'SEC',
+  'NSA', 'DHS', 'CBP', 'ATF', 'DEA', 'MAGA', 'GOP', 'DNC', 'RNC', 'IRS', 'FCC',
+  'FTC', 'USPS', 'NASA', 'FEMA', 'TSA', 'DEA', 'ATF', 'NIH', 'WHO', 'IMF'
+]);
+
+// Generic single words that should be blocked unless cross-source confirmed
+const BLOCKED_SINGLE_WORDS = new Set([
+  'Security', 'Education', 'Committee', 'York', 'National', 'Black', 'High',
+  'Good', 'Maybe', 'Please', 'Yeah', 'Additional', 'Song', 'Depth', 'Christmas',
+  'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+  'September', 'October', 'November', 'December', 'Monday', 'Tuesday', 'Wednesday',
+  'Thursday', 'Friday', 'Saturday', 'Sunday', 'American', 'President', 'White',
+  'Supreme', 'Department', 'Law', 'Bill', 'Government', 'Politics', 'World',
+  'Today', 'Week', 'Year', 'Month', 'People', 'Time', 'Way', 'Day', 'Night',
+  'Morning', 'Thing', 'Place', 'Question', 'Answer', 'Problem', 'Issue', 'Point',
+  'Fact', 'Story', 'Group', 'Family', 'Area', 'System', 'Program', 'Service',
+  'Money', 'State', 'Country', 'Company', 'Business', 'Life', 'Work', 'Word',
+  'Health', 'Science', 'History', 'Art', 'Music', 'Sports', 'Tech', 'Home',
+  'House', 'Building', 'Street', 'Road', 'City', 'Town', 'Federal', 'Institute',
+  'Details', 'Report', 'Snow', 'Precip', 'Link', 'Court', 'Party', 'Vote', 'News',
+  'Every', 'First', 'Well', 'Thank', 'Missing', 'States', 'United', 'European',
+  'Russian', 'Israeli', 'Chinese', 'James', 'John', 'Michael', 'David', 'Robert'
+]);
+
+// === TOPIC QUALITY GATE ===
+// Filters out low-quality topics before saving to database
+function isHighQualityTopic(
+  topic: string,
+  entityType: string,
+  crossSourceCount: number,
+  totalMentions: number
+): { pass: boolean; reason?: string } {
+  // 1. Block all "category" type entities (generic words)
+  if (entityType === 'category') {
+    return { pass: false, reason: 'category-type' };
+  }
+  
+  // 2. Single-word topics need extra validation
+  if (!topic.includes(' ')) {
+    // Allow known acronyms
+    if (KNOWN_ACRONYMS.has(topic)) {
+      return { pass: true };
+    }
+    
+    // Allow known countries/states as locations
+    if (entityType === 'location') {
+      return { pass: true };
+    }
+    
+    // Block known bad single words
+    if (BLOCKED_SINGLE_WORDS.has(topic)) {
+      return { pass: false, reason: 'blocked-single-word' };
+    }
+    
+    // Single words need cross-source confirmation OR high volume
+    if (crossSourceCount < 2 && totalMentions < 50) {
+      return { pass: false, reason: 'single-word-not-confirmed' };
+    }
+  }
+  
+  // 3. Very short topics are suspicious
+  if (topic.length < 4 && !KNOWN_ACRONYMS.has(topic)) {
+    return { pass: false, reason: 'too-short' };
+  }
+  
+  // 4. Topics with only numbers are not useful
+  if (/^\d+$/.test(topic)) {
+    return { pass: false, reason: 'numbers-only' };
+  }
+  
+  return { pass: true };
+}
+
 // Classify entity type based on topic name and context
 function classifyEntityType(topic: string, headlines: string[]): string {
   const lowerTopic = topic.toLowerCase();
@@ -252,7 +365,17 @@ function classifyEntityType(topic: string, headlines: string[]): string {
     return 'hashtag';
   }
   
-  // IMPORTANT: Check organizations BEFORE person patterns
+  // PRIORITY 1: Check countries FIRST (before other checks)
+  if (COUNTRIES.has(lowerTopic)) {
+    return 'location';
+  }
+  
+  // PRIORITY 2: Check US states
+  if (US_STATES.has(lowerTopic)) {
+    return 'location';
+  }
+  
+  // Check if it's a known organization
   for (const org of KNOWN_ORGS) {
     if (lowerTopic === org || lowerTopic.includes(org)) {
       return 'organization';
@@ -278,13 +401,6 @@ function classifyEntityType(topic: string, headlines: string[]): string {
     }
   }
   
-  // Check if it's a known organization
-  for (const org of KNOWN_ORGS) {
-    if (lowerTopic === org || lowerTopic.includes(org)) {
-      return 'organization';
-    }
-  }
-  
   // Check for event indicators in headlines
   for (const indicator of EVENT_INDICATORS) {
     if (headlineText.includes(indicator)) {
@@ -295,10 +411,7 @@ function classifyEntityType(topic: string, headlines: string[]): string {
     }
   }
   
-  // Check for location
-  if (US_STATES.has(lowerTopic)) {
-    return 'location';
-  }
+  // Check for location patterns
   for (const pattern of LOCATION_PATTERNS) {
     if (pattern.test(topic)) {
       return 'location';
@@ -312,7 +425,7 @@ function classifyEntityType(topic: string, headlines: string[]): string {
     return 'legislation';
   }
   
-  // Default to category
+  // Default to category (will be filtered by quality gate)
   return 'category';
 }
 
@@ -478,12 +591,18 @@ serve(async (req) => {
       
       // Priority 1: Check database aliases (most up-to-date)
       if (dbAliases.has(lowerTrimmed)) {
-        return dbAliases.get(lowerTrimmed)!;
+        const alias = dbAliases.get(lowerTrimmed)!;
+        // Handle skip markers
+        if (alias === '__SKIP__') return '';
+        return alias;
       }
       
       // Priority 2: Check hardcoded aliases (fallback)
       if (TOPIC_ALIASES[lowerTrimmed]) {
-        return TOPIC_ALIASES[lowerTrimmed];
+        const alias = TOPIC_ALIASES[lowerTrimmed];
+        // Handle skip markers - these are fragment words that should be ignored
+        if (alias === '__SKIP__') return '';
+        return alias;
       }
       
       // Priority 3: Check hashtag mappings
@@ -491,7 +610,9 @@ serve(async (req) => {
         const hashLower = lowerTrimmed;
         // Check DB for hashtag
         if (dbAliases.has(hashLower)) {
-          return dbAliases.get(hashLower)!;
+          const alias = dbAliases.get(hashLower)!;
+          if (alias === '__SKIP__') return '';
+          return alias;
         }
         if (HASHTAG_TO_TOPIC[hashLower]) {
           return HASHTAG_TO_TOPIC[hashLower];
@@ -511,10 +632,14 @@ serve(async (req) => {
       // Check DB and hardcoded aliases after normalization
       const normalizedLower = normalized.toLowerCase();
       if (dbAliases.has(normalizedLower)) {
-        return dbAliases.get(normalizedLower)!;
+        const alias = dbAliases.get(normalizedLower)!;
+        if (alias === '__SKIP__') return '';
+        return alias;
       }
       if (TOPIC_ALIASES[normalizedLower]) {
-        return TOPIC_ALIASES[normalizedLower];
+        const alias = TOPIC_ALIASES[normalizedLower];
+        if (alias === '__SKIP__') return '';
+        return alias;
       }
       
       // Track unresolved entity for potential future resolution
@@ -1038,6 +1163,19 @@ serve(async (req) => {
         (topicData.bluesky_count > 0 ? 1 : 0) +
         (topicData.rss_count > 0 ? 1 : 0)
       );
+      
+      // === QUALITY GATE: Filter out low-quality topics ===
+      const qualityCheck = isHighQualityTopic(
+        topicData.topic,
+        topicData.entity_type,
+        crossSourceScore,
+        topicData.total_count
+      );
+      
+      if (!qualityCheck.pass) {
+        console.log(`[QUALITY-GATE] Filtered: "${topicData.topic}" (${qualityCheck.reason}, type=${topicData.entity_type}, cross=${crossSourceScore})`);
+        continue; // Skip this topic
+      }
       
       // Calculate dominant sentiment
       const { positive, negative, neutral } = topicData.sentiment_counts;
