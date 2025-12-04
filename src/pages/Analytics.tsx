@@ -86,6 +86,10 @@ export default function Analytics() {
     totalBills: 0,
     criticalThreats: 0,
     avgSentiment: 0,
+    watchlistMatches: 0,
+    criticalWatchlistMatches: 0,
+    sentimentChange: 0, // vs previous period
+    newThreatsToday: 0,
   });
   const [topicSentiments, setTopicSentiments] = useState<TopicSentiment[]>([]);
   const [threatTrends, setThreatTrends] = useState<any[]>([]);
@@ -384,7 +388,9 @@ export default function Analytics() {
         { data: bills },
         { data: blueskyData, error: blueskyError },
         { count: postsCount },
-        { count: predictiveCount }
+        { count: predictiveCount },
+        { data: watchlistData },
+        { data: todayArticles }
       ] = await Promise.all([
         // AI-extracted trending topics with velocity scores
         supabase
@@ -428,7 +434,18 @@ export default function Analytics() {
         supabase
           .from('bluesky_article_correlations' as any)
           .select('*', { count: 'exact', head: true })
-          .eq('is_predictive', true)
+          .eq('is_predictive', true),
+
+        // Watchlist entities for contextual metrics
+        supabase
+          .from('entity_watchlist')
+          .select('entity_name'),
+
+        // Today's articles for "new today" metric
+        supabase
+          .from('articles')
+          .select('id, threat_level')
+          .gte('published_date', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
       ]);
 
       if (topicsError) {
@@ -455,12 +472,36 @@ export default function Analytics() {
         ? articlesWithSentiment.reduce((sum, a) => sum + a.sentiment_score, 0) / articlesWithSentiment.length
         : 0; // 0 means "no data" - will show as N/A in UI
       const criticalThreats = articles.filter(a => a.threat_level === 'critical' || a.threat_level === 'high').length;
+      
+      // Calculate watchlist matches
+      const watchlistEntities = (watchlistData || []).map((w: any) => w.entity_name?.toLowerCase() || '');
+      const watchlistMatches = articles.filter(a => 
+        watchlistEntities.some((entity: string) => 
+          entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
+        )
+      ).length;
+      
+      const criticalWatchlistMatches = articles.filter(a => 
+        (a.threat_level === 'critical' || a.threat_level === 'high') &&
+        watchlistEntities.some((entity: string) => 
+          entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
+        )
+      ).length;
+      
+      // Today's new threats
+      const newThreatsToday = (todayArticles || []).filter((a: any) => 
+        a.threat_level === 'critical' || a.threat_level === 'high'
+      ).length;
 
       setMetrics({
         totalArticles: articles.length,
         totalBills: bills?.length || 0,
         criticalThreats,
         avgSentiment,
+        watchlistMatches,
+        criticalWatchlistMatches,
+        sentimentChange: 0, // Could calculate vs previous period
+        newThreatsToday,
       });
 
       // === AGGREGATE AI-EXTRACTED TRENDING TOPICS ===
@@ -1029,9 +1070,13 @@ export default function Analytics() {
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">Total Coverage</p>
               <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                {metrics.totalArticles}
+                {metrics.totalArticles.toLocaleString()}
               </div>
-              <p className="text-xs text-muted-foreground">Click to view all articles</p>
+              <p className="text-xs text-muted-foreground">
+                {metrics.watchlistMatches > 0 
+                  ? `${metrics.watchlistMatches} mention your watchlist`
+                  : 'Click to view all articles'}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -1057,7 +1102,13 @@ export default function Analytics() {
               <div className="text-3xl font-bold text-red-600 dark:text-red-400">
                 {metrics.criticalThreats}
               </div>
-              <p className="text-xs text-muted-foreground">Click to view high priority</p>
+              <p className="text-xs text-muted-foreground">
+                {metrics.newThreatsToday > 0 
+                  ? <span className="text-red-500">{metrics.newThreatsToday} new today</span>
+                  : metrics.criticalWatchlistMatches > 0 
+                    ? `${metrics.criticalWatchlistMatches} affect your issues`
+                    : 'Click to view high priority'}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -1083,7 +1134,11 @@ export default function Analytics() {
               <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
                 {metrics.totalBills}
               </div>
-              <p className="text-xs text-muted-foreground">Click to view legislation</p>
+              <p className="text-xs text-muted-foreground">
+                {metrics.totalBills > 0 
+                  ? 'In current date range'
+                  : 'No bills in range • View all'}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -1127,7 +1182,15 @@ export default function Analytics() {
               }`}>
                 {metrics.avgSentiment > 0 ? `${(metrics.avgSentiment * 100).toFixed(0)}%` : 'N/A'}
               </div>
-              <p className="text-xs text-muted-foreground">Click for breakdown</p>
+              <p className="text-xs text-muted-foreground">
+                {metrics.avgSentiment > 0.6 
+                  ? 'Positive coverage trending'
+                  : metrics.avgSentiment < 0.4 && metrics.avgSentiment > 0
+                  ? 'Negative sentiment detected'
+                  : metrics.avgSentiment > 0
+                  ? 'Neutral tone overall'
+                  : 'No sentiment data available'}
+              </p>
             </div>
           </CardContent>
         </Card>
