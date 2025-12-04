@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Zap, GripVertical, RefreshCw, Newspaper, Users, Hash } from "lucide-react";
+import { TrendingUp, Zap, GripVertical, RefreshCw, Newspaper, Users, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useUnifiedTrends, getSourceTypeBadgeClass, getVelocityColor, formatSentiment } from "@/hooks/useUnifiedTrends";
+import { useUnifiedTrends, getSpikeRatioColor, formatSpikeRatio } from "@/hooks/useUnifiedTrends";
 import { cn } from "@/lib/utils";
 
 interface UnifiedTrendsWidgetProps {
@@ -13,7 +13,7 @@ interface UnifiedTrendsWidgetProps {
 }
 
 export function UnifiedTrendsWidget({ showDragHandle = false, compact = false }: UnifiedTrendsWidgetProps) {
-  const { trends, isLoading, stats, refresh } = useUnifiedTrends({ limit: compact ? 8 : 15 });
+  const { trends, isLoading, stats, refresh } = useUnifiedTrends({ limit: compact ? 8 : 10 });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -22,17 +22,21 @@ export function UnifiedTrendsWidget({ showDragHandle = false, compact = false }:
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
-  const getSourceIcon = (sourceType: string) => {
-    switch (sourceType) {
-      case 'news':
-        return <Newspaper className="h-3 w-3" />;
-      case 'social':
-        return <Users className="h-3 w-3" />;
-      case 'entity':
-        return <Hash className="h-3 w-3" />;
-      default:
-        return null;
+  const getSourceIcon = (sourceTypes: string[]) => {
+    const hasNews = sourceTypes.includes('news');
+    const hasSocial = sourceTypes.includes('social');
+    
+    if (hasNews && hasSocial) {
+      return (
+        <div className="flex items-center gap-0.5">
+          <Newspaper className="h-3 w-3 text-blue-400" />
+          <Users className="h-3 w-3 text-purple-400" />
+        </div>
+      );
     }
+    if (hasNews) return <Newspaper className="h-3 w-3 text-blue-400" />;
+    if (hasSocial) return <Users className="h-3 w-3 text-purple-400" />;
+    return <TrendingUp className="h-3 w-3 text-muted-foreground" />;
   };
 
   return (
@@ -47,12 +51,17 @@ export function UnifiedTrendsWidget({ showDragHandle = false, compact = false }:
               <TrendingUp className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold portal-text-primary">Unified Trends</h3>
-              {!compact && (
-                <p className="text-xs portal-text-secondary">
-                  {stats.totalTrending} trending • {stats.multiSourceTrends} cross-source
-                </p>
-              )}
+              <h3 className="text-sm font-semibold portal-text-primary">Trending Now</h3>
+              <p className="text-xs portal-text-secondary">
+                {stats.breakthroughs > 0 && (
+                  <span className="text-orange-400">{stats.breakthroughs} rising</span>
+                )}
+                {stats.breakthroughs > 0 && stats.multiSourceTrends > 0 && ' • '}
+                {stats.multiSourceTrends > 0 && (
+                  <span>{stats.multiSourceTrends} cross-platform</span>
+                )}
+                {stats.breakthroughs === 0 && stats.multiSourceTrends === 0 && 'Real-time snapshot'}
+              </p>
             </div>
           </div>
           <Button 
@@ -77,77 +86,57 @@ export function UnifiedTrendsWidget({ showDragHandle = false, compact = false }:
         ) : trends.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-8 text-center">
             <TrendingUp className="h-10 w-10 portal-text-secondary mb-2 opacity-50" />
-            <p className="text-sm portal-text-secondary">No trending topics at this time</p>
+            <p className="text-sm portal-text-secondary">No trending topics</p>
           </div>
         ) : (
           <ScrollArea className="h-full pr-2 portal-scrollbar">
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {trends.map((trend, index) => (
                 <div
                   key={trend.normalized_name}
-                  className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] hover:bg-[hsl(var(--portal-bg-hover))] transition-colors border border-transparent hover:border-[hsl(var(--portal-border-subtle))]"
+                  className={cn(
+                    "flex items-center gap-3 p-3 rounded-lg transition-colors cursor-pointer group",
+                    "bg-[hsl(var(--portal-bg-elevated))] hover:bg-[hsl(var(--portal-bg-hover))]",
+                    trend.is_breakthrough && trend.spike_ratio >= 3 && "ring-1 ring-orange-500/30"
+                  )}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        {trend.is_breakthrough && (
-                          <Zap className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
-                        )}
-                        <span 
-                          className="text-sm font-medium portal-text-primary truncate" 
-                          title={trend.name}
-                        >
-                          {trend.name}
-                        </span>
-                        {index < 3 && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-red-500/10 text-red-400 border-red-500/30">
-                            #{index + 1}
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      {!compact && (
-                        <div className="flex items-center gap-1.5 mt-1.5">
-                          {trend.source_types.map((type) => (
-                            <Badge 
-                              key={type} 
-                              variant="outline" 
-                              className={cn("text-[10px] px-1.5 py-0 h-4 gap-1", getSourceTypeBadgeClass(type))}
-                            >
-                              {getSourceIcon(type)}
-                              {type}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className={cn("text-sm font-bold", getVelocityColor(trend.unified_score))}>
-                        {trend.unified_score.toFixed(0)}
-                      </span>
-                      <div className="flex items-center gap-1.5 text-[10px] portal-text-secondary">
-                        <span>{trend.total_mentions_24h} mentions</span>
-                        {trend.source_count > 1 && (
-                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 bg-green-500/10 text-green-400 border-green-500/30">
-                            {trend.source_count}×
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+                  {/* Rank */}
+                  <div className="flex-shrink-0 w-5 text-center">
+                    <span className={cn(
+                      "text-sm font-bold",
+                      index < 3 ? "text-primary" : "text-muted-foreground"
+                    )}>
+                      {index + 1}
+                    </span>
                   </div>
                   
-                  {!compact && trend.avg_sentiment !== null && (
-                    <div className="mt-2 pt-2 border-t border-[hsl(var(--portal-border-subtle))]">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="portal-text-secondary">Sentiment</span>
-                        <span className={formatSentiment(trend.avg_sentiment).color}>
-                          {formatSentiment(trend.avg_sentiment).label}
-                          {trend.avg_sentiment !== null && ` (${(trend.avg_sentiment * 100).toFixed(0)}%)`}
-                        </span>
-                      </div>
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      {trend.is_breakthrough && trend.spike_ratio >= 3 && (
+                        <Flame className="h-3.5 w-3.5 text-orange-400 flex-shrink-0" />
+                      )}
+                      <span className="text-sm font-medium portal-text-primary truncate group-hover:text-primary transition-colors">
+                        {trend.name}
+                      </span>
                     </div>
-                  )}
+                    
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {getSourceIcon(trend.source_types)}
+                      <span className="text-xs text-muted-foreground">
+                        {trend.total_mentions_24h.toLocaleString()} mentions
+                        {trend.source_count >= 2 && (
+                          <span className="text-green-400 ml-1">• Cross-platform</span>
+                        )}
+                      </span>
+                    </div>
+                    
+                    {trend.spike_ratio >= 2 && (
+                      <span className={cn("text-xs font-medium mt-0.5 block", getSpikeRatioColor(trend.spike_ratio))}>
+                        {formatSpikeRatio(trend.spike_ratio)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

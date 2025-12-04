@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, Zap, GripVertical, RefreshCw, Newspaper, Users, Flame, ArrowUpRight } from "lucide-react";
+import { TrendingUp, Flame, GripVertical, RefreshCw, Newspaper, Users, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUnifiedTrends, getSpikeRatioColor, formatSpikeRatio } from "@/hooks/useUnifiedTrends";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,7 @@ interface TrendingTopicsWidgetProps {
 }
 
 export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsWidgetProps) {
-  const { trends, isLoading, stats, refresh } = useUnifiedTrends({ limit: 15 });
+  const { trends, isLoading, stats, refresh } = useUnifiedTrends({ limit: 10 });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -27,42 +27,23 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
     if (hasNews && hasSocial) {
       return (
         <div className="flex items-center gap-0.5">
-          <Newspaper className="h-3 w-3 text-status-info" />
-          <Users className="h-3 w-3 text-secondary" />
+          <Newspaper className="h-3 w-3 text-blue-400" />
+          <Users className="h-3 w-3 text-purple-400" />
         </div>
       );
     }
-    if (hasNews) {
-      return <Newspaper className="h-3 w-3 text-status-info" />;
-    }
-    if (hasSocial) {
-      return <Users className="h-3 w-3 text-secondary" />;
-    }
+    if (hasNews) return <Newspaper className="h-3 w-3 text-blue-400" />;
+    if (hasSocial) return <Users className="h-3 w-3 text-purple-400" />;
     return <TrendingUp className="h-3 w-3 text-muted-foreground" />;
   };
 
-  // Format time since last update
-  const formatTrendingTime = (lastUpdated: string) => {
+  const formatTime = (lastUpdated: string) => {
     const diff = Date.now() - new Date(lastUpdated).getTime();
     const minutes = Math.floor(diff / (1000 * 60));
-    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 60) return `${minutes}m`;
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
-  };
-
-  // Get spike indicator
-  const getSpikeIndicator = (spikeRatio: number, isBreakthrough: boolean) => {
-    if (isBreakthrough) {
-      return <Flame className="h-3.5 w-3.5 text-destructive animate-pulse" />;
-    }
-    if (spikeRatio >= 3) {
-      return <Zap className="h-3.5 w-3.5 text-status-warning" />;
-    }
-    if (spikeRatio >= 2) {
-      return <ArrowUpRight className="h-3.5 w-3.5 text-status-info" />;
-    }
-    return null;
+    if (hours < 24) return `${hours}h`;
+    return `${Math.floor(hours / 24)}d`;
   };
 
   return (
@@ -80,11 +61,11 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
               <h3 className="text-sm font-semibold portal-text-primary">Trending Now</h3>
               <p className="text-xs portal-text-secondary">
                 {stats.breakthroughs > 0 && (
-                  <span className="text-destructive font-medium">{stats.breakthroughs} breaking</span>
+                  <span className="text-orange-400 font-medium">{stats.breakthroughs} rising</span>
                 )}
                 {stats.breakthroughs > 0 && stats.multiSourceTrends > 0 && ' • '}
                 {stats.multiSourceTrends > 0 && (
-                  <span>{stats.multiSourceTrends} multi-source</span>
+                  <span>{stats.multiSourceTrends} cross-platform</span>
                 )}
                 {stats.breakthroughs === 0 && stats.multiSourceTrends === 0 && 'Real-time snapshot'}
               </p>
@@ -113,7 +94,7 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
           <div className="flex flex-col items-center justify-center h-full text-center py-8">
             <TrendingUp className="h-8 w-8 text-muted-foreground mb-2 opacity-50" />
             <p className="text-sm portal-text-secondary">No trending topics right now</p>
-            <p className="text-xs portal-text-secondary mt-1">Check back soon for updates</p>
+            <p className="text-xs portal-text-secondary mt-1">Check back soon</p>
           </div>
         ) : (
           <ScrollArea className="h-full pr-2 portal-scrollbar">
@@ -124,10 +105,10 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
                   className={cn(
                     "flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer group",
                     "bg-[hsl(var(--portal-bg-elevated))] hover:bg-[hsl(var(--portal-bg-hover))]",
-                    trend.is_breakthrough && "ring-1 ring-destructive/30 bg-destructive/5"
+                    trend.is_breakthrough && trend.spike_ratio >= 3 && "ring-1 ring-orange-500/30 bg-orange-500/5"
                   )}
                 >
-                  {/* Rank number */}
+                  {/* Rank */}
                   <div className="flex-shrink-0 w-6 text-center pt-0.5">
                     <span className={cn(
                       "text-sm font-bold",
@@ -137,34 +118,37 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
                     </span>
                   </div>
                   
-                  {/* Main content */}
+                  {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      {getSpikeIndicator(trend.spike_ratio, trend.is_breakthrough)}
+                      {trend.is_breakthrough && trend.spike_ratio >= 3 && (
+                        <Flame className="h-3.5 w-3.5 text-orange-400 animate-pulse" />
+                      )}
+                      {trend.spike_ratio >= 2 && trend.spike_ratio < 3 && (
+                        <ArrowUpRight className="h-3.5 w-3.5 text-yellow-400" />
+                      )}
                       <span className="text-sm font-semibold portal-text-primary truncate group-hover:text-primary transition-colors" title={trend.name}>
                         {trend.name}
                       </span>
                     </div>
                     
-                    {/* Context line - Twitter style */}
                     <div className="flex items-center gap-2 mt-1">
                       {getSourceIcon(trend.source_types)}
                       <span className="text-xs text-muted-foreground">
                         {trend.total_mentions_24h.toLocaleString()} mentions
                         {trend.source_count >= 2 && (
-                          <span className="text-status-success ml-1">• Cross-platform</span>
+                          <span className="text-green-400 ml-1">• Cross-platform</span>
                         )}
                       </span>
                     </div>
                     
-                    {/* Spike context */}
                     {trend.spike_ratio >= 2 && (
                       <div className="mt-1">
                         <span className={cn("text-xs font-medium", getSpikeRatioColor(trend.spike_ratio))}>
                           {formatSpikeRatio(trend.spike_ratio)}
                           {trend.baseline_hourly > 0 && (
                             <span className="text-muted-foreground font-normal ml-1">
-                              ({trend.spike_ratio.toFixed(1)}x above baseline)
+                              ({trend.spike_ratio.toFixed(1)}x baseline)
                             </span>
                           )}
                         </span>
@@ -172,10 +156,10 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
                     )}
                   </div>
                   
-                  {/* Right side - time indicator */}
+                  {/* Time */}
                   <div className="flex-shrink-0 text-right">
                     <div className="text-[10px] text-muted-foreground">
-                      {formatTrendingTime(trend.last_updated)}
+                      {formatTime(trend.last_updated)}
                     </div>
                   </div>
                 </div>

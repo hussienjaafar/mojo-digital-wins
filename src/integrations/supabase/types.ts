@@ -5097,23 +5097,19 @@ export type Database = {
       mv_unified_trends: {
         Row: {
           avg_sentiment: number | null
-          avg_velocity: number | null
-          baseline_daily: number | null
           baseline_hourly: number | null
-          id: number | null
           is_breakthrough: boolean | null
           last_updated: string | null
-          max_velocity: number | null
           name: string | null
           normalized_name: string | null
-          refreshed_at: string | null
           source_count: number | null
           source_types: string[] | null
-          sources: string[] | null
           spike_ratio: number | null
           total_mentions_1h: number | null
           total_mentions_24h: number | null
+          total_mentions_6h: number | null
           unified_score: number | null
+          velocity: number | null
         }
         Relationships: []
       }
@@ -5144,6 +5140,7 @@ export type Database = {
         Args: { time_window?: unknown; topic_name: string }
         Returns: number
       }
+      deduplicate_topic_name: { Args: { topic_name: string }; Returns: string }
       get_backfill_progress: {
         Args: never
         Returns: {
