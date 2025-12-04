@@ -925,24 +925,40 @@ serve(async (req) => {
         }
       }
       
-      // Get counts for velocity at multiple time windows (include BOTH Google News AND RSS articles)
+      // Get counts for velocity at multiple time windows (include Google News, RSS, AND Bluesky)
       const mins15Ago = new Date(now.getTime() - 15 * 60 * 1000);
       
-      const [newsResult15m, rssResult15m, newsResult1h, rssResult1h, newsResult6h, rssResult6h, existingCluster] = await Promise.all([
-        // Google News counts
+      // Escape special characters for ILIKE queries
+      const escapedTopic = topicData.topic.replace(/[%_]/g, '\\$&');
+      
+      const [
+        newsResult15m, rssResult15m, blueskyResult15m,
+        newsResult1h, rssResult1h, blueskyResult1h,
+        newsResult6h, rssResult6h, blueskyResult6h,
+        existingCluster,
+        blueskyUniqueAuthors
+      ] = await Promise.all([
+        // Google News counts (15m)
         supabase
           .from('google_news_articles')
           .select('id', { count: 'exact', head: true })
           .eq('ai_processed', true)
           .contains('ai_topics', [topicData.topic])
           .gte('published_at', mins15Ago.toISOString()),
-        // RSS article counts (15m)
+        // RSS article counts (15m) - use title ILIKE as primary since extracted_topics is JSONB
         supabase
           .from('articles')
           .select('id', { count: 'exact', head: true })
-          .eq('topics_extracted', true)
           .gte('published_date', mins15Ago.toISOString())
-          .or(`tags.cs.{${topicData.topic}},title.ilike.%${topicData.topic}%`),
+          .ilike('title', `%${escapedTopic}%`),
+        // Bluesky counts (15m) - CRITICAL: Include bluesky in time windows!
+        supabase
+          .from('bluesky_posts')
+          .select('id', { count: 'exact', head: true })
+          .eq('ai_processed', true)
+          .contains('ai_topics', [topicData.topic])
+          .gte('created_at', mins15Ago.toISOString()),
+          
         // Google News 1h
         supabase
           .from('google_news_articles')
@@ -954,9 +970,16 @@ serve(async (req) => {
         supabase
           .from('articles')
           .select('id', { count: 'exact', head: true })
-          .eq('topics_extracted', true)
           .gte('published_date', hour1Ago.toISOString())
-          .or(`tags.cs.{${topicData.topic}},title.ilike.%${topicData.topic}%`),
+          .ilike('title', `%${escapedTopic}%`),
+        // Bluesky 1h
+        supabase
+          .from('bluesky_posts')
+          .select('id', { count: 'exact', head: true })
+          .eq('ai_processed', true)
+          .contains('ai_topics', [topicData.topic])
+          .gte('created_at', hour1Ago.toISOString()),
+          
         // Google News 6h
         supabase
           .from('google_news_articles')
@@ -968,23 +991,62 @@ serve(async (req) => {
         supabase
           .from('articles')
           .select('id', { count: 'exact', head: true })
-          .eq('topics_extracted', true)
           .gte('published_date', hours6Ago.toISOString())
-          .or(`tags.cs.{${topicData.topic}},title.ilike.%${topicData.topic}%`),
+          .ilike('title', `%${escapedTopic}%`),
+        // Bluesky 6h
+        supabase
+          .from('bluesky_posts')
+          .select('id', { count: 'exact', head: true })
+          .eq('ai_processed', true)
+          .contains('ai_topics', [topicData.topic])
+          .gte('created_at', hours6Ago.toISOString()),
+          
         // Existing cluster
         supabase
           .from('trend_clusters')
           .select('velocity_score')
           .eq('cluster_title', topicData.topic)
-          .maybeSingle()
+          .maybeSingle(),
+          
+        // Spam detection: count unique authors for this topic in bluesky (last 24h)
+        supabase
+          .from('bluesky_posts')
+          .select('author_did')
+          .eq('ai_processed', true)
+          .contains('ai_topics', [topicData.topic])
+          .gte('created_at', hours24Ago.toISOString())
       ]);
       
-      // Sum counts from both Google News AND RSS
-      const mentions15m = (newsResult15m.count || 0) + (rssResult15m.count || 0);
-      const mentions1h = (newsResult1h.count || 0) + (rssResult1h.count || 0);
-      const mentions6h = (newsResult6h.count || 0) + (rssResult6h.count || 0);
+      // Calculate unique authors for spam detection
+      const uniqueAuthors = blueskyUniqueAuthors.data 
+        ? new Set(blueskyUniqueAuthors.data.map((p: any) => p.author_did)).size
+        : 0;
+      const blueskyMentionCount = topicData.bluesky_count;
+      
+      // Spam detection: if single author contributes >50% of mentions, it's likely spam
+      const isSpammy = uniqueAuthors > 0 && blueskyMentionCount > 10 && 
+                       (blueskyMentionCount / uniqueAuthors) > 5; // avg >5 posts per author suggests spam
+      
+      // Weight bluesky counts lower if spammy, but still include
+      const blueskyWeight = isSpammy ? 0.3 : 1.0;
+      
+      // Sum counts from all three sources (Google News, RSS, and Bluesky)
+      const mentions15m = (newsResult15m.count || 0) + 
+                          (rssResult15m.count || 0) + 
+                          Math.round((blueskyResult15m.count || 0) * blueskyWeight);
+      const mentions1h = (newsResult1h.count || 0) + 
+                         (rssResult1h.count || 0) + 
+                         Math.round((blueskyResult1h.count || 0) * blueskyWeight);
+      const mentions6h = (newsResult6h.count || 0) + 
+                         (rssResult6h.count || 0) + 
+                         Math.round((blueskyResult6h.count || 0) * blueskyWeight);
       const mentions24h = topicData.total_count;
       const previousVelocity = existingCluster.data?.velocity_score ?? null;
+      
+      // Log time-window breakdown for debugging top topics
+      if (topicData.rankScore > 100) {
+        console.log(`[TIME-WINDOWS] ${topicData.topic}: 15m=${mentions15m} (g:${newsResult15m.count||0}, r:${rssResult15m.count||0}, b:${blueskyResult15m.count||0}), 1h=${mentions1h}, 6h=${mentions6h}, 24h=${mentions24h}${isSpammy ? ' [SPAM DETECTED]' : ''}`);
+      }
       
       // Calculate enhanced velocity metrics
       const velocityMetrics = calculateEnhancedVelocity(
@@ -1062,7 +1124,7 @@ serve(async (req) => {
         }
       }
       
-      // Upsert cluster with enhanced velocity fields
+      // Upsert cluster with enhanced velocity fields and spam detection
       const { error } = await supabase
         .from('trend_clusters')
         .upsert({
@@ -1087,6 +1149,8 @@ serve(async (req) => {
             google_news: topicData.google_news_count,
             reddit: topicData.reddit_count,
             bluesky: topicData.bluesky_count,
+            bluesky_unique_authors: uniqueAuthors,
+            bluesky_spam_detected: isSpammy,
             rss: topicData.rss_count
           },
           google_news_count: topicData.google_news_count,
