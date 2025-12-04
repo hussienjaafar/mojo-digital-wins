@@ -313,23 +313,24 @@ serve(async (req) => {
     // Load entity aliases from database for hybrid resolution
     await loadEntityAliases(supabase);
 
-    // Best-effort status updates
+    // Best-effort status updates - now runs every 5 minutes for faster processing
     const markJob = async (status: 'running' | 'success' | 'failed') => {
       await supabase
         .from('scheduled_jobs')
         .update({
           last_run_status: status,
           last_run_at: new Date().toISOString(),
-          ...(status === 'success' ? { next_run_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() } : {})
+          ...(status === 'success' ? { next_run_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() } : {})
         })
         .eq('job_type', 'analyze_bluesky');
     };
 
     await markJob('running').catch(() => {});
 
-    console.log('🤖 Starting AI analysis of Bluesky posts (proper nouns only)...');
+    console.log('🤖 Starting AI analysis of Bluesky posts (proper nouns only) - batch size 100...');
 
-    const { batchSize = 30, minRelevance = 0.01 } = await req.json().catch(() => ({ batchSize: 30, minRelevance: 0.01 }));
+    // PHASE 2: Increased batch size from 30 to 100 for 3x throughput
+    const { batchSize = 100, minRelevance = 0.01 } = await req.json().catch(() => ({ batchSize: 100, minRelevance: 0.01 }));
 
     // Get unprocessed posts
     const { data: posts, error: fetchError } = await supabase
