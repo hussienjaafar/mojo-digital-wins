@@ -1002,24 +1002,26 @@ serve(async (req) => {
           .contains('ai_topics', [topicData.topic])
           .gte('created_at', hours6Ago.toISOString()),
           
-        // Google News 24h (keyword-based for consistency with 6h)
+        // Google News 24h (AI-based like 6h to avoid false positives)
         supabase
           .from('google_news_articles')
           .select('id', { count: 'exact', head: true })
-          .gte('published_at', hours24Ago.toISOString())
-          .ilike('title', `%${escapedTopic}%`),
-        // RSS 24h (keyword-based for consistency)
+          .eq('ai_processed', true)
+          .contains('ai_topics', [topicData.topic])
+          .gte('published_at', hours24Ago.toISOString()),
+        // RSS 24h (keyword-based in title - reliable)
         supabase
           .from('articles')
           .select('id', { count: 'exact', head: true })
           .gte('published_date', hours24Ago.toISOString())
           .ilike('title', `%${escapedTopic}%`),
-        // Bluesky 24h (keyword-based for consistency)
+        // Bluesky 24h (AI-based like 6h to avoid false positives from short words like ICE)
         supabase
           .from('bluesky_posts')
           .select('id', { count: 'exact', head: true })
-          .gte('created_at', hours24Ago.toISOString())
-          .ilike('text', `%${escapedTopic}%`),
+          .eq('ai_processed', true)
+          .contains('ai_topics', [topicData.topic])
+          .gte('created_at', hours24Ago.toISOString()),
           
         // Existing cluster
         supabase
