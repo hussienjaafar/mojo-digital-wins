@@ -20,6 +20,10 @@ export interface UnifiedTrend {
   matchesWatchlist?: boolean;
   watchlistEntity?: string;
   sampleHeadline?: string;
+  // Phase 3: Related topics
+  related_topics?: string[];
+  entity_type?: string;
+  is_breaking?: boolean;
 }
 
 interface UseUnifiedTrendsOptions {
@@ -57,7 +61,7 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     setError(null);
     
     try {
-      // Fetch trends, watchlist, and evergreen topics in parallel
+      // Fetch trends, watchlist, trend clusters (for related_topics), and evergreen topics in parallel
       let query = supabase
         .from('mv_unified_trends')
         .select('*')
@@ -68,7 +72,7 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
         query = query.eq('is_breakthrough', true);
       }
 
-      const [trendsResult, watchlistResult, headlinesResult, evergreenResult] = await Promise.all([
+      const [trendsResult, watchlistResult, headlinesResult, evergreenResult, clustersResult] = await Promise.all([
         query,
         supabase.from('entity_watchlist').select('entity_name'),
         // Get sample headlines for context
@@ -78,7 +82,11 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
           .order('published_date', { ascending: false })
           .limit(100),
         // Get evergreen topics from database
-        supabase.from('evergreen_topics').select('topic')
+        supabase.from('evergreen_topics').select('topic'),
+        // Get related topics from trend_clusters
+        supabase.from('trend_clusters')
+          .select('cluster_title, related_topics, entity_type, is_breaking')
+          .eq('is_trending', true)
       ]);
 
       if (trendsResult.error) {
@@ -89,6 +97,17 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
 
       const watchlistEntities = (watchlistResult.data || []).map((w: any) => w.entity_name?.toLowerCase() || '');
       const headlines = headlinesResult.data || [];
+      
+      // Build map of cluster data for related topics
+      const clusterMap = new Map<string, { related_topics: string[], entity_type: string, is_breaking: boolean }>();
+      for (const cluster of (clustersResult.data || [])) {
+        const key = cluster.cluster_title?.toLowerCase() || '';
+        clusterMap.set(key, {
+          related_topics: cluster.related_topics || [],
+          entity_type: cluster.entity_type || 'category',
+          is_breaking: cluster.is_breaking || false
+        });
+      }
       
       // Combine database evergreen with hardcoded patterns
       const dbEvergreen = (evergreenResult.data || []).map((e: any) => e.topic?.toLowerCase() || '');
@@ -126,12 +145,18 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
             article.title?.toLowerCase().includes(trendNameLower) ||
             (article.tags && article.tags.some((tag: string) => tag?.toLowerCase().includes(trendNameLower)))
           );
+          
+          // Get related topics from cluster data
+          const clusterData = clusterMap.get(trendNameLower) || clusterMap.get(normalizedLower);
 
           return {
             ...trend,
             matchesWatchlist: !!matchedEntity,
             watchlistEntity: matchedEntity || null,
             sampleHeadline: matchingHeadline?.title || null,
+            related_topics: clusterData?.related_topics || [],
+            entity_type: clusterData?.entity_type || 'category',
+            is_breaking: clusterData?.is_breaking || false,
           } as UnifiedTrend;
         });
 

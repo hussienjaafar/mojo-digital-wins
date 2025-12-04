@@ -500,6 +500,45 @@ serve(async (req) => {
       }
     }
     
+    // Build co-occurrence map for "Trending with" feature
+    const coOccurrenceMap = new Map<string, Map<string, number>>();
+    
+    // Track which topics appear together in the same articles
+    const buildCoOccurrence = (articleTopics: string[]) => {
+      for (const topic1 of articleTopics) {
+        if (!coOccurrenceMap.has(topic1)) {
+          coOccurrenceMap.set(topic1, new Map());
+        }
+        for (const topic2 of articleTopics) {
+          if (topic1 !== topic2) {
+            const count = coOccurrenceMap.get(topic1)!.get(topic2) || 0;
+            coOccurrenceMap.get(topic1)!.set(topic2, count + 1);
+          }
+        }
+      }
+    };
+    
+    // Process co-occurrences from news data
+    if (newsData) {
+      for (const item of newsData) {
+        const topics = (item.ai_topics || []).map((t: string) => normalizeTopic(t)).filter((t: string) => t.length >= 3);
+        buildCoOccurrence(topics);
+      }
+    }
+    
+    // Process co-occurrences from RSS data
+    if (rssData) {
+      for (const item of rssData) {
+        const topics = Array.isArray(item.extracted_topics) 
+          ? item.extracted_topics 
+          : (item.extracted_topics as any)?.topics || [];
+        const normalizedTopics = topics
+          .map((t: any) => normalizeTopic(typeof t === 'string' ? t : t?.topic || t?.name || ''))
+          .filter((t: string) => t.length >= 3);
+        buildCoOccurrence(normalizedTopics);
+      }
+    }
+    
     // Filter and process top topics with specificity-weighted ranking
     const significantTopics = Array.from(topicMap.values())
       .filter(t => t.total_count >= 3) // Minimum mentions
@@ -515,7 +554,16 @@ serve(async (req) => {
         // Calculate ranking score: Volume × Specificity × CrossSource
         const rankScore = t.total_count * specificityScore * (1 + crossSourceBonus);
         
-        return { ...t, specificityScore, rankScore };
+        // Get related topics from co-occurrence
+        const relatedMap = coOccurrenceMap.get(t.topic);
+        const relatedTopics = relatedMap 
+          ? Array.from(relatedMap.entries())
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 5)
+              .map(([topic]) => topic)
+          : [];
+        
+        return { ...t, specificityScore, rankScore, relatedTopics };
       })
       .sort((a, b) => b.rankScore - a.rankScore)
       .slice(0, 100); // Top 100 topics
@@ -598,8 +646,9 @@ serve(async (req) => {
       const isBreaking = isBreakingNews(velocity, crossSourceScore, topicData.first_seen, now);
       if (isBreaking) breakingCount++;
       
-      // Collect related hashtags
+      // Collect related hashtags and related topics
       const relatedHashtags = topicData.hashtags.slice(0, 10);
+      const relatedTopicsList = topicData.relatedTopics || [];
       
       // Generate summary using AI (only for high-signal topics)
       let clusterSummary = topicData.sample_headlines[0] || topicData.topic;
@@ -676,6 +725,7 @@ serve(async (req) => {
           hashtags: relatedHashtags,
           is_hashtag: topicData.entity_type === 'hashtag',
           is_breaking: isBreaking,
+          related_topics: relatedTopicsList,
           updated_at: now.toISOString()
         }, {
           onConflict: 'cluster_title'
