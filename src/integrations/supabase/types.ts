@@ -5523,6 +5523,7 @@ export type Database = {
         Args: { mentions_1h: number; mentions_24h: number; mentions_6h: number }
         Returns: number
       }
+      cleanup_old_cache: { Args: never; Returns: number }
       count_keyword_mentions: {
         Args: { search_keyword: string; time_window?: unknown }
         Returns: {
