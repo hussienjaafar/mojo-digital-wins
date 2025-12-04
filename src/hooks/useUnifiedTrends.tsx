@@ -14,6 +14,9 @@ export interface UnifiedTrend {
   avg_sentiment: number | null;
   last_updated: string;
   source_count: number;
+  spike_ratio: number;
+  baseline_hourly: number;
+  baseline_daily: number;
   unified_score: number;
   is_breakthrough: boolean;
   refreshed_at: string;
@@ -54,7 +57,8 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
         return;
       }
 
-      setTrends(data || []);
+      // Cast data to match our interface
+      setTrends((data || []) as UnifiedTrend[]);
     } catch (err) {
       console.error('Failed to fetch unified trends:', err);
       setError('Failed to load trends');
@@ -87,6 +91,23 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     stats,
     refresh: fetchTrends 
   };
+};
+
+// Helper to get spike ratio color (Twitter-style: higher = more urgent)
+export const getSpikeRatioColor = (spikeRatio: number): string => {
+  if (spikeRatio >= 5) return 'text-destructive';
+  if (spikeRatio >= 3) return 'text-severity-high';
+  if (spikeRatio >= 2) return 'text-status-warning';
+  return 'text-status-info';
+};
+
+// Helper to format spike ratio as a label
+export const formatSpikeRatio = (spikeRatio: number): string => {
+  if (spikeRatio >= 10) return '🔥 Viral';
+  if (spikeRatio >= 5) return '📈 Surging';
+  if (spikeRatio >= 3) return '⬆️ Rising';
+  if (spikeRatio >= 2) return '↗️ Up';
+  return '→ Steady';
 };
 
 // Helper to get source type badge color
