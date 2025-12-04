@@ -4,7 +4,6 @@ import { UnifiedTrendingPanel } from "@/components/analytics/UnifiedTrendingPane
 import { TopicContentSheet } from "@/components/analytics/TopicContentSheet";
 import { PriorityAlertsPanel } from "@/components/analytics/PriorityAlertsPanel";
 import { TodaysBriefing } from "@/components/analytics/TodaysBriefing";
-import { PoliticalTrendsFeed } from "@/components/analytics/PoliticalTrendsFeed";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
@@ -558,9 +557,6 @@ export default function Analytics() {
 
       {/* Unified Trending Topics - Main content */}
       <UnifiedTrendingPanel onTopicClick={handleTopicClick} />
-
-      {/* Political Trends Feed - Cross-source clustering */}
-      <PoliticalTrendsFeed />
 
       {/* Topic Content Sheet */}
       <TopicContentSheet
