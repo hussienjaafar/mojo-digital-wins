@@ -95,21 +95,23 @@ export function PriorityAlertsPanel({ onAlertClick }: PriorityAlertsPanelProps) 
 
       // Match trending topics to watchlist
       (trendingData || []).forEach(trend => {
-        const trendNameLower = trend.name?.toLowerCase() || '';
+        const trendNameLower = trend.topic?.toLowerCase() || '';
         const matchedEntity = watchlistEntities.find(entity => 
           trendNameLower.includes(entity.name) || entity.name.includes(trendNameLower)
         );
 
-        if (matchedEntity && trend.spike_ratio >= 2) {
+        // Use combined_velocity as spike indicator (>200 = 2x normal)
+        const spikeRatio = (trend.combined_velocity || 0) / 100;
+        if (matchedEntity && spikeRatio >= 2) {
           priorityAlerts.push({
-            id: `trend-${trend.normalized_name}`,
+            id: `trend-${trend.topic}`,
             type: 'watchlist_spike',
-            title: `"${trend.name}" is trending`,
-            description: `${trend.spike_ratio.toFixed(1)}x above normal • ${trend.total_mentions_24h} mentions in 24h`,
-            severity: trend.spike_ratio >= 4 ? 'critical' : trend.spike_ratio >= 3 ? 'high' : 'medium',
-            timestamp: trend.last_updated,
+            title: `"${trend.topic}" is trending`,
+            description: `${spikeRatio.toFixed(1)}x above normal • ${trend.total_mentions || 0} mentions in 24h`,
+            severity: spikeRatio >= 4 ? 'critical' : spikeRatio >= 3 ? 'high' : 'medium',
+            timestamp: trend.last_updated || new Date().toISOString(),
             entity: matchedEntity.name,
-            mentions: trend.total_mentions_24h,
+            mentions: trend.total_mentions || 0,
           });
         }
       });

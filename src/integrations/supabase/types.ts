@@ -460,6 +460,60 @@ export type Database = {
         }
         Relationships: []
       }
+      anomaly_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_type: string
+          baseline_value: number | null
+          current_value: number
+          detected_at: string | null
+          deviation_percentage: number | null
+          entity_type: string | null
+          id: string
+          is_acknowledged: boolean | null
+          metadata: Json | null
+          resolved_at: string | null
+          severity: string | null
+          topic: string
+          z_score: number | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type: string
+          baseline_value?: number | null
+          current_value: number
+          detected_at?: string | null
+          deviation_percentage?: number | null
+          entity_type?: string | null
+          id?: string
+          is_acknowledged?: boolean | null
+          metadata?: Json | null
+          resolved_at?: string | null
+          severity?: string | null
+          topic: string
+          z_score?: number | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type?: string
+          baseline_value?: number | null
+          current_value?: number
+          detected_at?: string | null
+          deviation_percentage?: number | null
+          entity_type?: string | null
+          id?: string
+          is_acknowledged?: boolean | null
+          metadata?: Json | null
+          resolved_at?: string | null
+          severity?: string | null
+          topic?: string
+          z_score?: number | null
+        }
+        Relationships: []
+      }
       article_bookmarks: {
         Row: {
           article_id: string
@@ -1908,12 +1962,14 @@ export type Database = {
           article_count: number | null
           avg_sentiment: number | null
           change_percentage: number | null
+          combined_sentiment: number | null
           created_at: string | null
           date: string
           id: string
           previous_avg_sentiment: number | null
           sentiment_trend: string | null
           social_post_count: number | null
+          social_sentiment: number | null
           top_sources: string[] | null
           top_topics: string[] | null
         }
@@ -1922,12 +1978,14 @@ export type Database = {
           article_count?: number | null
           avg_sentiment?: number | null
           change_percentage?: number | null
+          combined_sentiment?: number | null
           created_at?: string | null
           date: string
           id?: string
           previous_avg_sentiment?: number | null
           sentiment_trend?: string | null
           social_post_count?: number | null
+          social_sentiment?: number | null
           top_sources?: string[] | null
           top_topics?: string[] | null
         }
@@ -1936,12 +1994,14 @@ export type Database = {
           article_count?: number | null
           avg_sentiment?: number | null
           change_percentage?: number | null
+          combined_sentiment?: number | null
           created_at?: string | null
           date?: string
           id?: string
           previous_avg_sentiment?: number | null
           sentiment_trend?: string | null
           social_post_count?: number | null
+          social_sentiment?: number | null
           top_sources?: string[] | null
           top_topics?: string[] | null
         }
@@ -5470,20 +5530,24 @@ export type Database = {
       }
       mv_unified_trends: {
         Row: {
-          avg_sentiment: number | null
-          baseline_hourly: number | null
-          is_breakthrough: boolean | null
+          combined_sentiment: number | null
+          combined_velocity: number | null
+          entity_type: string | null
+          is_trending: boolean | null
           last_updated: string | null
-          name: string | null
-          normalized_name: string | null
-          source_count: number | null
-          source_types: string[] | null
-          spike_ratio: number | null
-          total_mentions_1h: number | null
-          total_mentions_24h: number | null
-          total_mentions_6h: number | null
-          unified_score: number | null
-          velocity: number | null
+          news_mentions: number | null
+          news_sentiment: number | null
+          news_topic: string | null
+          news_trending: boolean | null
+          news_velocity: number | null
+          row_id: number | null
+          social_mentions: number | null
+          social_sentiment: number | null
+          social_topic: string | null
+          social_trending: boolean | null
+          social_velocity: number | null
+          topic: string | null
+          total_mentions: number | null
         }
         Relationships: []
       }
@@ -5538,6 +5602,18 @@ export type Database = {
         Returns: number
       }
       deduplicate_topic_name: { Args: { topic_name: string }; Returns: string }
+      detect_velocity_anomalies: {
+        Args: { lookback_hours?: number; z_threshold?: number }
+        Returns: {
+          avg_velocity: number
+          current_velocity: number
+          entity_type: string
+          is_anomaly: boolean
+          std_velocity: number
+          topic: string
+          z_score: number
+        }[]
+      }
       discover_trending_keywords: {
         Args: { min_frequency?: number; time_window?: unknown }
         Returns: {
@@ -5660,6 +5736,7 @@ export type Database = {
         }
         Returns: string
       }
+      refresh_analytics_views: { Args: never; Returns: undefined }
       refresh_daily_group_sentiment: { Args: never; Returns: undefined }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
       refresh_materialized_view: {
