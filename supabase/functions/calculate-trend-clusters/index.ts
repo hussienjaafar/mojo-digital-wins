@@ -935,6 +935,7 @@ serve(async (req) => {
         newsResult15m, rssResult15m, blueskyResult15m,
         newsResult1h, rssResult1h, blueskyResult1h,
         newsResult6h, rssResult6h, blueskyResult6h,
+        newsResult24h, rssResult24h, blueskyResult24h,
         existingCluster,
         blueskyUniqueAuthors
       ] = await Promise.all([
@@ -987,7 +988,7 @@ serve(async (req) => {
           .eq('ai_processed', true)
           .contains('ai_topics', [topicData.topic])
           .gte('published_at', hours6Ago.toISOString()),
-        // RSS 6h
+        // RSS 6h (keyword-based for consistency)
         supabase
           .from('articles')
           .select('id', { count: 'exact', head: true })
@@ -1000,6 +1001,25 @@ serve(async (req) => {
           .eq('ai_processed', true)
           .contains('ai_topics', [topicData.topic])
           .gte('created_at', hours6Ago.toISOString()),
+          
+        // Google News 24h (keyword-based for consistency with 6h)
+        supabase
+          .from('google_news_articles')
+          .select('id', { count: 'exact', head: true })
+          .gte('published_at', hours24Ago.toISOString())
+          .ilike('title', `%${escapedTopic}%`),
+        // RSS 24h (keyword-based for consistency)
+        supabase
+          .from('articles')
+          .select('id', { count: 'exact', head: true })
+          .gte('published_date', hours24Ago.toISOString())
+          .ilike('title', `%${escapedTopic}%`),
+        // Bluesky 24h (keyword-based for consistency)
+        supabase
+          .from('bluesky_posts')
+          .select('id', { count: 'exact', head: true })
+          .gte('created_at', hours24Ago.toISOString())
+          .ilike('text', `%${escapedTopic}%`),
           
         // Existing cluster
         supabase
@@ -1030,22 +1050,34 @@ serve(async (req) => {
       // Weight bluesky counts lower if spammy, but still include
       const blueskyWeight = isSpammy ? 0.3 : 1.0;
       
-      // Sum counts from all three sources (Google News, RSS, and Bluesky)
-      const mentions15m = (newsResult15m.count || 0) + 
-                          (rssResult15m.count || 0) + 
-                          Math.round((blueskyResult15m.count || 0) * blueskyWeight);
-      const mentions1h = (newsResult1h.count || 0) + 
-                         (rssResult1h.count || 0) + 
-                         Math.round((blueskyResult1h.count || 0) * blueskyWeight);
-      const mentions6h = (newsResult6h.count || 0) + 
-                         (rssResult6h.count || 0) + 
-                         Math.round((blueskyResult6h.count || 0) * blueskyWeight);
-      const mentions24h = topicData.total_count;
+      // Sum counts from all three sources (Google News, RSS, and Bluesky) using keyword-based queries
+      const raw15m = (newsResult15m.count || 0) + 
+                     (rssResult15m.count || 0) + 
+                     Math.round((blueskyResult15m.count || 0) * blueskyWeight);
+      const raw1h = (newsResult1h.count || 0) + 
+                    (rssResult1h.count || 0) + 
+                    Math.round((blueskyResult1h.count || 0) * blueskyWeight);
+      const raw6h = (newsResult6h.count || 0) + 
+                    (rssResult6h.count || 0) + 
+                    Math.round((blueskyResult6h.count || 0) * blueskyWeight);
+      // 24h: use keyword-based counts and ensure >= AI-based total_count
+      const keyword24h = (newsResult24h.count || 0) + 
+                         (rssResult24h.count || 0) + 
+                         Math.round((blueskyResult24h.count || 0) * blueskyWeight);
+      const raw24h = Math.max(keyword24h, topicData.total_count);
+      
+      // CRITICAL: Ensure logical hierarchy - 24h >= 6h >= 1h >= 15m
+      // This prevents the impossible case where 6h > 24h
+      const mentions24h = Math.max(raw24h, raw6h, raw1h, raw15m);
+      const mentions6h = Math.max(raw6h, raw1h, raw15m);
+      const mentions1h = Math.max(raw1h, raw15m);
+      const mentions15m = raw15m;
+      
       const previousVelocity = existingCluster.data?.velocity_score ?? null;
       
       // Log time-window breakdown for debugging top topics
       if (topicData.rankScore > 100) {
-        console.log(`[TIME-WINDOWS] ${topicData.topic}: 15m=${mentions15m} (g:${newsResult15m.count||0}, r:${rssResult15m.count||0}, b:${blueskyResult15m.count||0}), 1h=${mentions1h}, 6h=${mentions6h}, 24h=${mentions24h}${isSpammy ? ' [SPAM DETECTED]' : ''}`);
+        console.log(`[TIME-WINDOWS] ${topicData.topic}: 15m=${mentions15m}, 1h=${mentions1h}, 6h=${mentions6h}, 24h=${mentions24h} (kw24h=${keyword24h}, ai24h=${topicData.total_count})${isSpammy ? ' [SPAM]' : ''}`);
       }
       
       // Calculate enhanced velocity metrics
