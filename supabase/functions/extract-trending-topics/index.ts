@@ -56,12 +56,50 @@ const TOPIC_NORMALIZATIONS: Record<string, string> = {
   'washington dc': 'Washington DC',
 };
 
+// Database-loaded aliases (populated at runtime)
+let dbAliases: Map<string, string> = new Map();
+
 /**
- * Normalize topic to canonical form
+ * Normalize topic to canonical form using hybrid resolution:
+ * 1. Database aliases (most current)
+ * 2. Hardcoded normalizations (fallback)
  */
 function normalizeTopic(topic: string): string {
-  const lower = topic.toLowerCase();
-  return TOPIC_NORMALIZATIONS[lower] || topic;
+  const lower = topic.toLowerCase().trim();
+  
+  // Priority 1: Check database aliases
+  if (dbAliases.has(lower)) {
+    return dbAliases.get(lower)!;
+  }
+  
+  // Priority 2: Check hardcoded normalizations
+  if (TOPIC_NORMALIZATIONS[lower]) {
+    return TOPIC_NORMALIZATIONS[lower];
+  }
+  
+  return topic;
+}
+
+/**
+ * Load entity aliases from database
+ */
+async function loadEntityAliases(supabase: any): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from('entity_aliases')
+      .select('raw_name, canonical_name')
+      .order('usage_count', { ascending: false });
+    
+    if (data && !error) {
+      dbAliases = new Map();
+      for (const alias of data) {
+        dbAliases.set(alias.raw_name.toLowerCase(), alias.canonical_name);
+      }
+      console.log(`Loaded ${dbAliases.size} entity aliases from database`);
+    }
+  } catch (e) {
+    console.error('Failed to load entity aliases:', e);
+  }
 }
 
 serve(async (req) => {
@@ -76,6 +114,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Load entity aliases from database for hybrid resolution
+    await loadEntityAliases(supabase);
 
     const body = await req.json().catch(() => ({}));
     const hoursBack = body.hoursBack || 0.5; // Analyze last 30 minutes
@@ -138,40 +179,43 @@ serve(async (req) => {
         `ID: ${a.id}\nTitle: ${a.title}\nContent: ${(a.description || a.content || '').substring(0, 500)}`
       ).join('\n\n---\n\n');
 
-      const extractionPrompt = `Extract names from these news headlines like Twitter trending. Answer: WHO? WHERE? WHAT specific thing?
+      const extractionPrompt = `Extract FULL CANONICAL NAMES from these news headlines like Twitter trending. Answer: WHO? WHERE? WHAT specific thing?
 
 ${articlesText}
 
-Extract ONLY:
-- PEOPLE: "Donald Trump", "Nancy Pelosi", "Dick Cheney"
-- PLACES: "Gaza", "Ukraine", "Texas"
-- ORGANIZATIONS: "Supreme Court", "FBI", "NATO" (NOT news outlets)
+Extract ONLY with FULL NAMES (not abbreviations or last names alone):
+- PEOPLE: Use FULL names: "Donald Trump" (NOT "Trump"), "Nancy Pelosi" (NOT "Pelosi"), "Joe Biden" (NOT "Biden")
+- PLACES: "Gaza", "Ukraine", "Texas", "Washington DC"
+- ORGANIZATIONS: "Supreme Court", "FBI", "NATO", "Department of Justice" (NOT news outlets)
 - BILLS: "HR 1234", "S 456"
 - PRODUCTS/EVENTS: "iPhone", "Super Bowl", "TikTok"
+
+CRITICAL - USE FULL CANONICAL NAMES:
+✅ "Donald Trump" (NOT "Trump" alone)
+✅ "Joe Biden" (NOT "Biden" alone)
+✅ "Elon Musk" (NOT "Musk" alone)
+✅ "Ron DeSantis" (NOT "DeSantis" alone)
+✅ "Pete Hegseth" (NOT "Hegseth" alone)
+✅ "Christopher Wray" (NOT "Wray" alone)
+✅ "Gavin Newsom" (NOT "Newsom" alone)
+✅ "Vladimir Putin" (NOT "Putin" alone)
 
 DO NOT extract:
 - Categories: "immigration", "healthcare", "politics"
 - Actions: "debate", "reform", "investigation"
 - Descriptions: "administration", "crisis", "tensions"
 - NEWS SOURCES: "Associated Press", "Reuters", "CNN", "BBC" (publishers reporting the news)
+- LAST NAMES ONLY: Never return just "Trump", "Biden", "Musk" - always use full name
 
 Rules:
 1. Must be a proper noun (starts with capital letter)
-2. 1-3 words max
+2. Use FULL CANONICAL NAME (First Last for people)
 3. Would have a Wikipedia page
 4. NOT a topic/theme/category
 5. NOT a news organization/publisher
 
-Examples:
-✅ "Elon Musk" (person IN the news)
-✅ "Gaza" (place IN the news)
-✅ "TikTok" (product IN the news)
-❌ "Associated Press" (news publisher, not news)
-❌ "social media" (category)
-❌ "administration" (description)
-
 Return JSON array:
-[{"topic": "Name Here", "keywords": ["word1", "word2"], "relevance": 0.9}]`;
+[{"topic": "Full Name Here", "keywords": ["word1", "word2"], "relevance": 0.9}]`;
 
       try {
         // Create timeout promise

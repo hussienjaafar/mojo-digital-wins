@@ -52,6 +52,9 @@ const TOPIC_NORMALIZATIONS: Record<string, string> = {
   'washington dc': 'Washington DC',
 };
 
+// Database-loaded aliases (populated at runtime)
+let dbAliases: Map<string, string> = new Map();
+
 // Evergreen topics that should NEVER be extracted as trending topics
 const EVERGREEN_BLOCKLIST = new Set([
   // Generic categories
@@ -69,8 +72,41 @@ const EVERGREEN_BLOCKLIST = new Set([
 ]);
 
 function normalizeTopic(topic: string): string {
-  const lower = topic.toLowerCase();
-  return TOPIC_NORMALIZATIONS[lower] || topic;
+  const lower = topic.toLowerCase().trim();
+  
+  // Priority 1: Check database aliases
+  if (dbAliases.has(lower)) {
+    return dbAliases.get(lower)!;
+  }
+  
+  // Priority 2: Check hardcoded normalizations
+  if (TOPIC_NORMALIZATIONS[lower]) {
+    return TOPIC_NORMALIZATIONS[lower];
+  }
+  
+  return topic;
+}
+
+/**
+ * Load entity aliases from database
+ */
+async function loadEntityAliases(supabase: any): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from('entity_aliases')
+      .select('raw_name, canonical_name')
+      .order('usage_count', { ascending: false });
+    
+    if (data && !error) {
+      dbAliases = new Map();
+      for (const alias of data) {
+        dbAliases.set(alias.raw_name.toLowerCase(), alias.canonical_name);
+      }
+      console.log(`Loaded ${dbAliases.size} entity aliases from database`);
+    }
+  } catch (e) {
+    console.error('Failed to load entity aliases:', e);
+  }
 }
 
 function isValidProperNoun(topic: string): boolean {
@@ -139,14 +175,26 @@ async function analyzePosts(posts: BlueSkyPost[]): Promise<any[]> {
   ).join('\n\n');
 
   // CRITICAL FIX: New prompt that extracts proper nouns only, matching extract-trending-topics
-  const prompt = `Analyze these Bluesky posts. Extract ONLY proper nouns (names) - NOT themes or categories.
+  const prompt = `Analyze these Bluesky posts. Extract ONLY FULL CANONICAL NAMES (proper nouns) - NOT themes or categories.
 
 ${postsText}
 
 For EACH post, extract:
 
-1. **topics**: Array of 1-4 PROPER NOUNS only. Ask: WHO? WHERE? WHAT specific thing?
-   EXTRACT: People ("Donald Trump"), Places ("Gaza"), Organizations ("FBI"), Bills ("HR 1234"), Events ("Super Bowl")
+1. **topics**: Array of 1-4 PROPER NOUNS with FULL CANONICAL NAMES. Ask: WHO? WHERE? WHAT specific thing?
+   EXTRACT with FULL NAMES: 
+   - People: "Donald Trump" (NOT "Trump"), "Joe Biden" (NOT "Biden"), "Elon Musk" (NOT "Musk")
+   - Places: "Gaza", "Ukraine", "Washington DC"
+   - Organizations: "FBI", "Supreme Court", "NATO"
+   - Bills: "HR 1234", "S 456"
+   
+   CRITICAL - USE FULL NAMES:
+   ✅ "Donald Trump" (NOT "Trump")
+   ✅ "Joe Biden" (NOT "Biden")
+   ✅ "Pete Hegseth" (NOT "Hegseth")
+   ✅ "Ron DeSantis" (NOT "DeSantis")
+   ✅ "Vladimir Putin" (NOT "Putin")
+   
    DO NOT EXTRACT: Categories ("immigration"), Actions ("debate"), Descriptions ("crisis")
 
 2. **affected_groups**: Which communities are discussed? Use ONLY these labels:
@@ -161,10 +209,12 @@ For EACH post, extract:
 
 VALIDATION RULES for topics:
 - Must be a proper noun (would have a Wikipedia page)
+- Must use FULL CANONICAL NAME (First Last for people)
 - Must be 1-4 words max
 - Must start with capital letter
 - NOT a theme/category/action word
 - NOT a news publisher
+- NEVER use last name alone
 
 Return JSON array:
 [{"index": 0, "topics": ["Pete Hegseth", "Pentagon"], "affected_groups": ["veterans"], "relevance_category": "politics", "sentiment": -0.3, "sentiment_label": "negative"}]`;
@@ -259,6 +309,9 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Load entity aliases from database for hybrid resolution
+    await loadEntityAliases(supabase);
 
     // Best-effort status updates
     const markJob = async (status: 'running' | 'success' | 'failed') => {
