@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, Flame, GripVertical, RefreshCw, Newspaper, Users, ArrowUpRight, Zap, Link } from "lucide-react";
+import { TrendingUp, Flame, GripVertical, RefreshCw, Newspaper, Users, ArrowUpRight, Zap, Link, Rocket, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUnifiedTrends, getSpikeRatioColor, formatSpikeRatio } from "@/hooks/useUnifiedTrends";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,15 @@ import { cn } from "@/lib/utils";
 interface TrendingTopicsWidgetProps {
   showDragHandle?: boolean;
 }
+
+// Trend stage badge colors and labels
+const TREND_STAGE_CONFIG: Record<string, { label: string; color: string; icon?: React.ReactNode }> = {
+  emerging: { label: 'Emerging', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+  surging: { label: 'Surging', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  peaking: { label: 'Peaking', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+  declining: { label: 'Declining', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
+  stable: { label: '', color: '' },
+};
 
 export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsWidgetProps) {
   const { trends, isLoading, stats, refresh } = useUnifiedTrends({ limit: 10 });
@@ -121,19 +130,34 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
                   
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {trend.is_breaking && (
                         <Zap className="h-3.5 w-3.5 text-red-500 animate-pulse" />
                       )}
-                      {!trend.is_breaking && trend.is_breakthrough && trend.spike_ratio >= 3 && (
+                      {!trend.is_breaking && trend.trend_stage === 'emerging' && (
+                        <Rocket className="h-3.5 w-3.5 text-green-400" />
+                      )}
+                      {!trend.is_breaking && trend.trend_stage === 'surging' && (
                         <Flame className="h-3.5 w-3.5 text-orange-400 animate-pulse" />
                       )}
-                      {!trend.is_breaking && trend.spike_ratio >= 2 && trend.spike_ratio < 3 && (
-                        <ArrowUpRight className="h-3.5 w-3.5 text-yellow-400" />
+                      {!trend.is_breaking && trend.trend_stage === 'peaking' && (
+                        <ArrowUpRight className="h-3.5 w-3.5 text-red-400" />
+                      )}
+                      {trend.trend_stage === 'declining' && (
+                        <TrendingDown className="h-3.5 w-3.5 text-gray-400" />
                       )}
                       <span className="text-sm font-semibold portal-text-primary truncate group-hover:text-primary transition-colors" title={trend.name}>
                         {trend.name}
                       </span>
+                      {/* Trend stage badge */}
+                      {trend.trend_stage && trend.trend_stage !== 'stable' && !trend.is_breaking && (
+                        <span className={cn(
+                          "text-[10px] px-1.5 py-0.5 rounded border font-medium",
+                          TREND_STAGE_CONFIG[trend.trend_stage]?.color
+                        )}>
+                          {TREND_STAGE_CONFIG[trend.trend_stage]?.label}
+                        </span>
+                      )}
                       {trend.entity_type === 'person' && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-medium">Person</span>
                       )}
@@ -148,6 +172,15 @@ export function TrendingTopicsWidget({ showDragHandle = false }: TrendingTopicsW
                         {trend.total_mentions_24h.toLocaleString()} mentions
                         {trend.source_count >= 2 && (
                           <span className="text-green-400 ml-1">• Cross-platform</span>
+                        )}
+                        {/* Show acceleration if significant */}
+                        {trend.acceleration && Math.abs(trend.acceleration) > 30 && (
+                          <span className={cn(
+                            "ml-1",
+                            trend.acceleration > 0 ? "text-green-400" : "text-red-400"
+                          )}>
+                            • {trend.acceleration > 0 ? '↑' : '↓'}{Math.abs(Math.round(trend.acceleration))}%
+                          </span>
                         )}
                       </span>
                     </div>
