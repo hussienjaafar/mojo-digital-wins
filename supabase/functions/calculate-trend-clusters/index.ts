@@ -26,6 +26,160 @@ interface TopicData {
   hashtags: string[];
 }
 
+// Topic aliasing system to unify variations
+// Maps variations to canonical names
+const TOPIC_ALIASES: Record<string, string> = {
+  // Trump variations
+  'trump': 'Donald Trump',
+  '#trump': 'Donald Trump',
+  '#donaldtrump': 'Donald Trump',
+  'president trump': 'Donald Trump',
+  'former president trump': 'Donald Trump',
+  'trump administration': 'Donald Trump',
+  
+  // MAGA (keep as related to Trump but separate concept)
+  'maga': 'MAGA',
+  '#maga': 'MAGA',
+  
+  // Biden variations
+  'biden': 'Joe Biden',
+  '#biden': 'Joe Biden',
+  '#joebiden': 'Joe Biden',
+  'president biden': 'Joe Biden',
+  'biden administration': 'Joe Biden',
+  
+  // Harris variations
+  'harris': 'Kamala Harris',
+  '#harris': 'Kamala Harris',
+  '#kamalaharris': 'Kamala Harris',
+  'vp harris': 'Kamala Harris',
+  'vice president harris': 'Kamala Harris',
+  
+  // Musk variations
+  'musk': 'Elon Musk',
+  '#musk': 'Elon Musk',
+  '#elonmusk': 'Elon Musk',
+  
+  // Supreme Court variations
+  'scotus': 'Supreme Court',
+  '#scotus': 'Supreme Court',
+  '#supremecourt': 'Supreme Court',
+  
+  // Government agencies (normalize casing)
+  'fbi': 'FBI',
+  '#fbi': 'FBI',
+  'doj': 'DOJ',
+  '#doj': 'DOJ',
+  'cia': 'CIA',
+  '#cia': 'CIA',
+  'ice': 'ICE',
+  '#ice': 'ICE',
+  'dhs': 'DHS',
+  '#dhs': 'DHS',
+  
+  // Congress variations
+  '#congress': 'Congress',
+  '#senate': 'Senate',
+  '#house': 'House',
+  'house of representatives': 'House',
+  
+  // GOP/Republican variations
+  'gop': 'Republican Party',
+  '#gop': 'Republican Party',
+  'republicans': 'Republican Party',
+  '#republicans': 'Republican Party',
+  'republican': 'Republican Party',
+  
+  // Democratic Party variations
+  'democrats': 'Democratic Party',
+  '#democrats': 'Democratic Party',
+  'democrat': 'Democratic Party',
+  '#democrat': 'Democratic Party',
+  
+  // White House
+  '#whitehouse': 'White House',
+  'the white house': 'White House',
+  'whitehouse': 'White House',
+  
+  // Key figures
+  'desantis': 'Ron DeSantis',
+  '#desantis': 'Ron DeSantis',
+  'newsom': 'Gavin Newsom',
+  '#newsom': 'Gavin Newsom',
+  'pence': 'Mike Pence',
+  '#pence': 'Mike Pence',
+  'obama': 'Barack Obama',
+  '#obama': 'Barack Obama',
+  'pelosi': 'Nancy Pelosi',
+  '#pelosi': 'Nancy Pelosi',
+  'mcconnell': 'Mitch McConnell',
+  '#mcconnell': 'Mitch McConnell',
+  'schumer': 'Chuck Schumer',
+  '#schumer': 'Chuck Schumer',
+  
+  // Current news figures
+  'hegseth': 'Pete Hegseth',
+  '#hegseth': 'Pete Hegseth',
+  'kash patel': 'Kash Patel',
+  '#kashpatel': 'Kash Patel',
+  'wray': 'Christopher Wray',
+  '#wray': 'Christopher Wray',
+  'chris wray': 'Christopher Wray',
+  'brian cole': 'Brian Cole',
+  '#briancole': 'Brian Cole',
+  
+  // Israel/Gaza related
+  '#israel': 'Israel',
+  '#gaza': 'Gaza',
+  '#palestine': 'Palestine',
+  '#hamas': 'Hamas',
+  '#ceasefire': 'Ceasefire',
+  
+  // Ukraine/Russia related
+  '#ukraine': 'Ukraine',
+  '#russia': 'Russia',
+  '#putin': 'Vladimir Putin',
+  'putin': 'Vladimir Putin',
+  'zelensky': 'Volodymyr Zelensky',
+  '#zelensky': 'Volodymyr Zelensky',
+};
+
+// Hashtag to base topic mapping (for merging hashtag counts into main topics)
+const HASHTAG_TO_TOPIC: Record<string, string> = {
+  '#trump': 'Donald Trump',
+  '#donaldtrump': 'Donald Trump',
+  '#maga': 'Donald Trump',
+  '#biden': 'Joe Biden',
+  '#joebiden': 'Joe Biden',
+  '#harris': 'Kamala Harris',
+  '#kamalaharris': 'Kamala Harris',
+  '#musk': 'Elon Musk',
+  '#elonmusk': 'Elon Musk',
+  '#scotus': 'Supreme Court',
+  '#supremecourt': 'Supreme Court',
+  '#fbi': 'FBI',
+  '#doj': 'DOJ',
+  '#cia': 'CIA',
+  '#ice': 'ICE',
+  '#congress': 'Congress',
+  '#senate': 'Senate',
+  '#house': 'House',
+  '#whitehouse': 'White House',
+  '#gop': 'Republican Party',
+  '#democrats': 'Democratic Party',
+  '#israel': 'Israel',
+  '#gaza': 'Gaza',
+  '#palestine': 'Palestine',
+  '#hamas': 'Hamas',
+  '#ukraine': 'Ukraine',
+  '#russia': 'Russia',
+  '#putin': 'Vladimir Putin',
+  '#zelensky': 'Volodymyr Zelensky',
+  '#hegseth': 'Pete Hegseth',
+  '#desantis': 'Ron DeSantis',
+  '#newsom': 'Gavin Newsom',
+};
+
 // Entity type classification with specificity scores
 // Higher score = more specific = ranked higher
 const ENTITY_SPECIFICITY: Record<string, number> = {
@@ -46,7 +200,7 @@ const KNOWN_PERSONS = new Set([
   'cheney', 'romney', 'manchin', 'sinema', 'fetterman', 'warnock',
   'kash patel', 'brian cole', 'jack smith', 'merrick garland', 'alito',
   'thomas', 'roberts', 'kavanaugh', 'gorsuch', 'barrett', 'sotomayor',
-  'kagan', 'jackson', 'musk', 'zuckerberg', 'bezos'
+  'kagan', 'jackson', 'musk', 'zuckerberg', 'bezos', 'hegseth', 'wray'
 ]);
 
 // Known organizations
@@ -299,20 +453,42 @@ serve(async (req) => {
     const hours6Ago = new Date(now.getTime() - 6 * 60 * 60 * 1000);
     const hours24Ago = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     
-    // Helper to normalize topic names (preserve case for proper nouns)
+    // Helper to normalize topic names with aliasing
     const normalizeTopic = (topic: string): string => {
       if (!topic || typeof topic !== 'string') return '';
       const trimmed = topic.trim();
-      if (trimmed.startsWith('#')) {
-        // Keep hashtags as-is but normalized
-        return trimmed.toLowerCase();
+      const lowerTrimmed = trimmed.toLowerCase();
+      
+      // Check for alias FIRST (before any other processing)
+      if (TOPIC_ALIASES[lowerTrimmed]) {
+        return TOPIC_ALIASES[lowerTrimmed];
       }
-      return trimmed
+      
+      // Check if hashtag maps to a base topic
+      if (trimmed.startsWith('#')) {
+        const hashLower = lowerTrimmed;
+        if (HASHTAG_TO_TOPIC[hashLower]) {
+          return HASHTAG_TO_TOPIC[hashLower];
+        }
+        // For unmapped hashtags, keep as-is but lowercase
+        return hashLower;
+      }
+      
+      // Standard normalization for non-aliased topics
+      const normalized = trimmed
         .replace(/[^\w\s'-]/g, '')
         .trim()
         .split(/\s+/)
         .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join(' ');
+      
+      // Check alias again after normalization
+      const normalizedLower = normalized.toLowerCase();
+      if (TOPIC_ALIASES[normalizedLower]) {
+        return TOPIC_ALIASES[normalizedLower];
+      }
+      
+      return normalized;
     };
     
     // Helper to initialize topic data
@@ -562,18 +738,43 @@ serve(async (req) => {
       }
     }
     
-    // Merge hashtags into main topic map
+    // Merge hashtags into main topic map (with aliasing to base topics)
     for (const [key, data] of hashtagMap) {
-      if (!topicMap.has(key)) {
+      // Check if this hashtag should be merged into a base topic
+      const baseTopic = HASHTAG_TO_TOPIC[key];
+      
+      if (baseTopic && topicMap.has(baseTopic)) {
+        // Merge hashtag counts into the base topic
+        const existing = topicMap.get(baseTopic)!;
+        existing.google_news_count += data.google_news_count;
+        existing.bluesky_count += data.bluesky_count;
+        existing.rss_count += data.rss_count;
+        existing.total_count += data.total_count;
+        existing.sentiment_counts.positive += data.sentiment_counts.positive;
+        existing.sentiment_counts.negative += data.sentiment_counts.negative;
+        existing.sentiment_counts.neutral += data.sentiment_counts.neutral;
+        // Track that this topic has related hashtags
+        if (!existing.hashtags.includes(key)) {
+          existing.hashtags.push(key);
+        }
+        console.log(`Merged hashtag ${key} (${data.total_count} mentions) into ${baseTopic}`);
+      } else if (baseTopic && !topicMap.has(baseTopic)) {
+        // Base topic doesn't exist yet, create it with hashtag data
+        const newData = { ...data, topic: baseTopic };
+        newData.hashtags = [key];
+        topicMap.set(baseTopic, newData);
+        console.log(`Created base topic ${baseTopic} from hashtag ${key}`);
+      } else if (!topicMap.has(key)) {
+        // No alias, add hashtag as its own topic
         topicMap.set(key, data);
       } else {
-        // Merge counts
+        // Hashtag key already exists in topicMap, merge counts
         const existing = topicMap.get(key)!;
         existing.google_news_count += data.google_news_count;
         existing.bluesky_count += data.bluesky_count;
         existing.rss_count += data.rss_count;
         existing.total_count += data.total_count;
-        existing.entity_type = 'hashtag'; // Prioritize hashtag classification
+        existing.entity_type = 'hashtag';
       }
     }
     
