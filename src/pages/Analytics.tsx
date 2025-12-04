@@ -1,23 +1,22 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UnifiedTrendingPanel } from "@/components/analytics/UnifiedTrendingPanel";
+import { TopicContentSheet } from "@/components/analytics/TopicContentSheet";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Progress } from "@/components/ui/progress";
 import { format, subDays } from "date-fns";
-import { CalendarIcon, Download, TrendingUp, TrendingDown, AlertTriangle, Newspaper, Scale, Building2, RefreshCw, Activity, ExternalLink, Search, WifiOff, AlertCircle } from "lucide-react";
+import { Download, TrendingUp, TrendingDown, AlertTriangle, Newspaper, Scale, RefreshCw, Activity, WifiOff, AlertCircle, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Area, Line } from "recharts";
 import { cn } from "@/lib/utils";
 import { useNewsFilters } from "@/contexts/NewsFilterContext";
+import { useTopicContent } from "@/hooks/useTopicContent";
+import { useNavigate } from "react-router-dom";
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
-
 interface TopicSentiment {
   topic: string;
   total: number;
@@ -114,11 +113,11 @@ export default function Analytics() {
     predictiveSignals: 0,
   });
 
-  // Sheet drawer state for viewing articles
+  // Topic content sheet state
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTopic, setSheetTopic] = useState<string>("");
-  const [sheetArticles, setSheetArticles] = useState<any[]>([]);
-  const [sheetLoading, setSheetLoading] = useState(false);
+  const { isLoading: sheetLoading, content: sheetContent, fetchTopicContent } = useTopicContent();
+  const navigate = useNavigate();
 
   // Error handling utility: Parse error and return user-friendly message
   const parseError = (error: any): { message: string; type: string; retryable: boolean } => {
@@ -809,74 +808,33 @@ export default function Analytics() {
     }
   };
 
-  const fetchTopicArticles = async (topicData: TopicSentiment) => {
-    try {
-      // Open sheet and show loading
-      setSheetTopic(topicData.topic);
-      setSheetOpen(true);
-      setSheetLoading(true);
-      setSheetArticles([]);
+  // Handle topic click - fetch content from appropriate sources
+  const handleTopicClick = (topic: string, sourceTypes: string[]) => {
+    setSheetTopic(topic);
+    setSheetOpen(true);
+    fetchTopicContent(topic, sourceTypes);
+  };
 
-      console.log('Fetching articles for topic:', topicData.topic);
-
-      // Get article IDs from trending_topics table
-      const { data: trendingData, error: trendingError } = await supabase
-        .from('trending_topics')
-        .select('article_ids, sample_titles')
-        .eq('topic', topicData.topic)
-        .gte('hour_timestamp', dateRange.from.toISOString())
-        .lte('hour_timestamp', dateRange.to.toISOString())
-        .order('hour_timestamp', { ascending: false })
-        .limit(1);
-
-      console.log('Trending data:', trendingData, 'Error:', trendingError);
-
-      if (trendingError) {
-        console.error('Trending data error:', trendingError);
-        throw trendingError;
-      }
-
-      if (trendingData && trendingData.length > 0 && trendingData[0].article_ids) {
-        const articleIds = trendingData[0].article_ids;
-        console.log('Article IDs:', articleIds);
-
-        if (!articleIds || articleIds.length === 0) {
-          console.warn('No article IDs found for topic');
-          setSheetArticles([]);
-          setSheetLoading(false);
-          return;
-        }
-
-        // Fetch full article details
-        const { data: articles, error: articlesError } = await supabase
-          .from('articles')
-          .select('id, title, description, source_url, source_name, published_date, sentiment_label')
-          .in('id', articleIds)
-          .order('published_date', { ascending: false })
-          .limit(20);
-
-        console.log('Articles fetched:', articles, 'Error:', articlesError);
-
-        if (articlesError) {
-          console.error('Articles fetch error:', articlesError);
-          throw articlesError;
-        }
-
-        setSheetArticles(articles || []);
-      } else {
-        console.warn('No trending data found or no article_ids');
-        setSheetArticles([]);
-      }
-    } catch (error: any) {
-      console.error('Error fetching topic articles:', error);
-      const parsedError = parseError(error);
-      toast.error('Failed to Load Articles', {
-        description: parsedError.message,
-        duration: 5000
-      });
-      setSheetArticles([]); // Clear articles on error
-    } finally {
-      setSheetLoading(false);
+  // Navigate to filtered news view
+  const handleStatCardClick = (type: 'coverage' | 'threats' | 'bills' | 'sentiment') => {
+    switch (type) {
+      case 'coverage':
+        setSearchTerm('');
+        navigateToTab?.('feed');
+        toast.info('Viewing all news coverage');
+        break;
+      case 'threats':
+        setSearchTerm('threat:high');
+        navigateToTab?.('feed');
+        toast.info('Filtered to critical threats');
+        break;
+      case 'bills':
+        navigate('/admin/bills');
+        toast.info('Viewing legislative activity');
+        break;
+      case 'sentiment':
+        toast.info('Sentiment breakdown coming soon');
+        break;
     }
   };
 
@@ -1018,54 +976,6 @@ export default function Analytics() {
           </div>
 
           <div className="flex gap-2 flex-wrap">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn("justify-start text-left font-normal")}
-                  aria-label="Select date range for analytics"
-                  aria-describedby="date-range-description"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
-                  {format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd")}
-                  <span id="date-range-description" className="sr-only">
-                    Current date range: {format(dateRange.from, "MMMM dd, yyyy")} to {format(dateRange.to, "MMMM dd, yyyy")}
-                  </span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end" role="dialog" aria-label="Date range options">
-                <div className="p-3 space-y-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setDateRange({ from: subDays(new Date(), 1), to: new Date() })}
-                    aria-label="Show data from last 24 hours"
-                  >
-                    Last 24h
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setDateRange({ from: subDays(new Date(), 7), to: new Date() })}
-                    aria-label="Show data from last 7 days"
-                  >
-                    Last 7 days
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setDateRange({ from: subDays(new Date(), 30), to: new Date() })}
-                    aria-label="Show data from last 30 days"
-                  >
-                    Last 30 days
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-
             <Button
               variant="smooth"
               onClick={() => fetchAnalytics()}
@@ -1098,64 +1008,95 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* Key Metrics - Enhanced with Claude Console Design */}
+      {/* Key Metrics - Clickable Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Coverage - Blue */}
-        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '0ms' }} role="article" aria-label="Total coverage metric">
+        <Card 
+          variant="elevated" 
+          className="animate-fade-in-up cursor-pointer hover:shadow-lg transition-all group" 
+          style={{ animationDelay: '0ms' }} 
+          role="button" 
+          aria-label="View all news coverage"
+          onClick={() => handleStatCardClick('coverage')}
+        >
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
                 <Newspaper className="h-5 w-5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
               </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">Total Coverage</p>
-              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400" aria-label={`${metrics.totalArticles} articles tracked`}>
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                 {metrics.totalArticles}
               </div>
-              <p className="text-xs text-muted-foreground">Articles tracked</p>
+              <p className="text-xs text-muted-foreground">Click to view all articles</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Critical Threats - Red */}
-        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '50ms' }} role="article" aria-label="Critical threats metric">
+        <Card 
+          variant="elevated" 
+          className="animate-fade-in-up cursor-pointer hover:shadow-lg transition-all group" 
+          style={{ animationDelay: '50ms' }} 
+          role="button" 
+          aria-label="View critical threats"
+          onClick={() => handleStatCardClick('threats')}
+        >
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950">
                 <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" aria-hidden="true" />
               </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">Critical Threats</p>
-              <div className="text-3xl font-bold text-red-600 dark:text-red-400" aria-label={`${metrics.criticalThreats} high priority items`}>
+              <div className="text-3xl font-bold text-red-600 dark:text-red-400">
                 {metrics.criticalThreats}
               </div>
-              <p className="text-xs text-muted-foreground">High priority items</p>
+              <p className="text-xs text-muted-foreground">Click to view high priority</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Active Bills - Purple */}
-        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '100ms' }} role="article" aria-label="Active bills metric">
+        <Card 
+          variant="elevated" 
+          className="animate-fade-in-up cursor-pointer hover:shadow-lg transition-all group" 
+          style={{ animationDelay: '100ms' }} 
+          role="button" 
+          aria-label="View legislative activity"
+          onClick={() => handleStatCardClick('bills')}
+        >
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
                 <Scale className="h-5 w-5 text-purple-600 dark:text-purple-400" aria-hidden="true" />
               </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">Active Bills</p>
               <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
                 {metrics.totalBills}
               </div>
-              <p className="text-xs text-muted-foreground">Legislative activity</p>
+              <p className="text-xs text-muted-foreground">Click to view legislation</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Overall Sentiment - Dynamic Color */}
-        <Card variant="elevated" className="animate-fade-in-up" style={{ animationDelay: '150ms' }}>
+        <Card 
+          variant="elevated" 
+          className="animate-fade-in-up cursor-pointer hover:shadow-lg transition-all group" 
+          style={{ animationDelay: '150ms' }}
+          role="button"
+          aria-label="View sentiment analysis"
+          onClick={() => handleStatCardClick('sentiment')}
+        >
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className={`p-2 rounded-lg ${
@@ -1173,6 +1114,7 @@ export default function Analytics() {
                     : 'text-gray-600 dark:text-gray-400'
                 }`} />
               </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">Overall Sentiment</p>
@@ -1185,89 +1127,23 @@ export default function Analytics() {
               }`}>
                 {metrics.avgSentiment > 0 ? `${(metrics.avgSentiment * 100).toFixed(0)}%` : 'N/A'}
               </div>
-              <p className="text-xs text-muted-foreground">Sentiment score</p>
+              <p className="text-xs text-muted-foreground">Click for breakdown</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Unified Trending Topics - Twitter-style */}
-      <UnifiedTrendingPanel 
-        onTopicClick={(topic) => {
-          setSheetTopic(topic);
-          setSheetOpen(true);
-          fetchTopicArticles({ topic, sampleTitles: [] } as any);
-        }} 
+      <UnifiedTrendingPanel onTopicClick={handleTopicClick} />
+
+      {/* Topic Content Sheet */}
+      <TopicContentSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        topic={sheetTopic}
+        isLoading={sheetLoading}
+        content={sheetContent}
       />
-
-      {/* Sheet drawer for Trending Topic Articles */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="text-2xl font-bold capitalize">{sheetTopic}</SheetTitle>
-            <SheetDescription>
-              {sheetLoading
-                ? 'Loading articles...'
-                : `${sheetArticles.length} article${sheetArticles.length !== 1 ? 's' : ''} mentioning this topic`
-              }
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="space-y-4 mt-6">
-            {sheetLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <LoadingSpinner size="md" label="Loading articles..." />
-              </div>
-            ) : sheetArticles.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No articles found</p>
-            ) : (
-              sheetArticles.map((article) => (
-                <a
-                  key={article.id}
-                  href={article.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg mb-1 hover:underline">
-                        {article.title}
-                      </h3>
-                      {article.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                          {article.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="font-medium">{article.source_name}</span>
-                        <span>•</span>
-                        <span>{new Date(article.published_date).toLocaleDateString()}</span>
-                        {article.sentiment_label && (
-                          <>
-                            <span>•</span>
-                            <span
-                              className={`px-2 py-0.5 rounded ${
-                                article.sentiment_label === 'positive'
-                                  ? 'bg-green-100 text-green-800'
-                                  : article.sentiment_label === 'negative'
-                                  ? 'bg-red-100 text-red-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
-                              {article.sentiment_label}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </a>
-              ))
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
