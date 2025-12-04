@@ -24,6 +24,11 @@ export interface UnifiedTrend {
   related_topics?: string[];
   entity_type?: string;
   is_breaking?: boolean;
+  // Phase 4: Enhanced velocity
+  trend_stage?: 'emerging' | 'surging' | 'peaking' | 'declining' | 'stable';
+  acceleration?: number;
+  velocity_1h?: number;
+  velocity_6h?: number;
 }
 
 interface UseUnifiedTrendsOptions {
@@ -83,9 +88,9 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
           .limit(100),
         // Get evergreen topics from database
         supabase.from('evergreen_topics').select('topic'),
-        // Get related topics from trend_clusters
+        // Get related topics and velocity data from trend_clusters
         supabase.from('trend_clusters')
-          .select('cluster_title, related_topics, entity_type, is_breaking')
+          .select('cluster_title, related_topics, entity_type, is_breaking, trend_stage, acceleration, velocity_1h, velocity_6h')
           .eq('is_trending', true)
       ]);
 
@@ -98,14 +103,26 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
       const watchlistEntities = (watchlistResult.data || []).map((w: any) => w.entity_name?.toLowerCase() || '');
       const headlines = headlinesResult.data || [];
       
-      // Build map of cluster data for related topics
-      const clusterMap = new Map<string, { related_topics: string[], entity_type: string, is_breaking: boolean }>();
+      // Build map of cluster data for related topics and velocity
+      const clusterMap = new Map<string, { 
+        related_topics: string[], 
+        entity_type: string, 
+        is_breaking: boolean,
+        trend_stage: string,
+        acceleration: number,
+        velocity_1h: number,
+        velocity_6h: number
+      }>();
       for (const cluster of (clustersResult.data || [])) {
         const key = cluster.cluster_title?.toLowerCase() || '';
         clusterMap.set(key, {
           related_topics: cluster.related_topics || [],
           entity_type: cluster.entity_type || 'category',
-          is_breaking: cluster.is_breaking || false
+          is_breaking: cluster.is_breaking || false,
+          trend_stage: cluster.trend_stage || 'stable',
+          acceleration: cluster.acceleration || 0,
+          velocity_1h: cluster.velocity_1h || 0,
+          velocity_6h: cluster.velocity_6h || 0
         });
       }
       
@@ -157,6 +174,10 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
             related_topics: clusterData?.related_topics || [],
             entity_type: clusterData?.entity_type || 'category',
             is_breaking: clusterData?.is_breaking || false,
+            trend_stage: clusterData?.trend_stage as UnifiedTrend['trend_stage'] || 'stable',
+            acceleration: clusterData?.acceleration || 0,
+            velocity_1h: clusterData?.velocity_1h || 0,
+            velocity_6h: clusterData?.velocity_6h || 0,
           } as UnifiedTrend;
         });
 

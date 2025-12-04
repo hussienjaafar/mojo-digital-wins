@@ -4896,6 +4896,7 @@ export type Database = {
       }
       trend_clusters: {
         Row: {
+          acceleration: number | null
           article_ids: string[] | null
           bluesky_count: number | null
           bluesky_ids: string[] | null
@@ -4916,11 +4917,13 @@ export type Database = {
           is_trending: boolean | null
           key_entities: string[] | null
           last_activity_at: string | null
+          mentions_last_15m: number | null
           mentions_last_24h: number | null
           mentions_last_6h: number | null
           mentions_last_hour: number | null
           momentum: string | null
           peak_at: string | null
+          peak_hour: string | null
           reddit_count: number | null
           reddit_ids: string[] | null
           related_topics: string[] | null
@@ -4928,12 +4931,17 @@ export type Database = {
           sentiment_score: number | null
           source_distribution: Json | null
           specificity_score: number | null
+          spike_detected_at: string | null
           total_mentions: number | null
+          trend_stage: string | null
           trending_since: string | null
           updated_at: string | null
+          velocity_1h: number | null
+          velocity_6h: number | null
           velocity_score: number | null
         }
         Insert: {
+          acceleration?: number | null
           article_ids?: string[] | null
           bluesky_count?: number | null
           bluesky_ids?: string[] | null
@@ -4954,11 +4962,13 @@ export type Database = {
           is_trending?: boolean | null
           key_entities?: string[] | null
           last_activity_at?: string | null
+          mentions_last_15m?: number | null
           mentions_last_24h?: number | null
           mentions_last_6h?: number | null
           mentions_last_hour?: number | null
           momentum?: string | null
           peak_at?: string | null
+          peak_hour?: string | null
           reddit_count?: number | null
           reddit_ids?: string[] | null
           related_topics?: string[] | null
@@ -4966,12 +4976,17 @@ export type Database = {
           sentiment_score?: number | null
           source_distribution?: Json | null
           specificity_score?: number | null
+          spike_detected_at?: string | null
           total_mentions?: number | null
+          trend_stage?: string | null
           trending_since?: string | null
           updated_at?: string | null
+          velocity_1h?: number | null
+          velocity_6h?: number | null
           velocity_score?: number | null
         }
         Update: {
+          acceleration?: number | null
           article_ids?: string[] | null
           bluesky_count?: number | null
           bluesky_ids?: string[] | null
@@ -4992,11 +5007,13 @@ export type Database = {
           is_trending?: boolean | null
           key_entities?: string[] | null
           last_activity_at?: string | null
+          mentions_last_15m?: number | null
           mentions_last_24h?: number | null
           mentions_last_6h?: number | null
           mentions_last_hour?: number | null
           momentum?: string | null
           peak_at?: string | null
+          peak_hour?: string | null
           reddit_count?: number | null
           reddit_ids?: string[] | null
           related_topics?: string[] | null
@@ -5004,9 +5021,13 @@ export type Database = {
           sentiment_score?: number | null
           source_distribution?: Json | null
           specificity_score?: number | null
+          spike_detected_at?: string | null
           total_mentions?: number | null
+          trend_stage?: string | null
           trending_since?: string | null
           updated_at?: string | null
+          velocity_1h?: number | null
+          velocity_6h?: number | null
           velocity_score?: number | null
         }
         Relationships: []

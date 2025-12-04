@@ -193,6 +193,90 @@ function isBreakingNews(
   );
 }
 
+// Enhanced velocity calculation
+interface VelocityMetrics {
+  velocity1h: number;   // Current hour vs avg
+  velocity6h: number;   // 6h window vs daily avg
+  velocity24h: number;  // Overall velocity
+  acceleration: number; // Change in velocity (speeding up or slowing down)
+  trendStage: 'emerging' | 'surging' | 'peaking' | 'declining' | 'stable';
+  peakHour: Date | null;
+  spikeDetectedAt: Date | null;
+}
+
+function calculateEnhancedVelocity(
+  mentions15m: number,
+  mentions1h: number,
+  mentions6h: number,
+  mentions24h: number,
+  previousVelocity: number | null,
+  firstSeen: Date,
+  now: Date
+): VelocityMetrics {
+  // Calculate rates at different windows
+  const rate15m = mentions15m * 4; // Normalized to hourly
+  const rate1h = mentions1h;
+  const rate6h = mentions6h / 6;
+  const rate24h = mentions24h / 24;
+  
+  // Calculate velocity at each window (% above/below average)
+  const velocity1h = rate24h > 0 
+    ? ((rate1h - rate24h) / rate24h) * 100 
+    : (rate1h > 0 ? 500 : 0);
+    
+  const velocity6h = rate24h > 0 
+    ? ((rate6h - rate24h) / rate24h) * 100 
+    : (rate6h > 0 ? 300 : 0);
+    
+  const velocity24h = velocity1h; // Primary velocity metric
+  
+  // Calculate acceleration (change in velocity)
+  // Compare 15-min rate extrapolated vs 1h rate
+  const shortTermRate = rate15m;
+  const mediumTermRate = rate1h;
+  const acceleration = mediumTermRate > 0 
+    ? ((shortTermRate - mediumTermRate) / mediumTermRate) * 100
+    : (shortTermRate > 0 ? 100 : 0);
+  
+  // Determine trend stage based on velocity and acceleration
+  let trendStage: VelocityMetrics['trendStage'] = 'stable';
+  const hoursOld = (now.getTime() - firstSeen.getTime()) / (1000 * 60 * 60);
+  
+  if (velocity1h > 100 && acceleration > 50 && hoursOld < 3) {
+    trendStage = 'emerging'; // New topic gaining fast
+  } else if (velocity1h > 150 && acceleration > 20) {
+    trendStage = 'surging'; // Strong upward momentum
+  } else if (velocity1h > 100 && acceleration < -20) {
+    trendStage = 'peaking'; // High but slowing down
+  } else if (velocity1h < -20 || (velocity1h < 50 && acceleration < -30)) {
+    trendStage = 'declining'; // Losing momentum
+  } else if (velocity1h > 30) {
+    trendStage = 'surging'; // Moderate but growing
+  }
+  
+  // Detect spike (significant jump in recent window)
+  let spikeDetectedAt: Date | null = null;
+  if (rate15m > rate1h * 2 || (rate1h > rate6h * 1.5 && velocity1h > 100)) {
+    spikeDetectedAt = now;
+  }
+  
+  // Detect peak hour (when was activity highest?)
+  let peakHour: Date | null = null;
+  if (trendStage === 'peaking' || velocity1h > 100) {
+    peakHour = now; // Mark current as peak if high velocity
+  }
+  
+  return {
+    velocity1h: Math.round(velocity1h * 100) / 100,
+    velocity6h: Math.round(velocity6h * 100) / 100,
+    velocity24h: Math.round(velocity24h * 100) / 100,
+    acceleration: Math.round(acceleration * 100) / 100,
+    trendStage,
+    peakHour,
+    spikeDetectedAt
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -606,45 +690,76 @@ serve(async (req) => {
         }
       }
       
-      // Get hour counts for velocity
-      const { count: hourCount } = await supabase
-        .from('google_news_articles')
-        .select('id', { count: 'exact', head: true })
-        .eq('ai_processed', true)
-        .contains('ai_topics', [topicData.topic])
-        .gte('published_at', hour1Ago.toISOString());
+      // Get counts for velocity at multiple time windows
+      const mins15Ago = new Date(now.getTime() - 15 * 60 * 1000);
       
-      const { count: sixHourCount } = await supabase
-        .from('google_news_articles')
-        .select('id', { count: 'exact', head: true })
-        .eq('ai_processed', true)
-        .contains('ai_topics', [topicData.topic])
-        .gte('published_at', hours6Ago.toISOString());
+      const [result15m, result1h, result6h, existingCluster] = await Promise.all([
+        supabase
+          .from('google_news_articles')
+          .select('id', { count: 'exact', head: true })
+          .eq('ai_processed', true)
+          .contains('ai_topics', [topicData.topic])
+          .gte('published_at', mins15Ago.toISOString()),
+        supabase
+          .from('google_news_articles')
+          .select('id', { count: 'exact', head: true })
+          .eq('ai_processed', true)
+          .contains('ai_topics', [topicData.topic])
+          .gte('published_at', hour1Ago.toISOString()),
+        supabase
+          .from('google_news_articles')
+          .select('id', { count: 'exact', head: true })
+          .eq('ai_processed', true)
+          .contains('ai_topics', [topicData.topic])
+          .gte('published_at', hours6Ago.toISOString()),
+        supabase
+          .from('trend_clusters')
+          .select('velocity_score')
+          .eq('cluster_title', topicData.topic)
+          .maybeSingle()
+      ]);
       
-      // Calculate velocity
-      const mentions1h = hourCount || 0;
-      const mentions6h = sixHourCount || 0;
+      const mentions15m = result15m.count || 0;
+      const mentions1h = result1h.count || 0;
+      const mentions6h = result6h.count || 0;
       const mentions24h = topicData.total_count;
+      const previousVelocity = existingCluster.data?.velocity_score ?? null;
       
-      const hourlyRate = mentions1h;
-      const dailyAvg = mentions24h / 24;
-      const velocity = dailyAvg > 0 
-        ? ((hourlyRate - dailyAvg) / dailyAvg) * 100 
-        : (mentions1h > 0 ? 500 : 0);
+      // Calculate enhanced velocity metrics
+      const velocityMetrics = calculateEnhancedVelocity(
+        mentions15m,
+        mentions1h,
+        mentions6h,
+        mentions24h,
+        previousVelocity,
+        topicData.first_seen,
+        now
+      );
       
-      // Determine momentum
-      const momentum = velocity > 50 ? 'up' : velocity < -20 ? 'down' : 'stable';
+      // Determine momentum from trend stage
+      const momentum = velocityMetrics.trendStage === 'surging' || velocityMetrics.trendStage === 'emerging' 
+        ? 'up' 
+        : velocityMetrics.trendStage === 'declining' 
+          ? 'down' 
+          : 'stable';
       
-      // Is trending? (with specificity boost)
+      // Is trending? (with specificity boost and enhanced velocity)
       const specificityBoost = topicData.specificityScore >= 2.0;
-      const isTrending = (velocity > 30 && mentions24h >= 5) || 
+      const isTrending = (velocityMetrics.velocity1h > 30 && mentions24h >= 5) || 
                          (crossSourceScore >= 3 && mentions24h >= 10) ||
-                         (specificityBoost && velocity > 20 && mentions24h >= 3) ||
-                         mentions1h >= 5;
+                         (specificityBoost && velocityMetrics.velocity1h > 20 && mentions24h >= 3) ||
+                         mentions1h >= 5 ||
+                         velocityMetrics.trendStage === 'emerging' ||
+                         velocityMetrics.trendStage === 'surging';
       
-      // Check for breaking news
-      const isBreaking = isBreakingNews(velocity, crossSourceScore, topicData.first_seen, now);
+      // Check for breaking news (use enhanced velocity)
+      const isBreaking = isBreakingNews(velocityMetrics.velocity1h, crossSourceScore, topicData.first_seen, now);
       if (isBreaking) breakingCount++;
+      
+      // Track surging/emerging topics
+      if (velocityMetrics.trendStage === 'surging' || velocityMetrics.trendStage === 'emerging') {
+        console.log(`[${velocityMetrics.trendStage.toUpperCase()}] ${topicData.topic}: vel=${velocityMetrics.velocity1h.toFixed(0)}%, acc=${velocityMetrics.acceleration.toFixed(0)}%`);
+      }
       
       // Collect related hashtags and related topics
       const relatedHashtags = topicData.hashtags.slice(0, 10);
@@ -686,7 +801,7 @@ serve(async (req) => {
         }
       }
       
-      // Upsert cluster with new fields
+      // Upsert cluster with enhanced velocity fields
       const { error } = await supabase
         .from('trend_clusters')
         .upsert({
@@ -698,7 +813,14 @@ serve(async (req) => {
           mentions_last_hour: mentions1h,
           mentions_last_6h: mentions6h,
           mentions_last_24h: mentions24h,
-          velocity_score: Math.round(velocity * 100) / 100,
+          mentions_last_15m: mentions15m,
+          velocity_score: velocityMetrics.velocity24h,
+          velocity_1h: velocityMetrics.velocity1h,
+          velocity_6h: velocityMetrics.velocity6h,
+          acceleration: velocityMetrics.acceleration,
+          trend_stage: velocityMetrics.trendStage,
+          peak_hour: velocityMetrics.peakHour?.toISOString() || null,
+          spike_detected_at: velocityMetrics.spikeDetectedAt?.toISOString() || null,
           momentum,
           source_distribution: {
             google_news: topicData.google_news_count,
