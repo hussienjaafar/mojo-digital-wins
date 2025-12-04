@@ -4542,6 +4542,45 @@ export type Database = {
         }
         Relationships: []
       }
+      topic_baselines: {
+        Row: {
+          avg_daily_mentions: number | null
+          avg_hourly_mentions: number | null
+          baseline_calculated_at: string | null
+          created_at: string | null
+          data_points: number | null
+          id: string
+          normalized_name: string
+          peak_mentions_24h: number | null
+          topic_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          avg_daily_mentions?: number | null
+          avg_hourly_mentions?: number | null
+          baseline_calculated_at?: string | null
+          created_at?: string | null
+          data_points?: number | null
+          id?: string
+          normalized_name: string
+          peak_mentions_24h?: number | null
+          topic_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          avg_daily_mentions?: number | null
+          avg_hourly_mentions?: number | null
+          baseline_calculated_at?: string | null
+          created_at?: string | null
+          data_points?: number | null
+          id?: string
+          normalized_name?: string
+          peak_mentions_24h?: number | null
+          topic_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       transaction_attribution: {
         Row: {
           attribution_calculated_at: string | null
@@ -5059,6 +5098,8 @@ export type Database = {
         Row: {
           avg_sentiment: number | null
           avg_velocity: number | null
+          baseline_daily: number | null
+          baseline_hourly: number | null
           id: number | null
           is_breakthrough: boolean | null
           last_updated: string | null
@@ -5069,6 +5110,7 @@ export type Database = {
           source_count: number | null
           source_types: string[] | null
           sources: string[] | null
+          spike_ratio: number | null
           total_mentions_1h: number | null
           total_mentions_24h: number | null
           unified_score: number | null
@@ -5088,6 +5130,7 @@ export type Database = {
         Args: { current_sentiment: number; previous_sentiment: number }
         Returns: string
       }
+      calculate_topic_baselines: { Args: never; Returns: number }
       calculate_topic_velocity: {
         Args: {
           daily_count: number
