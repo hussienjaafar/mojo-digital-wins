@@ -70,7 +70,18 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     const requestBody = await req.text();
 
-    console.log('Received ActBlue webhook');
+    console.log('Received ActBlue webhook at', new Date().toISOString());
+
+    // Log webhook delivery for debugging
+    await supabase.from('webhook_logs').insert({
+      platform: 'actblue',
+      event_type: 'incoming',
+      payload: JSON.parse(requestBody),
+      headers: Object.fromEntries(req.headers.entries()),
+      received_at: new Date().toISOString(),
+    }).then(({ error }) => {
+      if (error) console.error('Failed to log webhook:', error);
+    });
 
     // Parse and validate payload
     let payload;

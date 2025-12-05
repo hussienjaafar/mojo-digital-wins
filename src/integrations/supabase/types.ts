@@ -2088,6 +2088,53 @@ export type Database = {
         }
         Relationships: []
       }
+      data_freshness_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string | null
+          expected_freshness_hours: number | null
+          hours_stale: number | null
+          id: string
+          is_resolved: boolean | null
+          last_data_date: string | null
+          organization_id: string | null
+          platform: string
+          resolved_at: string | null
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string | null
+          expected_freshness_hours?: number | null
+          hours_stale?: number | null
+          id?: string
+          is_resolved?: boolean | null
+          last_data_date?: string | null
+          organization_id?: string | null
+          platform: string
+          resolved_at?: string | null
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string | null
+          expected_freshness_hours?: number | null
+          hours_stale?: number | null
+          id?: string
+          is_resolved?: boolean | null
+          last_data_date?: string | null
+          organization_id?: string | null
+          platform?: string
+          resolved_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_freshness_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       detected_anomalies: {
         Row: {
           alert_sent: boolean | null
