@@ -203,3 +203,6 @@ verify_jwt = false
 
 [functions.sync-actblue-csv]
 verify_jwt = false
+
+[functions.admin-sync-meta]
+verify_jwt = false
