@@ -9,6 +9,9 @@ const corsHeaders = {
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
+// PHASE 6: Alert throttling window
+const ALERT_THROTTLE_HOURS = 4;
+
 // Generate AI executive summary and key takeaways
 async function generateAISummary(briefingData: {
   critical_count: number;
@@ -149,6 +152,17 @@ serve(async (req) => {
 
     console.log(`Smart Alerting: Running action "${action}", localDate: ${localDate}`);
 
+    // PHASE 6: Pre-fetch recent alerts for throttling
+    const throttleCutoff = new Date(Date.now() - ALERT_THROTTLE_HOURS * 60 * 60 * 1000).toISOString();
+    const { data: recentAlerts } = await supabase
+      .from('alert_queue')
+      .select('title, alert_type')
+      .gte('created_at', throttleCutoff);
+    
+    const recentAlertKeys = new Set(
+      (recentAlerts || []).map(a => `${a.alert_type}-${a.title}`)
+    );
+
     const results: any = {};
 
     // =================================================================
@@ -253,21 +267,26 @@ serve(async (req) => {
 
         if (!error) clustersCreated++;
 
-        // Create alert for breaking news
+        // Create alert for breaking news - WITH THROTTLING
         if (cluster.sources.length >= 3) {
-          await supabase.from('alert_queue').insert({
-            alert_type: 'breaking_news',
-            priority: cluster.threatLevel,
-            source_type: 'breaking_news_cluster',
-            source_id: cluster.primaryArticleId,
-            title: `🔴 Breaking: ${cluster.sources.length} sources reporting`,
-            message: cluster.topic,
-            metadata: {
-              sources: cluster.sources,
-              article_count: cluster.articles.length,
-              affected_organizations: cluster.affectedOrgs,
-            },
-          });
+          const alertTitle = `🔴 Breaking: ${cluster.sources.length} sources reporting`;
+          const alertKey = `breaking_news-${alertTitle}`;
+          
+          if (!recentAlertKeys.has(alertKey)) {
+            await supabase.from('alert_queue').insert({
+              alert_type: 'breaking_news',
+              priority: cluster.threatLevel,
+              source_type: 'breaking_news_cluster',
+              source_id: cluster.primaryArticleId,
+              title: alertTitle,
+              message: cluster.topic,
+              metadata: {
+                sources: cluster.sources,
+                article_count: cluster.articles.length,
+                affected_organizations: cluster.affectedOrgs,
+              },
+            });
+          }
         }
       }
 
@@ -350,13 +369,20 @@ serve(async (req) => {
         }
       }
 
-      // Batch insert mentions and alerts
+      // Batch insert mentions and alerts - WITH THROTTLING
       if (mentionsToInsert.length > 0) {
         await supabase.from('organization_mentions').insert(mentionsToInsert);
         mentionsFound += mentionsToInsert.length;
       }
       if (alertsToInsert.length > 0) {
-        await supabase.from('alert_queue').insert(alertsToInsert);
+        // Filter out throttled alerts
+        const filteredAlerts = alertsToInsert.filter(
+          alert => !recentAlertKeys.has(`${alert.alert_type}-${alert.title}`)
+        );
+        if (filteredAlerts.length > 0) {
+          await supabase.from('alert_queue').insert(filteredAlerts);
+        }
+        console.log(`Org mention alerts: ${filteredAlerts.length} created, ${alertsToInsert.length - filteredAlerts.length} throttled`);
       }
 
       // OPTIMIZED: Skip state actions check to prevent timeout
