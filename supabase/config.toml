@@ -1,5 +1,8 @@
 project_id = "nuclmzoasgydubdshtab"
 
+[functions.cleanup-bluesky-posts]
+verify_jwt = false
+
 [functions.create-client-user]
 verify_jwt = true
 
