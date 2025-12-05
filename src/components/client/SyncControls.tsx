@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, DollarSign, MessageSquare, TrendingUp } from "lucide-react";
+import { RefreshCw, DollarSign, MessageSquare, TrendingUp, Heart } from "lucide-react";
 import { logger } from "@/lib/logger";
 
 type Props = {
@@ -68,6 +68,33 @@ const SyncControls = ({ organizationId }: Props) => {
     }
   };
 
+  const syncActBlue = async () => {
+    setSyncing({ ...syncing, actblue: true });
+    try {
+      const { error } = await (supabase as any).functions.invoke('sync-actblue-csv', {
+        body: { organization_id: organizationId }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "ActBlue sync completed successfully",
+      });
+
+      // Trigger ROI calculation
+      await calculateROI();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to sync ActBlue",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing({ ...syncing, actblue: false });
+    }
+  };
+
   const calculateROI = async () => {
     setSyncing({ ...syncing, roi: true });
     try {
@@ -98,6 +125,7 @@ const SyncControls = ({ organizationId }: Props) => {
     await Promise.all([
       syncMetaAds(),
       syncSwitchboard(),
+      syncActBlue(),
     ]);
 
     toast({
@@ -118,7 +146,7 @@ const SyncControls = ({ organizationId }: Props) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <Button
             onClick={syncMetaAds}
             disabled={syncing.meta}
@@ -139,6 +167,17 @@ const SyncControls = ({ organizationId }: Props) => {
             <MessageSquare className="w-6 h-6" />
             <span>Sync SMS</span>
             {syncing.sms && <RefreshCw className="w-4 h-4 animate-spin" />}
+          </Button>
+
+          <Button
+            onClick={syncActBlue}
+            disabled={syncing.actblue}
+            variant="outline"
+            className="h-auto flex-col gap-2 py-4"
+          >
+            <Heart className="w-6 h-6" />
+            <span>Sync ActBlue</span>
+            {syncing.actblue && <RefreshCw className="w-4 h-4 animate-spin" />}
           </Button>
 
           <Button

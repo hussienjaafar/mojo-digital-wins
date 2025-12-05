@@ -56,7 +56,14 @@ serve(async (req) => {
     }
 
     const credentials = credData.encrypted_credentials as unknown as MetaCredentials;
-    const { access_token, ad_account_id } = credentials;
+    const { access_token } = credentials;
+    
+    // Auto-add act_ prefix if missing (users often copy just the numeric ID)
+    let ad_account_id = credentials.ad_account_id;
+    if (ad_account_id && !ad_account_id.startsWith('act_')) {
+      ad_account_id = `act_${ad_account_id}`;
+      console.log(`Added act_ prefix to ad_account_id: ${ad_account_id}`);
+    }
 
     // Calculate date range (last 30 days)
     const endDate = new Date();
