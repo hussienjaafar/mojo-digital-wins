@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// PHASE 6: Alert throttling - prevent duplicate alerts within window
+const ALERT_THROTTLE_HOURS = 4;
+
 // Calculate z-score
 function calculateZScore(value: number, mean: number, stdDev: number): number {
   if (stdDev === 0) return 0;
@@ -31,10 +34,21 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const anomalies = [];
-    const Z_SCORE_THRESHOLD = 2.5; // Anomaly if z-score > 2.5
+    const anomalies: any[] = [];
+    const Z_SCORE_THRESHOLD = 2.5;
 
     console.log('[detect-anomalies] Starting anomaly detection');
+
+    // PHASE 6: Pre-fetch recent alerts for throttling
+    const throttleCutoff = new Date(Date.now() - ALERT_THROTTLE_HOURS * 60 * 60 * 1000).toISOString();
+    const { data: recentAlerts } = await supabase
+      .from('alert_queue')
+      .select('title, alert_type')
+      .gte('created_at', throttleCutoff);
+    
+    const recentAlertKeys = new Set(
+      (recentAlerts || []).map(a => `${a.alert_type}-${a.title}`)
+    );
 
     // 1. Detect topic velocity anomalies
     const { data: trends, error: trendsError } = await supabase
@@ -212,27 +226,34 @@ serve(async (req) => {
         }
       }
 
-      // Create alerts for critical/high severity anomalies
+      // Create alerts for critical/high severity anomalies - WITH THROTTLING
       const criticalAnomalies = anomalies.filter(a => 
         a.severity === 'critical' || a.severity === 'high'
       );
 
       if (criticalAnomalies.length > 0) {
-        const alerts = criticalAnomalies.map(anomaly => ({
-          alert_type: anomaly.anomaly_type,
-          severity: anomaly.severity,
-          title: `${anomaly.severity.toUpperCase()}: ${anomaly.entity_name}`,
-          message: `Anomaly detected: ${anomaly.anomaly_type} for ${anomaly.entity_type} "${anomaly.entity_name}". Z-score: ${anomaly.z_score.toFixed(2)}. Current value: ${anomaly.current_value?.toFixed(2)}, Baseline: ${anomaly.baseline_value?.toFixed(2)}`,
-          data: {
-            entity_type: anomaly.entity_type,
-            entity_id: anomaly.entity_id,
-            z_score: anomaly.z_score,
-            metadata: anomaly.metadata
-          }
-        }));
+        const alerts = criticalAnomalies
+          .map(anomaly => ({
+            alert_type: anomaly.anomaly_type,
+            severity: anomaly.severity,
+            title: `${anomaly.severity.toUpperCase()}: ${anomaly.entity_name}`,
+            message: `Anomaly detected: ${anomaly.anomaly_type} for ${anomaly.entity_type} "${anomaly.entity_name}". Z-score: ${anomaly.z_score.toFixed(2)}. Current value: ${anomaly.current_value?.toFixed(2)}, Baseline: ${anomaly.baseline_value?.toFixed(2)}`,
+            data: {
+              entity_type: anomaly.entity_type,
+              entity_id: anomaly.entity_id,
+              z_score: anomaly.z_score,
+              metadata: anomaly.metadata
+            }
+          }))
+          // PHASE 6: Filter out recently sent alerts (throttling)
+          .filter(alert => !recentAlertKeys.has(`${alert.alert_type}-${alert.title}`));
 
-        await supabase.from('alert_queue').insert(alerts);
-        console.log(`[detect-anomalies] Created ${alerts.length} alerts`);
+        if (alerts.length > 0) {
+          await supabase.from('alert_queue').insert(alerts);
+          console.log(`[detect-anomalies] Created ${alerts.length} alerts (${criticalAnomalies.length - alerts.length} throttled)`);
+        } else {
+          console.log(`[detect-anomalies] All ${criticalAnomalies.length} alerts throttled`);
+        }
       }
     }
     
