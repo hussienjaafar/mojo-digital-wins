@@ -4428,6 +4428,86 @@ export type Database = {
           },
         ]
       }
+      sms_campaigns: {
+        Row: {
+          amount_raised: number | null
+          campaign_id: string
+          campaign_name: string | null
+          clicks: number | null
+          conversions: number | null
+          cost: number | null
+          created_at: string | null
+          id: string
+          message_text: string | null
+          messages_delivered: number | null
+          messages_failed: number | null
+          messages_sent: number | null
+          opt_outs: number | null
+          organization_id: string
+          phone_list_name: string | null
+          previously_opted_out: number | null
+          replies: number | null
+          send_date: string | null
+          skipped: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount_raised?: number | null
+          campaign_id: string
+          campaign_name?: string | null
+          clicks?: number | null
+          conversions?: number | null
+          cost?: number | null
+          created_at?: string | null
+          id?: string
+          message_text?: string | null
+          messages_delivered?: number | null
+          messages_failed?: number | null
+          messages_sent?: number | null
+          opt_outs?: number | null
+          organization_id: string
+          phone_list_name?: string | null
+          previously_opted_out?: number | null
+          replies?: number | null
+          send_date?: string | null
+          skipped?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount_raised?: number | null
+          campaign_id?: string
+          campaign_name?: string | null
+          clicks?: number | null
+          conversions?: number | null
+          cost?: number | null
+          created_at?: string | null
+          id?: string
+          message_text?: string | null
+          messages_delivered?: number | null
+          messages_failed?: number | null
+          messages_sent?: number | null
+          opt_outs?: number | null
+          organization_id?: string
+          phone_list_name?: string | null
+          previously_opted_out?: number | null
+          replies?: number | null
+          send_date?: string | null
+          skipped?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_campaigns_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_creative_insights: {
         Row: {
           ai_model_used: string | null
