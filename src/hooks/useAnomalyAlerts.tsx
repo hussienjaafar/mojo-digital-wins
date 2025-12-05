@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/fixed-client';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface TrendAnomaly {
   id: string;
