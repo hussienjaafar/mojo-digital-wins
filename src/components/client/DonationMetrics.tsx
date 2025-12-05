@@ -33,6 +33,7 @@ type Transaction = {
   is_recurring: boolean;
   transaction_date: string;
   state: string | null;
+  city: string | null;
 };
 
 type DailyDonation = {
@@ -481,9 +482,23 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
                     || (row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : null)
                     || row.first_name 
                     || row.last_name 
-                    || row.donor_email 
-                    || 'Anonymous';
-                  return <span className="font-medium portal-text-primary">{displayName}</span>;
+                    || null;
+                  
+                  // Build location string
+                  const location = row.city && row.state 
+                    ? `${row.city}, ${row.state}` 
+                    : (row.city || row.state || null);
+                  
+                  return (
+                    <div className="flex flex-col">
+                      <span className="font-medium portal-text-primary">
+                        {displayName || row.donor_email || 'Anonymous'}
+                      </span>
+                      {location && (
+                        <span className="text-xs portal-text-muted">{location}</span>
+                      )}
+                    </div>
+                  );
                 },
               },
               {
