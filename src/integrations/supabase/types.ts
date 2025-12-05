@@ -5852,6 +5852,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_system_health_metrics: { Args: never; Returns: Json }
       get_user_organization_id: { Args: never; Returns: string }
       get_users_with_roles: {
         Args: never
