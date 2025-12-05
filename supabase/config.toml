@@ -34,7 +34,7 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.sync-switchboard-sms]
-verify_jwt = true
+verify_jwt = false
 
 [functions.actblue-webhook]
 verify_jwt = false
