@@ -5,6 +5,7 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL") || "hussein@ryzeup.io";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const PUBLIC_SITE_URL = Deno.env.get("PUBLIC_SITE_URL") || "https://your-app.com";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,7 +24,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { user_id }: ResetPasswordRequest = await req.json();
     
-    console.log("Resetting password for user:", user_id);
+    console.log("Initiating password reset for user:", user_id);
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
@@ -58,25 +59,27 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('id', clientUser?.organization_id)
       .single();
 
-    // Generate new temporary password
-    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase() + "!1";
+    const loginUrl = `${req.headers.get("origin") || PUBLIC_SITE_URL}/client-login`;
 
-    // Update password via admin API
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      user_id,
-      { password: tempPassword }
-    );
+    // Generate a secure password reset link using Supabase's built-in functionality
+    const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'recovery',
+      email: email,
+      options: {
+        redirectTo: loginUrl
+      }
+    });
 
-    if (updateError) {
-      console.error("Password update error:", updateError);
-      throw new Error(`Failed to update password: ${updateError.message}`);
+    if (resetError) {
+      console.error("Reset link generation error:", resetError);
+      throw new Error(`Failed to generate reset link: ${resetError.message}`);
     }
 
-    console.log("Password reset successfully");
+    console.log("Password reset link generated successfully");
 
-    // Send email with new credentials
+    // Send email with secure reset link (no plaintext password)
     if (RESEND_API_KEY) {
-      const loginUrl = `${req.headers.get("origin") || "https://your-app.com"}/client-login`;
+      const resetLink = resetData?.properties?.action_link || loginUrl;
       
       const htmlContent = `
         <!DOCTYPE html>
@@ -109,7 +112,7 @@ const handler = async (req: Request): Promise<Response> => {
                 margin: 0;
                 font-size: 24px;
               }
-              .credentials {
+              .info-box {
                 background-color: #f8f9fa;
                 border-radius: 6px;
                 padding: 20px;
@@ -133,6 +136,11 @@ const handler = async (req: Request): Promise<Response> => {
                 color: #666;
                 font-size: 14px;
               }
+              .warning {
+                font-size: 12px;
+                color: #888;
+                margin-top: 15px;
+              }
             </style>
           </head>
           <body>
@@ -144,21 +152,20 @@ const handler = async (req: Request): Promise<Response> => {
               <div class="content">
                 <p>Hello ${clientUser?.full_name || 'User'},</p>
                 
-                <p>Your password has been reset by an administrator. Use these new credentials to log in:</p>
+                <p>A password reset has been requested for your account by an administrator. Click the button below to set a new password:</p>
                 
-                <div class="credentials">
+                <div class="info-box">
                   <p><strong>Email:</strong> ${email}</p>
-                  <p><strong>Temporary Password:</strong> ${tempPassword}</p>
                 </div>
                 
                 <div style="text-align: center;">
-                  <a href="${loginUrl}" class="login-button">
-                    Log In to Portal
+                  <a href="${resetLink}" class="login-button">
+                    Reset Your Password
                   </a>
                 </div>
                 
-                <p style="margin-top: 20px; font-size: 14px; color: #666;">
-                  Please change your password after logging in for security purposes.
+                <p class="warning">
+                  This link will expire in 24 hours. If you didn't request this password reset, please contact your administrator immediately.
                 </p>
               </div>
               
@@ -200,7 +207,7 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: "Password reset successfully" 
+        message: "Password reset link sent successfully" 
       }),
       {
         status: 200,
