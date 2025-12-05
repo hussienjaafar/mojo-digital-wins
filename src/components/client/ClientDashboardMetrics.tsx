@@ -5,7 +5,7 @@ import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardContent } from
 import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
 import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare } from "lucide-react";
-import { format, parseISO, eachDayOfInterval } from "date-fns";
+import { format, parseISO, eachDayOfInterval, subDays } from "date-fns";
 import { logger } from "@/lib/logger";
 
 interface ClientDashboardMetricsProps {
@@ -42,7 +42,23 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
   const [donations, setDonations] = useState<DonationData[]>([]);
   const [metaMetrics, setMetaMetrics] = useState<MetaData[]>([]);
   const [smsMetrics, setSmsMetrics] = useState<SMSData[]>([]);
+  const [prevDonations, setPrevDonations] = useState<DonationData[]>([]);
+  const [prevMetaMetrics, setPrevMetaMetrics] = useState<MetaData[]>([]);
+  const [prevSmsMetrics, setPrevSmsMetrics] = useState<SMSData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Calculate previous period dates for comparison
+  const getPreviousPeriod = () => {
+    const start = parseISO(startDate);
+    const end = parseISO(endDate);
+    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const prevEnd = subDays(start, 1);
+    const prevStart = subDays(prevEnd, daysDiff);
+    return {
+      start: format(prevStart, 'yyyy-MM-dd'),
+      end: format(prevEnd, 'yyyy-MM-dd'),
+    };
+  };
 
   useEffect(() => {
     loadAllData();
@@ -50,8 +66,10 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
 
   const loadAllData = async () => {
     setIsLoading(true);
+    const prevPeriod = getPreviousPeriod();
+    
     try {
-      // Load donations (ActBlue)
+      // Load current period donations
       const { data: donationData } = await (supabase as any)
         .from('actblue_transactions')
         .select('amount, donor_email, is_recurring, transaction_date, refcode')
@@ -61,7 +79,17 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       
       setDonations(donationData || []);
 
-      // Load Meta Ads metrics
+      // Load previous period donations
+      const { data: prevDonationData } = await (supabase as any)
+        .from('actblue_transactions')
+        .select('amount, donor_email, is_recurring, transaction_date, refcode')
+        .eq('organization_id', organizationId)
+        .gte('transaction_date', prevPeriod.start)
+        .lte('transaction_date', prevPeriod.end);
+      
+      setPrevDonations(prevDonationData || []);
+
+      // Load current period Meta metrics
       const { data: metaData } = await (supabase as any)
         .from('meta_ad_metrics')
         .select('date, spend, impressions, clicks, conversions')
@@ -71,7 +99,17 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       
       setMetaMetrics(metaData || []);
 
-      // Load SMS metrics from sms_campaigns table
+      // Load previous period Meta metrics
+      const { data: prevMetaData } = await (supabase as any)
+        .from('meta_ad_metrics')
+        .select('date, spend, impressions, clicks, conversions')
+        .eq('organization_id', organizationId)
+        .gte('date', prevPeriod.start)
+        .lte('date', prevPeriod.end);
+      
+      setPrevMetaMetrics(prevMetaData || []);
+
+      // Load current period SMS metrics
       const { data: smsData } = await (supabase as any)
         .from('sms_campaigns')
         .select('send_date, messages_sent, conversions, cost, amount_raised')
@@ -81,6 +119,17 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         .neq('status', 'draft');
       
       setSmsMetrics(smsData || []);
+
+      // Load previous period SMS metrics
+      const { data: prevSmsData } = await (supabase as any)
+        .from('sms_campaigns')
+        .select('send_date, messages_sent, conversions, cost, amount_raised')
+        .eq('organization_id', organizationId)
+        .gte('send_date', prevPeriod.start)
+        .lte('send_date', `${prevPeriod.end}T23:59:59`)
+        .neq('status', 'draft');
+      
+      setPrevSmsMetrics(prevSmsData || []);
     } catch (error) {
       logger.error('Failed to load dashboard metrics', error);
     } finally {
@@ -88,7 +137,13 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     }
   };
 
-  // Calculate KPIs
+  // Calculate percentage change
+  const calcChange = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+  };
+
+  // Calculate KPIs for current period
   const kpis = useMemo(() => {
     const totalRaised = donations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
     const uniqueDonors = new Set(donations.map(d => d.donor_email)).size;
@@ -117,6 +172,28 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       donationCount: donations.length,
     };
   }, [donations, metaMetrics, smsMetrics]);
+
+  // Calculate KPIs for previous period
+  const prevKpis = useMemo(() => {
+    const totalRaised = prevDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    const uniqueDonors = new Set(prevDonations.map(d => d.donor_email)).size;
+    const recurringDonors = prevDonations.filter(d => d.is_recurring).length;
+    const recurringPercentage = prevDonations.length > 0 ? (recurringDonors / prevDonations.length) * 100 : 0;
+    
+    const totalMetaSpend = prevMetaMetrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
+    const totalSMSCost = prevSmsMetrics.reduce((sum, s) => sum + Number(s.cost || 0), 0);
+    const totalSpend = totalMetaSpend + totalSMSCost;
+    
+    const roi = totalSpend > 0 ? totalRaised / totalSpend : 0;
+
+    return {
+      totalRaised,
+      uniqueDonors,
+      recurringPercentage,
+      roi,
+      totalSpend,
+    };
+  }, [prevDonations, prevMetaMetrics, prevSmsMetrics]);
 
   // Build time series data for charts
   const timeSeriesData = useMemo(() => {
@@ -166,28 +243,28 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       label: "Total Raised",
       value: formatCurrency(kpis.totalRaised),
       icon: DollarSign,
-      trend: { value: 0, isPositive: true },
+      trend: { value: Math.round(calcChange(kpis.totalRaised, prevKpis.totalRaised)), isPositive: kpis.totalRaised >= prevKpis.totalRaised },
       subtitle: `${kpis.donationCount} donations`,
     },
     {
       label: "Unique Donors",
       value: kpis.uniqueDonors.toLocaleString(),
       icon: Users,
-      trend: { value: 0, isPositive: true },
+      trend: { value: Math.round(calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors)), isPositive: kpis.uniqueDonors >= prevKpis.uniqueDonors },
       subtitle: `Avg: ${formatCurrency(kpis.avgDonation)}`,
     },
     {
       label: "Overall ROI",
       value: `${kpis.roi.toFixed(1)}x`,
       icon: TrendingUp,
-      trend: { value: 0, isPositive: kpis.roi >= 1 },
+      trend: { value: Math.round(calcChange(kpis.roi, prevKpis.roi)), isPositive: kpis.roi >= prevKpis.roi },
       subtitle: `Spend: ${formatCurrency(kpis.totalSpend)}`,
     },
     {
       label: "Recurring Rate",
       value: `${kpis.recurringPercentage.toFixed(0)}%`,
       icon: Repeat,
-      trend: { value: 0, isPositive: true },
+      trend: { value: Math.round(calcChange(kpis.recurringPercentage, prevKpis.recurringPercentage)), isPositive: kpis.recurringPercentage >= prevKpis.recurringPercentage },
       subtitle: "Monthly sustainers",
     },
   ];
