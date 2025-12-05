@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Key, Plus, CheckCircle2, XCircle, RefreshCw, Settings, Pencil, Trash2, Play, Loader2, AlertTriangle, MoreVertical, ChevronDown, ChevronRight, Search, Clock, Zap } from "lucide-react";
+import { Key, Plus, CheckCircle2, XCircle, RefreshCw, Settings, Pencil, Trash2, Play, Loader2, AlertTriangle, MoreVertical, ChevronDown, ChevronRight, Search, Clock, Zap, Command } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -66,10 +66,39 @@ const APICredentialsManager = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
   const [deleteCredential, setDeleteCredential] = useState<APICredential | null>(null);
+  const [testingForm, setTestingForm] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + K to focus search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Escape to close dialog or clear search
+      if (e.key === 'Escape') {
+        if (showCreateDialog) {
+          handleCloseDialog();
+        } else if (searchQuery) {
+          setSearchQuery('');
+        }
+      }
+      // Cmd/Ctrl + N to add new credentials
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n' && !showCreateDialog) {
+        e.preventDefault();
+        setShowCreateDialog(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCreateDialog, searchQuery]);
 
   // Expand all organizations by default when data loads
   useEffect(() => {
@@ -257,6 +286,59 @@ const APICredentialsManager = () => {
       });
     } finally {
       setTestingId(null);
+    }
+  };
+
+  // Test connection from form (before saving)
+  const testFormConnection = async () => {
+    if (!selectedOrg || !selectedPlatform || !platformConfig[selectedPlatform]) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields before testing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestingForm(true);
+    
+    try {
+      let endpoint = '';
+      switch (selectedPlatform) {
+        case 'meta':
+          endpoint = 'admin-sync-meta';
+          break;
+        case 'switchboard':
+          endpoint = 'sync-switchboard-sms';
+          break;
+        case 'actblue':
+          endpoint = 'sync-actblue-csv';
+          break;
+      }
+
+      // For form testing, we pass the credentials directly
+      const { data, error } = await supabase.functions.invoke(endpoint, {
+        body: { 
+          organization_id: selectedOrg,
+          test_only: true,
+          credentials: platformConfig[selectedPlatform]
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Connection Successful",
+        description: `${selectedPlatform} credentials are valid. You can now save them.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Connection Failed",
+        description: error.message || `Unable to verify ${selectedPlatform} credentials`,
+        variant: "destructive",
+      });
+    } finally {
+      setTestingForm(false);
     }
   };
 
@@ -737,6 +819,20 @@ const APICredentialsManager = () => {
                   <Button type="button" variant="outline" onClick={handleCloseDialog} className="w-full sm:w-auto">
                     Cancel
                   </Button>
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    onClick={testFormConnection}
+                    disabled={testingForm || !selectedOrg}
+                    className="w-full sm:w-auto"
+                  >
+                    {testingForm ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Test Connection
+                  </Button>
                   <Button type="submit" className="w-full sm:w-auto">
                     {editingCredential ? 'Update Credentials' : 'Save Credentials'}
                   </Button>
@@ -748,15 +844,19 @@ const APICredentialsManager = () => {
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Search */}
+        {/* Search with keyboard shortcut hint */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            ref={searchInputRef}
             placeholder="Search organizations or platforms..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 pr-20"
           />
+          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+            <Command className="h-3 w-3" />K
+          </kbd>
         </div>
 
         {/* Grouped credentials by organization */}
