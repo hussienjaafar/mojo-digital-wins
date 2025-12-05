@@ -81,23 +81,33 @@ export function useChannelSummaries(organizationId: string, startDate: string, e
 
       // Fetch Donations summary
       try {
-        const { data: donationData } = await (supabase as any)
+        console.log('[useChannelSummaries] Fetching donations for org:', organizationId, 'dates:', startDate, 'to', endDate);
+        
+        const { data: donationData, error: donationError } = await (supabase as any)
           .from('actblue_transactions')
           .select('amount, donor_email')
           .eq('organization_id', organizationId)
-          .eq('transaction_type', 'donation')
           .gte('transaction_date', startDate)
-          .lte('transaction_date', endDate);
+          .lte('transaction_date', `${endDate}T23:59:59`);
+
+        if (donationError) {
+          console.error('[useChannelSummaries] Donation query error:', donationError);
+        }
+        
+        console.log('[useChannelSummaries] Donations found:', donationData?.length || 0);
 
         const total = donationData?.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0) || 0;
         const uniqueDonors = new Set(donationData?.map((d: any) => d.donor_email)).size;
         const avgDonation = donationData?.length > 0 ? total / donationData.length : 0;
+
+        console.log('[useChannelSummaries] Calculated totals:', { total, uniqueDonors, avgDonation });
 
         setSummary(prev => ({
           ...prev,
           donations: { total, donors: uniqueDonors, avgDonation, isLoading: false },
         }));
       } catch (error) {
+        console.error('[useChannelSummaries] Donation fetch error:', error);
         setSummary(prev => ({ ...prev, donations: { ...prev.donations, isLoading: false } }));
       }
     };
