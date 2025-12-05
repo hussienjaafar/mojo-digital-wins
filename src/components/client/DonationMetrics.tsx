@@ -23,6 +23,8 @@ type Transaction = {
   id: string;
   transaction_id: string;
   donor_name: string;
+  first_name: string | null;
+  last_name: string | null;
   donor_email: string;
   amount: number;
   refcode: string | null;
@@ -473,7 +475,16 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
                 key: "donor_name",
                 label: "Donor",
                 sortable: true,
-                render: (value) => <span className="font-medium portal-text-primary">{value}</span>,
+                render: (value, row) => {
+                  // Display name, fallback to first+last, then email
+                  const displayName = value 
+                    || (row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : null)
+                    || row.first_name 
+                    || row.last_name 
+                    || row.donor_email 
+                    || 'Anonymous';
+                  return <span className="font-medium portal-text-primary">{displayName}</span>;
+                },
               },
               {
                 key: "amount",
