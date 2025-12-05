@@ -34,58 +34,74 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify user authentication
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Authorization header required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    // Parse request body first
+    const body = await req.json();
+    const { organization_id, start_date, end_date, mode } = body;
+    
+    // Check for internal backfill call (bypasses auth)
+    const internalKey = req.headers.get('x-internal-key');
+    const isInternalCall = mode === 'backfill' && organization_id && internalKey === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.slice(0, 20);
+
+    let isAdmin = false;
+
+    if (!isInternalCall) {
+      // Verify user authentication
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ error: 'Authorization header required' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Get user from JWT token
+      const { data: { user }, error: authError } = await supabase.auth.getUser(
+        authHeader.replace('Bearer ', '')
       );
+
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid or expired token' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!organization_id) {
+        throw new Error('organization_id is required');
+      }
+
+      // Check if user is admin
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      isAdmin = userRoles?.some(r => r.role === 'admin') || false;
+
+      // Admins can sync any organization, regular users must belong to the organization
+      if (!isAdmin) {
+        const { data: clientUser, error: accessError } = await supabase
+          .from('client_users')
+          .select('organization_id')
+          .eq('id', user.id)
+          .single();
+
+        if (accessError || !clientUser || clientUser.organization_id !== organization_id) {
+          return new Response(
+            JSON.stringify({ error: 'You do not have access to this organization' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      console.log(`Starting Meta Ads sync for organization: ${organization_id} by ${isAdmin ? 'admin' : 'user'}`);
+    } else {
+      console.log(`Starting INTERNAL Meta Ads backfill for organization: ${organization_id}`);
     }
-
-    // Get user from JWT token
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { organization_id } = await req.json();
 
     if (!organization_id) {
       throw new Error('organization_id is required');
     }
-
-    // Check if user is admin
-    const { data: userRoles } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id);
-
-    const isAdmin = userRoles?.some(r => r.role === 'admin');
-
-    // Admins can sync any organization, regular users must belong to the organization
-    if (!isAdmin) {
-      const { data: clientUser, error: accessError } = await supabase
-        .from('client_users')
-        .select('organization_id')
-        .eq('id', user.id)
-        .single();
-
-      if (accessError || !clientUser || clientUser.organization_id !== organization_id) {
-        return new Response(
-          JSON.stringify({ error: 'You do not have access to this organization' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    console.log(`Starting Meta Ads sync for organization: ${organization_id} by ${isAdmin ? 'admin' : 'user'}: ${user.id}`);
 
     // Fetch credentials
     const { data: credData, error: credError } = await supabase
@@ -110,10 +126,19 @@ serve(async (req) => {
       console.log(`Added act_ prefix to ad_account_id: ${ad_account_id}`);
     }
 
-    // Calculate date range (last 30 days)
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
+    // Calculate date range - use provided dates or default to last 30 days
+    let endDate: Date;
+    let startDate: Date;
+    
+    if (start_date && end_date) {
+      startDate = new Date(start_date);
+      endDate = new Date(end_date);
+      console.log(`Using custom date range: ${start_date} to ${end_date}`);
+    } else {
+      endDate = new Date();
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+    }
 
     const dateRanges = {
       since: startDate.toISOString().split('T')[0],
