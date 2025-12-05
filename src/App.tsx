@@ -45,7 +45,6 @@ const AdminClientView = lazy(() => import("./pages/AdminClientView"));
 // Client portal pages (lazy loaded)
 const ClientLogin = lazy(() => import("./pages/ClientLogin"));
 const ClientDashboard = lazy(() => import("./pages/ClientDashboard"));
-const ClientDashboardCustom = lazy(() => import("./pages/ClientDashboardCustom"));
 const ClientWatchlist = lazy(() => import("./pages/ClientWatchlist"));
 const ClientAlerts = lazy(() => import("./pages/ClientAlerts"));
 const ClientActions = lazy(() => import("./pages/ClientActions"));
@@ -101,8 +100,9 @@ const AppContent = () => {
             <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />
             <Route path="/client-login" element={<ClientLogin />} />
             <Route path="/client/dashboard" element={<ClientDashboard />} />
-            <Route path="/client/dashboard/custom" element={<ClientDashboardCustom />} />
             <Route path="/client/portal" element={<Navigate to="/client/dashboard" replace />} />
+            {/* Redirect deprecated custom dashboard route */}
+            <Route path="/client/dashboard/custom" element={<Navigate to="/client/dashboard" replace />} />
             <Route path="/client/watchlist" element={<ClientWatchlist />} />
             <Route path="/client/alerts" element={<ClientAlerts />} />
             <Route path="/client/actions" element={<ClientActions />} />
