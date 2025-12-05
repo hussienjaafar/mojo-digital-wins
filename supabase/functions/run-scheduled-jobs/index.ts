@@ -392,6 +392,17 @@ serve(async (req) => {
             itemsCreated = result?.clusters_created || 0;
             break;
 
+          case 'sync_actblue_csv':
+            const actblueCsvResponse = await supabase.functions.invoke('sync-actblue-csv', {
+              body: job.payload || { mode: 'incremental' }
+            });
+            if (actblueCsvResponse.error) throw new Error(actblueCsvResponse.error.message);
+            result = actblueCsvResponse.data;
+            const csvResults = result?.results || [];
+            itemsProcessed = csvResults.reduce((sum: number, r: any) => sum + (r.processed || 0), 0);
+            itemsCreated = csvResults.reduce((sum: number, r: any) => sum + (r.inserted || 0), 0);
+            break;
+
           default:
             throw new Error(`Unknown job type: ${job.job_type}`);
         }
