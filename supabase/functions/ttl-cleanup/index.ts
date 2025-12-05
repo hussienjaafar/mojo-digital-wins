@@ -113,17 +113,23 @@ Deno.serve(async (req) => {
       error: e7?.message 
     });
 
-    // 8. Delete old articles (keep 90 days)
-    const { count: oldArticles, error: e8 } = await supabase
-      .from('articles')
-      .delete({ count: 'exact' })
-      .lt('published_date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString());
+    // 8. Archive old data (bluesky >30 days, articles >90 days)
+    // This calls the archive_old_data() function which moves data to archive tables
+    const { data: archiveResult, error: e8 } = await supabase.rpc('archive_old_data');
     
-    results.push({ 
-      table: 'articles (>90 days)', 
-      deleted: oldArticles || 0,
-      error: e8?.message 
-    });
+    if (archiveResult && archiveResult.length > 0) {
+      const archived = archiveResult[0];
+      results.push({ 
+        table: 'bluesky_posts_archive', 
+        deleted: archived.bluesky_archived || 0,
+        error: e8?.message 
+      });
+      results.push({ 
+        table: 'articles_archive', 
+        deleted: archived.articles_archived || 0,
+        error: e8?.message 
+      });
+    }
 
     const totalDeleted = results.reduce((sum, r) => sum + r.deleted, 0);
     const duration = Date.now() - startTime;

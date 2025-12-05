@@ -713,6 +713,48 @@ export type Database = {
           },
         ]
       }
+      articles_archive: {
+        Row: {
+          affected_groups: string[] | null
+          ai_summary: string | null
+          archived_at: string | null
+          id: string
+          published_date: string
+          relevance_category: string | null
+          sentiment_score: number | null
+          source_name: string
+          source_url: string
+          threat_level: string | null
+          title: string
+        }
+        Insert: {
+          affected_groups?: string[] | null
+          ai_summary?: string | null
+          archived_at?: string | null
+          id: string
+          published_date: string
+          relevance_category?: string | null
+          sentiment_score?: number | null
+          source_name: string
+          source_url: string
+          threat_level?: string | null
+          title: string
+        }
+        Update: {
+          affected_groups?: string[] | null
+          ai_summary?: string | null
+          archived_at?: string | null
+          id?: string
+          published_date?: string
+          relevance_category?: string | null
+          sentiment_score?: number | null
+          source_name?: string
+          source_url?: string
+          threat_level?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       attribution_health_logs: {
         Row: {
           alerts: Json
@@ -1180,6 +1222,45 @@ export type Database = {
           urls?: string[] | null
           validation_errors?: string[] | null
           validation_passed?: boolean | null
+        }
+        Relationships: []
+      }
+      bluesky_posts_archive: {
+        Row: {
+          affected_groups: string[] | null
+          ai_sentiment: number | null
+          ai_sentiment_label: string | null
+          ai_topics: string[] | null
+          archived_at: string | null
+          author_did: string
+          created_at: string
+          id: string
+          post_uri: string
+          text: string | null
+        }
+        Insert: {
+          affected_groups?: string[] | null
+          ai_sentiment?: number | null
+          ai_sentiment_label?: string | null
+          ai_topics?: string[] | null
+          archived_at?: string | null
+          author_did: string
+          created_at: string
+          id: string
+          post_uri: string
+          text?: string | null
+        }
+        Update: {
+          affected_groups?: string[] | null
+          ai_sentiment?: number | null
+          ai_sentiment_label?: string | null
+          ai_topics?: string[] | null
+          archived_at?: string | null
+          author_did?: string
+          created_at?: string
+          id?: string
+          post_uri?: string
+          text?: string | null
         }
         Relationships: []
       }
@@ -5633,6 +5714,13 @@ export type Database = {
       }
     }
     Functions: {
+      archive_old_data: {
+        Args: never
+        Returns: {
+          articles_archived: number
+          bluesky_archived: number
+        }[]
+      }
       calculate_bluesky_trend_velocity: {
         Args: { topic_name: string }
         Returns: number
