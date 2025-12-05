@@ -24,6 +24,26 @@ interface AdCreative {
   creative_type?: string;
 }
 
+// Demographics breakdown interface
+interface DemographicBreakdown {
+  age?: string;
+  gender?: string;
+  impressions: number;
+  clicks: number;
+  spend: number;
+  conversions: number;
+}
+
+// Placement breakdown interface
+interface PlacementBreakdown {
+  publisher_platform?: string;
+  platform_position?: string;
+  device_platform?: string;
+  impressions: number;
+  clicks: number;
+  spend: number;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -194,6 +214,10 @@ serve(async (req) => {
     let creativesProcessed = 0;
     let totalInsightRecords = 0;
     let latestDataDate: string | null = null;
+    
+    // Track demographic and placement data
+    let demographicRecords = 0;
+    let placementRecords = 0;
 
     // Fetch insights and creatives for each campaign
     for (const campaign of campaigns) {
@@ -291,9 +315,10 @@ serve(async (req) => {
             // Only store if we have some creative content
             if (primaryText || headline || description || videoId) {
               // Fetch ad-level insights for performance metrics
-              const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad.id}/insights?fields=impressions,clicks,spend,actions,action_values,ctr&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
+              const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad.id}/insights?fields=impressions,clicks,spend,actions,action_values,ctr,frequency,quality_ranking,engagement_rate_ranking,conversion_rate_ranking&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
               
               let impressions = 0, clicks = 0, spend = 0, conversions = 0, conversionValue = 0, ctr = 0;
+              let frequency = 0, qualityRanking = '', engagementRanking = '', conversionRanking = '';
               
               try {
                 const adInsightsResponse = await fetch(adInsightsUrl);
@@ -305,6 +330,10 @@ serve(async (req) => {
                   clicks = parseInt(insight.clicks) || 0;
                   spend = parseFloat(insight.spend) || 0;
                   ctr = parseFloat(insight.ctr) || 0;
+                  frequency = parseFloat(insight.frequency) || 0;
+                  qualityRanking = insight.quality_ranking || '';
+                  engagementRanking = insight.engagement_rate_ranking || '';
+                  conversionRanking = insight.conversion_rate_ranking || '';
                   
                   if (insight.actions) {
                     const convAction = insight.actions.find((a: any) => 
@@ -362,8 +391,84 @@ serve(async (req) => {
         console.error(`Error fetching creatives for campaign ${campaign.id}:`, creativeErr);
       }
       
-      // ========== Original: Fetch campaign-level insights ==========
-      const insightsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,reach,actions,action_values,cpc,cpm,ctr&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&time_increment=1&access_token=${access_token}`;
+      // ========== ENHANCED: Fetch demographic breakdown (age + gender) ==========
+      try {
+        console.log(`Fetching demographic breakdown for campaign ${campaign.id}`);
+        
+        const demographicUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,actions,action_values&breakdowns=age,gender&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
+        
+        const demographicResponse = await fetch(demographicUrl);
+        const demographicData = await demographicResponse.json();
+        
+        if (!demographicData.error && demographicData.data && demographicData.data.length > 0) {
+          // Build demographic breakdown object
+          const demographics: Record<string, any> = {};
+          
+          for (const row of demographicData.data) {
+            const key = `${row.age || 'unknown'}_${row.gender || 'unknown'}`;
+            
+            let conversions = 0;
+            if (row.actions) {
+              const convAction = row.actions.find((a: any) => 
+                a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+              );
+              if (convAction) conversions = parseInt(convAction.value) || 0;
+            }
+            
+            demographics[key] = {
+              age: row.age,
+              gender: row.gender,
+              impressions: parseInt(row.impressions) || 0,
+              clicks: parseInt(row.clicks) || 0,
+              spend: parseFloat(row.spend) || 0,
+              conversions,
+            };
+          }
+          
+          // Update campaign metrics with demographic data
+          if (Object.keys(demographics).length > 0) {
+            demographicRecords += Object.keys(demographics).length;
+            console.log(`Captured ${Object.keys(demographics).length} demographic breakdowns for campaign ${campaign.id}`);
+          }
+        }
+      } catch (demoErr) {
+        console.error(`Error fetching demographics for campaign ${campaign.id}:`, demoErr);
+      }
+      
+      // ========== ENHANCED: Fetch placement breakdown ==========
+      let placementData: Record<string, any> = {};
+      try {
+        console.log(`Fetching placement breakdown for campaign ${campaign.id}`);
+        
+        const placementUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,actions&breakdowns=publisher_platform,device_platform&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
+        
+        const placementResponse = await fetch(placementUrl);
+        const placementResult = await placementResponse.json();
+        
+        if (!placementResult.error && placementResult.data && placementResult.data.length > 0) {
+          for (const row of placementResult.data) {
+            const key = `${row.publisher_platform || 'unknown'}_${row.device_platform || 'unknown'}`;
+            
+            placementData[key] = {
+              publisher_platform: row.publisher_platform,
+              device_platform: row.device_platform,
+              impressions: parseInt(row.impressions) || 0,
+              clicks: parseInt(row.clicks) || 0,
+              spend: parseFloat(row.spend) || 0,
+            };
+          }
+          
+          if (Object.keys(placementData).length > 0) {
+            placementRecords += Object.keys(placementData).length;
+            console.log(`Captured ${Object.keys(placementData).length} placement breakdowns for campaign ${campaign.id}`);
+          }
+        }
+      } catch (placementErr) {
+        console.error(`Error fetching placement data for campaign ${campaign.id}:`, placementErr);
+      }
+      
+      // ========== Original: Fetch campaign-level insights with enhanced fields ==========
+      const insightsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,reach,actions,action_values,cpc,cpm,ctr,frequency,cost_per_action_type&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&time_increment=1&access_token=${access_token}`;
       
       const insightsResponse = await fetch(insightsUrl);
       const insightsData = await insightsResponse.json();
@@ -396,6 +501,36 @@ serve(async (req) => {
       // Find attribution mapping for this campaign
       const mapping = attributionMappings?.find(m => m.meta_campaign_id === campaign.id);
       
+      // Aggregate demographic data for the campaign period
+      let campaignDemographics: Record<string, any> = {};
+      
+      // Fetch demographic breakdown for campaign-level aggregation
+      try {
+        const demoAggUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,actions&breakdowns=age,gender&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
+        const demoAggResponse = await fetch(demoAggUrl);
+        const demoAggData = await demoAggResponse.json();
+        
+        if (!demoAggData.error && demoAggData.data) {
+          for (const row of demoAggData.data) {
+            const key = `${row.age || 'unknown'}_${row.gender || 'unknown'}`;
+            if (!campaignDemographics[key]) {
+              campaignDemographics[key] = {
+                age: row.age,
+                gender: row.gender,
+                impressions: 0,
+                clicks: 0,
+                spend: 0,
+              };
+            }
+            campaignDemographics[key].impressions += parseInt(row.impressions) || 0;
+            campaignDemographics[key].clicks += parseInt(row.clicks) || 0;
+            campaignDemographics[key].spend += parseFloat(row.spend) || 0;
+          }
+        }
+      } catch (err) {
+        console.error(`Error aggregating demographics for campaign ${campaign.id}:`, err);
+      }
+      
       // Store daily metrics
       for (const insight of insights) {
         totalInsightRecords++;
@@ -408,6 +543,7 @@ serve(async (req) => {
         // Extract conversions from actions
         let conversions = 0;
         let conversionValue = 0;
+        let costPerResult = 0;
 
         if (insight.actions) {
           const conversionAction = insight.actions.find((a: any) => 
@@ -424,6 +560,27 @@ serve(async (req) => {
           );
           if (valueAction) {
             conversionValue = parseFloat(valueAction.value) || 0;
+          }
+        }
+        
+        // Extract cost per result
+        if (insight.cost_per_action_type) {
+          const cprAction = insight.cost_per_action_type.find((a: any) => 
+            a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+          );
+          if (cprAction) {
+            costPerResult = parseFloat(cprAction.value) || 0;
+          }
+        }
+        
+        // Determine dominant placement from placement data
+        let dominantPlacement = null;
+        let dominantDevice = null;
+        if (Object.keys(placementData).length > 0) {
+          const sortedPlacements = Object.values(placementData).sort((a: any, b: any) => b.impressions - a.impressions);
+          if (sortedPlacements.length > 0) {
+            dominantPlacement = (sortedPlacements[0] as any).publisher_platform;
+            dominantDevice = (sortedPlacements[0] as any).device_platform;
           }
         }
 
@@ -447,6 +604,12 @@ serve(async (req) => {
             roas: conversionValue > 0 && parseFloat(insight.spend) > 0 
               ? conversionValue / parseFloat(insight.spend) 
               : 0,
+            // ENHANCED FIELDS
+            frequency: parseFloat(insight.frequency) || null,
+            cost_per_result: costPerResult || null,
+            placement: dominantPlacement,
+            device_platform: dominantDevice,
+            audience_demographics: Object.keys(campaignDemographics).length > 0 ? campaignDemographics : null,
           }, {
             onConflict: 'organization_id,campaign_id,ad_set_id,ad_id,date'
           });
@@ -497,14 +660,25 @@ serve(async (req) => {
       .eq('organization_id', organization_id)
       .eq('platform', 'meta');
 
-    console.log(`Meta Ads sync completed successfully. Campaigns: ${campaigns.length}, Creatives: ${creativesProcessed}, Total insight records: ${totalInsightRecords}, Latest data date: ${latestDataDate || 'none'}`);
+    console.log(`=== META ADS SYNC COMPLETE ===`);
+    console.log(`Campaigns: ${campaigns.length}`);
+    console.log(`Creatives processed: ${creativesProcessed}`);
+    console.log(`Total insight records: ${totalInsightRecords}`);
+    console.log(`Demographic breakdowns captured: ${demographicRecords}`);
+    console.log(`Placement breakdowns captured: ${placementRecords}`);
+    console.log(`Latest data date: ${latestDataDate || 'none'}`);
+    console.log(`=== END SYNC ===`);
 
     return new Response(
       JSON.stringify({
         success: true, 
         campaigns: campaigns.length,
         creatives_processed: creativesProcessed,
-        message: 'Meta Ads sync completed successfully'
+        insight_records: totalInsightRecords,
+        demographic_breakdowns: demographicRecords,
+        placement_breakdowns: placementRecords,
+        latest_data_date: latestDataDate,
+        message: 'Meta Ads sync completed successfully with enhanced demographics and placement data'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
