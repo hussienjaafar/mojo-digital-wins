@@ -1,17 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Key, Plus, CheckCircle2, XCircle, RefreshCw, Settings, Pencil, Trash2, Play, Loader2, AlertTriangle } from "lucide-react";
+import { Key, Plus, CheckCircle2, XCircle, RefreshCw, Settings, Pencil, Trash2, Play, Loader2, AlertTriangle, MoreVertical, ChevronDown, ChevronRight, Search, Clock, Zap } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type Organization = {
   id: string;
@@ -50,6 +52,7 @@ type PlatformConfig = {
 
 const APICredentialsManager = () => {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [credentials, setCredentials] = useState<APICredential[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,10 +63,20 @@ const APICredentialsManager = () => {
   const [editingCredential, setEditingCredential] = useState<APICredential | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
+  const [deleteCredential, setDeleteCredential] = useState<APICredential | null>(null);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Expand all organizations by default when data loads
+  useEffect(() => {
+    if (organizations.length > 0) {
+      setExpandedOrgs(new Set(organizations.map(o => o.id)));
+    }
+  }, [organizations]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -94,6 +107,28 @@ const APICredentialsManager = () => {
       setIsLoading(false);
     }
   };
+
+  // Group credentials by organization
+  const credentialsByOrg = useMemo(() => {
+    const grouped: Record<string, APICredential[]> = {};
+    credentials.forEach(cred => {
+      if (!grouped[cred.organization_id]) {
+        grouped[cred.organization_id] = [];
+      }
+      grouped[cred.organization_id].push(cred);
+    });
+    return grouped;
+  }, [credentials]);
+
+  // Filter organizations based on search
+  const filteredOrganizations = useMemo(() => {
+    if (!searchQuery) return organizations;
+    const query = searchQuery.toLowerCase();
+    return organizations.filter(org => 
+      org.name.toLowerCase().includes(query) ||
+      credentialsByOrg[org.id]?.some(c => c.platform.toLowerCase().includes(query))
+    );
+  }, [organizations, searchQuery, credentialsByOrg]);
 
   const handleSaveCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,7 +185,6 @@ const APICredentialsManager = () => {
     setSelectedOrg(cred.organization_id);
     setSelectedPlatform(cred.platform as any);
     
-    // Pre-populate with existing credentials (masked values as placeholders)
     if (cred.encrypted_credentials) {
       setPlatformConfig({
         [cred.platform]: cred.encrypted_credentials
@@ -174,6 +208,7 @@ const APICredentialsManager = () => {
         description: "Credentials deleted successfully",
       });
 
+      setDeleteCredential(null);
       loadData();
     } catch (error: any) {
       toast({
@@ -302,32 +337,122 @@ const APICredentialsManager = () => {
     return icons[platform] || "🔑";
   };
 
-  const getSyncStatusBadge = (status: string | null) => {
-    if (status === 'success') {
-      return (
-        <Badge variant="outline" className="gap-1 text-green-600 border-green-200 bg-green-50">
-          <CheckCircle2 className="w-3 h-3" />
-          Success
-        </Badge>
-      );
-    }
-    if (status === 'error') {
-      return (
-        <Badge variant="destructive" className="gap-1">
-          <XCircle className="w-3 h-3" />
-          Error
-        </Badge>
-      );
-    }
-    if (status === 'running') {
-      return (
-        <Badge variant="secondary" className="gap-1">
-          <Loader2 className="w-3 h-3 animate-spin" />
-          Running
-        </Badge>
-      );
-    }
-    return <span className="text-muted-foreground">-</span>;
+  const getHealthStatus = (cred: APICredential) => {
+    if (!cred.is_active) return { status: 'inactive', color: 'bg-muted', label: 'Inactive' };
+    if (cred.last_sync_status === 'error') return { status: 'error', color: 'bg-destructive', label: 'Error' };
+    if (!cred.last_sync_at) return { status: 'pending', color: 'bg-yellow-500', label: 'Never Synced' };
+    
+    const lastSync = new Date(cred.last_sync_at);
+    const hoursAgo = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60);
+    
+    if (hoursAgo > 24) return { status: 'stale', color: 'bg-yellow-500', label: 'Stale' };
+    return { status: 'healthy', color: 'bg-green-500', label: 'Healthy' };
+  };
+
+  const getOrgHealth = (orgId: string) => {
+    const orgCreds = credentialsByOrg[orgId] || [];
+    if (orgCreds.length === 0) return { status: 'none', color: 'text-muted-foreground' };
+    
+    const hasError = orgCreds.some(c => c.last_sync_status === 'error');
+    const allHealthy = orgCreds.every(c => c.is_active && c.last_sync_status === 'success');
+    
+    if (hasError) return { status: 'error', color: 'text-destructive' };
+    if (allHealthy) return { status: 'healthy', color: 'text-green-600' };
+    return { status: 'warning', color: 'text-yellow-600' };
+  };
+
+  const toggleOrgExpanded = (orgId: string) => {
+    setExpandedOrgs(prev => {
+      const next = new Set(prev);
+      if (next.has(orgId)) {
+        next.delete(orgId);
+      } else {
+        next.add(orgId);
+      }
+      return next;
+    });
+  };
+
+  // Credential card for mobile and grouped view
+  const CredentialCard = ({ cred }: { cred: APICredential }) => {
+    const health = getHealthStatus(cred);
+    
+    return (
+      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+        <div className="flex items-center gap-3">
+          <div className={`w-2 h-2 rounded-full ${health.color}`} title={health.label} />
+          <span className="text-lg">{getPlatformIcon(cred.platform)}</span>
+          <div>
+            <p className="font-medium capitalize">{cred.platform}</p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="w-3 h-3" />
+              {cred.last_sync_at 
+                ? new Date(cred.last_sync_at).toLocaleDateString() 
+                : 'Never synced'}
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {/* Primary action: Sync */}
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => triggerSync(cred)}
+            disabled={syncingId === cred.id || !cred.is_active}
+            className="h-8"
+          >
+            {syncingId === cred.id ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <Zap className="w-3 h-3" />
+            )}
+            <span className="ml-1">Sync</span>
+          </Button>
+          
+          {/* Actions dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => testConnection(cred)} disabled={testingId === cred.id}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${testingId === cred.id ? 'animate-spin' : ''}`} />
+                Test Connection
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleEditCredential(cred)}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit Credentials
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => toggleActive(cred.id, cred.is_active)}>
+                {cred.is_active ? (
+                  <>
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Deactivate
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Activate
+                  </>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => setDeleteCredential(cred)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -338,20 +463,16 @@ const APICredentialsManager = () => {
             <Settings className="h-6 w-6 text-purple-600 dark:text-purple-400" />
           </div>
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">API Credentials</h2>
-            <p className="text-sm portal-text-secondary">Loading platform connections...</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-foreground">API Credentials</h2>
+            <p className="text-sm text-muted-foreground">Loading platform connections...</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
-              <div className="portal-skeleton h-8 w-8 rounded" />
-              <div className="portal-skeleton h-5 w-32" />
-              <div className="portal-skeleton h-4 w-full" />
-              <div className="flex gap-2 mt-4">
-                <div className="portal-skeleton h-8 w-24" />
-                <div className="portal-skeleton h-8 w-20" />
-              </div>
+            <div key={i} className="bg-card border rounded-lg p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="h-8 w-8 bg-muted animate-pulse rounded" />
+              <div className="h-5 w-32 bg-muted animate-pulse rounded" />
+              <div className="h-4 w-full bg-muted animate-pulse rounded" />
             </div>
           ))}
         </div>
@@ -362,7 +483,7 @@ const APICredentialsManager = () => {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Key className="w-5 h-5" />
@@ -377,7 +498,7 @@ const APICredentialsManager = () => {
             else setShowCreateDialog(true);
           }}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Credentials
               </Button>
@@ -536,7 +657,7 @@ const APICredentialsManager = () => {
 
                     <div className="border-t pt-4 mt-4">
                       <h4 className="font-medium mb-3">CSV API Credentials (for data sync)</h4>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="csv_username">Client UUID *</Label>
                           <Input
@@ -570,7 +691,7 @@ const APICredentialsManager = () => {
 
                     <div className="border-t pt-4 mt-4">
                       <h4 className="font-medium mb-3">Webhook Credentials (for real-time updates)</h4>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="webhook_username">Webhook Username *</Label>
                           <Input
@@ -604,7 +725,7 @@ const APICredentialsManager = () => {
                       </p>
                       <div className="mt-3 p-2 bg-primary/5 rounded text-xs">
                         <span className="font-medium">Webhook URL:</span>{' '}
-                        <code className="bg-muted px-1 rounded">
+                        <code className="bg-muted px-1 rounded break-all">
                           https://nuclmzoasgydubdshtab.supabase.co/functions/v1/actblue-webhook
                         </code>
                       </div>
@@ -612,11 +733,11 @@ const APICredentialsManager = () => {
                   </TabsContent>
                 </Tabs>
 
-                <DialogFooter className="pt-4">
-                  <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
+                  <Button type="button" variant="outline" onClick={handleCloseDialog} className="w-full sm:w-auto">
                     Cancel
                   </Button>
-                  <Button type="submit">
+                  <Button type="submit" className="w-full sm:w-auto">
                     {editingCredential ? 'Update Credentials' : 'Save Credentials'}
                   </Button>
                 </DialogFooter>
@@ -625,154 +746,125 @@ const APICredentialsManager = () => {
           </Dialog>
         </div>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Organization</TableHead>
-              <TableHead>Platform</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last Sync</TableHead>
-              <TableHead>Sync Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {credentials.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  <div className="flex flex-col items-center gap-2">
-                    <Key className="w-8 h-8 opacity-50" />
-                    <p>No API credentials configured yet</p>
-                    <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(true)}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add your first integration
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              credentials.map((cred) => (
-                <TableRow key={cred.id}>
-                  <TableCell className="font-medium">
-                    {getOrganizationName(cred.organization_id)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span>{getPlatformIcon(cred.platform)}</span>
-                      <span className="capitalize">{cred.platform}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={cred.is_active ? "default" : "secondary"}>
-                      {cred.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {cred.last_sync_at
-                      ? new Date(cred.last_sync_at).toLocaleString()
-                      : 'Never'}
-                  </TableCell>
-                  <TableCell>
-                    {getSyncStatusBadge(cred.last_sync_status)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex gap-1 justify-end flex-wrap">
-                      {/* Sync Now Button */}
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={() => triggerSync(cred)}
-                        disabled={syncingId === cred.id || !cred.is_active}
-                        title="Sync data now"
-                      >
-                        {syncingId === cred.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
+      
+      <CardContent className="space-y-4">
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search organizations or platforms..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        {/* Grouped credentials by organization */}
+        {credentials.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Key className="w-12 h-12 mx-auto opacity-30 mb-4" />
+            <p className="font-medium">No API credentials configured yet</p>
+            <p className="text-sm mb-4">Add your first integration to start syncing data</p>
+            <Button variant="outline" onClick={() => setShowCreateDialog(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add your first integration
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredOrganizations.map(org => {
+              const orgCreds = credentialsByOrg[org.id] || [];
+              if (orgCreds.length === 0 && searchQuery) return null;
+              
+              const orgHealth = getOrgHealth(org.id);
+              const isExpanded = expandedOrgs.has(org.id);
+              
+              return (
+                <Collapsible 
+                  key={org.id} 
+                  open={isExpanded} 
+                  onOpenChange={() => toggleOrgExpanded(org.id)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/70 transition-colors">
+                      <div className="flex items-center gap-3">
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
                         ) : (
-                          <Play className="w-3 h-3" />
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
                         )}
-                        <span className="ml-1 hidden sm:inline">Sync</span>
-                      </Button>
-
-                      {/* Test Connection Button */}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => testConnection(cred)}
-                        disabled={testingId === cred.id}
-                        title="Test API connection"
-                      >
-                        {testingId === cred.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-3 h-3" />
+                        <div>
+                          <p className="font-medium">{org.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {orgCreds.length} integration{orgCreds.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {orgHealth.status === 'healthy' && (
+                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Healthy
+                          </Badge>
                         )}
-                        <span className="ml-1 hidden sm:inline">Test</span>
-                      </Button>
-
-                      {/* Edit Button */}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEditCredential(cred)}
-                        title="Edit credentials"
-                      >
-                        <Pencil className="w-3 h-3" />
-                        <span className="ml-1 hidden sm:inline">Edit</span>
-                      </Button>
-
-                      {/* Toggle Active Button */}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => toggleActive(cred.id, cred.is_active)}
-                        title={cred.is_active ? "Deactivate" : "Activate"}
-                      >
-                        {cred.is_active ? "Deactivate" : "Activate"}
-                      </Button>
-
-                      {/* Delete Button */}
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            title="Delete credentials"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle className="flex items-center gap-2">
-                              <AlertTriangle className="w-5 h-5 text-destructive" />
-                              Delete API Credentials?
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete the {cred.platform} credentials for{' '}
-                              <strong>{getOrganizationName(cred.organization_id)}</strong>.
-                              This action cannot be undone and will stop data syncing for this integration.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteCredential(cred.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                        {orgHealth.status === 'error' && (
+                          <Badge variant="destructive">
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Error
+                          </Badge>
+                        )}
+                        {orgHealth.status === 'warning' && (
+                          <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            Warning
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="pl-7 pr-3 py-2 space-y-2">
+                      {orgCreds.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-2">No integrations configured</p>
+                      ) : (
+                        orgCreds.map(cred => (
+                          <CredentialCard key={cred.id} cred={cred} />
+                        ))
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteCredential} onOpenChange={() => setDeleteCredential(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Delete API Credentials?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the {deleteCredential?.platform} credentials for{' '}
+              <strong>{deleteCredential && getOrganizationName(deleteCredential.organization_id)}</strong>.
+              This action cannot be undone and will stop data syncing for this integration.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteCredential && handleDeleteCredential(deleteCredential.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
