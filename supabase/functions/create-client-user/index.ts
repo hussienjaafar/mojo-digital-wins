@@ -5,6 +5,7 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL") || "hussein@ryzeup.io";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const PUBLIC_SITE_URL = Deno.env.get("PUBLIC_SITE_URL") || "https://your-app.com";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -111,9 +112,21 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('id', organization_id)
       .single();
 
-    // Send welcome email via Resend
+    // Generate a secure password reset link instead of sending plaintext password
+    const loginUrl = `${req.headers.get("origin") || PUBLIC_SITE_URL}/client-login`;
+    
+    // Generate password reset link using Supabase's built-in functionality
+    const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'recovery',
+      email: email,
+      options: {
+        redirectTo: loginUrl
+      }
+    });
+
+    // Send welcome email via Resend with secure reset link (no plaintext password)
     if (RESEND_API_KEY) {
-      const loginUrl = `${req.headers.get("origin") || "https://your-app.com"}/client-login`;
+      const resetLink = resetData?.properties?.action_link || loginUrl;
       
       const htmlContent = `
         <!DOCTYPE html>
@@ -146,7 +159,7 @@ const handler = async (req: Request): Promise<Response> => {
                 margin: 0;
                 font-size: 24px;
               }
-              .credentials {
+              .info-box {
                 background-color: #f8f9fa;
                 border-radius: 6px;
                 padding: 20px;
@@ -170,6 +183,11 @@ const handler = async (req: Request): Promise<Response> => {
                 color: #666;
                 font-size: 14px;
               }
+              .warning {
+                font-size: 12px;
+                color: #888;
+                margin-top: 15px;
+              }
             </style>
           </head>
           <body>
@@ -181,22 +199,21 @@ const handler = async (req: Request): Promise<Response> => {
               <div class="content">
                 <p>Hello ${full_name},</p>
                 
-                <p>Your client portal account has been created. Use the credentials below to log in:</p>
+                <p>Your client portal account has been created. Click the button below to set your password and access your account:</p>
                 
-                <div class="credentials">
+                <div class="info-box">
                   <p><strong>Email:</strong> ${email}</p>
-                  <p><strong>Temporary Password:</strong> ${password}</p>
                   <p><strong>Role:</strong> ${role}</p>
                 </div>
                 
                 <div style="text-align: center;">
-                  <a href="${loginUrl}" class="login-button">
-                    Log In to Portal
+                  <a href="${resetLink}" class="login-button">
+                    Set Your Password
                   </a>
                 </div>
                 
-                <p style="margin-top: 20px; font-size: 14px; color: #666;">
-                  Please change your password after your first login for security purposes.
+                <p class="warning">
+                  This link will expire in 24 hours. If you didn't request this account, please ignore this email.
                 </p>
               </div>
               
@@ -218,7 +235,7 @@ const handler = async (req: Request): Promise<Response> => {
           body: JSON.stringify({
             from: `Client Portal <${SENDER_EMAIL}>`,
             to: [email],
-            subject: `Welcome to ${org?.name || 'Client Portal'}`,
+            subject: `Welcome to ${org?.name || 'Client Portal'} - Set Your Password`,
             html: htmlContent,
           }),
         });
