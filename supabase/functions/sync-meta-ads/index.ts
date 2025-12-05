@@ -61,21 +61,31 @@ serve(async (req) => {
       throw new Error('organization_id is required');
     }
 
-    // Verify user has access to this organization
-    const { data: clientUser, error: accessError } = await supabase
-      .from('client_users')
-      .select('organization_id')
-      .eq('id', user.id)
-      .single();
+    // Check if user is admin
+    const { data: userRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
 
-    if (accessError || !clientUser || clientUser.organization_id !== organization_id) {
-      return new Response(
-        JSON.stringify({ error: 'You do not have access to this organization' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const isAdmin = userRoles?.some(r => r.role === 'admin');
+
+    // Admins can sync any organization, regular users must belong to the organization
+    if (!isAdmin) {
+      const { data: clientUser, error: accessError } = await supabase
+        .from('client_users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (accessError || !clientUser || clientUser.organization_id !== organization_id) {
+        return new Response(
+          JSON.stringify({ error: 'You do not have access to this organization' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
-    console.log(`Starting Meta Ads sync for organization: ${organization_id} by user: ${user.id}`);
+    console.log(`Starting Meta Ads sync for organization: ${organization_id} by ${isAdmin ? 'admin' : 'user'}: ${user.id}`);
 
     // Fetch credentials
     const { data: credData, error: credError } = await supabase
