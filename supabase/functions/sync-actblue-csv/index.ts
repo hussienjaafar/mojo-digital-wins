@@ -139,42 +139,88 @@ async function fetchActBlueCSV(
   limit: number = 1000
 ): Promise<{ rows: CSVRow[]; hasMore: boolean }> {
   const baseUrl = 'https://secure.actblue.com/api/v1/csvs';
-  
-  const params = new URLSearchParams({
-    csv_type: 'paid_contributions',
-    date_range_start: startDate,
-    date_range_end: endDate,
-    recipient_entity_ids: entityId,
-    offset: offset.toString(),
-    limit: limit.toString(),
-  });
-  
   const auth = btoa(`${username}:${password}`);
   
-  console.log(`Fetching ActBlue CSV: offset=${offset}, limit=${limit}, dates=${startDate} to ${endDate}`);
+  console.log(`Creating ActBlue CSV request: dates=${startDate} to ${endDate}`);
   
-  const response = await fetch(`${baseUrl}?${params}`, {
-    method: 'GET',
+  // Step 1: POST to create the CSV request
+  const createResponse = await fetch(baseUrl, {
+    method: 'POST',
     headers: {
       'Authorization': `Basic ${auth}`,
-      'Accept': 'text/csv',
+      'Content-Type': 'application/json',
     },
+    body: JSON.stringify({
+      csv_type: 'paid_contributions',
+      date_range_start: startDate,
+      date_range_end: endDate,
+    }),
   });
   
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`ActBlue API error ${response.status}: ${errorText}`);
+  if (!createResponse.ok) {
+    const errorText = await createResponse.text();
+    throw new Error(`ActBlue API error ${createResponse.status}: ${errorText}`);
   }
   
-  const csvText = await response.text();
+  const createData = await createResponse.json();
+  const csvId = createData.id;
+  
+  console.log(`CSV request created with ID: ${csvId}`);
+  
+  // Step 2: Poll the status endpoint until CSV is ready
+  let csvUrl = null;
+  let attempts = 0;
+  const maxAttempts = 30; // Max 30 attempts (up to 5 minutes with 10s delays)
+  
+  while (!csvUrl && attempts < maxAttempts) {
+    attempts++;
+    
+    const statusResponse = await fetch(`${baseUrl}/${csvId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+      },
+    });
+    
+    if (!statusResponse.ok) {
+      const errorText = await statusResponse.text();
+      throw new Error(`ActBlue status check error ${statusResponse.status}: ${errorText}`);
+    }
+    
+    const statusData = await statusResponse.json();
+    console.log(`CSV status (attempt ${attempts}): ${statusData.status}`);
+    
+    if (statusData.status === 'complete') {
+      csvUrl = statusData.download_url;
+      break;
+    } else if (statusData.status === 'failed') {
+      throw new Error('ActBlue CSV generation failed');
+    }
+    
+    // Wait 10 seconds before polling again
+    await new Promise(resolve => setTimeout(resolve, 10000));
+  }
+  
+  if (!csvUrl) {
+    throw new Error('ActBlue CSV generation timed out');
+  }
+  
+  console.log('CSV ready, downloading...');
+  
+  // Step 3: Download the CSV from the provided URL
+  const csvResponse = await fetch(csvUrl);
+  
+  if (!csvResponse.ok) {
+    throw new Error(`Failed to download ActBlue CSV: ${csvResponse.status}`);
+  }
+  
+  const csvText = await csvResponse.text();
   const rows = parseCSV(csvText);
   
-  // If we got exactly limit rows, there might be more
-  const hasMore = rows.length === limit;
+  console.log(`Fetched ${rows.length} rows from ActBlue CSV`);
   
-  console.log(`Fetched ${rows.length} rows, hasMore=${hasMore}`);
-  
-  return { rows, hasMore };
+  // ActBlue CSV API doesn't support pagination - returns all data for date range
+  return { rows, hasMore: false };
 }
 
 serve(async (req) => {
