@@ -44,19 +44,26 @@ const SyncControls = ({ organizationId }: Props) => {
   const syncSwitchboard = async () => {
     setSyncing({ ...syncing, sms: true });
     try {
-      const { error } = await (supabase as any).functions.invoke('sync-switchboard-sms', {
+      const { data, error } = await (supabase as any).functions.invoke('sync-switchboard-sms', {
         body: { organization_id: organizationId }
       });
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Switchboard SMS sync completed successfully",
-      });
-
-      // Trigger ROI calculation
-      await calculateROI();
+      // Check if API is not available (OneSwitchboard limitation)
+      if (data && data.error && data.credentials_valid) {
+        toast({
+          title: "Switchboard API Not Available",
+          description: "OneSwitchboard doesn't provide a public reporting API. Please export CSV reports from your dashboard manually.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Switchboard SMS sync completed successfully",
+        });
+        await calculateROI();
+      }
     } catch (error: any) {
       toast({
         title: "Error",
