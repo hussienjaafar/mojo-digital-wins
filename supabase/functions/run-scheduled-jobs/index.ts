@@ -404,26 +404,109 @@ serve(async (req) => {
             break;
 
           case 'sync':
-            // Handle sync jobs - call the appropriate sync function based on endpoint
-            const syncEndpoint = job.endpoint?.split('/').pop() || '';
-            const syncResponse = await supabase.functions.invoke(syncEndpoint, {
-              body: job.payload || {}
+          case 'sync_actblue_csv':
+            // Sync ActBlue CSV data for all active organizations
+            console.log('Running ActBlue CSV sync for all organizations');
+            const actblueResponse = await supabase.functions.invoke('sync-actblue-csv', {
+              body: { mode: 'incremental' }
             });
-            if (syncResponse.error) throw new Error(syncResponse.error.message);
-            result = syncResponse.data;
-            itemsProcessed = result?.results?.length || result?.processed || 1;
-            itemsCreated = result?.inserted || 0;
+            if (actblueResponse.error) throw new Error(actblueResponse.error.message);
+            result = actblueResponse.data;
+            itemsProcessed = result?.results?.length || result?.processed || 0;
+            itemsCreated = result?.results?.reduce((sum: number, r: any) => sum + (r.inserted || 0), 0) || 0;
+            break;
+
+          case 'sync_meta_ads':
+            // Sync Meta Ads data for all active organizations
+            console.log('Running Meta Ads sync for all organizations');
+            const { data: metaOrgs } = await supabase
+              .from('client_api_credentials')
+              .select('organization_id')
+              .eq('platform', 'meta')
+              .eq('is_active', true);
+            
+            let metaProcessed = 0;
+            let metaCreated = 0;
+            const metaResults: any[] = [];
+            
+            for (const org of (metaOrgs || [])) {
+              try {
+                const metaResponse = await supabase.functions.invoke('admin-sync-meta', {
+                  body: { organization_id: org.organization_id },
+                  headers: { 'x-admin-key': 'internal-sync-trigger' }
+                });
+                if (!metaResponse.error) {
+                  metaProcessed++;
+                  metaCreated += metaResponse.data?.records_processed || 0;
+                  metaResults.push({ org: org.organization_id, success: true });
+                } else {
+                  metaResults.push({ org: org.organization_id, error: metaResponse.error.message });
+                }
+              } catch (e: any) {
+                metaResults.push({ org: org.organization_id, error: e.message });
+              }
+            }
+            result = { organizations_synced: metaProcessed, results: metaResults };
+            itemsProcessed = metaProcessed;
+            itemsCreated = metaCreated;
+            break;
+
+          case 'sync_switchboard_sms':
+            // Sync Switchboard SMS data for all active organizations
+            console.log('Running Switchboard SMS sync for all organizations');
+            const { data: smsOrgs } = await supabase
+              .from('client_api_credentials')
+              .select('organization_id')
+              .eq('platform', 'switchboard')
+              .eq('is_active', true);
+            
+            let smsProcessed = 0;
+            let smsCreated = 0;
+            const smsResults: any[] = [];
+            
+            for (const org of (smsOrgs || [])) {
+              try {
+                const smsResponse = await supabase.functions.invoke('sync-switchboard-sms', {
+                  body: { organization_id: org.organization_id }
+                });
+                if (!smsResponse.error) {
+                  smsProcessed++;
+                  smsCreated += smsResponse.data?.campaigns_synced || 0;
+                  smsResults.push({ org: org.organization_id, success: true });
+                } else {
+                  smsResults.push({ org: org.organization_id, error: smsResponse.error.message });
+                }
+              } catch (e: any) {
+                smsResults.push({ org: org.organization_id, error: e.message });
+              }
+            }
+            result = { organizations_synced: smsProcessed, results: smsResults };
+            itemsProcessed = smsProcessed;
+            itemsCreated = smsCreated;
             break;
 
           case 'analytics':
-            // Handle analytics jobs
-            const analyticsEndpoint = job.endpoint?.split('/').pop() || '';
-            const analyticsResponse = await supabase.functions.invoke(analyticsEndpoint, {
-              body: job.payload || {}
-            });
-            if (analyticsResponse.error) throw new Error(analyticsResponse.error.message);
-            result = analyticsResponse.data;
-            itemsProcessed = result?.organizations_processed || 1;
+          case 'calculate_roi_all':
+            // Calculate ROI for all organizations
+            console.log('Running ROI calculation for all organizations');
+            const { data: roiOrgs } = await supabase
+              .from('client_organizations')
+              .select('id')
+              .eq('is_active', true);
+            
+            let roiProcessed = 0;
+            for (const org of (roiOrgs || [])) {
+              try {
+                const roiResponse = await supabase.functions.invoke('calculate-roi', {
+                  body: { organization_id: org.id }
+                });
+                if (!roiResponse.error) roiProcessed++;
+              } catch (e) {
+                console.error(`ROI calc failed for ${org.id}:`, e);
+              }
+            }
+            result = { organizations_processed: roiProcessed };
+            itemsProcessed = roiProcessed;
             break;
 
           case 'refresh_unified_trends':

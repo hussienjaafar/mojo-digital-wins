@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CheckCircle, AlertCircle, Clock, RefreshCw } from "lucide-react";
-import { formatDistanceToNow, parseISO } from "date-fns";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckCircle, AlertCircle, Clock, RefreshCw, AlertTriangle, Info } from "lucide-react";
+import { formatDistanceToNow, parseISO, format, differenceInHours, differenceInDays } from "date-fns";
 
 type Props = {
   organizationId: string;
   compact?: boolean;
+  showAlerts?: boolean;
 };
 
 type SyncStatus = {
@@ -22,12 +24,22 @@ type DataFreshness = {
   latestDate: string | null;
   recordCount: number;
   hoursStale: number | null;
+  expectedFreshnessHours: number; // Platform-specific expected freshness
+  isWebhookBased: boolean;
 };
 
-export const DataFreshnessIndicator = ({ organizationId, compact = false }: Props) => {
+// Platform-specific expected freshness (hours)
+const EXPECTED_FRESHNESS: Record<string, { hours: number; isWebhook: boolean; description: string }> = {
+  'Meta Ads': { hours: 48, isWebhook: false, description: 'Meta API has 24-48h reporting delay' },
+  'ActBlue': { hours: 1, isWebhook: true, description: 'Real-time via webhook, or 6h via CSV sync' },
+  'SMS': { hours: 24, isWebhook: false, description: 'Daily sync from Switchboard' },
+};
+
+export const DataFreshnessIndicator = ({ organizationId, compact = false, showAlerts = true }: Props) => {
   const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
   const [dataFreshness, setDataFreshness] = useState<DataFreshness[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [webhookCount, setWebhookCount] = useState<number>(0);
 
   useEffect(() => {
     loadFreshnessData();
@@ -72,8 +84,20 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false }: Prop
           latestDate,
           recordCount: metaCount || 0,
           hoursStale: latestDate 
-            ? (Date.now() - new Date(latestDate).getTime()) / (1000 * 60 * 60)
-            : null
+            ? differenceInHours(new Date(), parseISO(latestDate))
+            : null,
+          expectedFreshnessHours: EXPECTED_FRESHNESS['Meta Ads'].hours,
+          isWebhookBased: false
+        });
+      } else if (credentials?.some(c => c.platform === 'meta')) {
+        // Meta configured but no data
+        freshness.push({
+          source: 'Meta Ads',
+          latestDate: null,
+          recordCount: 0,
+          hoursStale: null,
+          expectedFreshnessHours: EXPECTED_FRESHNESS['Meta Ads'].hours,
+          isWebhookBased: false
         });
       }
 
@@ -85,6 +109,15 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false }: Prop
         .order('transaction_date', { ascending: false })
         .limit(1);
 
+      // Check for recent webhook activity (last 24h)
+      const { count: recentWebhooks } = await supabase
+        .from('actblue_transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      
+      setWebhookCount(recentWebhooks || 0);
+
       if (actblueData && actblueData.length > 0) {
         const latestDate = actblueData[0].transaction_date;
         freshness.push({
@@ -92,8 +125,19 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false }: Prop
           latestDate,
           recordCount: actblueCount || 0,
           hoursStale: latestDate 
-            ? (Date.now() - new Date(latestDate).getTime()) / (1000 * 60 * 60)
-            : null
+            ? differenceInHours(new Date(), parseISO(latestDate))
+            : null,
+          expectedFreshnessHours: EXPECTED_FRESHNESS['ActBlue'].hours,
+          isWebhookBased: true
+        });
+      } else if (credentials?.some(c => c.platform === 'actblue')) {
+        freshness.push({
+          source: 'ActBlue',
+          latestDate: null,
+          recordCount: 0,
+          hoursStale: null,
+          expectedFreshnessHours: EXPECTED_FRESHNESS['ActBlue'].hours,
+          isWebhookBased: true
         });
       }
 
@@ -112,8 +156,19 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false }: Prop
           latestDate,
           recordCount: smsCount || 0,
           hoursStale: latestDate 
-            ? (Date.now() - new Date(latestDate).getTime()) / (1000 * 60 * 60)
-            : null
+            ? differenceInHours(new Date(), parseISO(latestDate))
+            : null,
+          expectedFreshnessHours: EXPECTED_FRESHNESS['SMS'].hours,
+          isWebhookBased: false
+        });
+      } else if (credentials?.some(c => c.platform === 'switchboard')) {
+        freshness.push({
+          source: 'SMS',
+          latestDate: null,
+          recordCount: 0,
+          hoursStale: null,
+          expectedFreshnessHours: EXPECTED_FRESHNESS['SMS'].hours,
+          isWebhookBased: false
         });
       }
 
@@ -125,17 +180,17 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false }: Prop
     }
   };
 
-  const getStatusBadge = (hoursStale: number | null, status?: string | null) => {
+  const getStatusBadge = (item: DataFreshness, status?: string | null) => {
     if (status === 'failed') {
       return (
         <Badge variant="destructive" className="text-[10px] gap-1">
           <AlertCircle className="h-3 w-3" />
-          Failed
+          Sync Failed
         </Badge>
       );
     }
     
-    if (hoursStale === null) {
+    if (item.hoursStale === null) {
       return (
         <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground">
           <Clock className="h-3 w-3" />
@@ -143,8 +198,12 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false }: Prop
         </Badge>
       );
     }
+
+    // Check against expected freshness for this platform
+    const freshnessThreshold = item.expectedFreshnessHours;
+    const criticalThreshold = freshnessThreshold * 3; // 3x expected = critical
     
-    if (hoursStale < 24) {
+    if (item.hoursStale <= freshnessThreshold) {
       return (
         <Badge variant="outline" className="text-[10px] gap-1 bg-green-500/10 text-green-600 border-green-500/20">
           <CheckCircle className="h-3 w-3" />
@@ -153,21 +212,61 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false }: Prop
       );
     }
     
-    if (hoursStale < 72) {
+    if (item.hoursStale <= criticalThreshold) {
+      const daysStale = Math.round(item.hoursStale / 24);
       return (
         <Badge variant="outline" className="text-[10px] gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
           <Clock className="h-3 w-3" />
-          {Math.round(hoursStale)}h ago
+          {daysStale > 0 ? `${daysStale}d ago` : `${Math.round(item.hoursStale)}h ago`}
         </Badge>
       );
     }
     
+    const daysStale = Math.round(item.hoursStale / 24);
     return (
       <Badge variant="outline" className="text-[10px] gap-1 bg-red-500/10 text-red-600 border-red-500/20">
         <AlertCircle className="h-3 w-3" />
-        {Math.round(hoursStale / 24)}d stale
+        {daysStale}d stale!
       </Badge>
     );
+  };
+
+  const getCriticalAlerts = () => {
+    const alerts: { type: 'warning' | 'error'; message: string; source: string }[] = [];
+    
+    for (const item of dataFreshness) {
+      if (item.hoursStale === null && item.recordCount === 0) {
+        alerts.push({
+          type: 'warning',
+          message: `No ${item.source} data received yet`,
+          source: item.source
+        });
+        continue;
+      }
+
+      const criticalThreshold = item.expectedFreshnessHours * 3;
+      
+      if (item.hoursStale && item.hoursStale > criticalThreshold) {
+        const days = Math.round(item.hoursStale / 24);
+        alerts.push({
+          type: 'error',
+          message: `${item.source} data is ${days} days behind. ${EXPECTED_FRESHNESS[item.source]?.description || ''}`,
+          source: item.source
+        });
+      }
+    }
+
+    // Check for ActBlue webhook activity
+    const actblueItem = dataFreshness.find(d => d.source === 'ActBlue');
+    if (actblueItem && actblueItem.recordCount > 0 && webhookCount === 0 && actblueItem.hoursStale && actblueItem.hoursStale > 24) {
+      alerts.push({
+        type: 'warning',
+        message: 'No ActBlue webhook events in 24h. Verify webhook is configured in ActBlue dashboard.',
+        source: 'ActBlue'
+      });
+    }
+
+    return alerts;
   };
 
   if (isLoading) {
@@ -181,21 +280,31 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false }: Prop
 
   if (compact) {
     // Compact view: show overall health
-    const hasStaleData = dataFreshness.some(d => d.hoursStale && d.hoursStale > 48);
+    const hasCritical = dataFreshness.some(d => 
+      d.hoursStale && d.hoursStale > (d.expectedFreshnessHours * 3)
+    );
+    const hasStaleData = dataFreshness.some(d => 
+      d.hoursStale && d.hoursStale > d.expectedFreshnessHours
+    );
     const hasFailed = syncStatuses.some(s => s.status === 'failed');
     
-    if (hasFailed) {
+    if (hasFailed || hasCritical) {
       return (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger>
               <Badge variant="destructive" className="text-[10px] gap-1">
                 <AlertCircle className="h-3 w-3" />
-                Sync Issue
+                {hasFailed ? 'Sync Failed' : 'Data Critical'}
               </Badge>
             </TooltipTrigger>
             <TooltipContent>
-              <p className="text-xs">One or more data syncs have failed. Check settings.</p>
+              <p className="text-xs">
+                {hasFailed 
+                  ? 'One or more data syncs have failed. Check settings.' 
+                  : 'Data is significantly behind expected freshness levels.'
+                }
+              </p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -209,11 +318,11 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false }: Prop
             <TooltipTrigger>
               <Badge variant="outline" className="text-[10px] gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
                 <Clock className="h-3 w-3" />
-                Data may be stale
+                Data Delayed
               </Badge>
             </TooltipTrigger>
             <TooltipContent>
-              <p className="text-xs">Some data hasn't been updated in 48+ hours.</p>
+              <p className="text-xs">Some data is behind expected freshness levels.</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -230,16 +339,40 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false }: Prop
             </Badge>
           </TooltipTrigger>
           <TooltipContent>
-            <p className="text-xs">All data sources are up to date.</p>
+            <p className="text-xs">All data sources are within expected freshness.</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
   }
 
+  const alerts = getCriticalAlerts();
+
   // Full view
   return (
     <div className="space-y-3">
+      {/* Critical Alerts */}
+      {showAlerts && alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.map((alert, idx) => (
+            <Alert 
+              key={idx} 
+              variant={alert.type === 'error' ? 'destructive' : 'default'}
+              className="py-2"
+            >
+              {alert.type === 'error' ? (
+                <AlertCircle className="h-4 w-4" />
+              ) : (
+                <AlertTriangle className="h-4 w-4" />
+              )}
+              <AlertDescription className="text-xs ml-2">
+                {alert.message}
+              </AlertDescription>
+            </Alert>
+          ))}
+        </div>
+      )}
+
       <div className="text-sm font-medium">Data Freshness</div>
       <div className="grid gap-2">
         {dataFreshness.map((item) => {
@@ -250,20 +383,44 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false }: Prop
             (s.platform === 'switchboard' && item.source === 'SMS')
           );
           
+          const platformInfo = EXPECTED_FRESHNESS[item.source];
+          
           return (
             <div 
               key={item.source}
               className="flex items-center justify-between p-2 rounded-md bg-muted/50"
             >
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{item.source}</span>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{item.source}</span>
+                  {platformInfo && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-3 w-3 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs max-w-48">{platformInfo.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
                 <span className="text-xs text-muted-foreground">
                   {item.recordCount.toLocaleString()} records
-                  {item.latestDate && ` • Latest: ${formatDistanceToNow(parseISO(item.latestDate), { addSuffix: true })}`}
+                  {item.latestDate && (
+                    <>
+                      {' • Latest: '}
+                      {differenceInDays(new Date(), parseISO(item.latestDate)) > 7 
+                        ? format(parseISO(item.latestDate), 'MMM d, yyyy')
+                        : formatDistanceToNow(parseISO(item.latestDate), { addSuffix: true })
+                      }
+                    </>
+                  )}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                {getStatusBadge(item.hoursStale, syncStatus?.status)}
+                {getStatusBadge(item, syncStatus?.status)}
               </div>
             </div>
           );
