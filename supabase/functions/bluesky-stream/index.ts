@@ -396,6 +396,19 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // ⚠️ TEMPORARILY DISABLED - Database recovery in progress
+  // Remove this block to re-enable data ingestion
+  console.log('⏸️ Bluesky stream DISABLED - Database recovery mode');
+  return new Response(JSON.stringify({
+    status: 'disabled',
+    message: 'Bluesky stream temporarily disabled for database recovery',
+    timestamp: new Date().toISOString()
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
+  // Original code below - uncomment to re-enable
+  /*
   try {
     console.log('🚀 Starting STRICT collection session...');
     
@@ -417,4 +430,5 @@ serve(async (req) => {
       }
     );
   }
+  */
 });
