@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Building2, Plus, Eye, LogIn, MoreVertical, Search, Users, Plug, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Filter } from "lucide-react";
+import { Building2, Plus, Eye, LogIn, MoreVertical, Search, Users, Plug, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Filter, Command } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -51,10 +51,38 @@ const ClientOrganizationManager = () => {
     primary_contact_email: "",
     logo_url: "",
   });
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadOrganizations();
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + K to focus search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Escape to close dialog or clear search
+      if (e.key === 'Escape') {
+        if (showCreateDialog) {
+          setShowCreateDialog(false);
+        } else if (searchQuery) {
+          setSearchQuery('');
+        }
+      }
+      // Cmd/Ctrl + N to add new organization
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n' && !showCreateDialog) {
+        e.preventDefault();
+        setShowCreateDialog(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCreateDialog, searchQuery]);
 
   const loadOrganizations = async () => {
     setIsLoading(true);
@@ -477,11 +505,15 @@ const ClientOrganizationManager = () => {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              ref={searchInputRef}
               placeholder="Search organizations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 pr-20"
             />
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              <Command className="h-3 w-3" />K
+            </kbd>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
