@@ -149,6 +149,7 @@ async function fetchActBlueCSV(
     headers: {
       'Authorization': `Basic ${auth}`,
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
     body: JSON.stringify({
       csv_type: 'paid_contributions',
@@ -157,13 +158,20 @@ async function fetchActBlueCSV(
     }),
   });
   
-  if (!createResponse.ok) {
+  // ActBlue returns 202 Accepted for successful CSV creation requests
+  if (createResponse.status !== 202 && createResponse.status !== 200) {
     const errorText = await createResponse.text();
+    console.error(`ActBlue API error: status=${createResponse.status}, body=${errorText}`);
     throw new Error(`ActBlue API error ${createResponse.status}: ${errorText}`);
   }
   
   const createData = await createResponse.json();
   const csvId = createData.id;
+  
+  if (!csvId) {
+    console.error('ActBlue response missing CSV ID:', createData);
+    throw new Error('ActBlue API did not return a CSV ID');
+  }
   
   console.log(`CSV request created with ID: ${csvId}`);
   
