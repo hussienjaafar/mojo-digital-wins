@@ -162,7 +162,7 @@ const Admin = () => {
     }
   }, [session]);
 
-  const checkAdminStatus = async () => {
+  const checkAdminStatus = async (retryCount = 0) => {
     if (!session?.user?.id) {
       navigate('/auth');
       return;
@@ -174,7 +174,20 @@ const Admin = () => {
         _role: 'admin'
       });
 
-      if (error || !data) {
+      // Handle transient database errors with retry
+      if (error) {
+        console.error('Admin check error:', error);
+        // Retry on 503/timeout errors (up to 3 times)
+        if ((error.message?.includes('503') || error.code === 'PGRST002') && retryCount < 3) {
+          console.log(`Retrying admin check (attempt ${retryCount + 1}/3)...`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          return checkAdminStatus(retryCount + 1);
+        }
+        navigate('/access-denied?from=admin');
+        return;
+      }
+
+      if (!data) {
         navigate('/access-denied?from=admin');
         return;
       }
@@ -182,6 +195,13 @@ const Admin = () => {
       setIsAdmin(true);
       fetchSubmissions();
     } catch (error) {
+      console.error('Admin check exception:', error);
+      // Retry on network errors
+      if (retryCount < 3) {
+        console.log(`Retrying admin check after exception (attempt ${retryCount + 1}/3)...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        return checkAdminStatus(retryCount + 1);
+      }
       navigate('/access-denied?from=admin');
     } finally {
       setIsLoading(false);
