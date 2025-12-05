@@ -1,7 +1,7 @@
 project_id = "nuclmzoasgydubdshtab"
 
 [functions.create-client-user]
-verify_jwt = false
+verify_jwt = true
 
 [functions.calculate-entity-trends]
 verify_jwt = false
@@ -178,7 +178,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.reset-client-password]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-report]
 verify_jwt = true

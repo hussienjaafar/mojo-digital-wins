@@ -22,9 +22,14 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { user_id }: ResetPasswordRequest = await req.json();
-    
-    console.log("Initiating password reset for user:", user_id);
+    // Extract and validate the Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header", success: false }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
@@ -32,6 +37,70 @@ const handler = async (req: Request): Promise<Response> => {
         persistSession: false
       }
     });
+
+    // Create a user-scoped client to verify the caller's identity
+    const supabaseUser = createClient(
+      SUPABASE_URL,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      {
+        global: { headers: { Authorization: authHeader } },
+        auth: { autoRefreshToken: false, persistSession: false }
+      }
+    );
+
+    // Get the authenticated user
+    const { data: { user: callerUser }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !callerUser) {
+      console.error("Auth error:", userError);
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired token", success: false }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const { user_id }: ResetPasswordRequest = await req.json();
+    
+    console.log("Initiating password reset for user:", user_id, "requested by:", callerUser.id);
+
+    // Get target user's organization
+    const { data: targetUser } = await supabaseAdmin
+      .from('client_users')
+      .select('organization_id')
+      .eq('id', user_id)
+      .single();
+
+    // Verify the caller is authorized to reset this user's password
+    const { data: callerClientUser } = await supabaseAdmin
+      .from('client_users')
+      .select('role, organization_id')
+      .eq('id', callerUser.id)
+      .single();
+
+    // Check if caller is a system admin
+    const { data: isSystemAdmin } = await supabaseAdmin.rpc('has_role', {
+      _user_id: callerUser.id,
+      _role: 'admin'
+    });
+
+    if (!isSystemAdmin) {
+      // Must be a client admin/manager in the same organization
+      if (!callerClientUser) {
+        return new Response(
+          JSON.stringify({ error: "You are not authorized to reset passwords", success: false }),
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      const canManageUsers = ['admin', 'manager'].includes(callerClientUser.role);
+      const sameOrg = targetUser && callerClientUser.organization_id === targetUser.organization_id;
+
+      if (!canManageUsers || !sameOrg) {
+        return new Response(
+          JSON.stringify({ error: "You can only reset passwords for users in your own organization", success: false }),
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+    }
 
     // Get user details
     const { data: authUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(user_id);
