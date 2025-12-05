@@ -14,6 +14,8 @@ import MetaPixel from "@/components/MetaPixel";
 import { ExitIntentPopup } from "@/components/ExitIntentPopup";
 import { useSmoothScroll } from "@/hooks/useSmoothScroll";
 import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
+import { MaintenanceProvider } from "@/contexts/MaintenanceContext";
+import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 // Eagerly loaded pages (critical path)
@@ -124,15 +126,18 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="light" storageKey="molitico-ui-theme">
-      <ImpersonationProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
-        </TooltipProvider>
-      </ImpersonationProvider>
+      <MaintenanceProvider>
+        <ImpersonationProvider>
+          <TooltipProvider>
+            <MaintenanceBanner />
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </TooltipProvider>
+        </ImpersonationProvider>
+      </MaintenanceProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
