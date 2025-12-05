@@ -33,8 +33,11 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ organizationId }: AppSidebarProps) {
-  const { state } = useSidebar();
+  const { state, isMobile, openMobile } = useSidebar();
   const location = useLocation();
+  
+  // On mobile, always show labels when sidebar sheet is open
+  const isCollapsed = isMobile ? false : state === "collapsed";
   const [stats, setStats] = useState({
     alerts: 0,
     actions: 0,
@@ -95,8 +98,6 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
       ],
     },
   ];
-
-  const isCollapsed = state === "collapsed";
 
   return (
     <Sidebar collapsible="icon" role="navigation" aria-label="Main navigation" className="portal-sidebar">
