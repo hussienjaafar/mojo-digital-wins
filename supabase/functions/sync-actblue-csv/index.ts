@@ -352,15 +352,41 @@ serve(async (req) => {
       }
 
       // Determine date range
-      let syncStartDate = start_date;
       let syncEndDate = end_date || new Date().toISOString().split('T')[0];
+      let syncStartDate = start_date;
+      
+      // Generate date ranges (ActBlue API only allows 6-month chunks)
+      const dateRanges: { start: string; end: string }[] = [];
       
       if (!syncStartDate) {
         if (mode === 'backfill') {
-          // For backfill, go back 1 year
+          // For backfill, go back 1 year but in 6-month chunks
+          const now = new Date();
           const oneYearAgo = new Date();
           oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-          syncStartDate = oneYearAgo.toISOString().split('T')[0];
+          
+          // Create 6-month chunks
+          let chunkEnd = new Date(now);
+          while (chunkEnd > oneYearAgo) {
+            const chunkStart = new Date(chunkEnd);
+            chunkStart.setMonth(chunkStart.getMonth() - 5); // 5 months back (inclusive = ~6 months)
+            chunkStart.setDate(1); // Start of month to be safe
+            
+            if (chunkStart < oneYearAgo) {
+              chunkStart.setTime(oneYearAgo.getTime());
+            }
+            
+            dateRanges.push({
+              start: chunkStart.toISOString().split('T')[0],
+              end: chunkEnd.toISOString().split('T')[0]
+            });
+            
+            // Move to previous chunk
+            chunkEnd = new Date(chunkStart);
+            chunkEnd.setDate(chunkEnd.getDate() - 1);
+          }
+          
+          console.log(`Backfill: Created ${dateRanges.length} date range chunks`);
         } else {
           // For incremental, use last sync date or last 24 hours
           if (cred.last_sync_at) {
@@ -370,166 +396,201 @@ serve(async (req) => {
             yesterday.setDate(yesterday.getDate() - 1);
             syncStartDate = yesterday.toISOString().split('T')[0];
           }
+          dateRanges.push({ start: syncStartDate, end: syncEndDate });
+        }
+      } else {
+        // Custom date range provided - check if it exceeds 6 months
+        const startDateObj = new Date(syncStartDate);
+        const endDateObj = new Date(syncEndDate);
+        const monthsDiff = (endDateObj.getFullYear() - startDateObj.getFullYear()) * 12 + 
+                          (endDateObj.getMonth() - startDateObj.getMonth());
+        
+        if (monthsDiff > 5) {
+          // Split into chunks
+          let chunkEnd = new Date(endDateObj);
+          while (chunkEnd > startDateObj) {
+            const chunkStart = new Date(chunkEnd);
+            chunkStart.setMonth(chunkStart.getMonth() - 5);
+            
+            if (chunkStart < startDateObj) {
+              chunkStart.setTime(startDateObj.getTime());
+            }
+            
+            dateRanges.push({
+              start: chunkStart.toISOString().split('T')[0],
+              end: chunkEnd.toISOString().split('T')[0]
+            });
+            
+            chunkEnd = new Date(chunkStart);
+            chunkEnd.setDate(chunkEnd.getDate() - 1);
+          }
+        } else {
+          dateRanges.push({ start: syncStartDate, end: syncEndDate });
         }
       }
 
-      console.log(`Syncing ActBlue for org ${orgId}: ${syncStartDate} to ${syncEndDate} (${mode} mode)`);
+      console.log(`Syncing ActBlue for org ${orgId}: ${dateRanges.length} date range(s) (${mode} mode)`);
 
       let totalProcessed = 0;
       let totalInserted = 0;
       let totalSkipped = 0;
       let totalUpdated = 0;
-      let offset = 0;
-      const batchSize = 1000;
 
       try {
-        let hasMore = true;
-        
-        while (hasMore) {
-          const { rows, hasMore: more } = await fetchActBlueCSV(
-            config.username,
-            config.password,
-            config.entity_id,
-            syncStartDate,
-            syncEndDate,
-            offset,
-            batchSize
-          );
+        // Process each date range chunk
+        for (const dateRange of dateRanges) {
+          console.log(`Processing chunk: ${dateRange.start} to ${dateRange.end}`);
           
-          hasMore = more;
-          offset += batchSize;
+          let offset = 0;
+          const batchSize = 1000;
+          let hasMore = true;
           
-          for (const row of rows) {
-            totalProcessed++;
+          while (hasMore) {
+            const { rows, hasMore: more } = await fetchActBlueCSV(
+              config.username,
+              config.password,
+              config.entity_id,
+              dateRange.start,
+              dateRange.end,
+              offset,
+              batchSize
+            );
+          
+            hasMore = more;
+            offset += batchSize;
+          
+            for (const row of rows) {
+              totalProcessed++;
             
-            // Skip if no lineitem_id
-            if (!row.lineitem_id) {
-              totalSkipped++;
-              continue;
-            }
-
-            // Determine transaction type
-            let transactionType = 'donation';
-            if (row.refund_id && row.refund_date) {
-              transactionType = 'refund';
-            }
-
-            // Extract source campaign from refcode
-            let sourceCampaign = null;
-            const refcode = row.reference_code || '';
-            if (refcode) {
-              const lowerRefcode = refcode.toLowerCase();
-              if (lowerRefcode.includes('meta')) sourceCampaign = 'meta';
-              else if (lowerRefcode.includes('sms')) sourceCampaign = 'sms';
-              else if (lowerRefcode.includes('email')) sourceCampaign = 'email';
-            }
-
-            // Build donor name
-            const donorName = row.donor_firstname && row.donor_lastname
-              ? `${row.donor_firstname} ${row.donor_lastname}`.trim()
-              : null;
-
-            // Check if transaction exists
-            const { data: existing } = await supabase
-              .from('actblue_transactions')
-              .select('id, transaction_type')
-              .eq('transaction_id', row.lineitem_id)
-              .eq('organization_id', orgId)
-              .maybeSingle();
-
-            const transactionData = {
-              organization_id: orgId,
-              transaction_id: row.lineitem_id,
-              donor_email: row.donor_email || null,
-              donor_name: donorName,
-              first_name: row.donor_firstname || null,
-              last_name: row.donor_lastname || null,
-              addr1: row.donor_addr1 || null,
-              city: row.donor_city || null,
-              state: row.donor_state || null,
-              zip: row.donor_zip || null,
-              country: row.donor_country || null,
-              phone: row.donor_phone || null,
-              employer: row.donor_employer || null,
-              occupation: row.donor_occupation || null,
-              amount: parseFloat(row.amount) || 0,
-              order_number: row.payment_id || null,
-              contribution_form: row.fundraising_page || null,
-              refcode: row.reference_code || null,
-              refcode2: row.reference_code_2 || null,
-              source_campaign: sourceCampaign,
-              ab_test_name: row.ab_test_name || null,
-              ab_test_variation: row.ab_variation || null,
-              is_mobile: row.mobile === 'true' || row.mobile === '1',
-              is_express: row.actblue_express_lane === 'true' || row.actblue_express_lane === '1',
-              text_message_option: row.text_message_option || null,
-              lineitem_id: parseInt(row.lineitem_id) || null,
-              entity_id: row.entity_id || config.entity_id,
-              committee_name: row.recipient || null,
-              fec_id: row.fec_id || null,
-              recurring_period: row.recurring_total_months ? 'monthly' : null,
-              recurring_duration: parseInt(row.recurring_total_months) || null,
-              is_recurring: !!row.recurring_total_months,
-              transaction_type: transactionType,
-              transaction_date: row.paid_at || row.date,
-            };
-
-            if (existing) {
-              // Update if transaction type changed (e.g., donation -> refund)
-              if (existing.transaction_type !== transactionType) {
-                await supabase
-                  .from('actblue_transactions')
-                  .update({ transaction_type: transactionType })
-                  .eq('id', existing.id);
-                totalUpdated++;
-              } else {
+              // Skip if no lineitem_id
+              if (!row.lineitem_id) {
                 totalSkipped++;
+                continue;
               }
-            } else {
-              // Insert new transaction
-              const { error: insertError } = await supabase
-                .from('actblue_transactions')
-                .insert(transactionData);
 
-              if (insertError) {
-                if (insertError.code === '23505') {
-                  // Duplicate - skip
-                  totalSkipped++;
+              // Determine transaction type
+              let transactionType = 'donation';
+              if (row.refund_id && row.refund_date) {
+                transactionType = 'refund';
+              }
+
+              // Extract source campaign from refcode
+              let sourceCampaign = null;
+              const refcode = row.reference_code || '';
+              if (refcode) {
+                const lowerRefcode = refcode.toLowerCase();
+                if (lowerRefcode.includes('meta')) sourceCampaign = 'meta';
+                else if (lowerRefcode.includes('sms')) sourceCampaign = 'sms';
+                else if (lowerRefcode.includes('email')) sourceCampaign = 'email';
+              }
+
+              // Build donor name
+              const donorName = row.donor_firstname && row.donor_lastname
+                ? `${row.donor_firstname} ${row.donor_lastname}`.trim()
+                : null;
+
+              // Check if transaction exists
+              const { data: existing } = await supabase
+                .from('actblue_transactions')
+                .select('id, transaction_type')
+                .eq('transaction_id', row.lineitem_id)
+                .eq('organization_id', orgId)
+                .maybeSingle();
+
+              const transactionData = {
+                organization_id: orgId,
+                transaction_id: row.lineitem_id,
+                donor_email: row.donor_email || null,
+                donor_name: donorName,
+                first_name: row.donor_firstname || null,
+                last_name: row.donor_lastname || null,
+                addr1: row.donor_addr1 || null,
+                city: row.donor_city || null,
+                state: row.donor_state || null,
+                zip: row.donor_zip || null,
+                country: row.donor_country || null,
+                phone: row.donor_phone || null,
+                employer: row.donor_employer || null,
+                occupation: row.donor_occupation || null,
+                amount: parseFloat(row.amount) || 0,
+                order_number: row.payment_id || null,
+                contribution_form: row.fundraising_page || null,
+                refcode: row.reference_code || null,
+                refcode2: row.reference_code_2 || null,
+                source_campaign: sourceCampaign,
+                ab_test_name: row.ab_test_name || null,
+                ab_test_variation: row.ab_variation || null,
+                is_mobile: row.mobile === 'true' || row.mobile === '1',
+                is_express: row.actblue_express_lane === 'true' || row.actblue_express_lane === '1',
+                text_message_option: row.text_message_option || null,
+                lineitem_id: parseInt(row.lineitem_id) || null,
+                entity_id: row.entity_id || config.entity_id,
+                committee_name: row.recipient || null,
+                fec_id: row.fec_id || null,
+                recurring_period: row.recurring_total_months ? 'monthly' : null,
+                recurring_duration: parseInt(row.recurring_total_months) || null,
+                is_recurring: !!row.recurring_total_months,
+                transaction_type: transactionType,
+                transaction_date: row.paid_at || row.date,
+              };
+
+              if (existing) {
+                // Update if transaction type changed (e.g., donation -> refund)
+                if (existing.transaction_type !== transactionType) {
+                  await supabase
+                    .from('actblue_transactions')
+                    .update({ transaction_type: transactionType })
+                    .eq('id', existing.id);
+                  totalUpdated++;
                 } else {
-                  console.error('Insert error:', insertError);
+                  totalSkipped++;
                 }
               } else {
-                totalInserted++;
+                // Insert new transaction
+                const { error: insertError } = await supabase
+                  .from('actblue_transactions')
+                  .insert(transactionData);
 
-                // Update donor demographics for new transactions
-                if (row.donor_email) {
-                  await supabase.from('donor_demographics')
-                    .upsert({
-                      organization_id: orgId,
-                      donor_email: row.donor_email,
-                      first_name: row.donor_firstname || null,
-                      last_name: row.donor_lastname || null,
-                      address: row.donor_addr1 || null,
-                      city: row.donor_city || null,
-                      state: row.donor_state || null,
-                      zip: row.donor_zip || null,
-                      country: row.donor_country || null,
-                      phone: row.donor_phone || null,
-                      employer: row.donor_employer || null,
-                      occupation: row.donor_occupation || null,
-                      last_donation_date: row.paid_at || row.date,
-                    }, {
-                      onConflict: 'organization_id,donor_email',
-                      ignoreDuplicates: false,
-                    });
+                if (insertError) {
+                  if (insertError.code === '23505') {
+                    // Duplicate - skip
+                    totalSkipped++;
+                  } else {
+                    console.error('Insert error:', insertError);
+                  }
+                } else {
+                  totalInserted++;
+
+                  // Update donor demographics for new transactions
+                  if (row.donor_email) {
+                    await supabase.from('donor_demographics')
+                      .upsert({
+                        organization_id: orgId,
+                        donor_email: row.donor_email,
+                        first_name: row.donor_firstname || null,
+                        last_name: row.donor_lastname || null,
+                        address: row.donor_addr1 || null,
+                        city: row.donor_city || null,
+                        state: row.donor_state || null,
+                        zip: row.donor_zip || null,
+                        country: row.donor_country || null,
+                        phone: row.donor_phone || null,
+                        employer: row.donor_employer || null,
+                        occupation: row.donor_occupation || null,
+                        last_donation_date: row.paid_at || row.date,
+                      }, {
+                        onConflict: 'organization_id,donor_email',
+                        ignoreDuplicates: false,
+                      });
+                  }
                 }
               }
             }
-          }
           
-          // Add delay between batches to avoid rate limiting
-          if (hasMore) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Add delay between batches to avoid rate limiting
+            if (hasMore) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
           }
         }
 
@@ -549,7 +610,11 @@ serve(async (req) => {
           inserted: totalInserted,
           updated: totalUpdated,
           skipped: totalSkipped,
-          date_range: { start: syncStartDate, end: syncEndDate },
+          date_range: { 
+            start: dateRanges[dateRanges.length - 1]?.start || 'unknown', 
+            end: dateRanges[0]?.end || 'unknown' 
+          },
+          chunks_processed: dateRanges.length,
         });
 
         console.log(`Sync complete for org ${orgId}: ${totalInserted} inserted, ${totalUpdated} updated, ${totalSkipped} skipped`);
