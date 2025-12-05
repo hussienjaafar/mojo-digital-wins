@@ -7,9 +7,9 @@ interface MaintenanceContextType {
 }
 
 const MaintenanceContext = createContext<MaintenanceContextType>({
-  isMaintenanceMode: true, // Default to true during cleanup
+  isMaintenanceMode: false,
   setMaintenanceMode: () => {},
-  maintenanceMessage: 'Database maintenance in progress. Some features may be temporarily unavailable.',
+  maintenanceMessage: '',
 });
 
 export const useMaintenanceMode = () => useContext(MaintenanceContext);
@@ -17,7 +17,7 @@ export const useMaintenanceMode = () => useContext(MaintenanceContext);
 export const MaintenanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMaintenanceMode, setMaintenanceMode] = useState(() => {
     const stored = localStorage.getItem('maintenanceMode');
-    return stored === null ? true : stored === 'true'; // Default to true
+    return stored === 'true'; // Default to false (maintenance off)
   });
 
   const maintenanceMessage = 'Database maintenance in progress. Some features may be temporarily unavailable.';
