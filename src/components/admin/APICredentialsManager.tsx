@@ -4,14 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Key, Plus, CheckCircle2, XCircle, RefreshCw, Settings } from "lucide-react";
+import { Key, Plus, CheckCircle2, XCircle, RefreshCw, Settings, Pencil, Trash2, Play, Loader2, AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 type Organization = {
   id: string;
@@ -26,6 +26,7 @@ type APICredential = {
   last_sync_at: string | null;
   last_sync_status: string | null;
   created_at: string;
+  encrypted_credentials?: any;
 };
 
 type PlatformConfig = {
@@ -56,6 +57,9 @@ const APICredentialsManager = () => {
   const [selectedOrg, setSelectedOrg] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState<'meta' | 'switchboard' | 'actblue'>('meta');
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({});
+  const [editingCredential, setEditingCredential] = useState<APICredential | null>(null);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -119,12 +123,10 @@ const APICredentialsManager = () => {
 
       toast({
         title: "Success",
-        description: "API credentials saved successfully",
+        description: editingCredential ? "API credentials updated" : "API credentials saved",
       });
 
-      setShowCreateDialog(false);
-      setPlatformConfig({});
-      setSelectedOrg("");
+      handleCloseDialog();
       loadData();
     } catch (error: any) {
       toast({
@@ -135,20 +137,132 @@ const APICredentialsManager = () => {
     }
   };
 
-  const testConnection = async (credentialId: string, platform: string) => {
-    toast({
-      title: "Testing Connection",
-      description: `Testing ${platform} API connection...`,
-    });
+  const handleCloseDialog = () => {
+    setShowCreateDialog(false);
+    setEditingCredential(null);
+    setPlatformConfig({});
+    setSelectedOrg("");
+    setSelectedPlatform('meta');
+  };
+
+  const handleEditCredential = (cred: APICredential) => {
+    setEditingCredential(cred);
+    setSelectedOrg(cred.organization_id);
+    setSelectedPlatform(cred.platform as any);
     
-    // This would call an edge function to test the connection
-    // For now, just show a placeholder message
-    setTimeout(() => {
+    // Pre-populate with existing credentials (masked values as placeholders)
+    if (cred.encrypted_credentials) {
+      setPlatformConfig({
+        [cred.platform]: cred.encrypted_credentials
+      } as PlatformConfig);
+    }
+    
+    setShowCreateDialog(true);
+  };
+
+  const handleDeleteCredential = async (id: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('client_api_credentials')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
       toast({
-        title: "Coming Soon",
-        description: "Connection testing will be implemented with sync functions",
+        title: "Success",
+        description: "Credentials deleted successfully",
       });
-    }, 1000);
+
+      loadData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete credentials",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const testConnection = async (cred: APICredential) => {
+    setTestingId(cred.id);
+    
+    try {
+      let endpoint = '';
+      switch (cred.platform) {
+        case 'meta':
+          endpoint = 'admin-sync-meta';
+          break;
+        case 'switchboard':
+          endpoint = 'sync-switchboard-sms';
+          break;
+        case 'actblue':
+          endpoint = 'sync-actblue-csv';
+          break;
+      }
+
+      const { data, error } = await supabase.functions.invoke(endpoint, {
+        body: { 
+          organization_id: cred.organization_id,
+          test_only: true 
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Connection Successful",
+        description: `${cred.platform} API connection is working`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Connection Failed",
+        description: error.message || `Unable to connect to ${cred.platform} API`,
+        variant: "destructive",
+      });
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  const triggerSync = async (cred: APICredential) => {
+    setSyncingId(cred.id);
+    
+    try {
+      let endpoint = '';
+      switch (cred.platform) {
+        case 'meta':
+          endpoint = 'admin-sync-meta';
+          break;
+        case 'switchboard':
+          endpoint = 'sync-switchboard-sms';
+          break;
+        case 'actblue':
+          endpoint = 'sync-actblue-csv';
+          break;
+      }
+
+      const { data, error } = await supabase.functions.invoke(endpoint, {
+        body: { organization_id: cred.organization_id }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Sync Complete",
+        description: data?.message || `${cred.platform} data synced successfully`,
+      });
+
+      loadData();
+    } catch (error: any) {
+      toast({
+        title: "Sync Failed",
+        description: error.message || `Failed to sync ${cred.platform} data`,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingId(null);
+    }
   };
 
   const toggleActive = async (id: string, currentStatus: boolean) => {
@@ -186,6 +300,34 @@ const APICredentialsManager = () => {
       actblue: "💙",
     };
     return icons[platform] || "🔑";
+  };
+
+  const getSyncStatusBadge = (status: string | null) => {
+    if (status === 'success') {
+      return (
+        <Badge variant="outline" className="gap-1 text-green-600 border-green-200 bg-green-50">
+          <CheckCircle2 className="w-3 h-3" />
+          Success
+        </Badge>
+      );
+    }
+    if (status === 'error') {
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <XCircle className="w-3 h-3" />
+          Error
+        </Badge>
+      );
+    }
+    if (status === 'running') {
+      return (
+        <Badge variant="secondary" className="gap-1">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Running
+        </Badge>
+      );
+    }
+    return <span className="text-muted-foreground">-</span>;
   };
 
   if (isLoading) {
@@ -230,7 +372,10 @@ const APICredentialsManager = () => {
               Manage API credentials for Meta, Switchboard, and ActBlue
             </CardDescription>
           </div>
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <Dialog open={showCreateDialog} onOpenChange={(open) => {
+            if (!open) handleCloseDialog();
+            else setShowCreateDialog(true);
+          }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
@@ -239,15 +384,23 @@ const APICredentialsManager = () => {
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Configure API Credentials</DialogTitle>
+                <DialogTitle>
+                  {editingCredential ? 'Edit API Credentials' : 'Configure API Credentials'}
+                </DialogTitle>
                 <DialogDescription>
-                  Add or update API credentials for a client organization
+                  {editingCredential 
+                    ? 'Update API credentials for this integration' 
+                    : 'Add or update API credentials for a client organization'}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSaveCredentials} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="organization">Organization *</Label>
-                  <Select value={selectedOrg} onValueChange={setSelectedOrg} required>
+                  <Select 
+                    value={selectedOrg} 
+                    onValueChange={setSelectedOrg} 
+                    disabled={!!editingCredential}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select organization" />
                     </SelectTrigger>
@@ -261,11 +414,20 @@ const APICredentialsManager = () => {
                   </Select>
                 </div>
 
-                <Tabs value={selectedPlatform} onValueChange={(v) => setSelectedPlatform(v as any)}>
+                <Tabs 
+                  value={selectedPlatform} 
+                  onValueChange={(v) => setSelectedPlatform(v as any)}
+                >
                   <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="meta">Meta Ads</TabsTrigger>
-                    <TabsTrigger value="switchboard">Switchboard</TabsTrigger>
-                    <TabsTrigger value="actblue">ActBlue</TabsTrigger>
+                    <TabsTrigger value="meta" disabled={!!editingCredential && editingCredential.platform !== 'meta'}>
+                      Meta Ads
+                    </TabsTrigger>
+                    <TabsTrigger value="switchboard" disabled={!!editingCredential && editingCredential.platform !== 'switchboard'}>
+                      Switchboard
+                    </TabsTrigger>
+                    <TabsTrigger value="actblue" disabled={!!editingCredential && editingCredential.platform !== 'actblue'}>
+                      ActBlue
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="meta" className="space-y-4">
@@ -450,12 +612,14 @@ const APICredentialsManager = () => {
                   </TabsContent>
                 </Tabs>
 
-                <div className="flex gap-2 justify-end pt-4">
-                  <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                <DialogFooter className="pt-4">
+                  <Button type="button" variant="outline" onClick={handleCloseDialog}>
                     Cancel
                   </Button>
-                  <Button type="submit">Save Credentials</Button>
-                </div>
+                  <Button type="submit">
+                    {editingCredential ? 'Update Credentials' : 'Save Credentials'}
+                  </Button>
+                </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
@@ -476,8 +640,15 @@ const APICredentialsManager = () => {
           <TableBody>
             {credentials.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  No API credentials configured yet
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <div className="flex flex-col items-center gap-2">
+                    <Key className="w-8 h-8 opacity-50" />
+                    <p>No API credentials configured yet</p>
+                    <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add your first integration
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -503,37 +674,97 @@ const APICredentialsManager = () => {
                       : 'Never'}
                   </TableCell>
                   <TableCell>
-                    {cred.last_sync_status === 'success' && (
-                      <Badge variant="outline" className="gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Success
-                      </Badge>
-                    )}
-                    {cred.last_sync_status === 'error' && (
-                      <Badge variant="destructive" className="gap-1">
-                        <XCircle className="w-3 h-3" />
-                        Error
-                      </Badge>
-                    )}
-                    {!cred.last_sync_status && '-'}
+                    {getSyncStatusBadge(cred.last_sync_status)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex gap-2 justify-end">
+                    <div className="flex gap-1 justify-end flex-wrap">
+                      {/* Sync Now Button */}
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => triggerSync(cred)}
+                        disabled={syncingId === cred.id || !cred.is_active}
+                        title="Sync data now"
+                      >
+                        {syncingId === cred.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Play className="w-3 h-3" />
+                        )}
+                        <span className="ml-1 hidden sm:inline">Sync</span>
+                      </Button>
+
+                      {/* Test Connection Button */}
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => testConnection(cred.id, cred.platform)}
+                        onClick={() => testConnection(cred)}
+                        disabled={testingId === cred.id}
+                        title="Test API connection"
                       >
-                        <RefreshCw className="w-3 h-3 mr-1" />
-                        Test
+                        {testingId === cred.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3 h-3" />
+                        )}
+                        <span className="ml-1 hidden sm:inline">Test</span>
                       </Button>
+
+                      {/* Edit Button */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEditCredential(cred)}
+                        title="Edit credentials"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        <span className="ml-1 hidden sm:inline">Edit</span>
+                      </Button>
+
+                      {/* Toggle Active Button */}
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => toggleActive(cred.id, cred.is_active)}
+                        title={cred.is_active ? "Deactivate" : "Activate"}
                       >
                         {cred.is_active ? "Deactivate" : "Activate"}
                       </Button>
+
+                      {/* Delete Button */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            title="Delete credentials"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="flex items-center gap-2">
+                              <AlertTriangle className="w-5 h-5 text-destructive" />
+                              Delete API Credentials?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete the {cred.platform} credentials for{' '}
+                              <strong>{getOrganizationName(cred.organization_id)}</strong>.
+                              This action cannot be undone and will stop data syncing for this integration.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteCredential(cred.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>

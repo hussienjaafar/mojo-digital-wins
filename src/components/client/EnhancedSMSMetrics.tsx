@@ -83,16 +83,18 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Aggregate metrics by campaign
+  // Aggregate metrics by campaign - works with sms_campaigns table
   const aggregatedMetrics = useMemo(() => {
     const aggregated: Record<string, AggregatedMetric> = {};
     
     smsMetrics.forEach(metric => {
-      const key = metric.campaign_id;
+      const key = metric.campaign_id || metric.id;
+      if (!key) return;
+      
       if (!aggregated[key]) {
         aggregated[key] = {
-          campaign_id: metric.campaign_id,
-          campaign_name: metric.campaign_name || metric.campaign_id,
+          campaign_id: key,
+          campaign_name: metric.campaign_name || metric.message_text?.substring(0, 50) || key,
           messages_sent: 0,
           messages_delivered: 0,
           messages_failed: 0,
@@ -108,16 +110,16 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
           bounce_rate: 0,
           cost_per_conversion: 0,
           time_to_conversion: 0,
-          audience_segment: metric.audience_segment || "General",
-          a_b_test_variant: metric.a_b_test_variant || "",
+          audience_segment: metric.phone_list_name || "General",
+          a_b_test_variant: "",
         };
       }
       
       const agg = aggregated[key];
       agg.messages_sent += metric.messages_sent || 0;
       agg.messages_delivered += metric.messages_delivered || 0;
-      agg.messages_failed += metric.messages_failed || 0;
-      agg.opt_outs += metric.opt_outs || 0;
+      agg.messages_failed += metric.messages_failed || metric.skipped || 0;
+      agg.opt_outs += metric.opt_outs || metric.previously_opted_out || 0;
       agg.clicks += metric.clicks || 0;
       agg.conversions += metric.conversions || 0;
       agg.amount_raised += Number(metric.amount_raised || 0);
@@ -211,38 +213,43 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
     },
   ];
 
-  // Time series data for trends
+  // Time series data for trends - use send_date from sms_campaigns
   const timeSeriesData = useMemo(() => {
     const dataByDate: Record<string, any> = {};
     
     smsMetrics.forEach(metric => {
-      const dateKey = metric.date;
+      // Use send_date from sms_campaigns table, fallback to date for backwards compat
+      const dateKey = metric.send_date 
+        ? format(new Date(metric.send_date), 'yyyy-MM-dd')
+        : metric.date || '';
+      if (!dateKey) return;
+      
       if (!dataByDate[dateKey]) {
         dataByDate[dateKey] = {
           date: dateKey,
-          delivery_rate: 0,
-          opt_out_rate: 0,
-          conversion_rate: 0,
-          cost_per_conversion: 0,
+          messages_sent: 0,
+          messages_delivered: 0,
+          clicks: 0,
+          conversions: 0,
+          amount_raised: 0,
           count: 0,
         };
       }
       
       const data = dataByDate[dateKey];
-      if (metric.delivery_rate) data.delivery_rate += metric.delivery_rate;
-      if (metric.opt_out_rate) data.opt_out_rate += metric.opt_out_rate;
-      if (metric.conversion_rate) data.conversion_rate += metric.conversion_rate;
-      if (metric.cost_per_conversion) data.cost_per_conversion += metric.cost_per_conversion;
+      data.messages_sent += metric.messages_sent || 0;
+      data.messages_delivered += metric.messages_delivered || 0;
+      data.clicks += metric.clicks || 0;
+      data.conversions += metric.conversions || 0;
+      data.amount_raised += Number(metric.amount_raised || 0);
       data.count++;
     });
 
     return Object.values(dataByDate)
       .map(d => ({
         ...d,
-        delivery_rate: d.count > 0 ? d.delivery_rate / d.count : 0,
-        opt_out_rate: d.count > 0 ? d.opt_out_rate / d.count : 0,
-        conversion_rate: d.count > 0 ? d.conversion_rate / d.count : 0,
-        cost_per_conversion: d.count > 0 ? d.cost_per_conversion / d.count : 0,
+        delivery_rate: d.messages_sent > 0 ? (d.messages_delivered / d.messages_sent) * 100 : 0,
+        conversion_rate: d.clicks > 0 ? (d.conversions / d.clicks) * 100 : 0,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [smsMetrics]);

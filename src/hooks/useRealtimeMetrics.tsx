@@ -32,12 +32,12 @@ export function useRealtimeMetrics(organizationId: string, startDate: string, en
             .order('date', { ascending: false }),
           
           supabase
-            .from('sms_campaign_metrics')
+            .from('sms_campaigns')
             .select('*')
             .eq('organization_id', organizationId)
-            .gte('date', startDate)
-            .lte('date', endDate)
-            .order('date', { ascending: false }),
+            .gte('send_date', startDate)
+            .lte('send_date', endDate)
+            .order('send_date', { ascending: false }),
           
           supabase
             .from('actblue_transactions')
@@ -93,11 +93,11 @@ export function useRealtimeMetrics(organizationId: string, startDate: string, en
         {
           event: '*',
           schema: 'public',
-          table: 'sms_campaign_metrics',
+          table: 'sms_campaigns',
           filter: `organization_id=eq.${organizationId}`,
         },
         (payload: MetricsUpdate) => {
-          logger.info('SMS metrics update received');
+          logger.info('SMS campaigns update received');
           handleSmsUpdate(payload);
         }
       )
