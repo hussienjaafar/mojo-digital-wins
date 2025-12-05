@@ -66,13 +66,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get webhook signature for validation
-    const signature = req.headers.get('x-actblue-signature');
+    // Get Basic Auth credentials from request
+    const authHeader = req.headers.get('Authorization');
     const requestBody = await req.text();
 
-    if (Deno.env.get('ENVIRONMENT') === 'development') {
-      console.log('Received ActBlue webhook');
-    }
+    console.log('Received ActBlue webhook');
 
     // Parse and validate payload
     let payload;
@@ -136,16 +134,31 @@ serve(async (req) => {
     const organization_id = matchingCred.organization_id;
     const credentials = matchingCred.encrypted_credentials as any;
 
-    // Validate webhook signature
-    if (signature && credentials.webhook_secret) {
-      // In production, implement proper HMAC validation
-      if (Deno.env.get('ENVIRONMENT') === 'development') {
-        console.log('Webhook signature validation would happen here');
+    // Validate Basic Auth credentials (ActBlue uses HTTP Basic Auth, not signing secrets)
+    if (authHeader && authHeader.startsWith('Basic ')) {
+      const base64Credentials = authHeader.substring(6);
+      try {
+        const decodedCredentials = atob(base64Credentials);
+        const [providedUsername, providedPassword] = decodedCredentials.split(':');
+        
+        // Check if credentials match what we have stored
+        if (credentials.webhook_username && credentials.webhook_password) {
+          if (providedUsername !== credentials.webhook_username || 
+              providedPassword !== credentials.webhook_password) {
+            console.error('Invalid Basic Auth credentials');
+            return new Response(
+              JSON.stringify({ error: 'Unauthorized' }),
+              { 
+                status: 401,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+          console.log('Basic Auth credentials validated successfully');
+        }
+      } catch (e) {
+        console.error('Error decoding Basic Auth credentials:', e);
       }
-      // const isValid = validateSignature(requestBody, signature, credentials.webhook_secret);
-      // if (!isValid) {
-      //   throw new Error('Invalid webhook signature');
-      // }
     }
 
     // Determine transaction type
