@@ -544,7 +544,7 @@ serve(async (req) => {
               // Check if transaction exists
               const { data: existing } = await supabase
                 .from('actblue_transactions')
-                .select('id, transaction_type')
+                .select('id, transaction_type, first_name, last_name, donor_name')
                 .eq('transaction_id', row.lineitem_id)
                 .eq('organization_id', orgId)
                 .maybeSingle();
@@ -587,11 +587,28 @@ serve(async (req) => {
               };
 
               if (existing) {
-                // Update if transaction type changed (e.g., donation -> refund)
+                // Update existing record with donor info if missing, and transaction type if changed
+                const updateFields: any = {};
+                
+                // Always update donor names if we have them and existing record doesn't
+                if (firstName && !existing.first_name) updateFields.first_name = firstName;
+                if (lastName && !existing.last_name) updateFields.last_name = lastName;
+                if (firstName || lastName) {
+                  const newDonorName = firstName && lastName 
+                    ? `${firstName} ${lastName}`.trim() 
+                    : (firstName || lastName || null);
+                  if (newDonorName && !existing.donor_name) updateFields.donor_name = newDonorName;
+                }
+                
+                // Update transaction type if changed
                 if (existing.transaction_type !== transactionType) {
+                  updateFields.transaction_type = transactionType;
+                }
+                
+                if (Object.keys(updateFields).length > 0) {
                   await supabase
                     .from('actblue_transactions')
-                    .update({ transaction_type: transactionType })
+                    .update(updateFields)
                     .eq('id', existing.id);
                   totalUpdated++;
                 } else {
