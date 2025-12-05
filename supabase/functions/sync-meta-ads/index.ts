@@ -190,8 +190,10 @@ serve(async (req) => {
       .eq('organization_id', organization_id)
       .not('meta_campaign_id', 'is', null);
 
-    // Track creative insights synced
+    // Track creative insights synced and data freshness
     let creativesProcessed = 0;
+    let totalInsightRecords = 0;
+    let latestDataDate: string | null = null;
 
     // Fetch insights and creatives for each campaign
     for (const campaign of campaigns) {
@@ -373,11 +375,36 @@ serve(async (req) => {
 
       const insights = insightsData.data || [];
       
+      // Log data freshness for debugging
+      if (insights.length === 0) {
+        console.warn(`[DATA FRESHNESS] Campaign ${campaign.id} (${campaign.name}): No insights returned for date range ${dateRanges.since} to ${dateRanges.until}`);
+      } else {
+        const dates = insights.map((i: any) => i.date_start).sort();
+        const latestDate = dates[dates.length - 1];
+        const expectedEndDate = dateRanges.until;
+        console.log(`[DATA FRESHNESS] Campaign ${campaign.id} (${campaign.name}): ${insights.length} days of data, latest: ${latestDate}, expected: ${expectedEndDate}`);
+        
+        // Warn if data is more than 2 days behind expected end date
+        const latestDateObj = new Date(latestDate);
+        const expectedDateObj = new Date(expectedEndDate);
+        const daysBehind = Math.floor((expectedDateObj.getTime() - latestDateObj.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysBehind > 2) {
+          console.warn(`[DATA GAP] Campaign ${campaign.id}: Data is ${daysBehind} days behind expected date. Meta API may have reporting delay or campaign is paused.`);
+        }
+      }
+      
       // Find attribution mapping for this campaign
       const mapping = attributionMappings?.find(m => m.meta_campaign_id === campaign.id);
       
       // Store daily metrics
       for (const insight of insights) {
+        totalInsightRecords++;
+        
+        // Track latest data date
+        if (!latestDataDate || insight.date_start > latestDataDate) {
+          latestDataDate = insight.date_start;
+        }
+        
         // Extract conversions from actions
         let conversions = 0;
         let conversionValue = 0;
@@ -460,20 +487,20 @@ serve(async (req) => {
       }
     }
 
-    // Update sync status
+    // Update sync status with data freshness info
     await supabase
       .from('client_api_credentials')
       .update({
         last_sync_at: new Date().toISOString(),
-        last_sync_status: 'success'
+        last_sync_status: totalInsightRecords > 0 ? 'success' : 'success_no_data'
       })
       .eq('organization_id', organization_id)
       .eq('platform', 'meta');
 
-    console.log(`Meta Ads sync completed successfully. Creatives processed: ${creativesProcessed}`);
+    console.log(`Meta Ads sync completed successfully. Campaigns: ${campaigns.length}, Creatives: ${creativesProcessed}, Total insight records: ${totalInsightRecords}, Latest data date: ${latestDataDate || 'none'}`);
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true, 
         campaigns: campaigns.length,
         creatives_processed: creativesProcessed,

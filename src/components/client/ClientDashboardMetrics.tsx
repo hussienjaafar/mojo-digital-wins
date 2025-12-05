@@ -31,7 +31,7 @@ interface MetaData {
 }
 
 interface SMSData {
-  date: string;
+  send_date: string;
   messages_sent: number;
   conversions: number;
   cost: number;
@@ -71,13 +71,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       
       setMetaMetrics(metaData || []);
 
-      // Load SMS metrics
+      // Load SMS metrics from sms_campaigns table
       const { data: smsData } = await (supabase as any)
-        .from('sms_campaign_metrics')
-        .select('date, messages_sent, conversions, cost, amount_raised')
+        .from('sms_campaigns')
+        .select('send_date, messages_sent, conversions, cost, amount_raised')
         .eq('organization_id', organizationId)
-        .gte('date', startDate)
-        .lte('date', endDate);
+        .gte('send_date', startDate)
+        .lte('send_date', `${endDate}T23:59:59`)
+        .neq('status', 'draft');
       
       setSmsMetrics(smsData || []);
     } catch (error) {
@@ -130,7 +131,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       
       const dayDonations = donations.filter(d => d.transaction_date?.startsWith(dayStr));
       const dayMeta = metaMetrics.filter(m => m.date === dayStr);
-      const daySms = smsMetrics.filter(s => s.date === dayStr);
+      const daySms = smsMetrics.filter(s => s.send_date?.startsWith(dayStr));
 
       return {
         name: dayLabel,
