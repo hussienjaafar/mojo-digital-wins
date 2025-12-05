@@ -403,6 +403,29 @@ serve(async (req) => {
             itemsCreated = result?.polls_inserted || 0;
             break;
 
+          case 'sync':
+            // Handle sync jobs - call the appropriate sync function based on endpoint
+            const syncEndpoint = job.endpoint?.split('/').pop() || '';
+            const syncResponse = await supabase.functions.invoke(syncEndpoint, {
+              body: job.payload || {}
+            });
+            if (syncResponse.error) throw new Error(syncResponse.error.message);
+            result = syncResponse.data;
+            itemsProcessed = result?.results?.length || result?.processed || 1;
+            itemsCreated = result?.inserted || 0;
+            break;
+
+          case 'analytics':
+            // Handle analytics jobs
+            const analyticsEndpoint = job.endpoint?.split('/').pop() || '';
+            const analyticsResponse = await supabase.functions.invoke(analyticsEndpoint, {
+              body: job.payload || {}
+            });
+            if (analyticsResponse.error) throw new Error(analyticsResponse.error.message);
+            result = analyticsResponse.data;
+            itemsProcessed = result?.organizations_processed || 1;
+            break;
+
           case 'refresh_unified_trends':
             // Refresh the unified trends materialized view
             const { error: refreshError } = await supabase.rpc('refresh_unified_trends');
