@@ -77,16 +77,32 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     const prevPeriod = getPreviousPeriod();
 
     try {
+      logger.info('Loading ActBlue transactions', { 
+        organizationId, 
+        startDate, 
+        endDate,
+        prevPeriod 
+      });
+
       // Current period
       const { data, error } = await (supabase as any)
         .from('actblue_transactions')
         .select('*')
         .eq('organization_id', organizationId)
         .gte('transaction_date', startDate)
-        .lte('transaction_date', endDate)
+        .lte('transaction_date', `${endDate}T23:59:59`)
         .order('transaction_date', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        logger.error('ActBlue query error', { error, organizationId });
+        throw error;
+      }
+      
+      logger.info('ActBlue transactions loaded', { 
+        count: data?.length || 0,
+        organizationId 
+      });
+      
       setTransactions(data || []);
 
       // Previous period
@@ -95,7 +111,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         .select('*')
         .eq('organization_id', organizationId)
         .gte('transaction_date', prevPeriod.start)
-        .lte('transaction_date', prevPeriod.end);
+        .lte('transaction_date', `${prevPeriod.end}T23:59:59`);
 
       setPreviousTransactions(prevData || []);
     } catch (error) {
