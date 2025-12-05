@@ -20,6 +20,7 @@ export type Database = {
           ab_test_variation: string | null
           addr1: string | null
           amount: number
+          card_type: string | null
           city: string | null
           committee_name: string | null
           contribution_form: string | null
@@ -28,9 +29,11 @@ export type Database = {
           custom_fields: Json | null
           donor_email: string | null
           donor_name: string | null
+          double_down: boolean | null
           employer: string | null
           entity_id: string | null
           fec_id: string | null
+          fee: number | null
           first_name: string | null
           id: string
           is_express: boolean | null
@@ -41,12 +44,16 @@ export type Database = {
           occupation: string | null
           order_number: string | null
           organization_id: string
+          payment_method: string | null
           phone: string | null
           recurring_duration: number | null
           recurring_period: string | null
+          recurring_upsell_shown: boolean | null
+          recurring_upsell_succeeded: boolean | null
           refcode: string | null
           refcode_custom: string | null
           refcode2: string | null
+          smart_boost_amount: number | null
           source_campaign: string | null
           state: string | null
           text_message_option: string | null
@@ -60,6 +67,7 @@ export type Database = {
           ab_test_variation?: string | null
           addr1?: string | null
           amount: number
+          card_type?: string | null
           city?: string | null
           committee_name?: string | null
           contribution_form?: string | null
@@ -68,9 +76,11 @@ export type Database = {
           custom_fields?: Json | null
           donor_email?: string | null
           donor_name?: string | null
+          double_down?: boolean | null
           employer?: string | null
           entity_id?: string | null
           fec_id?: string | null
+          fee?: number | null
           first_name?: string | null
           id?: string
           is_express?: boolean | null
@@ -81,12 +91,16 @@ export type Database = {
           occupation?: string | null
           order_number?: string | null
           organization_id: string
+          payment_method?: string | null
           phone?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
+          recurring_upsell_shown?: boolean | null
+          recurring_upsell_succeeded?: boolean | null
           refcode?: string | null
           refcode_custom?: string | null
           refcode2?: string | null
+          smart_boost_amount?: number | null
           source_campaign?: string | null
           state?: string | null
           text_message_option?: string | null
@@ -100,6 +114,7 @@ export type Database = {
           ab_test_variation?: string | null
           addr1?: string | null
           amount?: number
+          card_type?: string | null
           city?: string | null
           committee_name?: string | null
           contribution_form?: string | null
@@ -108,9 +123,11 @@ export type Database = {
           custom_fields?: Json | null
           donor_email?: string | null
           donor_name?: string | null
+          double_down?: boolean | null
           employer?: string | null
           entity_id?: string | null
           fec_id?: string | null
+          fee?: number | null
           first_name?: string | null
           id?: string
           is_express?: boolean | null
@@ -121,12 +138,16 @@ export type Database = {
           occupation?: string | null
           order_number?: string | null
           organization_id?: string
+          payment_method?: string | null
           phone?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
+          recurring_upsell_shown?: boolean | null
+          recurring_upsell_succeeded?: boolean | null
           refcode?: string | null
           refcode_custom?: string | null
           refcode2?: string | null
+          smart_boost_amount?: number | null
           source_campaign?: string | null
           state?: string | null
           text_message_option?: string | null

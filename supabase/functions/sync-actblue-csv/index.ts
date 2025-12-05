@@ -105,6 +105,37 @@ function getDonorLastName(row: any): string | null {
   return row.donor_lastname || row.donor_last_name || row.donor_last || row.lastname || row.last_name || null;
 }
 
+// Helper to get A/B test name - ActBlue uses various header names
+function getABTestName(row: any): string | null {
+  // ActBlue CSV headers vary: "AB Test Name", "A/B Test Name", "ab_test_name", etc.
+  return row.ab_test_name || row['a/b_test_name'] || row.abtest_name || row.ab_test || row['a/b_test'] || null;
+}
+
+// Helper to get A/B test variation
+function getABTestVariation(row: any): string | null {
+  return row.ab_variation || row['a/b_variation'] || row.ab_test_variation || row.abtest_variation || row.variation || null;
+}
+
+// Helper to parse boolean from ActBlue CSV (can be "true", "True", "TRUE", "1", "Yes", "yes")
+function parseActBlueBoolean(value: string | undefined | null): boolean {
+  if (!value) return false;
+  const lowered = value.toLowerCase().trim();
+  return lowered === 'true' || lowered === '1' || lowered === 'yes' || lowered === 'y';
+}
+
+// Helper to get mobile flag
+function getIsMobile(row: any): boolean {
+  return parseActBlueBoolean(row.mobile) || parseActBlueBoolean(row.is_mobile) || parseActBlueBoolean(row.mobile_donation);
+}
+
+// Helper to get express lane flag
+function getIsExpress(row: any): boolean {
+  return parseActBlueBoolean(row.actblue_express_lane) || 
+         parseActBlueBoolean(row.express_lane) || 
+         parseActBlueBoolean(row.actblue_express) ||
+         parseActBlueBoolean(row.new_express_signup);
+}
+
 function parseCSV(csvText: string): { rows: CSVRow[], headers: string[] } {
   const lines = csvText.split('\n');
   if (lines.length < 2) return { rows: [], headers: [] };
@@ -113,9 +144,28 @@ function parseCSV(csvText: string): { rows: CSVRow[], headers: string[] } {
     h.trim().replace(/"/g, '').toLowerCase().replace(/\s+/g, '_')
   );
   
-  // Log headers for debugging
-  console.log('CSV headers found:', headers.slice(0, 30).join(', '));
-  console.log('Donor-related headers:', headers.filter(h => h.includes('donor') || h.includes('first') || h.includes('last')).join(', '));
+  // Detailed logging for debugging - log all headers
+  console.log('=== CSV HEADER ANALYSIS ===');
+  console.log(`Total headers found: ${headers.length}`);
+  console.log('All CSV headers:', headers.join(', '));
+  
+  // Log specific field groups for debugging
+  const abTestHeaders = headers.filter(h => h.includes('ab') || h.includes('a/b') || h.includes('test') || h.includes('variation'));
+  console.log('A/B Test related headers:', abTestHeaders.length > 0 ? abTestHeaders.join(', ') : 'NONE FOUND');
+  
+  const mobileHeaders = headers.filter(h => h.includes('mobile') || h.includes('device'));
+  console.log('Mobile related headers:', mobileHeaders.length > 0 ? mobileHeaders.join(', ') : 'NONE FOUND');
+  
+  const expressHeaders = headers.filter(h => h.includes('express'));
+  console.log('Express lane headers:', expressHeaders.length > 0 ? expressHeaders.join(', ') : 'NONE FOUND');
+  
+  const recurringHeaders = headers.filter(h => h.includes('recurring') || h.includes('upsell') || h.includes('boost'));
+  console.log('Recurring/upsell headers:', recurringHeaders.length > 0 ? recurringHeaders.join(', ') : 'NONE FOUND');
+  
+  const donorHeaders = headers.filter(h => h.includes('donor') || h.includes('first') || h.includes('last'));
+  console.log('Donor-related headers:', donorHeaders.join(', '));
+  
+  console.log('=== END HEADER ANALYSIS ===');
   
   const rows: CSVRow[] = [];
   
@@ -246,16 +296,41 @@ async function fetchActBlueCSV(
   const csvText = await csvResponse.text();
   const { rows, headers } = parseCSV(csvText);
   
-  // Log first row's donor fields for debugging
+  // Log first row's key fields for debugging
   if (rows.length > 0) {
     const firstRow = rows[0] as any;
-    console.log('Sample row donor fields:', {
+    console.log('=== FIRST ROW SAMPLE DATA ===');
+    console.log('Donor fields:', {
       donor_firstname: firstRow.donor_firstname,
       donor_first_name: firstRow.donor_first_name,
       donor_first: firstRow.donor_first,
       firstname: firstRow.firstname,
       first_name: firstRow.first_name,
     });
+    console.log('A/B Test fields:', {
+      ab_test_name: firstRow.ab_test_name,
+      'a/b_test_name': firstRow['a/b_test_name'],
+      ab_variation: firstRow.ab_variation,
+      'a/b_variation': firstRow['a/b_variation'],
+    });
+    console.log('Mobile/Express fields:', {
+      mobile: firstRow.mobile,
+      is_mobile: firstRow.is_mobile,
+      actblue_express_lane: firstRow.actblue_express_lane,
+      express_lane: firstRow.express_lane,
+      new_express_signup: firstRow.new_express_signup,
+    });
+    console.log('Upsell/Boost fields:', {
+      recurring_upsell_shown: firstRow.recurring_upsell_shown,
+      recurring_upsell_succeeded: firstRow.recurring_upsell_succeeded,
+      smart_boost_amount: firstRow.smart_boost_amount,
+      double_down: firstRow.double_down,
+    });
+    console.log('Payment fields:', {
+      fee: firstRow.fee,
+      card_type: firstRow.card_type,
+    });
+    console.log('=== END SAMPLE DATA ===');
   }
   
   console.log(`Fetched ${rows.length} rows from ActBlue CSV`);
@@ -486,6 +561,18 @@ serve(async (req) => {
       let totalInserted = 0;
       let totalSkipped = 0;
       let totalUpdated = 0;
+      
+      // Track captured data stats for debugging
+      const captureStats = {
+        with_ab_test: 0,
+        with_mobile_true: 0,
+        with_express_true: 0,
+        with_upsell_shown: 0,
+        with_upsell_succeeded: 0,
+        with_fee: 0,
+        with_card_type: 0,
+        with_smart_boost: 0,
+      };
 
       try {
         // Process each date range chunk
@@ -525,11 +612,39 @@ serve(async (req) => {
                 continue;
               }
               
-              // Log first row with names for debugging
-              if (totalProcessed === 1) {
-                const firstName = getDonorFirstName(row);
-                const lastName = getDonorLastName(row);
-                console.log(`First row: id=${transactionId}, firstName=${firstName}, lastName=${lastName}, email=${row.donor_email}`);
+              // Extract all the enhanced fields using helper functions
+              const abTestName = getABTestName(row);
+              const abTestVariation = getABTestVariation(row);
+              const isMobile = getIsMobile(row);
+              const isExpress = getIsExpress(row);
+              const recurringUpsellShown = parseActBlueBoolean(row.recurring_upsell_shown);
+              const recurringUpsellSucceeded = parseActBlueBoolean(row.recurring_upsell_succeeded);
+              const doubleDown = parseActBlueBoolean(row.double_down);
+              const fee = row.fee ? parseFloat(row.fee) : null;
+              const cardType = row.card_type || null;
+              const smartBoostAmount = row.smart_boost_amount ? parseFloat(row.smart_boost_amount) : null;
+              
+              // Track capture stats
+              if (abTestName) captureStats.with_ab_test++;
+              if (isMobile) captureStats.with_mobile_true++;
+              if (isExpress) captureStats.with_express_true++;
+              if (recurringUpsellShown) captureStats.with_upsell_shown++;
+              if (recurringUpsellSucceeded) captureStats.with_upsell_succeeded++;
+              if (fee !== null) captureStats.with_fee++;
+              if (cardType) captureStats.with_card_type++;
+              if (smartBoostAmount !== null) captureStats.with_smart_boost++;
+              
+              // Log first few rows with these fields for debugging
+              if (totalProcessed <= 3) {
+                console.log(`Row ${totalProcessed} enhanced fields:`, {
+                  ab_test_name: abTestName,
+                  ab_test_variation: abTestVariation,
+                  is_mobile: isMobile,
+                  is_express: isExpress,
+                  recurring_upsell_shown: recurringUpsellShown,
+                  fee,
+                  card_type: cardType,
+                });
               }
 
               // Determine transaction type
@@ -538,14 +653,23 @@ serve(async (req) => {
                 transactionType = 'refund';
               }
 
-              // Extract source campaign from refcode
+              // Extract source campaign from refcode with enhanced detection
               let sourceCampaign = null;
               const refcode = row.reference_code || '';
               if (refcode) {
                 const lowerRefcode = refcode.toLowerCase();
-                if (lowerRefcode.includes('meta')) sourceCampaign = 'meta';
-                else if (lowerRefcode.includes('sms')) sourceCampaign = 'sms';
-                else if (lowerRefcode.includes('email')) sourceCampaign = 'email';
+                // Enhanced refcode parsing
+                if (lowerRefcode.includes('meta') || lowerRefcode.includes('fb_') || lowerRefcode.includes('ig_') || lowerRefcode.includes('facebook')) {
+                  sourceCampaign = 'meta';
+                } else if (lowerRefcode.includes('sms') || lowerRefcode.includes('sw_') || lowerRefcode.includes('text') || lowerRefcode.includes('switchboard')) {
+                  sourceCampaign = 'sms';
+                } else if (lowerRefcode.includes('email') || lowerRefcode.includes('em_') || lowerRefcode.includes('eoy') || lowerRefcode.includes('eod')) {
+                  sourceCampaign = 'email';
+                } else if (lowerRefcode.includes('organic') || lowerRefcode.includes('direct') || lowerRefcode.includes('web')) {
+                  sourceCampaign = 'organic';
+                } else if (lowerRefcode.includes('google') || lowerRefcode.includes('gdn') || lowerRefcode.includes('search')) {
+                  sourceCampaign = 'google';
+                }
               }
 
               // Build donor name - use helpers to handle both naming conventions
@@ -558,7 +682,7 @@ serve(async (req) => {
               // Check if transaction exists
               const { data: existing } = await supabase
                 .from('actblue_transactions')
-                .select('id, transaction_type, first_name, last_name, donor_name')
+                .select('id, transaction_type, first_name, last_name, donor_name, ab_test_name, is_mobile, is_express')
                 .eq('transaction_id', transactionId)
                 .eq('organization_id', orgId)
                 .maybeSingle();
@@ -584,10 +708,18 @@ serve(async (req) => {
                 refcode: row.reference_code || null,
                 refcode2: row.reference_code_2 || null,
                 source_campaign: sourceCampaign,
-                ab_test_name: row.ab_test_name || null,
-                ab_test_variation: row.ab_variation || null,
-                is_mobile: row.mobile === 'true' || row.mobile === '1',
-                is_express: row.actblue_express_lane === 'true' || row.actblue_express_lane === '1',
+                // Enhanced fields
+                ab_test_name: abTestName,
+                ab_test_variation: abTestVariation,
+                is_mobile: isMobile,
+                is_express: isExpress,
+                fee: fee,
+                card_type: cardType,
+                recurring_upsell_shown: recurringUpsellShown,
+                recurring_upsell_succeeded: recurringUpsellSucceeded,
+                smart_boost_amount: smartBoostAmount,
+                double_down: doubleDown,
+                // Standard fields
                 text_message_option: row.text_message_option || null,
                 lineitem_id: parseInt(transactionId) || null,
                 entity_id: row.entity_id || config.entity_id,
@@ -601,7 +733,7 @@ serve(async (req) => {
               };
 
               if (existing) {
-                // Update existing record with donor info if missing, and transaction type if changed
+                // Update existing record with missing data
                 const updateFields: any = {};
                 
                 // Always update donor names if we have them and existing record doesn't
@@ -618,6 +750,18 @@ serve(async (req) => {
                 if (existing.transaction_type !== transactionType) {
                   updateFields.transaction_type = transactionType;
                 }
+                
+                // Update enhanced fields if not set
+                if (abTestName && !existing.ab_test_name) updateFields.ab_test_name = abTestName;
+                if (abTestVariation) updateFields.ab_test_variation = abTestVariation;
+                if (isMobile && !existing.is_mobile) updateFields.is_mobile = isMobile;
+                if (isExpress && !existing.is_express) updateFields.is_express = isExpress;
+                if (fee !== null) updateFields.fee = fee;
+                if (cardType) updateFields.card_type = cardType;
+                if (recurringUpsellShown) updateFields.recurring_upsell_shown = recurringUpsellShown;
+                if (recurringUpsellSucceeded) updateFields.recurring_upsell_succeeded = recurringUpsellSucceeded;
+                if (smartBoostAmount !== null) updateFields.smart_boost_amount = smartBoostAmount;
+                if (doubleDown) updateFields.double_down = doubleDown;
                 
                 if (Object.keys(updateFields).length > 0) {
                   await supabase
@@ -677,6 +821,17 @@ serve(async (req) => {
           }
         }
 
+        // Log capture statistics
+        console.log('=== DATA CAPTURE STATISTICS ===');
+        console.log(`Total processed: ${totalProcessed}`);
+        console.log(`With A/B Test: ${captureStats.with_ab_test} (${((captureStats.with_ab_test / totalProcessed) * 100).toFixed(1)}%)`);
+        console.log(`With Mobile=true: ${captureStats.with_mobile_true} (${((captureStats.with_mobile_true / totalProcessed) * 100).toFixed(1)}%)`);
+        console.log(`With Express=true: ${captureStats.with_express_true} (${((captureStats.with_express_true / totalProcessed) * 100).toFixed(1)}%)`);
+        console.log(`With Upsell Shown: ${captureStats.with_upsell_shown} (${((captureStats.with_upsell_shown / totalProcessed) * 100).toFixed(1)}%)`);
+        console.log(`With Fee: ${captureStats.with_fee} (${((captureStats.with_fee / totalProcessed) * 100).toFixed(1)}%)`);
+        console.log(`With Card Type: ${captureStats.with_card_type} (${((captureStats.with_card_type / totalProcessed) * 100).toFixed(1)}%)`);
+        console.log('=== END STATISTICS ===');
+
         // Update last sync timestamp
         await supabase
           .from('client_api_credentials')
@@ -693,6 +848,7 @@ serve(async (req) => {
           inserted: totalInserted,
           updated: totalUpdated,
           skipped: totalSkipped,
+          capture_stats: captureStats,
           date_range: { 
             start: dateRanges[dateRanges.length - 1]?.start || 'unknown', 
             end: dateRanges[0]?.end || 'unknown' 
