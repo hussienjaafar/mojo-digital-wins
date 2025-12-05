@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ActBlue CSV can have variations in column names depending on export type
+// The parser normalizes headers: "Donor First Name" -> "donor_first_name"
 interface CSVRow {
   lineitem_id: string;
   date: string;
@@ -18,8 +20,11 @@ interface CSVRow {
   reference_code: string;
   reference_code_2: string;
   reference_code_source: string;
-  donor_firstname: string;
-  donor_lastname: string;
+  // Support both naming conventions for donor fields
+  donor_firstname?: string;
+  donor_first_name?: string;
+  donor_lastname?: string;
+  donor_last_name?: string;
   donor_addr1: string;
   donor_addr2: string;
   donor_city: string;
@@ -86,6 +91,16 @@ interface CSVRow {
   account_type: string;
   fec_id: string;
   transaction_type: string;
+}
+
+// Helper to get donor first name from CSV row (handles both naming conventions)
+function getDonorFirstName(row: CSVRow): string | null {
+  return row.donor_firstname || row.donor_first_name || null;
+}
+
+// Helper to get donor last name from CSV row (handles both naming conventions)
+function getDonorLastName(row: CSVRow): string | null {
+  return row.donor_lastname || row.donor_last_name || null;
 }
 
 function parseCSV(csvText: string): CSVRow[] {
@@ -502,10 +517,12 @@ serve(async (req) => {
                 else if (lowerRefcode.includes('email')) sourceCampaign = 'email';
               }
 
-              // Build donor name
-              const donorName = row.donor_firstname && row.donor_lastname
-                ? `${row.donor_firstname} ${row.donor_lastname}`.trim()
-                : null;
+              // Build donor name - use helpers to handle both naming conventions
+              const firstName = getDonorFirstName(row);
+              const lastName = getDonorLastName(row);
+              const donorName = firstName && lastName
+                ? `${firstName} ${lastName}`.trim()
+                : (firstName || lastName || null);
 
               // Check if transaction exists
               const { data: existing } = await supabase
@@ -520,8 +537,8 @@ serve(async (req) => {
                 transaction_id: row.lineitem_id,
                 donor_email: row.donor_email || null,
                 donor_name: donorName,
-                first_name: row.donor_firstname || null,
-                last_name: row.donor_lastname || null,
+                first_name: firstName,
+                last_name: lastName,
                 addr1: row.donor_addr1 || null,
                 city: row.donor_city || null,
                 state: row.donor_state || null,
@@ -585,8 +602,8 @@ serve(async (req) => {
                       .upsert({
                         organization_id: orgId,
                         donor_email: row.donor_email,
-                        first_name: row.donor_firstname || null,
-                        last_name: row.donor_lastname || null,
+                        first_name: firstName,
+                        last_name: lastName,
                         address: row.donor_addr1 || null,
                         city: row.donor_city || null,
                         state: row.donor_state || null,
