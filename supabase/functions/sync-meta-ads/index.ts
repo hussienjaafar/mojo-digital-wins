@@ -126,7 +126,7 @@ serve(async (req) => {
       console.log(`Added act_ prefix to ad_account_id: ${ad_account_id}`);
     }
 
-    // Calculate date range - use provided dates or default to last 30 days
+    // Calculate date range - use provided dates or default to last 90 days
     let endDate: Date;
     let startDate: Date;
     
@@ -137,7 +137,7 @@ serve(async (req) => {
     } else {
       endDate = new Date();
       startDate = new Date();
-      startDate.setDate(startDate.getDate() - 30);
+      startDate.setDate(startDate.getDate() - 90); // Extended from 30 to 90 days for better historical coverage
     }
 
     const dateRanges = {
