@@ -1,64 +1,33 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
-import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Permissive validation schema for ActBlue webhook payload
-// ActBlue sends various field types - we accept both strings and numbers for flexibility
-// See: https://secure.actblue.com/docs/custom_integrations
-const actblueWebhookSchema = z.object({
-  donor: z.object({
-    firstname: z.string().optional().nullable(),
-    lastname: z.string().optional().nullable(),
-    addr1: z.string().optional().nullable(),
-    city: z.string().optional().nullable(),
-    state: z.string().optional().nullable(),
-    zip: z.union([z.string(), z.number()]).optional().nullable(),
-    country: z.string().optional().nullable(),
-    email: z.string().optional().nullable(),
-    phone: z.string().optional().nullable(),
-    employerData: z.object({
-      employer: z.string().optional().nullable(),
-      occupation: z.string().optional().nullable(),
-    }).passthrough().optional().nullable(),
-  }).passthrough().optional().nullable(),
-  contribution: z.object({
-    createdAt: z.string(),
-    orderNumber: z.string().optional().nullable(),
-    contributionForm: z.string().optional().nullable(),
-    refcode: z.string().optional().nullable(),
-    refcode2: z.string().optional().nullable(),
-    refcodes: z.record(z.any()).optional().nullable(),
-    abTestName: z.string().optional().nullable(),
-    abTestVariation: z.string().optional().nullable(),
-    isMobile: z.boolean().optional().nullable(),
-    isExpress: z.boolean().optional().nullable(),
-    textMessageOption: z.string().optional().nullable(),
-    recurringPeriod: z.string().optional().nullable(),
-    recurringDuration: z.union([z.number(), z.string()]).optional().nullable(),
-    customFields: z.array(z.record(z.any())).optional().nullable(),
-    status: z.string().optional().nullable(),
-    cancelledAt: z.string().optional().nullable(),
-  }).passthrough(),
-  form: z.object({
-    kind: z.string().optional().nullable(),
-    name: z.string().optional().nullable(),
-  }).passthrough().optional().nullable(),
-  lineitems: z.array(z.object({
-    lineitemId: z.union([z.number(), z.string()]),
-    entityId: z.union([z.number(), z.string()]),
-    fecId: z.union([z.number(), z.string()]).optional().nullable(),
-    committeeName: z.string().optional().nullable(),
-    amount: z.union([z.number(), z.string()]),
-    paidAt: z.string(),
-    refundedAt: z.string().optional().nullable(),
-    paymentId: z.union([z.number(), z.string()]).optional().nullable(),
-  }).passthrough()),
-}).passthrough();
+// Helper to safely extract values from any type
+const safeString = (val: any): string | null => {
+  if (val === null || val === undefined) return null;
+  return String(val);
+};
+
+const safeNumber = (val: any): number | null => {
+  if (val === null || val === undefined) return null;
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  return isNaN(num) ? null : num;
+};
+
+const safeInt = (val: any): number | null => {
+  if (val === null || val === undefined) return null;
+  const num = typeof val === 'number' ? Math.round(val) : parseInt(String(val));
+  return isNaN(num) ? null : num;
+};
+
+const safeBool = (val: any): boolean => {
+  if (val === true || val === 'true') return true;
+  return false;
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -87,16 +56,39 @@ serve(async (req) => {
       if (error) console.error('Failed to log webhook:', error);
     });
 
-    // Parse and validate payload
-    let payload;
+    // Parse payload - NO schema validation, just accept any valid JSON
+    // ActBlue says: "We may add new data to the JSON payloads without warning"
+    let payload: any;
     try {
-      payload = actblueWebhookSchema.parse(JSON.parse(requestBody));
-    } catch (validationError) {
-      if (Deno.env.get('ENVIRONMENT') === 'development') {
-        console.error('Invalid webhook payload:', validationError);
-      }
+      payload = JSON.parse(requestBody);
+      console.log('Parsed payload successfully, keys:', Object.keys(payload));
+    } catch (parseError) {
+      console.error('Failed to parse JSON:', parseError);
       return new Response(
-        JSON.stringify({ error: 'Invalid payload format' }),
+        JSON.stringify({ error: 'Invalid JSON' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Validate required fields exist
+    if (!payload.lineitems || !Array.isArray(payload.lineitems) || payload.lineitems.length === 0) {
+      console.error('Missing lineitems array in payload');
+      return new Response(
+        JSON.stringify({ error: 'Missing lineitems' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    if (!payload.contribution) {
+      console.error('Missing contribution object in payload');
+      return new Response(
+        JSON.stringify({ error: 'Missing contribution' }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -106,7 +98,7 @@ serve(async (req) => {
 
     // Find organization by entity_id from lineitems
     const lineitem = payload.lineitems[0];
-    const entityId = lineitem.entityId?.toString();
+    const entityId = safeString(lineitem.entityId);
     
     console.log('Processing lineitem with entityId:', entityId);
     
@@ -207,56 +199,72 @@ serve(async (req) => {
       ? `${donor.firstname} ${donor.lastname}`.trim() 
       : null;
 
+    // Extract data using safe helpers
+    const amount = safeNumber(lineitem.amount);
+    const lineitemId = safeInt(lineitem.lineitemId);
+    const paidAt = safeString(lineitem.paidAt) || safeString(contribution.createdAt) || new Date().toISOString();
+
+    if (amount === null || lineitemId === null) {
+      console.error('Missing required fields: amount or lineitemId', { amount, lineitemId });
+      return new Response(
+        JSON.stringify({ error: 'Missing required amount or lineitemId' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // Store enhanced transaction data
     const { error: insertError } = await supabase
       .from('actblue_transactions')
       .insert({
         organization_id,
-        transaction_id: `${lineitem.lineitemId}`,
-        donor_email: donor.email || null,
+        transaction_id: String(lineitemId),
+        donor_email: safeString(donor.email),
         donor_name: donorName,
-        first_name: donor.firstname || null,
-        last_name: donor.lastname || null,
-        addr1: donor.addr1 || null,
-        city: donor.city || null,
-        state: donor.state || null,
-        zip: donor.zip || null,
-        country: donor.country || null,
-        phone: donor.phone || null,
-        employer: donor.employerData?.employer || null,
-        occupation: donor.employerData?.occupation || null,
-        amount: typeof lineitem.amount === 'number' ? lineitem.amount : parseFloat(String(lineitem.amount)),
-        order_number: payload.contribution.orderNumber || null,
-        contribution_form: payload.contribution.contributionForm || null,
+        first_name: safeString(donor.firstname),
+        last_name: safeString(donor.lastname),
+        addr1: safeString(donor.addr1),
+        city: safeString(donor.city),
+        state: safeString(donor.state),
+        zip: safeString(donor.zip),
+        country: safeString(donor.country),
+        phone: safeString(donor.phone),
+        employer: safeString(donor.employerData?.employer),
+        occupation: safeString(donor.employerData?.occupation),
+        amount: amount,
+        order_number: safeString(contribution.orderNumber),
+        contribution_form: safeString(contribution.contributionForm),
         refcode: refcode,
-        refcode2: refcodes.refcode2 || null,
-        refcode_custom: refcodes.refcodeCustom || null,
+        refcode2: safeString(refcodes.refcode2),
+        refcode_custom: safeString(refcodes.refcodeCustom),
         source_campaign: sourceCampaign,
-        ab_test_name: payload.contribution.abTestName || null,
-        ab_test_variation: payload.contribution.abTestVariation || null,
-        is_mobile: payload.contribution.isMobile || false,
-        is_express: payload.contribution.isExpress || false,
-        text_message_option: payload.contribution.textMessageOption || null,
-        lineitem_id: typeof lineitem.lineitemId === 'number' ? lineitem.lineitemId : parseInt(String(lineitem.lineitemId)),
-        entity_id: String(lineitem.entityId) || null,
-        committee_name: lineitem.committeeName || null,
-        fec_id: lineitem.fecId ? String(lineitem.fecId) : null,
-        recurring_period: payload.contribution.recurringPeriod || null,
-        recurring_duration: payload.contribution.recurringDuration || null,
-        is_recurring: !!payload.contribution.recurringPeriod,
-        custom_fields: payload.contribution.customFields || [],
+        ab_test_name: safeString(contribution.abTestName),
+        ab_test_variation: safeString(contribution.abTestVariation),
+        is_mobile: safeBool(contribution.isMobile),
+        is_express: safeBool(contribution.isExpress),
+        text_message_option: safeString(contribution.textMessageOption),
+        lineitem_id: lineitemId,
+        entity_id: safeString(lineitem.entityId),
+        committee_name: safeString(lineitem.committeeName),
+        fec_id: safeString(lineitem.fecId),
+        recurring_period: safeString(contribution.recurringPeriod),
+        recurring_duration: safeInt(contribution.recurringDuration),
+        is_recurring: !!contribution.recurringPeriod && contribution.recurringPeriod !== 'once',
+        custom_fields: contribution.customFields || [],
         transaction_type: transactionType,
-        transaction_date: lineitem.paidAt,
+        transaction_date: paidAt,
       });
 
     if (insertError) {
       // If duplicate, update existing record
       if (insertError.code === '23505') {
-        console.log('Transaction already exists, updating:', lineitem.lineitemId);
+        console.log('Transaction already exists, updating:', lineitemId);
         const { error: updateError } = await supabase
           .from('actblue_transactions')
           .update({ transaction_type: transactionType })
-          .eq('transaction_id', `${lineitem.lineitemId}`);
+          .eq('transaction_id', String(lineitemId));
 
         if (updateError) throw updateError;
       } else {
@@ -268,17 +276,17 @@ serve(async (req) => {
     if (donor.email && refcode) {
       await supabase.from('attribution_touchpoints').insert({
         organization_id,
-        donor_email: donor.email,
+        donor_email: safeString(donor.email),
         touchpoint_type: sourceCampaign || 'other',
-        campaign_id: payload.contribution.contributionForm || null,
-        utm_source: refcodes.refcode2 || null,
+        campaign_id: safeString(contribution.contributionForm),
+        utm_source: safeString(refcodes.refcode2),
         utm_campaign: refcode,
         refcode: refcode,
-        occurred_at: lineitem.paidAt,
+        occurred_at: paidAt,
         metadata: {
-          ab_test: payload.contribution.abTestName,
-          ab_variation: payload.contribution.abTestVariation,
-          is_mobile: payload.contribution.isMobile,
+          ab_test: safeString(contribution.abTestName),
+          ab_variation: safeString(contribution.abTestVariation),
+          is_mobile: safeBool(contribution.isMobile),
         },
       }).then(({ error }) => {
         if (error) console.error('Error tracking touchpoint:', error);
@@ -288,18 +296,18 @@ serve(async (req) => {
       await supabase.from('donor_demographics')
         .upsert({
           organization_id,
-          donor_email: donor.email,
-          first_name: donor.firstname || null,
-          last_name: donor.lastname || null,
-          address: donor.addr1 || null,
-          city: donor.city || null,
-          state: donor.state || null,
-          zip: donor.zip || null,
-          country: donor.country || null,
-          phone: donor.phone || null,
-          employer: donor.employerData?.employer || null,
-          occupation: donor.employerData?.occupation || null,
-          last_donation_date: lineitem.paidAt,
+          donor_email: safeString(donor.email),
+          first_name: safeString(donor.firstname),
+          last_name: safeString(donor.lastname),
+          address: safeString(donor.addr1),
+          city: safeString(donor.city),
+          state: safeString(donor.state),
+          zip: safeString(donor.zip),
+          country: safeString(donor.country),
+          phone: safeString(donor.phone),
+          employer: safeString(donor.employerData?.employer),
+          occupation: safeString(donor.employerData?.occupation),
+          last_donation_date: paidAt,
         }, {
           onConflict: 'organization_id,donor_email',
           ignoreDuplicates: false,
@@ -321,7 +329,7 @@ serve(async (req) => {
                 .update({
                   total_donated: total,
                   donation_count: txData.length,
-                  first_donation_date: data.first_donation_date || lineitem.paidAt,
+                  first_donation_date: data.first_donation_date || paidAt,
                 })
                 .eq('id', data.id);
             }
@@ -329,12 +337,12 @@ serve(async (req) => {
         });
     }
 
-    console.log('ActBlue transaction stored successfully:', lineitem.lineitemId);
+    console.log('ActBlue transaction stored successfully:', lineitemId);
     
     return new Response(
       JSON.stringify({ 
         success: true, 
-        transaction_id: `${lineitem.lineitemId}`
+        transaction_id: String(lineitemId)
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
