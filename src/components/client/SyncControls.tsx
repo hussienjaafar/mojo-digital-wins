@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, DollarSign, MessageSquare, TrendingUp, Heart } from "lucide-react";
+import { RefreshCw, DollarSign, MessageSquare, TrendingUp, Heart, History } from "lucide-react";
 import { logger } from "@/lib/logger";
 
 type Props = {
@@ -75,18 +75,34 @@ const SyncControls = ({ organizationId }: Props) => {
     }
   };
 
-  const syncActBlue = async () => {
-    setSyncing({ ...syncing, actblue: true });
+  const syncActBlue = async (backfill = false) => {
+    const syncKey = backfill ? 'actblueBackfill' : 'actblue';
+    setSyncing({ ...syncing, [syncKey]: true });
     try {
-      const { error } = await (supabase as any).functions.invoke('sync-actblue-csv', {
-        body: { organization_id: organizationId }
+      if (backfill) {
+        toast({
+          title: "Starting ActBlue Backfill",
+          description: "Fetching 1 year of historical data. This may take a few minutes...",
+        });
+      }
+
+      const { data, error } = await (supabase as any).functions.invoke('sync-actblue-csv', {
+        body: { 
+          organization_id: organizationId,
+          mode: backfill ? 'backfill' : 'incremental'
+        }
       });
 
       if (error) throw error;
 
+      const inserted = data?.results?.[0]?.inserted || 0;
+      const processed = data?.results?.[0]?.processed || 0;
+
       toast({
         title: "Success",
-        description: "ActBlue sync completed successfully",
+        description: backfill 
+          ? `ActBlue backfill completed: ${inserted} new transactions from ${processed} processed`
+          : `ActBlue sync completed: ${inserted} new transactions`,
       });
 
       // Trigger ROI calculation
@@ -98,7 +114,7 @@ const SyncControls = ({ organizationId }: Props) => {
         variant: "destructive",
       });
     } finally {
-      setSyncing({ ...syncing, actblue: false });
+      setSyncing({ ...syncing, [syncKey]: false });
     }
   };
 
@@ -132,7 +148,7 @@ const SyncControls = ({ organizationId }: Props) => {
     await Promise.all([
       syncMetaAds(),
       syncSwitchboard(),
-      syncActBlue(),
+      syncActBlue(false),
     ]);
 
     toast({
@@ -153,7 +169,7 @@ const SyncControls = ({ organizationId }: Props) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <Button
             onClick={syncMetaAds}
             disabled={syncing.meta}
@@ -177,14 +193,25 @@ const SyncControls = ({ organizationId }: Props) => {
           </Button>
 
           <Button
-            onClick={syncActBlue}
-            disabled={syncing.actblue}
+            onClick={() => syncActBlue(false)}
+            disabled={syncing.actblue || syncing.actblueBackfill}
             variant="outline"
             className="h-auto flex-col gap-2 py-4"
           >
             <Heart className="w-6 h-6" />
             <span>Sync ActBlue</span>
             {syncing.actblue && <RefreshCw className="w-4 h-4 animate-spin" />}
+          </Button>
+
+          <Button
+            onClick={() => syncActBlue(true)}
+            disabled={syncing.actblue || syncing.actblueBackfill}
+            variant="outline"
+            className="h-auto flex-col gap-2 py-4 border-dashed"
+          >
+            <History className="w-6 h-6" />
+            <span>Backfill ActBlue</span>
+            {syncing.actblueBackfill && <RefreshCw className="w-4 h-4 animate-spin" />}
           </Button>
 
           <Button
