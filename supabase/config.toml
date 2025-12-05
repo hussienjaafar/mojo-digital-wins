@@ -197,3 +197,6 @@ verify_jwt = false
 
 [functions.entity-resolver]
 verify_jwt = false
+
+[functions.sync-actblue-csv]
+verify_jwt = false
