@@ -17,6 +17,64 @@ interface ContactNotificationRequest {
   created_at?: string;
 }
 
+// HTML escape function to prevent XSS in emails
+function escapeHtml(text: string): string {
+  const htmlEscapes: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, (char) => htmlEscapes[char] || char);
+}
+
+// Input validation
+function validateInput(data: any): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  // Name validation
+  if (!data.name || typeof data.name !== 'string') {
+    errors.push('Name is required');
+  } else if (data.name.trim().length === 0) {
+    errors.push('Name cannot be empty');
+  } else if (data.name.length > 100) {
+    errors.push('Name must be less than 100 characters');
+  }
+
+  // Email validation
+  if (!data.email || typeof data.email !== 'string') {
+    errors.push('Email is required');
+  } else {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(data.email)) {
+      errors.push('Invalid email format');
+    } else if (data.email.length > 255) {
+      errors.push('Email must be less than 255 characters');
+    }
+  }
+
+  // Message validation
+  if (!data.message || typeof data.message !== 'string') {
+    errors.push('Message is required');
+  } else if (data.message.trim().length === 0) {
+    errors.push('Message cannot be empty');
+  } else if (data.message.length > 5000) {
+    errors.push('Message must be less than 5000 characters');
+  }
+
+  // Optional fields validation
+  if (data.campaign && typeof data.campaign === 'string' && data.campaign.length > 200) {
+    errors.push('Campaign must be less than 200 characters');
+  }
+
+  if (data.organization_type && typeof data.organization_type === 'string' && data.organization_type.length > 100) {
+    errors.push('Organization type must be less than 100 characters');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -25,11 +83,35 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const data: ContactNotificationRequest = await req.json();
-    if (Deno.env.get('ENVIRONMENT') === 'development') {
-      console.log("Received contact notification request:", { ...data, message: data.message.substring(0, 50) + "..." });
+
+    // Validate input
+    const validation = validateInput(data);
+    if (!validation.valid) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Validation failed', 
+          details: validation.errors,
+          success: false 
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
     }
 
-    const { name, email, campaign, organization_type, message, created_at } = data;
+    // Sanitize and extract fields
+    const name = escapeHtml(data.name.trim());
+    const email = data.email.trim().toLowerCase();
+    const campaign = data.campaign ? escapeHtml(data.campaign.trim()) : null;
+    const organization_type = data.organization_type ? escapeHtml(data.organization_type.trim()) : null;
+    const message = escapeHtml(data.message.trim());
+    const created_at = data.created_at;
+
+    if (Deno.env.get('ENVIRONMENT') === 'development') {
+      console.log("Received contact notification request:", { name, email, messageLength: message.length });
+    }
+
     const timestamp = created_at ? new Date(created_at).toLocaleString() : new Date().toLocaleString();
 
     // Create HTML email template
