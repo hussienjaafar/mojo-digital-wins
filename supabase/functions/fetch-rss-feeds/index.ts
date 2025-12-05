@@ -430,7 +430,7 @@ serve(async (req) => {
     let totalErrors = 0;
     let processedSources = 0;
 
-    // Process source helper function
+    // Process source helper function - OPTIMIZED with batch upserts
     const processSource = async (source: any) => {
       let articlesAdded = 0;
       try {
@@ -439,70 +439,97 @@ serve(async (req) => {
         const items = await parseRSSFeed(source.url);
         console.log(`Found ${items.length} items from ${source.name}`);
 
-        // Insert articles
+        // Prepare all articles for batch upsert
+        const articlesToUpsert: any[] = [];
+        const highPriorityArticles: any[] = [];
+
         for (const item of items) {
           const sanitizedTitle = sanitizeText(item.title);
           const sanitizedDescription = sanitizeText(item.description);
-          // SKIP CONTENT FETCHING TO AVOID CPU TIMEOUT
-          const fullContent = sanitizedDescription;
+          // Truncate content to 1000 chars to save storage
+          const fullContent = sanitizedDescription.substring(0, 1000);
 
           const hash = generateHash(sanitizedTitle, sanitizedDescription);
           const tags = extractTags(sanitizedTitle, sanitizedDescription, sanitizedDescription);
 
           // Calculate threat level
           const textToAnalyze = `${sanitizedTitle} ${fullContent}`;
-          const { level: threatLevel, score, affectedOrgs } = calculateThreatLevel(textToAnalyze, source.name);
+          const { level: threatLevel, affectedOrgs } = calculateThreatLevel(textToAnalyze, source.name);
 
-          const { data: insertedArticle, error: insertError } = await supabase
+          const articleData = {
+            title: sanitizedTitle,
+            description: sanitizedDescription.substring(0, 500),
+            content: fullContent,
+            source_id: source.id,
+            source_name: source.name,
+            source_url: item.link,
+            published_date: item.pubDate,
+            image_url: item.imageUrl,
+            tags,
+            hash_signature: hash,
+            category: source.category,
+            threat_level: threatLevel,
+            affected_organizations: affectedOrgs,
+            processing_status: 'pending',
+          };
+
+          articlesToUpsert.push(articleData);
+
+          // Track high priority for notifications
+          if (threatLevel === 'critical' || threatLevel === 'high') {
+            highPriorityArticles.push({ ...articleData, threatLevel, link: item.link });
+          }
+        }
+
+        // BATCH UPSERT - silent deduplication via hash_signature
+        if (articlesToUpsert.length > 0) {
+          const { data: upsertedArticles, error: upsertError } = await supabase
             .from('articles')
-            .insert({
-              title: sanitizedTitle,
-              description: sanitizedDescription,
-              content: fullContent || sanitizedDescription,
-              source_id: source.id,
-              source_name: source.name,
-              source_url: item.link, // Individual article link
-              published_date: item.pubDate,
-              image_url: item.imageUrl,
-              tags,
-              hash_signature: hash,
-              category: source.category,
-              threat_level: threatLevel,
-              affected_organizations: affectedOrgs,
-              processing_status: 'pending',
+            .upsert(articlesToUpsert, {
+              onConflict: 'hash_signature',
+              ignoreDuplicates: true
             })
-            .select()
-            .maybeSingle();
+            .select('id, hash_signature');
 
-          if (!insertError && insertedArticle) {
-            articlesAdded++;
+          if (upsertError) {
+            console.error(`Batch upsert error for ${source.name}:`, upsertError.message);
+          } else {
+            articlesAdded = upsertedArticles?.length || 0;
+            
+            // Only create notifications for NEW high-priority articles
+            if (articlesAdded > 0 && highPriorityArticles.length > 0) {
+              const upsertedHashes = new Set(upsertedArticles?.map(a => a.hash_signature) || []);
+              const newHighPriority = highPriorityArticles.filter(a => upsertedHashes.has(a.hash_signature));
+              
+              if (newHighPriority.length > 0) {
+                const { data: users } = await supabase
+                  .from('user_article_preferences')
+                  .select('user_id')
+                  .limit(50);
 
-            // Create notifications for critical/high threat articles
-            if (threatLevel === 'critical' || threatLevel === 'high') {
-              const { data: users } = await supabase
-                .from('user_article_preferences')
-                .select('user_id')
-                .limit(100);
+                if (users && users.length > 0) {
+                  const notifications = newHighPriority.flatMap(article => {
+                    const matchedArticle = upsertedArticles?.find(a => a.hash_signature === article.hash_signature);
+                    if (!matchedArticle) return [];
+                    
+                    const priorityEmoji = article.threatLevel === 'critical' ? '🚨' : '⚠️';
+                    return users.map((user: any) => ({
+                      user_id: user.user_id,
+                      title: `${priorityEmoji} ${article.threatLevel.toUpperCase()}: ${source.name}`,
+                      message: article.title.substring(0, 200),
+                      priority: article.threatLevel,
+                      source_type: 'article',
+                      source_id: matchedArticle.id,
+                      link: article.link,
+                    }));
+                  });
 
-              if (users && users.length > 0) {
-                const priorityEmoji = threatLevel === 'critical' ? '🚨' : '⚠️';
-                const notifications = users.map((user: any) => ({
-                  user_id: user.user_id,
-                  title: `${priorityEmoji} ${threatLevel.toUpperCase()}: ${source.name}`,
-                  message: sanitizedTitle.substring(0, 200),
-                  priority: threatLevel,
-                  source_type: 'article',
-                  source_id: insertedArticle.id,
-                  link: item.link,
-                }));
-
-                await supabase
-                  .from('notifications')
-                  .insert(notifications);
+                  if (notifications.length > 0) {
+                    await supabase.from('notifications').insert(notifications);
+                  }
+                }
               }
             }
-          } else if (insertError && !insertError.message?.includes('duplicate key')) {
-            console.error(`Error inserting article from ${source.name}:`, insertError);
           }
         }
 
