@@ -80,6 +80,38 @@ serve(async (req) => {
 
     console.log(`Fetching Meta data from ${dateRanges.since} to ${dateRanges.until}`);
 
+    // First, validate the access token by fetching token debug info
+    console.log(`Validating Meta access token...`);
+    const tokenDebugUrl = `https://graph.facebook.com/v22.0/debug_token?input_token=${access_token}&access_token=${access_token}`;
+    try {
+      const tokenResponse = await fetch(tokenDebugUrl);
+      const tokenData = await tokenResponse.json();
+      if (tokenData.data) {
+        const expiresAt = tokenData.data.expires_at;
+        const isValid = tokenData.data.is_valid;
+        const scopes = tokenData.data.scopes || [];
+        console.log(`Token valid: ${isValid}, expires: ${expiresAt ? new Date(expiresAt * 1000).toISOString() : 'never'}, scopes: ${scopes.join(', ')}`);
+        
+        if (!isValid) {
+          console.error('ACCESS TOKEN IS INVALID OR EXPIRED');
+          return new Response(
+            JSON.stringify({ error: 'Meta access token is invalid or expired. Please update the token.' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Warn if token expires soon (within 7 days)
+        if (expiresAt) {
+          const daysUntilExpiry = (expiresAt * 1000 - Date.now()) / (1000 * 60 * 60 * 24);
+          if (daysUntilExpiry < 7) {
+            console.warn(`WARNING: Token expires in ${Math.round(daysUntilExpiry)} days!`);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not validate token (non-fatal):', e);
+    }
+
     // Fetch campaigns
     const campaignsUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time&access_token=${access_token}`;
     
@@ -88,6 +120,13 @@ serve(async (req) => {
 
     if (campaignsData.error) {
       console.error('Meta API error:', campaignsData.error);
+      // Check for specific error codes
+      if (campaignsData.error.code === 190) {
+        return new Response(
+          JSON.stringify({ error: 'Meta access token is invalid or expired. Please update the token in API Credentials.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       return new Response(
         JSON.stringify({ error: `Meta API Error: ${campaignsData.error.message}` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -121,6 +160,18 @@ serve(async (req) => {
       
       const insightsResponse = await fetch(insightsUrl);
       const insightsData = await insightsResponse.json();
+
+      // Log raw insights response for debugging
+      if (insightsData.error) {
+        console.error(`Insights error for campaign ${campaign.id} (${campaign.name}):`, insightsData.error);
+      } else if (!insightsData.data || insightsData.data.length === 0) {
+        console.warn(`No insights data returned for campaign ${campaign.id} (${campaign.name}) in range ${dateRanges.since} to ${dateRanges.until}`);
+      } else {
+        const dates = insightsData.data.map((i: any) => i.date_start).sort();
+        const latestDate = dates[dates.length - 1];
+        const totalSpend = insightsData.data.reduce((sum: number, i: any) => sum + (parseFloat(i.spend) || 0), 0);
+        console.log(`Campaign ${campaign.name}: ${insightsData.data.length} days of data, latest: ${latestDate}, total spend: $${totalSpend.toFixed(2)}`);
+      }
 
       if (!insightsData.error && insightsData.data) {
         for (const insight of insightsData.data) {

@@ -8,8 +8,9 @@ const corsHeaders = {
 };
 
 // Enhanced validation schema for ActBlue webhook payload
+// NOTE: ActBlue does NOT send event_type in their payload - it's determined by which webhook URL they call
+// See: https://secure.actblue.com/docs/custom_integrations
 const actblueWebhookSchema = z.object({
-  event_type: z.string(),
   donor: z.object({
     firstname: z.string().optional(),
     lastname: z.string().optional(),
@@ -172,14 +173,22 @@ serve(async (req) => {
       }
     }
 
-    // Determine transaction type
+    // Determine transaction type from URL path or contribution status
+    // ActBlue sends separate webhooks to different URLs for donations/refunds/cancellations
+    // The URL path isn't available here, so we infer from payload structure
     let transactionType = 'donation';
-    if (payload.event_type === 'refund') {
-      transactionType = 'refund';
-    } else if (payload.event_type === 'cancellation') {
+    const contribution = payload.contribution as any;
+    
+    // If there's a cancelledAt field, it's a cancellation
+    if (contribution.cancelledAt) {
       transactionType = 'cancellation';
     }
-    
+    // Check lineitems for refund indicators (cast to any to check optional fields)
+    const firstLineitem = payload.lineitems[0] as any;
+    if (firstLineitem.refundedAt) {
+      transactionType = 'refund';
+    }
+
     // Extract refcodes
     const refcodes = payload.contribution.refcodes || {};
     const refcode = refcodes.refcode || null;
