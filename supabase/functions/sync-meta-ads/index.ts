@@ -34,13 +34,48 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Verify user authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authorization header required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get user from JWT token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { organization_id } = await req.json();
 
     if (!organization_id) {
       throw new Error('organization_id is required');
     }
 
-    console.log(`Starting Meta Ads sync for organization: ${organization_id}`);
+    // Verify user has access to this organization
+    const { data: clientUser, error: accessError } = await supabase
+      .from('client_users')
+      .select('organization_id')
+      .eq('id', user.id)
+      .single();
+
+    if (accessError || !clientUser || clientUser.organization_id !== organization_id) {
+      return new Response(
+        JSON.stringify({ error: 'You do not have access to this organization' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Starting Meta Ads sync for organization: ${organization_id} by user: ${user.id}`);
 
     // Fetch credentials
     const { data: credData, error: credError } = await supabase
