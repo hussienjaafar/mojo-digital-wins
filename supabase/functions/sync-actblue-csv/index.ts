@@ -93,23 +93,28 @@ interface CSVRow {
   transaction_type: string;
 }
 
-// Helper to get donor first name from CSV row (handles both naming conventions)
-function getDonorFirstName(row: CSVRow): string | null {
-  return row.donor_firstname || row.donor_first_name || null;
+// Helper to get donor first name from CSV row (handles multiple naming conventions)
+// ActBlue CSV headers can vary: "Donor First Name", "Donor FirstName", "Donor First", etc.
+function getDonorFirstName(row: any): string | null {
+  return row.donor_firstname || row.donor_first_name || row.donor_first || row.firstname || row.first_name || null;
 }
 
-// Helper to get donor last name from CSV row (handles both naming conventions)
-function getDonorLastName(row: CSVRow): string | null {
-  return row.donor_lastname || row.donor_last_name || null;
+// Helper to get donor last name from CSV row (handles multiple naming conventions)
+function getDonorLastName(row: any): string | null {
+  return row.donor_lastname || row.donor_last_name || row.donor_last || row.lastname || row.last_name || null;
 }
 
-function parseCSV(csvText: string): CSVRow[] {
+function parseCSV(csvText: string): { rows: CSVRow[], headers: string[] } {
   const lines = csvText.split('\n');
-  if (lines.length < 2) return [];
+  if (lines.length < 2) return { rows: [], headers: [] };
   
   const headers = lines[0].split(',').map(h => 
     h.trim().replace(/"/g, '').toLowerCase().replace(/\s+/g, '_')
   );
+  
+  // Log headers for debugging
+  console.log('CSV headers found:', headers.slice(0, 30).join(', '));
+  console.log('Donor-related headers:', headers.filter(h => h.includes('donor') || h.includes('first') || h.includes('last')).join(', '));
   
   const rows: CSVRow[] = [];
   
@@ -141,7 +146,7 @@ function parseCSV(csvText: string): CSVRow[] {
     rows.push(row as CSVRow);
   }
   
-  return rows;
+  return { rows, headers };
 }
 
 async function fetchActBlueCSV(
@@ -238,7 +243,19 @@ async function fetchActBlueCSV(
   }
   
   const csvText = await csvResponse.text();
-  const rows = parseCSV(csvText);
+  const { rows, headers } = parseCSV(csvText);
+  
+  // Log first row's donor fields for debugging
+  if (rows.length > 0) {
+    const firstRow = rows[0] as any;
+    console.log('Sample row donor fields:', {
+      donor_firstname: firstRow.donor_firstname,
+      donor_first_name: firstRow.donor_first_name,
+      donor_first: firstRow.donor_first,
+      firstname: firstRow.firstname,
+      first_name: firstRow.first_name,
+    });
+  }
   
   console.log(`Fetched ${rows.length} rows from ActBlue CSV`);
   
