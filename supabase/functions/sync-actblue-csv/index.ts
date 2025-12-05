@@ -241,53 +241,71 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify user authentication
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Authorization header required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get user from JWT token
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
+    // Parse request body first to check mode
+    const requestBody = await req.json();
     const { 
       organization_id, 
       start_date, 
       end_date,
       mode = 'incremental' // 'incremental' or 'backfill'
-    } = await req.json();
+    } = requestBody;
+    
+    // Check for service-level invocation (internal trigger for backfill)
+    const authHeader = req.headers.get('Authorization');
+    const internalKey = req.headers.get('x-internal-key');
+    
+    // Allow internal backfill calls without auth
+    const isInternalBackfill = mode === 'backfill' && organization_id && internalKey;
+    
+    let user: any = null;
+    let isServiceCall = false;
+    
+    if (isInternalBackfill) {
+      // Internal service call - bypass user auth for backfill
+      isServiceCall = true;
+      console.log(`Internal backfill call detected for organization: ${organization_id}`);
+    } else if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authorization header required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } else {
+      // Get user from JWT token
+      const { data: userData, error: authError } = await supabase.auth.getUser(
+        authHeader.replace('Bearer ', '')
+      );
 
-    // Check if user is admin
-    const { data: userRoles } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id);
+      if (authError || !userData?.user) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid or expired token' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      user = userData.user;
+    }
 
-    const isAdmin = userRoles?.some(r => r.role === 'admin');
+    // Check if user is admin (skip for service calls)
+    let isAdmin = isServiceCall;
+    if (!isServiceCall && user) {
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      isAdmin = userRoles?.some(r => r.role === 'admin') || false;
+    }
 
     // If no org specified, process all active ActBlue integrations
     let credentials: any[] = [];
     
     if (organization_id) {
-      // Admins can sync any organization, regular users must belong to the organization
-      if (!isAdmin) {
+      // Service calls, admins can sync any organization, regular users must belong to the organization
+      if (!isServiceCall && !isAdmin) {
         const { data: clientUser, error: accessError } = await supabase
           .from('client_users')
           .select('organization_id')
-          .eq('id', user.id)
-          .single();
+          .eq('id', user?.id)
+          .maybeSingle();
 
         if (accessError || !clientUser || clientUser.organization_id !== organization_id) {
           return new Response(
@@ -297,7 +315,7 @@ serve(async (req) => {
         }
       }
 
-      console.log(`ActBlue sync initiated by ${isAdmin ? 'admin' : 'user'}: ${user.id} for organization: ${organization_id}`);
+      console.log(`ActBlue sync initiated by ${isServiceCall ? 'service' : isAdmin ? 'admin' : 'user'}: ${user?.id || 'internal'} for organization: ${organization_id}`);
 
       const { data, error } = await supabase
         .from('client_api_credentials')
@@ -312,15 +330,15 @@ serve(async (req) => {
       }
       credentials = [data];
     } else {
-      // For batch processing (no org specified), only allow admin users
-      if (!isAdmin) {
+      // For batch processing (no org specified), only allow admin/service users
+      if (!isServiceCall && !isAdmin) {
         return new Response(
           JSON.stringify({ error: 'Admin access required for batch sync' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      console.log(`Batch ActBlue sync initiated by admin: ${user.id}`);
+      console.log(`Batch ActBlue sync initiated by ${isServiceCall ? 'service' : 'admin'}: ${user?.id || 'internal'}`);
 
       const { data, error } = await supabase
         .from('client_api_credentials')
