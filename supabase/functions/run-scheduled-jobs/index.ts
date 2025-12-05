@@ -6,6 +6,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Job dependencies: job_type -> required predecessor job_types
+const JOB_DEPENDENCIES: Record<string, string[]> = {
+  'analyze_articles': ['fetch_rss'],
+  'analyze_bluesky': ['collect_bluesky'],
+  'calculate_bluesky_trends': ['analyze_bluesky'],
+  'calculate_news_trends': ['analyze_articles'],
+  'correlate_social_news': ['calculate_bluesky_trends', 'calculate_news_trends'],
+  'detect_anomalies': ['calculate_bluesky_trends', 'calculate_news_trends'],
+  'detect_fundraising_opportunities': ['correlate_social_news'],
+  'smart_alerting': ['analyze_articles', 'detect_anomalies'],
+};
+
+// Jobs that can be skipped if no new data
+const SKIP_IF_NO_DATA: Record<string, { table: string; column: string; minutes: number }> = {
+  'analyze_articles': { table: 'articles', column: 'created_at', minutes: 20 },
+  'analyze_bluesky': { table: 'bluesky_posts', column: 'created_at', minutes: 15 },
+  'calculate_bluesky_trends': { table: 'bluesky_posts', column: 'ai_processed_at', minutes: 20 },
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -18,8 +37,8 @@ serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const jobType = body.job_type; // Optional: run specific job type
-    const forceRun = body.force || false; // Force run even if not scheduled
+    const jobType = body.job_type;
+    const forceRun = body.force || false;
 
     console.log(`Scheduler: Running jobs${jobType ? ` (type: ${jobType})` : ''}`);
 
@@ -48,11 +67,70 @@ serve(async (req) => {
       );
     }
 
+    // Get recent job execution status for dependency checking
+    const { data: recentExecutions } = await supabase
+      .from('job_executions')
+      .select('job_id, status, completed_at')
+      .gte('started_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+      .eq('status', 'success')
+      .order('completed_at', { ascending: false });
+
+    const recentSuccessByJobId = new Map<string, Date>();
+    recentExecutions?.forEach(exec => {
+      if (!recentSuccessByJobId.has(exec.job_id)) {
+        recentSuccessByJobId.set(exec.job_id, new Date(exec.completed_at));
+      }
+    });
+
+    // Create job_type to job_id mapping
+    const jobTypeToId = new Map<string, string>();
+    jobs.forEach(job => jobTypeToId.set(job.job_type, job.id));
+
     const results: any[] = [];
+    const skipped: string[] = [];
 
     for (const job of jobs) {
       const startTime = Date.now();
       let executionId: string | null = null;
+
+      // Smart skip: Check if dependencies have run recently
+      const deps = JOB_DEPENDENCIES[job.job_type];
+      if (deps && !forceRun) {
+        const missingDeps = deps.filter(depType => {
+          const depJobId = jobTypeToId.get(depType);
+          if (!depJobId) return false;
+          const lastSuccess = recentSuccessByJobId.get(depJobId);
+          return !lastSuccess || (Date.now() - lastSuccess.getTime() > 60 * 60 * 1000);
+        });
+        if (missingDeps.length > 0) {
+          console.log(`Skipping ${job.job_name}: waiting for dependencies ${missingDeps.join(', ')}`);
+          skipped.push(job.job_name);
+          continue;
+        }
+      }
+
+      // Smart skip: Check if there's new data to process
+      const skipConfig = SKIP_IF_NO_DATA[job.job_type];
+      if (skipConfig && !forceRun) {
+        const cutoff = new Date(Date.now() - skipConfig.minutes * 60 * 1000).toISOString();
+        const { count } = await supabase
+          .from(skipConfig.table)
+          .select('*', { count: 'exact', head: true })
+          .gte(skipConfig.column, cutoff);
+        
+        if (!count || count === 0) {
+          console.log(`Skipping ${job.job_name}: no new data in ${skipConfig.table}`);
+          skipped.push(job.job_name);
+          // Still update next_run_at to prevent re-checking immediately
+          await supabase.rpc('update_job_after_execution', {
+            p_job_id: job.id,
+            p_status: 'skipped',
+            p_duration_ms: 0,
+            p_error: null,
+          });
+          continue;
+        }
+      }
 
       try {
         // Create execution record
@@ -487,6 +565,8 @@ serve(async (req) => {
         jobs_run: results.length,
         successful: successCount,
         failed: failureCount,
+        skipped: skipped.length,
+        skipped_jobs: skipped,
         results,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
