@@ -405,8 +405,8 @@ serve(async (req) => {
           .upsert({
             organization_id,
             campaign_id: campaign.id,
-            ad_set_id: null,
-            ad_id: null,
+            ad_set_id: '',
+            ad_id: '',
             date: insight.date_start,
             impressions: parseInt(insight.impressions) || 0,
             clicks: parseInt(insight.clicks) || 0,
