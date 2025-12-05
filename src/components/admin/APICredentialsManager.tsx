@@ -311,8 +311,12 @@ const APICredentialsManager = () => {
                   </TabsContent>
 
                   <TabsContent value="switchboard" className="space-y-4">
+                    <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground mb-4">
+                      <p className="font-medium mb-1">Switchboard Credentials:</p>
+                      <p>Find these in your Switchboard dashboard under Settings → API.</p>
+                    </div>
                     <div className="space-y-2">
-                      <Label htmlFor="switchboard_api_key">API Key *</Label>
+                      <Label htmlFor="switchboard_api_key">Token *</Label>
                       <Input
                         id="switchboard_api_key"
                         type="password"
@@ -321,9 +325,10 @@ const APICredentialsManager = () => {
                           ...platformConfig,
                           switchboard: { ...platformConfig.switchboard!, api_key: e.target.value }
                         })}
-                        placeholder="sb_live_..."
+                        placeholder="d58a7a264232412794cf2a42b379514e"
                         required={selectedPlatform === 'switchboard'}
                       />
+                      <p className="text-xs text-muted-foreground">Your Switchboard API token</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="account_id">Account ID *</Label>
@@ -334,9 +339,10 @@ const APICredentialsManager = () => {
                           ...platformConfig,
                           switchboard: { ...platformConfig.switchboard!, account_id: e.target.value }
                         })}
-                        placeholder="acc_..."
+                        placeholder="ac_01kbnytb9sd619s7nv7r7x4r10"
                         required={selectedPlatform === 'switchboard'}
                       />
+                      <p className="text-xs text-muted-foreground">Format: ac_xxxx</p>
                     </div>
                   </TabsContent>
 
@@ -370,7 +376,7 @@ const APICredentialsManager = () => {
                       <h4 className="font-medium mb-3">CSV API Credentials (for data sync)</h4>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="csv_username">API Username *</Label>
+                          <Label htmlFor="csv_username">Client UUID *</Label>
                           <Input
                             id="csv_username"
                             value={platformConfig.actblue?.username || ''}
@@ -378,12 +384,12 @@ const APICredentialsManager = () => {
                               ...platformConfig,
                               actblue: { ...platformConfig.actblue!, username: e.target.value }
                             })}
-                            placeholder="your-api-username"
+                            placeholder="b2ec7394-ae72-439a-a68c-eba35648e631"
                             required={selectedPlatform === 'actblue'}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="csv_password">API Password *</Label>
+                          <Label htmlFor="csv_password">Client Secret *</Label>
                           <Input
                             id="csv_password"
                             type="password"
@@ -392,12 +398,12 @@ const APICredentialsManager = () => {
                               ...platformConfig,
                               actblue: { ...platformConfig.actblue!, password: e.target.value }
                             })}
-                            placeholder="your-api-password"
+                            placeholder="Your client secret"
                             required={selectedPlatform === 'actblue'}
                           />
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">From ActBlue Dashboard → API Keys</p>
+                      <p className="text-xs text-muted-foreground mt-2">From ActBlue Dashboard → CSV API Settings</p>
                     </div>
 
                     <div className="border-t pt-4 mt-4">
