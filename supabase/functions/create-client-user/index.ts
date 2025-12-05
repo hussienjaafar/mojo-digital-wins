@@ -26,17 +26,94 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, full_name, organization_id, role, password }: CreateClientUserRequest = await req.json();
-    
-    console.log("Creating client user:", email);
+    // Extract and validate the Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header", success: false }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
-    // Create Supabase admin client with service role
+    // Create Supabase admin client with service role for admin operations
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
+
+    // Create a user-scoped client to verify the caller's identity
+    const supabaseUser = createClient(
+      SUPABASE_URL,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      {
+        global: { headers: { Authorization: authHeader } },
+        auth: { autoRefreshToken: false, persistSession: false }
+      }
+    );
+
+    // Get the authenticated user
+    const { data: { user: callerUser }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !callerUser) {
+      console.error("Auth error:", userError);
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired token", success: false }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const { email, full_name, organization_id, role, password }: CreateClientUserRequest = await req.json();
+    
+    console.log("Creating client user:", email, "requested by:", callerUser.id);
+
+    // Verify the caller is an admin or manager of the target organization
+    const { data: callerClientUser, error: callerError } = await supabaseAdmin
+      .from('client_users')
+      .select('role, organization_id')
+      .eq('id', callerUser.id)
+      .single();
+
+    if (callerError || !callerClientUser) {
+      // Check if caller is a system admin
+      const { data: isSystemAdmin } = await supabaseAdmin.rpc('has_role', {
+        _user_id: callerUser.id,
+        _role: 'admin'
+      });
+
+      if (!isSystemAdmin) {
+        console.error("Unauthorized: caller is not a client user or system admin");
+        return new Response(
+          JSON.stringify({ error: "You are not authorized to create users", success: false }),
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+    } else {
+      // Caller is a client user - verify they can create users in target org
+      const canManageUsers = ['admin', 'manager'].includes(callerClientUser.role);
+      const sameOrg = callerClientUser.organization_id === organization_id;
+
+      if (!canManageUsers || !sameOrg) {
+        console.error("Unauthorized: caller cannot create users in this organization");
+        return new Response(
+          JSON.stringify({ error: "You can only create users in your own organization with admin/manager role", success: false }),
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      // Prevent privilege escalation - can't create users with higher role than yourself
+      const roleHierarchy = { 'viewer': 1, 'editor': 2, 'manager': 3, 'admin': 4 };
+      const callerLevel = roleHierarchy[callerClientUser.role as keyof typeof roleHierarchy] || 0;
+      const newUserLevel = roleHierarchy[role as keyof typeof roleHierarchy] || 0;
+
+      if (newUserLevel > callerLevel) {
+        console.error("Privilege escalation attempt blocked");
+        return new Response(
+          JSON.stringify({ error: "You cannot create users with a higher role than your own", success: false }),
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+    }
 
     // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
