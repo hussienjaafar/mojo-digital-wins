@@ -67,6 +67,8 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     };
   };
 
+  const [lastSentDate, setLastSentDate] = useState<string | null>(null);
+
   useEffect(() => {
     loadData();
   }, [organizationId, startDate, endDate]);
@@ -76,14 +78,15 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     const prevPeriod = getPreviousPeriod();
 
     try {
-      // Current period
+      // Current period - query from sms_campaigns table using send_date
       const { data, error } = await (supabase as any)
-        .from('sms_campaign_metrics')
+        .from('sms_campaigns')
         .select('*')
         .eq('organization_id', organizationId)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: true });
+        .gte('send_date', startDate)
+        .lte('send_date', `${endDate}T23:59:59`)
+        .neq('status', 'draft')
+        .order('send_date', { ascending: true });
 
       if (error) throw error;
 
@@ -93,13 +96,27 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
       const daily = aggregateDailyMetrics(data || []);
       setDailyMetrics(daily);
 
+      // Get last sent SMS date for freshness indicator
+      const { data: latestSms } = await (supabase as any)
+        .from('sms_campaigns')
+        .select('send_date')
+        .eq('organization_id', organizationId)
+        .neq('status', 'draft')
+        .order('send_date', { ascending: false })
+        .limit(1);
+      
+      if (latestSms?.[0]?.send_date) {
+        setLastSentDate(latestSms[0].send_date.split('T')[0]);
+      }
+
       // Previous period
       const { data: prevData } = await (supabase as any)
-        .from('sms_campaign_metrics')
+        .from('sms_campaigns')
         .select('*')
         .eq('organization_id', organizationId)
-        .gte('date', prevPeriod.start)
-        .lte('date', prevPeriod.end);
+        .gte('send_date', prevPeriod.start)
+        .lte('send_date', `${prevPeriod.end}T23:59:59`)
+        .neq('status', 'draft');
 
       const prevAggregated = aggregateMetrics(prevData || []);
       setPreviousPeriodMetrics(prevAggregated);
@@ -113,11 +130,13 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
   const aggregateMetrics = (data: any[]): Record<string, SMSMetric> => {
     const aggregated: Record<string, SMSMetric> = {};
-    data?.forEach(metric => {
-      if (!aggregated[metric.campaign_id]) {
-        aggregated[metric.campaign_id] = {
-          campaign_id: metric.campaign_id,
-          campaign_name: metric.campaign_name || metric.campaign_id,
+    data?.forEach(campaign => {
+      // Each row is a campaign, not a daily metric - use campaign_id as key
+      const id = campaign.campaign_id || campaign.id;
+      if (!aggregated[id]) {
+        aggregated[id] = {
+          campaign_id: id,
+          campaign_name: campaign.campaign_name || id,
           messages_sent: 0,
           messages_delivered: 0,
           messages_failed: 0,
@@ -132,14 +151,14 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
           opt_out_rate: 0,
         };
       }
-      aggregated[metric.campaign_id].messages_sent += metric.messages_sent || 0;
-      aggregated[metric.campaign_id].messages_delivered += metric.messages_delivered || 0;
-      aggregated[metric.campaign_id].messages_failed += metric.messages_failed || 0;
-      aggregated[metric.campaign_id].opt_outs += metric.opt_outs || 0;
-      aggregated[metric.campaign_id].clicks += metric.clicks || 0;
-      aggregated[metric.campaign_id].conversions += metric.conversions || 0;
-      aggregated[metric.campaign_id].amount_raised += Number(metric.amount_raised || 0);
-      aggregated[metric.campaign_id].cost += Number(metric.cost || 0);
+      aggregated[id].messages_sent += campaign.messages_sent || 0;
+      aggregated[id].messages_delivered += campaign.messages_delivered || 0;
+      aggregated[id].messages_failed += campaign.messages_failed || 0;
+      aggregated[id].opt_outs += campaign.opt_outs || 0;
+      aggregated[id].clicks += campaign.clicks || 0;
+      aggregated[id].conversions += campaign.conversions || 0;
+      aggregated[id].amount_raised += Number(campaign.amount_raised || 0);
+      aggregated[id].cost += Number(campaign.cost || 0);
     });
 
     // Calculate derived metrics
@@ -157,14 +176,16 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
   const aggregateDailyMetrics = (data: any[]): DailyMetric[] => {
     const byDate: Record<string, DailyMetric> = {};
-    data?.forEach(metric => {
-      const date = metric.date;
+    data?.forEach(campaign => {
+      // Use send_date from sms_campaigns table
+      const date = campaign.send_date?.split('T')[0];
+      if (!date) return;
       if (!byDate[date]) {
         byDate[date] = { date, messages_sent: 0, conversions: 0, amount_raised: 0 };
       }
-      byDate[date].messages_sent += metric.messages_sent || 0;
-      byDate[date].conversions += metric.conversions || 0;
-      byDate[date].amount_raised += Number(metric.amount_raised || 0);
+      byDate[date].messages_sent += campaign.messages_sent || 0;
+      byDate[date].conversions += campaign.conversions || 0;
+      byDate[date].amount_raised += Number(campaign.amount_raised || 0);
     });
     return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
   };
@@ -363,87 +384,107 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
           </div>
         </PortalCardHeader>
         <PortalCardContent>
-          <PortalTable
-            data={filteredCampaigns}
-            columns={[
-              {
-                key: "campaign_name",
-                label: "Campaign",
-                sortable: true,
-                render: (value) => <span className="font-medium portal-text-primary">{value}</span>,
-              },
-              {
-                key: "messages_sent",
-                label: "Sent",
-                sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.number,
-              },
-              {
-                key: "delivery_rate",
-                label: "Delivery",
-                sortable: true,
-                className: "text-right",
-                render: (value) => <span className={value < 90 ? 'text-[hsl(var(--portal-warning))]' : ''}>{value.toFixed(1)}%</span>,
-                hiddenOnMobile: true,
-              },
-              {
-                key: "roi",
-                label: "ROI",
-                sortable: true,
-                className: "text-right",
-                render: (value) => (
-                  <span className={value >= 2 ? 'text-[hsl(var(--portal-success))] font-semibold' : ''}>
-                    {value.toFixed(2)}x
-                  </span>
-                ),
-              },
-              {
-                key: "amount_raised",
-                label: "Raised",
-                sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.currency,
-              },
-              {
-                key: "cost",
-                label: "Cost",
-                sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.currency,
-                hiddenOnMobile: true,
-              },
-              {
-                key: "opt_out_rate",
-                label: "Opt-out",
-                sortable: true,
-                className: "text-right",
-                render: (value) => (
-                  <span className={value >= 2 ? 'text-[hsl(var(--portal-warning))]' : ''}>
-                    {value.toFixed(2)}%
-                  </span>
-                ),
-                hiddenOnMobile: true,
-              },
-              {
-                key: "conversions",
-                label: "Conv.",
-                sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.number,
-              },
-            ]}
-            keyExtractor={(row) => row.campaign_id}
-            isLoading={isLoading}
-            emptyMessage="No SMS campaigns found"
-            emptyAction={
-              <p className="text-sm portal-text-muted">
-                Connect your SMS platform to see campaign data
+          {campaigns.length === 0 && !isLoading && lastSentDate ? (
+            <div className="text-center py-8 space-y-3">
+              <MessageSquare className="h-10 w-10 mx-auto text-[hsl(var(--portal-text-muted))]" />
+              <p className="text-sm portal-text-secondary">No SMS campaigns in selected date range</p>
+              <p className="text-xs portal-text-muted">
+                Last campaign sent: {format(parseISO(lastSentDate), 'MMM d, yyyy')}
               </p>
-            }
-          />
+            </div>
+          ) : (
+            <PortalTable
+              data={filteredCampaigns}
+              columns={[
+                {
+                  key: "campaign_name",
+                  label: "Campaign",
+                  sortable: true,
+                  render: (value) => <span className="font-medium portal-text-primary">{value}</span>,
+                },
+                {
+                  key: "messages_sent",
+                  label: "Sent",
+                  sortable: true,
+                  className: "text-right",
+                  render: PortalTableRenderers.number,
+                },
+                {
+                  key: "delivery_rate",
+                  label: "Delivery",
+                  sortable: true,
+                  className: "text-right",
+                  render: (value) => <span className={value < 90 ? 'text-[hsl(var(--portal-warning))]' : ''}>{value.toFixed(1)}%</span>,
+                  hiddenOnMobile: true,
+                },
+                {
+                  key: "roi",
+                  label: "ROI",
+                  sortable: true,
+                  className: "text-right",
+                  render: (value) => (
+                    <span className={value >= 2 ? 'text-[hsl(var(--portal-success))] font-semibold' : ''}>
+                      {value.toFixed(2)}x
+                    </span>
+                  ),
+                },
+                {
+                  key: "amount_raised",
+                  label: "Raised",
+                  sortable: true,
+                  className: "text-right",
+                  render: PortalTableRenderers.currency,
+                },
+                {
+                  key: "cost",
+                  label: "Cost",
+                  sortable: true,
+                  className: "text-right",
+                  render: PortalTableRenderers.currency,
+                  hiddenOnMobile: true,
+                },
+                {
+                  key: "opt_out_rate",
+                  label: "Opt-out",
+                  sortable: true,
+                  className: "text-right",
+                  render: (value) => (
+                    <span className={value >= 2 ? 'text-[hsl(var(--portal-warning))]' : ''}>
+                      {value.toFixed(2)}%
+                    </span>
+                  ),
+                  hiddenOnMobile: true,
+                },
+                {
+                  key: "conversions",
+                  label: "Conv.",
+                  sortable: true,
+                  className: "text-right",
+                  render: PortalTableRenderers.number,
+                },
+              ]}
+              keyExtractor={(row) => row.campaign_id}
+              isLoading={isLoading}
+              emptyMessage="No SMS campaigns found"
+              emptyAction={
+                <p className="text-sm portal-text-muted">
+                  Connect your SMS platform to see campaign data
+                </p>
+              }
+            />
+          )}
         </PortalCardContent>
       </PortalCard>
+
+      {/* Data Freshness Indicator */}
+      {lastSentDate && (
+        <div className="flex items-center gap-2 text-xs portal-text-muted">
+          <span>Last SMS campaign: {format(parseISO(lastSentDate), 'MMM d, yyyy')}</span>
+          {new Date().getTime() - new Date(lastSentDate).getTime() > 7 * 24 * 60 * 60 * 1000 && (
+            <PortalBadge variant="warning">No recent campaigns</PortalBadge>
+          )}
+        </div>
+      )}
     </div>
   );
 };
