@@ -1,18 +1,52 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, DollarSign, MessageSquare, TrendingUp, Heart, History } from "lucide-react";
+import { RefreshCw, DollarSign, MessageSquare, TrendingUp, Heart, History, CheckCircle, AlertCircle, Clock } from "lucide-react";
 import { logger } from "@/lib/logger";
+import { Badge } from "@/components/ui/badge";
+import { formatDistanceToNow } from "date-fns";
+import { DataFreshnessIndicator } from "./DataFreshnessIndicator";
 
 type Props = {
   organizationId: string;
 };
 
+type SyncStatus = {
+  platform: string;
+  lastSync: string | null;
+  status: string | null;
+};
 const SyncControls = ({ organizationId }: Props) => {
   const { toast } = useToast();
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
+  const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    loadSyncStatuses();
+  }, [organizationId]);
+
+  const loadSyncStatuses = async () => {
+    const { data } = await supabase
+      .from('client_api_credentials')
+      .select('platform, last_sync_at, last_sync_status')
+      .eq('organization_id', organizationId)
+      .eq('is_active', true);
+    
+    if (data) {
+      setSyncStatuses(data.map(c => ({
+        platform: c.platform,
+        lastSync: c.last_sync_at,
+        status: c.last_sync_status
+      })));
+    }
+  };
+
+  const getSyncStatus = (platform: string) => {
+    return syncStatuses.find(s => s.platform === platform);
+  };
 
   const syncMetaAds = async () => {
     setSyncing({ ...syncing, meta: true });
@@ -156,83 +190,131 @@ const SyncControls = ({ organizationId }: Props) => {
       description: "All data sources synced successfully",
     });
 
-    // Reload page to show updated data
-    setTimeout(() => window.location.reload(), 1000);
+    // Refresh sync statuses and trigger indicator refresh
+    await loadSyncStatuses();
+    setRefreshKey(prev => prev + 1);
+  };
+
+  const renderSyncStatusBadge = (platform: string) => {
+    const status = getSyncStatus(platform);
+    if (!status) return null;
+    
+    if (status.status === 'failed') {
+      return (
+        <Badge variant="destructive" className="text-[9px] gap-0.5 px-1">
+          <AlertCircle className="h-2 w-2" />
+          Failed
+        </Badge>
+      );
+    }
+    
+    if (status.status === 'success' && status.lastSync) {
+      return (
+        <Badge variant="outline" className="text-[9px] gap-0.5 px-1 bg-green-500/10 text-green-600 border-green-500/20">
+          <CheckCircle className="h-2 w-2" />
+          {formatDistanceToNow(new Date(status.lastSync), { addSuffix: false })}
+        </Badge>
+      );
+    }
+    
+    return null;
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Data Sync</CardTitle>
-        <CardDescription>
-          Manually sync data from connected platforms
-        </CardDescription>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle>Data Sync</CardTitle>
+            <CardDescription>
+              Manually sync data from connected platforms
+            </CardDescription>
+          </div>
+          <DataFreshnessIndicator organizationId={organizationId} compact key={refreshKey} />
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <Button
             onClick={syncMetaAds}
             disabled={syncing.meta}
             variant="outline"
-            className="h-auto flex-col gap-2 py-4"
+            className="h-auto flex-col gap-1.5 py-3 relative"
           >
-            <DollarSign className="w-6 h-6" />
-            <span>Sync Meta Ads</span>
-            {syncing.meta && <RefreshCw className="w-4 h-4 animate-spin" />}
+            <DollarSign className="w-5 h-5" />
+            <span className="text-xs">Sync Meta Ads</span>
+            {syncing.meta ? (
+              <RefreshCw className="w-3 h-3 animate-spin" />
+            ) : (
+              renderSyncStatusBadge('meta')
+            )}
           </Button>
 
           <Button
             onClick={syncSwitchboard}
             disabled={syncing.sms}
             variant="outline"
-            className="h-auto flex-col gap-2 py-4"
+            className="h-auto flex-col gap-1.5 py-3 relative"
           >
-            <MessageSquare className="w-6 h-6" />
-            <span>Sync SMS</span>
-            {syncing.sms && <RefreshCw className="w-4 h-4 animate-spin" />}
+            <MessageSquare className="w-5 h-5" />
+            <span className="text-xs">Sync SMS</span>
+            {syncing.sms ? (
+              <RefreshCw className="w-3 h-3 animate-spin" />
+            ) : (
+              renderSyncStatusBadge('switchboard')
+            )}
           </Button>
 
           <Button
             onClick={() => syncActBlue(false)}
             disabled={syncing.actblue || syncing.actblueBackfill}
             variant="outline"
-            className="h-auto flex-col gap-2 py-4"
+            className="h-auto flex-col gap-1.5 py-3 relative"
           >
-            <Heart className="w-6 h-6" />
-            <span>Sync ActBlue</span>
-            {syncing.actblue && <RefreshCw className="w-4 h-4 animate-spin" />}
+            <Heart className="w-5 h-5" />
+            <span className="text-xs">Sync ActBlue</span>
+            {syncing.actblue ? (
+              <RefreshCw className="w-3 h-3 animate-spin" />
+            ) : (
+              renderSyncStatusBadge('actblue')
+            )}
           </Button>
 
           <Button
             onClick={() => syncActBlue(true)}
             disabled={syncing.actblue || syncing.actblueBackfill}
             variant="outline"
-            className="h-auto flex-col gap-2 py-4 border-dashed"
+            className="h-auto flex-col gap-1.5 py-3 border-dashed"
           >
-            <History className="w-6 h-6" />
-            <span>Backfill ActBlue</span>
-            {syncing.actblueBackfill && <RefreshCw className="w-4 h-4 animate-spin" />}
+            <History className="w-5 h-5" />
+            <span className="text-xs">Backfill ActBlue</span>
+            {syncing.actblueBackfill && <RefreshCw className="w-3 h-3 animate-spin" />}
           </Button>
 
           <Button
             onClick={calculateROI}
             disabled={syncing.roi}
             variant="outline"
-            className="h-auto flex-col gap-2 py-4"
+            className="h-auto flex-col gap-1.5 py-3"
           >
-            <TrendingUp className="w-6 h-6" />
-            <span>Calculate ROI</span>
-            {syncing.roi && <RefreshCw className="w-4 h-4 animate-spin" />}
+            <TrendingUp className="w-5 h-5" />
+            <span className="text-xs">Calculate ROI</span>
+            {syncing.roi && <RefreshCw className="w-3 h-3 animate-spin" />}
           </Button>
 
           <Button
             onClick={syncAll}
             disabled={Object.values(syncing).some(Boolean)}
-            className="h-auto flex-col gap-2 py-4"
+            className="h-auto flex-col gap-1.5 py-3"
           >
-            <RefreshCw className="w-6 h-6" />
-            <span>Sync All</span>
+            <RefreshCw className="w-5 h-5" />
+            <span className="text-xs">Sync All</span>
           </Button>
+        </div>
+
+        {/* Expanded Freshness View */}
+        <div className="pt-4 border-t">
+          <DataFreshnessIndicator organizationId={organizationId} key={`full-${refreshKey}`} />
         </div>
       </CardContent>
     </Card>

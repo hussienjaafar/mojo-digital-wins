@@ -4,7 +4,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle, XCircle, AlertCircle, RefreshCw, Eye, Calendar, Activity } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, RefreshCw, Eye, Calendar, Activity, Database, Clock } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
+
+interface DataFreshness {
+  source: string;
+  latestDate: string | null;
+  recordCount: number;
+  hoursStale: number | null;
+}
 
 interface ClientHealth {
   id: string;
@@ -19,12 +28,15 @@ interface ClientHealth {
     last_sync_at: string | null;
     last_sync_status: string | null;
   }[];
+  data_freshness?: DataFreshness[];
 }
 
 export default function ClientHealthOverview() {
   const [clients, setClients] = useState<ClientHealth[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchClientHealth();
@@ -53,6 +65,22 @@ export default function ClientHealthOverview() {
 
       if (credError) throw credError;
 
+      // Fetch data freshness metrics
+      const { data: metaFreshness } = await supabase
+        .from("meta_ad_metrics")
+        .select("organization_id, date")
+        .order("date", { ascending: false });
+
+      const { data: actblueFreshness } = await supabase
+        .from("actblue_transactions")
+        .select("organization_id, transaction_date")
+        .order("transaction_date", { ascending: false });
+
+      const { data: smsFreshness } = await supabase
+        .from("sms_campaigns")
+        .select("organization_id, send_date")
+        .order("send_date", { ascending: false });
+
       // Combine data
       const clientHealthData = orgs?.map(org => {
         const orgUsers = users?.filter(u => u.organization_id === org.id) || [];
@@ -71,6 +99,27 @@ export default function ClientHealthOverview() {
           last_sync_status: c.last_sync_status,
         })) || [];
 
+        // Calculate data freshness
+        const freshness: DataFreshness[] = [];
+        
+        const latestMeta = metaFreshness?.find(m => m.organization_id === org.id);
+        if (latestMeta) {
+          const hoursStale = (Date.now() - new Date(latestMeta.date).getTime()) / (1000 * 60 * 60);
+          freshness.push({ source: 'Meta', latestDate: latestMeta.date, recordCount: 0, hoursStale });
+        }
+        
+        const latestActblue = actblueFreshness?.find(a => a.organization_id === org.id);
+        if (latestActblue) {
+          const hoursStale = (Date.now() - new Date(latestActblue.transaction_date).getTime()) / (1000 * 60 * 60);
+          freshness.push({ source: 'ActBlue', latestDate: latestActblue.transaction_date, recordCount: 0, hoursStale });
+        }
+        
+        const latestSms = smsFreshness?.find(s => s.organization_id === org.id);
+        if (latestSms) {
+          const hoursStale = (Date.now() - new Date(latestSms.send_date).getTime()) / (1000 * 60 * 60);
+          freshness.push({ source: 'SMS', latestDate: latestSms.send_date, recordCount: 0, hoursStale });
+        }
+
         return {
           id: org.id,
           name: org.name,
@@ -79,6 +128,7 @@ export default function ClientHealthOverview() {
           last_login: lastLogin,
           user_count: orgUsers.length,
           api_credentials: apiCredentials,
+          data_freshness: freshness,
         };
       }) || [];
 
@@ -88,6 +138,51 @@ export default function ClientHealthOverview() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const triggerSync = async (orgId: string, platform: string) => {
+    const syncKey = `${orgId}-${platform}`;
+    setSyncing(prev => ({ ...prev, [syncKey]: true }));
+    
+    try {
+      const functionName = platform === 'actblue' ? 'sync-actblue-csv' 
+        : platform === 'meta' ? 'sync-meta-ads'
+        : 'sync-switchboard-sms';
+      
+      const { error } = await supabase.functions.invoke(functionName, {
+        body: { organization_id: orgId }
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Sync Triggered",
+        description: `${platform} sync started for organization`,
+      });
+      
+      // Refresh data after a delay
+      setTimeout(() => fetchClientHealth(), 3000);
+    } catch (error: any) {
+      toast({
+        title: "Sync Failed",
+        description: error.message || `Failed to sync ${platform}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(prev => ({ ...prev, [syncKey]: false }));
+    }
+  };
+
+  const getDataFreshnessBadge = (hoursStale: number | null) => {
+    if (hoursStale === null) return null;
+    
+    if (hoursStale < 24) {
+      return <Badge variant="outline" className="text-[10px] bg-green-500/10 text-green-600 border-green-500/20">Fresh</Badge>;
+    }
+    if (hoursStale < 72) {
+      return <Badge variant="outline" className="text-[10px] bg-yellow-500/10 text-yellow-600 border-yellow-500/20">{Math.round(hoursStale)}h</Badge>;
+    }
+    return <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-600 border-red-500/20">{Math.round(hoursStale / 24)}d stale</Badge>;
   };
 
   const getSyncStatusBadge = (status: string | null) => {
@@ -193,23 +288,55 @@ export default function ClientHealthOverview() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
+                  {/* Data Freshness */}
+                  {client.data_freshness && client.data_freshness.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                        <Database className="h-3 w-3" />
+                        Data Freshness
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {client.data_freshness.map((df, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/30 border border-border/50">
+                            <span className="text-[10px] font-medium">{df.source}</span>
+                            {getDataFreshnessBadge(df.hoursStale)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-2">API Integrations</p>
                     {client.api_credentials.length === 0 ? (
                       <p className="text-xs text-muted-foreground">No API credentials configured</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {client.api_credentials.map((cred, idx) => (
-                          <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border">
-                            <span className="text-xs font-medium text-foreground">{cred.platform}</span>
-                            {getSyncStatusBadge(cred.last_sync_status)}
-                            {cred.last_sync_at && (
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(cred.last_sync_at).toLocaleDateString()}
-                              </span>
-                            )}
-                          </div>
-                        ))}
+                        {client.api_credentials.map((cred, idx) => {
+                          const syncKey = `${client.id}-${cred.platform}`;
+                          const isSyncing = syncing[syncKey];
+                          
+                          return (
+                            <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border">
+                              <span className="text-xs font-medium text-foreground">{cred.platform}</span>
+                              {getSyncStatusBadge(cred.last_sync_status)}
+                              {cred.last_sync_at && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  {formatDistanceToNow(new Date(cred.last_sync_at), { addSuffix: true })}
+                                </span>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 w-5 p-0"
+                                disabled={isSyncing}
+                                onClick={() => triggerSync(client.id, cred.platform)}
+                              >
+                                <RefreshCw className={`h-3 w-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                              </Button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
