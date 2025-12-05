@@ -5670,6 +5670,56 @@ export type Database = {
           },
         ]
       }
+      webhook_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          event_type: string | null
+          headers: Json | null
+          id: string
+          organization_id: string | null
+          payload: Json | null
+          platform: string
+          processed_at: string | null
+          processing_status: string | null
+          received_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          event_type?: string | null
+          headers?: Json | null
+          id?: string
+          organization_id?: string | null
+          payload?: Json | null
+          platform: string
+          processed_at?: string | null
+          processing_status?: string | null
+          received_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          event_type?: string | null
+          headers?: Json | null
+          id?: string
+          organization_id?: string | null
+          payload?: Json | null
+          platform?: string
+          processed_at?: string | null
+          processing_status?: string | null
+          received_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       backfill_monitoring: {
