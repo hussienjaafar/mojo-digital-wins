@@ -6,8 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ==================== SAFEGUARDS & LIMITS ====================
+// These prevent database overload
+const MAX_POSTS_IN_DB = 50000;          // Auto-pause if DB has more than this
+const MAX_POSTS_PER_SESSION = 500;      // Max posts to collect per invocation
+const MAX_DURATION_MS = 10000;          // Max 10 seconds per session
+const MIN_RELEVANCE_SCORE = 0.20;       // Higher threshold = fewer posts
+const POST_AGE_LIMIT_DAYS = 7;          // Posts older than this get cleaned
+
+// ==================== POLITICAL KEYWORDS ====================
 // HIGH-VALUE POLITICAL KEYWORDS - Focus on actionable political content
-// Removed generic terms that generate noise
 const POLITICAL_KEYWORDS = [
   // US Politics - Specific figures and institutions
   'congress', 'senate', 'biden', 'trump', 'pelosi', 'mcconnell', 'schumer',
@@ -74,24 +82,55 @@ interface JetStreamEvent {
   };
 }
 
+// ==================== DATABASE HEALTH CHECK ====================
+async function checkDatabaseHealth(supabase: any): Promise<{ healthy: boolean; postCount: number; message: string }> {
+  try {
+    // Simple count query - no date filter for reliability
+    const { count, error } = await supabase
+      .from('bluesky_posts')
+      .select('*', { count: 'exact', head: true });
+    
+    if (error) {
+      // If table doesn't exist or other error, assume empty and healthy
+      console.warn('⚠️ Database count query issue:', error.message);
+      return { healthy: true, postCount: 0, message: `Database accessible, count unavailable` };
+    }
+    
+    const postCount = count || 0;
+    console.log(`📊 Current post count: ${postCount}`);
+    
+    if (postCount >= MAX_POSTS_IN_DB) {
+      return { 
+        healthy: false, 
+        postCount, 
+        message: `Database at capacity: ${postCount}/${MAX_POSTS_IN_DB} posts. Cleanup required.` 
+      };
+    }
+    
+    return { 
+      healthy: true, 
+      postCount, 
+      message: `Database healthy: ${postCount}/${MAX_POSTS_IN_DB} posts` 
+    };
+  } catch (error) {
+    // On any error, be optimistic and allow ingestion with caution
+    console.warn('⚠️ Health check error, proceeding with caution:', error);
+    return { healthy: true, postCount: 0, message: `Health check unavailable, proceeding cautiously` };
+  }
+}
+
 // Check if post is spam/low-value
 function isSpamOrLowValue(text: string): boolean {
-  // Check spam patterns
   for (const pattern of SPAM_PATTERNS) {
-    if (pattern.test(text)) {
-      return true;
-    }
+    if (pattern.test(text)) return true;
   }
   
-  // Too many hashtags = promotional
   const hashtagCount = (text.match(/#\w+/g) || []).length;
   if (hashtagCount > 5) return true;
   
-  // Too many mentions = engagement farming
   const mentionCount = (text.match(/@[\w.]+/g) || []).length;
   if (mentionCount > 5) return true;
   
-  // All caps = low quality
   const capsRatio = (text.match(/[A-Z]/g) || []).length / text.length;
   if (capsRatio > 0.5 && text.length > 50) return true;
   
@@ -123,7 +162,6 @@ function extractUrls(text: string): string[] {
 function hasHighValueKeyword(text: string): boolean {
   const lowerText = text.toLowerCase();
   
-  // Stage 1: Quick substring check
   let hasSubstring = false;
   for (const keyword of POLITICAL_KEYWORDS_LOWER) {
     if (lowerText.includes(keyword)) {
@@ -134,7 +172,6 @@ function hasHighValueKeyword(text: string): boolean {
   
   if (!hasSubstring) return false;
   
-  // Stage 2: Word boundary check (more precise)
   for (const pattern of KEYWORD_PATTERNS) {
     if (pattern.test(text)) {
       return true;
@@ -152,11 +189,10 @@ function calculateRelevance(text: string): number {
 
   for (const keyword of POLITICAL_KEYWORDS_LOWER) {
     if (lowerText.includes(keyword)) {
-      score += 0.15; // Higher weight per keyword
+      score += 0.15;
       matchCount++;
       
       if (matchCount >= 2) {
-        // Multiple keyword matches = high relevance
         return Math.min(score + 0.2, 1.0);
       }
     }
@@ -165,13 +201,14 @@ function calculateRelevance(text: string): number {
   return score;
 }
 
-// Cursor-based stream processor with STRICT filtering
-async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPostsProcessed: number = 30000) {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
-  console.log('🔵 Starting STRICT cursor-based JetStream collection...');
+// Cursor-based stream processor with STRICT filtering and SAFEGUARDS
+async function processBlueskyStreamWithCursor(
+  supabase: any,
+  durationMs: number = MAX_DURATION_MS, 
+  maxPostsProcessed: number = MAX_POSTS_PER_SESSION
+) {
+  console.log('🔵 Starting SAFEGUARDED cursor-based JetStream collection...');
+  console.log(`   Limits: ${maxPostsProcessed} posts max, ${durationMs}ms max, ${MIN_RELEVANCE_SCORE} min relevance`);
 
   // Get last cursor position
   const { data: cursorData, error: cursorError } = await supabase
@@ -197,12 +234,13 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
   let spamFiltered = 0;
   let lowRelevanceFiltered = 0;
   let shouldStop = false;
-  const batchSize = 50;
+  const batchSize = 25; // Smaller batches for stability
   const collectedPosts: any[] = [];
 
   const startTime = Date.now();
   const timeout = setTimeout(() => {
     console.log(`⏱️  Collection timeout reached (${durationMs}ms)`);
+    shouldStop = true;
   }, durationMs);
 
   return new Promise((resolve, reject) => {
@@ -212,11 +250,14 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
       );
 
       ws.onopen = () => {
-        console.log('✅ Connected to JetStream (STRICT mode)');
+        console.log('✅ Connected to JetStream (SAFEGUARDED mode)');
       };
 
       ws.onmessage = async (event) => {
-        if (shouldStop) return;
+        if (shouldStop) {
+          ws.close();
+          return;
+        }
         
         try {
           const data: JetStreamEvent = JSON.parse(event.data);
@@ -231,8 +272,17 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
 
           postCount++;
           
-          if (postCount >= maxPostsProcessed) {
-            console.log(`⚠️ Safety limit reached: ${maxPostsProcessed} posts`);
+          // SAFEGUARD: Stop if we've collected enough relevant posts
+          if (relevantCount >= maxPostsProcessed) {
+            console.log(`🛑 Collected ${maxPostsProcessed} relevant posts - stopping`);
+            shouldStop = true;
+            ws.close();
+            return;
+          }
+          
+          // SAFEGUARD: Hard limit on total processed
+          if (postCount >= maxPostsProcessed * 100) {
+            console.log(`⚠️ Processed ${postCount} posts without hitting relevant limit - stopping`);
             shouldStop = true;
             ws.close();
             return;
@@ -248,28 +298,28 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
             return;
           }
           
-          // FILTER 2: Length bounds - STRICTER (50-400 chars)
-          if (text.length < 50 || text.length > 400) {
+          // FILTER 2: Length bounds - STRICTER (60-350 chars)
+          if (text.length < 60 || text.length > 350) {
             lengthFiltered++;
             return;
           }
 
-          // FILTER 3: Spam detection - NEW
+          // FILTER 3: Spam detection
           if (isSpamOrLowValue(text)) {
             spamFiltered++;
             return;
           }
 
-          // FILTER 4: Keyword matching - STRICTER keywords
+          // FILTER 4: Keyword matching
           if (!hasHighValueKeyword(text)) {
             return;
           }
           
           keywordMatchCount++;
 
-          // FILTER 5: Relevance score - HIGHER threshold (0.15 instead of 0.1)
+          // FILTER 5: Relevance score - HIGH threshold
           const relevanceScore = calculateRelevance(text);
-          if (relevanceScore < 0.15) {
+          if (relevanceScore < MIN_RELEVANCE_SCORE) {
             lowRelevanceFiltered++;
             return;
           }
@@ -311,11 +361,11 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
 
             if (insertError) {
               console.error('❌ Error inserting batch:', insertError);
+              // If insert fails, stop to prevent issues
+              shouldStop = true;
+              ws.close();
             } else {
-              const efficiency = ((relevantCount / postCount) * 100).toFixed(2);
-              console.log(
-                `✅ Batch: ${batch.length} | ${relevantCount}/${postCount} (${efficiency}%) | Spam:-${spamFiltered} Lang:-${languageFiltered} Len:-${lengthFiltered}`
-              );
+              console.log(`✅ Batch: ${batch.length} posts | Total: ${relevantCount}/${maxPostsProcessed}`);
             }
           }
 
@@ -366,9 +416,9 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
           console.error('❌ Error updating cursor:', updateError);
         }
 
-        const efficiency = ((relevantCount / postCount) * 100).toFixed(3);
+        const efficiency = postCount > 0 ? ((relevantCount / postCount) * 100).toFixed(3) : '0';
         console.log(
-          `✅ STRICT Complete: ${relevantCount} saved | ${postCount} processed (${efficiency}%) | Filtered: spam=${spamFiltered} lang=${languageFiltered} len=${lengthFiltered} lowRel=${lowRelevanceFiltered}`
+          `✅ SAFEGUARDED Complete: ${relevantCount} saved | ${postCount} processed (${efficiency}%)`
         );
 
         resolve({
@@ -396,27 +446,60 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // ⚠️ TEMPORARILY DISABLED - Database recovery in progress
-  // Remove this block to re-enable data ingestion
-  console.log('⏸️ Bluesky stream DISABLED - Database recovery mode');
-  return new Response(JSON.stringify({
-    status: 'disabled',
-    message: 'Bluesky stream temporarily disabled for database recovery',
-    timestamp: new Date().toISOString()
-  }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Original code below - uncomment to re-enable
-  /*
   try {
-    console.log('🚀 Starting STRICT collection session...');
+    // ==================== HEALTH CHECK BEFORE INGESTION ====================
+    console.log('🏥 Checking database health before ingestion...');
+    const health = await checkDatabaseHealth(supabase);
+    console.log(`   ${health.message}`);
     
-    const { durationMs = 15000, maxPostsProcessed = 30000 } = await req.json().catch(() => ({}));
-    
-    const result = await processBlueskyStreamWithCursor(durationMs, maxPostsProcessed);
+    if (!health.healthy) {
+      console.log('⏸️ Database not healthy - skipping ingestion');
+      return new Response(JSON.stringify({
+        status: 'paused',
+        reason: health.message,
+        postCount: health.postCount,
+        maxAllowed: MAX_POSTS_IN_DB,
+        recommendation: 'Run cleanup-bluesky-posts to free space',
+        timestamp: new Date().toISOString()
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    return new Response(JSON.stringify(result), {
+    // ==================== PROCEED WITH INGESTION ====================
+    console.log('🚀 Starting SAFEGUARDED collection session...');
+    
+    // Use conservative defaults, allow override only within limits
+    const body = await req.json().catch(() => ({}));
+    const durationMs = Math.min(body.durationMs || MAX_DURATION_MS, MAX_DURATION_MS);
+    const maxPosts = Math.min(body.maxPostsProcessed || MAX_POSTS_PER_SESSION, MAX_POSTS_PER_SESSION);
+    
+    const result = await processBlueskyStreamWithCursor(supabase, durationMs, maxPosts) as {
+      relevantPosts: number;
+      totalProcessed: number;
+      cursor: number;
+      durationMs: number;
+      filters: Record<string, number>;
+    };
+
+    return new Response(JSON.stringify({
+      relevantPosts: result.relevantPosts,
+      totalProcessed: result.totalProcessed,
+      cursor: result.cursor,
+      durationMs: result.durationMs,
+      filters: result.filters,
+      safeguards: {
+        maxPostsInDb: MAX_POSTS_IN_DB,
+        currentPostCount: health.postCount,
+        maxPostsPerSession: MAX_POSTS_PER_SESSION,
+        maxDurationMs: MAX_DURATION_MS,
+        minRelevanceScore: MIN_RELEVANCE_SCORE
+      }
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
@@ -430,5 +513,4 @@ serve(async (req) => {
       }
     );
   }
-  */
 });
