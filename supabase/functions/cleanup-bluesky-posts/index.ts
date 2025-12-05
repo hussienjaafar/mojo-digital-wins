@@ -16,15 +16,16 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body for optional parameters
-    let retentionDays = 30;
-    let batchSize = 1000;
-    let maxBatches = 10;
+    // DEFAULT: 7 days retention (down from 30) - insights are preserved in trend tables
+    let retentionDays = 7;
+    let batchSize = 500; // Smaller batches for stability
+    let maxBatches = 20; // More batches to process more data
 
     try {
       const body = await req.json();
-      retentionDays = body.retention_days || 30;
-      batchSize = body.batch_size || 1000;
-      maxBatches = body.max_batches || 10;
+      retentionDays = body.retention_days ?? 7;
+      batchSize = body.batch_size ?? 500;
+      maxBatches = body.max_batches ?? 20;
     } catch {
       // Use defaults if no body provided
     }
@@ -40,18 +41,28 @@ Deno.serve(async (req) => {
 
     let totalDeleted = 0;
     let batchesRun = 0;
+    const startTime = Date.now();
+    const maxDurationMs = 25000; // 25 second max to avoid timeout
 
-    // Run multiple small batches
+    // Run multiple small batches with time limit
     for (let i = 0; i < maxBatches; i++) {
+      // Check time limit
+      if (Date.now() - startTime > maxDurationMs) {
+        console.log(`⏱️ Time limit reached after ${batchesRun} batches`);
+        break;
+      }
+
       // First, get the IDs to delete (small query)
       const { data: idsToDelete, error: selectError } = await supabase
         .from('bluesky_posts')
         .select('id')
         .lt('created_at', cutoffISO)
+        .order('created_at', { ascending: true }) // Oldest first
         .limit(batchSize);
 
       if (selectError) {
         console.error(`Batch ${i + 1} select error:`, selectError);
+        // Don't break on error, continue with other cleanup
         break;
       }
 
@@ -79,58 +90,67 @@ Deno.serve(async (req) => {
 
       console.log(`   Batch ${i + 1}: Deleted ${deleted} posts (total: ${totalDeleted})`);
 
-      // Small delay between batches to avoid overwhelming the database
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Small delay between batches to reduce database load
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
-    // Also cleanup related tables
-    console.log(`🔗 Cleaning up related tables...`);
+    // Cleanup related tables (only if we have time)
+    if (Date.now() - startTime < maxDurationMs - 5000) {
+      console.log(`🔗 Cleaning up related tables...`);
 
-    // Clean up old bluesky_trends
-    const { error: trendsError } = await supabase
-      .from('bluesky_trends')
-      .delete()
-      .lt('calculated_at', cutoffISO);
+      // Clean up old bluesky_trends (older than 14 days)
+      const trendsCutoff = new Date();
+      trendsCutoff.setDate(trendsCutoff.getDate() - 14);
+      
+      const { error: trendsError } = await supabase
+        .from('bluesky_trends')
+        .delete()
+        .lt('calculated_at', trendsCutoff.toISOString());
 
-    if (trendsError) {
-      console.warn('Error cleaning bluesky_trends:', trendsError);
-    } else {
-      console.log('   Cleaned old bluesky_trends');
+      if (trendsError) {
+        console.warn('Error cleaning bluesky_trends:', trendsError);
+      } else {
+        console.log('   Cleaned old bluesky_trends (>14 days)');
+      }
+
+      // Clean up old entity_mentions (older than 30 days)
+      const mentionsCutoff = new Date();
+      mentionsCutoff.setDate(mentionsCutoff.getDate() - 30);
+      
+      const { error: mentionsError } = await supabase
+        .from('entity_mentions')
+        .delete()
+        .lt('created_at', mentionsCutoff.toISOString());
+
+      if (mentionsError) {
+        console.warn('Error cleaning entity_mentions:', mentionsError);
+      } else {
+        console.log('   Cleaned old entity_mentions (>30 days)');
+      }
+
+      // Clean up old trending_topics (older than 7 days)
+      const { error: topicsError } = await supabase
+        .from('trending_topics')
+        .delete()
+        .lt('created_at', cutoffISO);
+
+      if (topicsError) {
+        console.warn('Error cleaning trending_topics:', topicsError);
+      } else {
+        console.log('   Cleaned old trending_topics (>7 days)');
+      }
     }
 
-    // Clean up old entity_mentions linked to deleted posts
-    const { error: mentionsError } = await supabase
-      .from('entity_mentions')
-      .delete()
-      .lt('created_at', cutoffISO);
-
-    if (mentionsError) {
-      console.warn('Error cleaning entity_mentions:', mentionsError);
-    } else {
-      console.log('   Cleaned old entity_mentions');
-    }
-
-    // Clean up old trending_topics
-    const { error: topicsError } = await supabase
-      .from('trending_topics')
-      .delete()
-      .lt('created_at', cutoffISO);
-
-    if (topicsError) {
-      console.warn('Error cleaning trending_topics:', topicsError);
-    } else {
-      console.log('   Cleaned old trending_topics');
-    }
-
-    // Log completion
+    const durationMs = Date.now() - startTime;
     const result = {
       success: true,
       bluesky_posts_deleted: totalDeleted,
       batches_run: batchesRun,
       retention_days: retentionDays,
       cutoff_date: cutoffISO,
+      duration_ms: durationMs,
       message: totalDeleted > 0 
-        ? `Successfully deleted ${totalDeleted} old bluesky posts in ${batchesRun} batches`
+        ? `Deleted ${totalDeleted} old posts in ${batchesRun} batches (${durationMs}ms)`
         : 'No old posts found to delete'
     };
 

@@ -6,36 +6,52 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// BROAD POLITICAL KEYWORDS - Collect comprehensive political discourse
-// Categories: Politics, Policy, Rights, Justice, Community, Identity
+// HIGH-VALUE POLITICAL KEYWORDS - Focus on actionable political content
+// Removed generic terms that generate noise
 const POLITICAL_KEYWORDS = [
-  // US Politics
-  'congress', 'senate', 'house', 'biden', 'trump', 'democrats', 'republicans',
-  'election', 'vote', 'campaign', 'legislation', 'bill', 'executive order',
-  'white house', 'supreme court', 'federal', 'state legislature',
+  // US Politics - Specific figures and institutions
+  'congress', 'senate', 'biden', 'trump', 'pelosi', 'mcconnell', 'schumer',
+  'executive order', 'white house', 'supreme court', 'scotus',
   
-  // Policy Areas
-  'immigration', 'healthcare', 'climate', 'education', 'economy', 'inflation',
-  'housing', 'minimum wage', 'social security', 'medicare', 'medicaid',
-  'student debt', 'tax', 'regulation', 'foreign policy',
+  // Policy - Specific and actionable
+  'immigration ban', 'border wall', 'climate bill', 'student loan forgiveness',
+  'abortion ban', 'roe v wade', 'gun control', 'gun reform', 'healthcare bill',
   
-  // Civil Rights & Justice
-  'civil rights', 'civil liberties', 'discrimination', 'equality', 'justice',
-  'hate crime', 'police', 'criminal justice', 'prison', 'surveillance',
-  'voting rights', 'gerrymandering', 'protest', 'first amendment',
+  // Civil Rights - Specific issues
+  'voting rights', 'voter suppression', 'gerrymandering', 'hate crime',
+  'discrimination lawsuit', 'civil rights violation',
   
-  // Communities & Identity
-  'muslim', 'arab', 'jewish', 'christian', 'lgbtq', 'transgender', 'gay rights',
-  'black lives matter', 'latino', 'hispanic', 'asian american', 'indigenous',
-  'native american', 'disability', 'women rights', 'abortion', 'reproductive',
+  // Communities - Only when in political context
+  'muslim ban', 'islamophobia', 'antisemitism', 'anti-asian', 'black lives matter',
+  'lgbtq rights', 'trans rights', 'transgender ban',
   
-  // International (affecting US policy)
-  'israel', 'palestine', 'gaza', 'middle east', 'ukraine', 'russia', 'china',
-  'iran', 'iraq', 'afghanistan', 'syria', 'yemen'
+  // International - High-impact
+  'gaza', 'ceasefire', 'ukraine war', 'russia sanctions', 'china tariffs',
+  'israel palestine'
 ];
 
-// Lowercase keywords for fast matching (case-insensitive O(1) lookup)
+// SPAM/LOW-VALUE PATTERNS - Filter out noise
+const SPAM_PATTERNS = [
+  /follow\s*me/i,
+  /check\s*my\s*profile/i,
+  /link\s*in\s*bio/i,
+  /dm\s*me/i,
+  /\$\d+/,  // Price mentions
+  /crypto|bitcoin|eth|nft/i,
+  /giveaway|airdrop/i,
+  /onlyfans|nsfw/i,
+  /🔥.*🔥.*🔥/,  // Emoji spam
+  /!!!+/,  // Excessive punctuation
+  /follow.*follow.*follow/i,
+];
+
+// Lowercase keywords for fast matching
 const POLITICAL_KEYWORDS_LOWER = POLITICAL_KEYWORDS.map(k => k.toLowerCase());
+
+// Pre-compiled regex patterns for word boundary matching
+const KEYWORD_PATTERNS = POLITICAL_KEYWORDS_LOWER.map(keyword => 
+  new RegExp(`\\b${keyword.replace(/\s+/g, '\\s+')}\\b`, 'i')
+);
 
 interface JetStreamEvent {
   did: string;
@@ -56,6 +72,30 @@ interface JetStreamEvent {
     };
     cid: string;
   };
+}
+
+// Check if post is spam/low-value
+function isSpamOrLowValue(text: string): boolean {
+  // Check spam patterns
+  for (const pattern of SPAM_PATTERNS) {
+    if (pattern.test(text)) {
+      return true;
+    }
+  }
+  
+  // Too many hashtags = promotional
+  const hashtagCount = (text.match(/#\w+/g) || []).length;
+  if (hashtagCount > 5) return true;
+  
+  // Too many mentions = engagement farming
+  const mentionCount = (text.match(/@[\w.]+/g) || []).length;
+  if (mentionCount > 5) return true;
+  
+  // All caps = low quality
+  const capsRatio = (text.match(/[A-Z]/g) || []).length / text.length;
+  if (capsRatio > 0.5 && text.length > 50) return true;
+  
+  return false;
 }
 
 // Extract hashtags from text
@@ -79,22 +119,11 @@ function extractUrls(text: string): string[] {
   return Array.from(matches, m => m[1]);
 }
 
-// Pre-compiled regex patterns for performance (created once, not per-post)
-const KEYWORD_PATTERNS = POLITICAL_KEYWORDS_LOWER.map(keyword => 
-  new RegExp(`\\b${keyword.replace(/\s+/g, '\\s+')}\\b`, 'i')
-);
-
-// **ULTRA-FAST KEYWORD PRE-CHECK**: Multi-stage filtering
-// Stage 1: Quick string includes (very fast)
-// Stage 2: Regex with word boundaries (precise)
-function hasAnyKeyword(text: string): boolean {
-  // Quick length bounds check (most posts are 20-500 chars if relevant)
-  if (text.length < 20 || text.length > 500) return false;
-  
+// STRICT keyword matching - requires word boundaries
+function hasHighValueKeyword(text: string): boolean {
   const lowerText = text.toLowerCase();
   
-  // Stage 1: Fast substring check (no regex overhead)
-  // This filters out ~90% of posts instantly (broader than before)
+  // Stage 1: Quick substring check
   let hasSubstring = false;
   for (const keyword of POLITICAL_KEYWORDS_LOWER) {
     if (lowerText.includes(keyword)) {
@@ -105,8 +134,7 @@ function hasAnyKeyword(text: string): boolean {
   
   if (!hasSubstring) return false;
   
-  // Stage 2: Precise word-boundary matching on remaining ~5%
-  // Use pre-compiled patterns to avoid regex creation overhead
+  // Stage 2: Word boundary check (more precise)
   for (const pattern of KEYWORD_PATTERNS) {
     if (pattern.test(text)) {
       return true;
@@ -116,18 +144,20 @@ function hasAnyKeyword(text: string): boolean {
   return false;
 }
 
-// Calculate relevance score (0-1) based on political keywords
+// Calculate relevance score with STRICTER thresholds
 function calculateRelevance(text: string): number {
   const lowerText = text.toLowerCase();
   let score = 0;
+  let matchCount = 0;
 
   for (const keyword of POLITICAL_KEYWORDS_LOWER) {
     if (lowerText.includes(keyword)) {
-      score += 0.1; // Each keyword match adds to relevance
+      score += 0.15; // Higher weight per keyword
+      matchCount++;
       
-      // Early exit once we reach threshold (saves CPU cycles)
-      if (score >= 0.1) {
-        return Math.min(score, 1.0);
+      if (matchCount >= 2) {
+        // Multiple keyword matches = high relevance
+        return Math.min(score + 0.2, 1.0);
       }
     }
   }
@@ -135,14 +165,13 @@ function calculateRelevance(text: string): number {
   return score;
 }
 
-// Cursor-based stream processor with timeout and safety limits
-// Optimized to 15s duration with 50k post processing limit
-async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPostsProcessed: number = 50000) {
+// Cursor-based stream processor with STRICT filtering
+async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPostsProcessed: number = 30000) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  console.log('🔵 Starting cursor-based JetStream collection...');
+  console.log('🔵 Starting STRICT cursor-based JetStream collection...');
 
   // Get last cursor position
   const { data: cursorData, error: cursorError } = await supabase
@@ -165,11 +194,12 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
   let keywordMatchCount = 0;
   let languageFiltered = 0;
   let lengthFiltered = 0;
-  let shouldStop = false; // Flag to prevent processing after limit
-  const batchSize = 50; // Larger batches reduce DB roundtrips
+  let spamFiltered = 0;
+  let lowRelevanceFiltered = 0;
+  let shouldStop = false;
+  const batchSize = 50;
   const collectedPosts: any[] = [];
 
-  // Timeout handler
   const startTime = Date.now();
   const timeout = setTimeout(() => {
     console.log(`⏱️  Collection timeout reached (${durationMs}ms)`);
@@ -182,31 +212,27 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
       );
 
       ws.onopen = () => {
-        console.log('✅ Connected to JetStream');
+        console.log('✅ Connected to JetStream (STRICT mode)');
       };
 
       ws.onmessage = async (event) => {
-        // Skip processing if we've already hit the limit
         if (shouldStop) return;
         
         try {
           const data: JetStreamEvent = JSON.parse(event.data);
 
-          // Update cursor
           if (data.time_us) {
             latestCursor = data.time_us;
           }
 
-          // Only process commit events for posts with text
           if (data.kind !== 'commit' || !data.commit?.record?.text) {
             return;
           }
 
           postCount++;
           
-          // Safety valve: stop processing if we've hit the limit
           if (postCount >= maxPostsProcessed) {
-            console.log(`⚠️ Safety limit reached: ${maxPostsProcessed} posts processed`);
+            console.log(`⚠️ Safety limit reached: ${maxPostsProcessed} posts`);
             shouldStop = true;
             ws.close();
             return;
@@ -215,45 +241,45 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
           const record = data.commit.record;
           const text = record.text;
           
-          // **OPTIMIZATION 1: Language filter** - Only process English posts
-          // This filters out ~50% of firehose immediately
+          // FILTER 1: Language - English only
           const langs = record.langs || [];
           if (langs.length > 0 && !langs.includes('en')) {
             languageFiltered++;
             return;
           }
           
-          // **OPTIMIZATION 2: Length bounds** - Filter very short/long posts early
-          // Checked again in hasAnyKeyword but doing it here avoids string ops
-          if (text.length < 20 || text.length > 500) {
+          // FILTER 2: Length bounds - STRICTER (50-400 chars)
+          if (text.length < 50 || text.length > 400) {
             lengthFiltered++;
             return;
           }
 
-          // **OPTIMIZATION 3: Ultra-fast keyword pre-check**
-          // Two-stage filter: simple includes() then word-boundary regex
-          if (!hasAnyKeyword(text)) {
+          // FILTER 3: Spam detection - NEW
+          if (isSpamOrLowValue(text)) {
+            spamFiltered++;
+            return;
+          }
+
+          // FILTER 4: Keyword matching - STRICTER keywords
+          if (!hasHighValueKeyword(text)) {
             return;
           }
           
           keywordMatchCount++;
 
-          // Calculate detailed relevance score only for keyword-matching posts
+          // FILTER 5: Relevance score - HIGHER threshold (0.15 instead of 0.1)
           const relevanceScore = calculateRelevance(text);
-
-          // Store posts with relevance > 0.1 (broader threshold)
-          if (relevanceScore < 0.1) {
+          if (relevanceScore < 0.15) {
+            lowRelevanceFiltered++;
             return;
           }
 
           relevantCount++;
 
-          // Extract additional data
           const hashtags = extractHashtags(text);
           const mentions = extractMentions(text);
           const urls = extractUrls(text);
 
-          // Add to batch
           collectedPosts.push({
             author_did: data.did,
             post_uri: `at://${data.did}/${data.commit.collection}/${data.commit.rkey}`,
@@ -268,15 +294,14 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
             reply_to: record.reply?.parent?.uri || null,
             quote_of: null,
             embed_type: record.embed?.$type || null,
-            ai_relevance_score: relevanceScore, // CRITICAL: Save relevance score for analyzer
+            ai_relevance_score: relevanceScore,
           });
 
           // Insert batch when full
           if (collectedPosts.length >= batchSize) {
             const batch = [...collectedPosts];
-            collectedPosts.length = 0; // Clear array
+            collectedPosts.length = 0;
 
-            // Use upsert to handle duplicates gracefully
             const { error: insertError } = await supabase
               .from('bluesky_posts')
               .upsert(batch, {
@@ -289,12 +314,11 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
             } else {
               const efficiency = ((relevantCount / postCount) * 100).toFixed(2);
               console.log(
-                `✅ Batch: ${batch.length} | ${relevantCount}/${keywordMatchCount}/${postCount} (${efficiency}%) | Lang: -${languageFiltered} | Len: -${lengthFiltered}`
+                `✅ Batch: ${batch.length} | ${relevantCount}/${postCount} (${efficiency}%) | Spam:-${spamFiltered} Lang:-${languageFiltered} Len:-${lengthFiltered}`
               );
             }
           }
 
-          // Check timeout
           if (Date.now() - startTime >= durationMs) {
             ws.close();
           }
@@ -314,7 +338,6 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
 
         // Insert remaining posts
         if (collectedPosts.length > 0) {
-          // Use upsert to handle duplicates gracefully
           const { error: insertError } = await supabase
             .from('bluesky_posts')
             .upsert(collectedPosts, {
@@ -325,9 +348,7 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
           if (insertError) {
             console.error('❌ Error inserting final batch:', insertError);
           } else {
-            console.log(
-              `✅ Final batch: ${collectedPosts.length} posts | Total relevant: ${relevantCount}/${keywordMatchCount} matches/${postCount} total`
-            );
+            console.log(`✅ Final batch: ${collectedPosts.length} posts`);
           }
         }
 
@@ -343,18 +364,11 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
 
         if (updateError) {
           console.error('❌ Error updating cursor:', updateError);
-          await supabase
-            .from('bluesky_stream_cursor')
-            .update({
-              last_error: updateError.message,
-            })
-            .eq('id', 1);
         }
 
-        const efficiency = ((relevantCount / postCount) * 100).toFixed(2);
-        const filterReduction = ((languageFiltered + lengthFiltered) / postCount * 100).toFixed(1);
+        const efficiency = ((relevantCount / postCount) * 100).toFixed(3);
         console.log(
-          `✅ Complete: ${relevantCount} saved | ${keywordMatchCount} matches | ${postCount} processed (${efficiency}% efficiency) | Filtered: ${filterReduction}% (lang:${languageFiltered}, len:${lengthFiltered})`
+          `✅ STRICT Complete: ${relevantCount} saved | ${postCount} processed (${efficiency}%) | Filtered: spam=${spamFiltered} lang=${languageFiltered} len=${lengthFiltered} lowRel=${lowRelevanceFiltered}`
         );
 
         resolve({
@@ -362,6 +376,12 @@ async function processBlueskyStreamWithCursor(durationMs: number = 15000, maxPos
           totalProcessed: postCount,
           cursor: latestCursor,
           durationMs: Date.now() - startTime,
+          filters: {
+            spam: spamFiltered,
+            language: languageFiltered,
+            length: lengthFiltered,
+            lowRelevance: lowRelevanceFiltered,
+          }
         });
       };
     } catch (error) {
@@ -377,9 +397,9 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🚀 Starting collection session...');
+    console.log('🚀 Starting STRICT collection session...');
     
-    const { durationMs = 15000, maxPostsProcessed = 50000 } = await req.json().catch(() => ({}));
+    const { durationMs = 15000, maxPostsProcessed = 30000 } = await req.json().catch(() => ({}));
     
     const result = await processBlueskyStreamWithCursor(durationMs, maxPostsProcessed);
 
