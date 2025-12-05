@@ -269,25 +269,35 @@ serve(async (req) => {
       mode = 'incremental' // 'incremental' or 'backfill'
     } = await req.json();
 
+    // Check if user is admin
+    const { data: userRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    const isAdmin = userRoles?.some(r => r.role === 'admin');
+
     // If no org specified, process all active ActBlue integrations
     let credentials: any[] = [];
     
     if (organization_id) {
-      // Verify user has access to this organization
-      const { data: clientUser, error: accessError } = await supabase
-        .from('client_users')
-        .select('organization_id')
-        .eq('id', user.id)
-        .single();
+      // Admins can sync any organization, regular users must belong to the organization
+      if (!isAdmin) {
+        const { data: clientUser, error: accessError } = await supabase
+          .from('client_users')
+          .select('organization_id')
+          .eq('id', user.id)
+          .single();
 
-      if (accessError || !clientUser || clientUser.organization_id !== organization_id) {
-        return new Response(
-          JSON.stringify({ error: 'You do not have access to this organization' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        if (accessError || !clientUser || clientUser.organization_id !== organization_id) {
+          return new Response(
+            JSON.stringify({ error: 'You do not have access to this organization' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
 
-      console.log(`ActBlue sync initiated by user: ${user.id} for organization: ${organization_id}`);
+      console.log(`ActBlue sync initiated by ${isAdmin ? 'admin' : 'user'}: ${user.id} for organization: ${organization_id}`);
 
       const { data, error } = await supabase
         .from('client_api_credentials')
@@ -302,14 +312,7 @@ serve(async (req) => {
       }
       credentials = [data];
     } else {
-      // For batch processing (no org specified), only allow admin users or scheduled jobs
-      // Check if user is admin
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-
-      const isAdmin = userRoles?.some(r => r.role === 'admin');
+      // For batch processing (no org specified), only allow admin users
       if (!isAdmin) {
         return new Response(
           JSON.stringify({ error: 'Admin access required for batch sync' }),
