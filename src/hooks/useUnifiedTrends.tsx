@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useMaintenanceMode } from '@/contexts/MaintenanceContext';
 
 export interface UnifiedTrend {
   name: string;
@@ -117,12 +118,21 @@ const isBreakthrough = (trend: any): boolean => {
 
 export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
   const { limit = 30, breakthroughOnly = false, excludeEvergreen = true } = options;
+  const { isMaintenanceMode } = useMaintenanceMode();
   
   const [trends, setTrends] = useState<UnifiedTrend[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchTrends = useCallback(async () => {
+    // Skip heavy queries during maintenance mode
+    if (isMaintenanceMode) {
+      setTrends([]);
+      setIsLoading(false);
+      setError('Maintenance mode - trends temporarily unavailable');
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
     
@@ -270,15 +280,17 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     } finally {
       setIsLoading(false);
     }
-  }, [limit, breakthroughOnly, excludeEvergreen]);
+  }, [limit, breakthroughOnly, excludeEvergreen, isMaintenanceMode]);
 
   useEffect(() => {
     fetchTrends();
     
-    // Refresh every 2 minutes
-    const interval = setInterval(fetchTrends, 2 * 60 * 1000);
+    // Refresh every 2 minutes (skip during maintenance)
+    const interval = setInterval(() => {
+      if (!isMaintenanceMode) fetchTrends();
+    }, 2 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [fetchTrends]);
+  }, [fetchTrends, isMaintenanceMode]);
 
   const stats = {
     totalTrending: trends.length,

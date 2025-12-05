@@ -1,15 +1,24 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useMaintenanceMode } from '@/contexts/MaintenanceContext';
 import type { Database } from '@/integrations/supabase/types';
 
 type EntityTrend = Database['public']['Tables']['entity_trends']['Row'];
 
 export const useRealtimeTrends = () => {
+  const { isMaintenanceMode } = useMaintenanceMode();
   const [trends, setTrends] = useState<EntityTrend[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
 
   const fetchTrends = useCallback(async () => {
+    // Skip heavy queries during maintenance mode
+    if (isMaintenanceMode) {
+      setTrends([]);
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -33,9 +42,17 @@ export const useRealtimeTrends = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isMaintenanceMode]);
 
   useEffect(() => {
+    // Skip realtime subscription during maintenance
+    if (isMaintenanceMode) {
+      setTrends([]);
+      setIsLoading(false);
+      setConnectionStatus('disconnected');
+      return;
+    }
+    
     fetchTrends();
 
     // Subscribe to realtime changes on entity_trends
@@ -80,7 +97,7 @@ export const useRealtimeTrends = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchTrends]);
+  }, [fetchTrends, isMaintenanceMode]);
 
   return { trends, isLoading, connectionStatus, refresh: fetchTrends };
 };
