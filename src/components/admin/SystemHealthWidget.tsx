@@ -180,11 +180,29 @@ export function SystemHealthWidget({ showDragHandle = false }: SystemHealthWidge
         </div>
 
         {/* Footer Stats */}
-        <div className="pt-2 border-t flex items-center justify-between text-[10px] text-muted-foreground">
-          <span>Avg duration: {stats.avgDurationMs < 1000 
-            ? `${stats.avgDurationMs}ms` 
-            : `${(stats.avgDurationMs / 1000).toFixed(1)}s`}</span>
-          <span>{stats.recentExecutions} recent executions</span>
+        <div className="pt-2 border-t space-y-2">
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>Avg duration: {stats.avgDurationMs < 1000 
+              ? `${stats.avgDurationMs}ms` 
+              : `${(stats.avgDurationMs / 1000).toFixed(1)}s`}</span>
+            <span>{stats.recentExecutions} recent executions</span>
+          </div>
+          
+          {/* Optimization Status */}
+          <div className="flex flex-wrap gap-1">
+            <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-600 border-green-500/20">
+              Smart Skip
+            </Badge>
+            <Badge variant="outline" className="text-[9px] bg-blue-500/10 text-blue-600 border-blue-500/20">
+              4hr Throttle
+            </Badge>
+            <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-600 border-purple-500/20">
+              Batch AI
+            </Badge>
+            <Badge variant="outline" className="text-[9px] bg-orange-500/10 text-orange-600 border-orange-500/20">
+              Dependencies
+            </Badge>
+          </div>
         </div>
       </CardContent>
     </Card>
