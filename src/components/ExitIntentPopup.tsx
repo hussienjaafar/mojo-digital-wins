@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -9,11 +10,23 @@ import {
 import { ParticleButton } from "./ParticleButton";
 import { X, Clock, Users } from "lucide-react";
 
+// Marketing pages where exit popup should show
+const MARKETING_ROUTES = ['/', '/about', '/services', '/contact', '/blog', '/case-studies', '/creative-showcase'];
+
 export const ExitIntentPopup = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [hasShown, setHasShown] = useState(false);
+  const location = useLocation();
+
+  // Check if current route is a marketing page
+  const isMarketingPage = MARKETING_ROUTES.some(route => 
+    location.pathname === route || location.pathname.startsWith('/blog/') || location.pathname.startsWith('/case-studies/')
+  );
 
   useEffect(() => {
+    // Only show on marketing pages
+    if (!isMarketingPage) return;
+
     // Check if popup was already shown in this session
     const popupShown = sessionStorage.getItem("exitIntentShown");
     if (popupShown === "true") {
@@ -53,7 +66,7 @@ export const ExitIntentPopup = () => {
         clearTimeout(timeoutId);
       }
     };
-  }, [hasShown, isOpen]);
+  }, [hasShown, isOpen, isMarketingPage]);
 
   const handleClose = () => {
     setIsOpen(false);

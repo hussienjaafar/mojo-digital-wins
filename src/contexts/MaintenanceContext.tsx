@@ -16,8 +16,9 @@ export const useMaintenanceMode = () => useContext(MaintenanceContext);
 
 export const MaintenanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMaintenanceMode, setMaintenanceMode] = useState(() => {
-    const stored = localStorage.getItem('maintenanceMode');
-    return stored === 'true'; // Default to false (maintenance off)
+    // Clear any stale maintenance mode - it should only be enabled explicitly by admins
+    localStorage.removeItem('maintenanceMode');
+    return false;
   });
 
   const maintenanceMessage = 'Database maintenance in progress. Some features may be temporarily unavailable.';
