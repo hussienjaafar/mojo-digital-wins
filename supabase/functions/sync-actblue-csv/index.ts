@@ -10,6 +10,7 @@ const corsHeaders = {
 // The parser normalizes headers: "Donor First Name" -> "donor_first_name"
 interface CSVRow {
   lineitem_id: string;
+  receipt_id?: string; // ActBlue may use receipt_id instead of lineitem_id
   date: string;
   amount: string;
   recurring_total_months: string;
@@ -512,10 +513,23 @@ serve(async (req) => {
             for (const row of rows) {
               totalProcessed++;
             
-              // Skip if no lineitem_id
-              if (!row.lineitem_id) {
+              // ActBlue CSV can have either lineitem_id or receipt_id as the unique identifier
+              const transactionId = row.lineitem_id || row.receipt_id;
+              
+              // Skip if no transaction identifier
+              if (!transactionId) {
                 totalSkipped++;
+                if (totalSkipped <= 3) {
+                  console.log(`Skipped row - no identifier. First 5 keys: ${Object.keys(row).slice(0, 5).join(', ')}`);
+                }
                 continue;
+              }
+              
+              // Log first row with names for debugging
+              if (totalProcessed === 1) {
+                const firstName = getDonorFirstName(row);
+                const lastName = getDonorLastName(row);
+                console.log(`First row: id=${transactionId}, firstName=${firstName}, lastName=${lastName}, email=${row.donor_email}`);
               }
 
               // Determine transaction type
@@ -545,13 +559,13 @@ serve(async (req) => {
               const { data: existing } = await supabase
                 .from('actblue_transactions')
                 .select('id, transaction_type, first_name, last_name, donor_name')
-                .eq('transaction_id', row.lineitem_id)
+                .eq('transaction_id', transactionId)
                 .eq('organization_id', orgId)
                 .maybeSingle();
 
               const transactionData = {
                 organization_id: orgId,
-                transaction_id: row.lineitem_id,
+                transaction_id: transactionId,
                 donor_email: row.donor_email || null,
                 donor_name: donorName,
                 first_name: firstName,
@@ -575,7 +589,7 @@ serve(async (req) => {
                 is_mobile: row.mobile === 'true' || row.mobile === '1',
                 is_express: row.actblue_express_lane === 'true' || row.actblue_express_lane === '1',
                 text_message_option: row.text_message_option || null,
-                lineitem_id: parseInt(row.lineitem_id) || null,
+                lineitem_id: parseInt(transactionId) || null,
                 entity_id: row.entity_id || config.entity_id,
                 committee_name: row.recipient || null,
                 fec_id: row.fec_id || null,
@@ -686,7 +700,7 @@ serve(async (req) => {
           chunks_processed: dateRanges.length,
         });
 
-        console.log(`Sync complete for org ${orgId}: ${totalInserted} inserted, ${totalUpdated} updated, ${totalSkipped} skipped`);
+        console.log(`Sync complete for org ${orgId}: processed=${totalProcessed}, inserted=${totalInserted}, updated=${totalUpdated}, skipped=${totalSkipped}`);
 
       } catch (orgError: any) {
         console.error(`Error syncing org ${orgId}:`, orgError);
