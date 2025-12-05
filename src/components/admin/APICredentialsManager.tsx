@@ -39,8 +39,11 @@ type PlatformConfig = {
     account_id: string;
   };
   actblue?: {
-    webhook_secret: string;
     entity_id: string;
+    username: string;
+    password: string;
+    webhook_username: string;
+    webhook_password: string;
   };
 };
 
@@ -338,20 +341,16 @@ const APICredentialsManager = () => {
                   </TabsContent>
 
                   <TabsContent value="actblue" className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="webhook_secret">Webhook Secret *</Label>
-                      <Input
-                        id="webhook_secret"
-                        type="password"
-                        value={platformConfig.actblue?.webhook_secret || ''}
-                        onChange={(e) => setPlatformConfig({
-                          ...platformConfig,
-                          actblue: { ...platformConfig.actblue!, webhook_secret: e.target.value }
-                        })}
-                        placeholder="whsec_..."
-                        required={selectedPlatform === 'actblue'}
-                      />
+                    <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground mb-4">
+                      <p className="font-medium mb-1">Setup Instructions:</p>
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>Find your Entity ID in ActBlue Dashboard → Integrations → Webhooks</li>
+                        <li>Create CSV API credentials in ActBlue Dashboard → API Keys</li>
+                        <li>Create a webhook with your chosen username/password</li>
+                        <li>Enter all credentials below</li>
+                      </ol>
                     </div>
+                    
                     <div className="space-y-2">
                       <Label htmlFor="entity_id">Entity ID *</Label>
                       <Input
@@ -361,9 +360,86 @@ const APICredentialsManager = () => {
                           ...platformConfig,
                           actblue: { ...platformConfig.actblue!, entity_id: e.target.value }
                         })}
-                        placeholder="entity_..."
+                        placeholder="12345"
                         required={selectedPlatform === 'actblue'}
                       />
+                      <p className="text-xs text-muted-foreground">Found on ActBlue's Webhook Integrations page</p>
+                    </div>
+
+                    <div className="border-t pt-4 mt-4">
+                      <h4 className="font-medium mb-3">CSV API Credentials (for data sync)</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="csv_username">API Username *</Label>
+                          <Input
+                            id="csv_username"
+                            value={platformConfig.actblue?.username || ''}
+                            onChange={(e) => setPlatformConfig({
+                              ...platformConfig,
+                              actblue: { ...platformConfig.actblue!, username: e.target.value }
+                            })}
+                            placeholder="your-api-username"
+                            required={selectedPlatform === 'actblue'}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="csv_password">API Password *</Label>
+                          <Input
+                            id="csv_password"
+                            type="password"
+                            value={platformConfig.actblue?.password || ''}
+                            onChange={(e) => setPlatformConfig({
+                              ...platformConfig,
+                              actblue: { ...platformConfig.actblue!, password: e.target.value }
+                            })}
+                            placeholder="your-api-password"
+                            required={selectedPlatform === 'actblue'}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">From ActBlue Dashboard → API Keys</p>
+                    </div>
+
+                    <div className="border-t pt-4 mt-4">
+                      <h4 className="font-medium mb-3">Webhook Credentials (for real-time updates)</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="webhook_username">Webhook Username *</Label>
+                          <Input
+                            id="webhook_username"
+                            value={platformConfig.actblue?.webhook_username || ''}
+                            onChange={(e) => setPlatformConfig({
+                              ...platformConfig,
+                              actblue: { ...platformConfig.actblue!, webhook_username: e.target.value }
+                            })}
+                            placeholder="webhook-user"
+                            required={selectedPlatform === 'actblue'}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="webhook_password">Webhook Password *</Label>
+                          <Input
+                            id="webhook_password"
+                            type="password"
+                            value={platformConfig.actblue?.webhook_password || ''}
+                            onChange={(e) => setPlatformConfig({
+                              ...platformConfig,
+                              actblue: { ...platformConfig.actblue!, webhook_password: e.target.value }
+                            })}
+                            placeholder="webhook-password"
+                            required={selectedPlatform === 'actblue'}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        The username/password you entered when creating the webhook in ActBlue
+                      </p>
+                      <div className="mt-3 p-2 bg-primary/5 rounded text-xs">
+                        <span className="font-medium">Webhook URL:</span>{' '}
+                        <code className="bg-muted px-1 rounded">
+                          https://nuclmzoasgydubdshtab.supabase.co/functions/v1/actblue-webhook
+                        </code>
+                      </div>
                     </div>
                   </TabsContent>
                 </Tabs>
