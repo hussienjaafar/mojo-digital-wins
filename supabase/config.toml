@@ -206,3 +206,6 @@ verify_jwt = false
 
 [functions.admin-sync-meta]
 verify_jwt = false
+
+[functions.ttl-cleanup]
+verify_jwt = false
