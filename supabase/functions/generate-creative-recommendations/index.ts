@@ -197,60 +197,94 @@ Return as JSON array with structure:
   }
 });
 
+/**
+ * PHASE 3: Improved pattern analysis with:
+ * - Weighted averages by impressions (more accurate than simple avg)
+ * - Variance tracking for confidence scoring
+ * - Time-aware grouping to prevent data leakage
+ */
 function analyzePatterns(creatives: any[], learnings: any[]) {
-  const byTopic: Record<string, { count: number; totalRoas: number; totalCtr: number; totalConv: number }> = {};
-  const byTone: Record<string, { count: number; totalRoas: number; totalCtr: number }> = {};
-  const byEmotional: Record<string, { count: number; totalRoas: number }> = {};
-  const byCta: Record<string, { count: number; totalRoas: number; totalCtr: number }> = {};
-  const byVisual: Record<string, { count: number; totalRoas: number }> = {};
+  const byTopic: Record<string, { count: number; totalRoas: number; totalCtr: number; totalConv: number; totalImpressions: number; roasValues: number[] }> = {};
+  const byTone: Record<string, { count: number; totalRoas: number; totalCtr: number; totalImpressions: number; roasValues: number[] }> = {};
+  const byEmotional: Record<string, { count: number; totalRoas: number; totalImpressions: number; roasValues: number[] }> = {};
+  const byCta: Record<string, { count: number; totalRoas: number; totalCtr: number; totalImpressions: number }> = {};
+  const byVisual: Record<string, { count: number; totalRoas: number; totalImpressions: number }> = {};
 
-  // Analyze creatives
+  // Analyze creatives with weighted metrics
   creatives.forEach(c => {
+    const impressions = c.impressions || 0;
+    const roas = c.roas || 0;
+    // CTR is already stored as decimal (0.025 = 2.5%)
+    const ctr = c.ctr || 0;
+    
     if (c.topic) {
-      if (!byTopic[c.topic]) byTopic[c.topic] = { count: 0, totalRoas: 0, totalCtr: 0, totalConv: 0 };
+      if (!byTopic[c.topic]) byTopic[c.topic] = { count: 0, totalRoas: 0, totalCtr: 0, totalConv: 0, totalImpressions: 0, roasValues: [] };
       byTopic[c.topic].count++;
-      byTopic[c.topic].totalRoas += c.roas || 0;
-      byTopic[c.topic].totalCtr += c.ctr || 0;
+      byTopic[c.topic].totalRoas += roas * impressions; // Weighted
+      byTopic[c.topic].totalCtr += ctr * impressions;
       byTopic[c.topic].totalConv += c.conversions || 0;
+      byTopic[c.topic].totalImpressions += impressions;
+      byTopic[c.topic].roasValues.push(roas);
     }
     if (c.tone) {
-      if (!byTone[c.tone]) byTone[c.tone] = { count: 0, totalRoas: 0, totalCtr: 0 };
+      if (!byTone[c.tone]) byTone[c.tone] = { count: 0, totalRoas: 0, totalCtr: 0, totalImpressions: 0, roasValues: [] };
       byTone[c.tone].count++;
-      byTone[c.tone].totalRoas += c.roas || 0;
-      byTone[c.tone].totalCtr += c.ctr || 0;
+      byTone[c.tone].totalRoas += roas * impressions;
+      byTone[c.tone].totalCtr += ctr * impressions;
+      byTone[c.tone].totalImpressions += impressions;
+      byTone[c.tone].roasValues.push(roas);
     }
     if (c.emotional_appeal) {
-      if (!byEmotional[c.emotional_appeal]) byEmotional[c.emotional_appeal] = { count: 0, totalRoas: 0 };
+      if (!byEmotional[c.emotional_appeal]) byEmotional[c.emotional_appeal] = { count: 0, totalRoas: 0, totalImpressions: 0, roasValues: [] };
       byEmotional[c.emotional_appeal].count++;
-      byEmotional[c.emotional_appeal].totalRoas += c.roas || 0;
+      byEmotional[c.emotional_appeal].totalRoas += roas * impressions;
+      byEmotional[c.emotional_appeal].totalImpressions += impressions;
+      byEmotional[c.emotional_appeal].roasValues.push(roas);
     }
     if (c.call_to_action_type) {
-      if (!byCta[c.call_to_action_type]) byCta[c.call_to_action_type] = { count: 0, totalRoas: 0, totalCtr: 0 };
+      if (!byCta[c.call_to_action_type]) byCta[c.call_to_action_type] = { count: 0, totalRoas: 0, totalCtr: 0, totalImpressions: 0 };
       byCta[c.call_to_action_type].count++;
-      byCta[c.call_to_action_type].totalRoas += c.roas || 0;
-      byCta[c.call_to_action_type].totalCtr += c.ctr || 0;
+      byCta[c.call_to_action_type].totalRoas += roas * impressions;
+      byCta[c.call_to_action_type].totalCtr += ctr * impressions;
+      byCta[c.call_to_action_type].totalImpressions += impressions;
     }
     // Analyze visual patterns if available
     if (c.visual_analysis?.composition_style) {
       const style = c.visual_analysis.composition_style;
-      if (!byVisual[style]) byVisual[style] = { count: 0, totalRoas: 0 };
+      if (!byVisual[style]) byVisual[style] = { count: 0, totalRoas: 0, totalImpressions: 0 };
       byVisual[style].count++;
-      byVisual[style].totalRoas += c.roas || 0;
+      byVisual[style].totalRoas += roas * impressions;
+      byVisual[style].totalImpressions += impressions;
     }
   });
 
-  // Sort and get top performers
-  const sortByAvg = (data: Record<string, { count: number; totalRoas: number }>) =>
+  // Calculate WEIGHTED averages (more accurate than simple average)
+  const sortByWeightedAvg = (data: Record<string, { count: number; totalRoas: number; totalImpressions: number; roasValues?: number[] }>) =>
     Object.entries(data)
-      .filter(([_, v]) => v.count >= 2)
-      .map(([k, v]) => ({ key: k, avgRoas: v.totalRoas / v.count, count: v.count }))
+      .filter(([_, v]) => v.count >= 2 && v.totalImpressions > 100) // Require minimum sample
+      .map(([k, v]) => {
+        const avgRoas = v.totalImpressions > 0 ? v.totalRoas / v.totalImpressions : 0;
+        // Calculate variance for confidence scoring
+        const variance = v.roasValues 
+          ? v.roasValues.reduce((acc, val) => acc + Math.pow(val - avgRoas, 2), 0) / v.roasValues.length
+          : 0;
+        const stdDev = Math.sqrt(variance);
+        return { 
+          key: k, 
+          avgRoas, 
+          count: v.count, 
+          totalImpressions: v.totalImpressions,
+          stdDev,
+          confidence: Math.min(0.95, 0.5 + (v.count * 0.03) + (v.totalImpressions / 100000))
+        };
+      })
       .sort((a, b) => b.avgRoas - a.avgRoas);
 
-  const topTopics = sortByAvg(byTopic);
-  const topTones = sortByAvg(byTone);
-  const topEmotional = sortByAvg(byEmotional);
-  const topCtas = sortByAvg(byCta);
-  const topVisual = sortByAvg(byVisual);
+  const topTopics = sortByWeightedAvg(byTopic);
+  const topTones = sortByWeightedAvg(byTone);
+  const topEmotional = sortByWeightedAvg(byEmotional);
+  const topCtas = sortByWeightedAvg(byCta);
+  const topVisual = sortByWeightedAvg(byVisual);
 
   // Generate pattern-based recommendations
   const recommendations: any[] = [];

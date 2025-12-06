@@ -200,17 +200,18 @@ export function CreativeCard({ creative }: Props) {
           )}
 
           {/* Performance Metrics */}
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50">
             <div className="text-center">
-              <div className="text-sm font-semibold">{formatNumber(creative.impressions)}</div>
+              <div className="text-sm font-semibold text-foreground">{formatNumber(creative.impressions)}</div>
               <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                 <Eye className="h-3 w-3" />
                 Impr.
               </div>
             </div>
             <div className="text-center">
-              <div className="text-sm font-semibold">
-                {creative.ctr ? `${(creative.ctr * 100).toFixed(2)}%` : '-'}
+              <div className="text-sm font-semibold text-foreground">
+                {/* CTR is now stored as decimal (0.025 = 2.5%), display as percentage */}
+                {creative.ctr != null ? `${(creative.ctr * 100).toFixed(2)}%` : '-'}
               </div>
               <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                 <MousePointer className="h-3 w-3" />
@@ -220,9 +221,11 @@ export function CreativeCard({ creative }: Props) {
             <div className="text-center">
               <div className={cn(
                 "text-sm font-semibold",
-                (creative.roas || 0) >= 2 ? "text-green-500" : (creative.roas || 0) >= 1 ? "text-yellow-500" : "text-red-500"
+                (creative.roas || 0) >= 2 ? "text-green-600 dark:text-green-400" : 
+                (creative.roas || 0) >= 1 ? "text-yellow-600 dark:text-yellow-400" : 
+                "text-red-600 dark:text-red-400"
               )}>
-                {creative.roas ? `$${creative.roas.toFixed(2)}` : '-'}
+                {creative.roas ? `${creative.roas.toFixed(2)}x` : '-'}
               </div>
               <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                 <DollarSign className="h-3 w-3" />
