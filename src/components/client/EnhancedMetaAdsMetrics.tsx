@@ -20,6 +20,7 @@ import { format, parseISO } from "date-fns";
 import { useRealtimeMetrics } from "@/hooks/useRealtimeMetrics";
 import PullToRefresh from "@/components/PullToRefresh";
 import { toast } from "sonner";
+import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
 
 type Props = {
   organizationId: string;
@@ -367,6 +368,7 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <MetaDataFreshnessIndicator organizationId={organizationId} compact />
             <Button
               variant="outline"
               size="sm"
