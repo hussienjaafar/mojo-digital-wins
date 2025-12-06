@@ -5775,27 +5775,19 @@ export type Database = {
           addr1: string | null
           amount: number | null
           city: string | null
-          committee_name: string | null
-          contribution_form: string | null
           country: string | null
           created_at: string | null
           donor_email: string | null
           donor_name: string | null
           employer: string | null
-          entity_id: string | null
           first_name: string | null
           id: string | null
-          is_express: boolean | null
-          is_mobile: boolean | null
           is_recurring: boolean | null
           last_name: string | null
           occupation: string | null
           organization_id: string | null
           phone: string | null
-          recurring_period: string | null
           refcode: string | null
-          refcode_custom: string | null
-          refcode2: string | null
           source_campaign: string | null
           state: string | null
           transaction_date: string | null
@@ -5807,27 +5799,19 @@ export type Database = {
           addr1?: never
           amount?: number | null
           city?: string | null
-          committee_name?: string | null
-          contribution_form?: string | null
           country?: string | null
           created_at?: string | null
           donor_email?: never
           donor_name?: never
           employer?: never
-          entity_id?: string | null
           first_name?: never
           id?: string | null
-          is_express?: boolean | null
-          is_mobile?: boolean | null
           is_recurring?: boolean | null
           last_name?: never
           occupation?: never
           organization_id?: string | null
           phone?: never
-          recurring_period?: string | null
           refcode?: string | null
-          refcode_custom?: string | null
-          refcode2?: string | null
           source_campaign?: string | null
           state?: string | null
           transaction_date?: string | null
@@ -5839,27 +5823,19 @@ export type Database = {
           addr1?: never
           amount?: number | null
           city?: string | null
-          committee_name?: string | null
-          contribution_form?: string | null
           country?: string | null
           created_at?: string | null
           donor_email?: never
           donor_name?: never
           employer?: never
-          entity_id?: string | null
           first_name?: never
           id?: string | null
-          is_express?: boolean | null
-          is_mobile?: boolean | null
           is_recurring?: boolean | null
           last_name?: never
           occupation?: never
           organization_id?: string | null
           phone?: never
-          recurring_period?: string | null
           refcode?: string | null
-          refcode_custom?: string | null
-          refcode2?: string | null
           source_campaign?: string | null
           state?: string | null
           transaction_date?: string | null
