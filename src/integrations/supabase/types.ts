@@ -5900,6 +5900,7 @@ export type Database = {
         Args: { mentions_1h: number; mentions_24h: number; mentions_6h: number }
         Returns: number
       }
+      check_contact_rate_limit: { Args: never; Returns: boolean }
       cleanup_old_cache: { Args: never; Returns: number }
       count_keyword_mentions: {
         Args: { search_keyword: string; time_window?: unknown }
@@ -5999,6 +6000,7 @@ export type Database = {
       }
       get_system_health_metrics: { Args: never; Returns: Json }
       get_user_organization_id: { Args: never; Returns: string }
+      get_user_organization_id_safe: { Args: never; Returns: string }
       get_users_with_roles: {
         Args: never
         Returns: {
