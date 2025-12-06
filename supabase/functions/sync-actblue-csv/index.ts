@@ -514,14 +514,26 @@ serve(async (req) => {
           
           console.log(`Backfill: Created ${dateRanges.length} date range chunks`);
         } else {
-          // For incremental, use last sync date or last 24 hours
+          // For incremental, ALWAYS go back at least 3 days to account for:
+          // 1. ActBlue's Eastern Time vs UTC timezone differences
+          // 2. ActBlue's payment processing delay (contributions aren't "paid" immediately)
+          // 3. Weekend/holiday payment batching
+          const threeDaysAgo = new Date();
+          threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+          
+          // Use the earlier of: 3 days ago OR last_sync_at (if it's older)
           if (cred.last_sync_at) {
-            syncStartDate = new Date(cred.last_sync_at).toISOString().split('T')[0];
+            const lastSyncDate = new Date(cred.last_sync_at);
+            if (lastSyncDate < threeDaysAgo) {
+              syncStartDate = lastSyncDate.toISOString().split('T')[0];
+            } else {
+              syncStartDate = threeDaysAgo.toISOString().split('T')[0];
+            }
           } else {
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            syncStartDate = yesterday.toISOString().split('T')[0];
+            syncStartDate = threeDaysAgo.toISOString().split('T')[0];
           }
+          
+          console.log(`Incremental sync: ${syncStartDate} to ${syncEndDate} (3-day lookback for payment processing delay)`);
           dateRanges.push({ start: syncStartDate, end: syncEndDate });
         }
       } else {
