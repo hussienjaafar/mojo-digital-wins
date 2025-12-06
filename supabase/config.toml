@@ -1,5 +1,8 @@
 project_id = "nuclmzoasgydubdshtab"
 
+[functions.tiered-meta-sync]
+verify_jwt = false
+
 [functions.cleanup-bluesky-posts]
 verify_jwt = false
 
