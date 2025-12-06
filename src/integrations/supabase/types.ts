@@ -4990,6 +4990,13 @@ export type Database = {
             referencedRelation: "contact_submissions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "submission_notes_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "contact_submissions_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       suggested_actions: {
@@ -5819,7 +5826,7 @@ export type Database = {
         Insert: {
           addr1?: never
           amount?: number | null
-          city?: never
+          city?: string | null
           country?: string | null
           created_at?: string | null
           donor_email?: never
@@ -5843,7 +5850,7 @@ export type Database = {
         Update: {
           addr1?: never
           amount?: number | null
-          city?: never
+          city?: string | null
           country?: string | null
           created_at?: string | null
           donor_email?: never
@@ -5913,6 +5920,107 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_invite_codes_secure: {
+        Row: {
+          code: string | null
+          created_at: string | null
+          created_by: string | null
+          email_error: string | null
+          email_sent_at: string | null
+          email_sent_to: string | null
+          email_status: string | null
+          expires_at: string | null
+          id: string | null
+          is_active: boolean | null
+          resend_count: number | null
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email_error?: never
+          email_sent_at?: string | null
+          email_sent_to?: never
+          email_status?: string | null
+          expires_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          resend_count?: number | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email_error?: never
+          email_sent_at?: string | null
+          email_sent_to?: never
+          email_status?: string | null
+          expires_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          resend_count?: number | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
+      attribution_touchpoints_secure: {
+        Row: {
+          campaign_id: string | null
+          created_at: string | null
+          donor_email: string | null
+          id: string | null
+          metadata: Json | null
+          occurred_at: string | null
+          organization_id: string | null
+          refcode: string | null
+          touchpoint_type: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string | null
+          donor_email?: never
+          id?: string | null
+          metadata?: Json | null
+          occurred_at?: string | null
+          organization_id?: string | null
+          refcode?: string | null
+          touchpoint_type?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string | null
+          donor_email?: never
+          id?: string | null
+          metadata?: Json | null
+          occurred_at?: string | null
+          organization_id?: string | null
+          refcode?: string | null
+          touchpoint_type?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attribution_touchpoints_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       backfill_monitoring: {
         Row: {
           completion_percentage: number | null
@@ -5936,6 +6044,191 @@ export type Database = {
           status: string | null
           topic: string | null
           velocity: number | null
+        }
+        Relationships: []
+      }
+      contact_submissions_secure: {
+        Row: {
+          assigned_to: string | null
+          campaign: string | null
+          created_at: string | null
+          email: string | null
+          id: string | null
+          message: string | null
+          name: string | null
+          organization_type: string | null
+          priority: string | null
+          resolved_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          campaign?: string | null
+          created_at?: string | null
+          email?: never
+          id?: string | null
+          message?: string | null
+          name?: never
+          organization_type?: string | null
+          priority?: string | null
+          resolved_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          campaign?: string | null
+          created_at?: string | null
+          email?: never
+          id?: string | null
+          message?: string | null
+          name?: never
+          organization_type?: string | null
+          priority?: string | null
+          resolved_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_submissions_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_submissions_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      donor_demographics_secure: {
+        Row: {
+          address: string | null
+          age: number | null
+          city: string | null
+          country: string | null
+          created_at: string | null
+          donation_count: number | null
+          donor_email: string | null
+          employer: string | null
+          first_donation_date: string | null
+          first_name: string | null
+          gender: string | null
+          id: string | null
+          is_recurring: boolean | null
+          last_donation_date: string | null
+          last_name: string | null
+          occupation: string | null
+          organization_id: string | null
+          party_affiliation: string | null
+          phone: string | null
+          state: string | null
+          total_donated: number | null
+          updated_at: string | null
+          voter_file_matched: boolean | null
+          voter_score: number | null
+          zip: string | null
+        }
+        Insert: {
+          address?: never
+          age?: number | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          donation_count?: number | null
+          donor_email?: never
+          employer?: never
+          first_donation_date?: string | null
+          first_name?: never
+          gender?: string | null
+          id?: string | null
+          is_recurring?: boolean | null
+          last_donation_date?: string | null
+          last_name?: never
+          occupation?: never
+          organization_id?: string | null
+          party_affiliation?: string | null
+          phone?: never
+          state?: string | null
+          total_donated?: number | null
+          updated_at?: string | null
+          voter_file_matched?: boolean | null
+          voter_score?: number | null
+          zip?: never
+        }
+        Update: {
+          address?: never
+          age?: number | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          donation_count?: number | null
+          donor_email?: never
+          employer?: never
+          first_donation_date?: string | null
+          first_name?: never
+          gender?: string | null
+          id?: string | null
+          is_recurring?: boolean | null
+          last_donation_date?: string | null
+          last_name?: never
+          occupation?: never
+          organization_id?: string | null
+          party_affiliation?: string | null
+          phone?: never
+          state?: string | null
+          total_donated?: number | null
+          updated_at?: string | null
+          voter_file_matched?: boolean | null
+          voter_score?: number | null
+          zip?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donor_demographics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      login_history_secure: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          failure_reason: string | null
+          id: string | null
+          ip_address: string | null
+          login_successful: boolean | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: never
+          failure_reason?: string | null
+          id?: string | null
+          ip_address?: never
+          login_successful?: boolean | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: never
+          failure_reason?: string | null
+          id?: string | null
+          ip_address?: never
+          login_successful?: boolean | null
+          user_agent?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -6081,6 +6374,7 @@ export type Database = {
         Returns: boolean
       }
       check_contact_rate_limit: { Args: never; Returns: boolean }
+      cleanup_expired_invite_codes: { Args: never; Returns: undefined }
       cleanup_old_cache: { Args: never; Returns: number }
       count_keyword_mentions: {
         Args: { search_keyword: string; time_window?: unknown }
@@ -6192,6 +6486,7 @@ export type Database = {
           roles: string[]
         }[]
       }
+      has_pii_access: { Args: never; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -6234,6 +6529,10 @@ export type Database = {
         }
         Returns: string
       }
+      mask_address: { Args: { address_input: string }; Returns: string }
+      mask_email: { Args: { email_input: string }; Returns: string }
+      mask_name: { Args: { name_input: string }; Returns: string }
+      mask_phone: { Args: { phone_input: string }; Returns: string }
       refresh_analytics_views: { Args: never; Returns: undefined }
       refresh_daily_group_sentiment: { Args: never; Returns: undefined }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
