@@ -227,6 +227,11 @@ serve(async (req) => {
       }
     }
 
+    // Get the latest broadcast date for freshness tracking
+    const latestBroadcastDate = allBroadcasts.length > 0
+      ? allBroadcasts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at
+      : new Date().toISOString();
+
     // Update sync status
     await supabase
       .from('client_api_credentials')
@@ -236,6 +241,20 @@ serve(async (req) => {
       })
       .eq('organization_id', organization_id)
       .eq('platform', 'switchboard');
+
+    // Update data freshness tracking
+    const { error: freshnessError } = await supabase.rpc('update_data_freshness', {
+      p_source: 'switchboard',
+      p_organization_id: organization_id,
+      p_latest_data_timestamp: latestBroadcastDate,
+      p_sync_status: 'success',
+      p_error: null,
+      p_records_synced: allBroadcasts.length,
+      p_duration_ms: null,
+    });
+    if (freshnessError) {
+      console.error('Error updating freshness:', freshnessError);
+    }
 
     return new Response(
       JSON.stringify({ 

@@ -339,6 +339,20 @@ serve(async (req) => {
 
     console.log('ActBlue transaction stored successfully:', lineitemId);
     
+    // Update data freshness tracking for ActBlue webhook
+    const { error: freshnessError } = await supabase.rpc('update_data_freshness', {
+      p_source: 'actblue_webhook',
+      p_organization_id: organization_id,
+      p_latest_data_timestamp: paidAt,
+      p_sync_status: 'success',
+      p_error: null,
+      p_records_synced: 1,
+      p_duration_ms: null,
+    });
+    if (freshnessError) {
+      console.error('Error updating freshness:', freshnessError);
+    }
+    
     return new Response(
       JSON.stringify({ 
         success: true, 

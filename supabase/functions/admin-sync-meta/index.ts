@@ -383,6 +383,20 @@ serve(async (req) => {
       .eq('organization_id', organization_id)
       .eq('platform', 'meta');
 
+    // Update data freshness tracking
+    const { error: freshnessError } = await supabase.rpc('update_data_freshness', {
+      p_source: 'meta',
+      p_organization_id: organization_id,
+      p_latest_data_timestamp: latestDataDate ? new Date(latestDataDate).toISOString() : null,
+      p_sync_status: metricsStored > 0 ? 'success' : 'success_no_data',
+      p_error: null,
+      p_records_synced: metricsStored,
+      p_duration_ms: Date.now() - startTime,
+    });
+    if (freshnessError) {
+      console.error('Error updating freshness:', freshnessError);
+    }
+
     const duration = Date.now() - startTime;
     console.log(`[META SYNC] Complete: ${campaigns.length} campaigns, ${metricsStored} metrics, ${creativesStored} creatives, duration: ${duration}ms`);
     console.log(`[META SYNC] Data freshness: latest=${latestDataDate}, lag=${dataLagDays} days, reason=${lagReason}`);

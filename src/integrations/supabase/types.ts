@@ -2123,6 +2123,71 @@ export type Database = {
         }
         Relationships: []
       }
+      data_freshness: {
+        Row: {
+          created_at: string | null
+          data_lag_hours: number | null
+          freshness_sla_hours: number
+          id: string
+          is_within_sla: boolean | null
+          last_error: string | null
+          last_sync_status: string | null
+          last_synced_at: string | null
+          latest_data_timestamp: string | null
+          organization_id: string | null
+          records_synced: number | null
+          scope: string
+          sla_breach_count: number | null
+          source: string
+          sync_duration_ms: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_lag_hours?: number | null
+          freshness_sla_hours?: number
+          id?: string
+          is_within_sla?: boolean | null
+          last_error?: string | null
+          last_sync_status?: string | null
+          last_synced_at?: string | null
+          latest_data_timestamp?: string | null
+          organization_id?: string | null
+          records_synced?: number | null
+          scope?: string
+          sla_breach_count?: number | null
+          source: string
+          sync_duration_ms?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_lag_hours?: number | null
+          freshness_sla_hours?: number
+          id?: string
+          is_within_sla?: boolean | null
+          last_error?: string | null
+          last_sync_status?: string | null
+          last_synced_at?: string | null
+          latest_data_timestamp?: string | null
+          organization_id?: string | null
+          records_synced?: number | null
+          scope?: string
+          sla_breach_count?: number | null
+          source?: string
+          sync_duration_ms?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_freshness_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_freshness_alerts: {
         Row: {
           alert_type: string
@@ -2843,6 +2908,36 @@ export type Database = {
           is_system?: boolean | null
           template_name?: string
           template_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      freshness_sla_config: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          source: string
+          sync_interval_minutes: number
+          target_freshness_hours: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          source: string
+          sync_interval_minutes: number
+          target_freshness_hours: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          source?: string
+          sync_interval_minutes?: number
+          target_freshness_hours?: number
           updated_at?: string | null
         }
         Relationships: []
@@ -6107,6 +6202,33 @@ export type Database = {
           },
         ]
       }
+      data_freshness_summary: {
+        Row: {
+          data_lag_hours: number | null
+          freshness_sla_hours: number | null
+          freshness_status: string | null
+          is_within_sla: boolean | null
+          last_error: string | null
+          last_sync_status: string | null
+          last_synced_at: string | null
+          latest_data_timestamp: string | null
+          organization_id: string | null
+          organization_name: string | null
+          records_synced: number | null
+          source: string | null
+          source_display_name: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_freshness_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       donor_demographics_secure: {
         Row: {
           address: string | null
@@ -6628,6 +6750,18 @@ export type Database = {
           topic_name: string
           topic_velocity: number
         }[]
+      }
+      update_data_freshness: {
+        Args: {
+          p_duration_ms?: number
+          p_error?: string
+          p_latest_data_timestamp?: string
+          p_organization_id?: string
+          p_records_synced?: number
+          p_source: string
+          p_sync_status?: string
+        }
+        Returns: string
       }
       update_job_after_execution: {
         Args: {

@@ -215,3 +215,6 @@ verify_jwt = false
 
 [functions.generate-creative-recommendations]
 verify_jwt = false
+
+[functions.update-data-freshness]
+verify_jwt = false
