@@ -6,6 +6,47 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper to try multiple API endpoints for video source
+async function fetchVideoSource(videoId: string, accessToken: string): Promise<{ source: string | null; thumbnail: string | null; error: string | null }> {
+  try {
+    const primaryUrl = `https://graph.facebook.com/v22.0/${videoId}?fields=source,picture,thumbnails{uri,height,width}&access_token=${accessToken}`;
+    console.log(`[BACKFILL] Trying primary endpoint for video ${videoId}`);
+    
+    const response = await fetch(primaryUrl);
+    const data = await response.json();
+    
+    if (!data.error) {
+      let thumbnail = data.picture;
+      if (data.thumbnails?.data?.length > 0) {
+        const sorted = data.thumbnails.data.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+        thumbnail = sorted[0]?.uri || thumbnail;
+      }
+      return { source: data.source || null, thumbnail, error: null };
+    }
+    
+    console.log(`[BACKFILL] Primary endpoint error for ${videoId}: ${data.error.message}`);
+    
+    // Try alternate endpoint - without source field (some videos don't allow source download)
+    const altUrl = `https://graph.facebook.com/v22.0/${videoId}?fields=picture,thumbnails{uri,height,width}&access_token=${accessToken}`;
+    const altResponse = await fetch(altUrl);
+    const altData = await altResponse.json();
+    
+    if (!altData.error) {
+      let thumbnail = altData.picture;
+      if (altData.thumbnails?.data?.length > 0) {
+        const sorted = altData.thumbnails.data.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+        thumbnail = sorted[0]?.uri || thumbnail;
+      }
+      return { source: null, thumbnail, error: `Source not available: ${data.error.message}` };
+    }
+    
+    return { source: null, thumbnail: null, error: data.error.message };
+  } catch (err) {
+    console.error(`[BACKFILL] Exception fetching video ${videoId}:`, err);
+    return { source: null, thumbnail: null, error: String(err) };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -21,12 +62,12 @@ serve(async (req) => {
 
     console.log('[BACKFILL VIDEO SOURCES] Starting backfill...');
 
-    // Find videos that need source URLs
+    // Find videos that need source URLs OR have blurry thumbnails
     let query = supabase
       .from('meta_creative_insights')
-      .select('id, meta_video_id, organization_id, thumbnail_url')
-      .is('media_source_url', null)
+      .select('id, meta_video_id, organization_id, thumbnail_url, media_source_url')
       .not('meta_video_id', 'is', null)
+      .or('media_source_url.is.null,thumbnail_url.ilike.%p64x64%')
       .limit(limit);
 
     if (organization_id) {
@@ -88,49 +129,44 @@ serve(async (req) => {
       // Process each video
       for (const video of videos) {
         try {
-          // Fetch video details from Meta Graph API
-          const videoUrl = `https://graph.facebook.com/v22.0/${video.meta_video_id}?fields=source,picture,thumbnails{uri,height,width}&access_token=${accessToken}`;
-          const response = await fetch(videoUrl);
-          const data = await response.json();
+          const result = await fetchVideoSource(video.meta_video_id, accessToken);
 
-          if (data.error) {
-            console.error(`[BACKFILL] Meta API error for video ${video.meta_video_id}:`, data.error.message);
-            failCount++;
-            errors.push(`Video ${video.meta_video_id}: ${data.error.message}`);
-            continue;
+          // Determine what needs updating
+          const updateData: Record<string, any> = {};
+          
+          if (result.source && !video.media_source_url) {
+            updateData.media_source_url = result.source;
+          }
+          
+          // Update thumbnail if we got a better one and current is blurry
+          if (result.thumbnail && video.thumbnail_url?.includes('p64x64')) {
+            updateData.thumbnail_url = result.thumbnail;
           }
 
-          // Get source URL and best thumbnail
-          const mediaSourceUrl = data.source || null;
-          let highResThumbnail = video.thumbnail_url;
+          if (Object.keys(updateData).length > 0) {
+            const { error: updateError } = await supabase
+              .from('meta_creative_insights')
+              .update(updateData)
+              .eq('id', video.id);
 
-          if (data.thumbnails?.data?.length > 0) {
-            const sortedThumbs = data.thumbnails.data.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
-            highResThumbnail = sortedThumbs[0]?.uri || data.picture || highResThumbnail;
-          } else if (data.picture) {
-            highResThumbnail = data.picture;
-          }
-
-          // Update the record
-          const { error: updateError } = await supabase
-            .from('meta_creative_insights')
-            .update({
-              media_source_url: mediaSourceUrl,
-              thumbnail_url: highResThumbnail,
-            })
-            .eq('id', video.id);
-
-          if (updateError) {
-            console.error(`[BACKFILL] Error updating video ${video.id}:`, updateError);
+            if (updateError) {
+              console.error(`[BACKFILL] Error updating video ${video.id}:`, updateError);
+              failCount++;
+              errors.push(`Update failed for ${video.id}`);
+            } else {
+              successCount++;
+              console.log(`[BACKFILL] Updated video ${video.meta_video_id}: source=${!!result.source}, thumbnail=${!!result.thumbnail}`);
+            }
+          } else if (result.error) {
+            console.log(`[BACKFILL] No updates for video ${video.meta_video_id}: ${result.error}`);
             failCount++;
-            errors.push(`Update failed for ${video.id}`);
+            errors.push(`Video ${video.meta_video_id}: ${result.error}`);
           } else {
             successCount++;
-            console.log(`[BACKFILL] Updated video ${video.meta_video_id} with source URL`);
           }
 
-          // Small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200));
         } catch (err) {
           console.error(`[BACKFILL] Error processing video ${video.meta_video_id}:`, err);
           failCount++;
@@ -145,7 +181,7 @@ serve(async (req) => {
         success: true,
         processed: successCount,
         failed: failCount,
-        errors: errors.slice(0, 10), // Return first 10 errors
+        errors: errors.slice(0, 10),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
