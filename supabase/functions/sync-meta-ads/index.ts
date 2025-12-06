@@ -438,8 +438,8 @@ serve(async (req) => {
             
             // Only store if we have some creative content
             if (primaryText || headline || description || videoId) {
-              // Fetch ad-level insights for performance metrics
-              const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad.id}/insights?fields=impressions,clicks,spend,actions,action_values,ctr,frequency,quality_ranking,engagement_rate_ranking,conversion_rate_ranking&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
+              // Fetch ad-level insights for performance metrics - include purchase_roas for accurate ROAS
+              const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad.id}/insights?fields=impressions,clicks,spend,actions,action_values,ctr,frequency,quality_ranking,engagement_rate_ranking,conversion_rate_ranking,purchase_roas,website_purchase_roas&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&action_attribution_windows=["7d_click","1d_view"]&access_token=${access_token}`;
               
               let impressions = 0, clicks = 0, spend = 0, conversions = 0, conversionValue = 0, ctr = 0;
               let frequency = 0, qualityRanking = '', engagementRanking = '', conversionRanking = '';
@@ -473,6 +473,13 @@ serve(async (req) => {
                     );
                     if (valueAction) conversionValue = parseFloat(valueAction.value) || 0;
                   }
+                  
+                  // PHASE 2 FIX: Use Meta's purchase_roas for accurate ROAS matching Ads Manager
+                  const metaPurchaseRoas = insight.purchase_roas?.[0]?.value || insight.website_purchase_roas?.[0]?.value;
+                  if (metaPurchaseRoas) {
+                    // Meta returns ROAS directly (e.g., 2.5 means $2.50 return per $1 spent)
+                    conversionValue = parseFloat(metaPurchaseRoas) * (parseFloat(insight.spend) || 0);
+                  }
                 }
               } catch (insightErr) {
                 console.error(`Error fetching insights for ad ${ad.id}:`, insightErr);
@@ -495,6 +502,9 @@ serve(async (req) => {
               } else if (creative.asset_feed_spec) {
                 mediaType = 'carousel';
               }
+              
+              // PHASE 2 FIX: Calculate ROAS from Meta's purchase_roas when available
+              const creativeRoas = spend > 0 ? conversionValue / spend : 0;
               
               // Store creative insight with enhanced fields
               const { error: creativeError } = await supabase
@@ -521,8 +531,8 @@ serve(async (req) => {
                   spend,
                   conversions,
                   conversion_value: conversionValue,
-                  ctr, // Now stored as decimal (0.025 = 2.5%)
-                  roas: spend > 0 ? conversionValue / spend : 0,
+                  ctr, // Stored as decimal (0.025 = 2.5%)
+                  roas: creativeRoas, // Uses conversion_value which may come from purchase_roas
                   // PHASE 3: Track first seen for time-aware model
                   first_seen_at: new Date().toISOString(),
                 }, {
@@ -740,6 +750,16 @@ serve(async (req) => {
           }
         }
 
+        // PHASE 1 FIX: Normalize CTR to decimal and use Meta's purchase_roas
+        const normalizedCtr = (parseFloat(insight.ctr) || 0) / 100;
+        
+        // PHASE 2 FIX: Use Meta's calculated purchase_roas when available (matches Ads Manager)
+        const metaPurchaseRoas = insight.purchase_roas?.[0]?.value || insight.website_purchase_roas?.[0]?.value;
+        const calculatedRoas = conversionValue > 0 && parseFloat(insight.spend) > 0 
+          ? conversionValue / parseFloat(insight.spend) 
+          : 0;
+        const finalRoas = metaPurchaseRoas ? parseFloat(metaPurchaseRoas) : calculatedRoas;
+        
         const { error: metricsError } = await supabase
           .from('meta_ad_metrics')
           .upsert({
@@ -754,12 +774,10 @@ serve(async (req) => {
             reach: parseInt(insight.reach) || 0,
             cpc: parseFloat(insight.cpc) || 0,
             cpm: parseFloat(insight.cpm) || 0,
-            ctr: parseFloat(insight.ctr) || 0,
+            ctr: normalizedCtr, // Now stored as decimal (0.03 = 3%)
             conversions,
             conversion_value: conversionValue,
-            roas: conversionValue > 0 && parseFloat(insight.spend) > 0 
-              ? conversionValue / parseFloat(insight.spend) 
-              : 0,
+            roas: finalRoas, // Uses Meta's purchase_roas when available
             // ENHANCED FIELDS
             frequency: parseFloat(insight.frequency) || null,
             cost_per_result: costPerResult || null,
