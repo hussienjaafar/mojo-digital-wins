@@ -6326,6 +6326,68 @@ export type Database = {
         }
         Relationships: []
       }
+      transaction_attribution_secure: {
+        Row: {
+          attribution_calculated_at: string | null
+          created_at: string | null
+          donor_email: string | null
+          first_touch_campaign: string | null
+          first_touch_channel: string | null
+          first_touch_weight: number | null
+          id: string | null
+          last_touch_campaign: string | null
+          last_touch_channel: string | null
+          last_touch_weight: number | null
+          middle_touches: Json | null
+          middle_touches_weight: number | null
+          organization_id: string | null
+          total_touchpoints: number | null
+          transaction_id: string | null
+        }
+        Insert: {
+          attribution_calculated_at?: string | null
+          created_at?: string | null
+          donor_email?: never
+          first_touch_campaign?: string | null
+          first_touch_channel?: string | null
+          first_touch_weight?: number | null
+          id?: string | null
+          last_touch_campaign?: string | null
+          last_touch_channel?: string | null
+          last_touch_weight?: number | null
+          middle_touches?: Json | null
+          middle_touches_weight?: number | null
+          organization_id?: string | null
+          total_touchpoints?: number | null
+          transaction_id?: string | null
+        }
+        Update: {
+          attribution_calculated_at?: string | null
+          created_at?: string | null
+          donor_email?: never
+          first_touch_campaign?: string | null
+          first_touch_channel?: string | null
+          first_touch_weight?: number | null
+          id?: string | null
+          last_touch_campaign?: string | null
+          last_touch_channel?: string | null
+          last_touch_weight?: number | null
+          middle_touches?: Json | null
+          middle_touches_weight?: number | null
+          organization_id?: string | null
+          total_touchpoints?: number | null
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       archive_old_data: {
