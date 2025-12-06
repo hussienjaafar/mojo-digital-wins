@@ -6549,7 +6549,9 @@ export type Database = {
           roles: string[]
         }[]
       }
-      has_pii_access: { Args: never; Returns: boolean }
+      has_pii_access:
+        | { Args: never; Returns: boolean }
+        | { Args: { _organization_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
