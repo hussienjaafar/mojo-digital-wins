@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format, subDays, parseISO } from "date-fns";
 import { ResponsiveLineChart, ResponsiveBarChart } from "@/components/charts";
 import { formatCurrency } from "@/lib/chart-formatters";
+import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
 
 type Props = {
   organizationId: string;
@@ -293,6 +294,11 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
   return (
     <div className="space-y-6">
+      {/* Data Freshness Indicator */}
+      <div className="flex justify-end">
+        <MetaDataFreshnessIndicator organizationId={organizationId} />
+      </div>
+      
       {/* KPIs with Period Comparison */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="portal-bg-elevated rounded-lg p-4 border border-[hsl(var(--portal-border))]">
