@@ -1528,8 +1528,14 @@ export type Database = {
       }
       campaign_attribution: {
         Row: {
+          attributed_revenue: number | null
+          attributed_transactions: number | null
           created_at: string | null
           id: string
+          is_auto_matched: boolean | null
+          last_matched_at: string | null
+          match_confidence: number | null
+          match_reason: string | null
           meta_campaign_id: string | null
           organization_id: string
           refcode: string | null
@@ -1539,8 +1545,14 @@ export type Database = {
           utm_source: string | null
         }
         Insert: {
+          attributed_revenue?: number | null
+          attributed_transactions?: number | null
           created_at?: string | null
           id?: string
+          is_auto_matched?: boolean | null
+          last_matched_at?: string | null
+          match_confidence?: number | null
+          match_reason?: string | null
           meta_campaign_id?: string | null
           organization_id: string
           refcode?: string | null
@@ -1550,8 +1562,14 @@ export type Database = {
           utm_source?: string | null
         }
         Update: {
+          attributed_revenue?: number | null
+          attributed_transactions?: number | null
           created_at?: string | null
           id?: string
+          is_auto_matched?: boolean | null
+          last_matched_at?: string | null
+          match_confidence?: number | null
+          match_reason?: string | null
           meta_campaign_id?: string | null
           organization_id?: string
           refcode?: string | null
@@ -6619,6 +6637,25 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "transaction_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      unmatched_refcodes: {
+        Row: {
+          first_seen: string | null
+          last_seen: string | null
+          organization_id: string | null
+          refcode: string | null
+          total_revenue: number | null
+          transaction_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "client_organizations"

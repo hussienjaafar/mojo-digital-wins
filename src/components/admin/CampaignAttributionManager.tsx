@@ -8,9 +8,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Link2, Plus, Trash2, Target } from "lucide-react";
+import { Link2, Plus, Trash2, Target, Wand2, DollarSign } from "lucide-react";
 import { logger } from "@/lib/logger";
+import AttributionMatcher from "./AttributionMatcher";
+import { cn } from "@/lib/utils";
 
 type Organization = {
   id: string;
@@ -27,6 +30,11 @@ type Attribution = {
   meta_campaign_id: string | null;
   switchboard_campaign_id: string | null;
   created_at: string;
+  match_confidence: number | null;
+  is_auto_matched: boolean | null;
+  match_reason: string | null;
+  attributed_revenue: number | null;
+  attributed_transactions: number | null;
 };
 
 type MetaCampaign = {
@@ -60,7 +68,6 @@ const CampaignAttributionManager = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Load organizations
       const { data: orgsData, error: orgsError } = await (supabase as any)
         .from('client_organizations')
         .select('id, name')
@@ -70,7 +77,6 @@ const CampaignAttributionManager = () => {
       if (orgsError) throw orgsError;
       setOrganizations(orgsData || []);
 
-      // Load attributions
       const { data: attrsData, error: attrsError } = await (supabase as any)
         .from('campaign_attribution')
         .select('*')
@@ -79,7 +85,6 @@ const CampaignAttributionManager = () => {
       if (attrsError) throw attrsError;
       setAttributions(attrsData || []);
 
-      // Load Meta campaigns for dropdown
       const { data: campaignsData, error: campaignsError } = await (supabase as any)
         .from('meta_campaigns')
         .select('campaign_id, campaign_name')
@@ -179,6 +184,33 @@ const CampaignAttributionManager = () => {
     return organizations.find(o => o.id === orgId)?.name || 'Unknown';
   };
 
+  const getMetaCampaignName = (campaignId: string | null) => {
+    if (!campaignId) return '-';
+    const campaign = metaCampaigns.find(c => c.campaign_id === campaignId);
+    return campaign?.campaign_name || campaignId;
+  };
+
+  const formatCurrency = (amount: number | null) => {
+    if (!amount) return '-';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const getConfidenceBadge = (confidence: number | null) => {
+    if (!confidence) return null;
+    if (confidence >= 0.9) {
+      return <Badge className="bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30 text-xs">High</Badge>;
+    }
+    if (confidence >= 0.7) {
+      return <Badge className="bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30 text-xs">Medium</Badge>;
+    }
+    return <Badge className="bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30 text-xs">Low</Badge>;
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6 portal-animate-fade-in">
@@ -208,196 +240,225 @@ const CampaignAttributionManager = () => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Link2 className="w-5 h-5" />
-              Campaign Attribution
-            </CardTitle>
-            <CardDescription>
-              Map tracking codes to campaigns for accurate ROI attribution
-            </CardDescription>
-          </div>
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Attribution
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create Attribution Mapping</DialogTitle>
-                <DialogDescription>
-                  Link UTM parameters and refcodes to specific campaigns
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="organization">Organization *</Label>
-                  <select
-                    id="organization"
-                    value={formData.organization_id}
-                    onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background"
-                    required
-                  >
-                    <option value="">Select organization</option>
-                    {organizations.map((org) => (
-                      <option key={org.id} value={org.id}>
-                        {org.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+    <div className="space-y-6">
+      <Tabs defaultValue="matcher" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="matcher" className="flex items-center gap-2">
+            <Wand2 className="w-4 h-4" />
+            Smart Matcher
+          </TabsTrigger>
+          <TabsTrigger value="manual" className="flex items-center gap-2">
+            <Link2 className="w-4 h-4" />
+            All Mappings
+          </TabsTrigger>
+        </TabsList>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="utm_source">UTM Source</Label>
-                    <Input
-                      id="utm_source"
-                      value={formData.utm_source}
-                      onChange={(e) => setFormData({ ...formData, utm_source: e.target.value })}
-                      placeholder="facebook, google, email"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="utm_medium">UTM Medium</Label>
-                    <Input
-                      id="utm_medium"
-                      value={formData.utm_medium}
-                      onChange={(e) => setFormData({ ...formData, utm_medium: e.target.value })}
-                      placeholder="cpc, email, social"
-                    />
-                  </div>
-                </div>
+        <TabsContent value="matcher" className="mt-6">
+          <AttributionMatcher />
+        </TabsContent>
 
-                <div className="space-y-2">
-                  <Label htmlFor="utm_campaign">UTM Campaign</Label>
-                  <Input
-                    id="utm_campaign"
-                    value={formData.utm_campaign}
-                    onChange={(e) => setFormData({ ...formData, utm_campaign: e.target.value })}
-                    placeholder="summer-fundraiser-2024"
-                  />
+        <TabsContent value="manual" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Link2 className="w-5 h-5" />
+                    Attribution Mappings
+                  </CardTitle>
+                  <CardDescription>
+                    All configured campaign attribution mappings
+                  </CardDescription>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="refcode">ActBlue Refcode</Label>
-                  <Input
-                    id="refcode"
-                    value={formData.refcode}
-                    onChange={(e) => setFormData({ ...formData, refcode: e.target.value })}
-                    placeholder="SUMMER2024"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    The refcode used in ActBlue donation links
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="meta_campaign_id">Meta Campaign ID</Label>
-                  <select
-                    id="meta_campaign_id"
-                    value={formData.meta_campaign_id}
-                    onChange={(e) => setFormData({ ...formData, meta_campaign_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background"
-                  >
-                    <option value="">None</option>
-                    {metaCampaigns.map((campaign) => (
-                      <option key={campaign.campaign_id} value={campaign.campaign_id}>
-                        {campaign.campaign_name || campaign.campaign_id}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="switchboard_campaign_id">Switchboard Campaign ID</Label>
-                  <Input
-                    id="switchboard_campaign_id"
-                    value={formData.switchboard_campaign_id}
-                    onChange={(e) => setFormData({ ...formData, switchboard_campaign_id: e.target.value })}
-                    placeholder="sms_campaign_123"
-                  />
-                </div>
-
-                <div className="flex gap-2 justify-end pt-4">
-                  <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Create Attribution</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Organization</TableHead>
-              <TableHead>UTM Parameters</TableHead>
-              <TableHead>Refcode</TableHead>
-              <TableHead>Meta Campaign</TableHead>
-              <TableHead>SMS Campaign</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {attributions.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  No attribution mappings yet. Create your first one!
-                </TableCell>
-              </TableRow>
-            ) : (
-              attributions.map((attr) => (
-                <TableRow key={attr.id}>
-                  <TableCell className="font-medium">
-                    {getOrganizationName(attr.organization_id)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {attr.utm_source && <Badge variant="outline">source: {attr.utm_source}</Badge>}
-                      {attr.utm_medium && <Badge variant="outline">medium: {attr.utm_medium}</Badge>}
-                      {attr.utm_campaign && <Badge variant="outline">campaign: {attr.utm_campaign}</Badge>}
-                      {!attr.utm_source && !attr.utm_medium && !attr.utm_campaign && (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {attr.refcode ? (
-                      <Badge>{attr.refcode}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {attr.meta_campaign_id || '-'}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {attr.switchboard_campaign_id || '-'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDeleteClick(attr.id)}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
+                <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Manual
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Create Attribution Mapping</DialogTitle>
+                      <DialogDescription>
+                        Link UTM parameters and refcodes to specific campaigns
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreate} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="organization">Organization *</Label>
+                        <select
+                          id="organization"
+                          value={formData.organization_id}
+                          onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
+                          className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                          required
+                        >
+                          <option value="">Select organization</option>
+                          {organizations.map((org) => (
+                            <option key={org.id} value={org.id}>
+                              {org.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="utm_source">UTM Source</Label>
+                          <Input
+                            id="utm_source"
+                            value={formData.utm_source}
+                            onChange={(e) => setFormData({ ...formData, utm_source: e.target.value })}
+                            placeholder="facebook, google, email"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="utm_medium">UTM Medium</Label>
+                          <Input
+                            id="utm_medium"
+                            value={formData.utm_medium}
+                            onChange={(e) => setFormData({ ...formData, utm_medium: e.target.value })}
+                            placeholder="cpc, email, social"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="utm_campaign">UTM Campaign</Label>
+                        <Input
+                          id="utm_campaign"
+                          value={formData.utm_campaign}
+                          onChange={(e) => setFormData({ ...formData, utm_campaign: e.target.value })}
+                          placeholder="summer-fundraiser-2024"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="refcode">ActBlue Refcode</Label>
+                        <Input
+                          id="refcode"
+                          value={formData.refcode}
+                          onChange={(e) => setFormData({ ...formData, refcode: e.target.value })}
+                          placeholder="SUMMER2024"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          The refcode used in ActBlue donation links
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="meta_campaign_id">Meta Campaign</Label>
+                        <select
+                          id="meta_campaign_id"
+                          value={formData.meta_campaign_id}
+                          onChange={(e) => setFormData({ ...formData, meta_campaign_id: e.target.value })}
+                          className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        >
+                          <option value="">None</option>
+                          {metaCampaigns.map((campaign) => (
+                            <option key={campaign.campaign_id} value={campaign.campaign_id}>
+                              {campaign.campaign_name || campaign.campaign_id}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="switchboard_campaign_id">Switchboard Campaign ID</Label>
+                        <Input
+                          id="switchboard_campaign_id"
+                          value={formData.switchboard_campaign_id}
+                          onChange={(e) => setFormData({ ...formData, switchboard_campaign_id: e.target.value })}
+                          placeholder="sms_campaign_123"
+                        />
+                      </div>
+
+                      <div className="flex gap-2 justify-end pt-4">
+                        <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit">Create Attribution</Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Organization</TableHead>
+                    <TableHead>Refcode</TableHead>
+                    <TableHead>Meta Campaign</TableHead>
+                    <TableHead>Confidence</TableHead>
+                    <TableHead className="text-right">Revenue</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {attributions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        No attribution mappings yet. Use Smart Matcher or add one manually!
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    attributions.map((attr) => (
+                      <TableRow key={attr.id}>
+                        <TableCell className="font-medium">
+                          {getOrganizationName(attr.organization_id)}
+                        </TableCell>
+                        <TableCell>
+                          {attr.refcode ? (
+                            <Badge variant="outline" className="font-mono">{attr.refcode}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {getMetaCampaignName(attr.meta_campaign_id)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getConfidenceBadge(attr.match_confidence)}
+                            {attr.is_auto_matched && (
+                              <Badge variant="outline" className="text-xs">
+                                <Wand2 className="w-3 h-3 mr-1" />
+                                Auto
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {attr.attributed_revenue ? (
+                            <div className="flex items-center justify-end gap-1 text-green-600 dark:text-green-400">
+                              <DollarSign className="w-3 h-3" />
+                              {formatCurrency(attr.attributed_revenue)}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteClick(attr.id)}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
@@ -413,7 +474,7 @@ const CampaignAttributionManager = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </div>
   );
 };
 
