@@ -1,12 +1,13 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PortalMetric } from "@/components/portal/PortalMetric";
 import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardContent } from "@/components/portal/PortalCard";
 import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
-import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare } from "lucide-react";
+import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff } from "lucide-react";
 import { format, parseISO, eachDayOfInterval, subDays } from "date-fns";
 import { logger } from "@/lib/logger";
+import { toast } from "sonner";
 
 interface ClientDashboardMetricsProps {
   organizationId: string;
@@ -46,6 +47,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
   const [prevMetaMetrics, setPrevMetaMetrics] = useState<MetaData[]>([]);
   const [prevSmsMetrics, setPrevSmsMetrics] = useState<SMSData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
   // Calculate previous period dates for comparison
   const getPreviousPeriod = () => {
@@ -136,6 +138,54 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       setIsLoading(false);
     }
   };
+
+  // Real-time subscription for live donation updates
+  useEffect(() => {
+    const channel = supabase
+      .channel(`dashboard-realtime-${organizationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'actblue_transactions',
+          filter: `organization_id=eq.${organizationId}`,
+        },
+        (payload) => {
+          logger.info('New donation received via realtime', payload.new);
+          const newDonation = payload.new as any;
+          
+          // Check if donation falls within current date range
+          const txDate = newDonation.transaction_date;
+          if (txDate >= startDate && txDate <= `${endDate}T23:59:59`) {
+            setDonations(prev => [{
+              amount: newDonation.amount,
+              donor_email: newDonation.donor_email,
+              is_recurring: newDonation.is_recurring,
+              transaction_date: newDonation.transaction_date,
+              refcode: newDonation.refcode,
+            }, ...prev]);
+            
+            toast.success(`New donation: $${Number(newDonation.amount).toFixed(2)}`, {
+              description: newDonation.donor_name || 'Anonymous donor',
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setIsRealtimeConnected(true);
+          logger.info('Dashboard realtime connected');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setIsRealtimeConnected(false);
+          logger.warn('Dashboard realtime disconnected');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [organizationId, startDate, endDate]);
 
   // Calculate percentage change
   const calcChange = (current: number, previous: number) => {
@@ -286,6 +336,25 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
 
   return (
     <div className="space-y-6">
+      {/* Realtime Connection Indicator */}
+      <div className="flex items-center gap-2 text-sm">
+        {isRealtimeConnected ? (
+          <>
+            <Wifi className="h-4 w-4 text-emerald-500" />
+            <span className="portal-text-muted">Live updates enabled</span>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </>
+        ) : (
+          <>
+            <WifiOff className="h-4 w-4 portal-text-muted" />
+            <span className="portal-text-muted">Connecting...</span>
+          </>
+        )}
+      </div>
+
       {/* Hero KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {heroKpis.map((metric, index) => (
