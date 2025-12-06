@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMetaDataFreshness } from '@/hooks/useMetaDataFreshness';
+import { format, formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { PortalBadge } from '@/components/portal/PortalBadge';
 import { 
@@ -11,7 +12,6 @@ import {
   Loader2,
   Calendar
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
   Tooltip,
