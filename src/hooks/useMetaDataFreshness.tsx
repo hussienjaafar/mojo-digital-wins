@@ -61,7 +61,7 @@ export function useMetaDataFreshness(organizationId: string) {
         .eq('organization_id', organizationId)
         .eq('platform', 'meta')
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       if (credError) {
         logger.warn('Could not fetch Meta credentials status', credError);
@@ -74,7 +74,7 @@ export function useMetaDataFreshness(organizationId: string) {
         .eq('organization_id', organizationId)
         .order('date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (metricsError && metricsError.code !== 'PGRST116') {
         logger.warn('Could not fetch latest metrics date', metricsError);
