@@ -844,6 +844,11 @@ serve(async (req) => {
         console.log(`With Card Type: ${captureStats.with_card_type} (${((captureStats.with_card_type / totalProcessed) * 100).toFixed(1)}%)`);
         console.log('=== END STATISTICS ===');
 
+        // Get the latest transaction date for freshness tracking
+        const latestTransactionDate = dateRanges[0]?.end 
+          ? new Date(dateRanges[0].end).toISOString()
+          : new Date().toISOString();
+
         // Update last sync timestamp
         await supabase
           .from('client_api_credentials')
@@ -852,6 +857,20 @@ serve(async (req) => {
             last_sync_status: 'success',
           })
           .eq('id', cred.id);
+
+        // Update data freshness tracking
+        const { error: freshnessError } = await supabase.rpc('update_data_freshness', {
+          p_source: 'actblue_csv',
+          p_organization_id: orgId,
+          p_latest_data_timestamp: latestTransactionDate,
+          p_sync_status: 'success',
+          p_error: null,
+          p_records_synced: totalInserted + totalUpdated,
+          p_duration_ms: null,
+        });
+        if (freshnessError) {
+          console.error('Error updating freshness:', freshnessError);
+        }
 
         results.push({
           organization_id: orgId,
