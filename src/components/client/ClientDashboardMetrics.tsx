@@ -75,7 +75,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         .select('amount, donor_email, is_recurring, transaction_date, refcode')
         .eq('organization_id', organizationId)
         .gte('transaction_date', startDate)
-        .lte('transaction_date', endDate);
+        .lte('transaction_date', `${endDate}T23:59:59`);
       
       setDonations(donationData || []);
 
@@ -85,7 +85,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         .select('amount, donor_email, is_recurring, transaction_date, refcode')
         .eq('organization_id', organizationId)
         .gte('transaction_date', prevPeriod.start)
-        .lte('transaction_date', prevPeriod.end);
+        .lte('transaction_date', `${prevPeriod.end}T23:59:59`);
       
       setPrevDonations(prevDonationData || []);
 
