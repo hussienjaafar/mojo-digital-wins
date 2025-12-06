@@ -417,38 +417,15 @@ serve(async (req) => {
             break;
 
           case 'sync_meta_ads':
-            // Sync Meta Ads data for all active organizations
-            console.log('Running Meta Ads sync for all organizations');
-            const { data: metaOrgs } = await supabase
-              .from('client_api_credentials')
-              .select('organization_id')
-              .eq('platform', 'meta')
-              .eq('is_active', true);
-            
-            let metaProcessed = 0;
-            let metaCreated = 0;
-            const metaResults: any[] = [];
-            
-            for (const org of (metaOrgs || [])) {
-              try {
-                const metaResponse = await supabase.functions.invoke('admin-sync-meta', {
-                  body: { organization_id: org.organization_id },
-                  headers: { 'x-admin-key': 'internal-sync-trigger' }
-                });
-                if (!metaResponse.error) {
-                  metaProcessed++;
-                  metaCreated += metaResponse.data?.records_processed || 0;
-                  metaResults.push({ org: org.organization_id, success: true });
-                } else {
-                  metaResults.push({ org: org.organization_id, error: metaResponse.error.message });
-                }
-              } catch (e: any) {
-                metaResults.push({ org: org.organization_id, error: e.message });
-              }
-            }
-            result = { organizations_synced: metaProcessed, results: metaResults };
-            itemsProcessed = metaProcessed;
-            itemsCreated = metaCreated;
+            // Use the tiered sync scheduler instead of syncing all at once
+            console.log('Running tiered Meta Ads sync scheduler');
+            const tieredSyncResponse = await supabase.functions.invoke('tiered-meta-sync', {
+              body: {}
+            });
+            if (tieredSyncResponse.error) throw new Error(tieredSyncResponse.error.message);
+            result = tieredSyncResponse.data;
+            itemsProcessed = result?.accounts_synced || 0;
+            itemsCreated = result?.accounts_synced || 0;
             break;
 
           case 'sync_switchboard_sms':

@@ -1576,10 +1576,16 @@ export type Database = {
           encrypted_credentials: Json
           id: string
           is_active: boolean | null
+          last_meta_sync_at: string | null
           last_sync_at: string | null
+          last_sync_error: string | null
           last_sync_status: string | null
+          latest_meta_data_date: string | null
+          meta_sync_priority: string | null
           organization_id: string
           platform: string
+          rate_limit_backoff_until: string | null
+          sync_error_count: number | null
           updated_at: string | null
         }
         Insert: {
@@ -1587,10 +1593,16 @@ export type Database = {
           encrypted_credentials: Json
           id?: string
           is_active?: boolean | null
+          last_meta_sync_at?: string | null
           last_sync_at?: string | null
+          last_sync_error?: string | null
           last_sync_status?: string | null
+          latest_meta_data_date?: string | null
+          meta_sync_priority?: string | null
           organization_id: string
           platform: string
+          rate_limit_backoff_until?: string | null
+          sync_error_count?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -1598,10 +1610,16 @@ export type Database = {
           encrypted_credentials?: Json
           id?: string
           is_active?: boolean | null
+          last_meta_sync_at?: string | null
           last_sync_at?: string | null
+          last_sync_error?: string | null
           last_sync_status?: string | null
+          latest_meta_data_date?: string | null
+          meta_sync_priority?: string | null
           organization_id?: string
           platform?: string
+          rate_limit_backoff_until?: string | null
+          sync_error_count?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -3728,6 +3746,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      meta_sync_config: {
+        Row: {
+          created_at: string | null
+          date_range_days: number
+          description: string | null
+          id: string
+          interval_minutes: number
+          tier: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date_range_days?: number
+          description?: string | null
+          id?: string
+          interval_minutes: number
+          tier: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date_range_days?: number
+          description?: string | null
+          id?: string
+          interval_minutes?: number
+          tier?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       notification_preferences: {
         Row: {
@@ -6354,6 +6402,35 @@ export type Database = {
         }
         Relationships: []
       }
+      meta_sync_status: {
+        Row: {
+          credential_id: string | null
+          data_lag_days: number | null
+          date_range_days: number | null
+          interval_minutes: number | null
+          is_active: boolean | null
+          last_meta_sync_at: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          latest_meta_data_date: string | null
+          meta_sync_priority: string | null
+          minutes_until_sync: number | null
+          organization_id: string | null
+          organization_name: string | null
+          rate_limit_backoff_until: string | null
+          sync_due: boolean | null
+          sync_error_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_api_credentials_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mv_daily_metrics_summary: {
         Row: {
           avg_roi_percentage: number | null
@@ -6638,6 +6715,19 @@ export type Database = {
         }
         Returns: Json
       }
+      get_meta_accounts_due_for_sync: {
+        Args: { p_limit?: number }
+        Returns: {
+          credential_id: string
+          date_range_days: number
+          interval_minutes: number
+          last_sync_at: string
+          minutes_overdue: number
+          organization_id: string
+          organization_name: string
+          sync_priority: string
+        }[]
+      }
       get_submissions_with_details: {
         Args: never
         Returns: {
@@ -6768,6 +6858,16 @@ export type Database = {
           p_duration_ms: number
           p_error?: string
           p_job_id: string
+          p_status: string
+        }
+        Returns: undefined
+      }
+      update_meta_sync_status: {
+        Args: {
+          p_error?: string
+          p_is_rate_limited?: boolean
+          p_latest_data_date?: string
+          p_organization_id: string
           p_status: string
         }
         Returns: undefined
