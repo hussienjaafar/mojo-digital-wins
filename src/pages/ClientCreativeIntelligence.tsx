@@ -65,6 +65,9 @@ type Creative = {
   effectiveness_score: number | null;
   performance_tier: string | null;
   visual_analysis: any | null;
+  detected_text: string | null;
+  color_palette: string[] | null;
+  has_faces: boolean | null;
 };
 
 type AnalysisStats = {

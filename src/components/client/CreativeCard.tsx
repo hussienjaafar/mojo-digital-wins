@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { 
   Video, 
   Image as ImageIcon, 
@@ -12,7 +12,10 @@ import {
   Sparkles,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Palette,
+  User,
+  Type
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -24,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 type Creative = {
   id: string;
@@ -56,6 +60,9 @@ type Creative = {
   effectiveness_score: number | null;
   performance_tier: string | null;
   visual_analysis: any | null;
+  detected_text: string | null;
+  color_palette: string[] | null;
+  has_faces: boolean | null;
 };
 
 type Props = {
@@ -332,6 +339,100 @@ export function CreativeCard({ creative }: Props) {
                         {creative.key_themes.map((theme, i) => (
                           <Badge key={i} variant="secondary" className="text-xs">
                             {theme}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Effectiveness Score */}
+                  {creative.effectiveness_score !== null && (
+                    <div className="pt-3 border-t">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-muted-foreground">Effectiveness Score</span>
+                        <span className={cn(
+                          "text-sm font-bold",
+                          creative.effectiveness_score >= 80 ? "text-green-500" :
+                          creative.effectiveness_score >= 60 ? "text-blue-500" :
+                          creative.effectiveness_score >= 40 ? "text-yellow-500" :
+                          "text-red-500"
+                        )}>
+                          {creative.effectiveness_score.toFixed(0)}/100
+                        </span>
+                      </div>
+                      <Progress 
+                        value={creative.effectiveness_score} 
+                        className="h-2"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Visual Analysis */}
+              {creative.visual_analysis && (
+                <div className="p-4 rounded-lg border bg-card space-y-4">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <Palette className="h-4 w-4 text-primary" />
+                    Visual Analysis
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    {creative.visual_analysis.composition_style && (
+                      <div>
+                        <span className="text-xs text-muted-foreground">Composition</span>
+                        <p className="font-medium capitalize">{creative.visual_analysis.composition_style}</p>
+                      </div>
+                    )}
+                    {creative.has_faces !== null && (
+                      <div>
+                        <span className="text-xs text-muted-foreground">Has Faces</span>
+                        <p className="font-medium flex items-center gap-1">
+                          <User className={cn("h-4 w-4", creative.has_faces ? "text-green-500" : "text-muted-foreground")} />
+                          {creative.has_faces ? 'Yes' : 'No'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Detected Text */}
+                  {creative.detected_text && (
+                    <div>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Type className="h-3 w-3" />
+                        Detected Text
+                      </span>
+                      <p className="text-sm mt-1 p-2 bg-muted/50 rounded">
+                        {creative.detected_text}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Color Palette */}
+                  {creative.color_palette && creative.color_palette.length > 0 && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Color Palette</span>
+                      <div className="flex gap-1 mt-1">
+                        {creative.color_palette.slice(0, 5).map((color: string, i: number) => (
+                          <div 
+                            key={i}
+                            className="w-8 h-8 rounded-md border shadow-sm"
+                            style={{ backgroundColor: color }}
+                            title={color}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Visual Elements */}
+                  {creative.visual_analysis.visual_elements && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Visual Elements</span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {creative.visual_analysis.visual_elements.map((element: string, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">
+                            {element}
                           </Badge>
                         ))}
                       </div>
