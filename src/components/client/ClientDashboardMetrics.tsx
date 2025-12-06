@@ -71,9 +71,9 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     const prevPeriod = getPreviousPeriod();
     
     try {
-      // Load current period donations
+      // Load current period donations (using secure view for defense-in-depth PII protection)
       const { data: donationData } = await (supabase as any)
-        .from('actblue_transactions')
+        .from('actblue_transactions_secure')
         .select('amount, donor_email, is_recurring, transaction_date, refcode')
         .eq('organization_id', organizationId)
         .gte('transaction_date', startDate)
@@ -81,9 +81,9 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       
       setDonations(donationData || []);
 
-      // Load previous period donations
+      // Load previous period donations (using secure view for defense-in-depth PII protection)
       const { data: prevDonationData } = await (supabase as any)
-        .from('actblue_transactions')
+        .from('actblue_transactions_secure')
         .select('amount, donor_email, is_recurring, transaction_date, refcode')
         .eq('organization_id', organizationId)
         .gte('transaction_date', prevPeriod.start)

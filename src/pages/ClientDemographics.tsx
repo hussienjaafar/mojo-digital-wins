@@ -79,9 +79,9 @@ const ClientDemographics = () => {
 
       setOrganization(org);
 
-      // Load donor demographics from actblue_transactions
+      // Load donor demographics from secure view (defense-in-depth: masks PII for unauthorized users)
       const { data: transactions, error } = await (supabase as any)
-        .from('actblue_transactions')
+        .from('actblue_transactions_secure')
         .select('*')
         .eq('organization_id', clientUser.organization_id);
 
@@ -165,7 +165,7 @@ const ClientDemographics = () => {
         .maybeSingle();
 
       const { data: transactions } = await (supabase as any)
-        .from('actblue_transactions')
+        .from('actblue_transactions_secure')
         .select('*')
         .eq('organization_id', clientUser.organization_id);
 

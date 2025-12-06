@@ -92,8 +92,9 @@ export function useChannelSummaries(organizationId: string, startDate: string, e
       try {
         console.log('[useChannelSummaries] Fetching donations for org:', organizationId, 'dates:', startDate, 'to', endDate);
         
+        // Using secure view for defense-in-depth PII protection
         const { data: donationData, error: donationError } = await (supabase as any)
-          .from('actblue_transactions')
+          .from('actblue_transactions_secure')
           .select('amount, donor_email, transaction_date')
           .eq('organization_id', organizationId)
           .gte('transaction_date', startDate)

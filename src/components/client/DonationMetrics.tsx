@@ -87,9 +87,9 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         prevPeriod 
       });
 
-      // Current period
+      // Current period (using secure view for defense-in-depth PII protection)
       const { data, error } = await (supabase as any)
-        .from('actblue_transactions')
+        .from('actblue_transactions_secure')
         .select('*')
         .eq('organization_id', organizationId)
         .gte('transaction_date', startDate)
@@ -108,9 +108,9 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
       
       setTransactions(data || []);
 
-      // Previous period
+      // Previous period (using secure view for defense-in-depth PII protection)
       const { data: prevData } = await (supabase as any)
-        .from('actblue_transactions')
+        .from('actblue_transactions_secure')
         .select('*')
         .eq('organization_id', organizationId)
         .gte('transaction_date', prevPeriod.start)

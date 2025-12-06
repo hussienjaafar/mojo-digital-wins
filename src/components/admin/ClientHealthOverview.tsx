@@ -71,8 +71,9 @@ export default function ClientHealthOverview() {
         .select("organization_id, date")
         .order("date", { ascending: false });
 
+      // Using secure view for defense-in-depth PII protection
       const { data: actblueFreshness } = await supabase
-        .from("actblue_transactions")
+        .from("actblue_transactions_secure")
         .select("organization_id, transaction_date")
         .order("transaction_date", { ascending: false });
 

@@ -101,17 +101,17 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
         });
       }
 
-      // ActBlue freshness
+      // ActBlue freshness (using secure view for defense-in-depth PII protection)
       const { data: actblueData, count: actblueCount } = await supabase
-        .from('actblue_transactions')
+        .from('actblue_transactions_secure')
         .select('transaction_date', { count: 'exact' })
         .eq('organization_id', organizationId)
         .order('transaction_date', { ascending: false })
         .limit(1);
 
-      // Check for recent webhook activity (last 24h)
+      // Check for recent webhook activity (last 24h) - using secure view
       const { count: recentWebhooks } = await supabase
-        .from('actblue_transactions')
+        .from('actblue_transactions_secure')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
