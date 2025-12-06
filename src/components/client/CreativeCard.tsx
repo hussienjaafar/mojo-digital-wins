@@ -259,16 +259,24 @@ export function CreativeCard({ creative }: Props) {
           {/* Performance Metrics */}
           <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50">
             <div className="text-center">
-              <div className="text-sm font-semibold text-foreground">{formatNumber(creative.impressions)}</div>
+              <div className={cn(
+                "text-sm font-semibold",
+                creative.impressions > 0 ? "text-foreground" : "text-muted-foreground"
+              )}>
+                {creative.impressions > 0 ? formatNumber(creative.impressions) : '-'}
+              </div>
               <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                 <Eye className="h-3 w-3" />
                 Impr.
               </div>
             </div>
             <div className="text-center">
-              <div className="text-sm font-semibold text-foreground">
+              <div className={cn(
+                "text-sm font-semibold",
+                creative.ctr != null && creative.ctr > 0 ? "text-foreground" : "text-muted-foreground"
+              )}>
                 {/* CTR is now stored as decimal (0.025 = 2.5%), display as percentage */}
-                {creative.ctr != null ? `${(creative.ctr * 100).toFixed(2)}%` : '-'}
+                {creative.ctr != null && creative.ctr > 0 ? `${(creative.ctr * 100).toFixed(2)}%` : '-'}
               </div>
               <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                 <MousePointer className="h-3 w-3" />
@@ -280,9 +288,10 @@ export function CreativeCard({ creative }: Props) {
                 "text-sm font-semibold",
                 (creative.roas || 0) >= 2 ? "text-green-600 dark:text-green-400" : 
                 (creative.roas || 0) >= 1 ? "text-yellow-600 dark:text-yellow-400" : 
-                "text-red-600 dark:text-red-400"
+                creative.roas && creative.roas > 0 ? "text-red-600 dark:text-red-400" :
+                "text-muted-foreground"
               )}>
-                {creative.roas ? `${creative.roas.toFixed(2)}x` : '-'}
+                {creative.roas && creative.roas > 0 ? `${creative.roas.toFixed(2)}x` : '-'}
               </div>
               <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                 <DollarSign className="h-3 w-3" />
@@ -290,6 +299,14 @@ export function CreativeCard({ creative }: Props) {
               </div>
             </div>
           </div>
+          
+          {/* No data indicator */}
+          {creative.impressions === 0 && (
+            <div className="text-xs text-muted-foreground text-center pt-1 flex items-center justify-center gap-1">
+              <Clock className="h-3 w-3" />
+              Historical creative - no recent delivery
+            </div>
+          )}
         </CardContent>
       </Card>
 

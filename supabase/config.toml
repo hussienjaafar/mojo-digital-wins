@@ -221,3 +221,12 @@ verify_jwt = false
 
 [functions.update-data-freshness]
 verify_jwt = false
+
+[functions.aggregate-creative-metrics]
+verify_jwt = false
+
+[functions.backfill-thumbnails]
+verify_jwt = false
+
+[functions.backfill-video-sources]
+verify_jwt = false
