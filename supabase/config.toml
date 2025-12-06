@@ -209,3 +209,6 @@ verify_jwt = false
 
 [functions.ttl-cleanup]
 verify_jwt = false
+
+[functions.transcribe-video-creative]
+verify_jwt = false

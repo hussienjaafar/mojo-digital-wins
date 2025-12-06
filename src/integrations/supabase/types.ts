@@ -3487,6 +3487,7 @@ export type Database = {
           call_to_action_type: string | null
           campaign_id: string
           clicks: number | null
+          color_palette: string[] | null
           conversion_value: number | null
           conversions: number | null
           created_at: string | null
@@ -3494,12 +3495,17 @@ export type Database = {
           creative_type: string | null
           ctr: number | null
           description: string | null
+          detected_text: string | null
+          effectiveness_score: number | null
           emotional_appeal: string | null
+          has_faces: boolean | null
           headline: string | null
           id: string
           impressions: number | null
+          key_quotes: Json | null
           key_themes: string[] | null
           organization_id: string
+          performance_tier: string | null
           primary_text: string | null
           roas: number | null
           sentiment_label: string | null
@@ -3509,9 +3515,12 @@ export type Database = {
           tone: string | null
           topic: string | null
           transcript_confidence: number | null
+          transcription_status: string | null
           updated_at: string | null
           urgency_level: string | null
+          verbal_themes: string[] | null
           video_url: string | null
+          visual_analysis: Json | null
         }
         Insert: {
           ad_id?: string | null
@@ -3522,6 +3531,7 @@ export type Database = {
           call_to_action_type?: string | null
           campaign_id: string
           clicks?: number | null
+          color_palette?: string[] | null
           conversion_value?: number | null
           conversions?: number | null
           created_at?: string | null
@@ -3529,12 +3539,17 @@ export type Database = {
           creative_type?: string | null
           ctr?: number | null
           description?: string | null
+          detected_text?: string | null
+          effectiveness_score?: number | null
           emotional_appeal?: string | null
+          has_faces?: boolean | null
           headline?: string | null
           id?: string
           impressions?: number | null
+          key_quotes?: Json | null
           key_themes?: string[] | null
           organization_id: string
+          performance_tier?: string | null
           primary_text?: string | null
           roas?: number | null
           sentiment_label?: string | null
@@ -3544,9 +3559,12 @@ export type Database = {
           tone?: string | null
           topic?: string | null
           transcript_confidence?: number | null
+          transcription_status?: string | null
           updated_at?: string | null
           urgency_level?: string | null
+          verbal_themes?: string[] | null
           video_url?: string | null
+          visual_analysis?: Json | null
         }
         Update: {
           ad_id?: string | null
@@ -3557,6 +3575,7 @@ export type Database = {
           call_to_action_type?: string | null
           campaign_id?: string
           clicks?: number | null
+          color_palette?: string[] | null
           conversion_value?: number | null
           conversions?: number | null
           created_at?: string | null
@@ -3564,12 +3583,17 @@ export type Database = {
           creative_type?: string | null
           ctr?: number | null
           description?: string | null
+          detected_text?: string | null
+          effectiveness_score?: number | null
           emotional_appeal?: string | null
+          has_faces?: boolean | null
           headline?: string | null
           id?: string
           impressions?: number | null
+          key_quotes?: Json | null
           key_themes?: string[] | null
           organization_id?: string
+          performance_tier?: string | null
           primary_text?: string | null
           roas?: number | null
           sentiment_label?: string | null
@@ -3579,9 +3603,12 @@ export type Database = {
           tone?: string | null
           topic?: string | null
           transcript_confidence?: number | null
+          transcription_status?: string | null
           updated_at?: string | null
           urgency_level?: string | null
+          verbal_themes?: string[] | null
           video_url?: string | null
+          visual_analysis?: Json | null
         }
         Relationships: [
           {
