@@ -6101,6 +6101,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      user_belongs_to_organization: {
+        Args: { _organization_id: string }
+        Returns: boolean
+      }
       verify_admin_invite_code: {
         Args: { invite_code: string; user_id: string }
         Returns: boolean
