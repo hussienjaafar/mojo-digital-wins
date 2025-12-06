@@ -41,7 +41,8 @@ export function CreativePerformanceMatrix({ creatives, dimension }: Props) {
       ? ['topic', 'tone'] 
       : ['emotional_appeal', 'urgency_level'];
 
-    // Build matrix
+    // Build matrix with WEIGHTED averages (Phase 3 improvement)
+    // Use impressions as weights to avoid small sample bias
     creatives.forEach(c => {
       const rowKey = (c[rowField as keyof Creative] as string) || 'Unknown';
       const colKey = (c[colField as keyof Creative] as string) || 'Unknown';
@@ -51,20 +52,24 @@ export function CreativePerformanceMatrix({ creatives, dimension }: Props) {
 
       const key = `${rowKey}|${colKey}`;
       if (!cells[key]) {
-        cells[key] = { rowKey, colKey, avgRoas: 0, avgCtr: 0, count: 0, conversions: 0 };
+        cells[key] = { rowKey, colKey, avgRoas: 0, avgCtr: 0, count: 0, conversions: 0, totalImpressions: 0 } as MatrixCell & { totalImpressions: number };
       }
       
+      const impressions = c.impressions || 0;
       cells[key].count++;
-      cells[key].avgRoas += c.roas || 0;
-      cells[key].avgCtr += c.ctr || 0;
+      // Weighted sum for proper averaging later
+      cells[key].avgRoas += (c.roas || 0) * impressions;
+      cells[key].avgCtr += (c.ctr || 0) * impressions;
       cells[key].conversions += c.conversions || 0;
+      (cells[key] as any).totalImpressions += impressions;
     });
 
-    // Calculate averages
+    // Calculate weighted averages (more accurate than simple average)
     Object.values(cells).forEach(cell => {
-      if (cell.count > 0) {
-        cell.avgRoas = cell.avgRoas / cell.count;
-        cell.avgCtr = cell.avgCtr / cell.count;
+      const totalImpressions = (cell as any).totalImpressions || 1;
+      if (cell.count > 0 && totalImpressions > 0) {
+        cell.avgRoas = cell.avgRoas / totalImpressions;
+        cell.avgCtr = cell.avgCtr / totalImpressions;
       }
     });
 

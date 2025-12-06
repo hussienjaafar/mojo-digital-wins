@@ -287,10 +287,10 @@ export default function ClientCreativeIntelligence() {
   return (
     <ClientLayout>
       <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Header */}
+        {/* PHASE 4: Redesigned Header with Portal Theme */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
+            <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
               <Sparkles className="h-6 w-6 text-primary" />
             </div>
             <div>
@@ -306,66 +306,69 @@ export default function ClientCreativeIntelligence() {
                 variant="outline" 
                 onClick={handleTranscribeVideos}
                 disabled={isTranscribing}
-                className="gap-2"
+                size="sm"
+                className="gap-2 border-primary/30 hover:bg-primary/5"
               >
                 <Play className={cn("h-4 w-4", isTranscribing && "animate-pulse")} />
-                Transcribe Videos ({stats.pendingTranscription})
+                Transcribe ({stats.pendingTranscription})
               </Button>
             )}
             <Button 
               variant="outline" 
               onClick={handleAnalyzeAll}
               disabled={isAnalyzing}
-              className="gap-2"
+              size="sm"
+              className="gap-2 border-primary/30 hover:bg-primary/5"
             >
               <Zap className={cn("h-4 w-4", isAnalyzing && "animate-pulse")} />
-              Analyze Creatives
+              Analyze
             </Button>
             <Button 
               variant="outline" 
               onClick={() => setShowImport(true)}
+              size="sm"
               className="gap-2"
             >
               <TrendingUp className="h-4 w-4" />
-              Import Data
+              Import
             </Button>
           </div>
         </div>
 
-        {/* Stats Overview */}
+        {/* PHASE 4: Stats Overview with Portal Styling */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-            <Card className="p-4">
-              <div className="text-2xl font-bold">{stats.total}</div>
+            <Card className="p-4 border-border/50 bg-card/50">
+              <div className="text-2xl font-bold text-foreground">{stats.total}</div>
               <div className="text-xs text-muted-foreground">Total Creatives</div>
             </Card>
-            <Card className="p-4">
-              <div className="text-2xl font-bold text-green-500">{stats.analyzed}</div>
+            <Card className="p-4 border-border/50 bg-card/50">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.analyzed}</div>
               <div className="text-xs text-muted-foreground">Analyzed</div>
             </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-1">
+            <Card className="p-4 border-border/50 bg-card/50">
+              <div className="flex items-center gap-1.5">
                 <Video className="h-4 w-4 text-primary" />
-                <span className="text-2xl font-bold">{stats.videos}</span>
+                <span className="text-2xl font-bold text-foreground">{stats.videos}</span>
               </div>
               <div className="text-xs text-muted-foreground">Videos</div>
             </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-1">
+            <Card className="p-4 border-border/50 bg-card/50">
+              <div className="flex items-center gap-1.5">
                 <ImageIcon className="h-4 w-4 text-primary" />
-                <span className="text-2xl font-bold">{stats.images}</span>
+                <span className="text-2xl font-bold text-foreground">{stats.images}</span>
               </div>
               <div className="text-xs text-muted-foreground">Images</div>
             </Card>
-            <Card className="p-4">
-              <div className="text-2xl font-bold text-amber-500">{stats.pendingTranscription}</div>
+            <Card className="p-4 border-border/50 bg-card/50">
+              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.pendingTranscription}</div>
               <div className="text-xs text-muted-foreground">Need Transcription</div>
             </Card>
-            <Card className="p-4">
-              <div className="text-2xl font-bold">${stats.avgRoas.toFixed(2)}</div>
+            <Card className="p-4 border-border/50 bg-card/50">
+              <div className="text-2xl font-bold text-foreground">{stats.avgRoas.toFixed(2)}x</div>
               <div className="text-xs text-muted-foreground">Avg ROAS</div>
             </Card>
-            <Card className="p-4 bg-gradient-to-br from-primary/10 to-transparent">
+            <Card className="p-4 border-primary/30 bg-primary/5">
               <div className="text-2xl font-bold text-primary">{stats.topPerformers}</div>
               <div className="text-xs text-muted-foreground">Top Performers</div>
             </Card>

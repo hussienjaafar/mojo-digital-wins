@@ -453,7 +453,8 @@ serve(async (req) => {
                   impressions = parseInt(insight.impressions) || 0;
                   clicks = parseInt(insight.clicks) || 0;
                   spend = parseFloat(insight.spend) || 0;
-                  ctr = parseFloat(insight.ctr) || 0;
+                  // PHASE 1 FIX: Meta returns CTR as percentage (e.g., 2.5 for 2.5%), normalize to decimal (0.025)
+                  ctr = (parseFloat(insight.ctr) || 0) / 100;
                   frequency = parseFloat(insight.frequency) || 0;
                   qualityRanking = insight.quality_ranking || '';
                   engagementRanking = insight.engagement_rate_ranking || '';
@@ -477,7 +478,25 @@ serve(async (req) => {
                 console.error(`Error fetching insights for ad ${ad.id}:`, insightErr);
               }
               
-              // Store creative insight
+              // PHASE 2: Extract image hash if available from object_story_spec
+              let imageHash: string | null = null;
+              if (creative.object_story_spec?.link_data?.image_hash) {
+                imageHash = creative.object_story_spec.link_data.image_hash;
+              } else if (creative.object_story_spec?.photo_data?.image_hash) {
+                imageHash = creative.object_story_spec.photo_data.image_hash;
+              }
+              
+              // Determine media type more accurately
+              let mediaType = 'unknown';
+              if (videoId) {
+                mediaType = 'video';
+              } else if (imageHash || thumbnailUrl) {
+                mediaType = 'image';
+              } else if (creative.asset_feed_spec) {
+                mediaType = 'carousel';
+              }
+              
+              // Store creative insight with enhanced fields
               const { error: creativeError } = await supabase
                 .from('meta_creative_insights')
                 .upsert({
@@ -492,13 +511,20 @@ serve(async (req) => {
                   video_url: videoId ? `https://www.facebook.com/video.php?v=${videoId}` : null,
                   thumbnail_url: thumbnailUrl,
                   creative_type: creativeType,
+                  // PHASE 2: Store media identifiers for video/image pipeline
+                  meta_video_id: videoId || null,
+                  meta_image_hash: imageHash,
+                  media_type: mediaType,
+                  // Performance metrics
                   impressions,
                   clicks,
                   spend,
                   conversions,
                   conversion_value: conversionValue,
-                  ctr,
+                  ctr, // Now stored as decimal (0.025 = 2.5%)
                   roas: spend > 0 ? conversionValue / spend : 0,
+                  // PHASE 3: Track first seen for time-aware model
+                  first_seen_at: new Date().toISOString(),
                 }, {
                   onConflict: 'organization_id,campaign_id,ad_id'
                 });

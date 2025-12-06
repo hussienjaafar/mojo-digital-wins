@@ -254,17 +254,22 @@ Return only valid JSON:
           }
         }
 
-        // Calculate effectiveness score based on performance
+        // PHASE 1 & 3 FIX: Calculate effectiveness score with corrected CTR handling
+        // CTR is now stored as decimal (0.025 = 2.5%)
         const ctr = creative.ctr || (creative.impressions > 0 ? creative.clicks / creative.impressions : 0);
         const roas = creative.roas || 0;
         const convRate = creative.impressions > 0 ? creative.conversions / creative.impressions : 0;
         
         // Normalize and weight the metrics
-        const ctrScore = Math.min(ctr * 100, 10) * 10; // CTR up to 10% = 100 points
+        // CTR as decimal: 0.05 = 5% CTR, scale to score where 5% = 50 points, 10% = 100 points
+        const ctrScore = Math.min(ctr * 1000, 100); // 0.1 (10%) = 100 points
         const roasScore = Math.min(roas, 5) * 20; // ROAS up to 5x = 100 points
-        const convScore = Math.min(convRate * 1000, 10) * 10; // Conv rate normalized
+        const convScore = Math.min(convRate * 10000, 100); // Conv rate normalized
         
-        const effectivenessScore = Math.round((ctrScore * 0.3 + roasScore * 0.5 + convScore * 0.2));
+        // Weighted effectiveness with impression-based confidence
+        const impressionWeight = Math.min(creative.impressions / 10000, 1); // More impressions = higher confidence
+        const baseScore = (ctrScore * 0.3 + roasScore * 0.5 + convScore * 0.2);
+        const effectivenessScore = Math.round(baseScore * (0.5 + impressionWeight * 0.5));
         
         // Determine performance tier
         let performanceTier = 'low';

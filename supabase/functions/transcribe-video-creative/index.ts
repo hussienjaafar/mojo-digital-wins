@@ -6,6 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/**
+ * PHASE 2: Enhanced Video Transcription Pipeline
+ * - Improved Meta Graph API video URL extraction
+ * - Better error handling and retry logic
+ * - Stores media source URLs for future access
+ */
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -16,9 +22,9 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check for API keys
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    // Check for API keys - prefer Lovable AI for Whisper-compatible transcription
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 
     if (!openaiApiKey && !lovableApiKey) {
       throw new Error('No transcription API key configured (OPENAI_API_KEY or LOVABLE_API_KEY)');
@@ -26,7 +32,7 @@ serve(async (req) => {
 
     const { organization_id, batch_size = 5, creative_id } = await req.json();
 
-    console.log(`Starting video transcription${organization_id ? ` for org: ${organization_id}` : ''}`);
+    console.log(`[TRANSCRIBE] Starting video transcription${organization_id ? ` for org: ${organization_id}` : ''}`);
 
     // Get Meta API credentials for the organization to access videos
     let metaAccessToken: string | null = null;
@@ -46,13 +52,14 @@ serve(async (req) => {
     }
 
     // Build query for videos needing transcription
+    // PHASE 2: Include meta_video_id for direct API access
     let query = supabase
       .from('meta_creative_insights')
-      .select('id, video_url, campaign_id, creative_id, creative_type')
+      .select('id, video_url, campaign_id, creative_id, creative_type, meta_video_id, media_source_url')
       .eq('creative_type', 'video')
-      .not('video_url', 'is', null)
+      .or('video_url.not.is.null,meta_video_id.not.is.null')
       .is('audio_transcript', null)
-      .or('transcription_status.is.null,transcription_status.eq.pending')
+      .or('transcription_status.is.null,transcription_status.eq.pending,transcription_status.eq.requires_meta_auth')
       .limit(batch_size);
 
     if (organization_id) {
@@ -70,14 +77,14 @@ serve(async (req) => {
     }
 
     if (!videos || videos.length === 0) {
-      console.log('No videos pending transcription');
+      console.log('[TRANSCRIBE] No videos pending transcription');
       return new Response(
         JSON.stringify({ success: true, transcribed: 0, message: 'No videos pending transcription' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Found ${videos.length} videos to transcribe`);
+    console.log(`[TRANSCRIBE] Found ${videos.length} videos to process`);
 
     let transcribed = 0;
     let errors = 0;
@@ -85,7 +92,7 @@ serve(async (req) => {
 
     for (const video of videos) {
       try {
-        console.log(`Processing video ${video.id}: ${video.video_url?.substring(0, 50)}...`);
+        console.log(`[TRANSCRIBE] Processing video ${video.id}`);
 
         // Mark as processing
         await supabase
@@ -93,61 +100,102 @@ serve(async (req) => {
           .update({ transcription_status: 'processing' })
           .eq('id', video.id);
 
-        // Try to get actual video URL from Meta Graph API
-        let actualVideoUrl: string | null = null;
+        // PHASE 2: Try multiple methods to get video URL
+        let actualVideoUrl: string | null = video.media_source_url; // Check cached URL first
         
-        // Check if we have a Facebook video page URL (not a direct video file)
-        const isFacebookVideoPage = video.video_url.includes('facebook.com/video.php') || 
-                                     video.video_url.includes('fb.watch');
+        // Method 1: Use stored direct URL if available
+        if (actualVideoUrl) {
+          console.log(`[TRANSCRIBE] Using cached media_source_url`);
+        }
         
-        if (isFacebookVideoPage && metaAccessToken && video.creative_id) {
-          console.log(`Fetching actual video URL from Meta API for creative ${video.creative_id}`);
+        // Method 2: Use meta_video_id with Graph API
+        if (!actualVideoUrl && metaAccessToken && video.meta_video_id) {
+          console.log(`[TRANSCRIBE] Fetching video URL from Meta API using video_id: ${video.meta_video_id}`);
           
           try {
-            // Try to get video source from the ad creative
-            const graphResponse = await fetch(
-              `https://graph.facebook.com/v18.0/${video.creative_id}?fields=video_id,effective_object_story_id,object_story_spec&access_token=${metaAccessToken}`
+            const videoResponse = await fetch(
+              `https://graph.facebook.com/v22.0/${video.meta_video_id}?fields=source&access_token=${metaAccessToken}`
             );
             
-            if (graphResponse.ok) {
-              const graphData = await graphResponse.json();
-              const videoId = graphData.video_id;
+            if (videoResponse.ok) {
+              const videoData = await videoResponse.json();
+              if (videoData.source) {
+                actualVideoUrl = videoData.source;
+                console.log(`[TRANSCRIBE] Got video source URL from Meta API`);
+                
+                // Cache the URL for future use
+                await supabase
+                  .from('meta_creative_insights')
+                  .update({ media_source_url: actualVideoUrl })
+                  .eq('id', video.id);
+              }
+            } else {
+              console.log(`[TRANSCRIBE] Meta API returned ${videoResponse.status}`);
+            }
+          } catch (graphError) {
+            console.error('[TRANSCRIBE] Meta Graph API error:', graphError);
+          }
+        }
+
+        // Method 3: Try creative_id endpoint
+        if (!actualVideoUrl && metaAccessToken && video.creative_id) {
+          console.log(`[TRANSCRIBE] Trying creative endpoint: ${video.creative_id}`);
+          
+          try {
+            const creativeResponse = await fetch(
+              `https://graph.facebook.com/v22.0/${video.creative_id}?fields=video_id,object_story_spec&access_token=${metaAccessToken}`
+            );
+            
+            if (creativeResponse.ok) {
+              const creativeData = await creativeResponse.json();
+              const videoId = creativeData.video_id || 
+                             creativeData.object_story_spec?.video_data?.video_id ||
+                             creativeData.object_story_spec?.link_data?.video_id;
               
               if (videoId) {
-                // Get the video source URL
                 const videoResponse = await fetch(
-                  `https://graph.facebook.com/v18.0/${videoId}?fields=source&access_token=${metaAccessToken}`
+                  `https://graph.facebook.com/v22.0/${videoId}?fields=source&access_token=${metaAccessToken}`
                 );
                 
                 if (videoResponse.ok) {
                   const videoData = await videoResponse.json();
-                  actualVideoUrl = videoData.source;
-                  console.log(`Got actual video URL from Meta API`);
+                  if (videoData.source) {
+                    actualVideoUrl = videoData.source;
+                    console.log(`[TRANSCRIBE] Got video URL via creative endpoint`);
+                    
+                    // Store video_id and URL for future use
+                    await supabase
+                      .from('meta_creative_insights')
+                      .update({ 
+                        meta_video_id: videoId,
+                        media_source_url: actualVideoUrl 
+                      })
+                      .eq('id', video.id);
+                  }
                 }
               }
             }
-          } catch (graphError) {
-            console.error('Meta Graph API error:', graphError);
+          } catch (err) {
+            console.error('[TRANSCRIBE] Creative endpoint error:', err);
           }
         }
 
-        // If we couldn't get a direct URL from Meta API, check if the URL is already a direct video
-        if (!actualVideoUrl) {
-          // Check if URL looks like a direct video file
-          const isDirectVideo = /\.(mp4|m4a|webm|ogg|mp3)(\?|$)/i.test(video.video_url);
+        // Method 4: Check if video_url is already a direct video file
+        if (!actualVideoUrl && video.video_url) {
+          const isDirectVideo = /\.(mp4|m4a|webm|ogg|mp3|mov)(\?|$)/i.test(video.video_url);
           if (isDirectVideo) {
             actualVideoUrl = video.video_url;
+            console.log(`[TRANSCRIBE] Using direct video URL`);
           }
         }
 
         if (!actualVideoUrl) {
-          console.log(`Cannot access video - Facebook page URL requires Meta API access token`);
+          console.log(`[TRANSCRIBE] Cannot access video - requires Meta API credentials`);
           
           await supabase
             .from('meta_creative_insights')
             .update({ 
               transcription_status: 'requires_meta_auth',
-              verbal_themes: ['Video requires Meta API access token for transcription. Configure Meta credentials in API settings.']
             })
             .eq('id', video.id);
           
@@ -155,90 +203,73 @@ serve(async (req) => {
           continue;
         }
 
-        // Download the video
+        // Download the video with retry logic
         let audioBlob: Blob | null = null;
+        let retries = 2;
         
-        try {
-          console.log(`Downloading video from: ${actualVideoUrl.substring(0, 80)}...`);
-          
-          const videoResponse = await fetch(actualVideoUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (compatible; CreativeAnalyzer/1.0)'
+        while (retries > 0 && !audioBlob) {
+          try {
+            console.log(`[TRANSCRIBE] Downloading video (attempt ${3 - retries}/2)...`);
+            
+            const videoResponse = await fetch(actualVideoUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; CreativeAnalyzer/1.0)',
+              }
+            });
+
+            if (!videoResponse.ok) {
+              console.log(`[TRANSCRIBE] Download failed: HTTP ${videoResponse.status}`);
+              retries--;
+              if (retries === 0) {
+                await supabase
+                  .from('meta_creative_insights')
+                  .update({ transcription_status: 'download_failed' })
+                  .eq('id', video.id);
+                errors++;
+              }
+              continue;
             }
-          });
 
-          if (!videoResponse.ok) {
-            console.log(`Video fetch failed with status ${videoResponse.status}`);
+            const contentType = videoResponse.headers.get('content-type') || '';
             
-            await supabase
-              .from('meta_creative_insights')
-              .update({ 
-                transcription_status: 'download_failed',
-                verbal_themes: [`Video download failed: HTTP ${videoResponse.status}`]
-              })
-              .eq('id', video.id);
+            if (contentType.includes('text/html')) {
+              console.log('[TRANSCRIBE] Received HTML instead of video');
+              await supabase
+                .from('meta_creative_insights')
+                .update({ transcription_status: 'requires_meta_auth' })
+                .eq('id', video.id);
+              skipped++;
+              break;
+            }
+
+            const videoBuffer = await videoResponse.arrayBuffer();
             
-            errors++;
-            continue;
+            let mimeType = 'video/mp4';
+            if (contentType.includes('webm')) mimeType = 'video/webm';
+            else if (contentType.includes('ogg')) mimeType = 'audio/ogg';
+            else if (contentType.includes('mp3')) mimeType = 'audio/mpeg';
+            
+            audioBlob = new Blob([videoBuffer], { type: mimeType });
+            console.log(`[TRANSCRIBE] Downloaded ${(audioBlob.size / 1024).toFixed(1)}KB`);
+
+          } catch (downloadError) {
+            console.error('[TRANSCRIBE] Download error:', downloadError);
+            retries--;
+            if (retries > 0) {
+              await new Promise(r => setTimeout(r, 1000));
+            }
           }
-
-          // Check content type
-          const contentType = videoResponse.headers.get('content-type') || '';
-          console.log(`Video content-type: ${contentType}`);
-          
-          if (contentType.includes('text/html')) {
-            console.log('Received HTML instead of video - URL requires authentication');
-            
-            await supabase
-              .from('meta_creative_insights')
-              .update({ 
-                transcription_status: 'requires_meta_auth',
-                verbal_themes: ['Video URL returned HTML page. Configure Meta API credentials for access.']
-              })
-              .eq('id', video.id);
-            
-            skipped++;
-            continue;
-          }
-
-          const videoBuffer = await videoResponse.arrayBuffer();
-          
-          // Determine proper MIME type for Whisper
-          let mimeType = 'video/mp4';
-          if (contentType.includes('webm')) mimeType = 'video/webm';
-          else if (contentType.includes('mpeg')) mimeType = 'video/mpeg';
-          else if (contentType.includes('ogg')) mimeType = 'audio/ogg';
-          else if (contentType.includes('mp3') || contentType.includes('mpeg')) mimeType = 'audio/mpeg';
-          
-          audioBlob = new Blob([videoBuffer], { type: mimeType });
-          
-          console.log(`Downloaded video ${video.id}, size: ${(audioBlob.size / 1024).toFixed(1)}KB, type: ${mimeType}`);
-
-        } catch (downloadError) {
-          console.error(`Failed to download video ${video.id}:`, downloadError);
-          
-          await supabase
-            .from('meta_creative_insights')
-            .update({ 
-              transcription_status: 'download_failed',
-              verbal_themes: ['Failed to download video for transcription']
-            })
-            .eq('id', video.id);
-          
-          errors++;
-          continue;
         }
+
+        if (!audioBlob) continue;
 
         // Check file size (Whisper API has a 25MB limit)
         if (audioBlob.size > 25 * 1024 * 1024) {
-          console.log(`Video ${video.id} too large for transcription (${(audioBlob.size / 1024 / 1024).toFixed(1)}MB)`);
+          console.log(`[TRANSCRIBE] Video too large: ${(audioBlob.size / 1024 / 1024).toFixed(1)}MB`);
           
           await supabase
             .from('meta_creative_insights')
-            .update({ 
-              transcription_status: 'too_large',
-              verbal_themes: ['Video exceeds 25MB limit for transcription']
-            })
+            .update({ transcription_status: 'too_large' })
             .eq('id', video.id);
           
           skipped++;
@@ -247,8 +278,6 @@ serve(async (req) => {
 
         // Send to OpenAI Whisper API
         const formData = new FormData();
-        
-        // Use correct file extension based on MIME type
         const ext = audioBlob.type.includes('webm') ? 'webm' : 
                     audioBlob.type.includes('ogg') ? 'ogg' : 'mp4';
         formData.append('file', audioBlob, `video.${ext}`);
@@ -256,7 +285,7 @@ serve(async (req) => {
         formData.append('language', 'en');
         formData.append('response_format', 'verbose_json');
 
-        console.log(`Sending video ${video.id} to Whisper API...`);
+        console.log(`[TRANSCRIBE] Sending to Whisper API...`);
 
         const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
           method: 'POST',
@@ -268,41 +297,39 @@ serve(async (req) => {
 
         if (!whisperResponse.ok) {
           const errorText = await whisperResponse.text();
-          console.error(`Whisper API error for ${video.id}:`, errorText);
+          console.error(`[TRANSCRIBE] Whisper API error:`, errorText);
           
           if (whisperResponse.status === 429) {
-            console.log('Rate limited, stopping batch');
+            console.log('[TRANSCRIBE] Rate limited, stopping batch');
             break;
           }
           
           await supabase
             .from('meta_creative_insights')
-            .update({ 
-              transcription_status: 'transcription_failed',
-              verbal_themes: ['Whisper API transcription failed: ' + (JSON.parse(errorText)?.error?.message || 'Unknown error')]
-            })
+            .update({ transcription_status: 'transcription_failed' })
             .eq('id', video.id);
           
           errors++;
           continue;
         }
 
-        const transcriptionResult = await whisperResponse.json();
-        const transcript = transcriptionResult.text;
-        const confidence = transcriptionResult.segments?.[0]?.avg_logprob 
-          ? Math.exp(transcriptionResult.segments[0].avg_logprob) 
+        const result = await whisperResponse.json();
+        const transcript = result.text;
+        const duration = result.duration || null;
+        const confidence = result.segments?.[0]?.avg_logprob 
+          ? Math.exp(result.segments[0].avg_logprob) 
           : null;
 
-        console.log(`Transcribed video ${video.id}: "${transcript.substring(0, 100)}..."`);
+        console.log(`[TRANSCRIBE] Success: "${transcript.substring(0, 80)}..."`);
 
-        // Extract key quotes (sentences over 5 words)
+        // Extract key quotes
         const sentences = transcript.split(/[.!?]+/).filter((s: string) => s.trim().length > 0);
         const keyQuotes = sentences
           .filter((s: string) => s.trim().split(/\s+/).length >= 5)
           .slice(0, 5)
           .map((s: string) => s.trim());
 
-        // Update the database
+        // Update database with transcript and duration
         const { error: updateError } = await supabase
           .from('meta_creative_insights')
           .update({
@@ -310,23 +337,25 @@ serve(async (req) => {
             transcript_confidence: confidence,
             transcription_status: 'completed',
             key_quotes: keyQuotes,
+            video_duration_seconds: duration ? Math.round(duration) : null,
+            // Clear analyzed_at to trigger re-analysis with transcript
+            analyzed_at: null,
           })
           .eq('id', video.id);
 
         if (updateError) {
-          console.error(`Failed to update video ${video.id}:`, updateError);
+          console.error(`[TRANSCRIBE] Update error:`, updateError);
           errors++;
           continue;
         }
 
         transcribed++;
-        console.log(`Successfully transcribed video ${video.id}`);
 
-        // Small delay to avoid rate limiting
+        // Rate limit protection
         await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (videoError) {
-        console.error(`Error processing video ${video.id}:`, videoError);
+        console.error(`[TRANSCRIBE] Error processing ${video.id}:`, videoError);
         
         await supabase
           .from('meta_creative_insights')
@@ -337,23 +366,7 @@ serve(async (req) => {
       }
     }
 
-    // Now trigger re-analysis for transcribed videos
-    if (transcribed > 0 && organization_id) {
-      console.log(`Triggering re-analysis for ${transcribed} transcribed videos`);
-      
-      try {
-        await supabase
-          .from('meta_creative_insights')
-          .update({ analyzed_at: null })
-          .eq('organization_id', organization_id)
-          .eq('transcription_status', 'completed')
-          .not('audio_transcript', 'is', null);
-      } catch (reanalysisError) {
-        console.error('Failed to trigger re-analysis:', reanalysisError);
-      }
-    }
-
-    console.log(`Transcription complete. Transcribed: ${transcribed}, Skipped: ${skipped}, Errors: ${errors}`);
+    console.log(`[TRANSCRIBE] Complete. Transcribed: ${transcribed}, Skipped: ${skipped}, Errors: ${errors}`);
 
     return new Response(
       JSON.stringify({ 
@@ -365,21 +378,18 @@ serve(async (req) => {
         message: transcribed > 0 
           ? `Transcribed ${transcribed} videos` 
           : skipped > 0 
-            ? `${skipped} videos require Meta API credentials. Configure in API Settings.`
+            ? `${skipped} videos require Meta API credentials`
             : `${errors} transcription errors occurred`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: unknown) {
-    console.error('Error in transcribe-video-creative:', error);
+    console.error('[TRANSCRIBE] Fatal error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

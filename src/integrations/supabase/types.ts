@@ -3618,6 +3618,7 @@ export type Database = {
           conversion_value: number | null
           conversions: number | null
           created_at: string | null
+          created_date: string | null
           creative_id: string | null
           creative_type: string | null
           ctr: number | null
@@ -3625,12 +3626,19 @@ export type Database = {
           detected_text: string | null
           effectiveness_score: number | null
           emotional_appeal: string | null
+          first_seen_at: string | null
           has_faces: boolean | null
           headline: string | null
           id: string
+          image_height: number | null
+          image_width: number | null
           impressions: number | null
           key_quotes: Json | null
           key_themes: string[] | null
+          media_source_url: string | null
+          media_type: string | null
+          meta_image_hash: string | null
+          meta_video_id: string | null
           organization_id: string
           performance_tier: string | null
           primary_text: string | null
@@ -3641,11 +3649,16 @@ export type Database = {
           thumbnail_url: string | null
           tone: string | null
           topic: string | null
+          total_conversion_value: number | null
+          total_conversions: number | null
+          total_impressions: number | null
+          total_spend: number | null
           transcript_confidence: number | null
           transcription_status: string | null
           updated_at: string | null
           urgency_level: string | null
           verbal_themes: string[] | null
+          video_duration_seconds: number | null
           video_url: string | null
           visual_analysis: Json | null
         }
@@ -3662,6 +3675,7 @@ export type Database = {
           conversion_value?: number | null
           conversions?: number | null
           created_at?: string | null
+          created_date?: string | null
           creative_id?: string | null
           creative_type?: string | null
           ctr?: number | null
@@ -3669,12 +3683,19 @@ export type Database = {
           detected_text?: string | null
           effectiveness_score?: number | null
           emotional_appeal?: string | null
+          first_seen_at?: string | null
           has_faces?: boolean | null
           headline?: string | null
           id?: string
+          image_height?: number | null
+          image_width?: number | null
           impressions?: number | null
           key_quotes?: Json | null
           key_themes?: string[] | null
+          media_source_url?: string | null
+          media_type?: string | null
+          meta_image_hash?: string | null
+          meta_video_id?: string | null
           organization_id: string
           performance_tier?: string | null
           primary_text?: string | null
@@ -3685,11 +3706,16 @@ export type Database = {
           thumbnail_url?: string | null
           tone?: string | null
           topic?: string | null
+          total_conversion_value?: number | null
+          total_conversions?: number | null
+          total_impressions?: number | null
+          total_spend?: number | null
           transcript_confidence?: number | null
           transcription_status?: string | null
           updated_at?: string | null
           urgency_level?: string | null
           verbal_themes?: string[] | null
+          video_duration_seconds?: number | null
           video_url?: string | null
           visual_analysis?: Json | null
         }
@@ -3706,6 +3732,7 @@ export type Database = {
           conversion_value?: number | null
           conversions?: number | null
           created_at?: string | null
+          created_date?: string | null
           creative_id?: string | null
           creative_type?: string | null
           ctr?: number | null
@@ -3713,12 +3740,19 @@ export type Database = {
           detected_text?: string | null
           effectiveness_score?: number | null
           emotional_appeal?: string | null
+          first_seen_at?: string | null
           has_faces?: boolean | null
           headline?: string | null
           id?: string
+          image_height?: number | null
+          image_width?: number | null
           impressions?: number | null
           key_quotes?: Json | null
           key_themes?: string[] | null
+          media_source_url?: string | null
+          media_type?: string | null
+          meta_image_hash?: string | null
+          meta_video_id?: string | null
           organization_id?: string
           performance_tier?: string | null
           primary_text?: string | null
@@ -3729,11 +3763,16 @@ export type Database = {
           thumbnail_url?: string | null
           tone?: string | null
           topic?: string | null
+          total_conversion_value?: number | null
+          total_conversions?: number | null
+          total_impressions?: number | null
+          total_spend?: number | null
           transcript_confidence?: number | null
           transcription_status?: string | null
           updated_at?: string | null
           urgency_level?: string | null
           verbal_themes?: string[] | null
+          video_duration_seconds?: number | null
           video_url?: string | null
           visual_analysis?: Json | null
         }
