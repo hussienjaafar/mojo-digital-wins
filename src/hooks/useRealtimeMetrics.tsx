@@ -39,8 +39,9 @@ export function useRealtimeMetrics(organizationId: string, startDate: string, en
             .lte('send_date', endDate)
             .order('send_date', { ascending: false }),
           
+          // Using secure view for defense-in-depth PII protection
           supabase
-            .from('actblue_transactions')
+            .from('actblue_transactions_secure')
             .select('*')
             .eq('organization_id', organizationId)
             .gte('transaction_date', startDate)

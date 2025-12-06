@@ -120,9 +120,9 @@ const ClientDonorJourney = () => {
 
       setOrganization(org);
 
-      // Load transactions
+      // Load transactions (using secure view for defense-in-depth PII protection)
       const { data: transactions } = await (supabase as any)
-        .from('actblue_transactions')
+        .from('actblue_transactions_secure')
         .select('*')
         .eq('organization_id', clientUser.organization_id)
         .gte('amount', Number(minAmount))
