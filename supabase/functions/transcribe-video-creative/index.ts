@@ -34,8 +34,10 @@ serve(async (req) => {
 
     console.log(`[TRANSCRIBE] Starting video transcription${organization_id ? ` for org: ${organization_id}` : ''}`);
 
-    // Get Meta API credentials for the organization to access videos
+    // Get Meta API credentials - will fetch per-video if organization_id not provided
     let metaAccessToken: string | null = null;
+    let orgCredentialsCache: Map<string, string> = new Map();
+    
     if (organization_id) {
       const { data: credentials } = await supabase
         .from('client_api_credentials')
@@ -48,18 +50,44 @@ serve(async (req) => {
       if (credentials?.encrypted_credentials) {
         const creds = credentials.encrypted_credentials as any;
         metaAccessToken = creds.access_token || creds.accessToken;
+        if (metaAccessToken) {
+          orgCredentialsCache.set(organization_id, metaAccessToken);
+        }
       }
     }
+    
+    // Helper to get access token for a specific org
+    const getAccessTokenForOrg = async (orgId: string): Promise<string | null> => {
+      if (orgCredentialsCache.has(orgId)) {
+        return orgCredentialsCache.get(orgId) || null;
+      }
+      
+      const { data: creds } = await supabase
+        .from('client_api_credentials')
+        .select('encrypted_credentials')
+        .eq('organization_id', orgId)
+        .eq('platform', 'meta')
+        .eq('is_active', true)
+        .single();
+      
+      if (creds?.encrypted_credentials) {
+        const token = (creds.encrypted_credentials as any).access_token || (creds.encrypted_credentials as any).accessToken;
+        if (token) {
+          orgCredentialsCache.set(orgId, token);
+          return token;
+        }
+      }
+      return null;
+    };
 
     // Build query for videos needing transcription
-    // PHASE 2: Include meta_video_id for direct API access
+    // PHASE 2: Include meta_video_id for direct API access, also check media_type='video'
     let query = supabase
       .from('meta_creative_insights')
-      .select('id, video_url, campaign_id, creative_id, creative_type, meta_video_id, media_source_url')
-      .eq('creative_type', 'video')
-      .or('video_url.not.is.null,meta_video_id.not.is.null')
+      .select('id, video_url, campaign_id, creative_id, creative_type, meta_video_id, media_source_url, organization_id')
+      .or('creative_type.eq.video,media_type.eq.video,meta_video_id.not.is.null')
       .is('audio_transcript', null)
-      .or('transcription_status.is.null,transcription_status.eq.pending,transcription_status.eq.requires_meta_auth')
+      .or('transcription_status.is.null,transcription_status.eq.pending,transcription_status.eq.requires_meta_auth,transcription_status.eq.download_failed')
       .limit(batch_size);
 
     if (organization_id) {
@@ -100,6 +128,13 @@ serve(async (req) => {
           .update({ transcription_status: 'processing' })
           .eq('id', video.id);
 
+        // PHASE 2 FIX: Get access token for this specific video's organization
+        const videoOrgId = video.organization_id;
+        let accessToken = metaAccessToken;
+        if (!accessToken && videoOrgId) {
+          accessToken = await getAccessTokenForOrg(videoOrgId);
+        }
+        
         // PHASE 2: Try multiple methods to get video URL
         let actualVideoUrl: string | null = video.media_source_url; // Check cached URL first
         
@@ -108,13 +143,29 @@ serve(async (req) => {
           console.log(`[TRANSCRIBE] Using cached media_source_url`);
         }
         
-        // Method 2: Use meta_video_id with Graph API
-        if (!actualVideoUrl && metaAccessToken && video.meta_video_id) {
-          console.log(`[TRANSCRIBE] Fetching video URL from Meta API using video_id: ${video.meta_video_id}`);
+        // Method 2: Extract video_id from video_url if meta_video_id is null
+        let videoId = video.meta_video_id;
+        if (!videoId && video.video_url) {
+          const match = video.video_url.match(/v=(\d+)/);
+          if (match) {
+            videoId = match[1];
+            console.log(`[TRANSCRIBE] Extracted video_id from URL: ${videoId}`);
+            
+            // Update the record with extracted video_id
+            await supabase
+              .from('meta_creative_insights')
+              .update({ meta_video_id: videoId, media_type: 'video' })
+              .eq('id', video.id);
+          }
+        }
+        
+        // Method 3: Use meta_video_id with Graph API
+        if (!actualVideoUrl && accessToken && videoId) {
+          console.log(`[TRANSCRIBE] Fetching video URL from Meta API using video_id: ${videoId}`);
           
           try {
             const videoResponse = await fetch(
-              `https://graph.facebook.com/v22.0/${video.meta_video_id}?fields=source&access_token=${metaAccessToken}`
+              `https://graph.facebook.com/v22.0/${videoId}?fields=source&access_token=${accessToken}`
             );
             
             if (videoResponse.ok) {
@@ -128,33 +179,36 @@ serve(async (req) => {
                   .from('meta_creative_insights')
                   .update({ media_source_url: actualVideoUrl })
                   .eq('id', video.id);
+              } else if (videoData.error) {
+                console.log(`[TRANSCRIBE] Meta API error: ${videoData.error.message}`);
               }
             } else {
-              console.log(`[TRANSCRIBE] Meta API returned ${videoResponse.status}`);
+              const errorText = await videoResponse.text();
+              console.log(`[TRANSCRIBE] Meta API returned ${videoResponse.status}: ${errorText.substring(0, 200)}`);
             }
           } catch (graphError) {
             console.error('[TRANSCRIBE] Meta Graph API error:', graphError);
           }
         }
 
-        // Method 3: Try creative_id endpoint
-        if (!actualVideoUrl && metaAccessToken && video.creative_id) {
+        // Method 4: Try creative_id endpoint
+        if (!actualVideoUrl && accessToken && video.creative_id) {
           console.log(`[TRANSCRIBE] Trying creative endpoint: ${video.creative_id}`);
           
           try {
             const creativeResponse = await fetch(
-              `https://graph.facebook.com/v22.0/${video.creative_id}?fields=video_id,object_story_spec&access_token=${metaAccessToken}`
+              `https://graph.facebook.com/v22.0/${video.creative_id}?fields=video_id,object_story_spec&access_token=${accessToken}`
             );
             
             if (creativeResponse.ok) {
               const creativeData = await creativeResponse.json();
-              const videoId = creativeData.video_id || 
+              const extractedVideoId = creativeData.video_id || 
                              creativeData.object_story_spec?.video_data?.video_id ||
                              creativeData.object_story_spec?.link_data?.video_id;
               
-              if (videoId) {
+              if (extractedVideoId) {
                 const videoResponse = await fetch(
-                  `https://graph.facebook.com/v22.0/${videoId}?fields=source&access_token=${metaAccessToken}`
+                  `https://graph.facebook.com/v22.0/${extractedVideoId}?fields=source&access_token=${accessToken}`
                 );
                 
                 if (videoResponse.ok) {
@@ -167,7 +221,7 @@ serve(async (req) => {
                     await supabase
                       .from('meta_creative_insights')
                       .update({ 
-                        meta_video_id: videoId,
+                        meta_video_id: extractedVideoId,
                         media_source_url: actualVideoUrl 
                       })
                       .eq('id', video.id);
@@ -180,7 +234,7 @@ serve(async (req) => {
           }
         }
 
-        // Method 4: Check if video_url is already a direct video file
+        // Method 5: Check if video_url is already a direct video file
         if (!actualVideoUrl && video.video_url) {
           const isDirectVideo = /\.(mp4|m4a|webm|ogg|mp3|mov)(\?|$)/i.test(video.video_url);
           if (isDirectVideo) {
