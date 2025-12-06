@@ -131,10 +131,20 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
         });
       }
 
+      // Use dashboard date range for incremental sync, or default to last 7 days
+      const syncStartDate = backfill 
+        ? undefined 
+        : (startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+      const syncEndDate = backfill 
+        ? undefined 
+        : (endDate || new Date().toISOString().split('T')[0]);
+
       const { data, error } = await (supabase as any).functions.invoke('sync-actblue-csv', {
         body: { 
           organization_id: organizationId,
-          mode: backfill ? 'backfill' : 'incremental'
+          mode: backfill ? 'backfill' : 'incremental',
+          start_date: syncStartDate,
+          end_date: syncEndDate
         }
       });
 
