@@ -63,17 +63,18 @@ interface DataFreshnessInfo {
  * 
  * Key insights from Meta API:
  * - Data for "today" is often not available until next day
- * - Safe to request up to 2 days ago for guaranteed data
- * - Same-day data may return partial or empty results
+ * - Yesterday's data is usually available by morning
+ * - Requesting too large a date range can cause API to return truncated results
+ * - Best practice: request shorter ranges (30 days) for fresh data
  */
 function getOptimalDateRange(startDate?: string, endDate?: string): { since: string; until: string; expectedLatency: string } {
   const now = new Date();
   const today = now.toISOString().split('T')[0];
   
-  // Meta's typical data processing delay is 24-48 hours
-  // Request data up to 2 days ago for most reliable results
+  // Request up to yesterday - today's data may not be ready
+  // But don't cap too aggressively, let Meta return what it has
   const safeEndDate = new Date();
-  safeEndDate.setDate(safeEndDate.getDate() - 2);
+  safeEndDate.setDate(safeEndDate.getDate() - 1);
   const safeEndStr = safeEndDate.toISOString().split('T')[0];
   
   let since: string;
@@ -81,25 +82,23 @@ function getOptimalDateRange(startDate?: string, endDate?: string): { since: str
   
   if (startDate && endDate) {
     since = startDate;
-    // If requested end date is too recent, cap it at safe date
-    if (endDate > safeEndStr) {
-      until = safeEndStr;
-      console.log(`[DATA FRESHNESS] Requested end date ${endDate} is too recent. Meta API has ~48h delay. Capping at ${safeEndStr}`);
-    } else {
-      until = endDate;
-    }
+    until = endDate;
+    // Don't cap the end date - let Meta return whatever data is available
+    console.log(`[DATE RANGE] Using requested dates: ${since} to ${until}`);
   } else {
-    // Default: last 90 days ending 2 days ago
+    // Default: last 30 days (shorter range = more reliable data)
+    // For full historical data, user can specify custom dates
     const defaultStart = new Date();
-    defaultStart.setDate(defaultStart.getDate() - 90);
+    defaultStart.setDate(defaultStart.getDate() - 30);
     since = defaultStart.toISOString().split('T')[0];
-    until = safeEndStr;
+    until = today; // Request up to today, Meta will return what's available
+    console.log(`[DATE RANGE] Using default 30-day range: ${since} to ${until}`);
   }
   
   return { 
     since, 
     until,
-    expectedLatency: `Data available up to ${safeEndStr} (48h processing delay)`
+    expectedLatency: `Data typically available up to ${safeEndStr} (24h processing delay)`
   };
 }
 
