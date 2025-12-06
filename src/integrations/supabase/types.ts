@@ -354,6 +354,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "admin_invite_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       ai_analysis_cache: {
@@ -1828,6 +1835,13 @@ export type Database = {
             columns: ["assigned_to"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_submissions_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -4963,6 +4977,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "submission_notes_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "submission_notes_submission_id_fkey"
             columns: ["submission_id"]
             isOneToOne: false
@@ -5798,7 +5819,7 @@ export type Database = {
         Insert: {
           addr1?: never
           amount?: number | null
-          city?: string | null
+          city?: never
           country?: string | null
           created_at?: string | null
           donor_email?: never
@@ -5822,7 +5843,7 @@ export type Database = {
         Update: {
           addr1?: never
           amount?: number | null
-          city?: string | null
+          city?: never
           country?: string | null
           created_at?: string | null
           donor_email?: never
@@ -5918,83 +5939,6 @@ export type Database = {
         }
         Relationships: []
       }
-      donor_demographics_secure: {
-        Row: {
-          address: string | null
-          city: string | null
-          country: string | null
-          created_at: string | null
-          donation_count: number | null
-          donor_email: string | null
-          employer: string | null
-          first_donation_date: string | null
-          first_name: string | null
-          id: string | null
-          is_recurring: boolean | null
-          last_donation_date: string | null
-          last_name: string | null
-          occupation: string | null
-          organization_id: string | null
-          phone: string | null
-          state: string | null
-          total_donated: number | null
-          updated_at: string | null
-          zip: string | null
-        }
-        Insert: {
-          address?: never
-          city?: string | null
-          country?: string | null
-          created_at?: string | null
-          donation_count?: number | null
-          donor_email?: never
-          employer?: never
-          first_donation_date?: string | null
-          first_name?: never
-          id?: string | null
-          is_recurring?: boolean | null
-          last_donation_date?: string | null
-          last_name?: never
-          occupation?: never
-          organization_id?: string | null
-          phone?: never
-          state?: string | null
-          total_donated?: number | null
-          updated_at?: string | null
-          zip?: never
-        }
-        Update: {
-          address?: never
-          city?: string | null
-          country?: string | null
-          created_at?: string | null
-          donation_count?: number | null
-          donor_email?: never
-          employer?: never
-          first_donation_date?: string | null
-          first_name?: never
-          id?: string | null
-          is_recurring?: boolean | null
-          last_donation_date?: string | null
-          last_name?: never
-          occupation?: never
-          organization_id?: string | null
-          phone?: never
-          state?: string | null
-          total_donated?: number | null
-          updated_at?: string | null
-          zip?: never
-        }
-        Relationships: [
-          {
-            foreignKeyName: "donor_demographics_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "client_organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       mv_daily_metrics_summary: {
         Row: {
           avg_roi_percentage: number | null
@@ -6056,6 +6000,39 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles_secure: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string | null
+          is_active: boolean | null
+          last_sign_in_at: string | null
+          onboarding_completed: boolean | null
+          onboarding_completed_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: never
+          id?: string | null
+          is_active?: boolean | null
+          last_sign_in_at?: string | null
+          onboarding_completed?: boolean | null
+          onboarding_completed_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: never
+          id?: string | null
+          is_active?: boolean | null
+          last_sign_in_at?: string | null
+          onboarding_completed?: boolean | null
+          onboarding_completed_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       archive_old_data: {
@@ -6098,6 +6075,10 @@ export type Database = {
       calculate_trend_velocity_v2: {
         Args: { mentions_1h: number; mentions_24h: number; mentions_6h: number }
         Returns: number
+      }
+      can_access_organization_data: {
+        Args: { _organization_id: string }
+        Returns: boolean
       }
       check_contact_rate_limit: { Args: never; Returns: boolean }
       cleanup_old_cache: { Args: never; Returns: number }
@@ -6224,6 +6205,7 @@ export type Database = {
       }
       is_client_admin: { Args: never; Returns: boolean }
       is_org_admin_or_manager: { Args: never; Returns: boolean }
+      is_system_admin: { Args: never; Returns: boolean }
       log_admin_action: {
         Args: {
           _action_type: string
