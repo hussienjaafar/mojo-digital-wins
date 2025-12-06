@@ -6373,6 +6373,7 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: boolean
       }
+      check_authenticated_access: { Args: never; Returns: boolean }
       check_contact_rate_limit: { Args: never; Returns: boolean }
       cleanup_expired_invite_codes: { Args: never; Returns: undefined }
       cleanup_old_cache: { Args: never; Returns: number }
