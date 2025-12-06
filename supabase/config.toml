@@ -230,3 +230,6 @@ verify_jwt = false
 
 [functions.backfill-video-sources]
 verify_jwt = false
+
+[functions.auto-match-attribution]
+verify_jwt = false
