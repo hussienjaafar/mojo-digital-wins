@@ -212,3 +212,6 @@ verify_jwt = false
 
 [functions.transcribe-video-creative]
 verify_jwt = false
+
+[functions.generate-creative-recommendations]
+verify_jwt = false

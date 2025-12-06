@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { CreativeCard } from "@/components/client/CreativeCard";
 import { CreativePerformanceMatrix } from "@/components/client/CreativePerformanceMatrix";
 import { CreativeRecommendations } from "@/components/client/CreativeRecommendations";
+import { CreativeScorecard } from "@/components/client/CreativeScorecard";
 import { CreativeDataImport } from "@/components/client/CreativeDataImport";
 import {
   Sparkles,
@@ -28,7 +29,8 @@ import {
   Zap,
   BarChart3,
   Lightbulb,
-  Play
+  Play,
+  Target
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -87,6 +89,8 @@ export default function ClientCreativeIntelligence() {
   const [tierFilter, setTierFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showImport, setShowImport] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<any>(null);
+  const [isLoadingRecs, setIsLoadingRecs] = useState(false);
 
   const loadCreatives = useCallback(async () => {
     if (!organizationId) return;
@@ -128,6 +132,27 @@ export default function ClientCreativeIntelligence() {
   useEffect(() => {
     loadCreatives();
   }, [loadCreatives]);
+
+  // Load AI recommendations when recommendations tab is selected
+  useEffect(() => {
+    const loadAiRecommendations = async () => {
+      if (activeTab === 'scorecard' && organizationId && !aiRecommendations && !isLoadingRecs) {
+        setIsLoadingRecs(true);
+        try {
+          const { data, error } = await supabase.functions.invoke('generate-creative-recommendations', {
+            body: { organizationId }
+          });
+          if (error) throw error;
+          setAiRecommendations(data);
+        } catch (error) {
+          console.error('Error loading AI recommendations:', error);
+        } finally {
+          setIsLoadingRecs(false);
+        }
+      }
+    };
+    loadAiRecommendations();
+  }, [activeTab, organizationId, aiRecommendations, isLoadingRecs]);
 
   const handleAnalyzeAll = async () => {
     if (!organizationId) return;
@@ -346,22 +371,26 @@ export default function ClientCreativeIntelligence() {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 max-w-lg">
+          <TabsList className="grid w-full grid-cols-5 max-w-2xl">
             <TabsTrigger value="gallery" className="gap-2">
               <ImageIcon className="h-4 w-4" />
-              Gallery
+              <span className="hidden sm:inline">Gallery</span>
             </TabsTrigger>
             <TabsTrigger value="insights" className="gap-2">
               <Lightbulb className="h-4 w-4" />
-              Insights
+              <span className="hidden sm:inline">Insights</span>
             </TabsTrigger>
             <TabsTrigger value="matrix" className="gap-2">
               <BarChart3 className="h-4 w-4" />
-              Matrix
+              <span className="hidden sm:inline">Matrix</span>
             </TabsTrigger>
             <TabsTrigger value="recommendations" className="gap-2">
               <Sparkles className="h-4 w-4" />
-              Recommend
+              <span className="hidden sm:inline">Recommend</span>
+            </TabsTrigger>
+            <TabsTrigger value="scorecard" className="gap-2">
+              <Target className="h-4 w-4" />
+              <span className="hidden sm:inline">Scorecard</span>
             </TabsTrigger>
           </TabsList>
 
@@ -439,6 +468,21 @@ export default function ClientCreativeIntelligence() {
               organizationId={organizationId!}
               creatives={creatives}
             />
+          </TabsContent>
+
+          {/* Scorecard Tab */}
+          <TabsContent value="scorecard">
+            {isLoadingRecs ? (
+              <div className="space-y-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-64 w-full" />
+              </div>
+            ) : (
+              <CreativeScorecard 
+                scorecard={aiRecommendations?.scorecard || null}
+                optimalFormula={aiRecommendations?.optimalFormula || null}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </div>
