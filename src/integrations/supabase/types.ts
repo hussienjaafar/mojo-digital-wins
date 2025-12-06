@@ -5770,6 +5770,152 @@ export type Database = {
       }
     }
     Views: {
+      actblue_transactions_secure: {
+        Row: {
+          addr1: string | null
+          amount: number | null
+          city: string | null
+          committee_name: string | null
+          contribution_form: string | null
+          country: string | null
+          created_at: string | null
+          donor_email: string | null
+          donor_name: string | null
+          employer: string | null
+          entity_id: string | null
+          first_name: string | null
+          id: string | null
+          is_express: boolean | null
+          is_mobile: boolean | null
+          is_recurring: boolean | null
+          last_name: string | null
+          occupation: string | null
+          organization_id: string | null
+          phone: string | null
+          recurring_period: string | null
+          refcode: string | null
+          refcode_custom: string | null
+          refcode2: string | null
+          source_campaign: string | null
+          state: string | null
+          transaction_date: string | null
+          transaction_id: string | null
+          transaction_type: string | null
+          zip: string | null
+        }
+        Insert: {
+          addr1?: never
+          amount?: number | null
+          city?: string | null
+          committee_name?: string | null
+          contribution_form?: string | null
+          country?: string | null
+          created_at?: string | null
+          donor_email?: never
+          donor_name?: never
+          employer?: never
+          entity_id?: string | null
+          first_name?: never
+          id?: string | null
+          is_express?: boolean | null
+          is_mobile?: boolean | null
+          is_recurring?: boolean | null
+          last_name?: never
+          occupation?: never
+          organization_id?: string | null
+          phone?: never
+          recurring_period?: string | null
+          refcode?: string | null
+          refcode_custom?: string | null
+          refcode2?: string | null
+          source_campaign?: string | null
+          state?: string | null
+          transaction_date?: string | null
+          transaction_id?: string | null
+          transaction_type?: string | null
+          zip?: never
+        }
+        Update: {
+          addr1?: never
+          amount?: number | null
+          city?: string | null
+          committee_name?: string | null
+          contribution_form?: string | null
+          country?: string | null
+          created_at?: string | null
+          donor_email?: never
+          donor_name?: never
+          employer?: never
+          entity_id?: string | null
+          first_name?: never
+          id?: string | null
+          is_express?: boolean | null
+          is_mobile?: boolean | null
+          is_recurring?: boolean | null
+          last_name?: never
+          occupation?: never
+          organization_id?: string | null
+          phone?: never
+          recurring_period?: string | null
+          refcode?: string | null
+          refcode_custom?: string | null
+          refcode2?: string | null
+          source_campaign?: string | null
+          state?: string | null
+          transaction_date?: string | null
+          transaction_id?: string | null
+          transaction_type?: string | null
+          zip?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_audit_logs_secure: {
+        Row: {
+          action_type: string | null
+          created_at: string | null
+          id: string | null
+          ip_address: string | null
+          new_value: Json | null
+          old_value: Json | null
+          record_id: string | null
+          table_affected: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_type?: string | null
+          created_at?: string | null
+          id?: string | null
+          ip_address?: never
+          new_value?: Json | null
+          old_value?: Json | null
+          record_id?: string | null
+          table_affected?: string | null
+          user_agent?: never
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string | null
+          created_at?: string | null
+          id?: string | null
+          ip_address?: never
+          new_value?: Json | null
+          old_value?: Json | null
+          record_id?: string | null
+          table_affected?: string | null
+          user_agent?: never
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       backfill_monitoring: {
         Row: {
           completion_percentage: number | null
@@ -5795,6 +5941,83 @@ export type Database = {
           velocity: number | null
         }
         Relationships: []
+      }
+      donor_demographics_secure: {
+        Row: {
+          address: string | null
+          city: string | null
+          country: string | null
+          created_at: string | null
+          donation_count: number | null
+          donor_email: string | null
+          employer: string | null
+          first_donation_date: string | null
+          first_name: string | null
+          id: string | null
+          is_recurring: boolean | null
+          last_donation_date: string | null
+          last_name: string | null
+          occupation: string | null
+          organization_id: string | null
+          phone: string | null
+          state: string | null
+          total_donated: number | null
+          updated_at: string | null
+          zip: string | null
+        }
+        Insert: {
+          address?: never
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          donation_count?: number | null
+          donor_email?: never
+          employer?: never
+          first_donation_date?: string | null
+          first_name?: never
+          id?: string | null
+          is_recurring?: boolean | null
+          last_donation_date?: string | null
+          last_name?: never
+          occupation?: never
+          organization_id?: string | null
+          phone?: never
+          state?: string | null
+          total_donated?: number | null
+          updated_at?: string | null
+          zip?: never
+        }
+        Update: {
+          address?: never
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          donation_count?: number | null
+          donor_email?: never
+          employer?: never
+          first_donation_date?: string | null
+          first_name?: never
+          id?: string | null
+          is_recurring?: boolean | null
+          last_donation_date?: string | null
+          last_name?: never
+          occupation?: never
+          organization_id?: string | null
+          phone?: never
+          state?: string | null
+          total_donated?: number | null
+          updated_at?: string | null
+          zip?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donor_demographics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mv_daily_metrics_summary: {
         Row: {
@@ -6024,6 +6247,7 @@ export type Database = {
         Returns: undefined
       }
       is_client_admin: { Args: never; Returns: boolean }
+      is_org_admin_or_manager: { Args: never; Returns: boolean }
       log_admin_action: {
         Args: {
           _action_type: string
