@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ const navigationSections: NavigationSection[] = [
   {
     title: "Performance",
     items: [
+      { label: "Creative Intelligence", path: "/client/creative-intelligence", icon: Sparkles },
       { label: "Demographics", path: "/client-demographics", icon: UserCircle },
       { label: "Donor Journey", path: "/client-donor-journey", icon: TrendingUp },
     ],
