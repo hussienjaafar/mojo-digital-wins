@@ -380,7 +380,11 @@ const ClientDashboard = () => {
 
               {/* Sync Controls - Compact Footer */}
               <div className="mt-8">
-                <SyncControls organizationId={organization.id} />
+                <SyncControls 
+                  organizationId={organization.id} 
+                  startDate={startDate}
+                  endDate={endDate}
+                />
               </div>
             </PortalErrorBoundary>
           </div>

@@ -11,6 +11,8 @@ import { DataFreshnessIndicator } from "./DataFreshnessIndicator";
 
 type Props = {
   organizationId: string;
+  startDate?: string;
+  endDate?: string;
 };
 
 type SyncStatus = {
@@ -18,7 +20,7 @@ type SyncStatus = {
   lastSync: string | null;
   status: string | null;
 };
-const SyncControls = ({ organizationId }: Props) => {
+const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   const { toast } = useToast();
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
@@ -51,8 +53,17 @@ const SyncControls = ({ organizationId }: Props) => {
   const syncMetaAds = async () => {
     setSyncing({ ...syncing, meta: true });
     try {
+      // Pass date range to ensure we fetch data for the visible period
+      // Default to last 30 days if no dates provided
+      const syncStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const syncEndDate = endDate || new Date().toISOString().split('T')[0];
+      
       const { error } = await (supabase as any).functions.invoke('sync-meta-ads', {
-        body: { organization_id: organizationId }
+        body: { 
+          organization_id: organizationId,
+          start_date: syncStartDate,
+          end_date: syncEndDate
+        }
       });
 
       if (error) throw error;
