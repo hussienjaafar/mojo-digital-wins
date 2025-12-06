@@ -15,10 +15,14 @@ import {
   AlertCircle,
   Palette,
   User,
-  Type
+  Type,
+  Pause,
+  Volume2,
+  VolumeX,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 
 type Creative = {
   id: string;
@@ -39,6 +43,7 @@ type Creative = {
   call_to_action_type: string | null;
   video_url: string | null;
   thumbnail_url: string | null;
+  media_source_url?: string | null;
   creative_type: string;
   audio_transcript: string | null;
   transcription_status: string | null;
@@ -89,9 +94,17 @@ function getSentimentColor(sentiment: string | null) {
 
 export function CreativeCard({ creative }: Props) {
   const [showDetails, setShowDetails] = useState(false);
-  const isVideo = creative.creative_type === 'video';
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isVideoLoading, setIsVideoLoading] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+  const [thumbnailError, setThumbnailError] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  
+  const isVideo = creative.creative_type === 'video' || creative.media_source_url;
   const isAnalyzed = !!creative.analyzed_at;
   const hasTranscript = !!creative.audio_transcript;
+  const hasPlayableVideo = !!creative.media_source_url;
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -99,19 +112,52 @@ export function CreativeCard({ creative }: Props) {
     return num.toString();
   };
 
+  const handlePlayPause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleMuteToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const handleVideoLoad = () => {
+    setIsVideoLoading(false);
+    setVideoError(false);
+  };
+
+  const handleVideoError = () => {
+    setIsVideoLoading(false);
+    setVideoError(true);
+    console.error('Video failed to load:', creative.media_source_url);
+  };
+
   return (
     <>
       <Card className="overflow-hidden hover:shadow-lg transition-all duration-200 group cursor-pointer" onClick={() => setShowDetails(true)}>
         {/* Thumbnail/Preview */}
         <div className="relative aspect-video bg-muted">
-          {creative.thumbnail_url ? (
+          {creative.thumbnail_url && !thumbnailError ? (
             <img 
               src={creative.thumbnail_url} 
               alt={creative.headline || 'Creative thumbnail'}
               className="w-full h-full object-cover"
+              loading="lazy"
+              onError={() => setThumbnailError(true)}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
+            <div className="w-full h-full flex items-center justify-center bg-muted">
               {isVideo ? (
                 <Video className="h-12 w-12 text-muted-foreground" />
               ) : (
@@ -137,10 +183,16 @@ export function CreativeCard({ creative }: Props) {
           )}
 
           {/* Play button for video */}
-          {isVideo && creative.video_url && (
+          {isVideo && (
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="p-3 rounded-full bg-white/90 shadow-lg">
-                <Play className="h-6 w-6 text-primary" />
+              <div className={cn(
+                "p-3 rounded-full shadow-lg",
+                hasPlayableVideo ? "bg-white/90" : "bg-white/60"
+              )}>
+                <Play className={cn(
+                  "h-6 w-6",
+                  hasPlayableVideo ? "text-primary" : "text-muted-foreground"
+                )} />
               </div>
             </div>
           )}
@@ -152,6 +204,11 @@ export function CreativeCard({ creative }: Props) {
                 <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-400">
                   <CheckCircle2 className="h-3 w-3 mr-1" />
                   Transcribed
+                </Badge>
+              ) : hasPlayableVideo ? (
+                <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-400">
+                  <Play className="h-3 w-3 mr-1" />
+                  Playable
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="text-xs bg-yellow-500/20 text-yellow-400">
@@ -251,16 +308,73 @@ export function CreativeCard({ creative }: Props) {
           
           <ScrollArea className="max-h-[70vh] pr-4">
             <div className="space-y-6">
-              {/* Preview */}
-              {creative.thumbnail_url && (
-                <div className="aspect-video rounded-lg overflow-hidden bg-muted">
+              {/* Video Player or Image Preview */}
+              <div className="aspect-video rounded-lg overflow-hidden bg-muted relative">
+                {hasPlayableVideo && !videoError ? (
+                  <>
+                    {isVideoLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    <video
+                      ref={videoRef}
+                      src={creative.media_source_url!}
+                      poster={creative.thumbnail_url || undefined}
+                      className="w-full h-full object-contain bg-black"
+                      muted={isMuted}
+                      playsInline
+                      preload="metadata"
+                      onLoadedData={handleVideoLoad}
+                      onError={handleVideoError}
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      onLoadStart={() => setIsVideoLoading(true)}
+                    />
+                    {/* Video Controls */}
+                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-white hover:bg-white/20"
+                        onClick={handlePlayPause}
+                      >
+                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-white hover:bg-white/20"
+                        onClick={handleMuteToggle}
+                      >
+                        {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                      </Button>
+                      <span className="text-xs text-white/80 ml-auto">
+                        Click to {isPlaying ? 'pause' : 'play'}
+                      </span>
+                    </div>
+                  </>
+                ) : creative.thumbnail_url ? (
                   <img 
                     src={creative.thumbnail_url}
                     alt="Creative preview"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
-                </div>
-              )}
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    {isVideo ? (
+                      <div className="text-center">
+                        <Video className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          {videoError ? 'Video failed to load' : 'Video preview not available'}
+                        </p>
+                      </div>
+                    ) : (
+                      <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Text Content */}
               <div className="space-y-3">
@@ -463,7 +577,7 @@ export function CreativeCard({ creative }: Props) {
                     "text-lg font-bold",
                     (creative.roas || 0) >= 2 ? "text-green-500" : (creative.roas || 0) >= 1 ? "text-yellow-500" : ""
                   )}>
-                    ${creative.roas?.toFixed(2) || '0.00'}
+                    {creative.roas?.toFixed(2) || '0.00'}x
                   </div>
                   <div className="text-xs text-muted-foreground">ROAS</div>
                 </Card>

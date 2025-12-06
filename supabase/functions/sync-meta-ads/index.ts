@@ -438,6 +438,57 @@ serve(async (req) => {
             
             // Only store if we have some creative content
             if (primaryText || headline || description || videoId) {
+              // PHASE 3: Fetch high-res thumbnail and video source URL from Meta
+              let highResThumbnail = thumbnailUrl;
+              let mediaSourceUrl: string | null = null;
+              
+              if (videoId) {
+                try {
+                  // Fetch video details including source URL and high-res picture
+                  const videoDetailsUrl = `https://graph.facebook.com/v22.0/${videoId}?fields=source,picture,thumbnails{uri,height,width}&access_token=${access_token}`;
+                  const videoDetailsResponse = await fetch(videoDetailsUrl);
+                  const videoDetails = await videoDetailsResponse.json();
+                  
+                  if (!videoDetails.error) {
+                    // Get the actual playable video source URL
+                    if (videoDetails.source) {
+                      mediaSourceUrl = videoDetails.source;
+                      console.log(`[VIDEO] Got source URL for video ${videoId}`);
+                    }
+                    
+                    // Get highest resolution thumbnail
+                    if (videoDetails.thumbnails?.data?.length > 0) {
+                      // Sort by height to get largest thumbnail
+                      const sortedThumbs = videoDetails.thumbnails.data.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+                      highResThumbnail = sortedThumbs[0]?.uri || videoDetails.picture || thumbnailUrl;
+                    } else if (videoDetails.picture) {
+                      highResThumbnail = videoDetails.picture;
+                    }
+                    console.log(`[VIDEO] Got high-res thumbnail for video ${videoId}`);
+                  }
+                } catch (videoErr) {
+                  console.error(`Error fetching video details for ${videoId}:`, videoErr);
+                }
+              } else if (creative.id) {
+                // For image creatives, try to get a higher resolution thumbnail
+                try {
+                  const creativeDetailsUrl = `https://graph.facebook.com/v22.0/${creative.id}?fields=thumbnail_url,image_url,object_story_spec&thumbnail_height=720&access_token=${access_token}`;
+                  const creativeDetailsResponse = await fetch(creativeDetailsUrl);
+                  const creativeDetails = await creativeDetailsResponse.json();
+                  
+                  if (!creativeDetails.error) {
+                    highResThumbnail = creativeDetails.image_url || creativeDetails.thumbnail_url || highResThumbnail;
+                    
+                    // Also check object_story_spec for full-size image
+                    if (creativeDetails.object_story_spec?.link_data?.picture) {
+                      highResThumbnail = creativeDetails.object_story_spec.link_data.picture;
+                    }
+                  }
+                } catch (creativeErr) {
+                  console.error(`Error fetching creative details for ${creative.id}:`, creativeErr);
+                }
+              }
+
               // Fetch ad-level insights for performance metrics - include purchase_roas for accurate ROAS
               const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad.id}/insights?fields=impressions,clicks,spend,actions,action_values,ctr,frequency,quality_ranking,engagement_rate_ranking,conversion_rate_ranking,purchase_roas,website_purchase_roas&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&action_attribution_windows=["7d_click","1d_view"]&access_token=${access_token}`;
               
@@ -506,7 +557,7 @@ serve(async (req) => {
               // PHASE 2 FIX: Calculate ROAS from Meta's purchase_roas when available
               const creativeRoas = spend > 0 ? conversionValue / spend : 0;
               
-              // Store creative insight with enhanced fields
+              // Store creative insight with enhanced fields including high-res assets
               const { error: creativeError } = await supabase
                 .from('meta_creative_insights')
                 .upsert({
@@ -519,12 +570,14 @@ serve(async (req) => {
                   description: description || null,
                   call_to_action_type: callToActionType || null,
                   video_url: videoId ? `https://www.facebook.com/video.php?v=${videoId}` : null,
-                  thumbnail_url: thumbnailUrl,
+                  thumbnail_url: highResThumbnail, // High-res thumbnail
                   creative_type: creativeType,
                   // PHASE 2: Store media identifiers for video/image pipeline
                   meta_video_id: videoId || null,
                   meta_image_hash: imageHash,
                   media_type: mediaType,
+                  // PHASE 3: Store actual playable video source URL
+                  media_source_url: mediaSourceUrl,
                   // Performance metrics
                   impressions,
                   clicks,
