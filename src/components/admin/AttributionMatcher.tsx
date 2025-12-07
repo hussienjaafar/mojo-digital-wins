@@ -37,7 +37,11 @@ interface MatchSummary {
   totalUnmatchedRevenue: number;
 }
 
-const AttributionMatcher = () => {
+interface AttributionMatcherProps {
+  organizationId?: string;
+}
+
+const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
@@ -70,7 +74,7 @@ const AttributionMatcher = () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('auto-match-attribution', {
-        body: { dryRun: true, minConfidence: 0.5 }
+        body: { dryRun: true, minConfidence: 0.5, organizationId }
       });
 
       if (error) throw error;
