@@ -206,7 +206,8 @@ serve(async (req) => {
 
     const { organizationId, dryRun = true, minConfidence = 0.7 } = await req.json();
 
-    console.log(`🔗 Auto-matching attribution for org: ${organizationId || 'all'}, dryRun: ${dryRun}`);
+    console.log(`🔗 Auto-matching attribution for org: ${organizationId || 'all'}, dryRun: ${dryRun}, minConfidence: ${minConfidence}`);
+    console.log(`[DEBUG][auto-match] Starting auto-match process...`);
 
     // Get unmatched refcodes with revenue
     let refcodesQuery = supabase
@@ -262,8 +263,34 @@ serve(async (req) => {
 
     const { data: creatives, error: creativeError } = await creativesQuery;
     if (creativeError) {
-      console.warn('Error fetching creatives with URLs:', creativeError);
+      console.warn('[DEBUG][auto-match] Error fetching creatives with URLs:', creativeError);
     }
+
+    // Log data summary
+    console.log(`[DEBUG][auto-match] Data fetched:`, {
+      transactionCount: transactions?.length || 0,
+      uniqueRefcodes: refcodeAggregates.size,
+      existingAttributions: existingSet.size,
+      creativesWithUrls: creatives?.length || 0,
+      creativesWithRefcodes: creatives?.filter((c: any) => c.extracted_refcode).length || 0
+    });
+
+    // Log sample refcodes
+    const sampleRefcodes = Array.from(refcodeAggregates.entries()).slice(0, 5);
+    console.log(`[DEBUG][auto-match] Sample refcodes (top 5):`, 
+      sampleRefcodes.map(([k, v]) => ({
+        key: k, revenue: v.revenue.toFixed(2), count: v.count
+      }))
+    );
+
+    // Log sample creatives with URLs
+    console.log(`[DEBUG][auto-match] Sample creatives with URLs (top 5):`, 
+      (creatives || []).slice(0, 5).map((c: any) => ({
+        campaign_id: c.campaign_id,
+        destination_url: c.destination_url?.substring(0, 80) || 'NONE',
+        extracted_refcode: c.extracted_refcode || 'NONE'
+      }))
+    );
 
     // Get Meta campaigns
     let campaignsQuery = supabase
@@ -318,8 +345,22 @@ serve(async (req) => {
       const orgCreatives = creativesByOrg.get(orgId) || [];
       const orgCampaigns = campaignsByOrg.get(orgId) || [];
 
+      // Log matching context for each refcode
+      console.log(`[DEBUG][auto-match] Matching refcode "${refcode}" (org: ${orgId}):`, {
+        creativesCount: orgCreatives.length,
+        creativesWithRefcode: orgCreatives.filter(c => c.extracted_refcode).length,
+        campaignsCount: orgCampaigns.length,
+        availableRefcodesInAds: orgCreatives.filter(c => c.extracted_refcode).map(c => c.extracted_refcode).slice(0, 5)
+      });
+
       // PRIORITY 1: Try URL-based matching first (highest accuracy)
       const urlMatch = matchRefcodeToCreative(refcode, orgCreatives);
+      
+      console.log(`[DEBUG][auto-match] URL match result for "${refcode}":`, urlMatch ? {
+        campaign: urlMatch.campaign_name,
+        confidence: urlMatch.confidence,
+        matchType: urlMatch.match_type
+      } : 'NO_MATCH');
       
       if (urlMatch && urlMatch.confidence >= minConfidence) {
         matches.push({
@@ -409,7 +450,22 @@ serve(async (req) => {
       console.log(`✅ Created ${created} attribution mappings`);
     }
 
-    console.log(`📊 Found ${matches.length} matches (${urlMatchCount} URL, ${patternMatchCount} pattern, ${fuzzyMatchCount} fuzzy), ${unmatched.length} unmatched`);
+    // Comprehensive summary logging
+    console.log(`[DEBUG][auto-match] ========== MATCH SUMMARY ==========`);
+    console.log(`[DEBUG][auto-match] Total matches: ${matches.length}`);
+    console.log(`[DEBUG][auto-match] - URL matches: ${urlMatchCount}`);
+    console.log(`[DEBUG][auto-match] - Pattern matches: ${patternMatchCount}`);
+    console.log(`[DEBUG][auto-match] - Fuzzy matches: ${fuzzyMatchCount}`);
+    console.log(`[DEBUG][auto-match] Total unmatched: ${unmatched.length}`);
+    console.log(`[DEBUG][auto-match] - No URL data: ${noUrlCount}`);
+    console.log(`[DEBUG][auto-match] Matched revenue: $${matches.reduce((sum, m) => sum + m.revenue, 0).toFixed(2)}`);
+    console.log(`[DEBUG][auto-match] Unmatched revenue: $${unmatched.reduce((sum, u) => sum + u.revenue, 0).toFixed(2)}`);
+    
+    // Log sample unmatched reasons
+    console.log(`[DEBUG][auto-match] Sample unmatched reasons:`, 
+      unmatched.slice(0, 5).map(u => ({ refcode: u.refcode, reason: u.reason }))
+    );
+    console.log(`[DEBUG][auto-match] ===================================`);
 
     return new Response(
       JSON.stringify({
@@ -426,11 +482,24 @@ serve(async (req) => {
           lowConfidence: matches.filter(m => m.confidence < 0.7).length,
           totalMatchedRevenue: matches.reduce((sum, m) => sum + m.revenue, 0),
           totalUnmatchedRevenue: unmatched.reduce((sum, u) => sum + u.revenue, 0),
-          // NEW: Match type breakdown
+          // Match type breakdown
           urlMatches: urlMatchCount,
           patternMatches: patternMatchCount,
           fuzzyMatches: fuzzyMatchCount,
           noUrlData: noUrlCount
+        },
+        // Debug info for UI
+        debugInfo: {
+          transactionCount: transactions?.length || 0,
+          uniqueRefcodes: refcodeAggregates.size,
+          creativesWithUrls: creatives?.length || 0,
+          creativesWithRefcodes: (creatives || []).filter((c: any) => c.extracted_refcode).length,
+          metaCampaigns: campaigns?.length || 0,
+          sampleCreatives: (creatives || []).slice(0, 10).map((c: any) => ({
+            campaign_id: c.campaign_id,
+            destination_url: c.destination_url?.substring(0, 100) || 'NONE',
+            extracted_refcode: c.extracted_refcode || 'NONE'
+          }))
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

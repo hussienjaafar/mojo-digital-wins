@@ -349,19 +349,37 @@ serve(async (req) => {
       try {
         console.log(`Fetching ads and creatives for campaign ${campaign.id}`);
         
-        // Fetch ads with creative information
-        const adsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/ads?fields=id,name,creative{id,name,object_story_spec,asset_feed_spec,video_id,thumbnail_url,effective_object_story_id}&access_token=${access_token}`;
+        // Fetch ads with creative information - explicitly request link fields for refcode extraction
+        const adsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/ads?fields=id,name,creative{id,name,object_story_spec{link_data{link,message,name,description,call_to_action},video_data{video_id,title,link_description,call_to_action,image_url},photo_data{caption}},asset_feed_spec{bodies,titles,descriptions,call_to_action_types,videos,link_urls},video_id,thumbnail_url,effective_object_story_id}&access_token=${access_token}`;
+        
+        console.log(`[DEBUG][sync-meta-ads] Fetching ads URL: ${adsUrl.replace(access_token, 'REDACTED')}`);
         
         const adsResponse = await fetch(adsUrl);
         const adsData = await adsResponse.json();
         
         if (!adsData.error && adsData.data) {
           const ads = adsData.data || [];
-          console.log(`Found ${ads.length} ads for campaign ${campaign.id}`);
+          console.log(`[DEBUG][sync-meta-ads] Found ${ads.length} ads for campaign ${campaign.id}`);
+          
+          // Log first ad's raw response for debugging
+          if (ads.length > 0) {
+            console.log(`[DEBUG][sync-meta-ads] Sample raw ad response:`, JSON.stringify(ads[0], null, 2).substring(0, 2000));
+          }
           
           for (const ad of ads) {
             const creative = ad.creative;
-            if (!creative) continue;
+            if (!creative) {
+              console.log(`[DEBUG][sync-meta-ads] Ad ${ad.id} has no creative data`);
+              continue;
+            }
+            
+            // Log creative structure for debugging
+            console.log(`[DEBUG][sync-meta-ads] Creative ${creative.id} structure:`, {
+              hasObjectStorySpec: !!creative.object_story_spec,
+              objectStorySpecKeys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : [],
+              hasAssetFeedSpec: !!creative.asset_feed_spec,
+              assetFeedSpecKeys: creative.asset_feed_spec ? Object.keys(creative.asset_feed_spec) : []
+            });
             
             // Extract creative content
             let primaryText = '';
@@ -381,6 +399,16 @@ serve(async (req) => {
             if (creative.object_story_spec) {
               const spec = creative.object_story_spec;
               
+              // Log link_data structure for debugging
+              if (spec.link_data) {
+                console.log(`[DEBUG][sync-meta-ads] Creative ${creative.id} link_data:`, {
+                  hasLink: !!spec.link_data.link,
+                  link: spec.link_data.link?.substring(0, 100) || 'NOT_FOUND',
+                  hasCTA: !!spec.link_data.call_to_action,
+                  ctaLink: spec.link_data.call_to_action?.value?.link?.substring(0, 100) || 'NOT_FOUND'
+                });
+              }
+              
               // Link ad
               if (spec.link_data) {
                 primaryText = spec.link_data.message || '';
@@ -392,6 +420,8 @@ serve(async (req) => {
                 
                 // Extract destination URL from link_data
                 destinationUrl = spec.link_data.link || spec.link_data.call_to_action?.value?.link || null;
+                
+                console.log(`[DEBUG][sync-meta-ads] Extracted destination URL from link_data: ${destinationUrl?.substring(0, 100) || 'NONE'}`);
               }
               
               // Video ad
@@ -453,6 +483,18 @@ serve(async (req) => {
                 destinationUrl = feedSpec.link_urls[0].website_url || feedSpec.link_urls[0].display_url || null;
               }
             }
+
+            // Log final URL extraction summary
+            console.log(`[DEBUG][sync-meta-ads] Ad ${ad.id} final URL extraction:`, {
+              destinationUrl: destinationUrl?.substring(0, 100) || 'NONE',
+              creativeType,
+              source: destinationUrl ? (
+                creative.object_story_spec?.link_data?.link ? 'link_data.link' :
+                creative.object_story_spec?.link_data?.call_to_action?.value?.link ? 'link_data.cta' :
+                creative.object_story_spec?.video_data?.call_to_action?.value?.link ? 'video_data.cta' :
+                creative.asset_feed_spec?.link_urls ? 'asset_feed_spec.link_urls' : 'unknown'
+              ) : 'none'
+            });
 
             // Extract refcode from destination URL
             if (destinationUrl) {

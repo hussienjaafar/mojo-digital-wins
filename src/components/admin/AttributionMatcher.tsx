@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Check, X, AlertTriangle, RefreshCw, Link2, DollarSign, Loader2, ExternalLink, Info } from "lucide-react";
+import { Wand2, Check, X, AlertTriangle, RefreshCw, Link2, DollarSign, Loader2, ExternalLink, Info, Bug } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -49,6 +49,28 @@ interface AttributionMatcherProps {
   organizationId?: string;
 }
 
+interface DebugInfo {
+  timestamp: string;
+  dataFetched: {
+    transactionCount: number;
+    uniqueRefcodes: number;
+    creativesWithUrls: number;
+    creativesWithRefcodes: number;
+    metaCampaigns: number;
+  };
+  matchingStats: {
+    urlMatches: number;
+    patternMatches: number;
+    fuzzyMatches: number;
+    noUrlData: number;
+  };
+  sampleCreatives: Array<{
+    campaign_id: string;
+    destination_url: string;
+    extracted_refcode: string;
+  }>;
+}
+
 const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -58,6 +80,13 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
   const [summary, setSummary] = useState<MatchSummary | null>(null);
   const [selectedMatches, setSelectedMatches] = useState<Set<string>>(new Set());
   const [rejectedMatches, setRejectedMatches] = useState<Set<string>>(new Set());
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
+
+  // Helper to estimate refcode count from matches/unmatched
+  const refcodeAggregatesSize = (data: any) => {
+    return (data.matches?.length || 0) + (data.unmatched?.length || 0);
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -105,6 +134,25 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
       setMatches(data.matches || []);
       setUnmatched(data.unmatched || []);
       setSummary(data.summary || null);
+      
+      // Build debug info from response
+      setDebugInfo({
+        timestamp: new Date().toISOString(),
+        dataFetched: {
+          transactionCount: data.debugInfo?.transactionCount || 0,
+          uniqueRefcodes: data.debugInfo?.uniqueRefcodes || refcodeAggregatesSize(data),
+          creativesWithUrls: data.debugInfo?.creativesWithUrls || 0,
+          creativesWithRefcodes: data.debugInfo?.creativesWithRefcodes || 0,
+          metaCampaigns: data.debugInfo?.metaCampaigns || 0
+        },
+        matchingStats: {
+          urlMatches: data.summary?.urlMatches || 0,
+          patternMatches: data.summary?.patternMatches || 0,
+          fuzzyMatches: data.summary?.fuzzyMatches || 0,
+          noUrlData: data.summary?.noUrlData || 0
+        },
+        sampleCreatives: data.debugInfo?.sampleCreatives || []
+      });
       
       // Pre-select high confidence matches
       const preSelected = new Set<string>();
@@ -222,14 +270,25 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
               Automatically match ActBlue refcodes to Meta campaigns using destination URLs and pattern matching
             </CardDescription>
           </div>
-          <Button onClick={runAutoMatch} disabled={isLoading}>
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            Run Auto-Match
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowDebug(!showDebug)}
+              className="mr-2"
+            >
+              <Bug className="w-4 h-4 mr-1" />
+              {showDebug ? 'Hide Debug' : 'Debug'}
+            </Button>
+            <Button onClick={runAutoMatch} disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Run Auto-Match
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -484,6 +543,88 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
             <Wand2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Click "Run Auto-Match" to find potential attribution mappings</p>
             <p className="text-sm mt-2">The matcher will first try to match refcodes from Meta ad destination URLs, then fall back to pattern matching</p>
+          </div>
+        )}
+
+        {/* Debug Panel */}
+        {showDebug && debugInfo && (
+          <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
+            <h4 className="font-semibold flex items-center gap-2 mb-3">
+              <Bug className="w-4 h-4" />
+              Debug Information
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <h5 className="font-medium text-muted-foreground mb-2">Data Fetched</h5>
+                <ul className="space-y-1 font-mono text-xs">
+                  <li>Transactions: {debugInfo.dataFetched.transactionCount}</li>
+                  <li>Unique Refcodes: {debugInfo.dataFetched.uniqueRefcodes}</li>
+                  <li>Creatives with URLs: {debugInfo.dataFetched.creativesWithUrls}</li>
+                  <li className={debugInfo.dataFetched.creativesWithRefcodes === 0 ? "text-red-500 font-bold" : ""}>
+                    Creatives with Refcodes: {debugInfo.dataFetched.creativesWithRefcodes}
+                    {debugInfo.dataFetched.creativesWithRefcodes === 0 && " ⚠️ No refcodes extracted!"}
+                  </li>
+                  <li>Meta Campaigns: {debugInfo.dataFetched.metaCampaigns}</li>
+                </ul>
+              </div>
+              <div>
+                <h5 className="font-medium text-muted-foreground mb-2">Matching Stats</h5>
+                <ul className="space-y-1 font-mono text-xs">
+                  <li className="text-green-600">URL Matches: {debugInfo.matchingStats.urlMatches}</li>
+                  <li className="text-purple-600">Pattern Matches: {debugInfo.matchingStats.patternMatches}</li>
+                  <li className="text-orange-600">Fuzzy Matches: {debugInfo.matchingStats.fuzzyMatches}</li>
+                  <li className={debugInfo.matchingStats.noUrlData > 0 ? "text-red-500" : ""}>
+                    No URL Data: {debugInfo.matchingStats.noUrlData}
+                  </li>
+                </ul>
+              </div>
+            </div>
+            
+            {debugInfo.sampleCreatives && debugInfo.sampleCreatives.length > 0 && (
+              <div className="mt-4">
+                <h5 className="font-medium text-muted-foreground mb-2">Sample Meta Ad Creatives</h5>
+                <div className="rounded border border-border overflow-hidden">
+                  <table className="w-full text-xs font-mono">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="p-2 text-left">Campaign ID</th>
+                        <th className="p-2 text-left">Destination URL</th>
+                        <th className="p-2 text-left">Extracted Refcode</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {debugInfo.sampleCreatives.map((c, i) => (
+                        <tr key={i} className="border-t border-border">
+                          <td className="p-2">{c.campaign_id.substring(0, 20)}...</td>
+                          <td className="p-2 max-w-xs truncate">{c.destination_url}</td>
+                          <td className={`p-2 ${c.extracted_refcode === 'NONE' ? 'text-red-500' : 'text-green-600 font-bold'}`}>
+                            {c.extracted_refcode}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            
+            {debugInfo.sampleCreatives?.length === 0 && (
+              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded text-red-700 dark:text-red-400 text-sm">
+                <strong>⚠️ No creatives with destination URLs found!</strong>
+                <p className="mt-1">This means the Meta ads sync is not extracting destination URLs. Check edge function logs for "sync-meta-ads" to debug.</p>
+              </div>
+            )}
+            
+            <div className="mt-4 text-xs text-muted-foreground">
+              Last run: {new Date(debugInfo.timestamp).toLocaleString()}
+            </div>
+          </div>
+        )}
+        
+        {showDebug && !debugInfo && (
+          <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border text-center text-muted-foreground">
+            <Bug className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p>Run Auto-Match to see debug information</p>
           </div>
         )}
       </CardContent>
