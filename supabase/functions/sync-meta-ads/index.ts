@@ -497,6 +497,14 @@ serve(async (req) => {
               const feedSpec = creative.asset_feed_spec;
               creativeType = 'dynamic';
               
+              console.log(`[DEBUG][sync-meta-ads] Creative ${creative.id} has asset_feed_spec:`, {
+                hasVideos: !!(feedSpec.videos?.length),
+                videoCount: feedSpec.videos?.length || 0,
+                hasBodies: !!(feedSpec.bodies?.length),
+                hasLinkUrls: !!(feedSpec.link_urls?.length),
+                linkUrlsCount: feedSpec.link_urls?.length || 0
+              });
+              
               // Get first body text
               if (feedSpec.bodies && feedSpec.bodies.length > 0) {
                 primaryText = feedSpec.bodies.map((b: any) => b.text).join(' | ');
@@ -517,15 +525,34 @@ serve(async (req) => {
                 callToActionType = feedSpec.call_to_action_types[0];
               }
               
-              // Check for videos
+              // ENHANCED: Check for videos in asset_feed_spec
               if (feedSpec.videos && feedSpec.videos.length > 0) {
                 creativeType = 'video';
-                videoId = feedSpec.videos[0].video_id || videoId;
+                // Extract video_id from first video in the array
+                const firstVideo = feedSpec.videos[0];
+                videoId = firstVideo.video_id || firstVideo.id || videoId;
+                console.log(`[DEBUG][sync-meta-ads] Extracted video_id from asset_feed_spec.videos: ${videoId}`);
+                
+                // Also log the full video object for debugging
+                console.log(`[DEBUG][sync-meta-ads] asset_feed_spec.videos[0]:`, JSON.stringify(firstVideo, null, 2).substring(0, 300));
               }
               
               // Extract destination URLs from dynamic creatives
               if (!destinationUrl && feedSpec.link_urls && feedSpec.link_urls.length > 0) {
-                destinationUrl = feedSpec.link_urls[0].website_url || feedSpec.link_urls[0].display_url || null;
+                const linkUrl = feedSpec.link_urls[0];
+                destinationUrl = linkUrl.website_url || linkUrl.display_url || null;
+                console.log(`[DEBUG][sync-meta-ads] Extracted destination URL from asset_feed_spec.link_urls: ${destinationUrl?.substring(0, 100)}`);
+              }
+              
+              // ENHANCED: Check for CTAs in asset_feed_spec that may have URLs
+              if (!destinationUrl && feedSpec.call_to_actions && feedSpec.call_to_actions.length > 0) {
+                for (const cta of feedSpec.call_to_actions) {
+                  if (cta.value?.link) {
+                    destinationUrl = cta.value.link;
+                    console.log(`[DEBUG][sync-meta-ads] Extracted destination URL from asset_feed_spec.call_to_actions: ${destinationUrl?.substring(0, 100)}`);
+                    break;
+                  }
+                }
               }
             }
 
@@ -568,30 +595,53 @@ serve(async (req) => {
               
               if (videoId) {
                 try {
+                  console.log(`[VIDEO][DEBUG] Fetching video details for video_id: ${videoId}`);
+                  
                   // Fetch video details including source URL and high-res picture
                   const videoDetailsUrl = `https://graph.facebook.com/v22.0/${videoId}?fields=source,picture,thumbnails{uri,height,width}&access_token=${access_token}`;
                   const videoDetailsResponse = await fetch(videoDetailsUrl);
                   const videoDetails = await videoDetailsResponse.json();
                   
-                  if (!videoDetails.error) {
+                  console.log(`[VIDEO][DEBUG] Video ${videoId} API response:`, JSON.stringify(videoDetails, null, 2).substring(0, 500));
+                  
+                  if (videoDetails.error) {
+                    console.log(`[VIDEO][DEBUG] ⚠️ API Error for ${videoId}: ${videoDetails.error.message} (code: ${videoDetails.error.code})`);
+                    
+                    // Try alternate approach: fetch without 'source' field (may be restricted)
+                    console.log(`[VIDEO][DEBUG] Trying alternate endpoint without source field...`);
+                    const altUrl = `https://graph.facebook.com/v22.0/${videoId}?fields=picture,thumbnails{uri,height,width}&access_token=${access_token}`;
+                    const altResponse = await fetch(altUrl);
+                    const altData = await altResponse.json();
+                    
+                    if (!altData.error) {
+                      console.log(`[VIDEO][DEBUG] Alternate endpoint succeeded for ${videoId}`);
+                      if (altData.thumbnails?.data?.length > 0) {
+                        const sortedThumbs = altData.thumbnails.data.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+                        highResThumbnail = sortedThumbs[0]?.uri || altData.picture || thumbnailUrl;
+                      } else if (altData.picture) {
+                        highResThumbnail = altData.picture;
+                      }
+                    }
+                  } else {
                     // Get the actual playable video source URL
                     if (videoDetails.source) {
                       mediaSourceUrl = videoDetails.source;
-                      console.log(`[VIDEO] Got source URL for video ${videoId}`);
+                      console.log(`[VIDEO][DEBUG] ✓ Got source URL for video ${videoId}: ${videoDetails.source.substring(0, 80)}...`);
+                    } else {
+                      console.log(`[VIDEO][DEBUG] ⚠️ No source field in response for ${videoId}. Available fields:`, Object.keys(videoDetails));
                     }
                     
                     // Get highest resolution thumbnail
                     if (videoDetails.thumbnails?.data?.length > 0) {
-                      // Sort by height to get largest thumbnail
                       const sortedThumbs = videoDetails.thumbnails.data.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
                       highResThumbnail = sortedThumbs[0]?.uri || videoDetails.picture || thumbnailUrl;
+                      console.log(`[VIDEO][DEBUG] Got high-res thumbnail for video ${videoId}`);
                     } else if (videoDetails.picture) {
                       highResThumbnail = videoDetails.picture;
                     }
-                    console.log(`[VIDEO] Got high-res thumbnail for video ${videoId}`);
                   }
                 } catch (videoErr) {
-                  console.error(`Error fetching video details for ${videoId}:`, videoErr);
+                  console.error(`[VIDEO][DEBUG] Exception fetching video details for ${videoId}:`, videoErr);
                 }
               } else if (creative.id) {
                 // For image creatives, try to get a higher resolution thumbnail
