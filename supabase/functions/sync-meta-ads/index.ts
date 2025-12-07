@@ -372,6 +372,11 @@ serve(async (req) => {
             let thumbnailUrl = creative.thumbnail_url || null;
             let creativeType = 'unknown';
             
+            // NEW: Track destination URL and extracted refcode
+            let destinationUrl: string | null = null;
+            let extractedRefcode: string | null = null;
+            let refcodeSource: string | null = null;
+
             // Parse object_story_spec for standard creatives
             if (creative.object_story_spec) {
               const spec = creative.object_story_spec;
@@ -384,6 +389,9 @@ serve(async (req) => {
                 callToActionType = spec.link_data.call_to_action?.type || '';
                 creativeType = spec.link_data.video_id ? 'video' : 'image';
                 videoId = spec.link_data.video_id || videoId;
+                
+                // Extract destination URL from link_data
+                destinationUrl = spec.link_data.link || spec.link_data.call_to_action?.value?.link || null;
               }
               
               // Video ad
@@ -395,6 +403,11 @@ serve(async (req) => {
                 creativeType = 'video';
                 videoId = spec.video_data.video_id || videoId;
                 thumbnailUrl = spec.video_data.image_url || thumbnailUrl;
+                
+                // Extract destination URL from video CTA
+                if (!destinationUrl && spec.video_data.call_to_action?.value?.link) {
+                  destinationUrl = spec.video_data.call_to_action.value.link;
+                }
               }
               
               // Photo ad
@@ -433,6 +446,30 @@ serve(async (req) => {
               if (feedSpec.videos && feedSpec.videos.length > 0) {
                 creativeType = 'video';
                 videoId = feedSpec.videos[0].video_id || videoId;
+              }
+              
+              // Extract destination URLs from dynamic creatives
+              if (!destinationUrl && feedSpec.link_urls && feedSpec.link_urls.length > 0) {
+                destinationUrl = feedSpec.link_urls[0].website_url || feedSpec.link_urls[0].display_url || null;
+              }
+            }
+
+            // Extract refcode from destination URL
+            if (destinationUrl) {
+              try {
+                const url = new URL(destinationUrl);
+                extractedRefcode = url.searchParams.get('refcode') || url.searchParams.get('refCode') || url.searchParams.get('REFCODE');
+                if (extractedRefcode) {
+                  refcodeSource = 'url_param';
+                  console.log(`[REFCODE] Extracted "${extractedRefcode}" from ${destinationUrl}`);
+                }
+              } catch (urlErr) {
+                // URL parsing failed, try regex
+                const refcodeMatch = destinationUrl.match(/[?&]refcode=([^&]+)/i);
+                if (refcodeMatch) {
+                  extractedRefcode = refcodeMatch[1];
+                  refcodeSource = 'url_param';
+                }
               }
             }
             
@@ -557,7 +594,7 @@ serve(async (req) => {
               // PHASE 2 FIX: Calculate ROAS from Meta's purchase_roas when available
               const creativeRoas = spend > 0 ? conversionValue / spend : 0;
               
-              // Store creative insight with enhanced fields including high-res assets
+              // Store creative insight with enhanced fields including high-res assets and destination URL
               const { error: creativeError } = await supabase
                 .from('meta_creative_insights')
                 .upsert({
@@ -578,6 +615,10 @@ serve(async (req) => {
                   media_type: mediaType,
                   // PHASE 3: Store actual playable video source URL
                   media_source_url: mediaSourceUrl,
+                  // NEW: Store destination URL and extracted refcode for attribution matching
+                  destination_url: destinationUrl,
+                  extracted_refcode: extractedRefcode,
+                  refcode_source: refcodeSource,
                   // Performance metrics
                   impressions,
                   clicks,
