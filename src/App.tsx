@@ -57,6 +57,7 @@ const ClientPollingAlerts = lazy(() => import("./pages/ClientPollingAlerts"));
 const ClientSettings = lazy(() => import("./pages/ClientSettings"));
 const ClientIntelligence = lazy(() => import("./pages/ClientIntelligence"));
 const ClientCreativeIntelligence = lazy(() => import("./pages/ClientCreativeIntelligence"));
+const ClientAttribution = lazy(() => import("./pages/ClientAttribution"));
 
 const queryClient = new QueryClient();
 
@@ -116,6 +117,7 @@ const AppContent = () => {
             <Route path="/client/settings" element={<ClientSettings />} />
             <Route path="/client/intelligence" element={<ClientIntelligence />} />
             <Route path="/client/creative-intelligence" element={<ClientCreativeIntelligence />} />
+            <Route path="/client/attribution" element={<ClientAttribution />} />
             <Route path="/access-denied" element={<AccessDenied />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

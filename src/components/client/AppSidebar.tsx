@@ -14,6 +14,7 @@ import {
   Activity,
   ChevronRight,
   Sparkles,
+  GitBranch,
 } from "lucide-react";
 import {
   Sidebar,
@@ -93,6 +94,7 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
         { title: "Dashboard", url: "/client/dashboard", icon: Home },
         { title: "Intelligence", url: "/client/intelligence", icon: Activity },
         { title: "Creative Intelligence", url: "/client/creative-intelligence", icon: Sparkles },
+        { title: "Attribution", url: "/client/attribution", icon: GitBranch },
         { title: "Watchlist", url: "/client/watchlist", icon: Eye },
         { title: "Alerts", url: "/client/alerts", icon: Bell, badge: stats.alerts },
         { title: "Profile", url: "/client/profile", icon: Settings },
