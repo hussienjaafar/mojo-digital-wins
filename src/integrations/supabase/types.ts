@@ -3641,9 +3641,11 @@ export type Database = {
           creative_type: string | null
           ctr: number | null
           description: string | null
+          destination_url: string | null
           detected_text: string | null
           effectiveness_score: number | null
           emotional_appeal: string | null
+          extracted_refcode: string | null
           first_seen_at: string | null
           has_faces: boolean | null
           headline: string | null
@@ -3660,6 +3662,7 @@ export type Database = {
           organization_id: string
           performance_tier: string | null
           primary_text: string | null
+          refcode_source: string | null
           roas: number | null
           sentiment_label: string | null
           sentiment_score: number | null
@@ -3698,9 +3701,11 @@ export type Database = {
           creative_type?: string | null
           ctr?: number | null
           description?: string | null
+          destination_url?: string | null
           detected_text?: string | null
           effectiveness_score?: number | null
           emotional_appeal?: string | null
+          extracted_refcode?: string | null
           first_seen_at?: string | null
           has_faces?: boolean | null
           headline?: string | null
@@ -3717,6 +3722,7 @@ export type Database = {
           organization_id: string
           performance_tier?: string | null
           primary_text?: string | null
+          refcode_source?: string | null
           roas?: number | null
           sentiment_label?: string | null
           sentiment_score?: number | null
@@ -3755,9 +3761,11 @@ export type Database = {
           creative_type?: string | null
           ctr?: number | null
           description?: string | null
+          destination_url?: string | null
           detected_text?: string | null
           effectiveness_score?: number | null
           emotional_appeal?: string | null
+          extracted_refcode?: string | null
           first_seen_at?: string | null
           has_faces?: boolean | null
           headline?: string | null
@@ -3774,6 +3782,7 @@ export type Database = {
           organization_id?: string
           performance_tier?: string | null
           primary_text?: string | null
+          refcode_source?: string | null
           roas?: number | null
           sentiment_label?: string | null
           sentiment_score?: number | null

@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Wand2, Check, X, AlertTriangle, RefreshCw, Link2, DollarSign, Loader2 } from "lucide-react";
+import { Wand2, Check, X, AlertTriangle, RefreshCw, Link2, DollarSign, Loader2, ExternalLink, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MatchResult {
   refcode: string;
@@ -17,6 +18,8 @@ interface MatchResult {
   reason: string;
   revenue: number;
   transactions: number;
+  destination_url?: string;
+  match_type: 'url_exact' | 'url_pattern' | 'campaign_pattern' | 'fuzzy' | 'none';
 }
 
 interface UnmatchedRefcode {
@@ -24,6 +27,7 @@ interface UnmatchedRefcode {
   organization_id: string;
   revenue: number;
   transactions: number;
+  reason: string;
 }
 
 interface MatchSummary {
@@ -35,6 +39,10 @@ interface MatchSummary {
   lowConfidence: number;
   totalMatchedRevenue: number;
   totalUnmatchedRevenue: number;
+  urlMatches: number;
+  patternMatches: number;
+  fuzzyMatches: number;
+  noUrlData: number;
 }
 
 interface AttributionMatcherProps {
@@ -70,6 +78,21 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
     return <Badge className="bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30">Low ({Math.round(confidence * 100)}%)</Badge>;
   };
 
+  const getMatchTypeBadge = (matchType: string) => {
+    switch (matchType) {
+      case 'url_exact':
+        return <Badge className="bg-primary/20 text-primary border-primary/30">URL Match</Badge>;
+      case 'url_pattern':
+        return <Badge className="bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30">URL Pattern</Badge>;
+      case 'campaign_pattern':
+        return <Badge className="bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/30">Pattern</Badge>;
+      case 'fuzzy':
+        return <Badge className="bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30">Fuzzy</Badge>;
+      default:
+        return null;
+    }
+  };
+
   const runAutoMatch = async () => {
     setIsLoading(true);
     try {
@@ -95,7 +118,7 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
 
       toast({
         title: "Auto-match complete",
-        description: `Found ${data.summary?.totalMatched || 0} potential matches`,
+        description: `Found ${data.summary?.totalMatched || 0} potential matches (${data.summary?.urlMatches || 0} from URLs)`,
       });
     } catch (error: any) {
       console.error('Auto-match error:', error);
@@ -196,7 +219,7 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
               Smart Attribution Matcher
             </CardTitle>
             <CardDescription>
-              Automatically match ActBlue refcodes to Meta campaigns with confidence scores
+              Automatically match ActBlue refcodes to Meta campaigns using destination URLs and pattern matching
             </CardDescription>
           </div>
           <Button onClick={runAutoMatch} disabled={isLoading}>
@@ -212,35 +235,80 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
       <CardContent className="space-y-6">
         {/* Summary Stats */}
         {summary && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                <Check className="w-4 h-4" />
-                <span className="text-sm font-medium">High Confidence</span>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                  <Check className="w-4 h-4" />
+                  <span className="text-sm font-medium">High Confidence</span>
+                </div>
+                <div className="mt-1 text-2xl font-bold text-foreground">{summary.highConfidence}</div>
               </div>
-              <div className="mt-1 text-2xl font-bold text-foreground">{summary.highConfidence}</div>
+              <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span className="text-sm font-medium">Medium Confidence</span>
+                </div>
+                <div className="mt-1 text-2xl font-bold text-foreground">{summary.mediumConfidence}</div>
+              </div>
+              <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                <div className="flex items-center gap-2 text-primary">
+                  <DollarSign className="w-4 h-4" />
+                  <span className="text-sm font-medium">Matched Revenue</span>
+                </div>
+                <div className="mt-1 text-2xl font-bold text-foreground">{formatCurrency(summary.totalMatchedRevenue)}</div>
+              </div>
+              <div className="p-4 rounded-lg bg-muted border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <X className="w-4 h-4" />
+                  <span className="text-sm font-medium">Unmatched</span>
+                </div>
+                <div className="mt-1 text-2xl font-bold text-foreground">{summary.totalUnmatched}</div>
+                <div className="text-xs text-muted-foreground">{formatCurrency(summary.totalUnmatchedRevenue)} revenue</div>
+              </div>
             </div>
-            <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-              <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
-                <AlertTriangle className="w-4 h-4" />
-                <span className="text-sm font-medium">Medium Confidence</span>
+
+            {/* Match Type Breakdown */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
+                <div className="flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">URL Matches</span>
+                </div>
+                <div className="mt-1 text-xl font-bold text-foreground">{summary.urlMatches}</div>
+                <div className="text-xs text-muted-foreground">From destination URLs</div>
               </div>
-              <div className="mt-1 text-2xl font-bold text-foreground">{summary.mediumConfidence}</div>
-            </div>
-            <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-              <div className="flex items-center gap-2 text-primary">
-                <DollarSign className="w-4 h-4" />
-                <span className="text-sm font-medium">Matched Revenue</span>
+              <div className="p-3 rounded-lg bg-purple-500/5 border border-purple-500/10">
+                <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
+                  <span className="text-sm font-medium">Pattern Matches</span>
+                </div>
+                <div className="mt-1 text-xl font-bold text-foreground">{summary.patternMatches}</div>
+                <div className="text-xs text-muted-foreground">Campaign name patterns</div>
               </div>
-              <div className="mt-1 text-2xl font-bold text-foreground">{formatCurrency(summary.totalMatchedRevenue)}</div>
-            </div>
-            <div className="p-4 rounded-lg bg-muted border border-border">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <X className="w-4 h-4" />
-                <span className="text-sm font-medium">Unmatched</span>
+              <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/10">
+                <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                  <span className="text-sm font-medium">Fuzzy Matches</span>
+                </div>
+                <div className="mt-1 text-xl font-bold text-foreground">{summary.fuzzyMatches}</div>
+                <div className="text-xs text-muted-foreground">Similarity-based</div>
               </div>
-              <div className="mt-1 text-2xl font-bold text-foreground">{summary.totalUnmatched}</div>
-              <div className="text-xs text-muted-foreground">{formatCurrency(summary.totalUnmatchedRevenue)} revenue</div>
+              <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/10">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-2 text-red-700 dark:text-red-400 cursor-help">
+                        <Info className="w-4 h-4" />
+                        <span className="text-sm font-medium">Missing URL Data</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs">Refcodes that couldn't be matched because Meta ads don't have destination URLs with refcode parameters. Sync Meta ads to extract refcodes.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <div className="mt-1 text-xl font-bold text-foreground">{summary.noUrlData}</div>
+                <div className="text-xs text-muted-foreground">No refcodes in ads</div>
+              </div>
             </div>
           </div>
         )}
@@ -276,10 +344,10 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
                     <TableHead className="w-12">Status</TableHead>
                     <TableHead>Refcode</TableHead>
                     <TableHead>Meta Campaign</TableHead>
+                    <TableHead>Match Type</TableHead>
                     <TableHead>Confidence</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead className="text-right">Revenue</TableHead>
-                    <TableHead className="text-right">Txns</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -320,17 +388,35 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
                           <div className="flex items-center gap-2">
                             <Link2 className="w-4 h-4 text-muted-foreground" />
                             <span className="text-sm">{match.meta_campaign_name || match.meta_campaign_id}</span>
+                            {match.destination_url && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <a 
+                                      href={match.destination_url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-muted-foreground hover:text-primary"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs break-all">{match.destination_url}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                           </div>
                         </TableCell>
+                        <TableCell>{getMatchTypeBadge(match.match_type)}</TableCell>
                         <TableCell>{getConfidenceBadge(match.confidence)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
                           {match.reason}
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(match.revenue)}
-                        </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {match.transactions}
                         </TableCell>
                       </TableRow>
                     );
@@ -348,7 +434,7 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
               <AlertTriangle className="w-5 h-5 text-yellow-500" />
               Unmatched Refcodes
               <span className="text-sm font-normal text-muted-foreground">
-                (Requires manual mapping)
+                (Requires manual mapping or Meta ads sync)
               </span>
             </h3>
 
@@ -357,6 +443,7 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead>Refcode</TableHead>
+                    <TableHead>Reason</TableHead>
                     <TableHead className="text-right">Revenue</TableHead>
                     <TableHead className="text-right">Transactions</TableHead>
                   </TableRow>
@@ -368,6 +455,9 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
                         <Badge variant="outline" className="font-mono">
                           {item.refcode}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-xs">
+                        {item.reason}
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(item.revenue)}
@@ -393,6 +483,7 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
           <div className="text-center py-12 text-muted-foreground">
             <Wand2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Click "Run Auto-Match" to find potential attribution mappings</p>
+            <p className="text-sm mt-2">The matcher will first try to match refcodes from Meta ad destination URLs, then fall back to pattern matching</p>
           </div>
         )}
       </CardContent>
