@@ -447,6 +447,51 @@ serve(async (req) => {
               }
             }
             
+            // FALLBACK: If no destination URL found, try fetching from the creative directly
+            if (!destinationUrl && creative.id) {
+              try {
+                console.log(`[DEBUG][sync-meta-ads] No URL in object_story_spec, fetching creative ${creative.id} directly...`);
+                const creativeUrl = `https://graph.facebook.com/v22.0/${creative.id}?fields=object_story_spec,effective_object_story_id&access_token=${access_token}`;
+                const creativeResponse = await fetch(creativeUrl);
+                const creativeData = await creativeResponse.json();
+                
+                if (!creativeData.error) {
+                  console.log(`[DEBUG][sync-meta-ads] Direct creative fetch result:`, JSON.stringify(creativeData, null, 2).substring(0, 1000));
+                  
+                  // Try object_story_spec from direct fetch
+                  if (creativeData.object_story_spec?.link_data?.link) {
+                    destinationUrl = creativeData.object_story_spec.link_data.link;
+                    console.log(`[DEBUG][sync-meta-ads] Found URL in direct creative fetch: ${destinationUrl?.substring(0, 100)}`);
+                  } else if (creativeData.object_story_spec?.video_data?.call_to_action?.value?.link) {
+                    destinationUrl = creativeData.object_story_spec.video_data.call_to_action.value.link;
+                    console.log(`[DEBUG][sync-meta-ads] Found URL in video CTA from direct fetch: ${destinationUrl?.substring(0, 100)}`);
+                  }
+                  
+                  // Try effective_object_story_id (page post) if still no URL
+                  if (!destinationUrl && creativeData.effective_object_story_id) {
+                    console.log(`[DEBUG][sync-meta-ads] Trying effective_object_story_id: ${creativeData.effective_object_story_id}`);
+                    try {
+                      const postUrl = `https://graph.facebook.com/v22.0/${creativeData.effective_object_story_id}?fields=call_to_action,link&access_token=${access_token}`;
+                      const postResponse = await fetch(postUrl);
+                      const postData = await postResponse.json();
+                      
+                      if (!postData.error) {
+                        console.log(`[DEBUG][sync-meta-ads] Page post data:`, JSON.stringify(postData, null, 2).substring(0, 500));
+                        destinationUrl = postData.link || postData.call_to_action?.value?.link || null;
+                        if (destinationUrl) {
+                          console.log(`[DEBUG][sync-meta-ads] Found URL from page post: ${destinationUrl?.substring(0, 100)}`);
+                        }
+                      }
+                    } catch (postErr) {
+                      console.log(`[DEBUG][sync-meta-ads] Error fetching page post: ${postErr}`);
+                    }
+                  }
+                }
+              } catch (creativeErr) {
+                console.log(`[DEBUG][sync-meta-ads] Error fetching creative directly: ${creativeErr}`);
+              }
+            }
+            
             // Parse asset_feed_spec for dynamic creatives
             if (creative.asset_feed_spec) {
               const feedSpec = creative.asset_feed_spec;
