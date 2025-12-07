@@ -33,6 +33,7 @@ serve(async (req) => {
     const { organization_id, batch_size = 5, creative_id } = await req.json();
 
     console.log(`[TRANSCRIBE] Starting video transcription${organization_id ? ` for org: ${organization_id}` : ''}`);
+    console.log(`[TRANSCRIBE] API keys available: OpenAI=${!!openaiApiKey}, Lovable=${!!lovableApiKey}`);
 
     // Get Meta API credentials - will fetch per-video if organization_id not provided
     let metaAccessToken: string | null = null;
@@ -52,6 +53,7 @@ serve(async (req) => {
         metaAccessToken = creds.access_token || creds.accessToken;
         if (metaAccessToken) {
           orgCredentialsCache.set(organization_id, metaAccessToken);
+          console.log(`[TRANSCRIBE] Got Meta access token for org ${organization_id}`);
         }
       }
     }
@@ -191,20 +193,29 @@ serve(async (req) => {
           }
         }
 
-        // Method 4: Try creative_id endpoint
+        // Method 4: Try creative_id endpoint with enhanced extraction
         if (!actualVideoUrl && accessToken && video.creative_id) {
-          console.log(`[TRANSCRIBE] Trying creative endpoint: ${video.creative_id}`);
+          console.log(`[TRANSCRIBE] Method 4: Trying creative endpoint: ${video.creative_id}`);
           
           try {
             const creativeResponse = await fetch(
-              `https://graph.facebook.com/v22.0/${video.creative_id}?fields=video_id,object_story_spec&access_token=${accessToken}`
+              `https://graph.facebook.com/v22.0/${video.creative_id}?fields=video_id,object_story_spec,asset_feed_spec,effective_object_story_id&access_token=${accessToken}`
             );
             
             if (creativeResponse.ok) {
               const creativeData = await creativeResponse.json();
-              const extractedVideoId = creativeData.video_id || 
+              console.log(`[TRANSCRIBE] Creative data:`, JSON.stringify(creativeData, null, 2).substring(0, 500));
+              
+              let extractedVideoId = creativeData.video_id || 
                              creativeData.object_story_spec?.video_data?.video_id ||
                              creativeData.object_story_spec?.link_data?.video_id;
+              
+              // Check asset_feed_spec for video IDs
+              if (!extractedVideoId && creativeData.asset_feed_spec?.videos?.length > 0) {
+                extractedVideoId = creativeData.asset_feed_spec.videos[0].video_id || 
+                                   creativeData.asset_feed_spec.videos[0].id;
+                console.log(`[TRANSCRIBE] Extracted video_id from asset_feed_spec: ${extractedVideoId}`);
+              }
               
               if (extractedVideoId) {
                 const videoResponse = await fetch(
@@ -215,7 +226,7 @@ serve(async (req) => {
                   const videoData = await videoResponse.json();
                   if (videoData.source) {
                     actualVideoUrl = videoData.source;
-                    console.log(`[TRANSCRIBE] Got video URL via creative endpoint`);
+                    console.log(`[TRANSCRIBE] ✓ Got video URL via creative endpoint`);
                     
                     // Store video_id and URL for future use
                     await supabase
@@ -224,6 +235,30 @@ serve(async (req) => {
                         meta_video_id: extractedVideoId,
                         media_source_url: actualVideoUrl 
                       })
+                      .eq('id', video.id);
+                  } else {
+                    console.log(`[TRANSCRIBE] Video ${extractedVideoId} has no source field`);
+                  }
+                }
+              }
+              
+              // Method 5: Try effective_object_story_id (page post)
+              if (!actualVideoUrl && creativeData.effective_object_story_id) {
+                console.log(`[TRANSCRIBE] Method 5: Trying page post: ${creativeData.effective_object_story_id}`);
+                
+                const postResponse = await fetch(
+                  `https://graph.facebook.com/v22.0/${creativeData.effective_object_story_id}?fields=source&access_token=${accessToken}`
+                );
+                
+                if (postResponse.ok) {
+                  const postData = await postResponse.json();
+                  if (postData.source) {
+                    actualVideoUrl = postData.source;
+                    console.log(`[TRANSCRIBE] ✓ Got video URL via page post`);
+                    
+                    await supabase
+                      .from('meta_creative_insights')
+                      .update({ media_source_url: actualVideoUrl })
                       .eq('id', video.id);
                   }
                 }
