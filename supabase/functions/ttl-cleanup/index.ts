@@ -1,8 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// CORS with allowed origins
+const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
+const getCorsHeaders = (origin?: string) => {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] || 'https://lovable.dev';
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
 };
 
 interface CleanupResult {
@@ -12,6 +18,9 @@ interface CleanupResult {
 }
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin') || undefined;
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -20,6 +29,39 @@ Deno.serve(async (req) => {
   const results: CleanupResult[] = [];
 
   try {
+    // Auth check: require either CRON_SECRET header or valid admin JWT
+    const cronSecret = req.headers.get('x-cron-secret');
+    const expectedCronSecret = Deno.env.get('CRON_SECRET');
+    const authHeader = req.headers.get('authorization');
+
+    let isAuthorized = false;
+
+    if (cronSecret && expectedCronSecret && cronSecret === expectedCronSecret) {
+      isAuthorized = true;
+      console.log('[TTL Cleanup] Authorized via CRON_SECRET');
+    } else if (authHeader) {
+      const supabaseAuth = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: { user } } = await supabaseAuth.auth.getUser();
+      if (user) {
+        const { data: isAdmin } = await supabaseAuth.rpc('has_role', { _user_id: user.id, _role: 'admin' });
+        if (isAdmin) {
+          isAuthorized = true;
+          console.log('[TTL Cleanup] Authorized via admin JWT');
+        }
+      }
+    }
+
+    if (!isAuthorized) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - requires CRON_SECRET or admin JWT' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -114,7 +156,6 @@ Deno.serve(async (req) => {
     });
 
     // 8. Archive old data (bluesky >30 days, articles >90 days)
-    // This calls the archive_old_data() function which moves data to archive tables
     const { data: archiveResult, error: e8 } = await supabase.rpc('archive_old_data');
     
     if (archiveResult && archiveResult.length > 0) {
@@ -161,7 +202,7 @@ Deno.serve(async (req) => {
       results
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' }
     });
   }
 });
