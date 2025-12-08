@@ -1,21 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 
+// Use restricted CORS
+const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0] || 'https://lovable.dev',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
 /**
  * TIERED META SYNC SCHEDULER
  * 
  * This function runs every 15 minutes and determines which Meta accounts
- * need syncing based on their priority tier:
- * - HIGH: sync every 1 hour, fetch last 2 days
- * - MEDIUM: sync every 2 hours, fetch last 3 days  
- * - LOW: sync every 4 hours, fetch last 7 days
+ * need syncing based on their priority tier.
  * 
- * It respects rate limits and backs off when needed.
+ * SECURITY: Requires either:
+ * 1. Valid CRON_SECRET header (for scheduled jobs)
+ * 2. Admin JWT authentication (for manual triggers)
  */
 
 interface SyncAccount {
@@ -50,29 +51,65 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    // --- AUTH CHECK ---
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    const providedCronSecret = req.headers.get('x-cron-secret');
+    const authHeader = req.headers.get('Authorization');
+    
+    let isAuthorized = false;
+    
+    // Check cron secret first (for scheduled invocations)
+    if (cronSecret && providedCronSecret === cronSecret) {
+      isAuthorized = true;
+      console.log('[TIERED SYNC] Authorized via CRON_SECRET');
+    }
+    
+    // Check JWT auth (for manual admin triggers)
+    if (!isAuthorized && authHeader) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      if (!authError && user) {
+        const { data: isAdmin } = await userClient.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
+        
+        if (isAdmin) {
+          isAuthorized = true;
+          console.log('[TIERED SYNC] Authorized via admin JWT');
+        }
+      }
+    }
+    
+    if (!isAuthorized) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - requires CRON_SECRET or admin JWT' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Use service role for actual operations
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const body = await req.json().catch(() => ({}));
     const forceSync = body.force || false;
     const specificOrgId = body.organization_id;
-    const maxAccounts = body.max_accounts || 5; // Limit concurrent syncs
+    const maxAccounts = body.max_accounts || 5;
 
     console.log(`[TIERED SYNC] Starting tiered Meta sync scheduler...`);
     console.log(`[TIERED SYNC] Force: ${forceSync}, Specific org: ${specificOrgId || 'all'}`);
 
-    // Get accounts that are due for sync
     let accountsToSync: SyncAccount[] = [];
 
     if (specificOrgId) {
-      // Sync specific organization
       const { data: cred } = await supabase
         .from('client_api_credentials')
-        .select(`
-          id,
-          organization_id,
-          meta_sync_priority,
-          last_meta_sync_at
-        `)
+        .select(`id, organization_id, meta_sync_priority, last_meta_sync_at`)
         .eq('organization_id', specificOrgId)
         .eq('platform', 'meta')
         .eq('is_active', true)
@@ -103,15 +140,9 @@ serve(async (req) => {
         }];
       }
     } else if (forceSync) {
-      // Force sync all active accounts
       const { data: creds } = await supabase
         .from('client_api_credentials')
-        .select(`
-          id,
-          organization_id,
-          meta_sync_priority,
-          last_meta_sync_at
-        `)
+        .select(`id, organization_id, meta_sync_priority, last_meta_sync_at`)
         .eq('platform', 'meta')
         .eq('is_active', true);
 
@@ -142,7 +173,6 @@ serve(async (req) => {
         }
       }
     } else {
-      // Normal operation: get accounts due for sync using the DB function
       const { data: dueAccounts, error: dueError } = await supabase
         .rpc('get_meta_accounts_due_for_sync', { p_limit: maxAccounts });
 
@@ -170,12 +200,10 @@ serve(async (req) => {
 
     console.log(`[TIERED SYNC] ${accountsToSync.length} accounts due for sync`);
 
-    // Sync each account
     const results: SyncResult[] = [];
     let rateLimitHit = false;
 
     for (const account of accountsToSync) {
-      // If we hit a rate limit, skip lower priority accounts
       if (rateLimitHit && account.sync_priority !== 'high') {
         console.log(`[TIERED SYNC] Skipping ${account.organization_name} (${account.sync_priority}) due to rate limit`);
         results.push({
@@ -192,12 +220,10 @@ serve(async (req) => {
       console.log(`[TIERED SYNC] Syncing ${account.organization_name} (priority: ${account.sync_priority}, range: ${account.date_range_days} days)`);
 
       try {
-        // Calculate date range based on tier
         const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - account.date_range_days);
 
-        // Call the admin-sync-meta function
         const { data: syncData, error: syncError } = await supabase.functions.invoke('admin-sync-meta', {
           body: {
             organization_id: account.organization_id,
@@ -215,11 +241,9 @@ serve(async (req) => {
           throw new Error(syncError.message || 'Sync function failed');
         }
 
-        // Check for rate limiting in response
         if (syncData?.error?.includes('rate limit') || syncData?.error?.includes('429')) {
           rateLimitHit = true;
           
-          // Update with rate limit backoff
           await supabase.rpc('update_meta_sync_status', {
             p_organization_id: account.organization_id,
             p_status: 'rate_limited',
@@ -238,7 +262,6 @@ serve(async (req) => {
           continue;
         }
 
-        // Success - update sync status
         const latestDate = syncData?.date_range?.actual?.latest || syncData?.data_freshness?.latest_data_date;
 
         await supabase.rpc('update_meta_sync_status', {
@@ -264,13 +287,20 @@ serve(async (req) => {
       } catch (error: any) {
         console.error(`[TIERED SYNC] ✗ ${account.organization_name} failed:`, error.message);
 
-        // Check if it's a rate limit error
         const isRateLimit = error.message?.includes('rate limit') || error.message?.includes('429');
         if (isRateLimit) {
           rateLimitHit = true;
         }
 
-        // Update error status
+        // Log failure for dead-letter handling
+        try {
+          await supabase.rpc('log_job_failure', {
+            p_function_name: 'tiered-meta-sync',
+            p_error_message: error.message,
+            p_context: { organization_id: account.organization_id }
+          });
+        } catch (_) { /* ignore */ }
+
         await supabase.rpc('update_meta_sync_status', {
           p_organization_id: account.organization_id,
           p_status: 'failed',

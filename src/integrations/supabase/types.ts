@@ -1793,6 +1793,7 @@ export type Database = {
           full_name: string
           id: string
           last_login_at: string | null
+          mask_pii: boolean | null
           organization_id: string
           role: string | null
         }
@@ -1801,6 +1802,7 @@ export type Database = {
           full_name: string
           id: string
           last_login_at?: string | null
+          mask_pii?: boolean | null
           organization_id: string
           role?: string | null
         }
@@ -1809,6 +1811,7 @@ export type Database = {
           full_name?: string
           id?: string
           last_login_at?: string | null
+          mask_pii?: boolean | null
           organization_id?: string
           role?: string | null
         }
@@ -2158,6 +2161,50 @@ export type Database = {
           top_topics?: string[] | null
         }
         Relationships: []
+      }
+      data_export_logs: {
+        Row: {
+          created_at: string | null
+          export_type: string
+          filters_applied: Json | null
+          id: string
+          ip_address: string | null
+          organization_id: string | null
+          record_count: number | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          export_type: string
+          filters_applied?: Json | null
+          id?: string
+          ip_address?: string | null
+          organization_id?: string | null
+          record_count?: number | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          export_type?: string
+          filters_applied?: Json | null
+          id?: string
+          ip_address?: string | null
+          organization_id?: string | null
+          record_count?: number | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_export_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       data_freshness: {
         Row: {
@@ -4005,6 +4052,59 @@ export type Database = {
             foreignKeyName: "organization_profiles_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: true
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_quotas: {
+        Row: {
+          created_at: string | null
+          current_day_count: number | null
+          current_hour_count: number | null
+          day_reset_at: string | null
+          hour_reset_at: string | null
+          id: string
+          is_unlimited: boolean | null
+          max_per_day: number | null
+          max_per_hour: number | null
+          organization_id: string
+          quota_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_day_count?: number | null
+          current_hour_count?: number | null
+          day_reset_at?: string | null
+          hour_reset_at?: string | null
+          id?: string
+          is_unlimited?: boolean | null
+          max_per_day?: number | null
+          max_per_hour?: number | null
+          organization_id: string
+          quota_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_day_count?: number | null
+          current_hour_count?: number | null
+          day_reset_at?: string | null
+          hour_reset_at?: string | null
+          id?: string
+          is_unlimited?: boolean | null
+          max_per_day?: number | null
+          max_per_hour?: number | null
+          organization_id?: string
+          quota_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_quotas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
