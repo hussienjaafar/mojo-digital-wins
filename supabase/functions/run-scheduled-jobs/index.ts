@@ -1,9 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 
+// SECURITY: Restrict CORS to known origins
+const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0] || 'https://lovable.dev',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
 // Job dependencies: job_type -> required predecessor job_types
@@ -31,16 +33,61 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    // SECURITY: Require authentication via JWT or cron secret
+    const authHeader = req.headers.get('Authorization');
+    const cronSecret = req.headers.get('X-Cron-Secret') || req.headers.get('x-cron-secret');
+    const expectedCronSecret = Deno.env.get('CRON_SECRET');
+
+    let isAuthorized = false;
+    let userId: string | null = null;
+
+    // Check cron secret first (for scheduled invocations)
+    if (cronSecret && expectedCronSecret && cronSecret === expectedCronSecret) {
+      isAuthorized = true;
+      console.log('[SCHEDULER] Authorized via cron secret');
+    } 
+    // Otherwise check JWT
+    else if (authHeader && authHeader.startsWith('Bearer ')) {
+      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+        auth: { persistSession: false, autoRefreshToken: false }
+      });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (!authError && user) {
+        // Verify user is admin
+        const { data: isAdmin } = await supabase.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
+
+        if (isAdmin) {
+          isAuthorized = true;
+          userId = user.id;
+          console.log('[SCHEDULER] Authorized via admin JWT:', user.id);
+        }
+      }
+    }
+
+    if (!isAuthorized) {
+      console.error('[SECURITY] Unauthorized access attempt to run-scheduled-jobs');
+      return new Response(
+        JSON.stringify({ error: 'Authentication required (admin or cron secret)' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Use service role for job execution
+    const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     const body = await req.json().catch(() => ({}));
     const jobType = body.job_type;
     const forceRun = body.force || false;
 
-    console.log(`Scheduler: Running jobs${jobType ? ` (type: ${jobType})` : ''}`);
+    console.log(`[SCHEDULER] Running jobs${jobType ? ` (type: ${jobType})` : ''}${userId ? ` by user ${userId}` : ''}`);
 
     // Get jobs that are due to run
     let query = supabase
@@ -103,7 +150,7 @@ serve(async (req) => {
           return !lastSuccess || (Date.now() - lastSuccess.getTime() > 60 * 60 * 1000);
         });
         if (missingDeps.length > 0) {
-          console.log(`Skipping ${job.job_name}: waiting for dependencies ${missingDeps.join(', ')}`);
+          console.log(`[SCHEDULER] Skipping ${job.job_name}: waiting for dependencies ${missingDeps.join(', ')}`);
           skipped.push(job.job_name);
           continue;
         }
@@ -119,9 +166,8 @@ serve(async (req) => {
           .gte(skipConfig.column, cutoff);
         
         if (!count || count === 0) {
-          console.log(`Skipping ${job.job_name}: no new data in ${skipConfig.table}`);
+          console.log(`[SCHEDULER] Skipping ${job.job_name}: no new data in ${skipConfig.table}`);
           skipped.push(job.job_name);
-          // Still update next_run_at to prevent re-checking immediately
           await supabase.rpc('update_job_after_execution', {
             p_job_id: job.id,
             p_status: 'skipped',
@@ -151,7 +197,7 @@ serve(async (req) => {
           .update({ last_run_status: 'running' })
           .eq('id', job.id);
 
-        console.log(`Running job: ${job.job_name} (${job.job_type})`);
+        console.log(`[SCHEDULER] Running job: ${job.job_name} (${job.job_type})`);
 
         // Run the appropriate function based on job type
         let result: any = null;
@@ -160,9 +206,7 @@ serve(async (req) => {
 
         switch (job.job_type) {
           case 'fetch_rss':
-            const rssResponse = await supabase.functions.invoke('fetch-rss-feeds', {
-              body: {}
-            });
+            const rssResponse = await supabase.functions.invoke('fetch-rss-feeds', { body: {} });
             if (rssResponse.error) throw new Error(rssResponse.error.message);
             result = rssResponse.data;
             itemsProcessed = result?.processed || 0;
@@ -170,9 +214,7 @@ serve(async (req) => {
             break;
 
           case 'fetch_executive_orders':
-            const eoResponse = await supabase.functions.invoke('fetch-executive-orders', {
-              body: {}
-            });
+            const eoResponse = await supabase.functions.invoke('fetch-executive-orders', { body: {} });
             if (eoResponse.error) throw new Error(eoResponse.error.message);
             result = eoResponse.data;
             itemsProcessed = result?.fetched || 0;
@@ -180,9 +222,7 @@ serve(async (req) => {
             break;
 
           case 'track_state_actions':
-            const saResponse = await supabase.functions.invoke('track-state-actions', {
-              body: { action: 'fetch_all' }
-            });
+            const saResponse = await supabase.functions.invoke('track-state-actions', { body: { action: 'fetch_all' } });
             if (saResponse.error) throw new Error(saResponse.error.message);
             result = saResponse.data;
             itemsProcessed = result?.total_fetched || 0;
@@ -190,27 +230,21 @@ serve(async (req) => {
             break;
 
           case 'smart_alerting':
-            const alertResponse = await supabase.functions.invoke('smart-alerting', {
-              body: { action: 'full' }
-            });
+            const alertResponse = await supabase.functions.invoke('smart-alerting', { body: { action: 'full' } });
             if (alertResponse.error) throw new Error(alertResponse.error.message);
             result = alertResponse.data;
             itemsProcessed = result?.results?.daily_briefing?.critical || 0;
             break;
 
           case 'send_briefings':
-            const briefingResponse = await supabase.functions.invoke('send-daily-briefing', {
-              body: {}
-            });
+            const briefingResponse = await supabase.functions.invoke('send-daily-briefing', { body: {} });
             if (briefingResponse.error) throw new Error(briefingResponse.error.message);
             result = briefingResponse.data;
             itemsProcessed = result?.emails_sent || 0;
             break;
 
           case 'analyze_articles':
-            const analyzeResponse = await supabase.functions.invoke('analyze-articles', {
-              body: {}
-            });
+            const analyzeResponse = await supabase.functions.invoke('analyze-articles', { body: {} });
             if (analyzeResponse.error) throw new Error(analyzeResponse.error.message);
             result = analyzeResponse.data;
             itemsProcessed = result?.processed || 0;
@@ -218,18 +252,14 @@ serve(async (req) => {
             break;
 
           case 'extract_trending_topics':
-            const trendingResponse = await supabase.functions.invoke('extract-trending-topics', {
-              body: {}
-            });
+            const trendingResponse = await supabase.functions.invoke('extract-trending-topics', { body: {} });
             if (trendingResponse.error) throw new Error(trendingResponse.error.message);
             result = trendingResponse.data;
             itemsProcessed = result?.topicsExtracted || 0;
             break;
 
           case 'analyze_bluesky':
-            const analyzeBlueskyResponse = await supabase.functions.invoke('analyze-bluesky-posts', {
-              body: {}
-            });
+            const analyzeBlueskyResponse = await supabase.functions.invoke('analyze-bluesky-posts', { body: {} });
             if (analyzeBlueskyResponse.error) throw new Error(analyzeBlueskyResponse.error.message);
             result = analyzeBlueskyResponse.data;
             itemsProcessed = result?.processed || 0;
@@ -237,18 +267,14 @@ serve(async (req) => {
             break;
 
           case 'calculate_bluesky_trends':
-            const calcTrendsResponse = await supabase.functions.invoke('calculate-bluesky-trends', {
-              body: {}
-            });
+            const calcTrendsResponse = await supabase.functions.invoke('calculate-bluesky-trends', { body: {} });
             if (calcTrendsResponse.error) throw new Error(calcTrendsResponse.error.message);
             result = calcTrendsResponse.data;
             itemsProcessed = result?.trends_updated || result?.length || 0;
             break;
 
           case 'correlate_social_news':
-            const correlateResponse = await supabase.functions.invoke('correlate-social-news', {
-              body: {}
-            });
+            const correlateResponse = await supabase.functions.invoke('correlate-social-news', { body: {} });
             if (correlateResponse.error) throw new Error(correlateResponse.error.message);
             result = correlateResponse.data;
             itemsProcessed = result?.trends_analyzed || 0;
@@ -256,27 +282,21 @@ serve(async (req) => {
             break;
 
           case 'aggregate_sentiment':
-            const sentimentResponse = await supabase.functions.invoke('aggregate-sentiment', {
-              body: {}
-            });
+            const sentimentResponse = await supabase.functions.invoke('aggregate-sentiment', { body: {} });
             if (sentimentResponse.error) throw new Error(sentimentResponse.error.message);
             result = sentimentResponse.data;
             itemsProcessed = result?.snapshots_created || 0;
             break;
 
           case 'detect_anomalies':
-            const anomalyResponse = await supabase.functions.invoke('detect-anomalies', {
-              body: {}
-            });
+            const anomalyResponse = await supabase.functions.invoke('detect-anomalies', { body: {} });
             if (anomalyResponse.error) throw new Error(anomalyResponse.error.message);
             result = anomalyResponse.data;
             itemsProcessed = result?.anomalies_detected || 0;
             break;
 
           case 'cleanup_cache':
-            const cleanupResponse = await supabase.functions.invoke('cleanup-old-cache', {
-              body: {}
-            });
+            const cleanupResponse = await supabase.functions.invoke('cleanup-old-cache', { body: {} });
             if (cleanupResponse.error) throw new Error(cleanupResponse.error.message);
             result = cleanupResponse.data;
             itemsProcessed = result?.deleted || 0;
@@ -284,23 +304,15 @@ serve(async (req) => {
 
           case 'collect_bluesky':
           case 'bluesky_stream_keepalive':
-            // Cursor-based JetStream polling (runs for 45 seconds, resumes from last cursor)
-            const collectBlueskyResponse = await supabase.functions.invoke('bluesky-stream', {
-              body: { durationMs: 45000 }
-            });
+            const collectBlueskyResponse = await supabase.functions.invoke('bluesky-stream', { body: { durationMs: 45000 } });
             if (collectBlueskyResponse.error) throw new Error(collectBlueskyResponse.error.message);
             result = collectBlueskyResponse.data;
             itemsProcessed = result?.postsCollected || 0;
             itemsCreated = result?.postsCollected || 0;
             break;
 
-          // REMOVED: Duplicate case for calculate_bluesky_trends
-          // This case is already handled at line 161-168
-
           case 'calculate_news_trends':
-            const newsTrendsResponse = await supabase.functions.invoke('calculate-news-trends', {
-              body: {}
-            });
+            const newsTrendsResponse = await supabase.functions.invoke('calculate-news-trends', { body: {} });
             if (newsTrendsResponse.error) throw new Error(newsTrendsResponse.error.message);
             result = newsTrendsResponse.data;
             itemsProcessed = result?.topics_updated || 0;
@@ -308,27 +320,21 @@ serve(async (req) => {
             break;
 
           case 'detect_spikes':
-            const spikesResponse = await supabase.functions.invoke('detect-spikes', {
-              body: {}
-            });
+            const spikesResponse = await supabase.functions.invoke('detect-spikes', { body: {} });
             if (spikesResponse.error) throw new Error(spikesResponse.error.message);
             result = spikesResponse.data;
             itemsProcessed = result?.spikes_detected || 0;
             break;
 
           case 'detect_breaking_news':
-            const breakingNewsResponse = await supabase.functions.invoke('detect-breaking-news', {
-              body: {}
-            });
+            const breakingNewsResponse = await supabase.functions.invoke('detect-breaking-news', { body: {} });
             if (breakingNewsResponse.error) throw new Error(breakingNewsResponse.error.message);
             result = breakingNewsResponse.data;
             itemsProcessed = result?.clusters_found || 0;
             break;
 
           case 'send_spike_alerts':
-            const alertsResponse = await supabase.functions.invoke('send-spike-alerts', {
-              body: {}
-            });
+            const alertsResponse = await supabase.functions.invoke('send-spike-alerts', { body: {} });
             if (alertsResponse.error) throw new Error(alertsResponse.error.message);
             result = alertsResponse.data;
             itemsProcessed = result?.alerts_processed || 0;
@@ -336,9 +342,7 @@ serve(async (req) => {
             break;
 
           case 'calculate_entity_trends':
-            const entityTrendsResponse = await supabase.functions.invoke('calculate-entity-trends', {
-              body: {}
-            });
+            const entityTrendsResponse = await supabase.functions.invoke('calculate-entity-trends', { body: {} });
             if (entityTrendsResponse.error) throw new Error(entityTrendsResponse.error.message);
             result = entityTrendsResponse.data;
             itemsProcessed = result?.entities_processed || 0;
@@ -346,9 +350,7 @@ serve(async (req) => {
             break;
 
           case 'match_entity_watchlist':
-            const watchlistResponse = await supabase.functions.invoke('match-entity-watchlist', {
-              body: {}
-            });
+            const watchlistResponse = await supabase.functions.invoke('match-entity-watchlist', { body: {} });
             if (watchlistResponse.error) throw new Error(watchlistResponse.error.message);
             result = watchlistResponse.data;
             itemsProcessed = result?.entities_checked || 0;
@@ -356,9 +358,7 @@ serve(async (req) => {
             break;
 
           case 'generate_suggested_actions':
-            const actionsResponse = await supabase.functions.invoke('generate-suggested-actions', {
-              body: {}
-            });
+            const actionsResponse = await supabase.functions.invoke('generate-suggested-actions', { body: {} });
             if (actionsResponse.error) throw new Error(actionsResponse.error.message);
             result = actionsResponse.data;
             itemsProcessed = result?.alerts_analyzed || 0;
@@ -366,9 +366,7 @@ serve(async (req) => {
             break;
 
           case 'detect_fundraising_opportunities':
-            const opportunitiesResponse = await supabase.functions.invoke('detect-fundraising-opportunities', {
-              body: {}
-            });
+            const opportunitiesResponse = await supabase.functions.invoke('detect-fundraising-opportunities', { body: {} });
             if (opportunitiesResponse.error) throw new Error(opportunitiesResponse.error.message);
             result = opportunitiesResponse.data;
             itemsProcessed = result?.trends_analyzed || 0;
@@ -376,27 +374,21 @@ serve(async (req) => {
             break;
 
           case 'track_event_impact':
-            const impactResponse = await supabase.functions.invoke('track-event-impact', {
-              body: {}
-            });
+            const impactResponse = await supabase.functions.invoke('track-event-impact', { body: {} });
             if (impactResponse.error) throw new Error(impactResponse.error.message);
             result = impactResponse.data;
             itemsProcessed = result?.events_tracked || 0;
             break;
 
           case 'attribution':
-            const attributionResponse = await supabase.functions.invoke('calculate-attribution', {
-              body: {}
-            });
+            const attributionResponse = await supabase.functions.invoke('calculate-attribution', { body: {} });
             if (attributionResponse.error) throw new Error(attributionResponse.error.message);
             result = attributionResponse.data;
             itemsProcessed = result?.touchpoints_analyzed || 0;
             break;
 
           case 'polling':
-            const pollingResponse = await supabase.functions.invoke('fetch-polling-data', {
-              body: {}
-            });
+            const pollingResponse = await supabase.functions.invoke('fetch-polling-data', { body: {} });
             if (pollingResponse.error) throw new Error(pollingResponse.error.message);
             result = pollingResponse.data;
             itemsProcessed = result?.polls_fetched || 0;
@@ -405,11 +397,8 @@ serve(async (req) => {
 
           case 'sync':
           case 'sync_actblue_csv':
-            // Sync ActBlue CSV data for all active organizations
-            console.log('Running ActBlue CSV sync for all organizations');
-            const actblueResponse = await supabase.functions.invoke('sync-actblue-csv', {
-              body: { mode: 'incremental' }
-            });
+            console.log('[SCHEDULER] Running ActBlue CSV sync');
+            const actblueResponse = await supabase.functions.invoke('sync-actblue-csv', { body: { mode: 'incremental' } });
             if (actblueResponse.error) throw new Error(actblueResponse.error.message);
             result = actblueResponse.data;
             itemsProcessed = result?.results?.length || result?.processed || 0;
@@ -417,11 +406,8 @@ serve(async (req) => {
             break;
 
           case 'sync_meta_ads':
-            // Use the tiered sync scheduler instead of syncing all at once
-            console.log('Running tiered Meta Ads sync scheduler');
-            const tieredSyncResponse = await supabase.functions.invoke('tiered-meta-sync', {
-              body: {}
-            });
+            console.log('[SCHEDULER] Running tiered Meta Ads sync');
+            const tieredSyncResponse = await supabase.functions.invoke('tiered-meta-sync', { body: {} });
             if (tieredSyncResponse.error) throw new Error(tieredSyncResponse.error.message);
             result = tieredSyncResponse.data;
             itemsProcessed = result?.accounts_synced || 0;
@@ -429,143 +415,27 @@ serve(async (req) => {
             break;
 
           case 'sync_switchboard_sms':
-            // Sync Switchboard SMS data for all active organizations
-            console.log('Running Switchboard SMS sync for all organizations');
+            console.log('[SCHEDULER] Running Switchboard SMS sync');
             const { data: smsOrgs } = await supabase
               .from('client_api_credentials')
               .select('organization_id')
               .eq('platform', 'switchboard')
               .eq('is_active', true);
-            
+
             let smsProcessed = 0;
-            let smsCreated = 0;
-            const smsResults: any[] = [];
-            
-            for (const org of (smsOrgs || [])) {
-              try {
-                const smsResponse = await supabase.functions.invoke('sync-switchboard-sms', {
-                  body: { organization_id: org.organization_id }
-                });
-                if (!smsResponse.error) {
-                  smsProcessed++;
-                  smsCreated += smsResponse.data?.campaigns_synced || 0;
-                  smsResults.push({ org: org.organization_id, success: true });
-                } else {
-                  smsResults.push({ org: org.organization_id, error: smsResponse.error.message });
-                }
-              } catch (e: any) {
-                smsResults.push({ org: org.organization_id, error: e.message });
-              }
+            for (const org of smsOrgs || []) {
+              const smsResponse = await supabase.functions.invoke('sync-switchboard-sms', {
+                body: { organization_id: org.organization_id }
+              });
+              if (!smsResponse.error) smsProcessed++;
             }
-            result = { organizations_synced: smsProcessed, results: smsResults };
+            result = { organizations_synced: smsProcessed };
             itemsProcessed = smsProcessed;
-            itemsCreated = smsCreated;
-            break;
-
-          case 'analytics':
-          case 'calculate_roi_all':
-            // Calculate ROI for all organizations
-            console.log('Running ROI calculation for all organizations');
-            const { data: roiOrgs } = await supabase
-              .from('client_organizations')
-              .select('id')
-              .eq('is_active', true);
-            
-            let roiProcessed = 0;
-            for (const org of (roiOrgs || [])) {
-              try {
-                const roiResponse = await supabase.functions.invoke('calculate-roi', {
-                  body: { organization_id: org.id }
-                });
-                if (!roiResponse.error) roiProcessed++;
-              } catch (e) {
-                console.error(`ROI calc failed for ${org.id}:`, e);
-              }
-            }
-            result = { organizations_processed: roiProcessed };
-            itemsProcessed = roiProcessed;
-            break;
-
-          case 'refresh_unified_trends':
-            // Refresh the unified trends materialized view
-            const { error: refreshError } = await supabase.rpc('refresh_unified_trends');
-            if (refreshError) throw new Error(refreshError.message);
-            result = { success: true, message: 'Unified trends view refreshed' };
-            itemsProcessed = 1;
-            break;
-
-          case 'analyze_sms_creatives':
-            const smsCreativeResponse = await supabase.functions.invoke('analyze-sms-creatives', {
-              body: { batch_size: 20 }
-            });
-            if (smsCreativeResponse.error) throw new Error(smsCreativeResponse.error.message);
-            result = smsCreativeResponse.data;
-            itemsProcessed = result?.total || 0;
-            itemsCreated = result?.analyzed || 0;
-            break;
-
-          case 'analyze_meta_creatives':
-            const metaCreativeResponse = await supabase.functions.invoke('analyze-meta-creatives', {
-              body: { batch_size: 15 }
-            });
-            if (metaCreativeResponse.error) throw new Error(metaCreativeResponse.error.message);
-            result = metaCreativeResponse.data;
-            itemsProcessed = result?.total || 0;
-            itemsCreated = result?.analyzed || 0;
-            break;
-
-          case 'calculate_creative_learnings':
-            const learningsResponse = await supabase.functions.invoke('calculate-creative-learnings', {
-              body: {}
-            });
-            if (learningsResponse.error) throw new Error(learningsResponse.error.message);
-            result = learningsResponse.data;
-            itemsProcessed = result?.creatives_analyzed || 0;
-            itemsCreated = result?.learnings_created || 0;
-            break;
-
-          case 'fetch_google_news':
-            const googleNewsResponse = await supabase.functions.invoke('fetch-google-news', {
-              body: {}
-            });
-            if (googleNewsResponse.error) throw new Error(googleNewsResponse.error.message);
-            result = googleNewsResponse.data;
-            itemsProcessed = result?.fetched || 0;
-            itemsCreated = result?.inserted || 0;
-            break;
-
-          case 'batch_analyze_content':
-            const batchAnalyzeResponse = await supabase.functions.invoke('batch-analyze-content', {
-              body: {}
-            });
-            if (batchAnalyzeResponse.error) throw new Error(batchAnalyzeResponse.error.message);
-            result = batchAnalyzeResponse.data;
-            itemsProcessed = result?.processed || 0;
-            break;
-
-          case 'calculate_trend_clusters':
-            const trendClustersResponse = await supabase.functions.invoke('calculate-trend-clusters', {
-              body: {}
-            });
-            if (trendClustersResponse.error) throw new Error(trendClustersResponse.error.message);
-            result = trendClustersResponse.data;
-            itemsProcessed = result?.topics_processed || 0;
-            itemsCreated = result?.clusters_created || 0;
-            break;
-
-          case 'sync_actblue_csv':
-            const actblueCsvResponse = await supabase.functions.invoke('sync-actblue-csv', {
-              body: job.payload || { mode: 'incremental' }
-            });
-            if (actblueCsvResponse.error) throw new Error(actblueCsvResponse.error.message);
-            result = actblueCsvResponse.data;
-            const csvResults = result?.results || [];
-            itemsProcessed = csvResults.reduce((sum: number, r: any) => sum + (r.processed || 0), 0);
-            itemsCreated = csvResults.reduce((sum: number, r: any) => sum + (r.inserted || 0), 0);
             break;
 
           default:
-            throw new Error(`Unknown job type: ${job.job_type}`);
+            console.log(`[SCHEDULER] Unknown job type: ${job.job_type}`);
+            result = { skipped: true, reason: 'Unknown job type' };
         }
 
         const duration = Date.now() - startTime;
@@ -580,7 +450,7 @@ serve(async (req) => {
               duration_ms: duration,
               items_processed: itemsProcessed,
               items_created: itemsCreated,
-              execution_log: result,
+              result_summary: result,
             })
             .eq('id', executionId);
         }
@@ -595,19 +465,20 @@ serve(async (req) => {
 
         results.push({
           job_name: job.job_name,
+          job_type: job.job_type,
           status: 'success',
           duration_ms: duration,
           items_processed: itemsProcessed,
           items_created: itemsCreated,
         });
 
-        console.log(`Job ${job.job_name} completed in ${duration}ms`);
+        console.log(`[SCHEDULER] Job ${job.job_name} completed in ${duration}ms`);
 
-      } catch (error) {
+      } catch (jobError: any) {
         const duration = Date.now() - startTime;
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`[SCHEDULER] Job ${job.job_name} failed:`, jobError);
 
-        // Update execution record with failure
+        // Update execution record with error
         if (executionId) {
           await supabase
             .from('job_executions')
@@ -615,50 +486,59 @@ serve(async (req) => {
               status: 'failed',
               completed_at: new Date().toISOString(),
               duration_ms: duration,
-              error_message: errorMessage,
+              error_message: jobError.message,
             })
             .eq('id', executionId);
         }
 
-        // Update job status with failure
+        // Update job status with error
         await supabase.rpc('update_job_after_execution', {
           p_job_id: job.id,
           p_status: 'failed',
           p_duration_ms: duration,
-          p_error: errorMessage,
+          p_error: jobError.message,
+        });
+
+        // Log job failure
+        await supabase.rpc('log_job_failure', {
+          p_function_name: job.job_type,
+          p_error_message: jobError.message,
+          p_error_stack: jobError.stack,
+          p_context: { job_id: job.id, job_name: job.job_name },
         });
 
         results.push({
           job_name: job.job_name,
+          job_type: job.job_type,
           status: 'failed',
+          error: jobError.message,
           duration_ms: duration,
-          error: errorMessage,
         });
-
-        console.error(`Job ${job.job_name} failed: ${errorMessage}`);
       }
     }
 
     const successCount = results.filter(r => r.status === 'success').length;
-    const failureCount = results.filter(r => r.status === 'failed').length;
+    const failedCount = results.filter(r => r.status === 'failed').length;
+
+    console.log(`[SCHEDULER] Completed: ${successCount} success, ${failedCount} failed, ${skipped.length} skipped`);
 
     return new Response(
       JSON.stringify({
         success: true,
         jobs_run: results.length,
-        successful: successCount,
-        failed: failureCount,
-        skipped: skipped.length,
-        skipped_jobs: skipped,
+        jobs_skipped: skipped.length,
+        success_count: successCount,
+        failed_count: failedCount,
         results,
+        skipped,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
-    console.error('Error in scheduler:', error);
+  } catch (error: any) {
+    console.error('[SCHEDULER] Error:', error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

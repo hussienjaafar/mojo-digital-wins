@@ -1,8 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// SECURITY: Restrict CORS to known origins
+const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0] || 'https://lovable.dev',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -21,22 +23,67 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false
-        }
-      }
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    // SECURITY: Extract user's JWT and create client with their context
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create client with user's JWT for RLS enforcement
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { organizationId, cohortType = 'monthly' } = await req.json();
 
-    console.log(`📈 Analyzing donor cohorts for org: ${organizationId}`);
+    if (!organizationId) {
+      return new Response(
+        JSON.stringify({ error: 'organizationId is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Get all transactions
+    // SECURITY: Verify user belongs to the organization
+    const { data: userAccess } = await supabase
+      .from('client_users')
+      .select('organization_id')
+      .eq('id', user.id)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+
+    // Also check if user is admin
+    const { data: isAdmin } = await supabase.rpc('has_role', {
+      _user_id: user.id,
+      _role: 'admin'
+    });
+
+    if (!userAccess && !isAdmin) {
+      console.error('[SECURITY] User not authorized for organization:', organizationId);
+      return new Response(
+        JSON.stringify({ error: 'Access denied to this organization' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[COHORTS] Analyzing donor cohorts for org: ${organizationId}`);
+
+    // Get all transactions (RLS will filter by org for client_users)
     const { data: transactions, error } = await supabase
       .from('actblue_transactions')
       .select('*')
@@ -119,8 +166,8 @@ serve(async (req) => {
     // Calculate trends
     const trends = {
       growthRate: 0,
-      avgRetention: cohorts.reduce((sum, c) => sum + c.retentionRate, 0) / cohorts.length,
-      avgLTV: cohorts.reduce((sum, c) => sum + c.lifetimeValue, 0) / cohorts.length,
+      avgRetention: cohorts.length > 0 ? cohorts.reduce((sum, c) => sum + c.retentionRate, 0) / cohorts.length : 0,
+      avgLTV: cohorts.length > 0 ? cohorts.reduce((sum, c) => sum + c.lifetimeValue, 0) / cohorts.length : 0,
     };
 
     if (cohorts.length >= 2) {
@@ -131,7 +178,7 @@ serve(async (req) => {
         : 0;
     }
 
-    console.log(`✅ Analyzed ${cohorts.length} donor cohorts`);
+    console.log(`[COHORTS] Analyzed ${cohorts.length} donor cohorts`);
 
     return new Response(
       JSON.stringify({
@@ -143,14 +190,11 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error analyzing cohorts:', error);
+    console.error('[COHORTS] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

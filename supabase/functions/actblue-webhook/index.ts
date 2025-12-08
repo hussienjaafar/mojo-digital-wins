@@ -1,10 +1,76 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 
+// SECURITY: Restrict CORS to known origins
+const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0] || 'https://lovable.dev',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-actblue-signature',
 };
+
+// ============= HMAC Signature Validation =============
+// ActBlue sends HMAC-SHA256 signature in X-ActBlue-Signature header
+// Format: sha256=<hex-encoded-signature>
+
+/**
+ * Computes HMAC-SHA256 signature for request body
+ * @param body - Raw request body string
+ * @param secret - Webhook secret for the organization
+ * @returns hex-encoded signature
+ */
+export async function computeHmacSignature(body: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Validates HMAC signature from ActBlue webhook
+ * @param signatureHeader - Value of X-ActBlue-Signature header
+ * @param body - Raw request body
+ * @param secret - Organization's webhook secret
+ * @returns true if signature is valid
+ */
+export async function validateHmacSignature(
+  signatureHeader: string | null,
+  body: string,
+  secret: string
+): Promise<boolean> {
+  if (!signatureHeader || !secret) {
+    console.error('[SECURITY] Missing signature header or secret');
+    return false;
+  }
+
+  // Expected format: sha256=<signature>
+  const parts = signatureHeader.split('=');
+  if (parts.length !== 2 || parts[0] !== 'sha256') {
+    console.error('[SECURITY] Invalid signature format');
+    return false;
+  }
+
+  const providedSignature = parts[1];
+  const computedSignature = await computeHmacSignature(body, secret);
+
+  // Timing-safe comparison
+  if (providedSignature.length !== computedSignature.length) {
+    return false;
+  }
+
+  let result = 0;
+  for (let i = 0; i < providedSignature.length; i++) {
+    result |= providedSignature.charCodeAt(i) ^ computedSignature.charCodeAt(i);
+  }
+  return result === 0;
+}
 
 // Helper to safely extract values from any type
 const safeString = (val: any): string | null => {
@@ -30,6 +96,7 @@ const safeBool = (val: any): boolean => {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -39,69 +106,62 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get Basic Auth credentials from request
-    const authHeader = req.headers.get('Authorization');
+    // Get signature header BEFORE consuming body
+    const signatureHeader = req.headers.get('X-ActBlue-Signature') || req.headers.get('x-actblue-signature');
     const requestBody = await req.text();
 
-    console.log('Received ActBlue webhook at', new Date().toISOString());
+    console.log('[ACTBLUE] Received webhook at', new Date().toISOString());
 
-    // Log webhook delivery for debugging
+    // Log webhook delivery for debugging (without signature for security)
+    let parsedPayload: any;
+    try {
+      parsedPayload = JSON.parse(requestBody);
+    } catch (parseError) {
+      console.error('[ACTBLUE] Failed to parse JSON:', parseError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Log webhook for debugging
     await supabase.from('webhook_logs').insert({
       platform: 'actblue',
       event_type: 'incoming',
-      payload: JSON.parse(requestBody),
-      headers: Object.fromEntries(req.headers.entries()),
+      payload: parsedPayload,
+      headers: { 
+        ...Object.fromEntries(req.headers.entries()),
+        'x-actblue-signature': signatureHeader ? '[REDACTED]' : null 
+      },
       received_at: new Date().toISOString(),
     }).then(({ error }) => {
-      if (error) console.error('Failed to log webhook:', error);
+      if (error) console.error('[ACTBLUE] Failed to log webhook:', error);
     });
 
-    // Parse payload - NO schema validation, just accept any valid JSON
-    // ActBlue says: "We may add new data to the JSON payloads without warning"
-    let payload: any;
-    try {
-      payload = JSON.parse(requestBody);
-      console.log('Parsed payload successfully, keys:', Object.keys(payload));
-    } catch (parseError) {
-      console.error('Failed to parse JSON:', parseError);
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON' }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    // Validate required fields exist
-    if (!payload.lineitems || !Array.isArray(payload.lineitems) || payload.lineitems.length === 0) {
-      console.error('Missing lineitems array in payload');
+    // Validate required fields
+    if (!parsedPayload.lineitems || !Array.isArray(parsedPayload.lineitems) || parsedPayload.lineitems.length === 0) {
+      console.error('[ACTBLUE] Missing lineitems array in payload');
       return new Response(
         JSON.stringify({ error: 'Missing lineitems' }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!payload.contribution) {
-      console.error('Missing contribution object in payload');
+    if (!parsedPayload.contribution) {
+      console.error('[ACTBLUE] Missing contribution object in payload');
       return new Response(
         JSON.stringify({ error: 'Missing contribution' }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Find organization by entity_id from lineitems
-    const lineitem = payload.lineitems[0];
+    // SECURITY: Find organization by entity_id and validate signature
+    const lineitem = parsedPayload.lineitems[0];
     const entityId = safeString(lineitem.entityId);
     
-    console.log('Processing lineitem with entityId:', entityId);
+    console.log('[ACTBLUE] Processing lineitem with entityId:', entityId);
     
+    // Fetch ALL ActBlue credentials to find matching org by entity_id
     const { data: credData, error: credError } = await supabase
       .from('client_api_credentials')
       .select('organization_id, encrypted_credentials')
@@ -109,80 +169,67 @@ serve(async (req) => {
       .eq('is_active', true);
 
     if (credError || !credData || credData.length === 0) {
-      console.error('No active ActBlue credentials found:', credError);
+      console.error('[ACTBLUE] No active ActBlue credentials found:', credError);
       return new Response(
         JSON.stringify({ error: 'No matching organization found' }),
-        { 
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Found', credData.length, 'active ActBlue credentials');
-
-    // Find matching organization by entity_id
+    // Find organization by entity_id
     let matchingCred = credData.find((cred: any) => {
       const credentials = cred.encrypted_credentials as any;
-      return credentials.entity_id === entityId;
+      return credentials?.entity_id === entityId;
     });
-
-    // If no match by entity_id, try to match by Basic Auth credentials
-    // This handles ActBlue test webhooks which use different entity_ids
-    if (!matchingCred && authHeader && authHeader.startsWith('Basic ')) {
-      console.log('No entity_id match, trying Basic Auth fallback for entityId:', entityId);
-      const base64Credentials = authHeader.substring(6);
-      try {
-        const decodedCredentials = atob(base64Credentials);
-        const [providedUsername, providedPassword] = decodedCredentials.split(':');
-        
-        matchingCred = credData.find((cred: any) => {
-          const credentials = cred.encrypted_credentials as any;
-          return credentials.webhook_username === providedUsername && 
-                 credentials.webhook_password === providedPassword;
-        });
-        
-        if (matchingCred) {
-          console.log('Matched organization by Basic Auth credentials');
-        }
-      } catch (e) {
-        console.error('Error decoding Basic Auth for fallback:', e);
-      }
-    }
 
     if (!matchingCred) {
       const storedEntityIds = credData.map((c: any) => c.encrypted_credentials?.entity_id);
-      console.error('No organization matches. Webhook entityId:', entityId, 'Stored entityIds:', storedEntityIds);
+      console.error('[SECURITY] No organization matches entityId:', entityId, 'Stored:', storedEntityIds);
       return new Response(
-        JSON.stringify({ error: 'Organization not found for entity_id', receivedEntityId: entityId }),
-        { 
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        JSON.stringify({ error: 'Organization not found for entity_id' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const organization_id = matchingCred.organization_id;
-    console.log('Processing webhook for organization:', organization_id);
+    // SECURITY: Validate HMAC signature using org's webhook_secret
+    const credentials = matchingCred.encrypted_credentials as any;
+    const webhookSecret = credentials?.webhook_secret;
 
-    // Determine transaction type from URL path or contribution status
-    // ActBlue sends separate webhooks to different URLs for donations/refunds/cancellations
-    // The URL path isn't available here, so we infer from payload structure
+    if (!webhookSecret) {
+      console.error('[SECURITY] No webhook_secret configured for organization:', matchingCred.organization_id);
+      return new Response(
+        JSON.stringify({ error: 'Webhook secret not configured for organization' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const isValidSignature = await validateHmacSignature(signatureHeader, requestBody, webhookSecret);
+    if (!isValidSignature) {
+      console.error('[SECURITY] Invalid HMAC signature for organization:', matchingCred.organization_id);
+      return new Response(
+        JSON.stringify({ error: 'Invalid signature' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('[ACTBLUE] Signature validated for organization:', matchingCred.organization_id);
+
+    const organization_id = matchingCred.organization_id;
+
+    // Determine transaction type
     let transactionType = 'donation';
-    const contribution = payload.contribution as any;
+    const contribution = parsedPayload.contribution as any;
     
-    // If there's a cancelledAt field, it's a cancellation
     if (contribution.cancelledAt) {
       transactionType = 'cancellation';
     }
-    // Check lineitems for refund indicators (cast to any to check optional fields)
-    const firstLineitem = payload.lineitems[0] as any;
+    const firstLineitem = parsedPayload.lineitems[0] as any;
     if (firstLineitem.refundedAt) {
       transactionType = 'refund';
     }
 
     // Extract refcodes
-    const refcodes = payload.contribution.refcodes || {};
+    const refcodes = parsedPayload.contribution.refcodes || {};
     const refcode = refcodes.refcode || null;
     
     // Extract source campaign from refcode
@@ -194,7 +241,7 @@ serve(async (req) => {
       else if (lowerRefcode.includes('email')) sourceCampaign = 'email';
     }
 
-    const donor = payload.donor || {};
+    const donor = parsedPayload.donor || {};
     const donorName = donor.firstname && donor.lastname 
       ? `${donor.firstname} ${donor.lastname}`.trim() 
       : null;
@@ -205,17 +252,14 @@ serve(async (req) => {
     const paidAt = safeString(lineitem.paidAt) || safeString(contribution.createdAt) || new Date().toISOString();
 
     if (amount === null || lineitemId === null) {
-      console.error('Missing required fields: amount or lineitemId', { amount, lineitemId });
+      console.error('[ACTBLUE] Missing required fields: amount or lineitemId', { amount, lineitemId });
       return new Response(
         JSON.stringify({ error: 'Missing required amount or lineitemId' }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Store enhanced transaction data
+    // Store transaction data (RLS-compatible with service role)
     const { error: insertError } = await supabase
       .from('actblue_transactions')
       .insert({
@@ -258,9 +302,8 @@ serve(async (req) => {
       });
 
     if (insertError) {
-      // If duplicate, update existing record
       if (insertError.code === '23505') {
-        console.log('Transaction already exists, updating:', lineitemId);
+        console.log('[ACTBLUE] Transaction already exists, updating:', lineitemId);
         const { error: updateError } = await supabase
           .from('actblue_transactions')
           .update({ transaction_type: transactionType })
@@ -289,10 +332,10 @@ serve(async (req) => {
           is_mobile: safeBool(contribution.isMobile),
         },
       }).then(({ error }) => {
-        if (error) console.error('Error tracking touchpoint:', error);
+        if (error) console.error('[ACTBLUE] Error tracking touchpoint:', error);
       });
 
-      // Update or create donor demographics
+      // Update donor demographics
       await supabase.from('donor_demographics')
         .upsert({
           organization_id,
@@ -316,7 +359,6 @@ serve(async (req) => {
         .single()
         .then(async ({ data, error }) => {
           if (!error && data) {
-            // Update aggregates
             const { data: txData } = await supabase
               .from('actblue_transactions')
               .select('amount')
@@ -337,10 +379,10 @@ serve(async (req) => {
         });
     }
 
-    console.log('ActBlue transaction stored successfully:', lineitemId);
+    console.log('[ACTBLUE] Transaction stored successfully:', lineitemId);
     
-    // Update data freshness tracking for ActBlue webhook
-    const { error: freshnessError } = await supabase.rpc('update_data_freshness', {
+    // Update data freshness tracking
+    await supabase.rpc('update_data_freshness', {
       p_source: 'actblue_webhook',
       p_organization_id: organization_id,
       p_latest_data_timestamp: paidAt,
@@ -348,27 +390,20 @@ serve(async (req) => {
       p_error: null,
       p_records_synced: 1,
       p_duration_ms: null,
+    }).then(({ error }) => {
+      if (error) console.error('[ACTBLUE] Error updating freshness:', error);
     });
-    if (freshnessError) {
-      console.error('Error updating freshness:', freshnessError);
-    }
     
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        transaction_id: String(lineitemId)
-      }),
+      JSON.stringify({ success: true, transaction_id: String(lineitemId) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
-    console.error('Error in actblue-webhook:', error);
+    console.error('[ACTBLUE] Error in webhook:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
