@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders, validateCronOrAdmin, logJobFailure, checkRateLimit } from "../_shared/security.ts";
 
 // Calculate velocity: % change from average
 function calculateVelocity(hourlyCount: number, sixHourCount: number, dailyCount: number): number {
@@ -19,15 +15,36 @@ function calculateVelocity(hourlyCount: number, sixHourCount: number, dailyCount
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders();
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    // SECURITY: Require cron secret or admin JWT
+    const authResult = await validateCronOrAdmin(req, supabase);
+    if (!authResult.valid) {
+      console.error('[calculate-news-trends] Unauthorized access attempt');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // SECURITY: Rate limiting
+    const rateLimit = await checkRateLimit('calculate-news-trends', 20, 60000);
+    if (!rateLimit.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded', resetAt: rateLimit.resetAt }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log('[calculate-news-trends] Starting trend calculation...');
 
