@@ -4,7 +4,7 @@ import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardContent } from
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3 } from "lucide-react";
+import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity } from "lucide-react";
 import { logger } from "@/lib/logger";
 
 interface DonorIntelligenceProps {
@@ -44,11 +44,20 @@ interface CreativePerformance {
   avgDonation: number;
 }
 
+interface SmsFunnel {
+  sent: number;
+  delivered: number;
+  clicked: number;
+  donated: number;
+  optedOut: number;
+}
+
 export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorIntelligenceProps) => {
   const [attributionData, setAttributionData] = useState<AttributionData[]>([]);
   const [segmentData, setSegmentData] = useState<DonorSegment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deterministicOnly, setDeterministicOnly] = useState(false);
+  const [smsFunnel, setSmsFunnel] = useState<SmsFunnel>({ sent: 0, delivered: 0, clicked: 0, donated: 0, optedOut: 0 });
 
   useEffect(() => {
     loadData();
@@ -100,6 +109,31 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
         logger.error('Failed to load segment data', segError);
       } else {
         setSegmentData(segData || []);
+      }
+
+      // Load SMS funnel (counts by event_type)
+      const { data: smsEvents, error: smsError } = await (supabase as any)
+        .from('sms_events')
+        .select('event_type')
+        .eq('organization_id', organizationId)
+        .gte('occurred_at', startDate)
+        .lte('occurred_at', `${endDate}T23:59:59`);
+
+      if (smsError) {
+        logger.error('Failed to load SMS events', smsError);
+      } else {
+        const counts = (smsEvents || []).reduce((acc: any, ev: any) => {
+          const type = ev.event_type || 'unknown';
+          acc[type] = (acc[type] || 0) + 1;
+          return acc;
+        }, {});
+        setSmsFunnel({
+          sent: counts.sent || 0,
+          delivered: counts.delivered || 0,
+          clicked: counts.clicked || 0,
+          donated: counts.donated || 0, // placeholder until donation linkage is added
+          optedOut: counts.opted_out || 0,
+        });
       }
     } catch (error) {
       logger.error('Failed to load donor intelligence data', error);
@@ -267,11 +301,11 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
 
       <Tabs defaultValue="attribution" className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-[hsl(var(--portal-bg-elevated))]">
-              Deterministic: {deterministicRate.toFixed(0)}%
-            </Badge>
-            <span className="text-sm portal-text-muted">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="bg-[hsl(var(--portal-bg-elevated))]">
+            Deterministic: {deterministicRate.toFixed(0)}%
+          </Badge>
+          <span className="text-sm portal-text-muted">
               Deterministic when refcode/campaign/ad/creative mapping is present
             </span>
           </div>
@@ -287,6 +321,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
           <TabsTrigger value="attribution">Attribution</TabsTrigger>
           <TabsTrigger value="topics">Creative Topics</TabsTrigger>
           <TabsTrigger value="segments">Donor Segments</TabsTrigger>
+          <TabsTrigger value="sms">SMS Funnel</TabsTrigger>
         </TabsList>
 
         <TabsContent value="attribution" className="space-y-6">
@@ -465,6 +500,33 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                     <div className="text-2xl font-bold portal-text-primary">{segment.value}</div>
                     <div className="text-sm font-medium portal-text-primary">{segment.name}</div>
                     <div className="text-xs portal-text-muted">{formatCurrency(segment.totalValue)} LTV</div>
+                  </div>
+                ))}
+              </div>
+            </PortalCardContent>
+          </PortalCard>
+        </TabsContent>
+
+        <TabsContent value="sms" className="space-y-6">
+          <PortalCard>
+            <PortalCardHeader>
+              <PortalCardTitle className="flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                SMS Funnel
+              </PortalCardTitle>
+            </PortalCardHeader>
+            <PortalCardContent>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {[
+                  { label: "Sent", value: smsFunnel.sent },
+                  { label: "Delivered", value: smsFunnel.delivered },
+                  { label: "Clicked", value: smsFunnel.clicked },
+                  { label: "Donated (placeholder)", value: smsFunnel.donated },
+                  { label: "Opt-outs", value: smsFunnel.optedOut },
+                ].map(item => (
+                  <div key={item.label} className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                    <div className="text-sm portal-text-muted">{item.label}</div>
+                    <div className="text-2xl font-bold portal-text-primary">{item.value.toLocaleString()}</div>
                   </div>
                 ))}
               </div>
