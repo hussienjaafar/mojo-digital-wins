@@ -96,10 +96,30 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     const prevPeriod = getPreviousPeriod();
 
     try {
+      // ActBlue uses Eastern Time, so convert date boundaries accordingly
+      // Dec 8 Eastern = Dec 8 05:00 UTC to Dec 9 05:00 UTC (EST = UTC-5)
+      // Using 05:00 for EST, but during DST it would be 04:00 (EDT = UTC-4)
+      // For safety, we'll use a slightly wider window
+      const startDateObj = parseISO(startDate);
+      const endDateObj = parseISO(endDate);
+      
+      // Convert to UTC boundaries that capture Eastern Time day
+      // Start: beginning of day in Eastern = 05:00 UTC (or 04:00 during DST)
+      // We use 04:00 to be safe for both EST and EDT
+      const utcStart = new Date(startDateObj);
+      utcStart.setUTCHours(4, 0, 0, 0);
+      
+      // End: end of day in Eastern = next day 05:00 UTC
+      const utcEnd = new Date(endDateObj);
+      utcEnd.setDate(utcEnd.getDate() + 1);
+      utcEnd.setUTCHours(5, 0, 0, 0);
+
       logger.info('Loading ActBlue transactions', { 
         organizationId, 
         startDate, 
         endDate,
+        utcStart: utcStart.toISOString(),
+        utcEnd: utcEnd.toISOString(),
         prevPeriod 
       });
 
@@ -108,8 +128,8 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         .from('actblue_transactions_secure')
         .select('*')
         .eq('organization_id', organizationId)
-        .gte('transaction_date', startDate)
-        .lte('transaction_date', `${endDate}T23:59:59`)
+        .gte('transaction_date', utcStart.toISOString())
+        .lt('transaction_date', utcEnd.toISOString())
         .order('transaction_date', { ascending: false });
 
       if (error) {
@@ -124,13 +144,24 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
       
       setTransactions(data || []);
 
+      // Previous period - also use Eastern Time boundaries
+      const prevStartObj = parseISO(prevPeriod.start);
+      const prevEndObj = parseISO(prevPeriod.end);
+      
+      const prevUtcStart = new Date(prevStartObj);
+      prevUtcStart.setUTCHours(4, 0, 0, 0);
+      
+      const prevUtcEnd = new Date(prevEndObj);
+      prevUtcEnd.setDate(prevUtcEnd.getDate() + 1);
+      prevUtcEnd.setUTCHours(5, 0, 0, 0);
+
       // Previous period (using secure view for defense-in-depth PII protection)
       const { data: prevData } = await (supabase as any)
         .from('actblue_transactions_secure')
         .select('*')
         .eq('organization_id', organizationId)
-        .gte('transaction_date', prevPeriod.start)
-        .lte('transaction_date', `${prevPeriod.end}T23:59:59`);
+        .gte('transaction_date', prevUtcStart.toISOString())
+        .lt('transaction_date', prevUtcEnd.toISOString());
 
       setPreviousTransactions(prevData || []);
     } catch (error) {

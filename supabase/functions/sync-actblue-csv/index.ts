@@ -514,26 +514,32 @@ serve(async (req) => {
           
           console.log(`Backfill: Created ${dateRanges.length} date range chunks`);
         } else {
-          // For incremental, ALWAYS go back at least 3 days to account for:
+          // For incremental, ALWAYS go back at least 7 days to account for:
           // 1. ActBlue's Eastern Time vs UTC timezone differences
-          // 2. ActBlue's payment processing delay (contributions aren't "paid" immediately)
-          // 3. Weekend/holiday payment batching
-          const threeDaysAgo = new Date();
-          threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+          // 2. ActBlue's payment processing delay (paid_contributions API only shows settled payments)
+          // 3. Weekend/holiday payment batching which can delay settlement
+          // 4. ActBlue API may have hours-long delay before recent transactions appear
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
           
-          // Use the earlier of: 3 days ago OR last_sync_at (if it's older)
+          // Also extend end date to tomorrow to catch timezone edge cases
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          syncEndDate = tomorrow.toISOString().split('T')[0];
+          
+          // Use the earlier of: 7 days ago OR last_sync_at (if it's older)
           if (cred.last_sync_at) {
             const lastSyncDate = new Date(cred.last_sync_at);
-            if (lastSyncDate < threeDaysAgo) {
+            if (lastSyncDate < sevenDaysAgo) {
               syncStartDate = lastSyncDate.toISOString().split('T')[0];
             } else {
-              syncStartDate = threeDaysAgo.toISOString().split('T')[0];
+              syncStartDate = sevenDaysAgo.toISOString().split('T')[0];
             }
           } else {
-            syncStartDate = threeDaysAgo.toISOString().split('T')[0];
+            syncStartDate = sevenDaysAgo.toISOString().split('T')[0];
           }
           
-          console.log(`Incremental sync: ${syncStartDate} to ${syncEndDate} (3-day lookback for payment processing delay)`);
+          console.log(`Incremental sync: ${syncStartDate} to ${syncEndDate} (7-day lookback + tomorrow for ActBlue payment/timezone delays)`);
           dateRanges.push({ start: syncStartDate, end: syncEndDate });
         }
       } else {
