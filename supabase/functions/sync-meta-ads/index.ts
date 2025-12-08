@@ -774,6 +774,33 @@ serve(async (req) => {
                 console.error(`Error storing creative insight for ad ${ad.id}:`, creativeError);
               } else {
                 creativesProcessed++;
+                
+                // NEW: Store refcode mapping for deterministic attribution
+                if (extractedRefcode) {
+                  const { error: refcodeError } = await supabase
+                    .from('refcode_mappings')
+                    .upsert({
+                      organization_id,
+                      refcode: extractedRefcode,
+                      platform: 'meta',
+                      campaign_id: campaign.id,
+                      campaign_name: campaign.name,
+                      ad_id: ad.id,
+                      ad_name: ad.name || null,
+                      creative_id: creative.id,
+                      creative_name: creative.name || null,
+                      landing_page: destinationUrl,
+                      updated_at: new Date().toISOString(),
+                    }, {
+                      onConflict: 'organization_id,refcode'
+                    });
+                  
+                  if (refcodeError) {
+                    console.error(`[REFCODE MAPPING] Error storing refcode mapping for ${extractedRefcode}:`, refcodeError);
+                  } else {
+                    console.log(`[REFCODE MAPPING] Stored mapping: refcode="${extractedRefcode}" -> ad_id=${ad.id}, campaign=${campaign.name}`);
+                  }
+                }
               }
             }
           }
