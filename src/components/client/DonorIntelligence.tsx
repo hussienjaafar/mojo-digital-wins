@@ -15,6 +15,10 @@ interface DonorIntelligenceProps {
 
 interface AttributionData {
   attributed_platform: string | null;
+  attributed_campaign_id?: string | null;
+  attributed_ad_id?: string | null;
+  attributed_creative_id?: string | null;
+  refcode?: string | null;
   creative_topic: string | null;
   creative_tone: string | null;
   amount: number;
@@ -44,10 +48,29 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
   const [attributionData, setAttributionData] = useState<AttributionData[]>([]);
   const [segmentData, setSegmentData] = useState<DonorSegment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deterministicOnly, setDeterministicOnly] = useState(false);
 
   useEffect(() => {
     loadData();
   }, [organizationId, startDate, endDate]);
+
+  const isDeterministic = (d: AttributionData) => {
+    return Boolean(
+      d.attributed_platform &&
+      (d.attributed_campaign_id || d.attributed_ad_id || d.attributed_creative_id || d.refcode)
+    );
+  };
+
+  const filteredAttribution = useMemo(() => {
+    if (!deterministicOnly) return attributionData;
+    return attributionData.filter(isDeterministic);
+  }, [attributionData, deterministicOnly]);
+
+  const deterministicRate = useMemo(() => {
+    if (attributionData.length === 0) return 0;
+    const deterministicCount = attributionData.filter(isDeterministic).length;
+    return (deterministicCount / attributionData.length) * 100;
+  }, [attributionData]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -55,7 +78,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
       // Load attribution data
       const { data: attrData, error: attrError } = await (supabase as any)
         .from('donation_attribution')
-        .select('attributed_platform, creative_topic, creative_tone, amount, net_amount, transaction_type')
+        .select('attributed_platform, attributed_campaign_id, attributed_ad_id, attributed_creative_id, refcode, creative_topic, creative_tone, amount, net_amount, transaction_type')
         .eq('organization_id', organizationId)
         .gte('transaction_date', startDate)
         .lte('transaction_date', `${endDate}T23:59:59`)
@@ -88,7 +111,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
   // Revenue by platform - formatted for PortalBarChart
   const platformRevenue = useMemo(() => {
     const byPlatform: Record<string, { revenue: number; netRevenue: number; count: number }> = {};
-    attributionData.forEach(d => {
+    filteredAttribution.forEach(d => {
       const platform = d.attributed_platform || 'unattributed';
       if (!byPlatform[platform]) {
         byPlatform[platform] = { revenue: 0, netRevenue: 0, count: 0 };
@@ -112,7 +135,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
   // Revenue by creative topic
   const topicPerformance = useMemo(() => {
     const byTopic: Record<string, { revenue: number; count: number }> = {};
-    attributionData.forEach(d => {
+    filteredAttribution.forEach(d => {
       const topic = d.creative_topic || 'unknown';
       if (!byTopic[topic]) {
         byTopic[topic] = { revenue: 0, count: 0 };
@@ -243,6 +266,23 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
       </div>
 
       <Tabs defaultValue="attribution" className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-[hsl(var(--portal-bg-elevated))]">
+              Deterministic: {deterministicRate.toFixed(0)}%
+            </Badge>
+            <span className="text-sm portal-text-muted">
+              Deterministic when refcode/campaign/ad/creative mapping is present
+            </span>
+          </div>
+          <Badge
+            variant={deterministicOnly ? "default" : "outline"}
+            className="cursor-pointer"
+            onClick={() => setDeterministicOnly(!deterministicOnly)}
+          >
+            {deterministicOnly ? "Showing deterministic only" : "Filter to deterministic"}
+          </Badge>
+        </div>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="attribution">Attribution</TabsTrigger>
           <TabsTrigger value="topics">Creative Topics</TabsTrigger>
