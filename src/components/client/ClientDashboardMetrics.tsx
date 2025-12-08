@@ -4,10 +4,11 @@ import { PortalMetric } from "@/components/portal/PortalMetric";
 import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardContent } from "@/components/portal/PortalCard";
 import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
-import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet } from "lucide-react";
+import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, CopyMinus } from "lucide-react";
 import { format, parseISO, eachDayOfInterval, subDays } from "date-fns";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface ClientDashboardMetricsProps {
   organizationId: string;
@@ -55,6 +56,20 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
   const [prevSmsMetrics, setPrevSmsMetrics] = useState<SMSData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+
+  const palette = {
+    gross: "#0D9488",
+    net: "#0EA5E9",
+    refunds: "#DC2626",
+    meta: "#2563EB",
+    sms: "#8B5CF6",
+    grossPrev: "#0D948888",
+    netPrev: "#0EA5E988",
+    refundsPrev: "#DC262688",
+    metaPrev: "#2563EB88",
+    smsPrev: "#8B5CF688",
+  };
 
   // Calculate previous period dates for comparison
   const getPreviousPeriod = () => {
@@ -314,23 +329,37 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
 
   // Build time series data for charts
   const timeSeriesData = useMemo(() => {
+    const prevPeriod = getPreviousPeriod();
     const days = eachDayOfInterval({
       start: parseISO(startDate),
       end: parseISO(endDate),
+    });
+    const prevDays = eachDayOfInterval({
+      start: parseISO(prevPeriod.start),
+      end: parseISO(prevPeriod.end),
     });
 
     return days.map(day => {
       const dayStr = format(day, 'yyyy-MM-dd');
       const dayLabel = format(day, 'MMM d');
+      const prevDay = prevDays[days.indexOf(day)];
+      const prevDayStr = prevDay ? format(prevDay, 'yyyy-MM-dd') : null;
       
       const dayDonations = donations.filter(d => d.transaction_date?.startsWith(dayStr));
       const dayMeta = metaMetrics.filter(m => m.date === dayStr);
       const daySms = smsMetrics.filter(s => s.send_date?.startsWith(dayStr));
       const dayRefunds = dayDonations.filter(d => d.transaction_type === 'refund');
+      const prevDayDonations = prevDayStr ? prevDonations.filter(d => d.transaction_date?.startsWith(prevDayStr)) : [];
+      const prevDayMeta = prevDayStr ? prevMetaMetrics.filter(m => m.date === prevDayStr) : [];
+      const prevDaySms = prevDayStr ? prevSmsMetrics.filter(s => s.send_date?.startsWith(prevDayStr)) : [];
+      const prevDayRefunds = prevDayDonations.filter(d => d.transaction_type === 'refund');
 
       const grossDonations = dayDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
       const netDonations = dayDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
       const refundAmount = dayRefunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
+      const prevGross = prevDayDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+      const prevNet = prevDayDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
+      const prevRefundAmount = prevDayRefunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
 
       return {
         name: dayLabel,
@@ -339,9 +368,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         refunds: refundAmount,
         metaSpend: dayMeta.reduce((sum, m) => sum + Number(m.spend || 0), 0),
         smsSpend: daySms.reduce((sum, s) => sum + Number(s.cost || 0), 0),
+        donationsPrev: prevGross,
+        netDonationsPrev: prevNet,
+        refundsPrev: prevRefundAmount,
+        metaSpendPrev: prevDayMeta.reduce((sum, m) => sum + Number(m.spend || 0), 0),
+        smsSpendPrev: prevDaySms.reduce((sum, s) => sum + Number(s.cost || 0), 0),
       };
     });
-  }, [donations, metaMetrics, smsMetrics, startDate, endDate]);
+  }, [donations, metaMetrics, smsMetrics, prevDonations, prevMetaMetrics, prevSmsMetrics, startDate, endDate]);
 
   // Channel breakdown for bar chart
   const channelBreakdown = useMemo(() => {
@@ -361,6 +395,25 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
     return `$${value.toFixed(0)}`;
   };
+
+  const chartLines = useMemo(() => {
+    const base = [
+      { dataKey: "donations", stroke: palette.gross, name: "Gross donations" },
+      { dataKey: "netDonations", stroke: palette.net, name: "Net donations" },
+      { dataKey: "refunds", stroke: palette.refunds, name: "Refunds", strokeDasharray: "4 4" },
+      { dataKey: "metaSpend", stroke: palette.meta, name: "Meta spend" },
+      { dataKey: "smsSpend", stroke: palette.sms, name: "SMS spend" },
+    ];
+    if (!showCompare) return base;
+    return [
+      ...base,
+      { dataKey: "donationsPrev", stroke: palette.grossPrev, name: "Gross (prev)", strokeDasharray: "5 4", hideByDefault: false },
+      { dataKey: "netDonationsPrev", stroke: palette.netPrev, name: "Net (prev)", strokeDasharray: "5 4", hideByDefault: false },
+      { dataKey: "refundsPrev", stroke: palette.refundsPrev, name: "Refunds (prev)", strokeDasharray: "5 4", hideByDefault: false },
+      { dataKey: "metaSpendPrev", stroke: palette.metaPrev, name: "Meta spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
+      { dataKey: "smsSpendPrev", stroke: palette.smsPrev, name: "SMS spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
+    ];
+  }, [palette, showCompare]);
 
   const heroKpis = [
     {
@@ -463,19 +516,36 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         {/* Fundraising Trend - Main Chart */}
         <PortalCard className="lg:col-span-2 portal-animate-slide-in-left">
           <PortalCardHeader>
-            <PortalCardTitle>Fundraising Performance</PortalCardTitle>
-            <div className="flex items-center gap-6 mt-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <PortalCardTitle>Fundraising Performance</PortalCardTitle>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowCompare((prev) => !prev)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium border",
+                    showCompare
+                      ? "border-[hsl(var(--portal-accent))] text-[hsl(var(--portal-accent))] bg-[hsl(var(--portal-bg-elevated))]"
+                      : "border-[hsl(var(--portal-border))] portal-text-muted hover:bg-[hsl(var(--portal-bg-elevated))]"
+                  )}
+                  aria-pressed={showCompare}
+                >
+                  <CopyMinus className="h-3.5 w-3.5" />
+                  {showCompare ? "Hide compare" : "Compare prev period"}
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-6 mt-3 flex-wrap">
               <div className="flex items-center gap-2">
                 <div className="text-2xl font-bold portal-text-primary">{formatCurrency(kpis.totalRaised)}</div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-[#10B981]" />
+                  <div className="w-2 h-2 rounded-full" style={{ background: palette.gross }} />
                   <span className="text-xs portal-text-muted">Donations</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <div className="text-2xl font-bold portal-text-primary">{formatCurrency(kpis.totalSpend)}</div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-[#0D84FF]" />
+                  <div className="w-2 h-2 rounded-full" style={{ background: palette.meta }} />
                   <span className="text-xs portal-text-muted">Meta Spend</span>
                 </div>
               </div>
@@ -484,13 +554,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
           <PortalCardContent>
             <PortalLineChart
               data={timeSeriesData}
-              lines={[
-                { dataKey: "donations", stroke: "#10B981", name: "Gross Donations", valueType: "currency" },
-                { dataKey: "netDonations", stroke: "#0EA5E9", name: "Net Donations", valueType: "currency" },
-                { dataKey: "refunds", stroke: "#EF4444", name: "Refunds", valueType: "currency" },
-                { dataKey: "metaSpend", stroke: "#0D84FF", name: "Meta Spend", valueType: "currency" },
-                { dataKey: "smsSpend", stroke: "#A78BFA", name: "SMS Spend", valueType: "currency" },
-              ]}
+              lines={chartLines}
               height={280}
               valueType="currency"
             />
@@ -572,7 +636,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
             <PortalCardTitle>Conversion Sources</PortalCardTitle>
           </PortalCardHeader>
           <PortalCardContent>
-            <PortalBarChart data={channelBreakdown} height={200} valueType="number" />
+            <PortalBarChart data={channelBreakdown} height={220} valueType="number" showValues />
           </PortalCardContent>
         </PortalCard>
 

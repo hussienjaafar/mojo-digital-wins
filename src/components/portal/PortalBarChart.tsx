@@ -1,8 +1,8 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from "recharts";
 import { ResponsiveChartTooltip } from "@/components/charts/ResponsiveChartTooltip";
-import { getYAxisFormatter, ValueType } from "@/lib/chart-formatters";
+import { getYAxisFormatter, getTooltipFormatter, ValueType } from "@/lib/chart-formatters";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DataPoint {
@@ -17,6 +17,7 @@ interface PortalBarChartProps {
   barColor?: string;
   className?: string;
   valueType?: ValueType;
+  showValues?: boolean;
 }
 
 export const PortalBarChart: React.FC<PortalBarChartProps> = ({
@@ -25,6 +26,7 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   barColor = "hsl(var(--portal-accent-blue))",
   className,
   valueType = "number",
+  showValues = false,
 }) => {
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 200 : 250);
@@ -83,6 +85,14 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
                 fill={barColor}
               />
             ))}
+            {showValues && (
+              <LabelList 
+                dataKey="value" 
+                position="top" 
+                formatter={getTooltipFormatter(valueType)} 
+                className="text-[10px] sm:text-xs portal-text-primary"
+              />
+            )}
           </Bar>
         </BarChart>
       </ResponsiveContainer>

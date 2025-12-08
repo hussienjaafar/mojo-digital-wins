@@ -17,6 +17,8 @@ interface PortalLineChartProps {
     stroke: string;
     name: string;
     valueType?: ValueType;
+    strokeDasharray?: string;
+    hideByDefault?: boolean;
   }>;
   height?: number;
   className?: string;
@@ -32,6 +34,7 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
 }) => {
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 200 : 280);
+  const [hiddenKeys, setHiddenKeys] = React.useState<Set<string>>(new Set());
 
   // Build value types map for tooltip
   const valueTypes = React.useMemo(() => {
@@ -42,16 +45,42 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
     return types;
   }, [lines, valueType]);
 
+  React.useEffect(() => {
+    const defaults = lines.filter((l) => l.hideByDefault).map((l) => l.dataKey);
+    setHiddenKeys(new Set(defaults));
+  }, [lines]);
+
+  const handleLegendClick = (dataKey: string) => {
+    setHiddenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(dataKey)) {
+        next.delete(dataKey);
+      } else {
+        next.add(dataKey);
+      }
+      return next;
+    });
+  };
+
+  const legendPayload = lines.map((line) => ({
+    value: line.name,
+    dataKey: line.dataKey,
+    color: line.stroke,
+    type: "line" as const,
+    payload: line,
+    inactive: hiddenKeys.has(line.dataKey),
+  }));
+
   return (
     <div className={cn("w-full", className)} style={{ height: chartHeight }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart 
           data={data} 
           margin={{ 
-            top: 8, 
-            right: isMobile ? 8 : 16, 
-            bottom: isMobile ? 8 : 4, 
-            left: isMobile ? 0 : 0 
+            top: 12, 
+            right: isMobile ? 10 : 18, 
+            bottom: isMobile ? 12 : 10, 
+            left: isMobile ? 4 : 8 
           }}
         >
           <CartesianGrid 
@@ -88,14 +117,32 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
           />
           <Legend
             verticalAlign={isMobile ? "bottom" : "top"}
-            align={isMobile ? "center" : "right"}
-            wrapperStyle={{
-              fontSize: isMobile ? 11 : 12,
-              paddingTop: isMobile ? 8 : 0,
-              paddingBottom: isMobile ? 0 : 8,
-            }}
-            iconSize={isMobile ? 8 : 10}
-            iconType="circle"
+            align={isMobile ? "center" : "left"}
+            payload={legendPayload}
+            content={({ payload }) => (
+              <div className="flex flex-wrap gap-2 px-2 pb-2 pt-1 text-[11px] sm:text-xs">
+                {payload?.map((entry: any) => (
+                  <button
+                    key={entry.dataKey}
+                    onClick={() => handleLegendClick(entry.dataKey)}
+                    className={cn(
+                      "flex items-center gap-1 rounded px-2 py-1 transition-colors",
+                      hiddenKeys.has(entry.dataKey)
+                        ? "opacity-60 border border-dashed border-[hsl(var(--portal-border))]"
+                        : "bg-[hsl(var(--portal-bg-elevated))]"
+                    )}
+                  >
+                    <span
+                      className="inline-flex h-3 w-3 rounded-sm"
+                      style={{ background: entry.color }}
+                    />
+                    <span className={hiddenKeys.has(entry.dataKey) ? "line-through" : ""}>
+                      {entry.value}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           />
           {lines.map((line) => (
             <Line
@@ -103,8 +150,10 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
               type="monotone"
               dataKey={line.dataKey}
               stroke={line.stroke}
+              strokeDasharray={line.strokeDasharray}
               strokeWidth={isMobile ? 2 : 2.5}
               name={line.name}
+              hide={hiddenKeys.has(line.dataKey)}
               dot={!isMobile}
               activeDot={{ r: isMobile ? 4 : 5, strokeWidth: 2, fill: line.stroke }}
             />
