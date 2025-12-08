@@ -88,7 +88,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.run-scheduled-jobs]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-daily-briefing]
 verify_jwt = false
@@ -109,7 +109,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.monitor-attribution-health]
-verify_jwt = false
+verify_jwt = true
 
 [functions.calculate-attribution-models]
 verify_jwt = true

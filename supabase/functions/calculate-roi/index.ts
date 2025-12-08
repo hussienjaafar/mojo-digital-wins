@@ -1,8 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 
+// SECURITY: Restrict CORS to known origins
+const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0] || 'https://lovable.dev',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -13,13 +15,60 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    // SECURITY: Extract user's JWT and create client with their context
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create client with user's JWT for RLS enforcement
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { organization_id, start_date, end_date } = await req.json();
 
     if (!organization_id) {
-      throw new Error('organization_id is required');
+      return new Response(
+        JSON.stringify({ error: 'organization_id is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // SECURITY: Verify user belongs to the organization
+    const { data: userAccess, error: accessError } = await supabase
+      .from('client_users')
+      .select('organization_id')
+      .eq('id', user.id)
+      .eq('organization_id', organization_id)
+      .maybeSingle();
+
+    // Also check if user is admin
+    const { data: isAdmin } = await supabase.rpc('has_role', {
+      _user_id: user.id,
+      _role: 'admin'
+    });
+
+    if (!userAccess && !isAdmin) {
+      console.error('[SECURITY] User not authorized for organization:', organization_id);
+      return new Response(
+        JSON.stringify({ error: 'Access denied to this organization' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Default to last 30 days if no dates provided
@@ -29,7 +78,7 @@ serve(async (req) => {
     const startDateStr = startDateObj.toISOString().split('T')[0];
     const endDateStr = endDateObj.toISOString().split('T')[0];
 
-    console.log(`Calculating ROI for organization ${organization_id} from ${startDateStr} to ${endDateStr}`);
+    console.log(`[ROI] Calculating for organization ${organization_id} from ${startDateStr} to ${endDateStr}`);
 
     // Generate list of dates
     const dates: string[] = [];
@@ -39,9 +88,12 @@ serve(async (req) => {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
+    // Use service role for writes only (after auth check)
+    const serviceClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
     // Process each date
     for (const date of dates) {
-      // Fetch Meta Ads spend for the date
+      // Fetch Meta Ads spend for the date (RLS will filter by org)
       const { data: metaMetrics } = await supabase
         .from('meta_ad_metrics')
         .select('spend, impressions, clicks')
@@ -75,7 +127,7 @@ serve(async (req) => {
       const totalFundsRaised = transactions?.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) || 0;
       const totalDonations = transactions?.length || 0;
 
-      // Calculate unique donors (new donors for this date)
+      // Calculate unique donors
       const uniqueEmails = new Set(transactions?.map(t => t.donor_email).filter(Boolean));
       const newDonors = uniqueEmails.size;
 
@@ -85,8 +137,8 @@ serve(async (req) => {
         ? ((totalFundsRaised - totalSpent) / totalSpent) * 100
         : 0;
 
-      // Upsert aggregated metrics
-      const { error: upsertError } = await supabase
+      // Upsert aggregated metrics using service role
+      const { error: upsertError } = await serviceClient
         .from('daily_aggregated_metrics')
         .upsert({
           organization_id,
@@ -107,13 +159,13 @@ serve(async (req) => {
         });
 
       if (upsertError) {
-        console.error(`Error storing aggregated metrics for ${date}:`, upsertError);
+        console.error(`[ROI] Error storing metrics for ${date}:`, upsertError);
       } else {
-        console.log(`Aggregated metrics calculated for ${date}: Raised $${totalFundsRaised}, Spent $${totalSpent}, ROI ${roiPercentage.toFixed(2)}%`);
+        console.log(`[ROI] Metrics calculated for ${date}: Raised $${totalFundsRaised}, Spent $${totalSpent}, ROI ${roiPercentage.toFixed(2)}%`);
       }
     }
 
-    console.log('ROI calculation completed successfully');
+    console.log('[ROI] Calculation completed successfully');
 
     return new Response(
       JSON.stringify({ 
@@ -125,13 +177,10 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('Error in calculate-roi:', error);
+    console.error('[ROI] Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
