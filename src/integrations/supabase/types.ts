@@ -6195,6 +6195,7 @@ export type Database = {
           employer: string | null
           entity_id: string | null
           fec_id: string | null
+          entity_id: string | null
           fee: number | null
           first_name: string | null
           id: string | null
@@ -6206,6 +6207,7 @@ export type Database = {
           net_amount: number | null
           occupation: string | null
           order_number: string | null
+          net_amount: number | null
           organization_id: string | null
           payment_method: string | null
           phone: string | null
@@ -6244,6 +6246,7 @@ export type Database = {
           employer?: string | null
           entity_id?: string | null
           fec_id?: string | null
+          entity_id?: string | null
           fee?: number | null
           first_name?: never
           id?: string | null
@@ -6255,6 +6258,7 @@ export type Database = {
           net_amount?: number | null
           occupation?: string | null
           order_number?: string | null
+          net_amount?: number | null
           organization_id?: string | null
           payment_method?: string | null
           phone?: never
@@ -6293,6 +6297,7 @@ export type Database = {
           employer?: string | null
           entity_id?: string | null
           fec_id?: string | null
+          entity_id?: string | null
           fee?: number | null
           first_name?: never
           id?: string | null
@@ -6304,6 +6309,7 @@ export type Database = {
           net_amount?: number | null
           occupation?: string | null
           order_number?: string | null
+          net_amount?: number | null
           organization_id?: string | null
           payment_method?: string | null
           phone?: never
@@ -6598,12 +6604,23 @@ export type Database = {
           creative_type: string | null
           donor_email: string | null
           donor_id_hash: string | null
+          attributed_campaign_name: string | null
+          attributed_creative_id: string | null
+          attributed_platform: string | null
+          card_type: string | null
+          creative_emotional_appeal: string | null
+          creative_themes: string[] | null
+          creative_tone: string | null
+          creative_topic: string | null
           fee: number | null
           is_recurring: boolean | null
           net_amount: number | null
           organization_id: string | null
           refcode: string | null
           source_campaign: string | null
+          payment_method: string | null
+          recurring_period: string | null
+          refcode: string | null
           transaction_date: string | null
           transaction_id: string | null
           transaction_type: string | null
@@ -6743,11 +6760,20 @@ export type Database = {
           donor_tier?: never
           first_donation_date?: string | null
           first_name?: never
+          city?: string | null
+          days_since_donation?: never
+          donation_count?: number | null
+          donor_email?: string | null
+          donor_frequency_segment?: never
+          donor_tier?: never
+          first_donation_date?: string | null
+          first_name?: string | null
           frequency_score?: never
           id?: string | null
           is_recurring?: boolean | null
           last_donation_date?: string | null
           last_name?: never
+          last_name?: string | null
           monetary_score?: never
           organization_id?: string | null
           recency_score?: never
@@ -6765,17 +6791,30 @@ export type Database = {
           donor_tier?: never
           first_donation_date?: string | null
           first_name?: never
+          zip?: string | null
+        }
+        Update: {
+          city?: string | null
+          days_since_donation?: never
+          donation_count?: number | null
+          donor_email?: string | null
+          donor_frequency_segment?: never
+          donor_tier?: never
+          first_donation_date?: string | null
+          first_name?: string | null
           frequency_score?: never
           id?: string | null
           is_recurring?: boolean | null
           last_donation_date?: string | null
           last_name?: never
+          last_name?: string | null
           monetary_score?: never
           organization_id?: string | null
           recency_score?: never
           state?: string | null
           total_donated?: number | null
           zip?: never
+          zip?: string | null
         }
         Relationships: [
           {

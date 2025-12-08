@@ -15,13 +15,11 @@ interface DonorIntelligenceProps {
 
 interface AttributionData {
   attributed_platform: string | null;
-  creative_type: string | null;
-  creative_topic: string | null;  // mapped from 'topic' column in view
-  creative_tone: string | null;   // mapped from 'tone' column in view
+  creative_topic: string | null;
+  creative_tone: string | null;
   amount: number;
   net_amount: number | null;
   transaction_type: string;
-  donor_id_hash: string;
 }
 
 interface DonorSegment {
@@ -54,10 +52,10 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Load attribution data - using correct column names from view
+      // Load attribution data
       const { data: attrData, error: attrError } = await (supabase as any)
         .from('donation_attribution')
-        .select('attributed_platform, creative_type, creative_topic, creative_tone, amount, net_amount, transaction_type, donor_id_hash')
+        .select('attributed_platform, creative_topic, creative_tone, amount, net_amount, transaction_type')
         .eq('organization_id', organizationId)
         .gte('transaction_date', startDate)
         .lte('transaction_date', `${endDate}T23:59:59`)
@@ -111,7 +109,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
       .sort((a, b) => b.value - a.value);
   }, [attributionData]);
 
-  // Revenue by creative topic - using topic from creative insights
+  // Revenue by creative topic
   const topicPerformance = useMemo(() => {
     const byTopic: Record<string, { revenue: number; count: number }> = {};
     attributionData.forEach(d => {

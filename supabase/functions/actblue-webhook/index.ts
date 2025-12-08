@@ -336,13 +336,16 @@ serve(async (req) => {
 
     // First, try to look up refcode in refcode_mappings for deterministic attribution
     let determinedSource = sourceCampaign;
+    let mapping: any = null;
     if (refcode) {
-      const { data: mapping } = await supabase
+      const { data: mappingData } = await supabase
         .from('refcode_mappings')
         .select('platform, campaign_id, ad_id, creative_id')
         .eq('organization_id', organization_id)
         .eq('refcode', refcode)
         .maybeSingle();
+
+      mapping = mappingData;
 
       if (mapping?.platform) {
         determinedSource = mapping.platform;
@@ -418,27 +421,13 @@ serve(async (req) => {
       }
     }
 
-    // Track attribution touchpoint - FIX: Use deterministic source from refcode_mappings
+    // Track attribution touchpoint
     if (donor.email && refcode) {
-      // Get mapping data if available for deterministic attribution
-      let mappingData: { campaign_id?: string; ad_id?: string; creative_id?: string } = {};
-      if (refcode) {
-        const { data: mapping } = await supabase
-          .from('refcode_mappings')
-          .select('campaign_id, ad_id, creative_id')
-          .eq('organization_id', organization_id)
-          .eq('refcode', refcode)
-          .maybeSingle();
-        if (mapping) {
-          mappingData = mapping;
-        }
-      }
-      
       await supabase.from('attribution_touchpoints').insert({
         organization_id,
         donor_email: safeString(donor.email),
-        touchpoint_type: determinedSource || 'other',  // FIX: Use determinedSource instead of sourceCampaign
-        campaign_id: mappingData.campaign_id || safeString(contribution.contributionForm),
+        touchpoint_type: determinedSource || 'other',
+        campaign_id: mapping?.campaign_id || safeString(contribution.contributionForm),
         utm_source: safeString(refcodes.refcode2),
         utm_campaign: refcode,
         refcode: refcode,
@@ -447,9 +436,9 @@ serve(async (req) => {
           ab_test: safeString(contribution.abTestName),
           ab_variation: safeString(contribution.abTestVariation),
           is_mobile: safeBool(contribution.isMobile),
-          deterministic_match: !!mappingData.campaign_id,  // Track if this was deterministic
-          ad_id: mappingData.ad_id || null,
-          creative_id: mappingData.creative_id || null,
+          deterministic_match: !!mapping,
+          ad_id: mapping?.ad_id || null,
+          creative_id: mapping?.creative_id || null,
         },
       }).then(({ error }) => {
         if (error) console.error('[ACTBLUE] Error tracking touchpoint:', error);
