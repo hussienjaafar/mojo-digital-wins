@@ -14,9 +14,10 @@ This living doc tracks the phased plan to get optimal use of ActBlue, Meta, and 
 - [ ] **Sprint 3: Donor journeys & SMS effectiveness**
   - Donor journeys view joining sms_events (by phone hash), attribution_touchpoints, and donations (donor_id_hash/phone hash).
   - SMS funnel widget (sent → delivered → clicked → donated → opt-out) with rates; per-recipient cost estimation.
-- [ ] **Sprint 4: Creative/topic and forecasting**
-  - Stronger creative-to-donation linkage (click_id/refcode reconciliation) and backfill of refcode_mappings with creative/ad IDs.
-  - Simple retention/LTV predictions (90/180-day repeat probability) and net revenue forecasts; creative/topic performance cards with deterministic attribution %.
+- [x] **Sprint 4: Creative/topic and deterministic uplift**
+  - [x] Backfill/refcode reconciliation function (Meta creatives → refcode_mappings).
+  - [ ] Stronger linkage using click_id/fbclid when refcodes are absent.
+  - [ ] Simple retention/LTV predictions (90/180-day repeat probability) and net revenue forecasts; creative/topic performance cards with deterministic attribution %.
 - [ ] **Sprint 5: Hardening & backfills**
   - Backfill jobs (refcode_mappings reconciliation, SMS hash backfill, recurring status backfill).
   - Alerts for attribution quality drops and SMS opt-out spikes; runbooks for syncs.
