@@ -346,3 +346,85 @@ export async function updateCheckpoint(
     console.error('Failed to update checkpoint:', e);
   }
 }
+
+/**
+ * Validate either cron secret OR admin JWT for scheduled/admin functions
+ */
+export async function validateCronOrAdmin(
+  req: Request,
+  supabase: any
+): Promise<{ valid: boolean; isAdmin?: boolean; user?: any }> {
+  // First check cron secret
+  if (validateCronSecret(req)) {
+    return { valid: true };
+  }
+
+  // Then check for admin JWT
+  const auth = await validateAuth(req, supabase);
+  if (auth?.isAdmin) {
+    return { valid: true, isAdmin: true, user: auth.user };
+  }
+
+  return { valid: false };
+}
+
+/**
+ * Rate limiting using in-memory cache (per-function instance)
+ * For production, use Redis or database-backed rate limiting
+ */
+const rateLimitCache = new Map<string, { count: number; resetAt: number }>();
+
+export async function checkRateLimit(
+  identifier: string,
+  maxRequests: number = 100,
+  windowMs: number = 60000
+): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+  const now = Date.now();
+  const key = identifier;
+  
+  let entry = rateLimitCache.get(key);
+  
+  // Reset if window expired
+  if (!entry || entry.resetAt <= now) {
+    entry = { count: 0, resetAt: now + windowMs };
+    rateLimitCache.set(key, entry);
+  }
+  
+  entry.count++;
+  
+  const allowed = entry.count <= maxRequests;
+  const remaining = Math.max(0, maxRequests - entry.count);
+  
+  return { allowed, remaining, resetAt: entry.resetAt };
+}
+
+/**
+ * Timing-safe string comparison to prevent timing attacks
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+/**
+ * Validate webhook secret for public endpoints
+ */
+export function validateWebhookSecret(req: Request, secretName: string = 'WEBHOOK_SECRET'): boolean {
+  const secret = Deno.env.get(secretName);
+  if (!secret) {
+    console.warn(`${secretName} not configured - rejecting request`);
+    return false;
+  }
+  
+  const providedSecret = req.headers.get('x-webhook-secret') || 
+                         req.headers.get('authorization')?.replace('Bearer ', '');
+  
+  if (!providedSecret) return false;
+  
+  return timingSafeEqual(providedSecret, secret);
+}

@@ -49,10 +49,10 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    console.log(`[detect-breaking-news] Authorized via ${authResult.source}`);
+    console.log(`[detect-breaking-news] Authorized via ${authResult.isAdmin ? 'admin' : 'cron'}`);
 
     // SECURITY: Rate limiting
-    const rateLimit = checkRateLimit('detect-breaking-news', 20, 60000);
+    const rateLimit = await checkRateLimit('detect-breaking-news', 20, 60000);
     if (!rateLimit.allowed) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded', resetAt: rateLimit.resetAt }),

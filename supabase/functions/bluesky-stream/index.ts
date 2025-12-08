@@ -258,10 +258,10 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    console.log(`[bluesky-stream] Authorized via ${authResult.source}`);
+    console.log(`[bluesky-stream] Authorized via ${authResult.isAdmin ? 'admin' : 'cron'}`);
 
     // SECURITY: Rate limiting
-    const rateLimit = checkRateLimit('bluesky-stream', 6, 60000);
+    const rateLimit = await checkRateLimit('bluesky-stream', 6, 60000);
     if (!rateLimit.allowed) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded', resetAt: rateLimit.resetAt }),

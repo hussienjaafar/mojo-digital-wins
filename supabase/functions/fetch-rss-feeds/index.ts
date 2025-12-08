@@ -277,10 +277,10 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    console.log(`[fetch-rss-feeds] Authorized via ${authResult.source}`);
+    console.log(`[fetch-rss-feeds] Authorized via ${authResult.isAdmin ? 'admin' : 'cron'}`);
 
     // SECURITY: Rate limiting
-    const rateLimit = checkRateLimit('fetch-rss-feeds', 10, 60000);
+    const rateLimit = await checkRateLimit('fetch-rss-feeds', 10, 60000);
     if (!rateLimit.allowed) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded', resetAt: rateLimit.resetAt }),
