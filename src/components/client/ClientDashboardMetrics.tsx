@@ -20,10 +20,12 @@ interface DonationData {
   net_amount: number | null;
   fee: number | null;
   donor_email: string;
+  donor_id_hash: string;  // FIX: Stable hash for dedup instead of masked email
   is_recurring: boolean;
   recurring_upsell_shown: boolean | null;
   recurring_upsell_succeeded: boolean | null;
   transaction_date: string;
+  transaction_type: string;  // FIX: Track refunds/cancellations
   refcode: string | null;
   source_campaign: string | null;
 }
@@ -77,10 +79,10 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     
     try {
       // Load current period donations (using secure view for defense-in-depth PII protection)
-      // Now fetching net_amount, fee, and recurring upsell data for enhanced analytics
+      // FIX: Now fetching donor_id_hash for accurate dedup and transaction_type for churn metrics
       const { data: donationData } = await (supabase as any)
         .from('actblue_transactions_secure')
-        .select('amount, net_amount, fee, donor_email, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_date, refcode, source_campaign')
+        .select('amount, net_amount, fee, donor_email, donor_id_hash, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_date, transaction_type, refcode, source_campaign')
         .eq('organization_id', organizationId)
         .gte('transaction_date', startDate)
         .lte('transaction_date', `${endDate}T23:59:59`);
@@ -90,7 +92,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       // Load previous period donations (using secure view for defense-in-depth PII protection)
       const { data: prevDonationData } = await (supabase as any)
         .from('actblue_transactions_secure')
-        .select('amount, net_amount, fee, donor_email, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_date, refcode, source_campaign')
+        .select('amount, net_amount, fee, donor_email, donor_id_hash, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_date, transaction_type, refcode, source_campaign')
         .eq('organization_id', organizationId)
         .gte('transaction_date', prevPeriod.start)
         .lte('transaction_date', `${prevPeriod.end}T23:59:59`);
@@ -169,10 +171,12 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
               net_amount: newDonation.fee != null ? newDonation.amount - newDonation.fee : newDonation.amount,
               fee: newDonation.fee,
               donor_email: newDonation.donor_email,
+              donor_id_hash: newDonation.donor_id_hash || newDonation.donor_email,  // FIX: Add donor_id_hash
               is_recurring: newDonation.is_recurring,
               recurring_upsell_shown: newDonation.recurring_upsell_shown,
               recurring_upsell_succeeded: newDonation.recurring_upsell_succeeded,
               transaction_date: newDonation.transaction_date,
+              transaction_type: newDonation.transaction_type || 'donation',  // FIX: Add transaction_type
               refcode: newDonation.refcode,
               source_campaign: newDonation.source_campaign,
             }, ...prev]);
@@ -204,25 +208,36 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     return ((current - previous) / previous) * 100;
   };
 
-  // Calculate KPIs for current period - now with net revenue and upsell metrics
+  // Calculate KPIs for current period - now with net revenue, upsell metrics, and churn tracking
   const kpis = useMemo(() => {
-    const totalRaised = donations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
-    // Net revenue = gross - fees (using net_amount when available)
-    const totalNetRevenue = donations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const totalFees = donations.reduce((sum, d) => sum + Number(d.fee || 0), 0);
+    // FIX: Filter by transaction type for accurate revenue (exclude refunds/cancellations from totals)
+    const actualDonations = donations.filter(d => d.transaction_type === 'donation' || !d.transaction_type);
+    const refunds = donations.filter(d => d.transaction_type === 'refund');
+    const cancellations = donations.filter(d => d.transaction_type === 'cancellation');
+    
+    const totalRaised = actualDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    const refundAmount = refunds.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    // Net revenue = gross - fees - refunds (using net_amount when available)
+    const totalNetRevenue = actualDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0) - refundAmount;
+    const totalFees = actualDonations.reduce((sum, d) => sum + Number(d.fee || 0), 0);
     const feePercentage = totalRaised > 0 ? (totalFees / totalRaised) * 100 : 0;
     
-    const uniqueDonors = new Set(donations.map(d => d.donor_email)).size;
-    const recurringDonors = donations.filter(d => d.is_recurring).length;
-    const recurringPercentage = donations.length > 0 ? (recurringDonors / donations.length) * 100 : 0;
+    // FIX: Use stable donor_id_hash for accurate unique donor count instead of masked email
+    const uniqueDonors = new Set(actualDonations.map(d => d.donor_id_hash || d.donor_email)).size;
+    const recurringDonors = actualDonations.filter(d => d.is_recurring).length;
+    const recurringPercentage = actualDonations.length > 0 ? (recurringDonors / actualDonations.length) * 100 : 0;
     
     // Recurring upsell metrics
-    const upsellShown = donations.filter(d => d.recurring_upsell_shown).length;
-    const upsellSucceeded = donations.filter(d => d.recurring_upsell_succeeded).length;
+    const upsellShown = actualDonations.filter(d => d.recurring_upsell_shown).length;
+    const upsellSucceeded = actualDonations.filter(d => d.recurring_upsell_succeeded).length;
     const upsellConversionRate = upsellShown > 0 ? (upsellSucceeded / upsellShown) * 100 : 0;
     
+    // FIX: Churn metrics - refund and cancellation rates
+    const refundRate = actualDonations.length > 0 ? (refunds.length / actualDonations.length) * 100 : 0;
+    const cancellationRate = recurringDonors > 0 ? (cancellations.length / recurringDonors) * 100 : 0;
+    
     // Attribution breakdown by source
-    const bySource = donations.reduce((acc, d) => {
+    const bySource = actualDonations.reduce((acc, d) => {
       const source = d.source_campaign || 'direct';
       acc[source] = (acc[source] || 0) + Number(d.amount || 0);
       return acc;
@@ -237,13 +252,16 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     
     const totalImpressions = metaMetrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
     const totalClicks = metaMetrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
-    const avgDonation = donations.length > 0 ? totalRaised / donations.length : 0;
+    const avgDonation = actualDonations.length > 0 ? totalRaised / actualDonations.length : 0;
 
     return {
       totalRaised,
       totalNetRevenue,
       totalFees,
       feePercentage,
+      refundAmount,
+      refundRate,
+      cancellationRate,
       uniqueDonors,
       recurringPercentage,
       upsellConversionRate,
@@ -252,18 +270,26 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       totalImpressions,
       totalClicks,
       avgDonation,
-      donationCount: donations.length,
+      donationCount: actualDonations.length,
+      refundCount: refunds.length,
+      cancellationCount: cancellations.length,
       revenueBySource: bySource,
     };
   }, [donations, metaMetrics, smsMetrics]);
 
   // Calculate KPIs for previous period
   const prevKpis = useMemo(() => {
-    const totalRaised = prevDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
-    const totalNetRevenue = prevDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const uniqueDonors = new Set(prevDonations.map(d => d.donor_email)).size;
-    const recurringDonors = prevDonations.filter(d => d.is_recurring).length;
-    const recurringPercentage = prevDonations.length > 0 ? (recurringDonors / prevDonations.length) * 100 : 0;
+    // FIX: Filter by transaction type for accurate comparison
+    const actualPrevDonations = prevDonations.filter(d => d.transaction_type === 'donation' || !d.transaction_type);
+    const prevRefunds = prevDonations.filter(d => d.transaction_type === 'refund');
+    
+    const totalRaised = actualPrevDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    const prevRefundAmount = prevRefunds.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    const totalNetRevenue = actualPrevDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0) - prevRefundAmount;
+    // FIX: Use stable hash for unique donor count
+    const uniqueDonors = new Set(actualPrevDonations.map(d => d.donor_id_hash || d.donor_email)).size;
+    const recurringDonors = actualPrevDonations.filter(d => d.is_recurring).length;
+    const recurringPercentage = actualPrevDonations.length > 0 ? (recurringDonors / actualPrevDonations.length) * 100 : 0;
     
     const totalMetaSpend = prevMetaMetrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
     const totalSMSCost = prevSmsMetrics.reduce((sum, s) => sum + Number(s.cost || 0), 0);
