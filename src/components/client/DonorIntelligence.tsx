@@ -70,6 +70,8 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
   const [deterministicOnly, setDeterministicOnly] = useState(false);
   const [smsFunnel, setSmsFunnel] = useState<SmsFunnel>({ sent: 0, delivered: 0, clicked: 0, donated: 0, optedOut: 0 });
   const [journeyEvents, setJourneyEvents] = useState<JourneyEvent[]>([]);
+  const [smsCost, setSmsCost] = useState<number>(0);
+  const [smsSent, setSmsSent] = useState<number>(0);
 
   useEffect(() => {
     loadData();
@@ -188,6 +190,24 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
           donated: smsDonations,
           optedOut: counts.opted_out || 0,
         });
+      }
+
+      // Load SMS cost/sent from sms_campaigns for CAC calculations
+      const { data: smsCampaigns, error: smsCostErr } = await (supabase as any)
+        .from('sms_campaigns')
+        .select('cost, messages_sent, send_date, status')
+        .eq('organization_id', organizationId)
+        .gte('send_date', startDate)
+        .lte('send_date', `${endDate}T23:59:59`)
+        .neq('status', 'draft');
+
+      if (smsCostErr) {
+        logger.error('Failed to load sms_campaigns cost', smsCostErr);
+      } else {
+        const totalCost = smsCampaigns?.reduce((sum: number, c: any) => sum + Number(c.cost || 0), 0) || 0;
+        const totalSent = smsCampaigns?.reduce((sum: number, c: any) => sum + Number(c.messages_sent || 0), 0) || 0;
+        setSmsCost(totalCost);
+        setSmsSent(totalSent);
       }
 
       // Load donor journeys (limited for performance)
@@ -600,6 +620,27 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                     <div className="text-2xl font-bold portal-text-primary">{item.value.toLocaleString()}</div>
                   </div>
                 ))}
+              </div>
+              <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                  <div className="text-sm portal-text-muted">SMS Spend</div>
+                  <div className="text-2xl font-bold portal-text-primary">
+                    {smsCost >= 1000 ? `$${(smsCost / 1000).toFixed(1)}K` : `$${smsCost.toFixed(0)}`}
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                  <div className="text-sm portal-text-muted">Cost / Send</div>
+                  <div className="text-2xl font-bold portal-text-primary">
+                    {smsSent > 0 ? `$${(smsCost / smsSent).toFixed(3)}` : '$0'}
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                  <div className="text-sm portal-text-muted">SMS CAC</div>
+                  <div className="text-2xl font-bold portal-text-primary">
+                    {smsFunnel.donated > 0 ? `$${(smsCost / smsFunnel.donated).toFixed(0)}` : 'N/A'}
+                  </div>
+                  <div className="text-xs portal-text-muted">Cost per donating recipient</div>
+                </div>
               </div>
             </PortalCardContent>
           </PortalCard>
