@@ -19,6 +19,11 @@ interface AttributionData {
   attributed_ad_id?: string | null;
   attributed_creative_id?: string | null;
   refcode?: string | null;
+  attribution_method?: string | null;
+  transaction_click_id?: string | null;
+  transaction_fbclid?: string | null;
+  mapped_click_id?: string | null;
+  mapped_fbclid?: string | null;
   creative_topic: string | null;
   creative_tone: string | null;
   amount: number;
@@ -42,6 +47,7 @@ interface CreativePerformance {
   donations: number;
   revenue: number;
   avgDonation: number;
+  deterministicRate: number;
 }
 
 interface SmsFunnel {
@@ -89,9 +95,10 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
   }, [organizationId, startDate, endDate]);
 
   const isDeterministic = (d: AttributionData) => {
+    if (d.attribution_method === 'refcode' || d.attribution_method === 'click_id') return true;
     return Boolean(
       d.attributed_platform &&
-      (d.attributed_campaign_id || d.attributed_ad_id || d.attributed_creative_id || d.refcode)
+      (d.attributed_campaign_id || d.attributed_ad_id || d.attributed_creative_id || d.refcode || d.transaction_click_id || d.transaction_fbclid)
     );
   };
 
@@ -127,7 +134,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
       // Load attribution data
       const { data: attrData, error: attrError } = await (supabase as any)
         .from('donation_attribution')
-        .select('attributed_platform, attributed_campaign_id, attributed_ad_id, attributed_creative_id, refcode, creative_topic, creative_tone, amount, net_amount, transaction_type')
+        .select('attributed_platform, attributed_campaign_id, attributed_ad_id, attributed_creative_id, refcode, creative_topic, creative_tone, amount, net_amount, transaction_type, attribution_method, transaction_click_id, transaction_fbclid, mapped_click_id, mapped_fbclid')
         .eq('organization_id', organizationId)
         .gte('transaction_date', startDate)
         .lte('transaction_date', `${endDate}T23:59:59`)
@@ -262,15 +269,16 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
 
   // Revenue by platform - formatted for PortalBarChart
   const platformRevenue = useMemo(() => {
-    const byPlatform: Record<string, { revenue: number; netRevenue: number; count: number }> = {};
+    const byPlatform: Record<string, { revenue: number; netRevenue: number; count: number; deterministicCount: number }> = {};
     filteredAttribution.forEach(d => {
       const platform = d.attributed_platform || 'unattributed';
       if (!byPlatform[platform]) {
-        byPlatform[platform] = { revenue: 0, netRevenue: 0, count: 0 };
+        byPlatform[platform] = { revenue: 0, netRevenue: 0, count: 0, deterministicCount: 0 };
       }
       byPlatform[platform].revenue += Number(d.amount || 0);
       byPlatform[platform].netRevenue += Number(d.net_amount ?? d.amount ?? 0);
       byPlatform[platform].count++;
+      if (isDeterministic(d)) byPlatform[platform].deterministicCount++;
     });
 
     return Object.entries(byPlatform)
@@ -280,20 +288,22 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
         netRevenue: Math.round(data.netRevenue),
         donations: data.count,
         avgDonation: data.count > 0 ? Math.round(data.revenue / data.count) : 0,
+        deterministicRate: data.count > 0 ? Math.round((data.deterministicCount / data.count) * 100) : 0,
       }))
       .sort((a, b) => b.value - a.value);
-  }, [attributionData]);
+  }, [filteredAttribution, attributionData]);
 
   // Revenue by creative topic
   const topicPerformance = useMemo(() => {
-    const byTopic: Record<string, { revenue: number; count: number }> = {};
+    const byTopic: Record<string, { revenue: number; count: number; deterministicCount: number }> = {};
     filteredAttribution.forEach(d => {
       const topic = d.creative_topic || 'unknown';
       if (!byTopic[topic]) {
-        byTopic[topic] = { revenue: 0, count: 0 };
+        byTopic[topic] = { revenue: 0, count: 0, deterministicCount: 0 };
       }
       byTopic[topic].revenue += Number(d.amount || 0);
       byTopic[topic].count++;
+      if (isDeterministic(d)) byTopic[topic].deterministicCount++;
     });
 
     return Object.entries(byTopic)
@@ -303,10 +313,11 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
         donations: data.count,
         revenue: Math.round(data.revenue),
         avgDonation: data.count > 0 ? Math.round(data.revenue / data.count) : 0,
+        deterministicRate: data.count > 0 ? Math.round((data.deterministicCount / data.count) * 100) : 0,
       }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
-  }, [attributionData]);
+  }, [filteredAttribution, attributionData]);
 
   // Donor segments breakdown - formatted for PortalBarChart
   const segmentBreakdown = useMemo(() => {
@@ -435,7 +446,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
             {deterministicOnly ? "Showing deterministic only" : "Filter to deterministic"}
           </Badge>
         </div>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
           <TabsTrigger value="attribution">Attribution</TabsTrigger>
           <TabsTrigger value="topics">Creative Topics</TabsTrigger>
           <TabsTrigger value="segments">Donor Segments</TabsTrigger>
@@ -486,7 +497,9 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                         <div className="text-lg font-bold portal-text-muted">#{idx + 1}</div>
                         <div>
                           <div className="font-medium portal-text-primary">{platform.name}</div>
-                          <div className="text-sm portal-text-muted">{platform.donations} donations</div>
+                          <div className="text-sm portal-text-muted">
+                            {platform.donations} donations · {platform.deterministicRate}% deterministic
+                          </div>
                         </div>
                       </div>
                       <div className="text-right">
@@ -537,7 +550,9 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                       </div>
                       <div className="text-right">
                         <div className="font-bold portal-text-primary">{formatCurrency(topic.revenue)}</div>
-                        <div className="text-sm portal-text-muted">Avg: {formatCurrency(topic.avgDonation)}</div>
+                        <div className="text-sm portal-text-muted">
+                          Avg: {formatCurrency(topic.avgDonation)} · {topic.deterministicRate}% deterministic
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -766,7 +781,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                 </div>
               </div>
               <div className="mt-4 text-sm portal-text-muted">
-                Forecasting UI uses the latest donor_ltv_predictions (placeholder values until model is populated).
+                Forecasting uses the latest donor_ltv_predictions (heuristic v1, refresh with the LTV refresh function).
               </div>
             </PortalCardContent>
           </PortalCard>

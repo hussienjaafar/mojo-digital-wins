@@ -310,7 +310,7 @@ serve(async (req) => {
 
     // Extract refcodes
     const refcodes = parsedPayload.contribution.refcodes || {};
-    const refcode = refcodes.refcode || null;
+    let refcode = refcodes.refcode || null;
     
     // Extract source campaign from refcode
     let sourceCampaign = null;
@@ -326,6 +326,8 @@ serve(async (req) => {
       ? `${donor.firstname} ${donor.lastname}`.trim() 
       : null;
     const customFields = contribution.customFields || [];
+    const clickId = getCustomFieldValue(customFields, 'click_id') || getCustomFieldValue(customFields, 'fbclid');
+    const fbclid = getCustomFieldValue(customFields, 'fbclid');
 
     // Recurring state derivation (best-effort with available payload fields)
     let recurringState: string | null = null;
@@ -366,6 +368,29 @@ serve(async (req) => {
       }
     }
 
+    // Fallback deterministic lookup by click_id/fbclid when refcode is missing or unmapped
+    if (!mapping && (clickId || fbclid)) {
+      const conditions = [];
+      if (clickId) conditions.push(`click_id.eq.${clickId}`);
+      if (fbclid) conditions.push(`fbclid.eq.${fbclid}`);
+
+      const { data: clickMapping } = await supabase
+        .from('refcode_mappings')
+        .select('platform, campaign_id, ad_id, creative_id, refcode')
+        .eq('organization_id', organization_id)
+        .or(conditions.join(','))
+        .maybeSingle();
+
+      if (clickMapping) {
+        mapping = clickMapping;
+        determinedSource = clickMapping.platform || 'meta';
+        if (!refcode) {
+          refcode = clickMapping.refcode || clickId || fbclid;
+        }
+        console.log('[ACTBLUE] Deterministic attribution via click_id/fbclid', { clickId, fbclid });
+      }
+    }
+
     // Store transaction data (RLS-compatible with service role)
     // Now capturing ALL available ActBlue fields for complete analytics
     const { error: insertError } = await supabase
@@ -403,8 +428,8 @@ serve(async (req) => {
         refcode2: safeString(refcodes.refcode2),
         refcode_custom: safeString(refcodes.refcodeCustom),
         // Deterministic attribution support
-        click_id: getCustomFieldValue(customFields, 'click_id') || getCustomFieldValue(customFields, 'fbclid'),
-        fbclid: getCustomFieldValue(customFields, 'fbclid'),
+        click_id: clickId,
+        fbclid,
         source_campaign: determinedSource,
         ab_test_name: safeString(contribution.abTestName),
         ab_test_variation: safeString(contribution.abTestVariation),
@@ -440,23 +465,26 @@ serve(async (req) => {
     }
 
     // Track attribution touchpoint
-    if (donor.email && refcode) {
+    const touchpointRef = refcode || mapping?.refcode || clickId || fbclid;
+    if (donor.email && touchpointRef) {
       await supabase.from('attribution_touchpoints').insert({
         organization_id,
         donor_email: safeString(donor.email),
         touchpoint_type: determinedSource || 'other',
         campaign_id: mapping?.campaign_id || safeString(contribution.contributionForm),
+        ad_id: mapping?.ad_id || null,
+        creative_id: mapping?.creative_id || null,
         utm_source: safeString(refcodes.refcode2),
-        utm_campaign: refcode,
-        refcode: refcode,
+        utm_campaign: touchpointRef,
+        refcode: touchpointRef,
         occurred_at: paidAt,
         metadata: {
           ab_test: safeString(contribution.abTestName),
           ab_variation: safeString(contribution.abTestVariation),
           is_mobile: safeBool(contribution.isMobile),
           deterministic_match: !!mapping,
-          ad_id: mapping?.ad_id || null,
-          creative_id: mapping?.creative_id || null,
+          click_id: clickId,
+          fbclid: fbclid,
         },
       }).then(({ error }) => {
         if (error) console.error('[ACTBLUE] Error tracking touchpoint:', error);
