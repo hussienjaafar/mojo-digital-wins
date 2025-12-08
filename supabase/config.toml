@@ -1,129 +1,22 @@
 project_id = "nuclmzoasgydubdshtab"
 
+# --- SCHEDULED / CRON JOBS (require CRON_SECRET header or admin JWT) ---
 [functions.tiered-meta-sync]
-verify_jwt = false
-
-[functions.cleanup-bluesky-posts]
-verify_jwt = false
-
-[functions.create-client-user]
-verify_jwt = true
-
-[functions.calculate-entity-trends]
-verify_jwt = false
-
-[functions.match-entity-watchlist]
-verify_jwt = false
-
-[functions.generate-suggested-actions]
-verify_jwt = false
-
-[functions.calculate-attribution]
-verify_jwt = false
-
-[functions.fetch-polling-data]
-verify_jwt = false
-
-[functions.scrape-organization-website]
-verify_jwt = true
-
-[functions.generate-blog-post]
-verify_jwt = true
-
-[functions.meta-conversions]
-verify_jwt = true
-
-[functions.sync-meta-ads]
-verify_jwt = false
-
-[functions.sync-switchboard-sms]
-verify_jwt = false
-
-[functions.actblue-webhook]
-verify_jwt = false
-
-[functions.calculate-roi]
-verify_jwt = true
-
-[functions.send-email-report]
-verify_jwt = true
-
-[functions.send-contact-notification]
-verify_jwt = false
-
-[functions.send-admin-invite]
-verify_jwt = false
-
-[functions.fetch-rss-feeds]
-verify_jwt = false
-
-[functions.sync-congress-bills]
-verify_jwt = false
-
-[functions.fetch-bill-text]
-verify_jwt = false
-
-[functions.analyze-articles]
-verify_jwt = false
-
-[functions.send-notification-email]
-verify_jwt = false
-
-[functions.generate-ai-summary]
-verify_jwt = false
-
-[functions.generate-daily-briefing]
-verify_jwt = false
-
-[functions.detect-duplicates]
-verify_jwt = false
-
-[functions.fetch-executive-orders]
-verify_jwt = false
-
-[functions.track-state-actions]
-verify_jwt = false
-
-[functions.smart-alerting]
 verify_jwt = false
 
 [functions.run-scheduled-jobs]
 verify_jwt = true
 
-[functions.send-daily-briefing]
+[functions.ttl-cleanup]
 verify_jwt = false
 
-[functions.send-webhook]
+[functions.cleanup-old-cache]
 verify_jwt = false
 
-[functions.extract-trending-topics]
+[functions.cleanup-bluesky-posts]
 verify_jwt = false
 
-[functions.bluesky-stream]
-verify_jwt = false
-
-[functions.analyze-bluesky-posts]
-verify_jwt = false
-
-[functions.correlate-social-news]
-verify_jwt = false
-
-[functions.monitor-attribution-health]
-verify_jwt = true
-
-[functions.calculate-attribution-models]
-verify_jwt = true
-
-[functions.analyze-donor-cohorts]
-verify_jwt = true
-
-[functions.backfill-bluesky-analysis]
-verify_jwt = false
-
-[functions.calculate-bluesky-trends]
-verify_jwt = false
-
-[functions.calculate-news-trends]
+[functions.detect-anomalies]
 verify_jwt = false
 
 [functions.detect-spikes]
@@ -132,62 +25,35 @@ verify_jwt = false
 [functions.detect-breaking-news]
 verify_jwt = false
 
-[functions.send-spike-alerts]
+[functions.calculate-bluesky-trends]
 verify_jwt = false
 
-[functions.analyze-sms-creatives]
+[functions.calculate-news-trends]
 verify_jwt = false
 
-[functions.analyze-meta-creatives]
+[functions.calculate-entity-trends]
 verify_jwt = false
 
-[functions.calculate-creative-learnings]
-verify_jwt = false
-
-[functions.backfill-creative-analysis]
-verify_jwt = false
-
-[functions.detect-anomalies]
+[functions.calculate-trend-clusters]
 verify_jwt = false
 
 [functions.aggregate-sentiment]
 verify_jwt = false
 
-[functions.ops-alerts]
+[functions.extract-trending-topics]
 verify_jwt = false
 
-[functions.run-diagnostics]
+[functions.correlate-social-news]
 verify_jwt = false
 
-[functions.track-attribution-touchpoint]
+[functions.fetch-rss-feeds]
 verify_jwt = false
 
-[functions.track-event-impact]
+[functions.fetch-executive-orders]
 verify_jwt = false
 
-[functions.detect-fundraising-opportunities]
+[functions.fetch-polling-data]
 verify_jwt = false
-
-[functions.generate-campaign-messages]
-verify_jwt = false
-
-[functions.optimize-send-timing]
-verify_jwt = false
-
-[functions.backfill-bluesky-posts]
-verify_jwt = false
-
-[functions.cleanup-old-cache]
-verify_jwt = false
-
-[functions.backfill-analysis]
-verify_jwt = false
-
-[functions.reset-client-password]
-verify_jwt = true
-
-[functions.generate-report]
-verify_jwt = true
 
 [functions.fetch-google-news]
 verify_jwt = false
@@ -195,41 +61,177 @@ verify_jwt = false
 [functions.fetch-reddit-posts]
 verify_jwt = false
 
+[functions.sync-congress-bills]
+verify_jwt = false
+
+[functions.bluesky-stream]
+verify_jwt = false
+
+[functions.analyze-articles]
+verify_jwt = false
+
+[functions.analyze-bluesky-posts]
+verify_jwt = false
+
 [functions.batch-analyze-content]
 verify_jwt = false
 
-[functions.calculate-trend-clusters]
+[functions.detect-duplicates]
 verify_jwt = false
 
-[functions.entity-resolver]
+[functions.send-daily-briefing]
 verify_jwt = false
 
-[functions.sync-actblue-csv]
+[functions.send-spike-alerts]
 verify_jwt = false
 
-[functions.admin-sync-meta]
+[functions.smart-alerting]
 verify_jwt = false
 
-[functions.ttl-cleanup]
-verify_jwt = false
-
-[functions.transcribe-video-creative]
-verify_jwt = false
-
-[functions.generate-creative-recommendations]
+[functions.send-webhook]
 verify_jwt = false
 
 [functions.update-data-freshness]
 verify_jwt = false
 
-[functions.aggregate-creative-metrics]
+# --- ADMIN-ONLY FUNCTIONS (require admin JWT) ---
+[functions.admin-sync-meta]
 verify_jwt = false
+
+[functions.ops-alerts]
+verify_jwt = false
+
+[functions.run-diagnostics]
+verify_jwt = true
+
+[functions.backfill-analysis]
+verify_jwt = true
+
+[functions.backfill-bluesky-analysis]
+verify_jwt = true
+
+[functions.backfill-bluesky-posts]
+verify_jwt = true
+
+[functions.backfill-creative-analysis]
+verify_jwt = true
 
 [functions.backfill-thumbnails]
-verify_jwt = false
+verify_jwt = true
 
 [functions.backfill-video-sources]
-verify_jwt = false
+verify_jwt = true
+
+[functions.monitor-attribution-health]
+verify_jwt = true
+
+# --- CLIENT-AUTHENTICATED FUNCTIONS (require user JWT + org membership) ---
+[functions.calculate-roi]
+verify_jwt = true
+
+[functions.analyze-donor-cohorts]
+verify_jwt = true
+
+[functions.calculate-attribution-models]
+verify_jwt = true
+
+[functions.calculate-attribution]
+verify_jwt = true
+
+[functions.generate-report]
+verify_jwt = true
+
+[functions.send-email-report]
+verify_jwt = true
+
+[functions.sync-meta-ads]
+verify_jwt = true
+
+[functions.sync-switchboard-sms]
+verify_jwt = true
+
+[functions.sync-actblue-csv]
+verify_jwt = true
 
 [functions.auto-match-attribution]
+verify_jwt = true
+
+[functions.analyze-sms-creatives]
+verify_jwt = true
+
+[functions.analyze-meta-creatives]
+verify_jwt = true
+
+[functions.calculate-creative-learnings]
+verify_jwt = true
+
+[functions.aggregate-creative-metrics]
+verify_jwt = true
+
+[functions.generate-creative-recommendations]
+verify_jwt = true
+
+[functions.transcribe-video-creative]
+verify_jwt = true
+
+[functions.detect-fundraising-opportunities]
+verify_jwt = true
+
+[functions.generate-campaign-messages]
+verify_jwt = true
+
+[functions.optimize-send-timing]
+verify_jwt = true
+
+[functions.track-event-impact]
+verify_jwt = true
+
+[functions.create-client-user]
+verify_jwt = true
+
+[functions.reset-client-password]
+verify_jwt = true
+
+[functions.scrape-organization-website]
+verify_jwt = true
+
+[functions.generate-blog-post]
+verify_jwt = true
+
+# --- PUBLIC WEBHOOKS (verify their own signatures) ---
+[functions.actblue-webhook]
+verify_jwt = false
+
+[functions.meta-conversions]
+verify_jwt = false
+
+[functions.track-attribution-touchpoint]
+verify_jwt = false
+
+[functions.send-contact-notification]
+verify_jwt = false
+
+[functions.send-admin-invite]
+verify_jwt = false
+
+[functions.send-notification-email]
+verify_jwt = false
+
+# --- OTHER FUNCTIONS ---
+[functions.fetch-bill-text]
+verify_jwt = false
+
+[functions.generate-ai-summary]
+verify_jwt = false
+
+[functions.generate-daily-briefing]
+verify_jwt = false
+
+[functions.match-entity-watchlist]
+verify_jwt = false
+
+[functions.generate-suggested-actions]
+verify_jwt = false
+
+[functions.entity-resolver]
 verify_jwt = false

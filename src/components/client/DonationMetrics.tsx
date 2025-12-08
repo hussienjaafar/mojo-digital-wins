@@ -4,7 +4,7 @@ import { PortalCard, PortalCardContent, PortalCardHeader, PortalCardTitle } from
 import { PortalMetric } from "@/components/portal/PortalMetric";
 import { PortalBadge } from "@/components/portal/PortalBadge";
 import { Input } from "@/components/ui/input";
-import { Search, DollarSign, Users, Repeat, TrendingUp, TrendingDown, PieChart, BarChart3, Filter } from "lucide-react";
+import { Search, DollarSign, Users, Repeat, TrendingUp, TrendingDown, PieChart, BarChart3, Filter, ShieldAlert } from "lucide-react";
 import { format, subDays, parseISO } from "date-fns";
 import { logger } from "@/lib/logger";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
@@ -12,6 +12,8 @@ import { NoResultsEmptyState } from "@/components/portal/PortalEmptyState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ResponsiveLineChart, ResponsiveBarChart, ResponsivePieChart } from "@/components/charts";
 import { formatCurrency } from "@/lib/chart-formatters";
+import { usePIIAccess } from "@/hooks/usePIIAccess";
+import { maskDonorInfo, DonorInfo } from "@/lib/pii-masking";
 
 type Props = {
   organizationId: string;
@@ -58,6 +60,20 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [isLoading, setIsLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [amountFilter, setAmountFilter] = useState<string>("all");
+  
+  // PII access control - masks donor names/emails for users without PII access
+  const { shouldMaskPII, isLoading: piiLoading } = usePIIAccess(organizationId);
+
+  // Apply PII masking to transactions based on user's access level
+  const maskedTransactions = useMemo(() => {
+    if (!shouldMaskPII) return transactions;
+    return transactions.map(t => maskDonorInfo(t, true) as Transaction);
+  }, [transactions, shouldMaskPII]);
+
+  const maskedPreviousTransactions = useMemo(() => {
+    if (!shouldMaskPII) return previousTransactions;
+    return previousTransactions.map(t => maskDonorInfo(t, true) as Transaction);
+  }, [previousTransactions, shouldMaskPII]);
 
   const getPreviousPeriod = () => {
     const start = parseISO(startDate);
@@ -124,16 +140,22 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     }
   };
 
-  // Filter transactions
+  // Filter transactions (use masked data for display)
   const filteredTransactions = useMemo(() => {
-    let filtered = transactions;
+    let filtered = maskedTransactions;
 
     if (searchTerm) {
-      filtered = filtered.filter(t =>
-        t.donor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.transaction_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.refcode?.toLowerCase().includes(searchTerm.toLowerCase())
+      // Search on original data for accuracy, then filter masked results
+      const originalMatches = new Set(
+        transactions
+          .filter(t =>
+            t.donor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            t.transaction_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            t.refcode?.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+          .map(t => t.id)
       );
+      filtered = filtered.filter(t => originalMatches.has(t.id));
     }
 
     if (typeFilter === "recurring") {
@@ -153,7 +175,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     }
 
     return filtered;
-  }, [searchTerm, transactions, typeFilter, amountFilter]);
+  }, [searchTerm, transactions, maskedTransactions, typeFilter, amountFilter]);
 
   // Calculate current period metrics
   const metrics = useMemo(() => {
@@ -261,7 +283,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
       }));
   }, [transactions]);
 
-  // New vs repeat donors
+  // New vs repeat donors (use original data for accurate counts)
   const donorInsights = useMemo(() => {
     const donations = transactions.filter(t => t.transaction_type === 'donation');
     const donorEmails = new Set(donations.map(d => d.donor_email));
@@ -280,6 +302,14 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
     return { newDonors, repeatDonors };
   }, [transactions, previousTransactions]);
+
+  // PII masking indicator component
+  const PIIMaskingIndicator = () => shouldMaskPII ? (
+    <div className="flex items-center gap-1.5 text-xs portal-text-muted bg-[hsl(var(--portal-bg-elevated))] px-2 py-1 rounded border border-[hsl(var(--portal-border))]">
+      <ShieldAlert className="h-3 w-3" />
+      <span>Donor PII masked</span>
+    </div>
+  ) : null;
 
   const TrendIndicator = ({ value, isPositive }: { value: number; isPositive?: boolean }) => {
     const positive = isPositive ?? value >= 0;
@@ -419,7 +449,10 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
       <PortalCard>
         <PortalCardHeader>
           <div className="flex flex-col gap-3">
-            <PortalCardTitle>Recent Transactions</PortalCardTitle>
+            <div className="flex items-center justify-between">
+              <PortalCardTitle>Recent Transactions</PortalCardTitle>
+              <PIIMaskingIndicator />
+            </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 portal-text-muted" />
