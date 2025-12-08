@@ -4,7 +4,7 @@ import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardContent } from
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity } from "lucide-react";
+import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity, GitBranch } from "lucide-react";
 import { logger } from "@/lib/logger";
 
 interface DonorIntelligenceProps {
@@ -52,12 +52,24 @@ interface SmsFunnel {
   optedOut: number;
 }
 
+interface JourneyEvent {
+  donor_key: string;
+  event_type: string;
+  occurred_at: string;
+  amount: number | null;
+  net_amount: number | null;
+  source: string | null;
+  transaction_type: string | null;
+  refcode: string | null;
+}
+
 export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorIntelligenceProps) => {
   const [attributionData, setAttributionData] = useState<AttributionData[]>([]);
   const [segmentData, setSegmentData] = useState<DonorSegment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deterministicOnly, setDeterministicOnly] = useState(false);
   const [smsFunnel, setSmsFunnel] = useState<SmsFunnel>({ sent: 0, delivered: 0, clicked: 0, donated: 0, optedOut: 0 });
+  const [journeyEvents, setJourneyEvents] = useState<JourneyEvent[]>([]);
 
   useEffect(() => {
     loadData();
@@ -80,6 +92,21 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
     const deterministicCount = attributionData.filter(isDeterministic).length;
     return (deterministicCount / attributionData.length) * 100;
   }, [attributionData]);
+
+  const groupedJourneys = useMemo(() => {
+    const byDonor: Record<string, JourneyEvent[]> = {};
+    journeyEvents.forEach(ev => {
+      if (!ev.donor_key) return;
+      if (!byDonor[ev.donor_key]) byDonor[ev.donor_key] = [];
+      byDonor[ev.donor_key].push(ev);
+    });
+    // Sort events per donor by time desc
+    Object.values(byDonor).forEach(list => list.sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime()));
+    // Sort donors by most recent event
+    return Object.entries(byDonor)
+      .sort(([, a], [, b]) => (new Date(b[0]?.occurred_at || 0).getTime()) - (new Date(a[0]?.occurred_at || 0).getTime()))
+      .slice(0, 10); // limit to top 10 donors for display
+  }, [journeyEvents]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -161,6 +188,22 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
           donated: smsDonations,
           optedOut: counts.opted_out || 0,
         });
+      }
+
+      // Load donor journeys (limited for performance)
+      const { data: journeys, error: journeyErr } = await (supabase as any)
+        .from('donor_journeys')
+        .select('donor_key, event_type, occurred_at, amount, net_amount, source, transaction_type, refcode')
+        .eq('organization_id', organizationId)
+        .gte('occurred_at', startDate)
+        .lte('occurred_at', `${endDate}T23:59:59`)
+        .order('occurred_at', { ascending: false })
+        .limit(200);
+
+      if (journeyErr) {
+        logger.error('Failed to load donor journeys', journeyErr);
+      } else {
+        setJourneyEvents(journeys || []);
       }
     } catch (error) {
       logger.error('Failed to load donor intelligence data', error);
@@ -349,6 +392,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
           <TabsTrigger value="topics">Creative Topics</TabsTrigger>
           <TabsTrigger value="segments">Donor Segments</TabsTrigger>
           <TabsTrigger value="sms">SMS Funnel</TabsTrigger>
+          <TabsTrigger value="journeys">Journeys</TabsTrigger>
         </TabsList>
 
         <TabsContent value="attribution" className="space-y-6">
@@ -548,7 +592,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                   { label: "Sent", value: smsFunnel.sent },
                   { label: "Delivered", value: smsFunnel.delivered },
                   { label: "Clicked", value: smsFunnel.clicked },
-                  { label: "Donated (placeholder)", value: smsFunnel.donated },
+                  { label: "Donated (via journeys)", value: smsFunnel.donated },
                   { label: "Opt-outs", value: smsFunnel.optedOut },
                 ].map(item => (
                   <div key={item.label} className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
@@ -557,6 +601,60 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                   </div>
                 ))}
               </div>
+            </PortalCardContent>
+          </PortalCard>
+        </TabsContent>
+
+        <TabsContent value="journeys" className="space-y-6">
+          <PortalCard>
+            <PortalCardHeader>
+              <PortalCardTitle className="flex items-center gap-2">
+                <GitBranch className="h-4 w-4" />
+                Recent Journeys (top 10)
+              </PortalCardTitle>
+            </PortalCardHeader>
+            <PortalCardContent>
+              {groupedJourneys.length === 0 ? (
+                <div className="h-[120px] flex items-center justify-center portal-text-muted">
+                  No journeys found for this range
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {groupedJourneys.map(([donorKey, events]) => (
+                    <div key={donorKey} className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-semibold portal-text-primary">
+                          Donor {donorKey.slice(0, 6)}…{donorKey.slice(-4)}
+                        </div>
+                        <div className="text-xs portal-text-muted">
+                          {new Date(events[0].occurred_at).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {events.slice(0, 6).map((ev, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2 portal-text-muted">
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[hsl(var(--portal-bg-tertiary))] text-[10px] font-semibold">
+                                {ev.event_type === 'donation' ? '$' : ev.event_type === 'sms' ? 'SMS' : 'TP'}
+                              </span>
+                              <span className="portal-text-primary">
+                                {ev.event_type === 'donation'
+                                  ? `Donation ${ev.net_amount ? `$${Number(ev.net_amount).toFixed(0)}` : ''}`
+                                  : ev.event_type === 'sms'
+                                  ? `SMS ${ev.source || ''}` 
+                                  : `Touchpoint ${ev.source || ''}`}
+                              </span>
+                            </div>
+                            <div className="text-xs portal-text-muted">
+                              {new Date(ev.occurred_at).toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </PortalCardContent>
           </PortalCard>
         </TabsContent>
