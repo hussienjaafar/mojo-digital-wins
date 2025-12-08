@@ -4,7 +4,7 @@ import { PortalMetric } from "@/components/portal/PortalMetric";
 import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardContent } from "@/components/portal/PortalCard";
 import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
-import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff } from "lucide-react";
+import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet } from "lucide-react";
 import { format, parseISO, eachDayOfInterval, subDays } from "date-fns";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
@@ -17,10 +17,15 @@ interface ClientDashboardMetricsProps {
 
 interface DonationData {
   amount: number;
+  net_amount: number | null;
+  fee: number | null;
   donor_email: string;
   is_recurring: boolean;
+  recurring_upsell_shown: boolean | null;
+  recurring_upsell_succeeded: boolean | null;
   transaction_date: string;
   refcode: string | null;
+  source_campaign: string | null;
 }
 
 interface MetaData {
@@ -72,9 +77,10 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     
     try {
       // Load current period donations (using secure view for defense-in-depth PII protection)
+      // Now fetching net_amount, fee, and recurring upsell data for enhanced analytics
       const { data: donationData } = await (supabase as any)
         .from('actblue_transactions_secure')
-        .select('amount, donor_email, is_recurring, transaction_date, refcode')
+        .select('amount, net_amount, fee, donor_email, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_date, refcode, source_campaign')
         .eq('organization_id', organizationId)
         .gte('transaction_date', startDate)
         .lte('transaction_date', `${endDate}T23:59:59`);
@@ -84,7 +90,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       // Load previous period donations (using secure view for defense-in-depth PII protection)
       const { data: prevDonationData } = await (supabase as any)
         .from('actblue_transactions_secure')
-        .select('amount, donor_email, is_recurring, transaction_date, refcode')
+        .select('amount, net_amount, fee, donor_email, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_date, refcode, source_campaign')
         .eq('organization_id', organizationId)
         .gte('transaction_date', prevPeriod.start)
         .lte('transaction_date', `${prevPeriod.end}T23:59:59`);
@@ -160,10 +166,15 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
           if (txDate >= startDate && txDate <= `${endDate}T23:59:59`) {
             setDonations(prev => [{
               amount: newDonation.amount,
+              net_amount: newDonation.fee != null ? newDonation.amount - newDonation.fee : newDonation.amount,
+              fee: newDonation.fee,
               donor_email: newDonation.donor_email,
               is_recurring: newDonation.is_recurring,
+              recurring_upsell_shown: newDonation.recurring_upsell_shown,
+              recurring_upsell_succeeded: newDonation.recurring_upsell_succeeded,
               transaction_date: newDonation.transaction_date,
               refcode: newDonation.refcode,
+              source_campaign: newDonation.source_campaign,
             }, ...prev]);
             
             toast.success(`New donation: $${Number(newDonation.amount).toFixed(2)}`, {
@@ -193,18 +204,36 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     return ((current - previous) / previous) * 100;
   };
 
-  // Calculate KPIs for current period
+  // Calculate KPIs for current period - now with net revenue and upsell metrics
   const kpis = useMemo(() => {
     const totalRaised = donations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    // Net revenue = gross - fees (using net_amount when available)
+    const totalNetRevenue = donations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
+    const totalFees = donations.reduce((sum, d) => sum + Number(d.fee || 0), 0);
+    const feePercentage = totalRaised > 0 ? (totalFees / totalRaised) * 100 : 0;
+    
     const uniqueDonors = new Set(donations.map(d => d.donor_email)).size;
     const recurringDonors = donations.filter(d => d.is_recurring).length;
     const recurringPercentage = donations.length > 0 ? (recurringDonors / donations.length) * 100 : 0;
+    
+    // Recurring upsell metrics
+    const upsellShown = donations.filter(d => d.recurring_upsell_shown).length;
+    const upsellSucceeded = donations.filter(d => d.recurring_upsell_succeeded).length;
+    const upsellConversionRate = upsellShown > 0 ? (upsellSucceeded / upsellShown) * 100 : 0;
+    
+    // Attribution breakdown by source
+    const bySource = donations.reduce((acc, d) => {
+      const source = d.source_campaign || 'direct';
+      acc[source] = (acc[source] || 0) + Number(d.amount || 0);
+      return acc;
+    }, {} as Record<string, number>);
     
     const totalMetaSpend = metaMetrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
     const totalSMSCost = smsMetrics.reduce((sum, s) => sum + Number(s.cost || 0), 0);
     const totalSpend = totalMetaSpend + totalSMSCost;
     
-    const roi = totalSpend > 0 ? totalRaised / totalSpend : 0;
+    // Use net revenue for accurate ROI calculation
+    const roi = totalSpend > 0 ? totalNetRevenue / totalSpend : 0;
     
     const totalImpressions = metaMetrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
     const totalClicks = metaMetrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
@@ -212,20 +241,26 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
 
     return {
       totalRaised,
+      totalNetRevenue,
+      totalFees,
+      feePercentage,
       uniqueDonors,
       recurringPercentage,
+      upsellConversionRate,
       roi,
       totalSpend,
       totalImpressions,
       totalClicks,
       avgDonation,
       donationCount: donations.length,
+      revenueBySource: bySource,
     };
   }, [donations, metaMetrics, smsMetrics]);
 
   // Calculate KPIs for previous period
   const prevKpis = useMemo(() => {
     const totalRaised = prevDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    const totalNetRevenue = prevDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
     const uniqueDonors = new Set(prevDonations.map(d => d.donor_email)).size;
     const recurringDonors = prevDonations.filter(d => d.is_recurring).length;
     const recurringPercentage = prevDonations.length > 0 ? (recurringDonors / prevDonations.length) * 100 : 0;
@@ -234,10 +269,11 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     const totalSMSCost = prevSmsMetrics.reduce((sum, s) => sum + Number(s.cost || 0), 0);
     const totalSpend = totalMetaSpend + totalSMSCost;
     
-    const roi = totalSpend > 0 ? totalRaised / totalSpend : 0;
+    const roi = totalSpend > 0 ? totalNetRevenue / totalSpend : 0;
 
     return {
       totalRaised,
+      totalNetRevenue,
       uniqueDonors,
       recurringPercentage,
       roi,
@@ -290,11 +326,11 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
 
   const heroKpis = [
     {
-      label: "Total Raised",
-      value: formatCurrency(kpis.totalRaised),
-      icon: DollarSign,
-      trend: { value: Math.round(calcChange(kpis.totalRaised, prevKpis.totalRaised)), isPositive: kpis.totalRaised >= prevKpis.totalRaised },
-      subtitle: `${kpis.donationCount} donations`,
+      label: "Net Revenue",
+      value: formatCurrency(kpis.totalNetRevenue),
+      icon: Wallet,
+      trend: { value: Math.round(calcChange(kpis.totalNetRevenue, prevKpis.totalNetRevenue)), isPositive: kpis.totalNetRevenue >= prevKpis.totalNetRevenue },
+      subtitle: `Gross: ${formatCurrency(kpis.totalRaised)} (${kpis.feePercentage.toFixed(1)}% fees)`,
     },
     {
       label: "Unique Donors",
@@ -304,7 +340,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       subtitle: `Avg: ${formatCurrency(kpis.avgDonation)}`,
     },
     {
-      label: "Overall ROI",
+      label: "Net ROI",
       value: `${kpis.roi.toFixed(1)}x`,
       icon: TrendingUp,
       trend: { value: Math.round(calcChange(kpis.roi, prevKpis.roi)), isPositive: kpis.roi >= prevKpis.roi },
@@ -315,7 +351,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       value: `${kpis.recurringPercentage.toFixed(0)}%`,
       icon: Repeat,
       trend: { value: Math.round(calcChange(kpis.recurringPercentage, prevKpis.recurringPercentage)), isPositive: kpis.recurringPercentage >= prevKpis.recurringPercentage },
-      subtitle: "Monthly sustainers",
+      subtitle: kpis.upsellConversionRate > 0 ? `${kpis.upsellConversionRate.toFixed(0)}% upsell conv.` : "Monthly sustainers",
     },
   ];
 

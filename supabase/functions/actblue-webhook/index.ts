@@ -334,7 +334,24 @@ serve(async (req) => {
       );
     }
 
+    // First, try to look up refcode in refcode_mappings for deterministic attribution
+    let determinedSource = sourceCampaign;
+    if (refcode) {
+      const { data: mapping } = await supabase
+        .from('refcode_mappings')
+        .select('platform, campaign_id, ad_id, creative_id')
+        .eq('organization_id', organization_id)
+        .eq('refcode', refcode)
+        .maybeSingle();
+
+      if (mapping?.platform) {
+        determinedSource = mapping.platform;
+        console.log(`[ACTBLUE] Found deterministic attribution: refcode "${refcode}" -> platform "${mapping.platform}"`);
+      }
+    }
+
     // Store transaction data (RLS-compatible with service role)
+    // Now capturing ALL available ActBlue fields for complete analytics
     const { error: insertError } = await supabase
       .from('actblue_transactions')
       .insert({
@@ -353,12 +370,23 @@ serve(async (req) => {
         employer: safeString(donor.employerData?.employer),
         occupation: safeString(donor.employerData?.occupation),
         amount: amount,
+        // NEW: Capture fee for net revenue calculation
+        fee: safeNumber(lineitem.feeAmount),
+        // NEW: Payment method details for payment quality analysis
+        payment_method: safeString(contribution.paymentMethod),
+        card_type: safeString(contribution.cardType),
+        // NEW: Smart Boost and Double Down for upsell analysis
+        smart_boost_amount: safeNumber(contribution.smartBoostAmount),
+        double_down: safeBool(contribution.doubleDown),
+        // NEW: Recurring upsell tracking for subscription health
+        recurring_upsell_shown: safeBool(contribution.recurringUpsellShown),
+        recurring_upsell_succeeded: safeBool(contribution.recurringUpsellSucceeded),
         order_number: safeString(contribution.orderNumber),
         contribution_form: safeString(contribution.contributionForm),
         refcode: refcode,
         refcode2: safeString(refcodes.refcode2),
         refcode_custom: safeString(refcodes.refcodeCustom),
-        source_campaign: sourceCampaign,
+        source_campaign: determinedSource,
         ab_test_name: safeString(contribution.abTestName),
         ab_test_variation: safeString(contribution.abTestVariation),
         is_mobile: safeBool(contribution.isMobile),

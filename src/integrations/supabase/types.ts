@@ -41,6 +41,7 @@ export type Database = {
           is_recurring: boolean | null
           last_name: string | null
           lineitem_id: number | null
+          net_amount: number | null
           occupation: string | null
           order_number: string | null
           organization_id: string
@@ -88,6 +89,7 @@ export type Database = {
           is_recurring?: boolean | null
           last_name?: string | null
           lineitem_id?: number | null
+          net_amount?: number | null
           occupation?: string | null
           order_number?: string | null
           organization_id: string
@@ -135,6 +137,7 @@ export type Database = {
           is_recurring?: boolean | null
           last_name?: string | null
           lineitem_id?: number | null
+          net_amount?: number | null
           occupation?: string | null
           order_number?: string | null
           organization_id?: string
@@ -4469,6 +4472,71 @@ export type Database = {
         }
         Relationships: []
       }
+      refcode_mappings: {
+        Row: {
+          ad_id: string | null
+          ad_name: string | null
+          campaign_id: string | null
+          campaign_name: string | null
+          created_at: string | null
+          creative_id: string | null
+          creative_name: string | null
+          id: string
+          landing_page: string | null
+          organization_id: string | null
+          platform: string | null
+          refcode: string
+          updated_at: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          ad_id?: string | null
+          ad_name?: string | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          created_at?: string | null
+          creative_id?: string | null
+          creative_name?: string | null
+          id?: string
+          landing_page?: string | null
+          organization_id?: string | null
+          platform?: string | null
+          refcode: string
+          updated_at?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          ad_id?: string | null
+          ad_name?: string | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          created_at?: string | null
+          creative_id?: string | null
+          creative_name?: string | null
+          id?: string
+          landing_page?: string | null
+          organization_id?: string | null
+          platform?: string | null
+          refcode?: string
+          updated_at?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refcode_mappings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roi_analytics: {
         Row: {
           campaign_id: string
@@ -6109,22 +6177,38 @@ export type Database = {
     Views: {
       actblue_transactions_secure: {
         Row: {
+          ab_test_name: string | null
+          ab_test_variation: string | null
           addr1: string | null
           amount: number | null
+          card_type: string | null
           city: string | null
+          committee_name: string | null
+          contribution_form: string | null
           country: string | null
           created_at: string | null
           donor_email: string | null
           donor_name: string | null
-          employer: string | null
+          double_down: boolean | null
+          entity_id: string | null
+          fee: number | null
           first_name: string | null
           id: string | null
+          is_express: boolean | null
+          is_mobile: boolean | null
           is_recurring: boolean | null
           last_name: string | null
-          occupation: string | null
+          net_amount: number | null
           organization_id: string | null
+          payment_method: string | null
           phone: string | null
+          recurring_duration: number | null
+          recurring_period: string | null
+          recurring_upsell_shown: boolean | null
+          recurring_upsell_succeeded: boolean | null
           refcode: string | null
+          refcode2: string | null
+          smart_boost_amount: number | null
           source_campaign: string | null
           state: string | null
           transaction_date: string | null
@@ -6133,22 +6217,38 @@ export type Database = {
           zip: string | null
         }
         Insert: {
+          ab_test_name?: string | null
+          ab_test_variation?: string | null
           addr1?: never
           amount?: number | null
+          card_type?: string | null
           city?: string | null
+          committee_name?: string | null
+          contribution_form?: string | null
           country?: string | null
           created_at?: string | null
           donor_email?: never
           donor_name?: never
-          employer?: never
+          double_down?: boolean | null
+          entity_id?: string | null
+          fee?: number | null
           first_name?: never
           id?: string | null
+          is_express?: boolean | null
+          is_mobile?: boolean | null
           is_recurring?: boolean | null
           last_name?: never
-          occupation?: never
+          net_amount?: number | null
           organization_id?: string | null
+          payment_method?: string | null
           phone?: never
+          recurring_duration?: number | null
+          recurring_period?: string | null
+          recurring_upsell_shown?: boolean | null
+          recurring_upsell_succeeded?: boolean | null
           refcode?: string | null
+          refcode2?: string | null
+          smart_boost_amount?: number | null
           source_campaign?: string | null
           state?: string | null
           transaction_date?: string | null
@@ -6157,22 +6257,38 @@ export type Database = {
           zip?: never
         }
         Update: {
+          ab_test_name?: string | null
+          ab_test_variation?: string | null
           addr1?: never
           amount?: number | null
+          card_type?: string | null
           city?: string | null
+          committee_name?: string | null
+          contribution_form?: string | null
           country?: string | null
           created_at?: string | null
           donor_email?: never
           donor_name?: never
-          employer?: never
+          double_down?: boolean | null
+          entity_id?: string | null
+          fee?: number | null
           first_name?: never
           id?: string | null
+          is_express?: boolean | null
+          is_mobile?: boolean | null
           is_recurring?: boolean | null
           last_name?: never
-          occupation?: never
+          net_amount?: number | null
           organization_id?: string | null
+          payment_method?: string | null
           phone?: never
+          recurring_duration?: number | null
+          recurring_period?: string | null
+          recurring_upsell_shown?: boolean | null
+          recurring_upsell_succeeded?: boolean | null
           refcode?: string | null
+          refcode2?: string | null
+          smart_boost_amount?: number | null
           source_campaign?: string | null
           state?: string | null
           transaction_date?: string | null
@@ -6443,6 +6559,40 @@ export type Database = {
           },
         ]
       }
+      donation_attribution: {
+        Row: {
+          amount: number | null
+          attributed_ad_id: string | null
+          attributed_campaign_id: string | null
+          attributed_campaign_name: string | null
+          attributed_creative_id: string | null
+          attributed_platform: string | null
+          card_type: string | null
+          creative_emotional_appeal: string | null
+          creative_themes: string[] | null
+          creative_tone: string | null
+          creative_topic: string | null
+          fee: number | null
+          is_recurring: boolean | null
+          net_amount: number | null
+          organization_id: string | null
+          payment_method: string | null
+          recurring_period: string | null
+          refcode: string | null
+          transaction_date: string | null
+          transaction_id: string | null
+          transaction_type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       donor_demographics_secure: {
         Row: {
           address: string | null
@@ -6524,6 +6674,80 @@ export type Database = {
           voter_file_matched?: boolean | null
           voter_score?: number | null
           zip?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donor_demographics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      donor_segments: {
+        Row: {
+          city: string | null
+          days_since_donation: number | null
+          donation_count: number | null
+          donor_email: string | null
+          donor_frequency_segment: string | null
+          donor_tier: string | null
+          first_donation_date: string | null
+          first_name: string | null
+          frequency_score: number | null
+          id: string | null
+          is_recurring: boolean | null
+          last_donation_date: string | null
+          last_name: string | null
+          monetary_score: number | null
+          organization_id: string | null
+          recency_score: number | null
+          state: string | null
+          total_donated: number | null
+          zip: string | null
+        }
+        Insert: {
+          city?: string | null
+          days_since_donation?: never
+          donation_count?: number | null
+          donor_email?: string | null
+          donor_frequency_segment?: never
+          donor_tier?: never
+          first_donation_date?: string | null
+          first_name?: string | null
+          frequency_score?: never
+          id?: string | null
+          is_recurring?: boolean | null
+          last_donation_date?: string | null
+          last_name?: string | null
+          monetary_score?: never
+          organization_id?: string | null
+          recency_score?: never
+          state?: string | null
+          total_donated?: number | null
+          zip?: string | null
+        }
+        Update: {
+          city?: string | null
+          days_since_donation?: never
+          donation_count?: number | null
+          donor_email?: string | null
+          donor_frequency_segment?: never
+          donor_tier?: never
+          first_donation_date?: string | null
+          first_name?: string | null
+          frequency_score?: never
+          id?: string | null
+          is_recurring?: boolean | null
+          last_donation_date?: string | null
+          last_name?: string | null
+          monetary_score?: never
+          organization_id?: string | null
+          recency_score?: never
+          state?: string | null
+          total_donated?: number | null
+          zip?: string | null
         }
         Relationships: [
           {
