@@ -327,6 +327,12 @@ serve(async (req) => {
       : null;
     const customFields = contribution.customFields || [];
 
+    // Recurring state derivation (best-effort with available payload fields)
+    let recurringState: string | null = null;
+    if (transactionType === 'refund') recurringState = 'refunded';
+    else if (transactionType === 'cancellation') recurringState = 'cancelled';
+    else if (contribution.recurringPeriod) recurringState = 'active';
+
     // Extract data using safe helpers
     const amount = safeNumber(lineitem.amount);
     const lineitemId = safeInt(lineitem.lineitemId);
@@ -412,6 +418,8 @@ serve(async (req) => {
         recurring_period: safeString(contribution.recurringPeriod),
         recurring_duration: safeInt(contribution.recurringDuration),
         is_recurring: !!contribution.recurringPeriod && contribution.recurringPeriod !== 'once',
+        recurring_state: recurringState,
+        next_charge_date: null, // placeholder until ActBlue exposes next charge date
         custom_fields: contribution.customFields || [],
         transaction_type: transactionType,
         transaction_date: paidAt,
