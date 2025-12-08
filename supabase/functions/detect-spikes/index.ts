@@ -1,15 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders, validateCronOrAdmin, logJobFailure, checkRateLimit } from "../_shared/security.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Lower spike detection threshold (150% increase = 2.5x growth) - more useful for clients
+const corsHeaders = getCorsHeaders();
 const SPIKE_THRESHOLD = 150;
-
-// Minimum mentions required for a spike to be considered significant
 const MIN_MENTIONS_FOR_SPIKE = 3;
 
 serve(async (req) => {
@@ -23,9 +17,28 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    // SECURITY: Validate cron secret or admin JWT
+    const authResult = await validateCronOrAdmin(req, supabase);
+    if (!authResult.valid) {
+      console.error('[detect-spikes] Unauthorized access attempt');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    console.log(`[detect-spikes] Authorized via ${authResult.source}`);
+
+    // SECURITY: Rate limiting
+    const rateLimit = checkRateLimit('detect-spikes', 20, 60000);
+    if (!rateLimit.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded', resetAt: rateLimit.resetAt }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log(`[detect-spikes] Starting spike detection (threshold: ${SPIKE_THRESHOLD}%, min mentions: ${MIN_MENTIONS_FOR_SPIKE})...`);
 
-    // Get currently trending topics with meaningful velocity
     const { data: trends, error: trendsError } = await supabase
       .from('trending_news_topics')
       .select('*')
@@ -45,7 +58,6 @@ serve(async (req) => {
     const skipped: string[] = [];
 
     for (const trend of trends || []) {
-      // Check if we already alerted for this spike in last 2 hours (longer cooldown)
       const { data: existingAlert } = await supabase
         .from('spike_alerts')
         .select('id')
@@ -59,7 +71,6 @@ serve(async (req) => {
         continue;
       }
 
-      // Calculate severity based on velocity and mention count
       let severity = 'medium';
       if (trend.velocity >= 400 && trend.mentions_last_hour >= 8) {
         severity = 'critical';
@@ -67,7 +78,6 @@ serve(async (req) => {
         severity = 'high';
       }
 
-      // Get related Bluesky trends if they exist
       const { data: blueskyTrend } = await supabase
         .from('bluesky_trends')
         .select('id, mentions_last_hour, velocity')
@@ -80,7 +90,6 @@ serve(async (req) => {
           : 'No Bluesky correlation yet.'
       }`;
 
-      // Create spike alert
       const alert = {
         alert_type: 'topic_spike',
         entity_type: 'topic',
@@ -99,9 +108,7 @@ serve(async (req) => {
         retry_count: 0
       };
 
-      const { error: insertError } = await supabase
-        .from('spike_alerts')
-        .insert(alert);
+      const { error: insertError } = await supabase.from('spike_alerts').insert(alert);
 
       if (insertError) {
         console.error(`[detect-spikes] Error creating alert for ${trend.topic}:`, insertError);
@@ -111,7 +118,7 @@ serve(async (req) => {
       }
     }
 
-    // Also check for organization mention spikes
+    // Check organization mention spikes
     const { data: articles, error: articlesError } = await supabase
       .from('articles')
       .select('affected_organizations, id, title, source_name, created_at')
@@ -132,7 +139,6 @@ serve(async (req) => {
         }
       }
 
-      // Alert if org mentioned 4+ times in last hour (lowered from 5)
       for (const [org, data] of orgMentions) {
         if (data.count >= 4) {
           const { data: existingOrgAlert } = await supabase
@@ -152,11 +158,11 @@ serve(async (req) => {
               entity_name: org,
               previous_mentions: 0,
               current_mentions: data.count,
-              velocity_increase: data.count * 100, // Estimated velocity
+              velocity_increase: data.count * 100,
               time_window: '1h',
               severity,
               context_summary: `"${org}" mentioned ${data.count} times in last hour across multiple sources`,
-              related_articles: data.articles.slice(0, 10), // Limit to 10 articles
+              related_articles: data.articles.slice(0, 10),
               status: 'pending',
               notification_channels: severity === 'critical' ? ['email', 'webhook'] : ['email'],
               detected_at: new Date().toISOString(),
@@ -190,6 +196,13 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('[detect-spikes] Error:', error);
+    
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+    await logJobFailure(supabase, 'detect-spikes', error?.message || 'Unknown error');
+    
     return new Response(
       JSON.stringify({ error: error?.message || 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
