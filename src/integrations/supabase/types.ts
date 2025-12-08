@@ -6708,46 +6708,46 @@ export type Database = {
           zip: string | null
         }
         Insert: {
-          city?: string | null
+          city?: never
           days_since_donation?: never
           donation_count?: number | null
-          donor_email?: string | null
+          donor_email?: never
           donor_frequency_segment?: never
           donor_tier?: never
           first_donation_date?: string | null
-          first_name?: string | null
+          first_name?: never
           frequency_score?: never
           id?: string | null
           is_recurring?: boolean | null
           last_donation_date?: string | null
-          last_name?: string | null
+          last_name?: never
           monetary_score?: never
           organization_id?: string | null
           recency_score?: never
           state?: string | null
           total_donated?: number | null
-          zip?: string | null
+          zip?: never
         }
         Update: {
-          city?: string | null
+          city?: never
           days_since_donation?: never
           donation_count?: number | null
-          donor_email?: string | null
+          donor_email?: never
           donor_frequency_segment?: never
           donor_tier?: never
           first_donation_date?: string | null
-          first_name?: string | null
+          first_name?: never
           frequency_score?: never
           id?: string | null
           is_recurring?: boolean | null
           last_donation_date?: string | null
-          last_name?: string | null
+          last_name?: never
           monetary_score?: never
           organization_id?: string | null
           recency_score?: never
           state?: string | null
           total_donated?: number | null
-          zip?: string | null
+          zip?: never
         }
         Relationships: [
           {
