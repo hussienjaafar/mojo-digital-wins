@@ -114,7 +114,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
       // Load SMS funnel (counts by event_type)
       const { data: smsEvents, error: smsError } = await (supabase as any)
         .from('sms_events')
-        .select('event_type')
+        .select('event_type, phone_hash')
         .eq('organization_id', organizationId)
         .gte('occurred_at', startDate)
         .lte('occurred_at', `${endDate}T23:59:59`);
@@ -122,6 +122,33 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
       if (smsError) {
         logger.error('Failed to load SMS events', smsError);
       } else {
+        const phoneHashes = Array.from(
+          new Set(
+            (smsEvents || [])
+              .map((ev: any) => ev.phone_hash)
+              .filter(Boolean)
+          )
+        );
+
+        // Count donations from donors who received SMS in window (uses donor_journeys view keyed by phone hash)
+        let smsDonations = 0;
+        if (phoneHashes.length > 0) {
+          const { data: journeyDonations, error: journeyError } = await (supabase as any)
+            .from('donor_journeys')
+            .select('donor_key')
+            .eq('organization_id', organizationId)
+            .in('donor_key', phoneHashes)
+            .eq('event_type', 'donation')
+            .gte('occurred_at', startDate)
+            .lte('occurred_at', `${endDate}T23:59:59`);
+
+          if (journeyError) {
+            logger.error('Failed to load donor_journeys for SMS donations', journeyError);
+          } else {
+            smsDonations = new Set((journeyDonations || []).map((d: any) => d.donor_key)).size;
+          }
+        }
+
         const counts = (smsEvents || []).reduce((acc: any, ev: any) => {
           const type = ev.event_type || 'unknown';
           acc[type] = (acc[type] || 0) + 1;
@@ -131,7 +158,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
           sent: counts.sent || 0,
           delivered: counts.delivered || 0,
           clicked: counts.clicked || 0,
-          donated: counts.donated || 0, // placeholder until donation linkage is added
+          donated: smsDonations,
           optedOut: counts.opted_out || 0,
         });
       }
