@@ -125,6 +125,12 @@ const safeBool = (val: any): boolean => {
   return false;
 };
 
+const getCustomFieldValue = (customFields: any, key: string): string | null => {
+  if (!Array.isArray(customFields)) return null;
+  const match = customFields.find((f: any) => f?.name?.toLowerCase() === key.toLowerCase());
+  return match?.value ? safeString(match.value) : null;
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -319,6 +325,7 @@ serve(async (req) => {
     const donorName = donor.firstname && donor.lastname 
       ? `${donor.firstname} ${donor.lastname}`.trim() 
       : null;
+    const customFields = contribution.customFields || [];
 
     // Extract data using safe helpers
     const amount = safeNumber(lineitem.amount);
@@ -389,6 +396,9 @@ serve(async (req) => {
         refcode: refcode,
         refcode2: safeString(refcodes.refcode2),
         refcode_custom: safeString(refcodes.refcodeCustom),
+        // Deterministic attribution support
+        click_id: getCustomFieldValue(customFields, 'click_id') || getCustomFieldValue(customFields, 'fbclid'),
+        fbclid: getCustomFieldValue(customFields, 'fbclid'),
         source_campaign: determinedSource,
         ab_test_name: safeString(contribution.abTestName),
         ab_test_variation: safeString(contribution.abTestVariation),
