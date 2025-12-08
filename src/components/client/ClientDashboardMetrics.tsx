@@ -208,7 +208,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     return ((current - previous) / previous) * 100;
   };
 
-  // Calculate KPIs for current period - now with net revenue and upsell metrics
+  // Calculate KPIs for current period - now with net revenue, refunds, and recurring health
   const kpis = useMemo(() => {
     const totalRaised = donations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
     // Net revenue = gross - fees (using net_amount when available)
@@ -218,6 +218,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     const refunds = donations.filter(d => d.transaction_type === 'refund');
     const refundAmount = refunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
     const refundRate = totalRaised > 0 ? (refundAmount / totalRaised) * 100 : 0;
+
+    // Recurring health
+    const recurringDonations = donations.filter(d => d.is_recurring);
+    const recurringRaised = recurringDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
+    const recurringCancellations = recurringDonations.filter(d => d.transaction_type === 'cancellation').length;
+    const recurringRefunds = recurringDonations.filter(d => d.transaction_type === 'refund').length;
+    const recurringChurnEvents = recurringCancellations + recurringRefunds;
+    const recurringChurnRate = recurringDonations.length > 0 ? (recurringChurnEvents / recurringDonations.length) * 100 : 0;
     
     const uniqueDonors = new Set(donations.map(d => d.donor_id_hash || d.donor_email)).size;
     const recurringDonors = donations.filter(d => d.is_recurring).length;
@@ -253,6 +261,9 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       feePercentage,
       refundAmount,
       refundRate,
+      recurringRaised,
+      recurringChurnRate,
+      recurringDonations: recurringDonations.length,
       uniqueDonors,
       recurringPercentage,
       upsellConversionRate,
@@ -273,6 +284,10 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     const refunds = prevDonations.filter(d => d.transaction_type === 'refund');
     const refundAmount = refunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
     const refundRate = totalRaised > 0 ? (refundAmount / totalRaised) * 100 : 0;
+    const prevRecurring = prevDonations.filter(d => d.is_recurring);
+    const prevRecurringRaised = prevRecurring.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
+    const prevRecurringChurn = prevRecurring.filter(d => d.transaction_type === 'cancellation' || d.transaction_type === 'refund').length;
+    const prevRecurringChurnRate = prevRecurring.length > 0 ? (prevRecurringChurn / prevRecurring.length) * 100 : 0;
     const uniqueDonors = new Set(prevDonations.map(d => d.donor_id_hash || d.donor_email)).size;
     const recurringDonors = prevDonations.filter(d => d.is_recurring).length;
     const recurringPercentage = prevDonations.length > 0 ? (recurringDonors / prevDonations.length) * 100 : 0;
@@ -288,6 +303,8 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       totalNetRevenue,
       refundAmount,
       refundRate,
+      recurringRaised: prevRecurringRaised,
+      recurringChurnRate: prevRecurringChurnRate,
       uniqueDonors,
       recurringPercentage,
       roi,
@@ -380,6 +397,13 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       icon: Target,
       trend: { value: Math.round(calcChange(kpis.refundRate, prevKpis.refundRate)), isPositive: kpis.refundRate <= prevKpis.refundRate },
       subtitle: `Refunds: ${formatCurrency(kpis.refundAmount)}`,
+    },
+    {
+      label: "Recurring Health",
+      value: formatCurrency(kpis.recurringRaised),
+      icon: Repeat,
+      trend: { value: Math.round(calcChange(kpis.recurringChurnRate, prevKpis.recurringChurnRate)), isPositive: kpis.recurringChurnRate <= prevKpis.recurringChurnRate },
+      subtitle: `${kpis.recurringDonations} recurring tx • Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
     },
   ];
 
