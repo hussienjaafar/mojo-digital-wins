@@ -119,7 +119,7 @@ export function useChannelSummaries(organizationId: string, startDate: string, e
         const avgNet = donationData?.length > 0 ? totalNet / donationData.length : 0;
         const lastDonationDate = donationData?.[0]?.transaction_date?.split('T')[0] || null;
 
-        console.log('[useChannelSummaries] Calculated totals:', { total, uniqueDonors, avgDonation });
+        console.log('[useChannelSummaries] Calculated totals:', { totalGross, totalNet, uniqueDonors, avgNet });
 
         setSummary(prev => ({
           ...prev,
