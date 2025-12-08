@@ -63,6 +63,16 @@ interface JourneyEvent {
   refcode: string | null;
 }
 
+interface LtvPrediction {
+  donor_email_hash: string | null;
+  donor_phone_hash: string | null;
+  predicted_ltv_90: number | null;
+  predicted_ltv_180: number | null;
+  repeat_prob_90: number | null;
+  repeat_prob_180: number | null;
+  churn_risk: number | null;
+}
+
 export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorIntelligenceProps) => {
   const [attributionData, setAttributionData] = useState<AttributionData[]>([]);
   const [segmentData, setSegmentData] = useState<DonorSegment[]>([]);
@@ -72,6 +82,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
   const [journeyEvents, setJourneyEvents] = useState<JourneyEvent[]>([]);
   const [smsCost, setSmsCost] = useState<number>(0);
   const [smsSent, setSmsSent] = useState<number>(0);
+  const [ltvSummary, setLtvSummary] = useState<{ avgLtv90: number; avgLtv180: number; highRisk: number; total: number }>({ avgLtv90: 0, avgLtv180: 0, highRisk: 0, total: 0 });
 
   useEffect(() => {
     loadData();
@@ -224,6 +235,23 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
         logger.error('Failed to load donor journeys', journeyErr);
       } else {
         setJourneyEvents(journeys || []);
+      }
+
+      // Load LTV predictions
+      const { data: ltvData, error: ltvErr } = await (supabase as any)
+        .from('donor_ltv_predictions')
+        .select('predicted_ltv_90, predicted_ltv_180, churn_risk')
+        .eq('organization_id', organizationId)
+        .limit(500);
+
+      if (ltvErr) {
+        logger.error('Failed to load LTV predictions', ltvErr);
+      } else {
+        const total = ltvData?.length || 0;
+        const avgLtv90 = total > 0 ? ltvData.reduce((sum: number, d: any) => sum + Number(d.predicted_ltv_90 || 0), 0) / total : 0;
+        const avgLtv180 = total > 0 ? ltvData.reduce((sum: number, d: any) => sum + Number(d.predicted_ltv_180 || 0), 0) / total : 0;
+        const highRisk = ltvData?.filter((d: any) => Number(d.churn_risk || 0) >= 0.7).length || 0;
+        setLtvSummary({ avgLtv90, avgLtv180, highRisk, total });
       }
     } catch (error) {
       logger.error('Failed to load donor intelligence data', error);
@@ -413,6 +441,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
           <TabsTrigger value="segments">Donor Segments</TabsTrigger>
           <TabsTrigger value="sms">SMS Funnel</TabsTrigger>
           <TabsTrigger value="journeys">Journeys</TabsTrigger>
+          <TabsTrigger value="ltv">LTV/Forecast</TabsTrigger>
         </TabsList>
 
         <TabsContent value="attribution" className="space-y-6">
@@ -696,6 +725,49 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                   ))}
                 </div>
               )}
+            </PortalCardContent>
+          </PortalCard>
+        </TabsContent>
+
+        <TabsContent value="ltv" className="space-y-6">
+          <PortalCard>
+            <PortalCardHeader>
+              <PortalCardTitle className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                LTV & Forecast Signals
+              </PortalCardTitle>
+            </PortalCardHeader>
+            <PortalCardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                  <div className="text-sm portal-text-muted">Avg LTV (90d)</div>
+                  <div className="text-2xl font-bold portal-text-primary">
+                    {ltvSummary.avgLtv90 >= 1000 ? `$${(ltvSummary.avgLtv90 / 1000).toFixed(1)}K` : `$${ltvSummary.avgLtv90.toFixed(0)}`}
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                  <div className="text-sm portal-text-muted">Avg LTV (180d)</div>
+                  <div className="text-2xl font-bold portal-text-primary">
+                    {ltvSummary.avgLtv180 >= 1000 ? `$${(ltvSummary.avgLtv180 / 1000).toFixed(1)}K` : `$${ltvSummary.avgLtv180.toFixed(0)}`}
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                  <div className="text-sm portal-text-muted">High Churn Risk</div>
+                  <div className="text-2xl font-bold portal-text-primary">
+                    {ltvSummary.highRisk.toLocaleString()}
+                  </div>
+                  <div className="text-xs portal-text-muted">churn_risk ≥ 0.7</div>
+                </div>
+                <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                  <div className="text-sm portal-text-muted">Profiles scored</div>
+                  <div className="text-2xl font-bold portal-text-primary">
+                    {ltvSummary.total.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 text-sm portal-text-muted">
+                Forecasting UI uses the latest donor_ltv_predictions (placeholder values until model is populated).
+              </div>
             </PortalCardContent>
           </PortalCard>
         </TabsContent>
