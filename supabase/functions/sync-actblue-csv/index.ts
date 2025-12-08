@@ -672,21 +672,34 @@ serve(async (req) => {
               }
 
               // Extract source campaign from refcode with enhanced detection
+              // First, try deterministic lookup from refcode_mappings table
               let sourceCampaign = null;
               const refcode = row.reference_code || '';
               if (refcode) {
-                const lowerRefcode = refcode.toLowerCase();
-                // Enhanced refcode parsing
-                if (lowerRefcode.includes('meta') || lowerRefcode.includes('fb_') || lowerRefcode.includes('ig_') || lowerRefcode.includes('facebook')) {
-                  sourceCampaign = 'meta';
-                } else if (lowerRefcode.includes('sms') || lowerRefcode.includes('sw_') || lowerRefcode.includes('text') || lowerRefcode.includes('switchboard')) {
-                  sourceCampaign = 'sms';
-                } else if (lowerRefcode.includes('email') || lowerRefcode.includes('em_') || lowerRefcode.includes('eoy') || lowerRefcode.includes('eod')) {
-                  sourceCampaign = 'email';
-                } else if (lowerRefcode.includes('organic') || lowerRefcode.includes('direct') || lowerRefcode.includes('web')) {
-                  sourceCampaign = 'organic';
-                } else if (lowerRefcode.includes('google') || lowerRefcode.includes('gdn') || lowerRefcode.includes('search')) {
-                  sourceCampaign = 'google';
+                const { data: mapping } = await supabase
+                  .from('refcode_mappings')
+                  .select('platform, campaign_id, ad_id')
+                  .eq('organization_id', orgId)
+                  .eq('refcode', refcode)
+                  .maybeSingle();
+                
+                if (mapping?.platform) {
+                  sourceCampaign = mapping.platform;
+                  console.log(`[CSV] Deterministic attribution: refcode "${refcode}" -> platform "${mapping.platform}"`);
+                } else {
+                  // Fall back to regex-based detection
+                  const lowerRefcode = refcode.toLowerCase();
+                  if (lowerRefcode.includes('meta') || lowerRefcode.includes('fb_') || lowerRefcode.includes('ig_') || lowerRefcode.includes('facebook')) {
+                    sourceCampaign = 'meta';
+                  } else if (lowerRefcode.includes('sms') || lowerRefcode.includes('sw_') || lowerRefcode.includes('text') || lowerRefcode.includes('switchboard')) {
+                    sourceCampaign = 'sms';
+                  } else if (lowerRefcode.includes('email') || lowerRefcode.includes('em_') || lowerRefcode.includes('eoy') || lowerRefcode.includes('eod')) {
+                    sourceCampaign = 'email';
+                  } else if (lowerRefcode.includes('organic') || lowerRefcode.includes('direct') || lowerRefcode.includes('web')) {
+                    sourceCampaign = 'organic';
+                  } else if (lowerRefcode.includes('google') || lowerRefcode.includes('gdn') || lowerRefcode.includes('search')) {
+                    sourceCampaign = 'google';
+                  }
                 }
               }
 

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ChevronDown, ChevronUp, BarChart3, Sun, Moon } from "lucide-react";
+import { LogOut, ChevronDown, ChevronUp, BarChart3, Sun, Moon, Brain } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import { useTheme } from "@/components/ThemeProvider";
@@ -22,8 +22,9 @@ import { OrganizationSelector } from "@/components/client/OrganizationSelector";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// Lazy load Advanced Analytics for performance
+// Lazy load Advanced Analytics and Donor Intelligence for performance
 const AdvancedAnalytics = lazy(() => import("@/components/analytics/AdvancedAnalytics"));
+const DonorIntelligence = lazy(() => import("@/components/client/DonorIntelligence"));
 
 type Organization = {
   id: string;
@@ -62,6 +63,7 @@ const ClientDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
+  const [showDonorIntelligence, setShowDonorIntelligence] = useState(false);
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
@@ -343,6 +345,39 @@ const ClientDashboard = () => {
                   startDate={startDate}
                   endDate={endDate}
                 />
+              </div>
+
+              {/* DONOR INTELLIGENCE: Attribution, Segments, Topics */}
+              <div className="mb-6">
+                <Collapsible open={showDonorIntelligence} onOpenChange={setShowDonorIntelligence}>
+                  <CollapsibleTrigger asChild>
+                    <button className="w-full flex items-center justify-between p-4 rounded-lg border border-border/50 hover:border-border transition-colors bg-card/50">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg" style={{ background: 'hsl(var(--portal-accent-green) / 0.1)' }}>
+                          <Brain className="h-5 w-5" style={{ color: 'hsl(var(--portal-accent-green))' }} />
+                        </div>
+                        <div className="text-left">
+                          <h3 className="font-semibold portal-text-primary">Donor Intelligence</h3>
+                          <p className="text-sm portal-text-secondary">Attribution, creative topics, donor segments & RFM scoring</p>
+                        </div>
+                      </div>
+                      {showDonorIntelligence ? (
+                        <ChevronUp className="h-5 w-5 portal-text-secondary" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 portal-text-secondary" />
+                      )}
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-4">
+                    <Suspense fallback={<AdvancedAnalyticsSkeleton />}>
+                      <DonorIntelligence
+                        organizationId={organization.id}
+                        startDate={startDate}
+                        endDate={endDate}
+                      />
+                    </Suspense>
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
 
               {/* ADVANCED: Attribution, Forecasting, LTV/CAC */}
