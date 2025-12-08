@@ -309,10 +309,17 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       const dayDonations = donations.filter(d => d.transaction_date?.startsWith(dayStr));
       const dayMeta = metaMetrics.filter(m => m.date === dayStr);
       const daySms = smsMetrics.filter(s => s.send_date?.startsWith(dayStr));
+      const dayRefunds = dayDonations.filter(d => d.transaction_type === 'refund');
+
+      const grossDonations = dayDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+      const netDonations = dayDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
+      const refundAmount = dayRefunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
 
       return {
         name: dayLabel,
-        donations: dayDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0),
+        donations: grossDonations,
+        netDonations,
+        refunds: refundAmount,
         metaSpend: dayMeta.reduce((sum, m) => sum + Number(m.spend || 0), 0),
         smsSpend: daySms.reduce((sum, s) => sum + Number(s.cost || 0), 0),
       };
@@ -454,7 +461,9 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
             <PortalLineChart
               data={timeSeriesData}
               lines={[
-                { dataKey: "donations", stroke: "#10B981", name: "Donations", valueType: "currency" },
+                { dataKey: "donations", stroke: "#10B981", name: "Gross Donations", valueType: "currency" },
+                { dataKey: "netDonations", stroke: "#0EA5E9", name: "Net Donations", valueType: "currency" },
+                { dataKey: "refunds", stroke: "#EF4444", name: "Refunds", valueType: "currency" },
                 { dataKey: "metaSpend", stroke: "#0D84FF", name: "Meta Spend", valueType: "currency" },
                 { dataKey: "smsSpend", stroke: "#A78BFA", name: "SMS Spend", valueType: "currency" },
               ]}

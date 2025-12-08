@@ -43,6 +43,29 @@ interface SwitchboardResponse {
   errors: Array<{ code: string; title: string; description: string }>;
 }
 
+interface SwitchboardMessageEvent {
+  id: string;
+  phone_number: string | null;
+  status: string | null;
+  click_url?: string | null;
+  clicks?: number | null;
+  delivered_at?: string | null;
+  failed_at?: string | null;
+  sent_at?: string | null;
+  opted_out_at?: string | null;
+  replied_at?: string | null;
+  last_click_at?: string | null;
+  metadata?: Record<string, any> | null;
+}
+
+interface SwitchboardMessageResponse {
+  data: {
+    page: SwitchboardMessageEvent[];
+    next_page: string | null;
+  } | null;
+  errors: Array<{ code: string; title: string; description: string }>;
+}
+
 async function fetchSwitchboardBroadcasts(
   accountId: string,
   secretKey: string,
@@ -67,6 +90,54 @@ async function fetchSwitchboardBroadcasts(
 
   return await response.json();
 }
+
+async function fetchBroadcastMessages(
+  accountId: string,
+  secretKey: string,
+  broadcastId: string,
+  cursor?: string
+): Promise<SwitchboardMessageResponse> {
+  const url = cursor || `https://api.oneswitchboard.com/v1/broadcasts/${broadcastId}/messages`;
+  const credentials = btoa(`${accountId}:${secretKey}`);
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Basic ${credentials}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Switchboard API error (messages): ${response.status} - ${errorText}`);
+    throw new Error(`Switchboard API error: ${response.status} - ${errorText}`);
+  }
+
+  return await response.json();
+}
+
+const deriveEventType = (msg: SwitchboardMessageEvent): string => {
+  if (msg.opted_out_at) return 'opted_out';
+  if (msg.replied_at) return 'replied';
+  if (msg.last_click_at || (msg.clicks && msg.clicks > 0)) return 'clicked';
+  if (msg.delivered_at) return 'delivered';
+  if (msg.failed_at) return 'failed';
+  if (msg.sent_at) return 'sent';
+  return 'unknown';
+};
+
+const deriveOccurredAt = (msg: SwitchboardMessageEvent): string => {
+  return (
+    msg.opted_out_at ||
+    msg.replied_at ||
+    msg.last_click_at ||
+    msg.delivered_at ||
+    msg.failed_at ||
+    msg.sent_at ||
+    new Date().toISOString()
+  );
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -225,6 +296,65 @@ serve(async (req) => {
       }
 
       console.log(`Successfully upserted ${campaignsToUpsert.length} SMS campaigns`);
+    }
+
+    // Per-recipient events for donor journey and churn analytics
+    for (const broadcast of allBroadcasts) {
+      try {
+        let msgNext: string | null = null;
+        let msgPageCount = 0;
+        const messageEvents: SwitchboardMessageEvent[] = [];
+
+        do {
+          msgPageCount++;
+          const msgResp = await fetchBroadcastMessages(account_id, api_key, broadcast.id, msgNext || undefined);
+          if (msgResp.errors && msgResp.errors.length > 0) {
+            const errorMsg = msgResp.errors.map(e => e.description || e.title).join(', ');
+            throw new Error(`Switchboard message API errors: ${errorMsg}`);
+          }
+          if (msgResp.data?.page) {
+            messageEvents.push(...msgResp.data.page);
+            msgNext = msgResp.data.next_page;
+          } else {
+            msgNext = null;
+          }
+        } while (msgNext && msgPageCount < 100);
+
+        if (messageEvents.length > 0) {
+          const eventsToUpsert = messageEvents.map(msg => ({
+            organization_id,
+            campaign_id: broadcast.id,
+            message_id: msg.id,
+            recipient_phone: msg.phone_number,
+            status: msg.status,
+            event_type: deriveEventType(msg),
+            click_url: msg.click_url || null,
+            occurred_at: deriveOccurredAt(msg),
+            metadata: {
+              clicks: msg.clicks || 0,
+              delivered_at: msg.delivered_at,
+              failed_at: msg.failed_at,
+              sent_at: msg.sent_at,
+              opted_out_at: msg.opted_out_at,
+              replied_at: msg.replied_at,
+              last_click_at: msg.last_click_at,
+              raw_status: msg.status,
+            },
+          }));
+
+          const { error: eventError } = await supabase
+            .from('sms_events')
+            .upsert(eventsToUpsert, { onConflict: 'organization_id,message_id' });
+
+          if (eventError) {
+            console.error(`[SMS SYNC] Failed to upsert sms_events for broadcast ${broadcast.id}:`, eventError);
+          } else {
+            console.log(`[SMS SYNC] Upserted ${eventsToUpsert.length} sms_events for broadcast ${broadcast.id}`);
+          }
+        }
+      } catch (eventErr) {
+        console.warn(`[SMS SYNC] Skipping sms_events for broadcast ${broadcast.id}:`, eventErr?.message || eventErr);
+      }
     }
 
     // Aggregate daily metrics
