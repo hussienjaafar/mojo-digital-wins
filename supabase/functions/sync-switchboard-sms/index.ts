@@ -353,7 +353,8 @@ serve(async (req) => {
           }
         }
       } catch (eventErr) {
-        console.warn(`[SMS SYNC] Skipping sms_events for broadcast ${broadcast.id}:`, eventErr?.message || eventErr);
+        const errMessage = eventErr instanceof Error ? eventErr.message : String(eventErr);
+        console.warn(`[SMS SYNC] Skipping sms_events for broadcast ${broadcast.id}:`, errMessage);
       }
     }
 
