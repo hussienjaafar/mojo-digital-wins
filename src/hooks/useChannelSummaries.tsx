@@ -19,9 +19,12 @@ export type ChannelSummary = {
     campaignCount: number;
   };
   donations: {
-    total: number;
+    totalGross: number;
+    totalNet: number;
+    refundAmount: number;
+    refundCount: number;
     donors: number;
-    avgDonation: number;
+    avgNet: number;
     isLoading: boolean;
     lastDataDate: string | null;
   };
@@ -31,7 +34,7 @@ export function useChannelSummaries(organizationId: string, startDate: string, e
   const [summary, setSummary] = useState<ChannelSummary>({
     meta: { spend: 0, conversions: 0, roas: 0, hasConversionValueData: false, isLoading: true, lastDataDate: null },
     sms: { sent: 0, raised: 0, roi: 0, isLoading: true, lastDataDate: null, campaignCount: 0 },
-    donations: { total: 0, donors: 0, avgDonation: 0, isLoading: true, lastDataDate: null },
+    donations: { totalGross: 0, totalNet: 0, refundAmount: 0, refundCount: 0, donors: 0, avgNet: 0, isLoading: true, lastDataDate: null },
   });
 
   useEffect(() => {
@@ -95,7 +98,7 @@ export function useChannelSummaries(organizationId: string, startDate: string, e
         // Using secure view for defense-in-depth PII protection
         const { data: donationData, error: donationError } = await (supabase as any)
           .from('actblue_transactions_secure')
-          .select('amount, donor_email, transaction_date')
+          .select('amount, net_amount, donor_email, donor_id_hash, transaction_date, transaction_type')
           .eq('organization_id', organizationId)
           .gte('transaction_date', startDate)
           .lte('transaction_date', `${endDate}T23:59:59`)
@@ -107,16 +110,20 @@ export function useChannelSummaries(organizationId: string, startDate: string, e
         
         console.log('[useChannelSummaries] Donations found:', donationData?.length || 0);
 
-        const total = donationData?.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0) || 0;
-        const uniqueDonors = new Set(donationData?.map((d: any) => d.donor_email)).size;
-        const avgDonation = donationData?.length > 0 ? total / donationData.length : 0;
+        const totalGross = donationData?.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0) || 0;
+        const totalNet = donationData?.reduce((sum: number, t: any) => sum + Number(t.net_amount ?? t.amount ?? 0), 0) || 0;
+        const refunds = (donationData || []).filter((t: any) => t.transaction_type === 'refund');
+        const refundAmount = refunds.reduce((sum: number, t: any) => sum + Number(t.net_amount ?? t.amount ?? 0), 0);
+        const refundCount = refunds.length;
+        const uniqueDonors = new Set(donationData?.map((d: any) => d.donor_id_hash || d.donor_email)).size;
+        const avgNet = donationData?.length > 0 ? totalNet / donationData.length : 0;
         const lastDonationDate = donationData?.[0]?.transaction_date?.split('T')[0] || null;
 
         console.log('[useChannelSummaries] Calculated totals:', { total, uniqueDonors, avgDonation });
 
         setSummary(prev => ({
           ...prev,
-          donations: { total, donors: uniqueDonors, avgDonation, isLoading: false, lastDataDate: lastDonationDate },
+          donations: { totalGross, totalNet, refundAmount, refundCount, donors: uniqueDonors, avgNet, isLoading: false, lastDataDate: lastDonationDate },
         }));
       } catch (error) {
         console.error('[useChannelSummaries] Donation fetch error:', error);

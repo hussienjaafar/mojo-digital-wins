@@ -88,17 +88,18 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
       icon: DollarSign,
       description: "Transaction history and donor insights",
       color: "hsl(var(--portal-success))",
-      component: <DonationMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />,
-      getSummary: () => {
-        if (summaries.donations.isLoading) return null;
-        return [
-          { label: "Total", value: formatCurrency(summaries.donations.total) },
-          { label: "Donors", value: formatNumber(summaries.donations.donors) },
-          { label: "Avg", value: formatCurrency(summaries.donations.avgDonation) },
-        ];
-      },
+    component: <DonationMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />,
+    getSummary: () => {
+      if (summaries.donations.isLoading) return null;
+      return [
+        { label: "Net", value: formatCurrency(summaries.donations.totalNet) },
+        { label: "Refunds", value: formatCurrency(summaries.donations.refundAmount || 0) },
+        { label: "Donors", value: formatNumber(summaries.donations.donors) },
+        { label: "Avg Net", value: formatCurrency(summaries.donations.avgNet) },
+      ];
     },
-  ];
+  },
+];
 
   return (
     <div className="space-y-3">
