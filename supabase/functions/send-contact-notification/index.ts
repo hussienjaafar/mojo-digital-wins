@@ -63,7 +63,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     // SECURITY: Rate limiting for public endpoint
     const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
-    const rateLimit = checkRateLimit(`contact-notification:${clientIP}`, 5, 60000);
+    const rateLimit = await checkRateLimit(`contact-notification:${clientIP}`, 5, 60000);
     if (!rateLimit.allowed) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded. Please try again later.', success: false }),

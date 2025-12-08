@@ -42,7 +42,7 @@ serve(async (req) => {
   try {
     // SECURITY: Rate limiting for public endpoint
     const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
-    const rateLimit = checkRateLimit(`meta-conversions:${clientIP}`, 100, 60000);
+    const rateLimit = await checkRateLimit(`meta-conversions:${clientIP}`, 100, 60000);
     if (!rateLimit.allowed) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded' }),
