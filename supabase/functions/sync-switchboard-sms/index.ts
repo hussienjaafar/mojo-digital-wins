@@ -1,14 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 
+// Use restricted CORS
+const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0] || 'https://lovable.dev',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
 interface SwitchboardCredentials {
-  api_key: string;      // Secret Key
-  account_id: string;   // Account ID
+  api_key: string;
+  account_id: string;
 }
 
 interface SwitchboardBroadcast {
@@ -47,8 +49,6 @@ async function fetchSwitchboardBroadcasts(
   cursor?: string
 ): Promise<SwitchboardResponse> {
   const url = cursor || 'https://api.oneswitchboard.com/v1/broadcasts';
-  
-  // HTTP Basic Auth: Account ID as username, Secret Key as password
   const credentials = btoa(`${accountId}:${secretKey}`);
   
   const response = await fetch(url, {
@@ -75,14 +75,72 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
     const { organization_id } = await req.json();
 
     if (!organization_id) {
       throw new Error('organization_id is required');
     }
+
+    // --- AUTH CHECK ---
+    // Either cron secret or user JWT with org membership
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    const providedCronSecret = req.headers.get('x-cron-secret');
+    const authHeader = req.headers.get('Authorization');
+    
+    let isAuthorized = false;
+    
+    // Check cron secret (scheduled jobs)
+    if (cronSecret && providedCronSecret === cronSecret) {
+      isAuthorized = true;
+      console.log('[SMS SYNC] Authorized via CRON_SECRET');
+    }
+    
+    // Check JWT auth (user must belong to org or be admin)
+    if (!isAuthorized && authHeader) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      if (!authError && user) {
+        // Check if admin
+        const { data: isAdmin } = await userClient.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
+        
+        if (isAdmin) {
+          isAuthorized = true;
+          console.log('[SMS SYNC] Authorized via admin JWT');
+        } else {
+          // Check org membership
+          const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+          const { data: clientUser } = await serviceClient
+            .from('client_users')
+            .select('organization_id')
+            .eq('id', user.id)
+            .single();
+          
+          if (clientUser?.organization_id === organization_id) {
+            isAuthorized = true;
+            console.log('[SMS SYNC] Authorized via org membership');
+          }
+        }
+      }
+    }
+    
+    if (!isAuthorized) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - requires CRON_SECRET or valid org membership' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Use service role for operations
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     console.log(`Starting Switchboard SMS sync for organization: ${organization_id}`);
 
@@ -108,11 +166,10 @@ serve(async (req) => {
 
     console.log(`Fetching broadcasts for account: ${account_id}`);
 
-    // Fetch all broadcasts with pagination
     const allBroadcasts: SwitchboardBroadcast[] = [];
     let nextPage: string | null = null;
     let pageCount = 0;
-    const maxPages = 50; // Safety limit
+    const maxPages = 50;
 
     do {
       pageCount++;
@@ -135,7 +192,6 @@ serve(async (req) => {
 
     console.log(`Fetched ${allBroadcasts.length} broadcasts across ${pageCount} pages`);
 
-    // Transform and upsert to sms_campaigns table
     const campaignsToUpsert = allBroadcasts.map(broadcast => ({
       organization_id,
       campaign_id: broadcast.id,
@@ -161,9 +217,7 @@ serve(async (req) => {
     if (campaignsToUpsert.length > 0) {
       const { error: upsertError } = await supabase
         .from('sms_campaigns')
-        .upsert(campaignsToUpsert, {
-          onConflict: 'organization_id,campaign_id',
-        });
+        .upsert(campaignsToUpsert, { onConflict: 'organization_id,campaign_id' });
 
       if (upsertError) {
         console.error('Error upserting SMS campaigns:', upsertError);
@@ -173,7 +227,7 @@ serve(async (req) => {
       console.log(`Successfully upserted ${campaignsToUpsert.length} SMS campaigns`);
     }
 
-    // Calculate aggregate daily metrics
+    // Aggregate daily metrics
     const dailyMetrics: Record<string, {
       messages_sent: number;
       messages_delivered: number;
@@ -200,7 +254,6 @@ serve(async (req) => {
       dailyMetrics[date].cost += parseFloat(broadcast.cost_estimate) || 0;
     }
 
-    // Upsert daily metrics
     const dailyMetricsToUpsert = Object.entries(dailyMetrics).map(([date, metrics]) => ({
       organization_id,
       date,
@@ -215,24 +268,19 @@ serve(async (req) => {
     if (dailyMetricsToUpsert.length > 0) {
       const { error: dailyError } = await supabase
         .from('daily_aggregated_metrics')
-        .upsert(dailyMetricsToUpsert, {
-          onConflict: 'organization_id,date,channel',
-        });
+        .upsert(dailyMetricsToUpsert, { onConflict: 'organization_id,date,channel' });
 
       if (dailyError) {
         console.error('Error upserting daily metrics:', dailyError);
-        // Don't throw, continue with sync status update
       } else {
         console.log(`Updated ${dailyMetricsToUpsert.length} daily metric records`);
       }
     }
 
-    // Get the latest broadcast date for freshness tracking
     const latestBroadcastDate = allBroadcasts.length > 0
       ? allBroadcasts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at
       : new Date().toISOString();
 
-    // Update sync status
     await supabase
       .from('client_api_credentials')
       .update({
@@ -242,7 +290,6 @@ serve(async (req) => {
       .eq('organization_id', organization_id)
       .eq('platform', 'switchboard');
 
-    // Update data freshness tracking
     const { error: freshnessError } = await supabase.rpc('update_data_freshness', {
       p_source: 'switchboard',
       p_organization_id: organization_id,
@@ -263,15 +310,13 @@ serve(async (req) => {
         daily_metrics: Object.keys(dailyMetrics).length,
         message: `Successfully synced ${allBroadcasts.length} SMS broadcasts`
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
     console.error('Error in sync-switchboard-sms:', error);
 
-    // Try to update error status
+    // Log failure for dead-letter handling
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -279,7 +324,16 @@ serve(async (req) => {
       
       const body = await req.clone().json().catch(() => ({}));
       const { organization_id } = body;
+      
       if (organization_id) {
+        try {
+          await supabase.rpc('log_job_failure', {
+            p_function_name: 'sync-switchboard-sms',
+            p_error_message: error.message,
+            p_context: { organization_id }
+          });
+        } catch (_) { /* ignore */ }
+        
         await supabase
           .from('client_api_credentials')
           .update({
@@ -294,14 +348,8 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message 
-      }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
