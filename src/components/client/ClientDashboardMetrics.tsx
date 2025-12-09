@@ -249,6 +249,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     const recurringChurnRate = recurringDonations.length > 0 ? (recurringChurnEvents / recurringDonations.length) * 100 : 0;
     
     const uniqueDonors = new Set(donations.map(d => d.donor_id_hash || d.donor_email)).size;
+    const currentDonorSet = new Set(donations.map(d => d.donor_id_hash || d.donor_email));
+    const prevDonorSet = new Set(prevDonations.map(d => d.donor_id_hash || d.donor_email));
+    let newDonors = 0;
+    let returningDonors = 0;
+    currentDonorSet.forEach((d) => {
+      if (prevDonorSet.has(d)) returningDonors += 1;
+      else newDonors += 1;
+    });
     const recurringDonors = donations.filter(d => d.is_recurring).length;
     const recurringPercentage = donations.length > 0 ? (recurringDonors / donations.length) * 100 : 0;
     
@@ -286,6 +294,8 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       recurringChurnRate,
       recurringDonations: recurringDonations.length,
       uniqueDonors,
+      newDonors,
+      returningDonors,
       recurringPercentage,
       upsellConversionRate,
       roi,
@@ -478,7 +488,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       value: kpis.uniqueDonors.toLocaleString(),
       icon: Users,
       trend: { value: Math.round(calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors)), isPositive: kpis.uniqueDonors >= prevKpis.uniqueDonors },
-      subtitle: `Avg: ${formatCurrency(kpis.avgDonation)}`,
+      subtitle: `New ${kpis.newDonors} / Returning ${kpis.returningDonors}`,
     },
   ];
 
@@ -724,6 +734,12 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
               <span className="text-sm portal-text-muted">Cost Per Donor</span>
               <span className="text-sm font-semibold portal-text-primary">
                 {kpis.uniqueDonors > 0 ? formatCurrency(kpis.totalSpend / kpis.uniqueDonors) : '$0'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-t border-[hsl(var(--portal-border))]">
+              <span className="text-sm portal-text-muted">New vs Returning</span>
+              <span className="text-sm font-semibold portal-text-primary">
+                {kpis.newDonors} / {kpis.returningDonors}
               </span>
             </div>
           </PortalCardContent>

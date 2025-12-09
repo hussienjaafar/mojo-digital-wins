@@ -7,6 +7,7 @@ interface PortalMetricProps {
   label: string;
   value: string | number;
   icon?: LucideIcon;
+  onClick?: () => void;
   trend?: {
     value: number;
     isPositive: boolean;
@@ -22,6 +23,7 @@ export const PortalMetric: React.FC<PortalMetricProps> = ({
   label,
   value,
   icon: Icon,
+  onClick,
   trend,
   progress,
   subtitle,
@@ -60,8 +62,19 @@ export const PortalMetric: React.FC<PortalMetricProps> = ({
     );
   }
 
+  const clickable = typeof onClick === "function";
+
   return (
-    <div className={cn("portal-metric portal-interactive group portal-animate-fade-in", className)}>
+    <div
+      className={cn(
+        "portal-metric portal-interactive group portal-animate-fade-in",
+        clickable && "cursor-pointer hover:shadow-md",
+        className
+      )}
+      onClick={onClick}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+    >
       <div className="flex items-start justify-between mb-3">
         <span className="portal-metric-label transition-colors duration-300 group-hover:text-[hsl(var(--portal-accent-blue))]">{label}</span>
         {Icon && (
