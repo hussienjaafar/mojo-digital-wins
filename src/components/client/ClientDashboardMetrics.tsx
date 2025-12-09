@@ -57,6 +57,11 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
   const [isLoading, setIsLoading] = useState(true);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const deterministicRate = useMemo(() => {
+    if (donations.length === 0) return 0;
+    const deterministic = donations.filter(d => d.refcode || d.source_campaign).length;
+    return (deterministic / donations.length) * 100;
+  }, [donations]);
 
   const palette = {
     gross: "#0D9488",
@@ -496,6 +501,12 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         )}
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 text-xs portal-text-muted">
+        <span className="px-2 py-1 rounded-md border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
+          Range: {format(parseISO(startDate), 'MMM d')} – {format(parseISO(endDate), 'MMM d')}
+        </span>
+      </div>
+
       {/* Hero KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {heroKpis.map((metric, index) => (
@@ -565,7 +576,12 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         <PortalCard className="portal-animate-slide-in-right portal-delay-100">
           <PortalCardHeader>
             <PortalCardTitle>Channel Performance</PortalCardTitle>
-            <p className="text-sm portal-text-muted mt-1">Conversions by source</p>
+            <div className="flex flex-wrap items-center gap-2 mt-1 text-sm portal-text-muted">
+              <span>Conversions by source</span>
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[hsl(var(--portal-bg-elevated))] text-[11px]">
+                Deterministic: {deterministicRate.toFixed(0)}%
+              </span>
+            </div>
           </PortalCardHeader>
           <PortalCardContent>
             <div className="space-y-4">
@@ -624,24 +640,24 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                 </div>
               </div>
             </div>
+
+            <div className="mt-4 pt-4 border-t border-[hsl(var(--portal-border))]">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium portal-text-primary">Conversion Sources</p>
+                <span className="text-xs portal-text-muted">
+                  {format(parseISO(startDate), 'MMM d')} - {format(parseISO(endDate), 'MMM d')}
+                </span>
+              </div>
+              <PortalBarChart data={channelBreakdown} height={220} valueType="number" showValues />
+            </div>
           </PortalCardContent>
         </PortalCard>
       </div>
 
       {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Conversion Sources Bar Chart */}
-        <PortalCard className="lg:col-span-2 portal-animate-fade-in portal-delay-200">
-          <PortalCardHeader>
-            <PortalCardTitle>Conversion Sources</PortalCardTitle>
-          </PortalCardHeader>
-          <PortalCardContent>
-            <PortalBarChart data={channelBreakdown} height={220} valueType="number" showValues />
-          </PortalCardContent>
-        </PortalCard>
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Quick Stats */}
-        <PortalCard className="portal-animate-scale-in portal-delay-300">
+        <PortalCard className="portal-animate-scale-in portal-delay-200 lg:col-span-2">
           <PortalCardHeader>
             <PortalCardTitle>Campaign Health</PortalCardTitle>
             <p className="text-sm portal-text-muted mt-1">Key efficiency metrics</p>
