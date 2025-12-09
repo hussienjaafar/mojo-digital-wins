@@ -64,6 +64,11 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     return (deterministic / donations.length) * 100;
   }, [donations]);
 
+  const scrollToId = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const palette = {
     gross: "#0D9488",
     net: "#0EA5E9",
@@ -454,6 +459,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       icon: Wallet,
       trend: { value: Math.round(calcChange(kpis.totalNetRevenue, prevKpis.totalNetRevenue)), isPositive: kpis.totalNetRevenue >= prevKpis.totalNetRevenue },
       subtitle: `Gross: ${formatCurrency(kpis.totalRaised)} (${kpis.feePercentage.toFixed(1)}% fees)`,
+      onClick: () => scrollToId("fundraising-chart"),
     },
     {
       label: "Net ROI",
@@ -461,6 +467,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       icon: TrendingUp,
       trend: { value: Math.round(calcChange(kpis.roi, prevKpis.roi)), isPositive: kpis.roi >= prevKpis.roi },
       subtitle: `Spend: ${formatCurrency(kpis.totalSpend)}`,
+      onClick: () => scrollToId("channel-performance"),
     },
     {
       label: "Refund Rate",
@@ -468,6 +475,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       icon: Target,
       trend: { value: Math.round(calcChange(kpis.refundRate, prevKpis.refundRate)), isPositive: kpis.refundRate <= prevKpis.refundRate },
       subtitle: `Refunds: ${formatCurrency(kpis.refundAmount)}`,
+      onClick: () => scrollToId("fundraising-chart"),
     },
     {
       label: "Recurring Health",
@@ -475,6 +483,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       icon: Repeat,
       trend: { value: Math.round(calcChange(kpis.recurringChurnRate, prevKpis.recurringChurnRate)), isPositive: kpis.recurringChurnRate <= prevKpis.recurringChurnRate },
       subtitle: `${kpis.recurringDonations} recurring tx • Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
+      onClick: () => scrollToId("campaign-health"),
     },
     {
       label: "Attribution Quality",
@@ -482,6 +491,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       icon: CopyMinus,
       trend: { value: 0, isPositive: true },
       subtitle: "Deterministic (refcode/click)",
+      onClick: () => scrollToId("channel-performance"),
     },
     {
       label: "Unique Donors",
@@ -489,6 +499,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       icon: Users,
       trend: { value: Math.round(calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors)), isPositive: kpis.uniqueDonors >= prevKpis.uniqueDonors },
       subtitle: `New ${kpis.newDonors} / Returning ${kpis.returningDonors}`,
+      onClick: () => scrollToId("campaign-health"),
     },
   ];
 
@@ -552,7 +563,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Fundraising Trend - Main Chart */}
-        <PortalCard className="lg:col-span-2 portal-animate-slide-in-left">
+        <PortalCard id="fundraising-chart" className="lg:col-span-2 portal-animate-slide-in-left">
           <PortalCardHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <PortalCardTitle>Fundraising Performance</PortalCardTitle>
@@ -628,7 +639,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         </PortalCard>
 
         {/* Channel Performance Summary */}
-        <PortalCard className="portal-animate-slide-in-right portal-delay-100">
+        <PortalCard id="channel-performance" className="portal-animate-slide-in-right portal-delay-100">
           <PortalCardHeader>
             <PortalCardTitle>Channel Performance</PortalCardTitle>
             <div className="flex flex-wrap items-center gap-2 mt-1 text-sm portal-text-muted">
@@ -710,9 +721,9 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       </div>
 
       {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Stats */}
-        <PortalCard className="portal-animate-scale-in portal-delay-200 lg:col-span-2">
+        <PortalCard id="campaign-health" className="portal-animate-scale-in portal-delay-200 lg:col-span-2">
           <PortalCardHeader>
             <PortalCardTitle>Campaign Health</PortalCardTitle>
             <p className="text-sm portal-text-muted mt-1">Key efficiency metrics</p>
@@ -742,6 +753,31 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                 {kpis.newDonors} / {kpis.returningDonors}
               </span>
             </div>
+          </PortalCardContent>
+        </PortalCard>
+
+        {/* Retention Snapshot */}
+        <PortalCard className="portal-animate-scale-in portal-delay-300">
+          <PortalCardHeader>
+            <PortalCardTitle>Retention Snapshot</PortalCardTitle>
+            <p className="text-sm portal-text-muted mt-1">Recurring health at a glance</p>
+          </PortalCardHeader>
+          <PortalCardContent className="space-y-3">
+            <div className="flex items-center justify-between py-1 border-b border-[hsl(var(--portal-border))]">
+              <span className="text-sm portal-text-muted">Recurring Raised</span>
+              <span className="text-sm font-semibold portal-text-primary">{formatCurrency(kpis.recurringRaised)}</span>
+            </div>
+            <div className="flex items-center justify-between py-1 border-b border-[hsl(var(--portal-border))]">
+              <span className="text-sm portal-text-muted">Churn Rate</span>
+              <span className="text-sm font-semibold portal-text-primary">{kpis.recurringChurnRate.toFixed(1)}%</span>
+            </div>
+            <div className="flex items-center justify-between py-1">
+              <span className="text-sm portal-text-muted">Recurring Share</span>
+              <span className="text-sm font-semibold portal-text-primary">{kpis.recurringPercentage.toFixed(0)}%</span>
+            </div>
+            <p className="text-[11px] portal-text-muted">
+              For deeper LTV and retention trends, open the Donor Intelligence → LTV/Forecast tab.
+            </p>
           </PortalCardContent>
         </PortalCard>
       </div>

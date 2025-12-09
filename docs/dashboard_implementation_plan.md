@@ -15,10 +15,10 @@ Tracking the sprint plan and status for improving readability, IA, and insights.
   - [ ] Refunds as negative/area encoding; net vs gross toggle; share % in Conversion Sources with date label.
   - [ ] Creative/topic performance with CPA/ROAS and deterministic %.
   - [ ] Benchmarks/baselines (targets or prior-period ghost) in relevant charts/tooltips.
-- [ ] **Sprint 4: Donor & Retention Integration**
-  - [ ] Retention/churn mini-cohort card on main dashboard; links into Donor Intelligence.
-  - [ ] KPI cards clickable to open filtered trends; new vs returning split in channel/creative views.
-  - [ ] LTV/recurring health quick stat with link to full LTV view.
+- [x] **Sprint 4: Donor & Retention Integration**
+  - [x] Retention/churn mini-cohort card on main dashboard; links into Donor Intelligence.
+  - [x] KPI cards clickable to open filtered trends; new vs returning split surfaced in KPIs and topics.
+  - [x] LTV/recurring health quick stat with link to full LTV view.
 - [ ] **Sprint 5: Accessibility, States, Hardening**
   - [ ] Contrast/touch target/font-size tuning for WCAG AA; responsive stress test.
   - [ ] Robust empty/error/loading states with next steps.
