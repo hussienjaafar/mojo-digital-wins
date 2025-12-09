@@ -21,7 +21,7 @@ Tracking the sprint plan and status for improving readability, IA, and insights.
   - [x] LTV/recurring health quick stat with link to full LTV view.
 - [x] **Sprint 5: Accessibility, States, Hardening**
   - [x] Font-size tuning for chart ticks; keyboard/ARIA for clickable KPI cards.
-  - [x] Empty-state handling on charts; aria-label support on charts.
+  - [x] Empty-state handling on charts; aria-label support on charts; focusable chart regions.
   - [x] Touch-target improvement on chart toggles; chart descriptions for screen readers.
   - [ ] Contrast tuning for WCAG AA; responsive stress test.
   - [ ] Screen reader labels and focus for filters/controls (filters still pending).

@@ -87,11 +87,12 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
 
   return (
     <div
-      className={cn("w-full", className)}
+      className={cn("w-full outline-none", className)}
       style={{ height: chartHeight }}
       role="img"
       aria-label={ariaLabel}
       aria-describedby={descriptionId}
+      tabIndex={0}
     >
       <ResponsiveContainer width="100%" height="100%">
         <LineChart 

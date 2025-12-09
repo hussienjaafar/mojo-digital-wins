@@ -636,6 +636,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
               valueType="currency"
               ariaLabel="Fundraising performance line chart showing donations, net, refunds, and spend over time"
               descriptionId="fundraising-desc"
+              className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[hsl(var(--portal-accent))]"
             />
             <p id="fundraising-desc" className="sr-only">
               Toggle net-only or gross and net; refunds are shown as negative. Use compare toggle to overlay previous period.
@@ -726,6 +727,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                 showValues
                 ariaLabel="Conversion sources bar chart"
                 descriptionId="conversion-sources-desc"
+                className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[hsl(var(--portal-accent))]"
               />
               <p id="conversion-sources-desc" className="sr-only">
                 Shows conversions by Meta, SMS, and Direct with percentage share for the selected date range.
