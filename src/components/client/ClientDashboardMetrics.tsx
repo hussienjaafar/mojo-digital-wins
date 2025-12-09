@@ -429,25 +429,11 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       subtitle: `Gross: ${formatCurrency(kpis.totalRaised)} (${kpis.feePercentage.toFixed(1)}% fees)`,
     },
     {
-      label: "Unique Donors",
-      value: kpis.uniqueDonors.toLocaleString(),
-      icon: Users,
-      trend: { value: Math.round(calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors)), isPositive: kpis.uniqueDonors >= prevKpis.uniqueDonors },
-      subtitle: `Avg: ${formatCurrency(kpis.avgDonation)}`,
-    },
-    {
       label: "Net ROI",
       value: `${kpis.roi.toFixed(1)}x`,
       icon: TrendingUp,
       trend: { value: Math.round(calcChange(kpis.roi, prevKpis.roi)), isPositive: kpis.roi >= prevKpis.roi },
       subtitle: `Spend: ${formatCurrency(kpis.totalSpend)}`,
-    },
-    {
-      label: "Recurring Rate",
-      value: `${kpis.recurringPercentage.toFixed(0)}%`,
-      icon: Repeat,
-      trend: { value: Math.round(calcChange(kpis.recurringPercentage, prevKpis.recurringPercentage)), isPositive: kpis.recurringPercentage >= prevKpis.recurringPercentage },
-      subtitle: kpis.upsellConversionRate > 0 ? `${kpis.upsellConversionRate.toFixed(0)}% upsell conv.` : "Monthly sustainers",
     },
     {
       label: "Refund Rate",
@@ -462,6 +448,20 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       icon: Repeat,
       trend: { value: Math.round(calcChange(kpis.recurringChurnRate, prevKpis.recurringChurnRate)), isPositive: kpis.recurringChurnRate <= prevKpis.recurringChurnRate },
       subtitle: `${kpis.recurringDonations} recurring tx • Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
+    },
+    {
+      label: "Attribution Quality",
+      value: `${deterministicRate.toFixed(0)}%`,
+      icon: CopyMinus,
+      trend: { value: 0, isPositive: true },
+      subtitle: "Deterministic (refcode/click)",
+    },
+    {
+      label: "Unique Donors",
+      value: kpis.uniqueDonors.toLocaleString(),
+      icon: Users,
+      trend: { value: Math.round(calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors)), isPositive: kpis.uniqueDonors >= prevKpis.uniqueDonors },
+      subtitle: `Avg: ${formatCurrency(kpis.avgDonation)}`,
     },
   ];
 

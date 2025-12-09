@@ -7,10 +7,10 @@ Tracking the sprint plan and status for improving readability, IA, and insights.
   - [x] Legend with series toggle for line/bar charts; distinct colorblind-safe palette and dash patterns.
   - [x] Currency/date formatting and improved chart padding.
   - [x] Compare-to-previous-period overlay on Fundraising chart.
-- [ ] **Sprint 2: KPI Hierarchy & Information Architecture**
-  - [ ] Revamp hero row to surface net revenue, refund/fee rate, attribution quality %, ROAS, recurring health.
-  - [ ] Add deterministic attribution badge near channel charts; date/org context pill and quick ranges.
-  - [ ] Consolidate channel info (Channel Performance + Conversion Sources) into one coherent section.
+- [x] **Sprint 2: KPI Hierarchy & Information Architecture**
+  - [x] Revamp hero row to surface net revenue, refund rate, attribution quality %, ROI, recurring health.
+  - [x] Add deterministic attribution badge near channel charts; date context pill.
+  - [x] Consolidate channel info (Channel Performance + Conversion Sources) into one coherent section.
 - [ ] **Sprint 3: Data Visualization Enhancements**
   - [ ] Refunds as negative/area encoding; net vs gross toggle; share % in Conversion Sources with date label.
   - [ ] Creative/topic performance with CPA/ROAS and deterministic %.
