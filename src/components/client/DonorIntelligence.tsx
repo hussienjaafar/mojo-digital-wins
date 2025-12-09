@@ -89,6 +89,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
   const [smsCost, setSmsCost] = useState<number>(0);
   const [smsSent, setSmsSent] = useState<number>(0);
   const [ltvSummary, setLtvSummary] = useState<{ avgLtv90: number; avgLtv180: number; highRisk: number; total: number }>({ avgLtv90: 0, avgLtv180: 0, highRisk: 0, total: 0 });
+  const [metaSpend, setMetaSpend] = useState<number>(0);
 
   useEffect(() => {
     loadData();
@@ -228,6 +229,21 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
         setSmsSent(totalSent);
       }
 
+      // Load Meta spend for ROAS/CPA
+      const { data: metaSpendData, error: metaSpendErr } = await (supabase as any)
+        .from('meta_ad_metrics')
+        .select('spend')
+        .eq('organization_id', organizationId)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      if (metaSpendErr) {
+        logger.error('Failed to load meta spend', metaSpendErr);
+      } else {
+        const spend = metaSpendData?.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0) || 0;
+        setMetaSpend(spend);
+      }
+
       // Load donor journeys (limited for performance)
       const { data: journeys, error: journeyErr } = await (supabase as any)
         .from('donor_journeys')
@@ -361,6 +377,22 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
     return `$${value.toFixed(0)}`;
   };
 
+  const platformEfficiency = useMemo(() => {
+    const metaDonations = filteredAttribution.filter(d => d.attributed_platform === 'meta');
+    const metaNet = metaDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
+    const metaCpa = metaDonations.length > 0 ? metaSpend / metaDonations.length : 0;
+    const metaRoas = metaSpend > 0 ? metaNet / metaSpend : 0;
+    return {
+      meta: {
+        donations: metaDonations.length,
+        net: metaNet,
+        spend: metaSpend,
+        cpa: metaCpa,
+        roas: metaRoas,
+      },
+    };
+  }, [filteredAttribution, metaSpend]);
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -464,6 +496,9 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                   <BarChart3 className="h-4 w-4" />
                   Revenue by Platform
                 </PortalCardTitle>
+                <p className="text-sm portal-text-muted mt-1">
+                  CPA/ROAS shown when spend is available (Meta).
+                </p>
               </PortalCardHeader>
               <PortalCardContent>
                 {platformRevenue.length > 0 ? (
@@ -471,12 +506,29 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                     data={platformRevenue}
                     height={250}
                     valueType="currency"
+                    showValues
                   />
                 ) : (
                   <div className="h-[250px] flex items-center justify-center portal-text-muted">
                     No attributed donations yet
                   </div>
                 )}
+                <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
+                  <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                    <div className="portal-text-muted text-xs mb-1">Meta CPA</div>
+                    <div className="font-semibold portal-text-primary">
+                      {platformEfficiency.meta.donations > 0 ? formatCurrency(platformEfficiency.meta.cpa) : 'N/A'}
+                    </div>
+                    <div className="portal-text-muted text-[11px]">Spend / Meta donations</div>
+                  </div>
+                  <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                    <div className="portal-text-muted text-xs mb-1">Meta ROAS (net)</div>
+                    <div className="font-semibold portal-text-primary">
+                      {platformEfficiency.meta.spend > 0 ? `${platformEfficiency.meta.roas.toFixed(1)}x` : 'N/A'}
+                    </div>
+                    <div className="portal-text-muted text-[11px]">Net revenue / spend</div>
+                  </div>
+                </div>
               </PortalCardContent>
             </PortalCard>
 

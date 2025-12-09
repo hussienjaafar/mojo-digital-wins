@@ -4,7 +4,7 @@ import { PortalMetric } from "@/components/portal/PortalMetric";
 import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardContent } from "@/components/portal/PortalCard";
 import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
-import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, CopyMinus } from "lucide-react";
+import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, CopyMinus, SlidersHorizontal } from "lucide-react";
 import { format, parseISO, eachDayOfInterval, subDays } from "date-fns";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
@@ -57,6 +57,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
   const [isLoading, setIsLoading] = useState(true);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const [valueMode, setValueMode] = useState<"both" | "net">("both");
   const deterministicRate = useMemo(() => {
     if (donations.length === 0) return 0;
     const deterministic = donations.filter(d => d.refcode || d.source_campaign).length;
@@ -404,23 +405,37 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
   };
 
   const chartLines = useMemo(() => {
-    const base = [
-      { dataKey: "donations", stroke: palette.gross, name: "Gross donations" },
-      { dataKey: "netDonations", stroke: palette.net, name: "Net donations" },
-      { dataKey: "refunds", stroke: palette.refunds, name: "Refunds (negative)", strokeDasharray: "4 4" },
-      { dataKey: "metaSpend", stroke: palette.meta, name: "Meta spend" },
-      { dataKey: "smsSpend", stroke: palette.sms, name: "SMS spend" },
-    ];
+    const base = valueMode === "net"
+      ? [
+          { dataKey: "netDonations", stroke: palette.net, name: "Net donations" },
+          { dataKey: "refunds", stroke: palette.refunds, name: "Refunds (negative)", strokeDasharray: "4 4" },
+          { dataKey: "metaSpend", stroke: palette.meta, name: "Meta spend" },
+          { dataKey: "smsSpend", stroke: palette.sms, name: "SMS spend" },
+        ]
+      : [
+          { dataKey: "donations", stroke: palette.gross, name: "Gross donations" },
+          { dataKey: "netDonations", stroke: palette.net, name: "Net donations" },
+          { dataKey: "refunds", stroke: palette.refunds, name: "Refunds (negative)", strokeDasharray: "4 4" },
+          { dataKey: "metaSpend", stroke: palette.meta, name: "Meta spend" },
+          { dataKey: "smsSpend", stroke: palette.sms, name: "SMS spend" },
+        ];
     if (!showCompare) return base;
-    return [
-      ...base,
-      { dataKey: "donationsPrev", stroke: palette.grossPrev, name: "Gross (prev)", strokeDasharray: "5 4", hideByDefault: false },
-      { dataKey: "netDonationsPrev", stroke: palette.netPrev, name: "Net (prev)", strokeDasharray: "5 4", hideByDefault: false },
-      { dataKey: "refundsPrev", stroke: palette.refundsPrev, name: "Refunds (prev, negative)", strokeDasharray: "5 4", hideByDefault: false },
-      { dataKey: "metaSpendPrev", stroke: palette.metaPrev, name: "Meta spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
-      { dataKey: "smsSpendPrev", stroke: palette.smsPrev, name: "SMS spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
-    ];
-  }, [palette, showCompare]);
+    const compare = valueMode === "net"
+      ? [
+          { dataKey: "netDonationsPrev", stroke: palette.netPrev, name: "Net (prev)", strokeDasharray: "5 4", hideByDefault: false },
+          { dataKey: "refundsPrev", stroke: palette.refundsPrev, name: "Refunds (prev, negative)", strokeDasharray: "5 4", hideByDefault: false },
+          { dataKey: "metaSpendPrev", stroke: palette.metaPrev, name: "Meta spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
+          { dataKey: "smsSpendPrev", stroke: palette.smsPrev, name: "SMS spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
+        ]
+      : [
+          { dataKey: "donationsPrev", stroke: palette.grossPrev, name: "Gross (prev)", strokeDasharray: "5 4", hideByDefault: false },
+          { dataKey: "netDonationsPrev", stroke: palette.netPrev, name: "Net (prev)", strokeDasharray: "5 4", hideByDefault: false },
+          { dataKey: "refundsPrev", stroke: palette.refundsPrev, name: "Refunds (prev, negative)", strokeDasharray: "5 4", hideByDefault: false },
+          { dataKey: "metaSpendPrev", stroke: palette.metaPrev, name: "Meta spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
+          { dataKey: "smsSpendPrev", stroke: palette.smsPrev, name: "SMS spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
+        ];
+    return [...base, ...compare];
+  }, [palette, showCompare, valueMode]);
 
   const heroKpis = [
     {
@@ -532,6 +547,34 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <PortalCardTitle>Fundraising Performance</PortalCardTitle>
               <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="px-2 py-1 rounded-md border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))] flex items-center gap-1">
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    View:
+                  </span>
+                  <button
+                    onClick={() => setValueMode("both")}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 border text-xs",
+                      valueMode === "both"
+                        ? "border-[hsl(var(--portal-accent))] text-[hsl(var(--portal-accent))] bg-[hsl(var(--portal-bg-elevated))]"
+                        : "border-[hsl(var(--portal-border))] portal-text-muted hover:bg-[hsl(var(--portal-bg-elevated))]"
+                    )}
+                  >
+                    Gross & Net
+                  </button>
+                  <button
+                    onClick={() => setValueMode("net")}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 border text-xs",
+                      valueMode === "net"
+                        ? "border-[hsl(var(--portal-accent))] text-[hsl(var(--portal-accent))] bg-[hsl(var(--portal-bg-elevated))]"
+                        : "border-[hsl(var(--portal-border))] portal-text-muted hover:bg-[hsl(var(--portal-bg-elevated))]"
+                    )}
+                  >
+                    Net focus
+                  </button>
+                </div>
                 <button
                   onClick={() => setShowCompare((prev) => !prev)}
                   className={cn(
