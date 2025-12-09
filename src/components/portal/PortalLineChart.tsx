@@ -91,7 +91,7 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
           />
           <XAxis
             dataKey="name"
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 11 : 12 }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 12 : 12 }}
             tickLine={false}
             axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
             angle={isMobile ? -45 : 0}
@@ -100,7 +100,7 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
             interval={isMobile ? "preserveStartEnd" : "equidistantPreserveStart"}
           />
           <YAxis
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 11 : 12 }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 12 : 12 }}
             tickLine={false}
             axisLine={false}
             tickFormatter={getYAxisFormatter(valueType)}

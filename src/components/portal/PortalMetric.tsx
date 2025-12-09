@@ -67,13 +67,20 @@ export const PortalMetric: React.FC<PortalMetricProps> = ({
   return (
     <div
       className={cn(
-        "portal-metric portal-interactive group portal-animate-fade-in",
+        "portal-metric portal-interactive group portal-animate-fade-in focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[hsl(var(--portal-accent))]",
         clickable && "cursor-pointer hover:shadow-md",
         className
       )}
       onClick={onClick}
       role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (!clickable) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
     >
       <div className="flex items-start justify-between mb-3">
         <span className="portal-metric-label transition-colors duration-300 group-hover:text-[hsl(var(--portal-accent-blue))]">{label}</span>

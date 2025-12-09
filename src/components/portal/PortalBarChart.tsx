@@ -54,7 +54,7 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
           />
           <XAxis
             dataKey="name"
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 11 : 12 }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 12 : 12 }}
             tickLine={false}
             axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
             angle={needsRotation ? -45 : 0}
@@ -63,7 +63,7 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
             interval={0}
           />
           <YAxis
-            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 11 : 12 }}
+            tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 12 : 12 }}
             tickLine={false}
             axisLine={false}
             tickFormatter={getYAxisFormatter(valueType)}

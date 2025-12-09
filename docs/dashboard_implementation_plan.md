@@ -20,9 +20,10 @@ Tracking the sprint plan and status for improving readability, IA, and insights.
   - [x] KPI cards clickable to open filtered trends; new vs returning split surfaced in KPIs and topics.
   - [x] LTV/recurring health quick stat with link to full LTV view.
 - [ ] **Sprint 5: Accessibility, States, Hardening**
-  - [ ] Contrast/touch target/font-size tuning for WCAG AA; responsive stress test.
+  - [x] Font-size tuning for chart ticks; keyboard/ARIA for clickable KPI cards.
+  - [ ] Contrast/touch target tuning for WCAG AA; responsive stress test.
   - [ ] Robust empty/error/loading states with next steps.
-  - [ ] Screen reader labels, keyboard focus states for filters/controls.
+  - [ ] Screen reader labels, keyboard focus states for filters/controls (filters still pending).
 
 ## Notes
 - Cross-sprint: shared chart components for legend toggles, compare mode, net/gross toggle, attribution badges; design tokens update for palette and spacing.
