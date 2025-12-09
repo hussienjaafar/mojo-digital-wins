@@ -98,10 +98,10 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
         <LineChart 
           data={data} 
           margin={{ 
-            top: 12, 
+            top: 10, 
             right: isMobile ? 10 : 18, 
-            bottom: isMobile ? 12 : 10, 
-            left: isMobile ? 4 : 8 
+            bottom: isMobile ? 6 : 6, 
+            left: isMobile ? 6 : 10 
           }}
         >
           <CartesianGrid 
