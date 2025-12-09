@@ -370,12 +370,12 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         name: dayLabel,
         donations: grossDonations,
         netDonations,
-        refunds: refundAmount,
+        refunds: -refundAmount, // plot refunds as negative for readability
         metaSpend: dayMeta.reduce((sum, m) => sum + Number(m.spend || 0), 0),
         smsSpend: daySms.reduce((sum, s) => sum + Number(s.cost || 0), 0),
         donationsPrev: prevGross,
         netDonationsPrev: prevNet,
-        refundsPrev: prevRefundAmount,
+        refundsPrev: -prevRefundAmount,
         metaSpendPrev: prevDayMeta.reduce((sum, m) => sum + Number(m.spend || 0), 0),
         smsSpendPrev: prevDaySms.reduce((sum, s) => sum + Number(s.cost || 0), 0),
       };
@@ -387,11 +387,13 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     const metaConversions = metaMetrics.reduce((sum, m) => sum + (m.conversions || 0), 0);
     const smsConversions = smsMetrics.reduce((sum, s) => sum + (s.conversions || 0), 0);
     const directDonations = donations.filter(d => !d.refcode).length;
+    const total = metaConversions + smsConversions + directDonations || 1;
+    const pct = (val: number) => Math.round((val / total) * 100);
 
     return [
-      { name: "Meta Ads", value: metaConversions, label: `${metaConversions}` },
-      { name: "SMS", value: smsConversions, label: `${smsConversions}` },
-      { name: "Direct", value: directDonations, label: `${directDonations}` },
+      { name: `Meta Ads (${pct(metaConversions)}%)`, value: metaConversions, label: `${metaConversions}` },
+      { name: `SMS (${pct(smsConversions)}%)`, value: smsConversions, label: `${smsConversions}` },
+      { name: `Direct (${pct(directDonations)}%)`, value: directDonations, label: `${directDonations}` },
     ];
   }, [donations, metaMetrics, smsMetrics]);
 
@@ -405,7 +407,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     const base = [
       { dataKey: "donations", stroke: palette.gross, name: "Gross donations" },
       { dataKey: "netDonations", stroke: palette.net, name: "Net donations" },
-      { dataKey: "refunds", stroke: palette.refunds, name: "Refunds", strokeDasharray: "4 4" },
+      { dataKey: "refunds", stroke: palette.refunds, name: "Refunds (negative)", strokeDasharray: "4 4" },
       { dataKey: "metaSpend", stroke: palette.meta, name: "Meta spend" },
       { dataKey: "smsSpend", stroke: palette.sms, name: "SMS spend" },
     ];
@@ -414,7 +416,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       ...base,
       { dataKey: "donationsPrev", stroke: palette.grossPrev, name: "Gross (prev)", strokeDasharray: "5 4", hideByDefault: false },
       { dataKey: "netDonationsPrev", stroke: palette.netPrev, name: "Net (prev)", strokeDasharray: "5 4", hideByDefault: false },
-      { dataKey: "refundsPrev", stroke: palette.refundsPrev, name: "Refunds (prev)", strokeDasharray: "5 4", hideByDefault: false },
+      { dataKey: "refundsPrev", stroke: palette.refundsPrev, name: "Refunds (prev, negative)", strokeDasharray: "5 4", hideByDefault: false },
       { dataKey: "metaSpendPrev", stroke: palette.metaPrev, name: "Meta spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
       { dataKey: "smsSpendPrev", stroke: palette.smsPrev, name: "SMS spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
     ];
