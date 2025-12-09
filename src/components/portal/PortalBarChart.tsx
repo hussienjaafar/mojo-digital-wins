@@ -18,6 +18,8 @@ interface PortalBarChartProps {
   className?: string;
   valueType?: ValueType;
   showValues?: boolean;
+  ariaLabel?: string;
+  emptyLabel?: string;
 }
 
 export const PortalBarChart: React.FC<PortalBarChartProps> = ({
@@ -27,6 +29,8 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   className,
   valueType = "number",
   showValues = false,
+  ariaLabel,
+  emptyLabel = "No data available",
 }) => {
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 200 : 250);
@@ -34,8 +38,16 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   // Only rotate when there are many items or long labels
   const needsRotation = isMobile && (data.length > 4 || data.some(d => d.name.length > 10));
 
+  if (!data || data.length === 0) {
+    return (
+      <div className={cn("w-full flex items-center justify-center text-sm portal-text-muted", className)} style={{ height: chartHeight }} role="img" aria-label={ariaLabel || emptyLabel}>
+        {emptyLabel}
+      </div>
+    );
+  }
+
   return (
-    <div className={cn("w-full", className)} style={{ height: chartHeight }}>
+    <div className={cn("w-full", className)} style={{ height: chartHeight }} role="img" aria-label={ariaLabel}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart 
           data={data} 
