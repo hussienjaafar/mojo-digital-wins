@@ -20,6 +20,7 @@ interface PortalBarChartProps {
   showValues?: boolean;
   ariaLabel?: string;
   emptyLabel?: string;
+  descriptionId?: string;
 }
 
 export const PortalBarChart: React.FC<PortalBarChartProps> = ({
@@ -31,6 +32,7 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   showValues = false,
   ariaLabel,
   emptyLabel = "No data available",
+  descriptionId,
 }) => {
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 200 : 250);
@@ -47,7 +49,13 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   }
 
   return (
-    <div className={cn("w-full", className)} style={{ height: chartHeight }} role="img" aria-label={ariaLabel}>
+    <div
+      className={cn("w-full", className)}
+      style={{ height: chartHeight }}
+      role="img"
+      aria-label={ariaLabel}
+      aria-describedby={descriptionId}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <BarChart 
           data={data} 

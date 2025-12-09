@@ -22,7 +22,8 @@ Tracking the sprint plan and status for improving readability, IA, and insights.
 - [x] **Sprint 5: Accessibility, States, Hardening**
   - [x] Font-size tuning for chart ticks; keyboard/ARIA for clickable KPI cards.
   - [x] Empty-state handling on charts; aria-label support on charts.
-  - [ ] Contrast/touch target tuning for WCAG AA; responsive stress test.
+  - [x] Touch-target improvement on chart toggles; chart descriptions for screen readers.
+  - [ ] Contrast tuning for WCAG AA; responsive stress test.
   - [ ] Screen reader labels and focus for filters/controls (filters still pending).
 
 ## Notes

@@ -25,6 +25,7 @@ interface PortalLineChartProps {
   valueType?: ValueType;
   ariaLabel?: string;
   emptyLabel?: string;
+  descriptionId?: string;
 }
 
 export const PortalLineChart: React.FC<PortalLineChartProps> = ({
@@ -35,6 +36,7 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
   valueType = "number",
   ariaLabel,
   emptyLabel = "No data available",
+  descriptionId,
 }) => {
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 200 : 280);
@@ -84,7 +86,13 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
   }
 
   return (
-    <div className={cn("w-full", className)} style={{ height: chartHeight }} role="img" aria-label={ariaLabel}>
+    <div
+      className={cn("w-full", className)}
+      style={{ height: chartHeight }}
+      role="img"
+      aria-label={ariaLabel}
+      aria-describedby={descriptionId}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <LineChart 
           data={data} 

@@ -576,7 +576,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                   <button
                     onClick={() => setValueMode("both")}
                     className={cn(
-                      "rounded-md px-3 py-1.5 border text-xs",
+                      "rounded-md px-3 py-2 border text-xs min-h-[40px]",
                       valueMode === "both"
                         ? "border-[hsl(var(--portal-accent))] text-[hsl(var(--portal-accent))] bg-[hsl(var(--portal-bg-elevated))]"
                         : "border-[hsl(var(--portal-border))] portal-text-muted hover:bg-[hsl(var(--portal-bg-elevated))]"
@@ -587,7 +587,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                   <button
                     onClick={() => setValueMode("net")}
                     className={cn(
-                      "rounded-md px-3 py-1.5 border text-xs",
+                      "rounded-md px-3 py-2 border text-xs min-h-[40px]",
                       valueMode === "net"
                         ? "border-[hsl(var(--portal-accent))] text-[hsl(var(--portal-accent))] bg-[hsl(var(--portal-bg-elevated))]"
                         : "border-[hsl(var(--portal-border))] portal-text-muted hover:bg-[hsl(var(--portal-bg-elevated))]"
@@ -599,7 +599,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                 <button
                   onClick={() => setShowCompare((prev) => !prev)}
                   className={cn(
-                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium border",
+                    "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[40px]",
                     showCompare
                       ? "border-[hsl(var(--portal-accent))] text-[hsl(var(--portal-accent))] bg-[hsl(var(--portal-bg-elevated))]"
                       : "border-[hsl(var(--portal-border))] portal-text-muted hover:bg-[hsl(var(--portal-bg-elevated))]"
@@ -634,7 +634,12 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
               lines={chartLines}
               height={280}
               valueType="currency"
+              ariaLabel="Fundraising performance line chart showing donations, net, refunds, and spend over time"
+              descriptionId="fundraising-desc"
             />
+            <p id="fundraising-desc" className="sr-only">
+              Toggle net-only or gross and net; refunds are shown as negative. Use compare toggle to overlay previous period.
+            </p>
           </PortalCardContent>
         </PortalCard>
 
@@ -714,7 +719,17 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                   {format(parseISO(startDate), 'MMM d')} - {format(parseISO(endDate), 'MMM d')}
                 </span>
               </div>
-              <PortalBarChart data={channelBreakdown} height={220} valueType="number" showValues />
+              <PortalBarChart
+                data={channelBreakdown}
+                height={220}
+                valueType="number"
+                showValues
+                ariaLabel="Conversion sources bar chart"
+                descriptionId="conversion-sources-desc"
+              />
+              <p id="conversion-sources-desc" className="sr-only">
+                Shows conversions by Meta, SMS, and Direct with percentage share for the selected date range.
+              </p>
             </div>
           </PortalCardContent>
         </PortalCard>
