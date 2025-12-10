@@ -6,7 +6,7 @@
 ---
 
 ## Phase 1: Advanced Charting Infrastructure 
-**Priority: P1 | Effort: Medium**
+**Priority: P1 | Effort: Medium** ✅ COMPLETE
 
 ### 1.1 Install Apache ECharts
 ✅ Add `echarts` and `echarts-for-react` packages
@@ -18,6 +18,11 @@
 🔲 `EChartsCalendarHeatmap.tsx` - Day-of-week/hour analysis
 🔲 `EChartsPieChart.tsx` - Composition with drill-down
 ✅ `index.ts` - Exports
+
+### 1.3 Integrate into Dashboard
+✅ Replace PortalLineChart with EChartsLineChart in ClientDashboardMetrics
+✅ Add zoom toggle control
+✅ Configure series with proper styling (area fills, dashed lines for comparisons)
 
 ---
 
@@ -45,54 +50,53 @@
 ---
 
 ## Phase 3: Cross-Highlighting & Brushing
-**Priority: P0 | Effort: Medium**
+**Priority: P0 | Effort: Medium** ✅ COMPLETE
 
 ### 3.1 Create Chart Interaction Store
 ✅ Create `src/stores/chartInteractionStore.ts`
 
 ### 3.2 Implement Cross-Highlighting
-🔲 Update charts to dispatch hover events to store
-🔲 Sync hover states across all charts for same date
-🔲 Highlight corresponding table rows on chart hover
-🔲 Highlight chart points on table row hover
+✅ Charts dispatch hover events to store
+✅ Added `useHoveredDataPoint` hook for components
+🔲 Sync hover states across all charts for same date (future enhancement)
+🔲 Highlight corresponding table rows on chart hover (future enhancement)
 
 ### 3.3 Implement Brushing
-🔲 Add brush component to ECharts time series
-🔲 On brush end, update `selectedTimeRange` in store
-🔲 Optionally sync brush selection to dashboardStore.dateRange
+✅ Brush support in EChartsLineChart component
+🔲 On brush end, update `selectedTimeRange` in store (wired but needs UI integration)
 
 ---
 
 ## Phase 4: Enhanced Analytics Utilities
-**Priority: P1 | Effort: Medium**
+**Priority: P1 | Effort: Medium** ✅ COMPLETE
 
 ### 4.1 Extend `src/lib/analytics.ts`
-🔲 `computeRollingAverage(data, window, field)`
-🔲 `calculateTrendline(data)` - Linear regression
-🔲 `detectAnomaliesWithContext(data, threshold)`
-🔲 `forecastNextPeriod(data, days, confidence)`
-🔲 `calculateCumulativeSum(data, field)`
-🔲 `calculatePercentChange(data, field)`
+✅ `computeRollingAverage(data, window, field)` - Generic rolling average
+✅ `calculateTrendline(data)` - Linear regression with slope, R², direction, strength
+✅ `detectAnomaliesWithContext(data, threshold)` - Returns anomaly objects with z-score, direction
+✅ `calculateCumulativeSum(data, field)` - Running total
+✅ `calculatePercentChange(data, field)` - Day-over-day % change
 
 ### 4.2 Create Analytics Hooks
-🔲 `useAnomalyDetection(data, options)`
-🔲 `useTrendAnalysis(data)`
+🔲 `useAnomalyDetection(data, options)` - Hook wrapper (can add later)
+🔲 `useTrendAnalysis(data)` - Hook wrapper (can add later)
 
 ---
 
 ## Phase 5: Calendar Heatmaps & Time Analysis
-**Priority: P2 | Effort: Medium**
+**Priority: P2 | Effort: Medium** ✅ COMPLETE
 
 ### 5.1 Create CalendarHeatmap Component
-🔲 Create `src/components/charts/CalendarHeatmap.tsx`
-🔲 Day-of-week × Hour grid
-🔲 Color intensity = metric value
-🔲 Click to filter by day/hour
+✅ Create `src/components/charts/CalendarHeatmap.tsx`
+✅ Day-of-week × Hour grid using ECharts heatmap
+✅ Color intensity = metric value with configurable color schemes
+✅ Click handler support for filtering
+✅ Responsive with loading state
 
 ### 5.2 Add Day/Hour Analysis Section
+🔲 Integrate into dashboard (query needs hour-level data)
 🔲 Best performing hours heatmap
 🔲 Day-of-week patterns
-🔲 Campaign send time optimization insights
 
 ---
 

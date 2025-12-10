@@ -11,14 +11,15 @@ import {
   V3LoadingState,
   V3ErrorState,
 } from "@/components/v3";
-import { PortalLineChart } from "@/components/portal/PortalLineChart";
+import { EChartsLineChart, type LineSeriesConfig } from "@/components/charts/echarts";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
-import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, CopyMinus, SlidersHorizontal } from "lucide-react";
+import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, CopyMinus, SlidersHorizontal, ZoomIn } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useClientDashboardMetricsQuery } from "@/queries";
+import { useHoveredDataPoint } from "@/stores/chartInteractionStore";
 
 interface ClientDashboardMetricsProps {
   organizationId: string;
@@ -57,6 +58,10 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [valueMode, setValueMode] = useState<"both" | "net">("both");
+  const [showZoom, setShowZoom] = useState(false);
+  
+  // Cross-highlighting state from store
+  const hoveredDataPoint = useHoveredDataPoint();
 
   // Use TanStack Query hook
   const { data, isLoading, error, refetch } = useClientDashboardMetricsQuery(organizationId);
@@ -127,37 +132,40 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     return `$${value.toFixed(0)}`;
   }, []);
 
-  // Memoized chart lines configuration
-  const chartLines = useMemo(() => {
-    const base = valueMode === "net"
+  // Memoized ECharts series configuration
+  const echartsSeriesConfig = useMemo((): LineSeriesConfig[] => {
+    const base: LineSeriesConfig[] = valueMode === "net"
       ? [
-          { dataKey: "netDonations", stroke: palette.net, name: "Net donations" },
-          { dataKey: "refunds", stroke: palette.refunds, name: "Refunds (negative)", strokeDasharray: "4 4" },
-          { dataKey: "metaSpend", stroke: palette.meta, name: "Meta spend" },
-          { dataKey: "smsSpend", stroke: palette.sms, name: "SMS spend" },
+          { dataKey: "netDonations", name: "Net donations", color: palette.net, type: "area", areaStyle: { opacity: 0.1 } },
+          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" } },
+          { dataKey: "metaSpend", name: "Meta spend", color: palette.meta },
+          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms },
         ]
       : [
-          { dataKey: "donations", stroke: palette.gross, name: "Gross donations" },
-          { dataKey: "netDonations", stroke: palette.net, name: "Net donations" },
-          { dataKey: "refunds", stroke: palette.refunds, name: "Refunds (negative)", strokeDasharray: "4 4" },
-          { dataKey: "metaSpend", stroke: palette.meta, name: "Meta spend" },
-          { dataKey: "smsSpend", stroke: palette.sms, name: "SMS spend" },
+          { dataKey: "donations", name: "Gross donations", color: palette.gross, type: "area", areaStyle: { opacity: 0.1 } },
+          { dataKey: "netDonations", name: "Net donations", color: palette.net },
+          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" } },
+          { dataKey: "metaSpend", name: "Meta spend", color: palette.meta },
+          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms },
         ];
+    
     if (!showCompare) return base;
-    const compare = valueMode === "net"
+    
+    const compare: LineSeriesConfig[] = valueMode === "net"
       ? [
-          { dataKey: "netDonationsPrev", stroke: palette.netPrev, name: "Net (prev)", strokeDasharray: "5 4", hideByDefault: false },
-          { dataKey: "refundsPrev", stroke: palette.refundsPrev, name: "Refunds (prev, negative)", strokeDasharray: "5 4", hideByDefault: false },
-          { dataKey: "metaSpendPrev", stroke: palette.metaPrev, name: "Meta spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
-          { dataKey: "smsSpendPrev", stroke: palette.smsPrev, name: "SMS spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
+          { dataKey: "netDonationsPrev", name: "Net (prev)", color: palette.netPrev, lineStyle: { type: "dashed", width: 1 } },
+          { dataKey: "refundsPrev", name: "Refunds (prev)", color: palette.refundsPrev, lineStyle: { type: "dotted", width: 1 } },
+          { dataKey: "metaSpendPrev", name: "Meta (prev)", color: palette.metaPrev, lineStyle: { type: "dashed", width: 1 } },
+          { dataKey: "smsSpendPrev", name: "SMS (prev)", color: palette.smsPrev, lineStyle: { type: "dashed", width: 1 } },
         ]
       : [
-          { dataKey: "donationsPrev", stroke: palette.grossPrev, name: "Gross (prev)", strokeDasharray: "5 4", hideByDefault: false },
-          { dataKey: "netDonationsPrev", stroke: palette.netPrev, name: "Net (prev)", strokeDasharray: "5 4", hideByDefault: false },
-          { dataKey: "refundsPrev", stroke: palette.refundsPrev, name: "Refunds (prev, negative)", strokeDasharray: "5 4", hideByDefault: false },
-          { dataKey: "metaSpendPrev", stroke: palette.metaPrev, name: "Meta spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
-          { dataKey: "smsSpendPrev", stroke: palette.smsPrev, name: "SMS spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
+          { dataKey: "donationsPrev", name: "Gross (prev)", color: palette.grossPrev, lineStyle: { type: "dashed", width: 1 } },
+          { dataKey: "netDonationsPrev", name: "Net (prev)", color: palette.netPrev, lineStyle: { type: "dashed", width: 1 } },
+          { dataKey: "refundsPrev", name: "Refunds (prev)", color: palette.refundsPrev, lineStyle: { type: "dotted", width: 1 } },
+          { dataKey: "metaSpendPrev", name: "Meta (prev)", color: palette.metaPrev, lineStyle: { type: "dashed", width: 1 } },
+          { dataKey: "smsSpendPrev", name: "SMS (prev)", color: palette.smsPrev, lineStyle: { type: "dashed", width: 1 } },
         ];
+    
     return [...base, ...compare];
   }, [showCompare, valueMode]);
 
@@ -359,6 +367,19 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                 <CopyMinus className="h-3.5 w-3.5" />
                 {showCompare ? "Hide compare" : "Compare prev period"}
               </button>
+              <button
+                onClick={() => setShowZoom((prev) => !prev)}
+                className={cn(
+                  "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[36px]",
+                  showZoom
+                    ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
+                    : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
+                )}
+                aria-pressed={showZoom}
+                title="Enable zoom & pan"
+              >
+                <ZoomIn className="h-3.5 w-3.5" />
+              </button>
             </div>
           }
         >
@@ -378,12 +399,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
               </div>
             </div>
           </div>
-          <PortalLineChart
-            data={timeSeriesData as any}
-            lines={chartLines}
+          <EChartsLineChart
+            data={timeSeriesData}
+            xAxisKey="name"
+            series={echartsSeriesConfig}
             height={280}
             valueType="currency"
-            ariaLabel="Fundraising performance line chart showing donations, net, refunds, and spend over time"
+            showZoom={showZoom}
+            showLegend={true}
           />
         </V3ChartWrapper>
 
