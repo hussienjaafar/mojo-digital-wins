@@ -2,8 +2,7 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ChevronRight, BarChart3, Sun, Moon, Brain, LayoutDashboard, Layers } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { LogOut, ChevronRight, BarChart3, Sun, Moon, Brain, LayoutDashboard, Layers, RefreshCw } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
 import { useTheme } from "@/components/ThemeProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -13,7 +12,6 @@ import { OnboardingWizard } from "@/components/client/OnboardingWizard";
 import { ClientDashboardMetrics } from "@/components/client/ClientDashboardMetrics";
 import { ConsolidatedChannelMetrics } from "@/components/client/ConsolidatedChannelMetrics";
 import SyncControls from "@/components/client/SyncControls";
-import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
 import { OrganizationSelector } from "@/components/client/OrganizationSelector";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -22,8 +20,11 @@ import {
   V3Card,
   V3SectionHeader,
   V3LoadingState,
+  V3DateRangePicker,
 } from "@/components/v3";
 import { cn } from "@/lib/utils";
+import { useDashboardStore, useDateRange } from "@/stores/dashboardStore";
+import { Button } from "@/components/ui/button";
 
 // Lazy load Advanced Analytics and Donor Intelligence for performance
 const AdvancedAnalytics = lazy(() => import("@/components/analytics/AdvancedAnalytics"));
@@ -97,8 +98,10 @@ const ClientDashboard = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
   const [showDonorIntelligence, setShowDonorIntelligence] = useState(false);
-  const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
-  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  
+  // V3: Use Zustand store for global date range
+  const dateRange = useDateRange();
+  const triggerRefresh = useDashboardStore((s) => s.triggerRefresh);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -137,11 +140,6 @@ const ClientDashboard = () => {
     if (profile && !profile.onboarding_completed) {
       setShowOnboarding(true);
     }
-  };
-
-  const handleDateChange = (start: string, end: string) => {
-    setStartDate(start);
-    setEndDate(end);
   };
 
   const loadUserOrganizations = async () => {
@@ -480,18 +478,29 @@ const ClientDashboard = () => {
                         subtitle="Key performance indicators for your campaign"
                         icon={LayoutDashboard}
                         actions={
-                          <DateRangeSelector
-                            startDate={startDate}
-                            endDate={endDate}
-                            onDateChange={handleDateChange}
-                          />
+                          <div className="flex items-center gap-2">
+                            <V3DateRangePicker />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={triggerRefresh}
+                                  className="h-9 px-3 bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-hover))]"
+                                >
+                                  <RefreshCw className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Refresh data</TooltipContent>
+                            </Tooltip>
+                          </div>
                         }
                         className="mb-4"
                       />
                       <ClientDashboardMetrics
                         organizationId={organization.id}
-                        startDate={startDate}
-                        endDate={endDate}
+                        startDate={dateRange.startDate}
+                        endDate={dateRange.endDate}
                       />
                     </motion.section>
 
@@ -505,8 +514,8 @@ const ClientDashboard = () => {
                       />
                       <ConsolidatedChannelMetrics
                         organizationId={organization.id}
-                        startDate={startDate}
-                        endDate={endDate}
+                        startDate={dateRange.startDate}
+                        endDate={dateRange.endDate}
                       />
                     </motion.section>
 
@@ -523,8 +532,8 @@ const ClientDashboard = () => {
                         <Suspense fallback={<V3SectionSkeleton />}>
                           <DonorIntelligence
                             organizationId={organization.id}
-                            startDate={startDate}
-                            endDate={endDate}
+                            startDate={dateRange.startDate}
+                            endDate={dateRange.endDate}
                           />
                         </Suspense>
                       </CollapsibleSection>
@@ -543,8 +552,8 @@ const ClientDashboard = () => {
                         <Suspense fallback={<V3SectionSkeleton />}>
                           <AdvancedAnalytics
                             organizationId={organization.id}
-                            startDate={startDate}
-                            endDate={endDate}
+                            startDate={dateRange.startDate}
+                            endDate={dateRange.endDate}
                           />
                         </Suspense>
                       </CollapsibleSection>
@@ -554,8 +563,8 @@ const ClientDashboard = () => {
                     <motion.section variants={sectionVariants}>
                       <SyncControls
                         organizationId={organization.id}
-                        startDate={startDate}
-                        endDate={endDate}
+                        startDate={dateRange.startDate}
+                        endDate={dateRange.endDate}
                       />
                     </motion.section>
                   </motion.div>
