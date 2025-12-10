@@ -141,6 +141,7 @@ export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
             onSelect={handleDateSelect}
             numberOfMonths={2}
             defaultMonth={subDays(new Date(), 30)}
+            className="p-3 pointer-events-auto"
           />
         </PopoverContent>
       </Popover>
