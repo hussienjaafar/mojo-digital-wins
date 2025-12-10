@@ -16,5 +16,5 @@ export { V3KPICard, type V3KPIAccent } from "./V3KPICard";
 export { V3ChartWrapper } from "./V3ChartWrapper";
 export { V3LoadingState } from "./V3LoadingState";
 export { V3ErrorState } from "./V3ErrorState";
-export { V3EmptyState } from "./V3EmptyState";
+export { V3EmptyState, type V3EmptyAccent } from "./V3EmptyState";
 export { V3SectionHeader } from "./V3SectionHeader";

@@ -7047,8 +7047,8 @@ export type Database = {
         Returns: number
       }
       calculate_next_run:
-        | { Args: { cron_schedule: string }; Returns: string }
         | { Args: { cron_expr: string; from_time?: string }; Returns: string }
+        | { Args: { cron_schedule: string }; Returns: string }
       calculate_sentiment_trend: {
         Args: { current_sentiment: number; previous_sentiment: number }
         Returns: string
@@ -7199,8 +7199,8 @@ export type Database = {
         }[]
       }
       has_pii_access:
-        | { Args: { _organization_id: string }; Returns: boolean }
         | { Args: never; Returns: boolean }
+        | { Args: { _organization_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
