@@ -85,7 +85,7 @@ export const PortalMultiBarChart: React.FC<PortalMultiBarChartProps> = ({
     dataKey: bar.dataKey,
     color: bar.fill,
     type: "square" as const,
-    payload: bar,
+    payload: { ...bar, strokeDasharray: "0" },
     inactive: hiddenKeys.has(bar.dataKey),
   }));
 

@@ -2,6 +2,8 @@ import * as React from "react";
 import { type LucideIcon, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+export type V3EmptyAccent = "blue" | "green" | "purple" | "amber" | "red" | "default";
+
 interface V3EmptyStateProps {
   /** Custom icon (defaults to Inbox) */
   icon?: LucideIcon;
@@ -13,9 +15,29 @@ interface V3EmptyStateProps {
   action?: React.ReactNode;
   /** Size variant */
   variant?: "compact" | "default" | "large";
+  /** Accent color for the icon background */
+  accent?: V3EmptyAccent;
   /** Additional class names */
   className?: string;
 }
+
+const accentClasses: Record<V3EmptyAccent, string> = {
+  blue: "bg-[hsl(var(--portal-accent-blue)/0.1)]",
+  green: "bg-[hsl(var(--portal-success)/0.1)]",
+  purple: "bg-[hsl(var(--portal-accent-purple)/0.1)]",
+  amber: "bg-[hsl(var(--portal-warning)/0.1)]",
+  red: "bg-[hsl(var(--portal-error)/0.1)]",
+  default: "bg-[hsl(var(--portal-bg-elevated))]",
+};
+
+const accentIconClasses: Record<V3EmptyAccent, string> = {
+  blue: "text-[hsl(var(--portal-accent-blue))]",
+  green: "text-[hsl(var(--portal-success))]",
+  purple: "text-[hsl(var(--portal-accent-purple))]",
+  amber: "text-[hsl(var(--portal-warning))]",
+  red: "text-[hsl(var(--portal-error))]",
+  default: "text-[hsl(var(--portal-text-muted))]",
+};
 
 export const V3EmptyState: React.FC<V3EmptyStateProps> = ({
   icon: Icon = Inbox,
@@ -23,6 +45,7 @@ export const V3EmptyState: React.FC<V3EmptyStateProps> = ({
   description,
   action,
   variant = "default",
+  accent = "default",
   className,
 }) => {
   const sizeClasses = {
@@ -56,11 +79,11 @@ export const V3EmptyState: React.FC<V3EmptyStateProps> = ({
       <div
         className={cn(
           "rounded-full p-4 mb-4",
-          "bg-[hsl(var(--portal-bg-elevated))]"
+          accentClasses[accent]
         )}
       >
         <Icon
-          className={cn(iconSizes[variant], "text-[hsl(var(--portal-text-muted))]")}
+          className={cn(iconSizes[variant], accentIconClasses[accent])}
           aria-hidden="true"
         />
       </div>

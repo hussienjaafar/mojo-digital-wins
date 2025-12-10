@@ -58,7 +58,7 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+    transition: { duration: 0.3, ease: "easeOut" as const },
   },
 };
 
@@ -67,12 +67,12 @@ const formVariants = {
   visible: {
     opacity: 1,
     height: "auto",
-    transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+    transition: { duration: 0.3, ease: "easeOut" as const },
   },
   exit: {
     opacity: 0,
     height: 0,
-    transition: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+    transition: { duration: 0.2, ease: "easeOut" as const },
   },
 };
 

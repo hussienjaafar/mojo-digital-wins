@@ -53,7 +53,7 @@ const sectionVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+    transition: { duration: 0.3, ease: "easeOut" as const },
   },
 };
 
@@ -63,7 +63,7 @@ const contentVariants = {
     height: 0,
     opacity: 0,
     transition: {
-      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] },
       opacity: { duration: 0.2 },
     },
   },
@@ -71,7 +71,7 @@ const contentVariants = {
     height: "auto",
     opacity: 1,
     transition: {
-      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] },
       opacity: { duration: 0.3, delay: 0.1 },
     },
   },

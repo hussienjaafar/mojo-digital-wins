@@ -73,7 +73,7 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
     dataKey: line.dataKey,
     color: line.stroke,
     type: "line" as const,
-    payload: line,
+    payload: { ...line, strokeDasharray: line.strokeDasharray || "0" },
     inactive: hiddenKeys.has(line.dataKey),
   }));
 
