@@ -16,6 +16,8 @@ import {
   V3CardDescription,
 } from "@/components/v3";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
+import { dashboardKeys, metaKeys, smsKeys, donationKeys, channelKeys } from "@/queries/queryKeys";
 
 type Props = {
   organizationId: string;
@@ -65,6 +67,7 @@ const spinTransition = {
 
 const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -93,6 +96,14 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
     return syncStatuses.find(s => s.platform === platform);
   };
 
+  // Invalidate all dashboard-related queries
+  const invalidateDashboardQueries = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all }),
+      queryClient.invalidateQueries({ queryKey: channelKeys.all }),
+    ]);
+  };
+
   const syncMetaAds = async () => {
     setSyncing({ ...syncing, meta: true });
     try {
@@ -114,6 +125,9 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
         description: "Meta Ads sync completed successfully",
       });
 
+      // Invalidate Meta queries
+      await queryClient.invalidateQueries({ queryKey: metaKeys.all });
+      await invalidateDashboardQueries();
       await calculateROI();
     } catch (error: any) {
       toast({
@@ -146,6 +160,9 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
           title: "Success",
           description: "Switchboard SMS sync completed successfully",
         });
+        // Invalidate SMS queries
+        await queryClient.invalidateQueries({ queryKey: smsKeys.all });
+        await invalidateDashboardQueries();
         await calculateROI();
       }
     } catch (error: any) {
@@ -198,6 +215,9 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
           : `ActBlue sync completed: ${inserted} new transactions`,
       });
 
+      // Invalidate donation queries
+      await queryClient.invalidateQueries({ queryKey: donationKeys.all });
+      await invalidateDashboardQueries();
       await calculateROI();
     } catch (error: any) {
       toast({
