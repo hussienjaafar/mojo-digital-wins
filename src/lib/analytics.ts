@@ -133,7 +133,55 @@ export function forecastTrend(
 }
 
 /**
- * Detect anomalies using standard deviation
+ * Anomaly detection result with context
+ */
+export interface AnomalyResult {
+  index: number;
+  value: number;
+  zScore: number;
+  isAnomaly: boolean;
+  direction: 'high' | 'low' | 'normal';
+  date?: string;
+}
+
+/**
+ * Detect anomalies using z-score with detailed results
+ */
+export function detectAnomaliesWithContext(
+  data: { date: string; value: number }[],
+  threshold: number = 2
+): AnomalyResult[] {
+  if (data.length < 3) return data.map((d, i) => ({
+    index: i,
+    value: d.value,
+    zScore: 0,
+    isAnomaly: false,
+    direction: 'normal' as const,
+    date: d.date,
+  }));
+
+  const values = data.map(d => d.value);
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+  const stdDev = Math.sqrt(variance);
+  
+  return data.map((d, i) => {
+    const zScore = stdDev > 0 ? (d.value - mean) / stdDev : 0;
+    const isAnomaly = Math.abs(zScore) > threshold;
+    
+    return {
+      index: i,
+      value: d.value,
+      zScore,
+      isAnomaly,
+      direction: zScore > threshold ? 'high' : zScore < -threshold ? 'low' : 'normal',
+      date: d.date,
+    };
+  });
+}
+
+/**
+ * Simple anomaly detection returning boolean array
  */
 export function detectAnomalies(
   data: number[],
@@ -144,6 +192,114 @@ export function detectAnomalies(
   const stdDev = Math.sqrt(variance);
   
   return data.map(val => Math.abs(val - mean) > threshold * stdDev);
+}
+
+/**
+ * Linear regression result
+ */
+export interface TrendlineResult {
+  slope: number;
+  intercept: number;
+  rSquared: number;
+  direction: 'up' | 'down' | 'flat';
+  strength: 'strong' | 'moderate' | 'weak';
+  predictedValues: number[];
+}
+
+/**
+ * Calculate trendline with regression metrics
+ */
+export function calculateTrendline(
+  data: number[]
+): TrendlineResult {
+  const n = data.length;
+  if (n < 2) {
+    return {
+      slope: 0,
+      intercept: data[0] || 0,
+      rSquared: 0,
+      direction: 'flat',
+      strength: 'weak',
+      predictedValues: data,
+    };
+  }
+
+  const xValues = data.map((_, i) => i);
+  const yValues = data;
+  
+  const sumX = xValues.reduce((a, b) => a + b, 0);
+  const sumY = yValues.reduce((a, b) => a + b, 0);
+  const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0);
+  const sumXX = xValues.reduce((sum, x) => sum + x * x, 0);
+  
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  
+  // Calculate R-squared
+  const yMean = sumY / n;
+  const ssTotal = yValues.reduce((sum, y) => sum + Math.pow(y - yMean, 2), 0);
+  const predictions = xValues.map(x => slope * x + intercept);
+  const ssRes = yValues.reduce((sum, y, i) => sum + Math.pow(y - predictions[i], 2), 0);
+  const rSquared = ssTotal > 0 ? 1 - (ssRes / ssTotal) : 0;
+  
+  // Determine direction and strength
+  const direction = Math.abs(slope) < 0.001 ? 'flat' : slope > 0 ? 'up' : 'down';
+  const strength = rSquared > 0.7 ? 'strong' : rSquared > 0.4 ? 'moderate' : 'weak';
+  
+  return {
+    slope,
+    intercept,
+    rSquared,
+    direction,
+    strength,
+    predictedValues: predictions,
+  };
+}
+
+/**
+ * Compute rolling average for any field in data array
+ */
+export function computeRollingAverage<T extends Record<string, any>>(
+  data: T[],
+  field: keyof T,
+  window: number
+): (T & { rollingAvg: number })[] {
+  return data.map((item, i) => {
+    const start = Math.max(0, i - window + 1);
+    const windowData = data.slice(start, i + 1);
+    const avg = windowData.reduce((sum, d) => sum + Number(d[field] || 0), 0) / windowData.length;
+    return { ...item, rollingAvg: avg };
+  });
+}
+
+/**
+ * Calculate cumulative sum
+ */
+export function calculateCumulativeSum<T extends Record<string, any>>(
+  data: T[],
+  field: keyof T
+): (T & { cumulative: number })[] {
+  let cumulative = 0;
+  return data.map(item => {
+    cumulative += Number(item[field] || 0);
+    return { ...item, cumulative };
+  });
+}
+
+/**
+ * Calculate day-over-day percent change
+ */
+export function calculatePercentChange<T extends Record<string, any>>(
+  data: T[],
+  field: keyof T
+): (T & { percentChange: number })[] {
+  return data.map((item, i) => {
+    if (i === 0) return { ...item, percentChange: 0 };
+    const prev = Number(data[i - 1][field] || 0);
+    const current = Number(item[field] || 0);
+    const percentChange = prev !== 0 ? ((current - prev) / prev) * 100 : 0;
+    return { ...item, percentChange };
+  });
 }
 
 /**

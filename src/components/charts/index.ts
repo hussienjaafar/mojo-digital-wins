@@ -12,6 +12,12 @@ export {
   NumberChartTooltip 
 } from "./CustomChartTooltip";
 
+// ECharts components
+export * from "./echarts";
+
+// Advanced charts
+export { CalendarHeatmap, type CalendarHeatmapProps, type HeatmapDataPoint } from "./CalendarHeatmap";
+
 // Re-export formatters for convenience
 export { 
   formatCurrency, 
