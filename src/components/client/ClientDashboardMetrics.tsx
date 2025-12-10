@@ -1,14 +1,24 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { PortalMetric } from "@/components/portal/PortalMetric";
-import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardContent } from "@/components/portal/PortalCard";
+import { motion } from "framer-motion";
+import {
+  V3Card,
+  V3CardHeader,
+  V3CardTitle,
+  V3CardContent,
+  V3KPICard,
+  V3ChartWrapper,
+  V3LoadingState,
+  V3ErrorState,
+} from "@/components/v3";
 import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
 import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, CopyMinus, SlidersHorizontal } from "lucide-react";
-import { format, parseISO, eachDayOfInterval, subDays } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useClientDashboardMetricsQuery } from "@/queries";
 
 interface ClientDashboardMetricsProps {
   organizationId: string;
@@ -16,161 +26,49 @@ interface ClientDashboardMetricsProps {
   endDate: string;
 }
 
-interface DonationData {
-  amount: number;
-  net_amount: number | null;
-  fee: number | null;
-  donor_email: string;
-  donor_id_hash?: string | null;
-  is_recurring: boolean;
-  recurring_upsell_shown: boolean | null;
-  recurring_upsell_succeeded: boolean | null;
-  transaction_date: string;
-  transaction_type?: string | null;  // Track refunds/cancellations
-  refcode: string | null;
-  source_campaign: string | null;
-}
+const palette = {
+  gross: "#0D9488",
+  net: "#0EA5E9",
+  refunds: "#DC2626",
+  meta: "#2563EB",
+  sms: "#8B5CF6",
+  grossPrev: "#0D948888",
+  netPrev: "#0EA5E988",
+  refundsPrev: "#DC262688",
+  metaPrev: "#2563EB88",
+  smsPrev: "#8B5CF688",
+};
 
-interface MetaData {
-  date: string;
-  spend: number;
-  impressions: number;
-  clicks: number;
-  conversions: number;
-}
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.05 },
+  },
+};
 
-interface SMSData {
-  send_date: string;
-  messages_sent: number;
-  conversions: number;
-  cost: number;
-  amount_raised: number;
-}
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
+};
 
 export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: ClientDashboardMetricsProps) => {
-  const [donations, setDonations] = useState<DonationData[]>([]);
-  const [metaMetrics, setMetaMetrics] = useState<MetaData[]>([]);
-  const [smsMetrics, setSmsMetrics] = useState<SMSData[]>([]);
-  const [prevDonations, setPrevDonations] = useState<DonationData[]>([]);
-  const [prevMetaMetrics, setPrevMetaMetrics] = useState<MetaData[]>([]);
-  const [prevSmsMetrics, setPrevSmsMetrics] = useState<SMSData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [valueMode, setValueMode] = useState<"both" | "net">("both");
-  const deterministicRate = useMemo(() => {
-    if (donations.length === 0) return 0;
-    const deterministic = donations.filter(d => d.refcode || d.source_campaign).length;
-    return (deterministic / donations.length) * 100;
-  }, [donations]);
+
+  // Use TanStack Query hook
+  const { data, isLoading, error, refetch } = useClientDashboardMetricsQuery(organizationId);
+
+  const kpis = data?.kpis;
+  const prevKpis = data?.prevKpis || {};
+  const timeSeriesData = data?.timeSeries || [];
+  const channelBreakdown = data?.channelBreakdown || [];
 
   const scrollToId = (id: string) => {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const palette = {
-    gross: "#0D9488",
-    net: "#0EA5E9",
-    refunds: "#DC2626",
-    meta: "#2563EB",
-    sms: "#8B5CF6",
-    grossPrev: "#0D948888",
-    netPrev: "#0EA5E988",
-    refundsPrev: "#DC262688",
-    metaPrev: "#2563EB88",
-    smsPrev: "#8B5CF688",
-  };
-
-  // Calculate previous period dates for comparison
-  const getPreviousPeriod = () => {
-    const start = parseISO(startDate);
-    const end = parseISO(endDate);
-    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const prevEnd = subDays(start, 1);
-    const prevStart = subDays(prevEnd, daysDiff);
-    return {
-      start: format(prevStart, 'yyyy-MM-dd'),
-      end: format(prevEnd, 'yyyy-MM-dd'),
-    };
-  };
-
-  useEffect(() => {
-    loadAllData();
-  }, [organizationId, startDate, endDate]);
-
-  const loadAllData = async () => {
-    setIsLoading(true);
-    const prevPeriod = getPreviousPeriod();
-    
-    try {
-      // Load current period donations (using secure view for defense-in-depth PII protection)
-      // Now fetching net_amount, fee, and recurring upsell data for enhanced analytics
-      const { data: donationData } = await (supabase as any)
-        .from('actblue_transactions_secure')
-        .select('amount, net_amount, fee, donor_email, donor_id_hash, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_type, transaction_date, refcode, source_campaign')
-        .eq('organization_id', organizationId)
-        .gte('transaction_date', startDate)
-        .lte('transaction_date', `${endDate}T23:59:59`);
-      
-      setDonations(donationData || []);
-
-      // Load previous period donations (using secure view for defense-in-depth PII protection)
-      const { data: prevDonationData } = await (supabase as any)
-        .from('actblue_transactions_secure')
-        .select('amount, net_amount, fee, donor_email, donor_id_hash, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_type, transaction_date, refcode, source_campaign')
-        .eq('organization_id', organizationId)
-        .gte('transaction_date', prevPeriod.start)
-        .lte('transaction_date', `${prevPeriod.end}T23:59:59`);
-      
-      setPrevDonations(prevDonationData || []);
-
-      // Load current period Meta metrics
-      const { data: metaData } = await (supabase as any)
-        .from('meta_ad_metrics')
-        .select('date, spend, impressions, clicks, conversions')
-        .eq('organization_id', organizationId)
-        .gte('date', startDate)
-        .lte('date', endDate);
-      
-      setMetaMetrics(metaData || []);
-
-      // Load previous period Meta metrics
-      const { data: prevMetaData } = await (supabase as any)
-        .from('meta_ad_metrics')
-        .select('date, spend, impressions, clicks, conversions')
-        .eq('organization_id', organizationId)
-        .gte('date', prevPeriod.start)
-        .lte('date', prevPeriod.end);
-      
-      setPrevMetaMetrics(prevMetaData || []);
-
-      // Load current period SMS metrics
-      const { data: smsData } = await (supabase as any)
-        .from('sms_campaigns')
-        .select('send_date, messages_sent, conversions, cost, amount_raised')
-        .eq('organization_id', organizationId)
-        .gte('send_date', startDate)
-        .lte('send_date', `${endDate}T23:59:59`)
-        .neq('status', 'draft');
-      
-      setSmsMetrics(smsData || []);
-
-      // Load previous period SMS metrics
-      const { data: prevSmsData } = await (supabase as any)
-        .from('sms_campaigns')
-        .select('send_date, messages_sent, conversions, cost, amount_raised')
-        .eq('organization_id', organizationId)
-        .gte('send_date', prevPeriod.start)
-        .lte('send_date', `${prevPeriod.end}T23:59:59`)
-        .neq('status', 'draft');
-      
-      setPrevSmsMetrics(prevSmsData || []);
-    } catch (error) {
-      logger.error('Failed to load dashboard metrics', error);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   // Real-time subscription for live donation updates
@@ -192,20 +90,8 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
           // Check if donation falls within current date range
           const txDate = newDonation.transaction_date;
           if (txDate >= startDate && txDate <= `${endDate}T23:59:59`) {
-            setDonations(prev => [{
-              amount: newDonation.amount,
-              net_amount: newDonation.fee != null ? newDonation.amount - newDonation.fee : newDonation.amount,
-              fee: newDonation.fee,
-              donor_email: newDonation.donor_email,
-              donor_id_hash: newDonation.donor_id_hash || newDonation.donor_email || null,
-              is_recurring: newDonation.is_recurring,
-              recurring_upsell_shown: newDonation.recurring_upsell_shown,
-              recurring_upsell_succeeded: newDonation.recurring_upsell_succeeded,
-              transaction_date: newDonation.transaction_date,
-              transaction_type: newDonation.transaction_type || 'donation',
-              refcode: newDonation.refcode,
-              source_campaign: newDonation.source_campaign,
-            }, ...prev]);
+            // Refetch data to update KPIs
+            refetch();
             
             toast.success(`New donation: $${Number(newDonation.amount).toFixed(2)}`, {
               description: newDonation.donor_name || 'Anonymous donor',
@@ -226,199 +112,21 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [organizationId, startDate, endDate]);
+  }, [organizationId, startDate, endDate, refetch]);
 
   // Calculate percentage change
-  const calcChange = (current: number, previous: number) => {
-    if (previous === 0) return current > 0 ? 100 : 0;
+  const calcChange = useCallback((current: number, previous: number | undefined) => {
+    if (!previous || previous === 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous) * 100;
-  };
+  }, []);
 
-  // Calculate KPIs for current period - now with net revenue, refunds, and recurring health
-  const kpis = useMemo(() => {
-    const totalRaised = donations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
-    // Net revenue = gross - fees (using net_amount when available)
-    const totalNetRevenue = donations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const totalFees = donations.reduce((sum, d) => sum + Number(d.fee || 0), 0);
-    const feePercentage = totalRaised > 0 ? (totalFees / totalRaised) * 100 : 0;
-    const refunds = donations.filter(d => d.transaction_type === 'refund');
-    const refundAmount = refunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const refundRate = totalRaised > 0 ? (refundAmount / totalRaised) * 100 : 0;
-
-    // Recurring health
-    const recurringDonations = donations.filter(d => d.is_recurring);
-    const recurringRaised = recurringDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const recurringCancellations = recurringDonations.filter(d => d.transaction_type === 'cancellation').length;
-    const recurringRefunds = recurringDonations.filter(d => d.transaction_type === 'refund').length;
-    const recurringChurnEvents = recurringCancellations + recurringRefunds;
-    const recurringChurnRate = recurringDonations.length > 0 ? (recurringChurnEvents / recurringDonations.length) * 100 : 0;
-    
-    const uniqueDonors = new Set(donations.map(d => d.donor_id_hash || d.donor_email)).size;
-    const currentDonorSet = new Set(donations.map(d => d.donor_id_hash || d.donor_email));
-    const prevDonorSet = new Set(prevDonations.map(d => d.donor_id_hash || d.donor_email));
-    let newDonors = 0;
-    let returningDonors = 0;
-    currentDonorSet.forEach((d) => {
-      if (prevDonorSet.has(d)) returningDonors += 1;
-      else newDonors += 1;
-    });
-    const recurringDonors = donations.filter(d => d.is_recurring).length;
-    const recurringPercentage = donations.length > 0 ? (recurringDonors / donations.length) * 100 : 0;
-    
-    // Recurring upsell metrics
-    const upsellShown = donations.filter(d => d.recurring_upsell_shown).length;
-    const upsellSucceeded = donations.filter(d => d.recurring_upsell_succeeded).length;
-    const upsellConversionRate = upsellShown > 0 ? (upsellSucceeded / upsellShown) * 100 : 0;
-    
-    // Attribution breakdown by source
-    const bySource = donations.reduce((acc, d) => {
-      const source = d.source_campaign || 'direct';
-      acc[source] = (acc[source] || 0) + Number(d.amount || 0);
-      return acc;
-    }, {} as Record<string, number>);
-    
-    const totalMetaSpend = metaMetrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
-    const totalSMSCost = smsMetrics.reduce((sum, s) => sum + Number(s.cost || 0), 0);
-    const totalSpend = totalMetaSpend + totalSMSCost;
-    
-    // Use net revenue for accurate ROI calculation
-    const roi = totalSpend > 0 ? totalNetRevenue / totalSpend : 0;
-    
-    const totalImpressions = metaMetrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
-    const totalClicks = metaMetrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
-    const avgDonation = donations.length > 0 ? totalRaised / donations.length : 0;
-
-    return {
-      totalRaised,
-      totalNetRevenue,
-      totalFees,
-      feePercentage,
-      refundAmount,
-      refundRate,
-      recurringRaised,
-      recurringChurnRate,
-      recurringDonations: recurringDonations.length,
-      uniqueDonors,
-      newDonors,
-      returningDonors,
-      recurringPercentage,
-      upsellConversionRate,
-      roi,
-      totalSpend,
-      totalImpressions,
-      totalClicks,
-      avgDonation,
-      donationCount: donations.length,
-      revenueBySource: bySource,
-    };
-  }, [donations, metaMetrics, smsMetrics]);
-
-  // Calculate KPIs for previous period
-  const prevKpis = useMemo(() => {
-    const totalRaised = prevDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
-    const totalNetRevenue = prevDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const refunds = prevDonations.filter(d => d.transaction_type === 'refund');
-    const refundAmount = refunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const refundRate = totalRaised > 0 ? (refundAmount / totalRaised) * 100 : 0;
-    const prevRecurring = prevDonations.filter(d => d.is_recurring);
-    const prevRecurringRaised = prevRecurring.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const prevRecurringChurn = prevRecurring.filter(d => d.transaction_type === 'cancellation' || d.transaction_type === 'refund').length;
-    const prevRecurringChurnRate = prevRecurring.length > 0 ? (prevRecurringChurn / prevRecurring.length) * 100 : 0;
-    const uniqueDonors = new Set(prevDonations.map(d => d.donor_id_hash || d.donor_email)).size;
-    const recurringDonors = prevDonations.filter(d => d.is_recurring).length;
-    const recurringPercentage = prevDonations.length > 0 ? (recurringDonors / prevDonations.length) * 100 : 0;
-    
-    const totalMetaSpend = prevMetaMetrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
-    const totalSMSCost = prevSmsMetrics.reduce((sum, s) => sum + Number(s.cost || 0), 0);
-    const totalSpend = totalMetaSpend + totalSMSCost;
-    
-    const roi = totalSpend > 0 ? totalNetRevenue / totalSpend : 0;
-
-    return {
-      totalRaised,
-      totalNetRevenue,
-      refundAmount,
-      refundRate,
-      recurringRaised: prevRecurringRaised,
-      recurringChurnRate: prevRecurringChurnRate,
-      uniqueDonors,
-      recurringPercentage,
-      roi,
-      totalSpend,
-    };
-  }, [prevDonations, prevMetaMetrics, prevSmsMetrics]);
-
-  // Build time series data for charts
-  const timeSeriesData = useMemo(() => {
-    const prevPeriod = getPreviousPeriod();
-    const days = eachDayOfInterval({
-      start: parseISO(startDate),
-      end: parseISO(endDate),
-    });
-    const prevDays = eachDayOfInterval({
-      start: parseISO(prevPeriod.start),
-      end: parseISO(prevPeriod.end),
-    });
-
-    return days.map(day => {
-      const dayStr = format(day, 'yyyy-MM-dd');
-      const dayLabel = format(day, 'MMM d');
-      const prevDay = prevDays[days.indexOf(day)];
-      const prevDayStr = prevDay ? format(prevDay, 'yyyy-MM-dd') : null;
-      
-      const dayDonations = donations.filter(d => d.transaction_date?.startsWith(dayStr));
-      const dayMeta = metaMetrics.filter(m => m.date === dayStr);
-      const daySms = smsMetrics.filter(s => s.send_date?.startsWith(dayStr));
-      const dayRefunds = dayDonations.filter(d => d.transaction_type === 'refund');
-      const prevDayDonations = prevDayStr ? prevDonations.filter(d => d.transaction_date?.startsWith(prevDayStr)) : [];
-      const prevDayMeta = prevDayStr ? prevMetaMetrics.filter(m => m.date === prevDayStr) : [];
-      const prevDaySms = prevDayStr ? prevSmsMetrics.filter(s => s.send_date?.startsWith(prevDayStr)) : [];
-      const prevDayRefunds = prevDayDonations.filter(d => d.transaction_type === 'refund');
-
-      const grossDonations = dayDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
-      const netDonations = dayDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-      const refundAmount = dayRefunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-      const prevGross = prevDayDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
-      const prevNet = prevDayDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-      const prevRefundAmount = prevDayRefunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-
-      return {
-        name: dayLabel,
-        donations: grossDonations,
-        netDonations,
-        refunds: -refundAmount, // plot refunds as negative for readability
-        metaSpend: dayMeta.reduce((sum, m) => sum + Number(m.spend || 0), 0),
-        smsSpend: daySms.reduce((sum, s) => sum + Number(s.cost || 0), 0),
-        donationsPrev: prevGross,
-        netDonationsPrev: prevNet,
-        refundsPrev: -prevRefundAmount,
-        metaSpendPrev: prevDayMeta.reduce((sum, m) => sum + Number(m.spend || 0), 0),
-        smsSpendPrev: prevDaySms.reduce((sum, s) => sum + Number(s.cost || 0), 0),
-      };
-    });
-  }, [donations, metaMetrics, smsMetrics, prevDonations, prevMetaMetrics, prevSmsMetrics, startDate, endDate]);
-
-  // Channel breakdown for bar chart
-  const channelBreakdown = useMemo(() => {
-    const metaConversions = metaMetrics.reduce((sum, m) => sum + (m.conversions || 0), 0);
-    const smsConversions = smsMetrics.reduce((sum, s) => sum + (s.conversions || 0), 0);
-    const directDonations = donations.filter(d => !d.refcode).length;
-    const total = metaConversions + smsConversions + directDonations || 1;
-    const pct = (val: number) => Math.round((val / total) * 100);
-
-    return [
-      { name: `Meta Ads (${pct(metaConversions)}%)`, value: metaConversions, label: `${metaConversions}` },
-      { name: `SMS (${pct(smsConversions)}%)`, value: smsConversions, label: `${smsConversions}` },
-      { name: `Direct (${pct(directDonations)}%)`, value: directDonations, label: `${directDonations}` },
-    ];
-  }, [donations, metaMetrics, smsMetrics]);
-
-  const formatCurrency = (value: number) => {
+  const formatCurrency = useCallback((value: number) => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
     return `$${value.toFixed(0)}`;
-  };
+  }, []);
 
+  // Memoized chart lines configuration
   const chartLines = useMemo(() => {
     const base = valueMode === "net"
       ? [
@@ -450,72 +158,95 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
           { dataKey: "smsSpendPrev", stroke: palette.smsPrev, name: "SMS spend (prev)", strokeDasharray: "6 4", hideByDefault: false },
         ];
     return [...base, ...compare];
-  }, [palette, showCompare, valueMode]);
+  }, [showCompare, valueMode]);
 
-  const heroKpis = [
-    {
-      label: "Net Revenue",
-      value: formatCurrency(kpis.totalNetRevenue),
-      icon: Wallet,
-      trend: { value: Math.round(calcChange(kpis.totalNetRevenue, prevKpis.totalNetRevenue)), isPositive: kpis.totalNetRevenue >= prevKpis.totalNetRevenue },
-      subtitle: `Gross: ${formatCurrency(kpis.totalRaised)} (${kpis.feePercentage.toFixed(1)}% fees)`,
-      onClick: () => scrollToId("fundraising-chart"),
-    },
-    {
-      label: "Net ROI",
-      value: `${kpis.roi.toFixed(1)}x`,
-      icon: TrendingUp,
-      trend: { value: Math.round(calcChange(kpis.roi, prevKpis.roi)), isPositive: kpis.roi >= prevKpis.roi },
-      subtitle: `Spend: ${formatCurrency(kpis.totalSpend)}`,
-      onClick: () => scrollToId("channel-performance"),
-    },
-    {
-      label: "Refund Rate",
-      value: `${kpis.refundRate.toFixed(1)}%`,
-      icon: Target,
-      trend: { value: Math.round(calcChange(kpis.refundRate, prevKpis.refundRate)), isPositive: kpis.refundRate <= prevKpis.refundRate },
-      subtitle: `Refunds: ${formatCurrency(kpis.refundAmount)}`,
-      onClick: () => scrollToId("fundraising-chart"),
-    },
-    {
-      label: "Recurring Health",
-      value: formatCurrency(kpis.recurringRaised),
-      icon: Repeat,
-      trend: { value: Math.round(calcChange(kpis.recurringChurnRate, prevKpis.recurringChurnRate)), isPositive: kpis.recurringChurnRate <= prevKpis.recurringChurnRate },
-      subtitle: `${kpis.recurringDonations} recurring tx • Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
-      onClick: () => scrollToId("campaign-health"),
-    },
-    {
-      label: "Attribution Quality",
-      value: `${deterministicRate.toFixed(0)}%`,
-      icon: CopyMinus,
-      trend: { value: 0, isPositive: true },
-      subtitle: "Deterministic (refcode/click)",
-      onClick: () => scrollToId("channel-performance"),
-    },
-    {
-      label: "Unique Donors",
-      value: kpis.uniqueDonors.toLocaleString(),
-      icon: Users,
-      trend: { value: Math.round(calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors)), isPositive: kpis.uniqueDonors >= prevKpis.uniqueDonors },
-      subtitle: `New ${kpis.newDonors} / Returning ${kpis.returningDonors}`,
-      onClick: () => scrollToId("campaign-health"),
-    },
-  ];
+  // Hero KPIs configuration
+  const heroKpis = useMemo(() => {
+    if (!kpis) return [];
+    return [
+      {
+        label: "Net Revenue",
+        value: formatCurrency(kpis.totalNetRevenue),
+        icon: Wallet,
+        trend: { value: Math.round(calcChange(kpis.totalNetRevenue, prevKpis.totalNetRevenue)), isPositive: kpis.totalNetRevenue >= (prevKpis.totalNetRevenue || 0) },
+        subtitle: `Gross: ${formatCurrency(kpis.totalRaised)} (${kpis.feePercentage.toFixed(1)}% fees)`,
+        onClick: () => scrollToId("fundraising-chart"),
+        accent: "green" as const,
+      },
+      {
+        label: "Net ROI",
+        value: `${kpis.roi.toFixed(1)}x`,
+        icon: TrendingUp,
+        trend: { value: Math.round(calcChange(kpis.roi, prevKpis.roi)), isPositive: kpis.roi >= (prevKpis.roi || 0) },
+        subtitle: `Spend: ${formatCurrency(kpis.totalSpend)}`,
+        onClick: () => scrollToId("channel-performance"),
+        accent: "blue" as const,
+      },
+      {
+        label: "Refund Rate",
+        value: `${kpis.refundRate.toFixed(1)}%`,
+        icon: Target,
+        trend: { value: Math.round(calcChange(kpis.refundRate, prevKpis.refundRate)), isPositive: kpis.refundRate <= (prevKpis.refundRate || 0) },
+        subtitle: `Refunds: ${formatCurrency(kpis.refundAmount)}`,
+        onClick: () => scrollToId("fundraising-chart"),
+        accent: kpis.refundRate > 5 ? "red" as const : "default" as const,
+      },
+      {
+        label: "Recurring Health",
+        value: formatCurrency(kpis.recurringRaised),
+        icon: Repeat,
+        trend: { value: Math.round(calcChange(kpis.recurringChurnRate, prevKpis.recurringChurnRate)), isPositive: kpis.recurringChurnRate <= (prevKpis.recurringChurnRate || 0) },
+        subtitle: `${kpis.recurringDonations} recurring tx • Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
+        onClick: () => scrollToId("campaign-health"),
+        accent: "amber" as const,
+      },
+      {
+        label: "Attribution Quality",
+        value: `${kpis.deterministicRate.toFixed(0)}%`,
+        icon: CopyMinus,
+        trend: { value: 0, isPositive: true },
+        subtitle: "Deterministic (refcode/click)",
+        onClick: () => scrollToId("channel-performance"),
+        accent: "purple" as const,
+      },
+      {
+        label: "Unique Donors",
+        value: kpis.uniqueDonors.toLocaleString(),
+        icon: Users,
+        trend: { value: Math.round(calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors)), isPositive: kpis.uniqueDonors >= (prevKpis.uniqueDonors || 0) },
+        subtitle: `New ${kpis.newDonors} / Returning ${kpis.returningDonors}`,
+        onClick: () => scrollToId("campaign-health"),
+        accent: "blue" as const,
+      },
+    ];
+  }, [kpis, prevKpis, calcChange, formatCurrency]);
 
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="portal-card p-6 animate-pulse">
-              <div className="h-4 w-24 bg-[hsl(var(--portal-bg-elevated))] rounded mb-3" />
-              <div className="h-8 w-20 bg-[hsl(var(--portal-bg-elevated))] rounded" />
-            </div>
-          ))}
+        <V3LoadingState variant="kpi-grid" count={6} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <V3LoadingState variant="chart" height={320} />
+          </div>
+          <V3LoadingState variant="chart" height={320} />
         </div>
       </div>
     );
+  }
+
+  if (error) {
+    return (
+      <V3ErrorState
+        title="Failed to load dashboard metrics"
+        message={error instanceof Error ? error.message : 'An error occurred'}
+        onRetry={() => refetch()}
+      />
+    );
+  }
+
+  if (!kpis) {
+    return null;
   }
 
   return (
@@ -524,199 +255,203 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       <div className="flex items-center gap-2 text-sm">
         {isRealtimeConnected ? (
           <>
-            <Wifi className="h-4 w-4 text-emerald-500" />
-            <span className="portal-text-muted">Live updates enabled</span>
+            <Wifi className="h-4 w-4 text-[hsl(var(--portal-success))]" />
+            <span className="text-[hsl(var(--portal-text-muted))]">Live updates enabled</span>
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[hsl(var(--portal-success))] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[hsl(var(--portal-success))]"></span>
             </span>
           </>
         ) : (
           <>
-            <WifiOff className="h-4 w-4 portal-text-muted" />
-            <span className="portal-text-muted">Connecting...</span>
+            <WifiOff className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+            <span className="text-[hsl(var(--portal-text-muted))]">Connecting...</span>
           </>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs portal-text-muted">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-[hsl(var(--portal-text-muted))]">
         <span className="px-2 py-1 rounded-md border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
           Range: {format(parseISO(startDate), 'MMM d')} – {format(parseISO(endDate), 'MMM d')}
         </span>
       </div>
 
       {/* Hero KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        {heroKpis.map((metric, index) => (
-          <PortalMetric
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            icon={metric.icon}
-            trend={metric.trend}
-            subtitle={metric.subtitle}
-            className={`portal-delay-${index * 100}`}
-          />
+      <motion.div
+        className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {heroKpis.map((metric) => (
+          <motion.div key={metric.label} variants={itemVariants}>
+            <V3KPICard
+              label={metric.label}
+              value={metric.value}
+              icon={metric.icon}
+              trend={metric.trend}
+              subtitle={metric.subtitle}
+              accent={metric.accent}
+              onClick={metric.onClick}
+            />
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Fundraising Trend - Main Chart */}
-        <PortalCard id="fundraising-chart" className="lg:col-span-2 portal-animate-slide-in-left">
-          <PortalCardHeader>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <PortalCardTitle>Fundraising Performance</PortalCardTitle>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="px-2 py-1 rounded-md border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))] flex items-center gap-1">
-                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                    View:
-                  </span>
-                  <button
-                    onClick={() => setValueMode("both")}
-                    className={cn(
-                      "rounded-md px-3 py-2 border text-xs min-h-[40px]",
-                      valueMode === "both"
-                        ? "border-[hsl(var(--portal-accent))] text-[hsl(var(--portal-accent))] bg-[hsl(var(--portal-bg-elevated))]"
-                        : "border-[hsl(var(--portal-border))] portal-text-muted hover:bg-[hsl(var(--portal-bg-elevated))]"
-                    )}
-                  >
-                    Gross & Net
-                  </button>
-                  <button
-                    onClick={() => setValueMode("net")}
-                    className={cn(
-                      "rounded-md px-3 py-2 border text-xs min-h-[40px]",
-                      valueMode === "net"
-                        ? "border-[hsl(var(--portal-accent))] text-[hsl(var(--portal-accent))] bg-[hsl(var(--portal-bg-elevated))]"
-                        : "border-[hsl(var(--portal-border))] portal-text-muted hover:bg-[hsl(var(--portal-bg-elevated))]"
-                    )}
-                  >
-                    Net focus
-                  </button>
-                </div>
+        <V3ChartWrapper
+          title="Fundraising Performance"
+          icon={TrendingUp}
+          ariaLabel="Fundraising performance chart showing donations and spend over time"
+          description="Line chart displaying daily donations, net revenue, refunds, and channel spend"
+          accent="green"
+          className="lg:col-span-2"
+          actions={
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2 py-1 rounded-md border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))] flex items-center gap-1">
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  View:
+                </span>
                 <button
-                  onClick={() => setShowCompare((prev) => !prev)}
+                  onClick={() => setValueMode("both")}
                   className={cn(
-                    "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[40px]",
-                    showCompare
-                      ? "border-[hsl(var(--portal-accent))] text-[hsl(var(--portal-accent))] bg-[hsl(var(--portal-bg-elevated))]"
-                      : "border-[hsl(var(--portal-border))] portal-text-muted hover:bg-[hsl(var(--portal-bg-elevated))]"
+                    "rounded-md px-3 py-2 border text-xs min-h-[36px]",
+                    valueMode === "both"
+                      ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
+                      : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
                   )}
-                  aria-pressed={showCompare}
                 >
-                  <CopyMinus className="h-3.5 w-3.5" />
-                  {showCompare ? "Hide compare" : "Compare prev period"}
+                  Gross & Net
+                </button>
+                <button
+                  onClick={() => setValueMode("net")}
+                  className={cn(
+                    "rounded-md px-3 py-2 border text-xs min-h-[36px]",
+                    valueMode === "net"
+                      ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
+                      : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
+                  )}
+                >
+                  Net focus
                 </button>
               </div>
+              <button
+                onClick={() => setShowCompare((prev) => !prev)}
+                className={cn(
+                  "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[36px]",
+                  showCompare
+                    ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
+                    : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
+                )}
+                aria-pressed={showCompare}
+              >
+                <CopyMinus className="h-3.5 w-3.5" />
+                {showCompare ? "Hide compare" : "Compare prev period"}
+              </button>
             </div>
-            <div className="flex items-center gap-6 mt-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <div className="text-2xl font-bold portal-text-primary">{formatCurrency(kpis.totalRaised)}</div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full" style={{ background: palette.gross }} />
-                  <span className="text-xs portal-text-muted">Donations</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="text-2xl font-bold portal-text-primary">{formatCurrency(kpis.totalSpend)}</div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full" style={{ background: palette.meta }} />
-                  <span className="text-xs portal-text-muted">Meta Spend</span>
-                </div>
+          }
+        >
+          <div className="flex items-center gap-6 mb-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{formatCurrency(kpis.totalRaised)}</div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full" style={{ background: palette.gross }} />
+                <span className="text-xs text-[hsl(var(--portal-text-muted))]">Donations</span>
               </div>
             </div>
-          </PortalCardHeader>
-          <PortalCardContent>
-            <PortalLineChart
-              data={timeSeriesData}
-              lines={chartLines}
-              height={280}
-              valueType="currency"
-              ariaLabel="Fundraising performance line chart showing donations, net, refunds, and spend over time"
-              descriptionId="fundraising-desc"
-              className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[hsl(var(--portal-accent))]"
-            />
-            <p id="fundraising-desc" className="sr-only">
-              Toggle net-only or gross and net; refunds are shown as negative. Use compare toggle to overlay previous period.
-            </p>
-          </PortalCardContent>
-        </PortalCard>
+            <div className="flex items-center gap-2">
+              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{formatCurrency(kpis.totalSpend)}</div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full" style={{ background: palette.meta }} />
+                <span className="text-xs text-[hsl(var(--portal-text-muted))]">Meta Spend</span>
+              </div>
+            </div>
+          </div>
+          <PortalLineChart
+            data={timeSeriesData as any}
+            lines={chartLines}
+            height={280}
+            valueType="currency"
+            ariaLabel="Fundraising performance line chart showing donations, net, refunds, and spend over time"
+          />
+        </V3ChartWrapper>
 
         {/* Channel Performance Summary */}
-        <PortalCard id="channel-performance" className="portal-animate-slide-in-right portal-delay-100">
-          <PortalCardHeader>
-            <PortalCardTitle>Channel Performance</PortalCardTitle>
-            <div className="flex flex-wrap items-center gap-2 mt-1 text-sm portal-text-muted">
+        <V3Card id="channel-performance" accent="blue">
+          <V3CardHeader>
+            <V3CardTitle>Channel Performance</V3CardTitle>
+            <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-[hsl(var(--portal-text-muted))]">
               <span>Conversions by source</span>
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[hsl(var(--portal-bg-elevated))] text-[11px]">
-                Deterministic: {deterministicRate.toFixed(0)}%
+                Deterministic: {kpis.deterministicRate.toFixed(0)}%
               </span>
             </div>
-          </PortalCardHeader>
-          <PortalCardContent>
+          </V3CardHeader>
+          <V3CardContent>
             <div className="space-y-4">
               {/* Meta Ads */}
-              <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
-                <div className="p-2 rounded-lg bg-[#0D84FF]/10">
-                  <Target className="h-4 w-4 text-[#0D84FF]" />
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
+                  <Target className="h-4 w-4 text-[hsl(var(--portal-accent-blue))]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium portal-text-primary">Meta Ads</p>
-                  <p className="text-xs portal-text-muted">
-                    {formatCurrency(metaMetrics.reduce((s, m) => s + Number(m.spend || 0), 0))} spent
+                  <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Meta Ads</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                    {formatCurrency(data?.metaSpend || 0)} spent
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold portal-text-primary">
-                    {metaMetrics.reduce((s, m) => s + (m.conversions || 0), 0)}
+                  <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
+                    {data?.metaConversions || 0}
                   </p>
-                  <p className="text-xs portal-text-muted">conversions</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">conversions</p>
                 </div>
               </div>
 
               {/* SMS */}
-              <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
-                <div className="p-2 rounded-lg bg-[#A78BFA]/10">
-                  <MessageSquare className="h-4 w-4 text-[#A78BFA]" />
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]">
+                  <MessageSquare className="h-4 w-4 text-[hsl(var(--portal-accent-purple))]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium portal-text-primary">SMS Campaigns</p>
-                  <p className="text-xs portal-text-muted">
-                    {smsMetrics.reduce((s, m) => s + (m.messages_sent || 0), 0).toLocaleString()} sent
+                  <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">SMS Campaigns</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                    {(data?.smsMessagesSent || 0).toLocaleString()} sent
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold portal-text-primary">
-                    {smsMetrics.reduce((s, m) => s + (m.conversions || 0), 0)}
+                  <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
+                    {data?.smsConversions || 0}
                   </p>
-                  <p className="text-xs portal-text-muted">conversions</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">conversions</p>
                 </div>
               </div>
 
               {/* Direct */}
-              <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
-                <div className="p-2 rounded-lg bg-[#10B981]/10">
-                  <DollarSign className="h-4 w-4 text-[#10B981]" />
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                <div className="p-2 rounded-lg bg-[hsl(var(--portal-success)/0.1)]">
+                  <DollarSign className="h-4 w-4 text-[hsl(var(--portal-success))]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium portal-text-primary">Direct Donations</p>
-                  <p className="text-xs portal-text-muted">No attribution</p>
+                  <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Direct Donations</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">No attribution</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold portal-text-primary">
-                    {donations.filter(d => !d.refcode).length}
+                  <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
+                    {data?.directDonations || 0}
                   </p>
-                  <p className="text-xs portal-text-muted">donations</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">donations</p>
                 </div>
               </div>
             </div>
 
             <div className="mt-4 pt-4 border-t border-[hsl(var(--portal-border))]">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium portal-text-primary">Conversion Sources</p>
-                <span className="text-xs portal-text-muted">
+                <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Conversion Sources</p>
+                <span className="text-xs text-[hsl(var(--portal-text-muted))]">
                   {format(parseISO(startDate), 'MMM d')} - {format(parseISO(endDate), 'MMM d')}
                 </span>
               </div>
@@ -726,77 +461,81 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                 valueType="number"
                 showValues
                 ariaLabel="Conversion sources bar chart"
-                descriptionId="conversion-sources-desc"
-                className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[hsl(var(--portal-accent))]"
               />
-              <p id="conversion-sources-desc" className="sr-only">
-                Shows conversions by Meta, SMS, and Direct with percentage share for the selected date range.
-              </p>
             </div>
-          </PortalCardContent>
-        </PortalCard>
+          </V3CardContent>
+        </V3Card>
       </div>
 
-      {/* Bottom Row */}
+      {/* Bottom Row - Campaign Health */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Stats */}
-        <PortalCard id="campaign-health" className="portal-animate-scale-in portal-delay-200 lg:col-span-2">
-          <PortalCardHeader>
-            <PortalCardTitle>Campaign Health</PortalCardTitle>
-            <p className="text-sm portal-text-muted mt-1">Key efficiency metrics</p>
-          </PortalCardHeader>
-          <PortalCardContent className="space-y-4">
+        <V3Card id="campaign-health" className="lg:col-span-2" accent="purple">
+          <V3CardHeader>
+            <V3CardTitle>Campaign Health</V3CardTitle>
+            <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">Key efficiency metrics</p>
+          </V3CardHeader>
+          <V3CardContent className="space-y-4">
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
-              <span className="text-sm portal-text-muted">Average Donation</span>
-              <span className="text-sm font-semibold portal-text-primary">{formatCurrency(kpis.avgDonation)}</span>
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Average Donation</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{formatCurrency(kpis.avgDonation)}</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
-              <span className="text-sm portal-text-muted">Total Impressions</span>
-              <span className="text-sm font-semibold portal-text-primary">{kpis.totalImpressions.toLocaleString()}</span>
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Total Impressions</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{kpis.totalImpressions.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
-              <span className="text-sm portal-text-muted">Total Clicks</span>
-              <span className="text-sm font-semibold portal-text-primary">{kpis.totalClicks.toLocaleString()}</span>
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Total Clicks</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{kpis.totalClicks.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Recurring %</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{kpis.recurringPercentage.toFixed(1)}%</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Upsell Conversion</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{kpis.upsellConversionRate.toFixed(1)}%</span>
             </div>
             <div className="flex items-center justify-between py-2">
-              <span className="text-sm portal-text-muted">Cost Per Donor</span>
-              <span className="text-sm font-semibold portal-text-primary">
-                {kpis.uniqueDonors > 0 ? formatCurrency(kpis.totalSpend / kpis.uniqueDonors) : '$0'}
-              </span>
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Total Donations</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{kpis.donationCount.toLocaleString()}</span>
             </div>
-            <div className="flex items-center justify-between py-2 border-t border-[hsl(var(--portal-border))]">
-              <span className="text-sm portal-text-muted">New vs Returning</span>
-              <span className="text-sm font-semibold portal-text-primary">
-                {kpis.newDonors} / {kpis.returningDonors}
-              </span>
-            </div>
-          </PortalCardContent>
-        </PortalCard>
+          </V3CardContent>
+        </V3Card>
 
-        {/* Retention Snapshot */}
-        <PortalCard className="portal-animate-scale-in portal-delay-300">
-          <PortalCardHeader>
-            <PortalCardTitle>Retention Snapshot</PortalCardTitle>
-            <p className="text-sm portal-text-muted mt-1">Recurring health at a glance</p>
-          </PortalCardHeader>
-          <PortalCardContent className="space-y-3">
-            <div className="flex items-center justify-between py-1 border-b border-[hsl(var(--portal-border))]">
-              <span className="text-sm portal-text-muted">Recurring Raised</span>
-              <span className="text-sm font-semibold portal-text-primary">{formatCurrency(kpis.recurringRaised)}</span>
+        {/* Recurring Summary */}
+        <V3Card accent="amber">
+          <V3CardHeader>
+            <V3CardTitle>Recurring Summary</V3CardTitle>
+            <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">Sustainer program health</p>
+          </V3CardHeader>
+          <V3CardContent className="space-y-4">
+            <div className="text-center py-4">
+              <p className="text-3xl font-bold text-[hsl(var(--portal-text-primary))]">
+                {formatCurrency(kpis.recurringRaised)}
+              </p>
+              <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">Recurring Revenue</p>
             </div>
-            <div className="flex items-center justify-between py-1 border-b border-[hsl(var(--portal-border))]">
-              <span className="text-sm portal-text-muted">Churn Rate</span>
-              <span className="text-sm font-semibold portal-text-primary">{kpis.recurringChurnRate.toFixed(1)}%</span>
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[hsl(var(--portal-border))]">
+              <div className="text-center">
+                <p className="text-xl font-semibold text-[hsl(var(--portal-text-primary))]">
+                  {kpis.recurringDonations}
+                </p>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))]">Transactions</p>
+              </div>
+              <div className="text-center">
+                <p className={cn(
+                  "text-xl font-semibold",
+                  kpis.recurringChurnRate > 5 
+                    ? "text-[hsl(var(--portal-error))]" 
+                    : "text-[hsl(var(--portal-text-primary))]"
+                )}>
+                  {kpis.recurringChurnRate.toFixed(1)}%
+                </p>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))]">Churn Rate</p>
+              </div>
             </div>
-            <div className="flex items-center justify-between py-1">
-              <span className="text-sm portal-text-muted">Recurring Share</span>
-              <span className="text-sm font-semibold portal-text-primary">{kpis.recurringPercentage.toFixed(0)}%</span>
-            </div>
-            <p className="text-[11px] portal-text-muted">
-              For deeper LTV and retention trends, open the Donor Intelligence → LTV/Forecast tab.
-            </p>
-          </PortalCardContent>
-        </PortalCard>
+          </V3CardContent>
+        </V3Card>
       </div>
     </div>
   );
