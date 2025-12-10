@@ -19,7 +19,8 @@ import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTab
 import { Target, MousePointer, Eye, DollarSign, TrendingUp, BarChart3, Filter, RefreshCw } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, subDays, parseISO } from "date-fns";
-import { ResponsiveLineChart, ResponsiveBarChart } from "@/components/charts";
+import { PortalLineChart } from "@/components/portal/PortalLineChart";
+import { PortalMultiBarChart } from "@/components/portal/PortalMultiBarChart";
 import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
 
 type Props = {
@@ -414,13 +415,14 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Line chart displaying daily spend and conversion trends for Meta advertising campaigns"
           accent="blue"
         >
-          <ResponsiveLineChart
+          <PortalLineChart
             data={trendChartData}
             lines={[
-              { dataKey: "Spend", name: "Spend", color: CHART_COLORS.spend, valueType: "currency" },
-              { dataKey: "Conversions", name: "Conversions", color: CHART_COLORS.conversions, valueType: "number" },
+              { dataKey: "Spend", name: "Spend", stroke: CHART_COLORS.spend, valueType: "currency" },
+              { dataKey: "Conversions", name: "Conversions", stroke: CHART_COLORS.conversions, valueType: "number" },
             ]}
             valueType="currency"
+            ariaLabel="Meta Ads performance trend showing spend and conversions over time"
           />
         </V3ChartWrapper>
       )}
@@ -434,13 +436,14 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Bar chart comparing spend and conversions across top performing Meta campaigns"
           accent="blue"
         >
-          <ResponsiveBarChart
+          <PortalMultiBarChart
             data={campaignBreakdownData}
             bars={[
-              { dataKey: "spend", name: "Spend", color: CHART_COLORS.spend, valueType: "currency" },
-              { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.conversions, valueType: "number" },
+              { dataKey: "spend", name: "Spend", fill: CHART_COLORS.spend, valueType: "currency" },
+              { dataKey: "conversions", name: "Conversions", fill: CHART_COLORS.conversions, valueType: "number" },
             ]}
             valueType="currency"
+            ariaLabel="Campaign breakdown showing spend and conversions by campaign"
           />
         </V3ChartWrapper>
       )}

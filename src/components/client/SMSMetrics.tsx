@@ -18,7 +18,8 @@ import { PortalBadge } from "@/components/portal/PortalBadge";
 import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, subDays, parseISO } from "date-fns";
-import { ResponsiveLineChart, ResponsiveBarChart } from "@/components/charts";
+import { PortalLineChart } from "@/components/portal/PortalLineChart";
+import { PortalMultiBarChart } from "@/components/portal/PortalMultiBarChart";
 
 type Props = {
   organizationId: string;
@@ -388,13 +389,14 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Line chart displaying daily SMS send volume and conversion trends"
           accent="purple"
         >
-          <ResponsiveLineChart
+          <PortalLineChart
             data={trendChartData}
             lines={[
-              { dataKey: "Sent", name: "Messages Sent", color: CHART_COLORS.sent, valueType: "number" },
-              { dataKey: "Conversions", name: "Conversions", color: CHART_COLORS.conversions, valueType: "number" },
+              { dataKey: "Sent", name: "Messages Sent", stroke: CHART_COLORS.sent, valueType: "number" },
+              { dataKey: "Conversions", name: "Conversions", stroke: CHART_COLORS.conversions, valueType: "number" },
             ]}
             valueType="number"
+            ariaLabel="SMS campaign performance trend showing messages sent and conversions over time"
           />
         </V3ChartWrapper>
       )}
@@ -408,12 +410,13 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Bar chart comparing ROI performance across top SMS campaigns"
           accent="purple"
         >
-          <ResponsiveBarChart
+          <PortalMultiBarChart
             data={roiComparisonData}
             bars={[
-              { dataKey: "roi", name: "ROI", color: CHART_COLORS.conversions, valueType: "ratio" },
+              { dataKey: "roi", name: "ROI", fill: CHART_COLORS.conversions, valueType: "ratio" },
             ]}
             valueType="ratio"
+            ariaLabel="Campaign ROI comparison showing return on investment by campaign"
           />
         </V3ChartWrapper>
       )}

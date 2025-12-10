@@ -20,7 +20,9 @@ import { logger } from "@/lib/logger";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
 import { NoResultsEmptyState } from "@/components/portal/PortalEmptyState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ResponsiveLineChart, ResponsiveBarChart, ResponsivePieChart } from "@/components/charts";
+import { PortalLineChart } from "@/components/portal/PortalLineChart";
+import { PortalMultiBarChart } from "@/components/portal/PortalMultiBarChart";
+import { PortalPieChart } from "@/components/portal/PortalPieChart";
 import { usePIIAccess } from "@/hooks/usePIIAccess";
 import { maskDonorInfo } from "@/lib/pii-masking";
 
@@ -488,13 +490,14 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Line chart displaying daily donation amounts and transaction counts"
           accent="green"
         >
-          <ResponsiveLineChart
+          <PortalLineChart
             data={dailyTrend}
             lines={[
-              { dataKey: "Amount", name: "Amount", color: "hsl(var(--portal-success))", valueType: "currency" },
-              { dataKey: "Donations", name: "Donations", color: "hsl(var(--portal-accent-blue))", valueType: "number" },
+              { dataKey: "Amount", name: "Amount", stroke: "hsl(var(--portal-success))", valueType: "currency" },
+              { dataKey: "Donations", name: "Donations", stroke: "hsl(var(--portal-accent-blue))", valueType: "number" },
             ]}
             valueType="currency"
+            ariaLabel="Donation trend showing daily amounts and transaction counts over time"
           />
         </V3ChartWrapper>
       )}
@@ -510,11 +513,12 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
             description="Pie chart showing donation amounts broken down by attribution source or refcode"
             accent="green"
           >
-            <ResponsivePieChart
+            <PortalPieChart
               data={attributionData}
               valueType="currency"
               innerRadius={45}
               colors={CHART_COLORS}
+              ariaLabel="Donation attribution breakdown by source"
             />
           </V3ChartWrapper>
         )}
@@ -527,12 +531,13 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Bar chart showing the number of donations in each gift size category"
           accent="green"
         >
-          <ResponsiveBarChart
+          <PortalMultiBarChart
             data={giftSizeData}
             bars={[
-              { dataKey: "count", name: "Donations", color: "hsl(var(--portal-accent-blue))" },
+              { dataKey: "count", name: "Donations", fill: "hsl(var(--portal-accent-blue))" },
             ]}
             valueType="number"
+            ariaLabel="Gift size distribution showing donation counts by amount range"
           />
         </V3ChartWrapper>
       </div>
