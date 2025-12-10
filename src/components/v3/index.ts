@@ -14,6 +14,7 @@ export {
 
 export { V3TrendIndicator } from "./V3TrendIndicator";
 export { V3KPICard, type V3KPIAccent } from "./V3KPICard";
+export { V3KPICardWithSparkline } from "./V3KPICardWithSparkline";
 export { V3ChartWrapper } from "./V3ChartWrapper";
 export { V3LoadingState } from "./V3LoadingState";
 export { V3ErrorState } from "./V3ErrorState";
