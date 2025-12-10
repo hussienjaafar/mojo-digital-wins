@@ -1,15 +1,24 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { PortalCard, PortalCardContent, PortalCardHeader, PortalCardTitle } from "@/components/portal/PortalCard";
-import { PortalMetric } from "@/components/portal/PortalMetric";
+import { motion } from "framer-motion";
+import {
+  V3Card,
+  V3CardContent,
+  V3CardHeader,
+  V3CardTitle,
+  V3KPICard,
+  V3ChartWrapper,
+  V3LoadingState,
+  V3ErrorState,
+  V3EmptyState,
+} from "@/components/v3";
 import { logger } from "@/lib/logger";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
-import { MessageSquare, CheckCircle, DollarSign, Target, TrendingUp, TrendingDown, Filter, BarChart3, AlertTriangle } from "lucide-react";
+import { PortalBadge } from "@/components/portal/PortalBadge";
+import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, subDays, parseISO } from "date-fns";
-import { PortalBadge } from "@/components/portal/PortalBadge";
 import { ResponsiveLineChart, ResponsiveBarChart } from "@/components/charts";
-import { formatCurrency, formatRatio } from "@/lib/chart-formatters";
 
 type Props = {
   organizationId: string;
@@ -47,13 +56,29 @@ const CHART_COLORS = {
   raised: "hsl(var(--portal-accent-blue))",
 };
 
+// Animation variants for staggered KPI cards
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.05 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
+};
+
 const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [metrics, setMetrics] = useState<Record<string, SMSMetric>>({});
   const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
   const [previousPeriodMetrics, setPreviousPeriodMetrics] = useState<Record<string, SMSMetric>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [performanceFilter, setPerformanceFilter] = useState<string>("all");
+  const [lastSentDate, setLastSentDate] = useState<string | null>(null);
 
   const getPreviousPeriod = () => {
     const start = parseISO(startDate);
@@ -67,19 +92,18 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     };
   };
 
-  const [lastSentDate, setLastSentDate] = useState<string | null>(null);
-
   useEffect(() => {
     loadData();
   }, [organizationId, startDate, endDate]);
 
   const loadData = async () => {
     setIsLoading(true);
+    setError(null);
     const prevPeriod = getPreviousPeriod();
 
     try {
       // Current period - query from sms_campaigns table using send_date
-      const { data, error } = await (supabase as any)
+      const { data, error: queryError } = await (supabase as any)
         .from('sms_campaigns')
         .select('*')
         .eq('organization_id', organizationId)
@@ -88,7 +112,7 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
         .neq('status', 'draft')
         .order('send_date', { ascending: true });
 
-      if (error) throw error;
+      if (queryError) throw queryError;
 
       const aggregated = aggregateMetrics(data || []);
       setMetrics(aggregated);
@@ -104,7 +128,7 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
         .neq('status', 'draft')
         .order('send_date', { ascending: false })
         .limit(1);
-      
+
       if (latestSms?.[0]?.send_date) {
         setLastSentDate(latestSms[0].send_date.split('T')[0]);
       }
@@ -121,8 +145,9 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
       const prevAggregated = aggregateMetrics(prevData || []);
       setPreviousPeriodMetrics(prevAggregated);
 
-    } catch (error) {
-      logger.error('Failed to load SMS data', error);
+    } catch (err) {
+      logger.error('Failed to load SMS data', err);
+      setError('Failed to load SMS data. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -224,7 +249,6 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const prevDeliveryRate = prevTotals.sent > 0 ? (prevTotals.delivered / prevTotals.sent) * 100 : 0;
   const ctr = totals.delivered > 0 ? (totals.clicks / totals.delivered) * 100 : 0;
   const optOutRate = totals.delivered > 0 ? (totals.optOuts / totals.delivered) * 100 : 0;
-  const costPerConversion = totals.conversions > 0 ? totals.cost / totals.conversions : 0;
 
   // Filter campaigns
   const filteredCampaigns = useMemo(() => {
@@ -262,116 +286,147 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     Conversions: d.conversions,
   }));
 
-  const TrendIndicator = ({ value, isPositive }: { value: number; isPositive?: boolean }) => {
-    const positive = isPositive ?? value >= 0;
+  // Show loading state
+  if (isLoading) {
     return (
-      <span className={`flex items-center gap-0.5 text-xs font-medium ${positive ? 'text-[hsl(var(--portal-success))]' : 'text-[hsl(var(--portal-error))]'}`}>
-        {positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-        {Math.abs(value).toFixed(1)}%
-      </span>
+      <div className="space-y-6">
+        <V3LoadingState variant="kpi-grid" count={5} />
+        <V3LoadingState variant="chart" height={280} />
+        <V3LoadingState variant="table" />
+      </div>
     );
-  };
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <V3ErrorState
+        title="Failed to load SMS data"
+        message={error}
+        onRetry={loadData}
+      />
+    );
+  }
+
+  // Show empty state if no campaigns
+  if (campaigns.length === 0 && !isLoading) {
+    return (
+      <V3EmptyState
+        icon={MessageSquare}
+        title="No SMS campaigns found"
+        description={
+          lastSentDate
+            ? `No SMS campaigns in selected date range. Last campaign sent: ${format(parseISO(lastSentDate), 'MMM d, yyyy')}`
+            : "Connect your SMS platform to see campaign data."
+        }
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* KPIs with Period Comparison */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="portal-bg-elevated rounded-lg p-4 border border-[hsl(var(--portal-border))]">
-          <div className="flex items-center gap-2 mb-1">
-            <DollarSign className="h-4 w-4 text-[hsl(var(--portal-success))]" />
-            <span className="text-xs portal-text-secondary">ROI</span>
-          </div>
-          <div className="text-xl font-bold portal-text-primary">{roi.toFixed(2)}x</div>
-          <TrendIndicator value={calcChange(roi, prevRoi)} />
-        </div>
-        <div className="portal-bg-elevated rounded-lg p-4 border border-[hsl(var(--portal-border))]">
-          <div className="flex items-center gap-2 mb-1">
-            <DollarSign className="h-4 w-4 text-[hsl(var(--portal-accent-blue))]" />
-            <span className="text-xs portal-text-secondary">Amount Raised</span>
-          </div>
-          <div className="text-xl font-bold portal-text-primary">${totals.raised.toLocaleString()}</div>
-          <TrendIndicator value={calcChange(totals.raised, prevTotals.raised)} />
-        </div>
-        <div className="portal-bg-elevated rounded-lg p-4 border border-[hsl(var(--portal-border))]">
-          <div className="flex items-center gap-2 mb-1">
-            <MessageSquare className="h-4 w-4 text-[hsl(var(--portal-accent-purple))]" />
-            <span className="text-xs portal-text-secondary">Delivery Rate</span>
-          </div>
-          <div className="text-xl font-bold portal-text-primary">{deliveryRate.toFixed(1)}%</div>
-          <TrendIndicator value={calcChange(deliveryRate, prevDeliveryRate)} />
-        </div>
-        <div className="portal-bg-elevated rounded-lg p-4 border border-[hsl(var(--portal-border))]">
-          <div className="flex items-center gap-2 mb-1">
-            <Target className="h-4 w-4 text-[hsl(var(--portal-success))]" />
-            <span className="text-xs portal-text-secondary">CTR</span>
-          </div>
-          <div className="text-xl font-bold portal-text-primary">{ctr.toFixed(2)}%</div>
-          <span className="text-xs portal-text-muted">{totals.clicks.toLocaleString()} clicks</span>
-        </div>
-        <div className="portal-bg-elevated rounded-lg p-4 border border-[hsl(var(--portal-border))]">
-          <div className="flex items-center gap-2 mb-1">
-            <AlertTriangle className={`h-4 w-4 ${optOutRate > 2 ? 'text-[hsl(var(--portal-warning))]' : 'text-[hsl(var(--portal-text-muted))]'}`} />
-            <span className="text-xs portal-text-secondary">Opt-out Rate</span>
-          </div>
-          <div className={`text-xl font-bold ${optOutRate > 2 ? 'text-[hsl(var(--portal-warning))]' : 'portal-text-primary'}`}>
-            {optOutRate.toFixed(2)}%
-          </div>
-          <span className="text-xs portal-text-muted">{totals.optOuts.toLocaleString()} opt-outs</span>
-        </div>
-      </div>
+      {/* V3 KPI Cards with Period Comparison */}
+      <motion.div
+        className="grid grid-cols-2 md:grid-cols-5 gap-3"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.div variants={itemVariants}>
+          <V3KPICard
+            icon={DollarSign}
+            label="ROI"
+            value={`${roi.toFixed(2)}x`}
+            trend={{ value: calcChange(roi, prevRoi), isPositive: roi >= prevRoi }}
+            accent="green"
+          />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <V3KPICard
+            icon={DollarSign}
+            label="Amount Raised"
+            value={`$${totals.raised.toLocaleString()}`}
+            trend={{ value: calcChange(totals.raised, prevTotals.raised) }}
+            accent="blue"
+          />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <V3KPICard
+            icon={MessageSquare}
+            label="Delivery Rate"
+            value={`${deliveryRate.toFixed(1)}%`}
+            trend={{ value: calcChange(deliveryRate, prevDeliveryRate) }}
+            accent="purple"
+          />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <V3KPICard
+            icon={Target}
+            label="CTR"
+            value={`${ctr.toFixed(2)}%`}
+            subtitle={`${totals.clicks.toLocaleString()} clicks`}
+            accent="green"
+          />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <V3KPICard
+            icon={AlertTriangle}
+            label="Opt-out Rate"
+            value={`${optOutRate.toFixed(2)}%`}
+            subtitle={`${totals.optOuts.toLocaleString()} opt-outs`}
+            accent={optOutRate > 2 ? "amber" : "default"}
+          />
+        </motion.div>
+      </motion.div>
 
       {/* Performance Trend Chart */}
       {trendChartData.length > 0 && (
-        <PortalCard>
-          <PortalCardHeader>
-            <PortalCardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Performance Trend
-            </PortalCardTitle>
-          </PortalCardHeader>
-          <PortalCardContent>
-            <ResponsiveLineChart
-              data={trendChartData}
-              lines={[
-                { dataKey: "Sent", name: "Messages Sent", color: CHART_COLORS.sent, valueType: "number" },
-                { dataKey: "Conversions", name: "Conversions", color: CHART_COLORS.conversions, valueType: "number" },
-              ]}
-              valueType="number"
-            />
-          </PortalCardContent>
-        </PortalCard>
+        <V3ChartWrapper
+          title="Performance Trend"
+          icon={TrendingUp}
+          ariaLabel="SMS campaign performance trend chart showing messages sent and conversions over time"
+          description="Line chart displaying daily SMS send volume and conversion trends"
+          accent="purple"
+        >
+          <ResponsiveLineChart
+            data={trendChartData}
+            lines={[
+              { dataKey: "Sent", name: "Messages Sent", color: CHART_COLORS.sent, valueType: "number" },
+              { dataKey: "Conversions", name: "Conversions", color: CHART_COLORS.conversions, valueType: "number" },
+            ]}
+            valueType="number"
+          />
+        </V3ChartWrapper>
       )}
 
       {/* Campaign ROI Comparison */}
       {roiComparisonData.length > 0 && (
-        <PortalCard>
-          <PortalCardHeader>
-            <PortalCardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Campaign ROI Comparison
-            </PortalCardTitle>
-          </PortalCardHeader>
-          <PortalCardContent>
-            <ResponsiveBarChart
-              data={roiComparisonData}
-              bars={[
-                { dataKey: "roi", name: "ROI", color: CHART_COLORS.conversions, valueType: "ratio" },
-              ]}
-              valueType="ratio"
-            />
-          </PortalCardContent>
-        </PortalCard>
+        <V3ChartWrapper
+          title="Campaign ROI Comparison"
+          icon={BarChart3}
+          ariaLabel="SMS campaign ROI comparison bar chart showing return on investment by campaign"
+          description="Bar chart comparing ROI performance across top SMS campaigns"
+          accent="purple"
+        >
+          <ResponsiveBarChart
+            data={roiComparisonData}
+            bars={[
+              { dataKey: "roi", name: "ROI", color: CHART_COLORS.conversions, valueType: "ratio" },
+            ]}
+            valueType="ratio"
+          />
+        </V3ChartWrapper>
       )}
 
       {/* Campaign Details Table with Filters */}
-      <PortalCard>
-        <PortalCardHeader>
+      <V3Card accent="purple">
+        <V3CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <PortalCardTitle>Campaign Details</PortalCardTitle>
+            <V3CardTitle>Campaign Details</V3CardTitle>
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 portal-text-muted" />
+              <Filter className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
               <Select value={performanceFilter} onValueChange={setPerformanceFilter}>
-                <SelectTrigger className="w-[140px] h-8 text-xs">
+                <SelectTrigger className="w-[140px] h-8 text-xs" aria-label="Filter by performance">
                   <SelectValue placeholder="Performance" />
                 </SelectTrigger>
                 <SelectContent>
@@ -382,103 +437,97 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
               </Select>
             </div>
           </div>
-        </PortalCardHeader>
-        <PortalCardContent>
-          {campaigns.length === 0 && !isLoading && lastSentDate ? (
-            <div className="text-center py-8 space-y-3">
-              <MessageSquare className="h-10 w-10 mx-auto text-[hsl(var(--portal-text-muted))]" />
-              <p className="text-sm portal-text-secondary">No SMS campaigns in selected date range</p>
-              <p className="text-xs portal-text-muted">
-                Last campaign sent: {format(parseISO(lastSentDate), 'MMM d, yyyy')}
+        </V3CardHeader>
+        <V3CardContent>
+          <PortalTable
+            data={filteredCampaigns}
+            columns={[
+              {
+                key: "campaign_name",
+                label: "Campaign",
+                sortable: true,
+                render: (value) => <span className="font-medium text-[hsl(var(--portal-text-primary))]">{value}</span>,
+              },
+              {
+                key: "messages_sent",
+                label: "Sent",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.number,
+              },
+              {
+                key: "delivery_rate",
+                label: "Delivery",
+                sortable: true,
+                className: "text-right",
+                render: (value) => (
+                  <span className={value < 90 ? 'text-[hsl(var(--portal-warning))]' : ''}>
+                    {value.toFixed(1)}%
+                  </span>
+                ),
+                hiddenOnMobile: true,
+              },
+              {
+                key: "roi",
+                label: "ROI",
+                sortable: true,
+                className: "text-right",
+                render: (value) => (
+                  <span className={value >= 2 ? 'text-[hsl(var(--portal-success))] font-semibold' : ''}>
+                    {value.toFixed(2)}x
+                  </span>
+                ),
+              },
+              {
+                key: "amount_raised",
+                label: "Raised",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.currency,
+              },
+              {
+                key: "cost",
+                label: "Cost",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.currency,
+                hiddenOnMobile: true,
+              },
+              {
+                key: "opt_out_rate",
+                label: "Opt-out",
+                sortable: true,
+                className: "text-right",
+                render: (value) => (
+                  <span className={value >= 2 ? 'text-[hsl(var(--portal-warning))]' : ''}>
+                    {value.toFixed(2)}%
+                  </span>
+                ),
+                hiddenOnMobile: true,
+              },
+              {
+                key: "conversions",
+                label: "Conv.",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.number,
+              },
+            ]}
+            keyExtractor={(row) => row.campaign_id}
+            isLoading={isLoading}
+            emptyMessage="No SMS campaigns found"
+            emptyAction={
+              <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+                Connect your SMS platform to see campaign data
               </p>
-            </div>
-          ) : (
-            <PortalTable
-              data={filteredCampaigns}
-              columns={[
-                {
-                  key: "campaign_name",
-                  label: "Campaign",
-                  sortable: true,
-                  render: (value) => <span className="font-medium portal-text-primary">{value}</span>,
-                },
-                {
-                  key: "messages_sent",
-                  label: "Sent",
-                  sortable: true,
-                  className: "text-right",
-                  render: PortalTableRenderers.number,
-                },
-                {
-                  key: "delivery_rate",
-                  label: "Delivery",
-                  sortable: true,
-                  className: "text-right",
-                  render: (value) => <span className={value < 90 ? 'text-[hsl(var(--portal-warning))]' : ''}>{value.toFixed(1)}%</span>,
-                  hiddenOnMobile: true,
-                },
-                {
-                  key: "roi",
-                  label: "ROI",
-                  sortable: true,
-                  className: "text-right",
-                  render: (value) => (
-                    <span className={value >= 2 ? 'text-[hsl(var(--portal-success))] font-semibold' : ''}>
-                      {value.toFixed(2)}x
-                    </span>
-                  ),
-                },
-                {
-                  key: "amount_raised",
-                  label: "Raised",
-                  sortable: true,
-                  className: "text-right",
-                  render: PortalTableRenderers.currency,
-                },
-                {
-                  key: "cost",
-                  label: "Cost",
-                  sortable: true,
-                  className: "text-right",
-                  render: PortalTableRenderers.currency,
-                  hiddenOnMobile: true,
-                },
-                {
-                  key: "opt_out_rate",
-                  label: "Opt-out",
-                  sortable: true,
-                  className: "text-right",
-                  render: (value) => (
-                    <span className={value >= 2 ? 'text-[hsl(var(--portal-warning))]' : ''}>
-                      {value.toFixed(2)}%
-                    </span>
-                  ),
-                  hiddenOnMobile: true,
-                },
-                {
-                  key: "conversions",
-                  label: "Conv.",
-                  sortable: true,
-                  className: "text-right",
-                  render: PortalTableRenderers.number,
-                },
-              ]}
-              keyExtractor={(row) => row.campaign_id}
-              isLoading={isLoading}
-              emptyMessage="No SMS campaigns found"
-              emptyAction={
-                <p className="text-sm portal-text-muted">
-                  Connect your SMS platform to see campaign data
-                </p>
-              }
-            />
-          )}
-        </PortalCardContent>
-      </PortalCard>
+            }
+          />
+        </V3CardContent>
+      </V3Card>
 
       {/* Data Freshness Indicator */}
       {lastSentDate && (
-        <div className="flex items-center gap-2 text-xs portal-text-muted">
+        <div className="flex items-center gap-2 text-xs text-[hsl(var(--portal-text-muted))]">
           <span>Last SMS campaign: {format(parseISO(lastSentDate), 'MMM d, yyyy')}</span>
           {new Date().getTime() - new Date(lastSentDate).getTime() > 7 * 24 * 60 * 60 * 1000 && (
             <PortalBadge variant="warning">No recent campaigns</PortalBadge>

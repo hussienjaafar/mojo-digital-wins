@@ -1,15 +1,25 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Lightbulb, TrendingUp, Target, MessageSquare, Check } from "lucide-react";
+import { Copy, Lightbulb, TrendingUp, Target, MessageSquare, Check, Zap, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Progress } from "@/components/ui/progress";
 import { Session } from "@supabase/supabase-js";
 import { ClientLayout } from "@/components/client/ClientLayout";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  V3Card,
+  V3CardContent,
+  V3CardHeader,
+  V3KPICard,
+  V3SectionHeader,
+  V3LoadingState,
+  V3EmptyState,
+} from "@/components/v3";
+import { cn } from "@/lib/utils";
 
 type SuggestedAction = {
   id: string;
@@ -37,6 +47,27 @@ type Organization = {
   id: string;
   name: string;
   logo_url: string | null;
+};
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+  },
 };
 
 const ClientActions = () => {
@@ -75,8 +106,7 @@ const ClientActions = () => {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      
-      // Load organization
+
       const { data: clientUser } = await (supabase as any)
         .from('client_users')
         .select('organization_id')
@@ -94,7 +124,6 @@ const ClientActions = () => {
       if (!org) throw new Error("Organization not found");
       setOrganization(org);
 
-      // Load suggested actions with related alerts
       const { data: actionsData, error } = await (supabase as any)
         .from('suggested_actions')
         .select(`
@@ -123,8 +152,7 @@ const ClientActions = () => {
     try {
       await navigator.clipboard.writeText(action.sms_copy);
       setCopiedId(action.id);
-      
-      // Mark as used
+
       const { error } = await (supabase as any)
         .from('suggested_actions')
         .update({ is_used: true, used_at: new Date().toISOString() })
@@ -172,218 +200,297 @@ const ClientActions = () => {
     }
   };
 
-  if (isLoading || !organization) {
-    return null;
-  }
-
   const usedActions = actions.filter(a => a.is_used);
   const pendingActions = actions.filter(a => !a.is_used);
 
   return (
     <ClientLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending Actions</p>
-                  <p className="text-3xl font-bold">{pendingActions.length}</p>
-                </div>
-                <Lightbulb className="h-8 w-8 text-warning" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Used This Week</p>
-                  <p className="text-3xl font-bold">{usedActions.length}</p>
-                </div>
-                <Check className="h-8 w-8 text-success" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Generated</p>
-                  <p className="text-3xl font-bold">{actions.length}</p>
-                </div>
-                <MessageSquare className="h-8 w-8 text-info" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      <motion.div
+        className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Page Header */}
+        <motion.div variants={itemVariants} className="mb-6">
+          <V3SectionHeader
+            title="Suggested Actions"
+            subtitle="AI-generated campaign suggestions based on your alerts"
+            icon={Zap}
+            size="lg"
+          />
+        </motion.div>
 
-        {/* Actions List */}
-        {pendingActions.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Lightbulb className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No pending suggestions</h3>
-              <p className="text-muted-foreground text-center mb-4">
-                New AI-generated action suggestions will appear here based on your alerts
-              </p>
-              <Button 
-                onClick={() => navigate('/client/alerts')}
-                className="min-h-[44px]"
-              >
-                View Alerts
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {pendingActions.map((action) => (
-              <Card key={action.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge className="bg-primary">
-                          {action.action_type}
-                        </Badge>
-                        {action.topic_relevance_score >= 70 && (
-                          <Badge className="bg-success/10 text-success border-success/20">High Relevance</Badge>
-                        )}
-                        {action.urgency_score >= 70 && (
-                          <Badge className="bg-severity-critical/10 text-severity-critical border-severity-critical/20">Urgent</Badge>
-                        )}
-                      </div>
-                      <CardTitle className="text-lg">{action.topic}</CardTitle>
-                      <CardDescription>
-                        {action.alert?.entity_name && `Related to: ${action.alert.entity_name}`}
-                      </CardDescription>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Relevance</p>
-                      <p className="text-2xl font-bold text-primary">{action.topic_relevance_score}%</p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* SMS Preview */}
-                  <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">SMS Text Preview</span>
-                      <Badge variant="outline">
-                        {action.character_count}/160
-                      </Badge>
-                    </div>
-                    <p className="text-sm font-mono">{action.sms_copy}</p>
-                    <Progress value={(action.character_count / 160) * 100} className="h-1" />
-                  </div>
-
-                  {/* Scores */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Urgency Score</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Progress value={action.urgency_score} className="h-2 flex-1" />
-                        <span className="text-sm font-bold">{action.urgency_score}%</span>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Target className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Impact</span>
-                      </div>
-                      <Badge variant="secondary">{action.estimated_impact}</Badge>
-                    </div>
-                  </div>
-
-                  {/* Value Prop & Audience */}
-                  <div className="space-y-2">
-                    <div>
-                      <p className="text-sm font-medium mb-1">Value Proposition</p>
-                      <p className="text-sm text-muted-foreground">{action.value_proposition}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium mb-1">Target Audience</p>
-                      <p className="text-sm text-muted-foreground">{action.target_audience}</p>
-                    </div>
-                  </div>
-
-                  {/* Historical Context */}
-                  {action.historical_context && (
-                    <div className="border-t pt-4">
-                      <p className="text-sm font-medium mb-1">Historical Context</p>
-                      <p className="text-xs text-muted-foreground">{action.historical_context}</p>
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex gap-2 pt-4 border-t">
-                    <Button
-                      onClick={() => handleCopy(action)}
-                      className="flex-1 min-h-[44px] active:scale-95 transition-transform"
-                      disabled={copiedId === action.id}
-                    >
-                      {copiedId === action.id ? (
-                        <>
-                          <Check className="h-4 w-4 mr-2" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy SMS Text
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleDismiss(action.id)}
-                      className="min-h-[44px] min-w-[44px] active:scale-95 transition-transform"
-                    >
-                      Dismiss
-                    </Button>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground text-center">
-                    Generated {format(new Date(action.created_at), 'MMM d, yyyy h:mm a')}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Used Actions Section */}
-        {usedActions.length > 0 && (
-          <div className="mt-12">
-            <h2 className="text-2xl font-bold mb-4">Recently Used</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              {usedActions.slice(0, 6).map((action) => (
-                <Card key={action.id} className="opacity-75">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">{action.topic}</CardTitle>
-                      <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                        <Check className="h-3 w-3 mr-1" />
-                        Used
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{action.sms_copy}</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Used {format(new Date(action.created_at), 'MMM d, yyyy')}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
+        {/* Loading State */}
+        {isLoading && (
+          <motion.div variants={itemVariants} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <V3LoadingState variant="kpi" />
+              <V3LoadingState variant="kpi" />
+              <V3LoadingState variant="kpi" />
             </div>
-          </div>
+            <V3LoadingState variant="channel" />
+            <V3LoadingState variant="channel" />
+          </motion.div>
         )}
-      </div>
+
+        {!isLoading && (
+          <>
+            {/* Stats KPIs */}
+            <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <V3KPICard
+                icon={Lightbulb}
+                label="Pending Actions"
+                value={pendingActions.length.toString()}
+                accent="amber"
+              />
+              <V3KPICard
+                icon={Check}
+                label="Used This Week"
+                value={usedActions.length.toString()}
+                accent="green"
+              />
+              <V3KPICard
+                icon={MessageSquare}
+                label="Total Generated"
+                value={actions.length.toString()}
+                accent="blue"
+              />
+            </motion.div>
+
+            {/* Actions List */}
+            {pendingActions.length === 0 ? (
+              <motion.div variants={itemVariants}>
+                <V3EmptyState
+                  icon={Lightbulb}
+                  title="No pending suggestions"
+                  description="New AI-generated action suggestions will appear here based on your alerts"
+                  action={
+                    <Button
+                      onClick={() => navigate('/client/alerts')}
+                      className="min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue)/0.9)] text-white"
+                    >
+                      View Alerts
+                    </Button>
+                  }
+                  accent="amber"
+                />
+              </motion.div>
+            ) : (
+              <motion.div variants={containerVariants} className="space-y-4">
+                {pendingActions.map((action, index) => (
+                  <motion.div key={action.id} variants={itemVariants}>
+                    <V3Card
+                      accent={action.urgency_score >= 70 ? "red" : action.topic_relevance_score >= 70 ? "green" : "blue"}
+                      interactive
+                    >
+                      <V3CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <Badge className="bg-[hsl(var(--portal-accent-blue))] text-white">
+                                {action.action_type}
+                              </Badge>
+                              {action.topic_relevance_score >= 70 && (
+                                <Badge className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]">
+                                  High Relevance
+                                </Badge>
+                              )}
+                              {action.urgency_score >= 70 && (
+                                <Badge className="bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))] border-[hsl(var(--portal-error)/0.2)]">
+                                  Urgent
+                                </Badge>
+                              )}
+                            </div>
+                            <h3 className="text-lg font-semibold text-[hsl(var(--portal-text-primary))] line-clamp-2">
+                              {action.topic}
+                            </h3>
+                            {action.alert?.entity_name && (
+                              <p className="text-sm text-[hsl(var(--portal-text-secondary))] mt-1">
+                                Related to: {action.alert.entity_name}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-xs text-[hsl(var(--portal-text-muted))]">Relevance</p>
+                            <p className="text-2xl font-bold text-[hsl(var(--portal-accent-blue))] tabular-nums">
+                              {action.topic_relevance_score}%
+                            </p>
+                          </div>
+                        </div>
+                      </V3CardHeader>
+
+                      <V3CardContent className="space-y-4">
+                        {/* SMS Preview */}
+                        <div className="bg-[hsl(var(--portal-bg-elevated))] rounded-lg p-4 border border-[hsl(var(--portal-border))]">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                              SMS Text Preview
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="bg-transparent border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-secondary))]"
+                            >
+                              {action.character_count}/160
+                            </Badge>
+                          </div>
+                          <p className="text-sm font-mono text-[hsl(var(--portal-text-primary))]">
+                            {action.sms_copy}
+                          </p>
+                          <Progress
+                            value={(action.character_count / 160) * 100}
+                            className="h-1 mt-2"
+                          />
+                        </div>
+
+                        {/* Scores Grid */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <TrendingUp className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+                              <span className="text-sm text-[hsl(var(--portal-text-secondary))]">
+                                Urgency Score
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Progress value={action.urgency_score} className="h-2 flex-1" />
+                              <span className="text-sm font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                                {action.urgency_score}%
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Target className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+                              <span className="text-sm text-[hsl(var(--portal-text-secondary))]">
+                                Impact
+                              </span>
+                            </div>
+                            <Badge
+                              variant="secondary"
+                              className="bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]"
+                            >
+                              {action.estimated_impact}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Value Prop & Audience */}
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-1">
+                              Value Proposition
+                            </p>
+                            <p className="text-sm text-[hsl(var(--portal-text-secondary))]">
+                              {action.value_proposition}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-1">
+                              Target Audience
+                            </p>
+                            <p className="text-sm text-[hsl(var(--portal-text-secondary))]">
+                              {action.target_audience}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Historical Context */}
+                        {action.historical_context && (
+                          <div className="border-t border-[hsl(var(--portal-border))] pt-4">
+                            <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-1">
+                              Historical Context
+                            </p>
+                            <p className="text-xs text-[hsl(var(--portal-text-secondary))]">
+                              {action.historical_context}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-3 pt-4 border-t border-[hsl(var(--portal-border))]">
+                          <motion.div className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                            <Button
+                              onClick={() => handleCopy(action)}
+                              className="w-full min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue)/0.9)] text-white"
+                              disabled={copiedId === action.id}
+                            >
+                              {copiedId === action.id ? (
+                                <>
+                                  <Check className="h-4 w-4 mr-2" />
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Copy SMS Text
+                                </>
+                              )}
+                            </Button>
+                          </motion.div>
+                          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                            <Button
+                              variant="outline"
+                              onClick={() => handleDismiss(action.id)}
+                              className="min-h-[44px] min-w-[44px] border-[hsl(var(--portal-border))] hover:bg-[hsl(var(--portal-bg-elevated))]"
+                            >
+                              Dismiss
+                            </Button>
+                          </motion.div>
+                        </div>
+
+                        <p className="text-xs text-[hsl(var(--portal-text-muted))] text-center flex items-center justify-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Generated {format(new Date(action.created_at), 'MMM d, yyyy h:mm a')}
+                        </p>
+                      </V3CardContent>
+                    </V3Card>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+
+            {/* Used Actions Section */}
+            {usedActions.length > 0 && (
+              <motion.div variants={itemVariants} className="mt-12">
+                <V3SectionHeader
+                  title="Recently Used"
+                  subtitle="Actions you've already implemented"
+                  icon={Check}
+                  className="mb-4"
+                />
+                <div className="grid gap-4 md:grid-cols-2">
+                  {usedActions.slice(0, 6).map((action) => (
+                    <motion.div key={action.id} variants={itemVariants}>
+                      <V3Card accent="green" className="opacity-75">
+                        <V3CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-base font-semibold text-[hsl(var(--portal-text-primary))] line-clamp-1">
+                              {action.topic}
+                            </h4>
+                            <Badge className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]">
+                              <Check className="h-3 w-3 mr-1" />
+                              Used
+                            </Badge>
+                          </div>
+                        </V3CardHeader>
+                        <V3CardContent>
+                          <p className="text-sm text-[hsl(var(--portal-text-secondary))] line-clamp-2">
+                            {action.sms_copy}
+                          </p>
+                          <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-2">
+                            Used {format(new Date(action.created_at), 'MMM d, yyyy')}
+                          </p>
+                        </V3CardContent>
+                      </V3Card>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </>
+        )}
+      </motion.div>
     </ClientLayout>
   );
 };

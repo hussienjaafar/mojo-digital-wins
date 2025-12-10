@@ -1,13 +1,21 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, DollarSign, MessageSquare, TrendingUp, Heart, History, CheckCircle, AlertCircle, Clock } from "lucide-react";
+import { RefreshCw, DollarSign, MessageSquare, TrendingUp, Heart, History, CheckCircle, AlertCircle, Zap } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { DataFreshnessIndicator } from "./DataFreshnessIndicator";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  V3Card,
+  V3CardContent,
+  V3CardHeader,
+  V3CardTitle,
+  V3CardDescription,
+} from "@/components/v3";
+import { cn } from "@/lib/utils";
 
 type Props = {
   organizationId: string;
@@ -20,6 +28,41 @@ type SyncStatus = {
   lastSync: string | null;
   status: string | null;
 };
+
+// Animation variants for buttons
+const buttonVariants = {
+  idle: { scale: 1 },
+  hover: { scale: 1.02 },
+  tap: { scale: 0.98 },
+};
+
+// Container animation for staggered entry
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+  },
+};
+
+// Spinner animation
+const spinTransition = {
+  repeat: Infinity,
+  ease: "linear",
+  duration: 1,
+};
+
 const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   const { toast } = useToast();
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
@@ -36,7 +79,7 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
       .select('platform, last_sync_at, last_sync_status')
       .eq('organization_id', organizationId)
       .eq('is_active', true);
-    
+
     if (data) {
       setSyncStatuses(data.map(c => ({
         platform: c.platform,
@@ -53,13 +96,11 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   const syncMetaAds = async () => {
     setSyncing({ ...syncing, meta: true });
     try {
-      // Pass date range to ensure we fetch data for the visible period
-      // Default to last 30 days if no dates provided
       const syncStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const syncEndDate = endDate || new Date().toISOString().split('T')[0];
-      
+
       const { error } = await (supabase as any).functions.invoke('sync-meta-ads', {
-        body: { 
+        body: {
           organization_id: organizationId,
           start_date: syncStartDate,
           end_date: syncEndDate
@@ -73,7 +114,6 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
         description: "Meta Ads sync completed successfully",
       });
 
-      // Trigger ROI calculation
       await calculateROI();
     } catch (error: any) {
       toast({
@@ -95,7 +135,6 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
 
       if (error) throw error;
 
-      // Check if API is not available (OneSwitchboard limitation)
       if (data && data.error && data.credentials_valid) {
         toast({
           title: "Switchboard API Not Available",
@@ -131,16 +170,15 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
         });
       }
 
-      // Use dashboard date range for incremental sync, or default to last 7 days
-      const syncStartDate = backfill 
-        ? undefined 
+      const syncStartDate = backfill
+        ? undefined
         : (startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-      const syncEndDate = backfill 
-        ? undefined 
+      const syncEndDate = backfill
+        ? undefined
         : (endDate || new Date().toISOString().split('T')[0]);
 
       const { data, error } = await (supabase as any).functions.invoke('sync-actblue-csv', {
-        body: { 
+        body: {
           organization_id: organizationId,
           mode: backfill ? 'backfill' : 'incremental',
           start_date: syncStartDate,
@@ -155,12 +193,11 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
 
       toast({
         title: "Success",
-        description: backfill 
+        description: backfill
           ? `ActBlue backfill completed: ${inserted} new transactions from ${processed} processed`
           : `ActBlue sync completed: ${inserted} new transactions`,
       });
 
-      // Trigger ROI calculation
       await calculateROI();
     } catch (error: any) {
       toast({
@@ -188,7 +225,6 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
       });
     } catch (error: any) {
       logger.error('ROI calculation failed', error);
-      // Don't show error to user as this is a background task
     } finally {
       setSyncing({ ...syncing, roi: false });
     }
@@ -211,7 +247,6 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
       description: "All data sources synced successfully",
     });
 
-    // Refresh sync statuses and trigger indicator refresh
     await loadSyncStatuses();
     setRefreshKey(prev => prev + 1);
   };
@@ -219,126 +254,230 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   const renderSyncStatusBadge = (platform: string) => {
     const status = getSyncStatus(platform);
     if (!status) return null;
-    
+
     if (status.status === 'failed') {
       return (
-        <Badge variant="destructive" className="text-[9px] gap-0.5 px-1">
-          <AlertCircle className="h-2 w-2" />
-          Failed
-        </Badge>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.2 }}
+        >
+          <Badge variant="destructive" className="text-[9px] gap-0.5 px-1.5 py-0.5">
+            <AlertCircle className="h-2.5 w-2.5" />
+            Failed
+          </Badge>
+        </motion.div>
       );
     }
-    
+
     if (status.status === 'success' && status.lastSync) {
       return (
-        <Badge variant="outline" className="text-[9px] gap-0.5 px-1 bg-green-500/10 text-green-600 border-green-500/20">
-          <CheckCircle className="h-2 w-2" />
-          {formatDistanceToNow(new Date(status.lastSync), { addSuffix: false })}
-        </Badge>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.2 }}
+        >
+          <Badge
+            variant="outline"
+            className="text-[9px] gap-0.5 px-1.5 py-0.5 bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]"
+          >
+            <CheckCircle className="h-2.5 w-2.5" />
+            {formatDistanceToNow(new Date(status.lastSync), { addSuffix: false })}
+          </Badge>
+        </motion.div>
       );
     }
-    
+
     return null;
   };
 
+  const SyncButton = ({
+    onClick,
+    disabled,
+    syncing: isSyncing,
+    icon: Icon,
+    label,
+    platform,
+    variant = "outline",
+    dashed = false,
+    accent,
+  }: {
+    onClick: () => void;
+    disabled: boolean;
+    syncing: boolean;
+    icon: typeof DollarSign;
+    label: string;
+    platform?: string;
+    variant?: "outline" | "default";
+    dashed?: boolean;
+    accent?: "blue" | "purple" | "green" | "amber";
+  }) => {
+    const accentColors = {
+      blue: "hover:border-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue)/0.05)]",
+      purple: "hover:border-[hsl(var(--portal-accent-purple))] hover:bg-[hsl(var(--portal-accent-purple)/0.05)]",
+      green: "hover:border-[hsl(var(--portal-success))] hover:bg-[hsl(var(--portal-success)/0.05)]",
+      amber: "hover:border-[hsl(var(--portal-warning))] hover:bg-[hsl(var(--portal-warning)/0.05)]",
+    };
+
+    const iconColors = {
+      blue: "text-[hsl(var(--portal-accent-blue))]",
+      purple: "text-[hsl(var(--portal-accent-purple))]",
+      green: "text-[hsl(var(--portal-success))]",
+      amber: "text-[hsl(var(--portal-warning))]",
+    };
+
+    return (
+      <motion.div
+        variants={itemVariants}
+        whileHover="hover"
+        whileTap="tap"
+        initial="idle"
+        animate="idle"
+      >
+        <motion.div variants={buttonVariants}>
+          <Button
+            onClick={onClick}
+            disabled={disabled}
+            variant={variant}
+            className={cn(
+              "h-auto flex-col gap-2 py-4 px-3 relative w-full",
+              "transition-all duration-200",
+              "border-[hsl(var(--portal-border))]",
+              dashed && "border-dashed",
+              accent && accentColors[accent],
+              variant === "default" && "bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue)/0.9)] text-white border-transparent"
+            )}
+          >
+            <AnimatePresence mode="wait">
+              {isSyncing ? (
+                <motion.div
+                  key="spinning"
+                  initial={{ opacity: 0, rotate: 0 }}
+                  animate={{ opacity: 1, rotate: 360 }}
+                  exit={{ opacity: 0 }}
+                  transition={spinTransition}
+                >
+                  <RefreshCw className={cn("w-5 h-5", accent ? iconColors[accent] : "")} />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="icon"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Icon className={cn("w-5 h-5", accent && variant !== "default" ? iconColors[accent] : "")} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <span className="text-xs font-medium">{label}</span>
+            {platform && !isSyncing && renderSyncStatusBadge(platform)}
+          </Button>
+        </motion.div>
+      </motion.div>
+    );
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle>Data Sync</CardTitle>
-            <CardDescription>
-              Manually sync data from connected platforms
-            </CardDescription>
+    <V3Card accent="blue">
+      <V3CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <motion.div
+              className="p-2.5 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]"
+              whileHover={{ scale: 1.05 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            >
+              <Zap className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" aria-hidden="true" />
+            </motion.div>
+            <div>
+              <V3CardTitle>Data Sync</V3CardTitle>
+              <V3CardDescription>
+                Manually sync data from connected platforms
+              </V3CardDescription>
+            </div>
           </div>
           <DataFreshnessIndicator organizationId={organizationId} compact key={refreshKey} />
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <Button
+      </V3CardHeader>
+      <V3CardContent className="space-y-6">
+        <motion.div
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <SyncButton
             onClick={syncMetaAds}
             disabled={syncing.meta}
-            variant="outline"
-            className="h-auto flex-col gap-1.5 py-3 relative"
-          >
-            <DollarSign className="w-5 h-5" />
-            <span className="text-xs">Sync Meta Ads</span>
-            {syncing.meta ? (
-              <RefreshCw className="w-3 h-3 animate-spin" />
-            ) : (
-              renderSyncStatusBadge('meta')
-            )}
-          </Button>
+            syncing={syncing.meta}
+            icon={DollarSign}
+            label="Sync Meta Ads"
+            platform="meta"
+            accent="blue"
+          />
 
-          <Button
+          <SyncButton
             onClick={syncSwitchboard}
             disabled={syncing.sms}
-            variant="outline"
-            className="h-auto flex-col gap-1.5 py-3 relative"
-          >
-            <MessageSquare className="w-5 h-5" />
-            <span className="text-xs">Sync SMS</span>
-            {syncing.sms ? (
-              <RefreshCw className="w-3 h-3 animate-spin" />
-            ) : (
-              renderSyncStatusBadge('switchboard')
-            )}
-          </Button>
+            syncing={syncing.sms}
+            icon={MessageSquare}
+            label="Sync SMS"
+            platform="switchboard"
+            accent="purple"
+          />
 
-          <Button
+          <SyncButton
             onClick={() => syncActBlue(false)}
             disabled={syncing.actblue || syncing.actblueBackfill}
-            variant="outline"
-            className="h-auto flex-col gap-1.5 py-3 relative"
-          >
-            <Heart className="w-5 h-5" />
-            <span className="text-xs">Sync ActBlue</span>
-            {syncing.actblue ? (
-              <RefreshCw className="w-3 h-3 animate-spin" />
-            ) : (
-              renderSyncStatusBadge('actblue')
-            )}
-          </Button>
+            syncing={syncing.actblue}
+            icon={Heart}
+            label="Sync ActBlue"
+            platform="actblue"
+            accent="green"
+          />
 
-          <Button
+          <SyncButton
             onClick={() => syncActBlue(true)}
             disabled={syncing.actblue || syncing.actblueBackfill}
-            variant="outline"
-            className="h-auto flex-col gap-1.5 py-3 border-dashed"
-          >
-            <History className="w-5 h-5" />
-            <span className="text-xs">Backfill ActBlue</span>
-            {syncing.actblueBackfill && <RefreshCw className="w-3 h-3 animate-spin" />}
-          </Button>
+            syncing={syncing.actblueBackfill}
+            icon={History}
+            label="Backfill ActBlue"
+            accent="amber"
+            dashed
+          />
 
-          <Button
+          <SyncButton
             onClick={calculateROI}
             disabled={syncing.roi}
-            variant="outline"
-            className="h-auto flex-col gap-1.5 py-3"
-          >
-            <TrendingUp className="w-5 h-5" />
-            <span className="text-xs">Calculate ROI</span>
-            {syncing.roi && <RefreshCw className="w-3 h-3 animate-spin" />}
-          </Button>
+            syncing={syncing.roi}
+            icon={TrendingUp}
+            label="Calculate ROI"
+            accent="green"
+          />
 
-          <Button
+          <SyncButton
             onClick={syncAll}
             disabled={Object.values(syncing).some(Boolean)}
-            className="h-auto flex-col gap-1.5 py-3"
-          >
-            <RefreshCw className="w-5 h-5" />
-            <span className="text-xs">Sync All</span>
-          </Button>
-        </div>
+            syncing={Object.values(syncing).some(Boolean)}
+            icon={RefreshCw}
+            label="Sync All"
+            variant="default"
+          />
+        </motion.div>
 
         {/* Expanded Freshness View */}
-        <div className="pt-4 border-t">
+        <motion.div
+          className="pt-4 border-t border-[hsl(var(--portal-border))]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
           <DataFreshnessIndicator organizationId={organizationId} key={`full-${refreshKey}`} />
-        </div>
-      </CardContent>
-    </Card>
+        </motion.div>
+      </V3CardContent>
+    </V3Card>
   );
 };
 

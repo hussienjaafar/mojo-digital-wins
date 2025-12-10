@@ -1,10 +1,8 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ChevronDown, ChevronUp, BarChart3, Sun, Moon, Brain } from "lucide-react";
+import { LogOut, ChevronRight, BarChart3, Sun, Moon, Brain, LayoutDashboard, Layers } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import { useTheme } from "@/components/ThemeProvider";
@@ -16,11 +14,16 @@ import { ClientDashboardMetrics } from "@/components/client/ClientDashboardMetri
 import { ConsolidatedChannelMetrics } from "@/components/client/ConsolidatedChannelMetrics";
 import SyncControls from "@/components/client/SyncControls";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
-import { PortalSectionHeader } from "@/components/portal/PortalSectionHeader";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
 import { OrganizationSelector } from "@/components/client/OrganizationSelector";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  V3Card,
+  V3SectionHeader,
+  V3LoadingState,
+} from "@/components/v3";
+import { cn } from "@/lib/utils";
 
 // Lazy load Advanced Analytics and Donor Intelligence for performance
 const AdvancedAnalytics = lazy(() => import("@/components/analytics/AdvancedAnalytics"));
@@ -33,22 +36,52 @@ type Organization = {
   role?: string;
 };
 
-const AdvancedAnalyticsSkeleton = () => (
-  <div className="space-y-4 animate-pulse">
-    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-      {[...Array(4)].map((_, i) => (
-        <Card key={i}>
-          <CardHeader className="space-y-0 pb-2">
-            <Skeleton className="h-4 w-24" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-3 w-20" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-    <Skeleton className="h-96 w-full" />
+// Animation variants for page sections
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+  },
+};
+
+// Expand/collapse animation variants
+const contentVariants = {
+  collapsed: {
+    height: 0,
+    opacity: 0,
+    transition: {
+      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+      opacity: { duration: 0.2 },
+    },
+  },
+  expanded: {
+    height: "auto",
+    opacity: 1,
+    transition: {
+      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+      opacity: { duration: 0.3, delay: 0.1 },
+    },
+  },
+};
+
+// V3 Section Loading Skeleton
+const V3SectionSkeleton = () => (
+  <div className="space-y-4">
+    <V3LoadingState variant="kpi-grid" />
+    <V3LoadingState variant="chart" />
   </div>
 );
 
@@ -113,14 +146,12 @@ const ClientDashboard = () => {
 
   const loadUserOrganizations = async () => {
     try {
-      // Check if user is admin FIRST - admins get access to ALL organizations
       const { data: isAdminUser } = await supabase.rpc("has_role", {
         _user_id: session?.user?.id,
         _role: "admin",
       });
 
       if (isAdminUser) {
-        // Admin gets access to ALL organizations
         const { data: allOrgs, error: orgError } = await supabase
           .from('client_organizations')
           .select('id, name, logo_url')
@@ -128,7 +159,7 @@ const ClientDashboard = () => {
           .order('name');
 
         if (orgError) throw orgError;
-        
+
         if (!allOrgs || allOrgs.length === 0) {
           toast({
             title: "No Organizations",
@@ -145,13 +176,12 @@ const ClientDashboard = () => {
           logo_url: org.logo_url,
           role: 'admin',
         }));
-        
+
         setOrganizations(orgs);
         const savedOrgId = localStorage.getItem('selectedOrganizationId');
         const savedOrg = orgs.find(org => org.id === savedOrgId);
         setOrganization(savedOrg || orgs[0]);
       } else {
-        // Non-admin: check client_users table
         const { data: clientUserData, error: userError } = await (supabase as any)
           .from('client_users')
           .select(`
@@ -177,7 +207,7 @@ const ClientDashboard = () => {
           logo_url: item.client_organizations.logo_url,
           role: item.role,
         }));
-        
+
         setOrganizations(orgs);
         const savedOrgId = localStorage.getItem('selectedOrganizationId');
         const savedOrg = orgs.find(org => org.id === savedOrgId);
@@ -212,11 +242,126 @@ const ClientDashboard = () => {
     navigate('/client-login');
   };
 
+  // V3 Collapsible Section Component
+  const CollapsibleSection = ({
+    title,
+    subtitle,
+    icon: Icon,
+    accent,
+    isExpanded,
+    onToggle,
+    children,
+  }: {
+    title: string;
+    subtitle: string;
+    icon: typeof Brain;
+    accent: "blue" | "green" | "purple";
+    isExpanded: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
+  }) => {
+    const accentColors = {
+      blue: {
+        bg: "bg-[hsl(var(--portal-accent-blue)/0.1)]",
+        text: "text-[hsl(var(--portal-accent-blue))]",
+      },
+      green: {
+        bg: "bg-[hsl(var(--portal-success)/0.1)]",
+        text: "text-[hsl(var(--portal-success))]",
+      },
+      purple: {
+        bg: "bg-[hsl(var(--portal-accent-purple)/0.1)]",
+        text: "text-[hsl(var(--portal-accent-purple))]",
+      },
+    };
+
+    return (
+      <V3Card accent={accent} interactive className="overflow-hidden">
+        <button
+          onClick={onToggle}
+          className={cn(
+            "w-full px-4 sm:px-6 py-4",
+            "flex items-center justify-between",
+            "transition-colors duration-200",
+            "hover:bg-[hsl(var(--portal-bg-elevated))]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
+            "focus-visible:ring-[hsl(var(--portal-accent-blue))]",
+            "group"
+          )}
+          aria-expanded={isExpanded}
+        >
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+            <motion.div
+              className={cn("p-2.5 rounded-lg shrink-0", accentColors[accent].bg)}
+              whileHover={{ scale: 1.1 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            >
+              <Icon
+                className={cn("h-5 w-5", accentColors[accent].text)}
+                aria-hidden="true"
+              />
+            </motion.div>
+            <div className="text-left min-w-0 flex-1">
+              <h3 className="text-base sm:text-lg font-semibold text-[hsl(var(--portal-text-primary))] transition-colors duration-200 group-hover:text-[hsl(var(--portal-accent-blue))]">
+                {title}
+              </h3>
+              <p className="text-xs sm:text-sm text-[hsl(var(--portal-text-secondary))] mt-0.5 truncate hidden sm:block">
+                {subtitle}
+              </p>
+            </div>
+          </div>
+
+          <motion.div
+            className={cn(
+              "shrink-0 p-1.5 rounded-md transition-colors duration-200",
+              isExpanded
+                ? "bg-[hsl(var(--portal-accent-blue))]"
+                : "bg-[hsl(var(--portal-bg-elevated))] group-hover:bg-[hsl(var(--portal-bg-tertiary))]"
+            )}
+            animate={{ rotate: isExpanded ? 90 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronRight
+              className={cn(
+                "h-4 w-4",
+                isExpanded
+                  ? "text-white"
+                  : "text-[hsl(var(--portal-text-secondary))] group-hover:text-[hsl(var(--portal-text-primary))]"
+              )}
+              aria-hidden="true"
+            />
+          </motion.div>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isExpanded && (
+            <motion.div
+              variants={contentVariants}
+              initial="collapsed"
+              animate="expanded"
+              exit="collapsed"
+              className="overflow-hidden"
+            >
+              <div className="px-4 sm:px-6 pb-6 pt-2 border-t border-[hsl(var(--portal-border))]">
+                {children}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </V3Card>
+    );
+  };
+
   if (isLoading || !organization) {
     return (
       <div className="portal-theme portal-bg min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-t-transparent rounded-full animate-spin mx-auto" style={{ borderColor: 'hsl(var(--portal-accent-blue))' }} />
+          <motion.div
+            className="w-16 h-16 border-4 border-t-transparent rounded-full mx-auto"
+            style={{ borderColor: 'hsl(var(--portal-accent-blue))' }}
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+          />
           <p className="portal-text-secondary font-medium">Loading your dashboard...</p>
         </div>
       </div>
@@ -232,200 +377,193 @@ const ClientDashboard = () => {
       <SidebarProvider defaultOpen={!isMobile}>
         <div className="portal-theme min-h-screen w-full flex portal-bg">
           <AppSidebar organizationId={organization.id} />
-        
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Clean Modern Header */}
-          <header className="portal-header-clean">
-            <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-3">
-              <div className="flex items-center justify-between gap-4">
-                {/* Left: Sidebar Trigger + Organization */}
-                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                  <SidebarTrigger className="portal-icon-btn shrink-0" />
-                  
-                  {organization.logo_url && (
-                    <img
-                      src={organization.logo_url}
-                      alt={organization.name}
-                      className="h-8 sm:h-10 w-auto object-contain shrink-0"
-                    />
-                  )}
-                  
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-base sm:text-lg font-semibold portal-text-primary truncate">
-                        {organization.name}
-                      </h1>
-                      {organizations.length > 1 && (
-                        <OrganizationSelector
-                          organizations={organizations}
-                          selectedId={organization.id}
-                          onSelect={handleOrganizationChange}
-                        />
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="portal-status-dot" />
-                      <span className="text-xs portal-text-muted">Live</span>
+
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* V3 Modern Header */}
+            <header className="portal-header-clean">
+              <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-3">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Left: Sidebar Trigger + Organization */}
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <SidebarTrigger className="portal-icon-btn shrink-0" />
+
+                    {organization.logo_url && (
+                      <motion.img
+                        src={organization.logo_url}
+                        alt={organization.name}
+                        className="h-8 sm:h-10 w-auto object-contain shrink-0"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.2 }}
+                      />
+                    )}
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h1 className="text-base sm:text-lg font-semibold portal-text-primary truncate">
+                          {organization.name}
+                        </h1>
+                        {organizations.length > 1 && (
+                          <OrganizationSelector
+                            organizations={organizations}
+                            selectedId={organization.id}
+                            onSelect={handleOrganizationChange}
+                          />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="portal-status-dot" />
+                        <span className="text-xs portal-text-muted">Live</span>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Right: Icon Actions */}
+                  <TooltipProvider delayDuration={300}>
+                    <div className="portal-header-actions">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <motion.button
+                            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                            className="portal-icon-btn"
+                            aria-label="Toggle theme"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            {theme === "dark" ? (
+                              <Sun className="h-[18px] w-[18px]" />
+                            ) : (
+                              <Moon className="h-[18px] w-[18px]" />
+                            )}
+                          </motion.button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p>Toggle theme</p>
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <motion.button
+                            onClick={handleLogout}
+                            className="portal-icon-btn portal-icon-btn-danger"
+                            aria-label="Logout"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <LogOut className="h-[18px] w-[18px]" />
+                          </motion.button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p>Logout</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TooltipProvider>
                 </div>
-
-                {/* Right: Icon Actions */}
-                <TooltipProvider delayDuration={300}>
-                  <div className="portal-header-actions">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                          className="portal-icon-btn"
-                          aria-label="Toggle theme"
-                        >
-                          {theme === "dark" ? (
-                            <Sun className="h-[18px] w-[18px]" />
-                          ) : (
-                            <Moon className="h-[18px] w-[18px]" />
-                          )}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        <p>Toggle theme</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={handleLogout}
-                          className="portal-icon-btn portal-icon-btn-danger"
-                          aria-label="Logout"
-                        >
-                          <LogOut className="h-[18px] w-[18px]" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        <p>Logout</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                </TooltipProvider>
               </div>
-            </div>
-          </header>
+            </header>
 
-        <main className="portal-scrollbar flex-1 overflow-auto">
-          <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 w-full">
-            <PortalErrorBoundary>
-              {/* AT A GLANCE: Performance Overview */}
-              <div className="mb-6 md:mb-8">
-                <PortalSectionHeader
-                  title="Performance Overview"
-                  subtitle="Key performance indicators"
-                >
-                  <DateRangeSelector
-                    startDate={startDate}
-                    endDate={endDate}
-                    onDateChange={handleDateChange}
-                  />
-                </PortalSectionHeader>
-                <ClientDashboardMetrics
-                  organizationId={organization.id}
-                  startDate={startDate}
-                  endDate={endDate}
-                />
-              </div>
-
-              {/* DEEP DIVE: Channel Details - Expandable Sections */}
-              <div className="mb-6">
-                <PortalSectionHeader
-                  title="Channel Details"
-                  subtitle="Expand for detailed channel insights"
-                />
-                <ConsolidatedChannelMetrics
-                  organizationId={organization.id}
-                  startDate={startDate}
-                  endDate={endDate}
-                />
-              </div>
-
-              {/* DONOR INTELLIGENCE: Attribution, Segments, Topics */}
-              <div className="mb-6">
-                <Collapsible open={showDonorIntelligence} onOpenChange={setShowDonorIntelligence}>
-                  <CollapsibleTrigger asChild>
-                    <button className="w-full flex items-center justify-between p-4 rounded-lg border border-border/50 hover:border-border transition-colors bg-card/50">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg" style={{ background: 'hsl(var(--portal-accent-green) / 0.1)' }}>
-                          <Brain className="h-5 w-5" style={{ color: 'hsl(var(--portal-accent-green))' }} />
-                        </div>
-                        <div className="text-left">
-                          <h3 className="font-semibold portal-text-primary">Donor Intelligence</h3>
-                          <p className="text-sm portal-text-secondary">Attribution, creative topics, donor segments & RFM scoring</p>
-                        </div>
-                      </div>
-                      {showDonorIntelligence ? (
-                        <ChevronUp className="h-5 w-5 portal-text-secondary" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 portal-text-secondary" />
-                      )}
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-4">
-                    <Suspense fallback={<AdvancedAnalyticsSkeleton />}>
-                      <DonorIntelligence
+            <main className="portal-scrollbar flex-1 overflow-auto">
+              <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 w-full">
+                <PortalErrorBoundary>
+                  <motion.div
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                    className="space-y-6"
+                  >
+                    {/* AT A GLANCE: Performance Overview */}
+                    <motion.section variants={sectionVariants}>
+                      <V3SectionHeader
+                        title="Performance Overview"
+                        subtitle="Key performance indicators for your campaign"
+                        icon={LayoutDashboard}
+                        actions={
+                          <DateRangeSelector
+                            startDate={startDate}
+                            endDate={endDate}
+                            onDateChange={handleDateChange}
+                          />
+                        }
+                        className="mb-4"
+                      />
+                      <ClientDashboardMetrics
                         organizationId={organization.id}
                         startDate={startDate}
                         endDate={endDate}
                       />
-                    </Suspense>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
+                    </motion.section>
 
-              {/* ADVANCED: Attribution, Forecasting, LTV/CAC */}
-              <div className="mb-6">
-                <Collapsible open={showAdvancedAnalytics} onOpenChange={setShowAdvancedAnalytics}>
-                  <CollapsibleTrigger asChild>
-                    <button className="w-full flex items-center justify-between p-4 rounded-lg border border-border/50 hover:border-border transition-colors bg-card/50">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg" style={{ background: 'hsl(var(--portal-accent-purple) / 0.1)' }}>
-                          <BarChart3 className="h-5 w-5" style={{ color: 'hsl(var(--portal-accent-purple))' }} />
-                        </div>
-                        <div className="text-left">
-                          <h3 className="font-semibold portal-text-primary">Advanced Analytics</h3>
-                          <p className="text-sm portal-text-secondary">Attribution models, LTV/CAC, forecasting & comparisons</p>
-                        </div>
-                      </div>
-                      {showAdvancedAnalytics ? (
-                        <ChevronUp className="h-5 w-5 portal-text-secondary" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 portal-text-secondary" />
-                      )}
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-4">
-                    <Suspense fallback={<AdvancedAnalyticsSkeleton />}>
-                      <AdvancedAnalytics
+                    {/* DEEP DIVE: Channel Details */}
+                    <motion.section variants={sectionVariants}>
+                      <V3SectionHeader
+                        title="Channel Details"
+                        subtitle="Expand for detailed channel insights"
+                        icon={Layers}
+                        className="mb-4"
+                      />
+                      <ConsolidatedChannelMetrics
                         organizationId={organization.id}
                         startDate={startDate}
                         endDate={endDate}
                       />
-                    </Suspense>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
+                    </motion.section>
 
-              {/* Sync Controls - Compact Footer */}
-              <div className="mt-8">
-                <SyncControls 
-                  organizationId={organization.id} 
-                  startDate={startDate}
-                  endDate={endDate}
-                />
+                    {/* DONOR INTELLIGENCE: Attribution, Segments, Topics */}
+                    <motion.section variants={sectionVariants}>
+                      <CollapsibleSection
+                        title="Donor Intelligence"
+                        subtitle="Attribution, creative topics, donor segments & RFM scoring"
+                        icon={Brain}
+                        accent="green"
+                        isExpanded={showDonorIntelligence}
+                        onToggle={() => setShowDonorIntelligence(!showDonorIntelligence)}
+                      >
+                        <Suspense fallback={<V3SectionSkeleton />}>
+                          <DonorIntelligence
+                            organizationId={organization.id}
+                            startDate={startDate}
+                            endDate={endDate}
+                          />
+                        </Suspense>
+                      </CollapsibleSection>
+                    </motion.section>
+
+                    {/* ADVANCED: Attribution, Forecasting, LTV/CAC */}
+                    <motion.section variants={sectionVariants}>
+                      <CollapsibleSection
+                        title="Advanced Analytics"
+                        subtitle="Attribution models, LTV/CAC, forecasting & comparisons"
+                        icon={BarChart3}
+                        accent="purple"
+                        isExpanded={showAdvancedAnalytics}
+                        onToggle={() => setShowAdvancedAnalytics(!showAdvancedAnalytics)}
+                      >
+                        <Suspense fallback={<V3SectionSkeleton />}>
+                          <AdvancedAnalytics
+                            organizationId={organization.id}
+                            startDate={startDate}
+                            endDate={endDate}
+                          />
+                        </Suspense>
+                      </CollapsibleSection>
+                    </motion.section>
+
+                    {/* Sync Controls */}
+                    <motion.section variants={sectionVariants}>
+                      <SyncControls
+                        organizationId={organization.id}
+                        startDate={startDate}
+                        endDate={endDate}
+                      />
+                    </motion.section>
+                  </motion.div>
+                </PortalErrorBoundary>
               </div>
-            </PortalErrorBoundary>
+            </main>
           </div>
-        </main>
         </div>
-      </div>
       </SidebarProvider>
     </>
   );

@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { UnifiedTrendingPanel } from "@/components/analytics/UnifiedTrendingPanel";
 import { TopicContentSheet } from "@/components/analytics/TopicContentSheet";
 import { PriorityAlertsPanel } from "@/components/analytics/PriorityAlertsPanel";
@@ -15,6 +14,12 @@ import { useNewsFilters } from "@/contexts/NewsFilterContext";
 import { useTopicContent } from "@/hooks/useTopicContent";
 import { useUnifiedTrends } from "@/hooks/useUnifiedTrends";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  V3Card,
+  V3CardContent,
+  V3SectionHeader,
+} from "@/components/v3";
 import { cn } from "@/lib/utils";
 
 interface MetricWithComparison {
@@ -22,6 +27,27 @@ interface MetricWithComparison {
   previous: number;
   change: number; // percentage
 }
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+  },
+};
 
 export default function Analytics() {
   const { setSearchTerm, navigateToTab } = useNewsFilters();
@@ -62,7 +88,7 @@ export default function Analytics() {
     from: subDays(new Date(), 7),
     to: new Date(),
   });
-  
+
   // Metrics with comparison
   const [metrics, setMetrics] = useState<{
     watchlistMentions: MetricWithComparison;
@@ -75,7 +101,7 @@ export default function Analytics() {
     newArticles: { current: 0, previous: 0, change: 0 },
     socialPosts: { current: 0, previous: 0, change: 0 },
   });
-  
+
   const [loading, setLoading] = useState(true);
   const [loadingPhase, setLoadingPhase] = useState<string>("");
   const [loadingProgress, setLoadingProgress] = useState<number>(0);
@@ -90,7 +116,7 @@ export default function Analytics() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTopic, setSheetTopic] = useState<string>("");
   const { isLoading: sheetLoading, content: sheetContent, fetchTopicContent, addToWatchlist } = useTopicContent();
-  
+
   // Get unified trends stats
   const { stats: trendStats, refresh: refreshTrends } = useUnifiedTrends({ limit: 10 });
 
@@ -223,33 +249,33 @@ export default function Analytics() {
       const watchlistEntities = (watchlistResult.data || []).map(w => w.entity_name?.toLowerCase() || '');
       const todayArticles = todayArticlesResult.data || [];
       const yesterdayArticles = yesterdayArticlesResult.data || [];
-      
+
       // Calculate today's watchlist mentions
-      const todayWatchlistMentions = todayArticles.filter(a => 
-        watchlistEntities.some(entity => 
+      const todayWatchlistMentions = todayArticles.filter(a =>
+        watchlistEntities.some(entity =>
           entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
         )
       ).length;
 
       // Calculate yesterday's watchlist mentions
-      const yesterdayWatchlistMentions = yesterdayArticles.filter(a => 
-        watchlistEntities.some(entity => 
+      const yesterdayWatchlistMentions = yesterdayArticles.filter(a =>
+        watchlistEntities.some(entity =>
           entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
         )
       ).length;
 
       // Critical items today
-      const todayCritical = todayArticles.filter(a => 
+      const todayCritical = todayArticles.filter(a =>
         (a.threat_level === 'critical' || a.threat_level === 'high') &&
-        watchlistEntities.some(entity => 
+        watchlistEntities.some(entity =>
           entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
         )
       ).length;
 
       // Critical items yesterday
-      const yesterdayCritical = yesterdayArticles.filter(a => 
+      const yesterdayCritical = yesterdayArticles.filter(a =>
         (a.threat_level === 'critical' || a.threat_level === 'high') &&
-        watchlistEntities.some(entity => 
+        watchlistEntities.some(entity =>
           entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
         )
       ).length;
@@ -278,7 +304,7 @@ export default function Analytics() {
       });
 
       setLoadingProgress(100);
-      
+
       // Also refresh trends
       refreshTrends();
 
@@ -317,23 +343,35 @@ export default function Analytics() {
   // Render change indicator
   const ChangeIndicator = ({ change, inverse = false }: { change: number; inverse?: boolean }) => {
     if (change === 0) return null;
-    
+
     const isPositive = inverse ? change < 0 : change > 0;
     const Icon = change > 0 ? ArrowUp : ArrowDown;
-    
+
     return (
-      <span className={cn(
-        "inline-flex items-center text-xs font-medium",
-        isPositive ? "text-green-600" : change < 0 ? "text-red-600" : "text-muted-foreground"
-      )}>
+      <motion.span
+        className={cn(
+          "inline-flex items-center text-xs font-medium",
+          isPositive ? "text-[hsl(var(--portal-success))]" : change < 0 ? "text-[hsl(var(--portal-error))]" : "text-[hsl(var(--portal-text-muted))]"
+        )}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.2 }}
+      >
         <Icon className="h-3 w-3 mr-0.5" />
         {Math.abs(change)}%
-      </span>
+      </motion.span>
     );
   };
 
   return (
-    <div className="space-y-6" role="main" aria-label="News Pulse Analytics Dashboard">
+    <motion.div
+      className="space-y-6"
+      role="main"
+      aria-label="News Pulse Analytics Dashboard"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {/* Screen reader announcements */}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {loading && "Loading analytics data"}
@@ -342,74 +380,120 @@ export default function Analytics() {
       </div>
 
       {/* Loading Progress Bar */}
-      {loading && loadingProgress > 0 && (
-        <div className="fixed top-0 left-0 right-0 z-50">
-          <Progress value={loadingProgress} className="h-1 rounded-none" />
-          {loadingPhase && (
-            <div className="bg-background/95 backdrop-blur border-b px-4 py-2">
-              <p className="text-sm text-muted-foreground text-center animate-pulse">{loadingPhase}</p>
-            </div>
-          )}
-        </div>
-      )}
+      <AnimatePresence>
+        {loading && loadingProgress > 0 && (
+          <motion.div
+            className="fixed top-0 left-0 right-0 z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <Progress value={loadingProgress} className="h-1 rounded-none" />
+            {loadingPhase && (
+              <div className="bg-[hsl(var(--portal-bg-base))]/95 backdrop-blur border-b border-[hsl(var(--portal-border))] px-4 py-2">
+                <p className="text-sm text-[hsl(var(--portal-text-muted))] text-center animate-pulse">{loadingPhase}</p>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Stale Data Warning */}
-      {isStale && !loading && !error && (
-        <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
-          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <AlertDescription className="text-amber-800 dark:text-amber-200">
-            Data may be stale. Refreshing automatically...
-          </AlertDescription>
-        </Alert>
-      )}
+      <AnimatePresence>
+        {isStale && !loading && !error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <Alert className="bg-[hsl(var(--portal-warning)/0.1)] border-[hsl(var(--portal-warning)/0.3)]">
+              <AlertCircle className="h-4 w-4 text-[hsl(var(--portal-warning))]" />
+              <AlertDescription className="text-[hsl(var(--portal-warning))]">
+                Data may be stale. Refreshing automatically...
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Offline Warning */}
-      {isOffline && (
-        <Alert variant="destructive">
-          <WifiOff className="h-4 w-4" />
-          <AlertDescription>
-            <strong>You're offline.</strong> Some features may not work.
-          </AlertDescription>
-        </Alert>
-      )}
+      <AnimatePresence>
+        {isOffline && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <Alert className="bg-[hsl(var(--portal-error)/0.1)] border-[hsl(var(--portal-error)/0.3)]">
+              <WifiOff className="h-4 w-4 text-[hsl(var(--portal-error))]" />
+              <AlertDescription className="text-[hsl(var(--portal-error))]">
+                <strong>You're offline.</strong> Some features may not work.
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Error Alert */}
-      {error && !loading && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>{error.message}</span>
-            {error.retryable && (
-              <Button onClick={fetchAnalytics} variant="outline" size="sm" className="ml-4">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Retry
-              </Button>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
+      <AnimatePresence>
+        {error && !loading && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <Alert className="bg-[hsl(var(--portal-error)/0.1)] border-[hsl(var(--portal-error)/0.3)]">
+              <AlertCircle className="h-4 w-4 text-[hsl(var(--portal-error))]" />
+              <AlertDescription className="flex items-center justify-between text-[hsl(var(--portal-error))]">
+                <span>{error.message}</span>
+                {error.retryable && (
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                    <Button
+                      onClick={fetchAnalytics}
+                      variant="outline"
+                      size="sm"
+                      className="ml-4 border-[hsl(var(--portal-error)/0.3)] hover:bg-[hsl(var(--portal-error)/0.1)]"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Retry
+                    </Button>
+                  </motion.div>
+                )}
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Header */}
-      <div className="flex flex-col gap-4">
+      <motion.div variants={itemVariants} className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3 flex-1">
-            <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
-              <Activity className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-            </div>
+            <motion.div
+              className="p-2.5 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]"
+              whileHover={{ scale: 1.05 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            >
+              <Activity className="h-6 w-6 text-[hsl(var(--portal-accent-purple))]" aria-hidden="true" />
+            </motion.div>
             <div className="flex-1">
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">News Pulse</h1>
-                <div className="flex items-center gap-2 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-semibold animate-pulse">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[hsl(var(--portal-text-primary))]">News Pulse</h1>
+                <motion.div
+                  className="flex items-center gap-2 px-3 py-1 bg-[hsl(var(--portal-error))] text-white rounded-full text-sm font-semibold"
+                  animate={{ opacity: [1, 0.7, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
                   </span>
                   LIVE
-                </div>
+                </motion.div>
               </div>
-              <div className="flex flex-wrap items-center gap-4 mt-1 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-4 mt-1 text-sm text-[hsl(var(--portal-text-muted))]">
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                  <span className="inline-block w-2 h-2 rounded-full bg-[hsl(var(--portal-success))]"></span>
                   Updated {timeAgo}
                 </span>
                 {!loading && nextRefreshIn > 0 && (
@@ -423,140 +507,177 @@ export default function Analytics() {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="smooth" onClick={fetchAnalytics} disabled={loading}>
-              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            <Button variant="smooth" onClick={exportToCSV}>
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button
+                variant="outline"
+                onClick={fetchAnalytics}
+                disabled={loading}
+                className="border-[hsl(var(--portal-border))] hover:bg-[hsl(var(--portal-bg-elevated))]"
+              >
+                <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+                Refresh
+              </Button>
+            </motion.div>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button
+                variant="outline"
+                onClick={exportToCSV}
+                className="border-[hsl(var(--portal-border))] hover:bg-[hsl(var(--portal-bg-elevated))]"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </motion.div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Today's AI Briefing + Priority Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TodaysBriefing />
         <PriorityAlertsPanel onAlertClick={handleAlertClick} />
-      </div>
+      </motion.div>
 
       {/* Contextual Metrics with Comparison */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-          <CardContent className="p-4">
+      <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <V3Card accent="blue" className="bg-gradient-to-br from-[hsl(var(--portal-accent-blue)/0.05)] to-[hsl(var(--portal-accent-blue)/0.1)]">
+          <V3CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Target className="h-5 w-5 text-primary" />
-              </div>
+              <motion.div
+                className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]"
+                whileHover={{ scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              >
+                <Target className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
+              </motion.div>
               <ChangeIndicator change={metrics.watchlistMentions.change} />
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold text-primary">{metrics.watchlistMentions.current}</p>
-              <p className="text-xs text-muted-foreground">Watchlist mentions today</p>
+              <p className="text-2xl font-bold text-[hsl(var(--portal-accent-blue))] tabular-nums">{metrics.watchlistMentions.current}</p>
+              <p className="text-xs text-[hsl(var(--portal-text-muted))]">Watchlist mentions today</p>
               {metrics.watchlistMentions.previous > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">
                   vs {metrics.watchlistMentions.previous} yesterday
                 </p>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </V3CardContent>
+        </V3Card>
 
-        <Card className={cn(
-          "bg-gradient-to-br border-l-4",
-          metrics.criticalItems.current > 0 
-            ? "from-red-500/5 to-red-500/10 border-red-500 border-red-500/20" 
-            : "from-green-500/5 to-green-500/10 border-green-500 border-green-500/20"
-        )}>
-          <CardContent className="p-4">
+        <V3Card
+          accent={metrics.criticalItems.current > 0 ? "red" : "green"}
+          className={cn(
+            "bg-gradient-to-br border-l-4",
+            metrics.criticalItems.current > 0
+              ? "from-[hsl(var(--portal-error)/0.05)] to-[hsl(var(--portal-error)/0.1)] border-l-[hsl(var(--portal-error))]"
+              : "from-[hsl(var(--portal-success)/0.05)] to-[hsl(var(--portal-success)/0.1)] border-l-[hsl(var(--portal-success))]"
+          )}
+        >
+          <V3CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div className={cn(
-                "p-2 rounded-lg",
-                metrics.criticalItems.current > 0 ? "bg-red-500/10" : "bg-green-500/10"
-              )}>
+              <motion.div
+                className={cn(
+                  "p-2 rounded-lg",
+                  metrics.criticalItems.current > 0 ? "bg-[hsl(var(--portal-error)/0.1)]" : "bg-[hsl(var(--portal-success)/0.1)]"
+                )}
+                whileHover={{ scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              >
                 <AlertCircle className={cn(
                   "h-5 w-5",
-                  metrics.criticalItems.current > 0 ? "text-red-500" : "text-green-500"
+                  metrics.criticalItems.current > 0 ? "text-[hsl(var(--portal-error))]" : "text-[hsl(var(--portal-success))]"
                 )} />
-              </div>
+              </motion.div>
               <ChangeIndicator change={metrics.criticalItems.change} inverse />
             </div>
             <div className="mt-3">
               <p className={cn(
-                "text-2xl font-bold",
-                metrics.criticalItems.current > 0 ? "text-red-500" : "text-green-500"
+                "text-2xl font-bold tabular-nums",
+                metrics.criticalItems.current > 0 ? "text-[hsl(var(--portal-error))]" : "text-[hsl(var(--portal-success))]"
               )}>
                 {metrics.criticalItems.current}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-[hsl(var(--portal-text-muted))]">
                 {metrics.criticalItems.current > 0 ? "Critical items to review" : "All clear - no critical items"}
               </p>
             </div>
-          </CardContent>
-        </Card>
+          </V3CardContent>
+        </V3Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/5 to-blue-500/10 border-blue-500/20">
-          <CardContent className="p-4">
+        <V3Card accent="blue" className="bg-gradient-to-br from-[hsl(var(--portal-accent-blue)/0.05)] to-[hsl(var(--portal-accent-blue)/0.1)]">
+          <V3CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-blue-500/10">
-                <Newspaper className="h-5 w-5 text-blue-500" />
-              </div>
+              <motion.div
+                className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]"
+                whileHover={{ scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              >
+                <Newspaper className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
+              </motion.div>
               <ChangeIndicator change={metrics.newArticles.change} />
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold text-blue-500">{metrics.newArticles.current}</p>
-              <p className="text-xs text-muted-foreground">New articles today</p>
+              <p className="text-2xl font-bold text-[hsl(var(--portal-accent-blue))] tabular-nums">{metrics.newArticles.current}</p>
+              <p className="text-xs text-[hsl(var(--portal-text-muted))]">New articles today</p>
               {metrics.newArticles.previous > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">
                   vs {metrics.newArticles.previous} yesterday
                 </p>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </V3CardContent>
+        </V3Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-purple-500/20">
-          <CardContent className="p-4">
+        <V3Card accent="purple" className="bg-gradient-to-br from-[hsl(var(--portal-accent-purple)/0.05)] to-[hsl(var(--portal-accent-purple)/0.1)]">
+          <V3CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div className="p-2 rounded-lg bg-purple-500/10">
-                <Users className="h-5 w-5 text-purple-500" />
-              </div>
+              <motion.div
+                className="p-2 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]"
+                whileHover={{ scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              >
+                <Users className="h-5 w-5 text-[hsl(var(--portal-accent-purple))]" />
+              </motion.div>
               <ChangeIndicator change={metrics.socialPosts.change} />
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold text-purple-500">{metrics.socialPosts.current.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">Social posts today</p>
+              <p className="text-2xl font-bold text-[hsl(var(--portal-accent-purple))] tabular-nums">{metrics.socialPosts.current.toLocaleString()}</p>
+              <p className="text-xs text-[hsl(var(--portal-text-muted))]">Social posts today</p>
               {metrics.socialPosts.previous > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">
                   vs {metrics.socialPosts.previous.toLocaleString()} yesterday
                 </p>
               )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </V3CardContent>
+        </V3Card>
+      </motion.div>
 
       {/* Quick Stats Bar */}
-      <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 text-sm flex-wrap">
-        <span className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-orange-500" />
-          <strong>{trendStats.breakthroughs}</strong> rising fast
+      <motion.div
+        variants={itemVariants}
+        className="flex items-center gap-4 p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))] text-sm flex-wrap"
+      >
+        <span className="flex items-center gap-2 text-[hsl(var(--portal-text-secondary))]">
+          <TrendingUp className="h-4 w-4 text-[hsl(var(--portal-warning))]" />
+          <strong className="text-[hsl(var(--portal-text-primary))]">{trendStats.breakthroughs}</strong> rising fast
         </span>
-        <span className="text-muted-foreground hidden sm:inline">•</span>
-        <span className="flex items-center gap-2">
-          <Target className="h-4 w-4 text-primary" />
-          <strong>{trendStats.watchlistMatches}</strong> match watchlist
+        <span className="text-[hsl(var(--portal-text-muted))] hidden sm:inline">•</span>
+        <span className="flex items-center gap-2 text-[hsl(var(--portal-text-secondary))]">
+          <Target className="h-4 w-4 text-[hsl(var(--portal-accent-blue))]" />
+          <strong className="text-[hsl(var(--portal-text-primary))]">{trendStats.watchlistMatches}</strong> match watchlist
         </span>
-        <span className="text-muted-foreground hidden sm:inline">•</span>
-        <span className="flex items-center gap-2">
-          <Newspaper className="h-4 w-4 text-green-500" />
-          <strong>{trendStats.multiSourceTrends}</strong> cross-platform
+        <span className="text-[hsl(var(--portal-text-muted))] hidden sm:inline">•</span>
+        <span className="flex items-center gap-2 text-[hsl(var(--portal-text-secondary))]">
+          <Newspaper className="h-4 w-4 text-[hsl(var(--portal-success))]" />
+          <strong className="text-[hsl(var(--portal-text-primary))]">{trendStats.multiSourceTrends}</strong> cross-platform
         </span>
-      </div>
+      </motion.div>
 
       {/* Unified Trending Topics - Main content */}
-      <UnifiedTrendingPanel onTopicClick={handleTopicClick} />
+      <motion.div variants={itemVariants}>
+        <UnifiedTrendingPanel onTopicClick={handleTopicClick} />
+      </motion.div>
 
       {/* Topic Content Sheet */}
       <TopicContentSheet
@@ -567,6 +688,6 @@ export default function Analytics() {
         content={sheetContent}
         onAddToWatchlist={addToWatchlist}
       />
-    </div>
+    </motion.div>
   );
 }
