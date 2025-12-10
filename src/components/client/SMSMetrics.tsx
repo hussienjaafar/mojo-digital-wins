@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   V3Card,
@@ -12,43 +11,19 @@ import {
   V3ErrorState,
   V3EmptyState,
 } from "@/components/v3";
-import { logger } from "@/lib/logger";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
 import { PortalBadge } from "@/components/portal/PortalBadge";
 import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format, subDays, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { PortalMultiBarChart } from "@/components/portal/PortalMultiBarChart";
+import { useSMSMetricsQuery } from "@/queries";
 
 type Props = {
   organizationId: string;
   startDate: string;
   endDate: string;
-};
-
-type SMSMetric = {
-  campaign_id: string;
-  campaign_name: string;
-  messages_sent: number;
-  messages_delivered: number;
-  messages_failed: number;
-  opt_outs: number;
-  clicks: number;
-  conversions: number;
-  amount_raised: number;
-  cost: number;
-  roi: number;
-  delivery_rate: number;
-  ctr: number;
-  opt_out_rate: number;
-};
-
-type DailyMetric = {
-  date: string;
-  messages_sent: number;
-  conversions: number;
-  amount_raised: number;
 };
 
 const CHART_COLORS = {
@@ -72,149 +47,19 @@ const itemVariants = {
 };
 
 const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
-  const [metrics, setMetrics] = useState<Record<string, SMSMetric>>({});
-  const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
-  const [previousPeriodMetrics, setPreviousPeriodMetrics] = useState<Record<string, SMSMetric>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [performanceFilter, setPerformanceFilter] = useState<string>("all");
-  const [lastSentDate, setLastSentDate] = useState<string | null>(null);
 
-  const getPreviousPeriod = () => {
-    const start = parseISO(startDate);
-    const end = parseISO(endDate);
-    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const prevEnd = subDays(start, 1);
-    const prevStart = subDays(prevEnd, daysDiff);
-    return {
-      start: format(prevStart, 'yyyy-MM-dd'),
-      end: format(prevEnd, 'yyyy-MM-dd'),
-    };
-  };
+  // Use TanStack Query hook instead of direct Supabase calls
+  const { data, isLoading, error, refetch } = useSMSMetricsQuery(organizationId);
 
-  useEffect(() => {
-    loadData();
-  }, [organizationId, startDate, endDate]);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    setError(null);
-    const prevPeriod = getPreviousPeriod();
-
-    try {
-      // Current period - query from sms_campaigns table using send_date
-      const { data, error: queryError } = await (supabase as any)
-        .from('sms_campaigns')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .gte('send_date', startDate)
-        .lte('send_date', `${endDate}T23:59:59`)
-        .neq('status', 'draft')
-        .order('send_date', { ascending: true });
-
-      if (queryError) throw queryError;
-
-      const aggregated = aggregateMetrics(data || []);
-      setMetrics(aggregated);
-
-      const daily = aggregateDailyMetrics(data || []);
-      setDailyMetrics(daily);
-
-      // Get last sent SMS date for freshness indicator
-      const { data: latestSms } = await (supabase as any)
-        .from('sms_campaigns')
-        .select('send_date')
-        .eq('organization_id', organizationId)
-        .neq('status', 'draft')
-        .order('send_date', { ascending: false })
-        .limit(1);
-
-      if (latestSms?.[0]?.send_date) {
-        setLastSentDate(latestSms[0].send_date.split('T')[0]);
-      }
-
-      // Previous period
-      const { data: prevData } = await (supabase as any)
-        .from('sms_campaigns')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .gte('send_date', prevPeriod.start)
-        .lte('send_date', `${prevPeriod.end}T23:59:59`)
-        .neq('status', 'draft');
-
-      const prevAggregated = aggregateMetrics(prevData || []);
-      setPreviousPeriodMetrics(prevAggregated);
-
-    } catch (err) {
-      logger.error('Failed to load SMS data', err);
-      setError('Failed to load SMS data. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const aggregateMetrics = (data: any[]): Record<string, SMSMetric> => {
-    const aggregated: Record<string, SMSMetric> = {};
-    data?.forEach(campaign => {
-      // Each row is a campaign, not a daily metric - use campaign_id as key
-      const id = campaign.campaign_id || campaign.id;
-      if (!aggregated[id]) {
-        aggregated[id] = {
-          campaign_id: id,
-          campaign_name: campaign.campaign_name || id,
-          messages_sent: 0,
-          messages_delivered: 0,
-          messages_failed: 0,
-          opt_outs: 0,
-          clicks: 0,
-          conversions: 0,
-          amount_raised: 0,
-          cost: 0,
-          roi: 0,
-          delivery_rate: 0,
-          ctr: 0,
-          opt_out_rate: 0,
-        };
-      }
-      aggregated[id].messages_sent += campaign.messages_sent || 0;
-      aggregated[id].messages_delivered += campaign.messages_delivered || 0;
-      aggregated[id].messages_failed += campaign.messages_failed || 0;
-      aggregated[id].opt_outs += campaign.opt_outs || 0;
-      aggregated[id].clicks += campaign.clicks || 0;
-      aggregated[id].conversions += campaign.conversions || 0;
-      aggregated[id].amount_raised += Number(campaign.amount_raised || 0);
-      aggregated[id].cost += Number(campaign.cost || 0);
-    });
-
-    // Calculate derived metrics
-    Object.values(aggregated).forEach(m => {
-      if (m.cost > 0) m.roi = m.amount_raised / m.cost;
-      if (m.messages_sent > 0) m.delivery_rate = (m.messages_delivered / m.messages_sent) * 100;
-      if (m.messages_delivered > 0) {
-        m.ctr = (m.clicks / m.messages_delivered) * 100;
-        m.opt_out_rate = (m.opt_outs / m.messages_delivered) * 100;
-      }
-    });
-
-    return aggregated;
-  };
-
-  const aggregateDailyMetrics = (data: any[]): DailyMetric[] => {
-    const byDate: Record<string, DailyMetric> = {};
-    data?.forEach(campaign => {
-      // Use send_date from sms_campaigns table
-      const date = campaign.send_date?.split('T')[0];
-      if (!date) return;
-      if (!byDate[date]) {
-        byDate[date] = { date, messages_sent: 0, conversions: 0, amount_raised: 0 };
-      }
-      byDate[date].messages_sent += campaign.messages_sent || 0;
-      byDate[date].conversions += campaign.conversions || 0;
-      byDate[date].amount_raised += Number(campaign.amount_raised || 0);
-    });
-    return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
-  };
+  // Memoized derived data
+  const { metrics, dailyMetrics, previousPeriodMetrics, lastSentDate } = useMemo(() => ({
+    metrics: data?.metrics || {},
+    dailyMetrics: data?.dailyMetrics || [],
+    previousPeriodMetrics: data?.previousPeriodMetrics || {},
+    lastSentDate: data?.lastSentDate || null,
+  }), [data]);
 
   const campaigns = useMemo(() => Object.values(metrics), [metrics]);
   const previousCampaigns = useMemo(() => Object.values(previousPeriodMetrics), [previousPeriodMetrics]);
@@ -269,7 +114,7 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
   }, [campaigns, campaignFilter, performanceFilter]);
 
   // Campaign ROI comparison chart data
-  const roiComparisonData = campaigns
+  const roiComparisonData = useMemo(() => campaigns
     .filter(c => c.cost > 0)
     .sort((a, b) => b.roi - a.roi)
     .slice(0, 8)
@@ -278,14 +123,14 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
       roi: c.roi,
       raised: c.amount_raised,
       cost: c.cost,
-    }));
+    })), [campaigns]);
 
   // Trend chart data
-  const trendChartData = dailyMetrics.map(d => ({
+  const trendChartData = useMemo(() => dailyMetrics.map(d => ({
     name: format(parseISO(d.date), 'MMM d'),
     Sent: d.messages_sent,
     Conversions: d.conversions,
-  }));
+  })), [dailyMetrics]);
 
   // Show loading state
   if (isLoading) {
@@ -303,8 +148,8 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     return (
       <V3ErrorState
         title="Failed to load SMS data"
-        message={error}
-        onRetry={loadData}
+        message={error instanceof Error ? error.message : 'An error occurred'}
+        onRetry={() => refetch()}
       />
     );
   }
@@ -444,6 +289,7 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
         <V3CardContent>
           <PortalTable
             data={filteredCampaigns}
+            keyExtractor={(row) => row.campaign_id}
             columns={[
               {
                 key: "campaign_name",
@@ -508,35 +354,11 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
                 ),
                 hiddenOnMobile: true,
               },
-              {
-                key: "conversions",
-                label: "Conv.",
-                sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.number,
-              },
             ]}
-            keyExtractor={(row) => row.campaign_id}
-            isLoading={isLoading}
-            emptyMessage="No SMS campaigns found"
-            emptyAction={
-              <p className="text-sm text-[hsl(var(--portal-text-muted))]">
-                Connect your SMS platform to see campaign data
-              </p>
-            }
+            emptyMessage="No campaigns match the selected filters"
           />
         </V3CardContent>
       </V3Card>
-
-      {/* Data Freshness Indicator */}
-      {lastSentDate && (
-        <div className="flex items-center gap-2 text-xs text-[hsl(var(--portal-text-muted))]">
-          <span>Last SMS campaign: {format(parseISO(lastSentDate), 'MMM d, yyyy')}</span>
-          {new Date().getTime() - new Date(lastSentDate).getTime() > 7 * 24 * 60 * 60 * 1000 && (
-            <PortalBadge variant="warning">No recent campaigns</PortalBadge>
-          )}
-        </div>
-      )}
     </div>
   );
 };
