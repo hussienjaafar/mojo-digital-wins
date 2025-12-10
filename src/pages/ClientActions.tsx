@@ -15,6 +15,7 @@ import {
   V3CardContent,
   V3CardHeader,
   V3KPICard,
+  V3PageContainer,
   V3SectionHeader,
   V3LoadingState,
   V3EmptyState,
@@ -205,21 +206,18 @@ const ClientActions = () => {
 
   return (
     <ClientLayout>
-      <motion.div
-        className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
+      <V3PageContainer
+        icon={Zap}
+        title="Suggested Actions"
+        description="AI-generated campaign suggestions based on your alerts"
+        animate={false}
       >
-        {/* Page Header */}
-        <motion.div variants={itemVariants} className="mb-6">
-          <V3SectionHeader
-            title="Suggested Actions"
-            subtitle="AI-generated campaign suggestions based on your alerts"
-            icon={Zap}
-            size="lg"
-          />
-        </motion.div>
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6"
+        >
 
         {/* Loading State */}
         {isLoading && (
@@ -490,7 +488,8 @@ const ClientActions = () => {
             )}
           </>
         )}
-      </motion.div>
+        </motion.div>
+      </V3PageContainer>
     </ClientLayout>
   );
 };

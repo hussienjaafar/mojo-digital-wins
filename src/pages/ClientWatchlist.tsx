@@ -18,6 +18,7 @@ import {
   V3CardHeader,
   V3CardTitle,
   V3CardDescription,
+  V3PageContainer,
   V3SectionHeader,
   V3LoadingState,
   V3EmptyState,
@@ -293,21 +294,18 @@ const ClientWatchlist = () => {
 
   return (
     <ClientLayout>
-      <motion.div
-        className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 space-y-6"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
+      <V3PageContainer
+        icon={Target}
+        title="Entity Watchlist"
+        description="Track organizations, people, topics, and issues relevant to your mission"
+        animate={false}
       >
-        {/* Page Header */}
-        <motion.div variants={itemVariants}>
-          <V3SectionHeader
-            title="Entity Watchlist"
-            subtitle="Track organizations, people, topics, and issues relevant to your mission"
-            icon={Target}
-            size="lg"
-          />
-        </motion.div>
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6"
+        >
 
         {/* Add Entity Section */}
         <motion.div variants={itemVariants}>
@@ -625,7 +623,8 @@ const ClientWatchlist = () => {
             })}
           </motion.div>
         )}
-      </motion.div>
+        </motion.div>
+      </V3PageContainer>
     </ClientLayout>
   );
 };
