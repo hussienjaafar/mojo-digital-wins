@@ -6,7 +6,7 @@ import {
   V3CardHeader,
   V3CardTitle,
   V3CardContent,
-  V3KPICard,
+  V3KPICardWithSparkline,
   V3ChartWrapper,
   V3LoadingState,
   V3ErrorState,
@@ -65,6 +65,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
   const prevKpis = data?.prevKpis || {};
   const timeSeriesData = data?.timeSeries || [];
   const channelBreakdown = data?.channelBreakdown || [];
+  const sparklines = data?.sparklines;
 
   const scrollToId = (id: string) => {
     const el = document.getElementById(id);
@@ -160,7 +161,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     return [...base, ...compare];
   }, [showCompare, valueMode]);
 
-  // Hero KPIs configuration
+  // Hero KPIs configuration with sparkline data
   const heroKpis = useMemo(() => {
     if (!kpis) return [];
     return [
@@ -172,6 +173,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         subtitle: `Gross: ${formatCurrency(kpis.totalRaised)} (${kpis.feePercentage.toFixed(1)}% fees)`,
         onClick: () => scrollToId("fundraising-chart"),
         accent: "green" as const,
+        sparklineData: sparklines?.netRevenue || [],
       },
       {
         label: "Net ROI",
@@ -181,6 +183,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         subtitle: `Spend: ${formatCurrency(kpis.totalSpend)}`,
         onClick: () => scrollToId("channel-performance"),
         accent: "blue" as const,
+        sparklineData: sparklines?.roi || [],
       },
       {
         label: "Refund Rate",
@@ -190,6 +193,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         subtitle: `Refunds: ${formatCurrency(kpis.refundAmount)}`,
         onClick: () => scrollToId("fundraising-chart"),
         accent: kpis.refundRate > 5 ? "red" as const : "default" as const,
+        sparklineData: sparklines?.refundRate || [],
       },
       {
         label: "Recurring Health",
@@ -199,6 +203,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         subtitle: `${kpis.recurringDonations} recurring tx • Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
         onClick: () => scrollToId("campaign-health"),
         accent: "amber" as const,
+        sparklineData: sparklines?.recurringHealth || [],
       },
       {
         label: "Attribution Quality",
@@ -208,6 +213,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         subtitle: "Deterministic (refcode/click)",
         onClick: () => scrollToId("channel-performance"),
         accent: "purple" as const,
+        sparklineData: sparklines?.attributionQuality || [],
       },
       {
         label: "Unique Donors",
@@ -217,9 +223,10 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         subtitle: `New ${kpis.newDonors} / Returning ${kpis.returningDonors}`,
         onClick: () => scrollToId("campaign-health"),
         accent: "blue" as const,
+        sparklineData: sparklines?.uniqueDonors || [],
       },
     ];
-  }, [kpis, prevKpis, calcChange, formatCurrency]);
+  }, [kpis, prevKpis, calcChange, formatCurrency, sparklines]);
 
   if (isLoading) {
     return (
@@ -285,7 +292,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       >
         {heroKpis.map((metric) => (
           <motion.div key={metric.label} variants={itemVariants}>
-            <V3KPICard
+            <V3KPICardWithSparkline
               label={metric.label}
               value={metric.value}
               icon={metric.icon}
@@ -293,6 +300,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
               subtitle={metric.subtitle}
               accent={metric.accent}
               onClick={metric.onClick}
+              sparklineData={metric.sparklineData}
             />
           </motion.div>
         ))}

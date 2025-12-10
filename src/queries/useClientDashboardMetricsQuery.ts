@@ -47,11 +47,21 @@ export interface ChannelBreakdown {
   label: string;
 }
 
+export interface SparklineData {
+  netRevenue: number[];
+  roi: number[];
+  refundRate: number[];
+  recurringHealth: number[];
+  uniqueDonors: number[];
+  attributionQuality: number[];
+}
+
 interface DashboardMetricsResult {
   kpis: DashboardKPIs;
   prevKpis: Partial<DashboardKPIs>;
   timeSeries: DashboardTimeSeriesPoint[];
   channelBreakdown: ChannelBreakdown[];
+  sparklines: SparklineData;
   metaConversions: number;
   smsConversions: number;
   directDonations: number;
@@ -270,6 +280,40 @@ async function fetchDashboardMetrics(
     { name: `Direct (${pct(directDonationCount)}%)`, value: directDonationCount, label: `${directDonationCount}` },
   ];
 
+  // Build sparkline data from time series (last 7-14 days depending on range)
+  const sparklines: SparklineData = {
+    netRevenue: timeSeries.map(d => d.netDonations),
+    roi: timeSeries.map((d, i) => {
+      const daySpend = d.metaSpend + d.smsSpend;
+      return daySpend > 0 ? d.netDonations / daySpend : 0;
+    }),
+    refundRate: timeSeries.map(d => {
+      const gross = d.donations;
+      const refundAbs = Math.abs(d.refunds);
+      return gross > 0 ? (refundAbs / gross) * 100 : 0;
+    }),
+    recurringHealth: timeSeries.map((d, i) => {
+      // Use the daily recurring donations portion
+      const dayDonations = donations.filter((don: any) => 
+        don.transaction_date?.startsWith(format(days[i], 'yyyy-MM-dd')) && don.is_recurring
+      );
+      return dayDonations.reduce((sum: number, don: any) => sum + Number(don.net_amount ?? don.amount ?? 0), 0);
+    }),
+    uniqueDonors: timeSeries.map((d, i) => {
+      const dayDonations = donations.filter((don: any) => 
+        don.transaction_date?.startsWith(format(days[i], 'yyyy-MM-dd'))
+      );
+      return new Set(dayDonations.map((don: any) => don.donor_id_hash || don.donor_email)).size;
+    }),
+    attributionQuality: timeSeries.map((d, i) => {
+      const dayDonations = donations.filter((don: any) => 
+        don.transaction_date?.startsWith(format(days[i], 'yyyy-MM-dd'))
+      );
+      const attributed = dayDonations.filter((don: any) => don.refcode || don.source_campaign).length;
+      return dayDonations.length > 0 ? (attributed / dayDonations.length) * 100 : 0;
+    }),
+  };
+
   return {
     kpis: {
       totalRaised,
@@ -308,6 +352,7 @@ async function fetchDashboardMetrics(
     },
     timeSeries,
     channelBreakdown,
+    sparklines,
     metaConversions,
     smsConversions,
     directDonations: directDonationCount,
