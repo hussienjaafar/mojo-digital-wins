@@ -9,6 +9,7 @@ export {
   V3CardContent,
   V3CardFooter,
   type V3CardAccent,
+  type V3CardProps,
 } from "./V3Card";
 
 export { V3TrendIndicator } from "./V3TrendIndicator";

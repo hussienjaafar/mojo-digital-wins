@@ -3,10 +3,14 @@ import { cn } from "@/lib/utils";
 
 export type V3CardAccent = "blue" | "green" | "purple" | "amber" | "red" | "default";
 
-interface V3CardProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface V3CardProps extends React.HTMLAttributes<HTMLDivElement> {
   accent?: V3CardAccent;
   children: React.ReactNode;
   interactive?: boolean;
+  /** Optional title - renders V3CardHeader with title automatically */
+  title?: string;
+  /** Optional subtitle/description - renders below title */
+  subtitle?: string;
 }
 
 const accentStyles: Record<V3CardAccent, string> = {
@@ -19,13 +23,13 @@ const accentStyles: Record<V3CardAccent, string> = {
 };
 
 export const V3Card = React.forwardRef<HTMLDivElement, V3CardProps>(
-  ({ className, accent = "default", interactive = false, children, ...props }, ref) => {
+  ({ className, accent = "default", interactive = false, title, subtitle, children, ...props }, ref) => {
     return (
       <div
         ref={ref}
         className={cn(
           "rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]",
-          "shadow-sm transition-all duration-200",
+          "shadow-sm transition-all duration-200 relative",
           accentStyles[accent],
           interactive && [
             "hover:border-[hsl(var(--portal-border-hover))]",
@@ -36,7 +40,23 @@ export const V3Card = React.forwardRef<HTMLDivElement, V3CardProps>(
         )}
         {...props}
       >
-        {children}
+        {(title || subtitle) && (
+          <div className="p-4 sm:p-6 pb-3 sm:pb-4">
+            {title && (
+              <h3 className="text-base sm:text-lg font-semibold text-[hsl(var(--portal-text-primary))]">
+                {title}
+              </h3>
+            )}
+            {subtitle && (
+              <p className="text-xs sm:text-sm text-[hsl(var(--portal-text-secondary))] mt-1">
+                {subtitle}
+              </p>
+            )}
+          </div>
+        )}
+        <div className={cn(title || subtitle ? "p-4 sm:p-6 pt-0" : "p-4 sm:p-6")}>
+          {children}
+        </div>
       </div>
     );
   }
