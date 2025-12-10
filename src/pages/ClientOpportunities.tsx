@@ -9,11 +9,10 @@ import { motion } from "framer-motion";
 import {
   V3Card,
   V3CardContent,
-  V3SectionHeader,
+  V3PageContainer,
   V3LoadingState,
   V3EmptyState,
 } from "@/components/v3";
-import { cn } from "@/lib/utils";
 
 // Animation variants
 const containerVariants = {
@@ -66,21 +65,18 @@ export default function ClientOpportunities() {
 
   return (
     <ClientLayout>
-      <motion.div
-        className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 space-y-6"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
+      <V3PageContainer
+        icon={Target}
+        title="Fundraising Opportunities"
+        description="Real-time opportunities based on trending topics and historical performance"
+        animate={false}
       >
-        {/* Page Header */}
-        <motion.div variants={itemVariants}>
-          <V3SectionHeader
-            title="Fundraising Opportunities"
-            subtitle="Real-time opportunities based on trending topics and historical performance"
-            icon={Target}
-            size="lg"
-          />
-        </motion.div>
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6"
+        >
 
         {/* Loading State */}
         {isLoading && (
@@ -218,7 +214,8 @@ export default function ClientOpportunities() {
             })}
           </motion.div>
         )}
-      </motion.div>
+        </motion.div>
+      </V3PageContainer>
     </ClientLayout>
   );
 }
