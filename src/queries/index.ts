@@ -1,5 +1,6 @@
 // Query key factories
 export * from "./queryKeys";
+export * from "./useClientDashboardMetricsQuery";
 
 // Dashboard queries
 export { useDashboardKPIsQuery } from "./useDashboardKPIsQuery";

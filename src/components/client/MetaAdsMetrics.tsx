@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   V3Card,
@@ -7,57 +6,26 @@ import {
   V3CardHeader,
   V3CardTitle,
   V3KPICard,
-  V3TrendIndicator,
   V3ChartWrapper,
   V3LoadingState,
   V3ErrorState,
   V3EmptyState,
 } from "@/components/v3";
 import { PortalBadge } from "@/components/portal/PortalBadge";
-import { logger } from "@/lib/logger";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
-import { Target, MousePointer, Eye, DollarSign, TrendingUp, BarChart3, Filter, RefreshCw } from "lucide-react";
+import { Target, MousePointer, Eye, DollarSign, TrendingUp, BarChart3, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format, subDays, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { PortalMultiBarChart } from "@/components/portal/PortalMultiBarChart";
 import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
+import { useMetaAdsMetricsQuery } from "@/queries";
+import { useState } from "react";
 
 type Props = {
   organizationId: string;
   startDate: string;
   endDate: string;
-};
-
-type MetaCampaign = {
-  campaign_id: string;
-  campaign_name: string;
-  status: string;
-  objective: string;
-  daily_budget: number;
-  lifetime_budget: number;
-};
-
-type MetaMetric = {
-  campaign_id: string;
-  impressions: number;
-  clicks: number;
-  spend: number;
-  conversions: number;
-  conversion_value: number;
-  reach: number;
-  cpc: number;
-  ctr: number;
-  roas: number;
-  cpm: number;
-};
-
-type DailyMetric = {
-  date: string;
-  spend: number;
-  conversions: number;
-  impressions: number;
-  clicks: number;
 };
 
 const CHART_COLORS = {
@@ -81,138 +49,19 @@ const itemVariants = {
 };
 
 const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
-  const [campaigns, setCampaigns] = useState<MetaCampaign[]>([]);
-  const [metrics, setMetrics] = useState<Record<string, MetaMetric>>({});
-  const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
-  const [previousPeriodMetrics, setPreviousPeriodMetrics] = useState<Record<string, MetaMetric>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [performanceFilter, setPerformanceFilter] = useState<string>("all");
 
-  // Calculate previous period dates
-  const getPreviousPeriod = () => {
-    const start = parseISO(startDate);
-    const end = parseISO(endDate);
-    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const prevEnd = subDays(start, 1);
-    const prevStart = subDays(prevEnd, daysDiff);
-    return {
-      start: format(prevStart, 'yyyy-MM-dd'),
-      end: format(prevEnd, 'yyyy-MM-dd'),
-    };
-  };
+  // Use TanStack Query hook instead of direct Supabase calls
+  const { data, isLoading, error, refetch } = useMetaAdsMetricsQuery(organizationId);
 
-  useEffect(() => {
-    loadData();
-  }, [organizationId, startDate, endDate]);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    setError(null);
-    const prevPeriod = getPreviousPeriod();
-
-    try {
-      // Fetch campaigns
-      const { data: campaignData, error: campaignError } = await (supabase as any)
-        .from('meta_campaigns')
-        .select('*')
-        .eq('organization_id', organizationId);
-
-      if (campaignError) throw campaignError;
-      setCampaigns(campaignData || []);
-
-      // Fetch current period metrics
-      const { data: metricsData, error: metricsError } = await (supabase as any)
-        .from('meta_ad_metrics')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: true });
-
-      if (metricsError) throw metricsError;
-
-      // Aggregate by campaign
-      const aggregated = aggregateMetrics(metricsData || []);
-      setMetrics(aggregated);
-
-      // Group by date for trend chart
-      const daily = aggregateDailyMetrics(metricsData || []);
-      setDailyMetrics(daily);
-
-      // Fetch previous period for comparison
-      const { data: prevData } = await (supabase as any)
-        .from('meta_ad_metrics')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .gte('date', prevPeriod.start)
-        .lte('date', prevPeriod.end);
-
-      const prevAggregated = aggregateMetrics(prevData || []);
-      setPreviousPeriodMetrics(prevAggregated);
-
-    } catch (err) {
-      logger.error('Failed to load Meta Ads data', err);
-      setError('Failed to load Meta Ads data. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const aggregateMetrics = (data: any[]): Record<string, MetaMetric> => {
-    const aggregated: Record<string, MetaMetric> = {};
-    data?.forEach(metric => {
-      if (!aggregated[metric.campaign_id]) {
-        aggregated[metric.campaign_id] = {
-          campaign_id: metric.campaign_id,
-          impressions: 0,
-          clicks: 0,
-          spend: 0,
-          conversions: 0,
-          conversion_value: 0,
-          reach: 0,
-          cpc: 0,
-          ctr: 0,
-          roas: 0,
-          cpm: 0,
-        };
-      }
-      aggregated[metric.campaign_id].impressions += metric.impressions || 0;
-      aggregated[metric.campaign_id].clicks += metric.clicks || 0;
-      aggregated[metric.campaign_id].spend += Number(metric.spend || 0);
-      aggregated[metric.campaign_id].conversions += metric.conversions || 0;
-      aggregated[metric.campaign_id].conversion_value += Number(metric.conversion_value || 0);
-      aggregated[metric.campaign_id].reach += metric.reach || 0;
-    });
-
-    // Calculate derived metrics
-    Object.values(aggregated).forEach(metric => {
-      if (metric.clicks > 0) metric.cpc = metric.spend / metric.clicks;
-      if (metric.impressions > 0) {
-        metric.ctr = (metric.clicks / metric.impressions) * 100;
-        metric.cpm = (metric.spend / metric.impressions) * 1000;
-      }
-      if (metric.spend > 0) metric.roas = metric.conversion_value / metric.spend;
-    });
-
-    return aggregated;
-  };
-
-  const aggregateDailyMetrics = (data: any[]): DailyMetric[] => {
-    const byDate: Record<string, DailyMetric> = {};
-    data?.forEach(metric => {
-      const date = metric.date;
-      if (!byDate[date]) {
-        byDate[date] = { date, spend: 0, conversions: 0, impressions: 0, clicks: 0 };
-      }
-      byDate[date].spend += Number(metric.spend || 0);
-      byDate[date].conversions += metric.conversions || 0;
-      byDate[date].impressions += metric.impressions || 0;
-      byDate[date].clicks += metric.clicks || 0;
-    });
-    return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
-  };
+  // Memoized derived data
+  const { campaigns, metrics, dailyMetrics, previousPeriodMetrics } = useMemo(() => ({
+    campaigns: data?.campaigns || [],
+    metrics: data?.metrics || {},
+    dailyMetrics: data?.dailyMetrics || [],
+    previousPeriodMetrics: data?.previousPeriodMetrics || {},
+  }), [data]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -281,7 +130,7 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
   }, [campaigns, metrics, statusFilter, performanceFilter]);
 
   // Prepare table data
-  const tableData = filteredCampaigns.map(campaign => {
+  const tableData = useMemo(() => filteredCampaigns.map(campaign => {
     const metric = metrics[campaign.campaign_id] || {
       impressions: 0, clicks: 0, spend: 0, conversions: 0, cpc: 0, ctr: 0, roas: 0, cpm: 0,
     };
@@ -291,10 +140,10 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
       status: campaign.status,
       ...metric,
     };
-  });
+  }), [filteredCampaigns, metrics]);
 
   // Prepare chart data for campaign breakdown
-  const campaignBreakdownData = tableData
+  const campaignBreakdownData = useMemo(() => tableData
     .filter(c => c.spend > 0)
     .sort((a, b) => b.spend - a.spend)
     .slice(0, 8)
@@ -303,14 +152,14 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
       spend: c.spend,
       conversions: c.conversions,
       roas: c.roas,
-    }));
+    })), [tableData]);
 
   // Prepare trend chart data
-  const trendChartData = dailyMetrics.map(d => ({
+  const trendChartData = useMemo(() => dailyMetrics.map(d => ({
     name: format(parseISO(d.date), 'MMM d'),
     Spend: d.spend,
     Conversions: d.conversions,
-  }));
+  })), [dailyMetrics]);
 
   // Show loading state
   if (isLoading) {
@@ -328,8 +177,8 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
     return (
       <V3ErrorState
         title="Failed to load Meta Ads data"
-        message={error}
-        onRetry={loadData}
+        message={error instanceof Error ? error.message : 'An error occurred'}
+        onRetry={() => refetch()}
       />
     );
   }
@@ -481,6 +330,7 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
         <V3CardContent>
           <PortalTable
             data={tableData}
+            keyExtractor={(row) => row.campaign_id}
             columns={[
               {
                 key: "campaign_name",
@@ -506,6 +356,37 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
                 render: PortalTableRenderers.currency,
               },
               {
+                key: "impressions",
+                label: "Impr.",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.number,
+                hiddenOnMobile: true,
+              },
+              {
+                key: "clicks",
+                label: "Clicks",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.number,
+                hiddenOnMobile: true,
+              },
+              {
+                key: "ctr",
+                label: "CTR",
+                sortable: true,
+                className: "text-right",
+                render: (value) => `${value.toFixed(2)}%`,
+                hiddenOnMobile: true,
+              },
+              {
+                key: "conversions",
+                label: "Conv",
+                sortable: true,
+                className: "text-right",
+                render: PortalTableRenderers.number,
+              },
+              {
                 key: "roas",
                 label: "ROAS",
                 sortable: true,
@@ -516,46 +397,8 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
                   </span>
                 ),
               },
-              {
-                key: "conversions",
-                label: "Conv.",
-                sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.number,
-              },
-              {
-                key: "ctr",
-                label: "CTR",
-                sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.percentage,
-                hiddenOnMobile: true,
-              },
-              {
-                key: "cpc",
-                label: "CPC",
-                sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.currency,
-                hiddenOnMobile: true,
-              },
-              {
-                key: "impressions",
-                label: "Impr.",
-                sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.number,
-                hiddenOnMobile: true,
-              },
             ]}
-            keyExtractor={(row) => row.campaign_id}
-            isLoading={isLoading}
-            emptyMessage="No Meta campaigns found"
-            emptyAction={
-              <p className="text-sm text-[hsl(var(--portal-text-muted))]">
-                Connect your Meta Ads account to see campaign data
-              </p>
-            }
+            emptyMessage="No campaigns match the selected filters"
           />
         </V3CardContent>
       </V3Card>
