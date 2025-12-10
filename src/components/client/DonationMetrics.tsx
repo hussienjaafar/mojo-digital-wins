@@ -14,7 +14,7 @@ import {
 } from "@/components/v3";
 import { PortalBadge } from "@/components/portal/PortalBadge";
 import { Input } from "@/components/ui/input";
-import { Search, DollarSign, Users, Repeat, TrendingUp, PieChart, BarChart3, Filter, ShieldAlert, Heart } from "lucide-react";
+import { Search, DollarSign, Users, Repeat, TrendingUp, PieChart, BarChart3, Filter, ShieldAlert, Heart, UserPlus, Receipt } from "lucide-react";
 import { format, subDays, parseISO } from "date-fns";
 import { logger } from "@/lib/logger";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
@@ -446,30 +446,36 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         animate="visible"
       >
         <motion.div variants={itemVariants}>
-          <div className="rounded-lg p-3 border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
-            <span className="text-xs text-[hsl(var(--portal-text-secondary))]">New Donors</span>
-            <div className="text-lg font-semibold text-[hsl(var(--portal-success))]">{donorInsights.newDonors}</div>
-          </div>
+          <V3KPICard
+            icon={UserPlus}
+            label="New Donors"
+            value={donorInsights.newDonors.toLocaleString()}
+            accent="green"
+          />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <div className="rounded-lg p-3 border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
-            <span className="text-xs text-[hsl(var(--portal-text-secondary))]">Repeat Donors</span>
-            <div className="text-lg font-semibold text-[hsl(var(--portal-accent-blue))]">{donorInsights.repeatDonors}</div>
-          </div>
+          <V3KPICard
+            icon={Heart}
+            label="Repeat Donors"
+            value={donorInsights.repeatDonors.toLocaleString()}
+            accent="blue"
+          />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <div className="rounded-lg p-3 border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
-            <span className="text-xs text-[hsl(var(--portal-text-secondary))]">Total Donations</span>
-            <div className="text-lg font-semibold text-[hsl(var(--portal-text-primary))]">{metrics.donationCount}</div>
-          </div>
+          <V3KPICard
+            icon={Receipt}
+            label="Total Donations"
+            value={metrics.donationCount.toLocaleString()}
+            accent="default"
+          />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <div className="rounded-lg p-3 border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
-            <span className="text-xs text-[hsl(var(--portal-text-secondary))]">Avg Gifts/Donor</span>
-            <div className="text-lg font-semibold text-[hsl(var(--portal-text-primary))]">
-              {metrics.uniqueDonors > 0 ? (metrics.donationCount / metrics.uniqueDonors).toFixed(1) : '0'}
-            </div>
-          </div>
+          <V3KPICard
+            icon={TrendingUp}
+            label="Avg Gifts/Donor"
+            value={metrics.uniqueDonors > 0 ? (metrics.donationCount / metrics.uniqueDonors).toFixed(1) : '0'}
+            accent="purple"
+          />
         </motion.div>
       </motion.div>
 
