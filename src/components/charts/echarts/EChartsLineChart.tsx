@@ -22,6 +22,12 @@ export interface LineSeriesConfig {
   yAxisIndex?: number;
 }
 
+export interface AnomalyMarker {
+  index: number;
+  type: "high" | "low";
+  label?: string;
+}
+
 export interface EChartsLineChartProps {
   data: Record<string, any>[];
   xAxisKey: string;
@@ -41,6 +47,7 @@ export interface EChartsLineChartProps {
     splitNumber?: number;
   };
   dualYAxis?: boolean;
+  anomalyMarkers?: AnomalyMarker[];
   onBrushEnd?: (range: { start: string; end: string }) => void;
   onDataPointClick?: (params: { dataIndex: number; seriesName: string; value: any }) => void;
 }
@@ -69,6 +76,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
   xAxisType = "category",
   yAxisConfig,
   dualYAxis = false,
+  anomalyMarkers = [],
   onBrushEnd,
   onDataPointClick,
 }) => {
