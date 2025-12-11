@@ -63,7 +63,7 @@ export const TremorDonutChart: React.FC<TremorDonutChartProps> = ({
       <DonutChart
         data={data}
         category={category}
-        value={value}
+        index={value}
         colors={colors}
         valueFormatter={valueFormatter}
         variant={variant}
