@@ -1,7 +1,14 @@
 import { useState, useMemo } from "react";
-import { V3Card, V3CardHeader, V3CardTitle, V3CardContent, V3KPICard, V3LoadingState, V3ChartWrapper } from "@/components/v3";
-import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardContent } from "@/components/portal/PortalCard";
-import { PortalBarChart } from "@/components/portal/PortalBarChart";
+import { 
+  V3Card, 
+  V3CardHeader, 
+  V3CardTitle, 
+  V3CardContent, 
+  V3KPICard, 
+  V3LoadingState, 
+  V3ChartWrapper 
+} from "@/components/v3";
+import { EChartsBarChart } from "@/components/charts/echarts";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity, GitBranch } from "lucide-react";
@@ -249,121 +256,119 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
 
         <TabsContent value="attribution" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <PortalCard>
-              <PortalCardHeader>
-                <PortalCardTitle className="flex items-center gap-2">
+            <V3Card>
+              <V3CardHeader>
+                <V3CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
                   Revenue by Platform
-                </PortalCardTitle>
-                <p className="text-sm portal-text-muted mt-1">
+                </V3CardTitle>
+                <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
                   CPA/ROAS shown when spend is available (Meta).
                 </p>
-              </PortalCardHeader>
-              <PortalCardContent>
+              </V3CardHeader>
+              <V3CardContent>
                 {platformRevenue.length > 0 ? (
-                  <PortalBarChart
+                  <EChartsBarChart
                     data={platformRevenue}
+                    xAxisKey="name"
+                    series={[{ dataKey: "value", name: "Revenue" }]}
                     height={250}
                     valueType="currency"
-                    showValues
-                    enableCrossHighlight
                   />
                 ) : (
-                  <div className="h-[250px] flex items-center justify-center portal-text-muted">
+                  <div className="h-[250px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
                     No attributed donations yet
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
-                  <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
-                    <div className="portal-text-muted text-xs mb-1">Meta CPA</div>
-                    <div className="font-semibold portal-text-primary">
+                  <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                    <div className="text-[hsl(var(--portal-text-muted))] text-xs mb-1">Meta CPA</div>
+                    <div className="font-semibold text-[hsl(var(--portal-text-primary))]">
                       {platformEfficiency.meta.donations > 0 ? formatCurrency(platformEfficiency.meta.cpa) : 'N/A'}
                     </div>
-                    <div className="portal-text-muted text-[11px]">Spend / Meta donations</div>
+                    <div className="text-[hsl(var(--portal-text-muted))] text-[11px]">Spend / Meta donations</div>
                   </div>
-                  <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
-                    <div className="portal-text-muted text-xs mb-1">Meta ROAS (net)</div>
-                    <div className="font-semibold portal-text-primary">
+                  <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                    <div className="text-[hsl(var(--portal-text-muted))] text-xs mb-1">Meta ROAS (net)</div>
+                    <div className="font-semibold text-[hsl(var(--portal-text-primary))]">
                       {platformEfficiency.meta.spend > 0 ? `${platformEfficiency.meta.roas.toFixed(1)}x` : 'N/A'}
                     </div>
-                    <div className="portal-text-muted text-[11px]">Net revenue / spend</div>
+                    <div className="text-[hsl(var(--portal-text-muted))] text-[11px]">Net revenue / spend</div>
                   </div>
                 </div>
-              </PortalCardContent>
-            </PortalCard>
+              </V3CardContent>
+            </V3Card>
 
-            <PortalCard>
-              <PortalCardHeader>
-                <PortalCardTitle>Platform Performance</PortalCardTitle>
-              </PortalCardHeader>
-              <PortalCardContent>
+            <V3Card>
+              <V3CardHeader>
+                <V3CardTitle>Platform Performance</V3CardTitle>
+              </V3CardHeader>
+              <V3CardContent>
                 <div className="space-y-3">
                   {platformRevenue.map((platform, idx) => (
                     <div 
                       key={platform.name} 
-                      className="flex items-center justify-between p-3 rounded-lg"
-                      style={{ background: 'hsl(var(--portal-bg-elevated))' }}
+                      className="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="text-lg font-bold portal-text-muted">#{idx + 1}</div>
+                        <div className="text-lg font-bold text-[hsl(var(--portal-text-muted))]">#{idx + 1}</div>
                         <div>
-                          <div className="font-medium portal-text-primary">{platform.name}</div>
-                          <div className="text-sm portal-text-muted">
+                          <div className="font-medium text-[hsl(var(--portal-text-primary))]">{platform.name}</div>
+                          <div className="text-sm text-[hsl(var(--portal-text-muted))]">
                             {platform.donations} donations · {platform.deterministicRate}% deterministic
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold portal-text-primary">{formatCurrency(platform.value)}</div>
-                        <div className="text-sm portal-text-muted">Avg: {formatCurrency(platform.avgDonation)}</div>
+                        <div className="font-bold text-[hsl(var(--portal-text-primary))]">{formatCurrency(platform.value)}</div>
+                        <div className="text-sm text-[hsl(var(--portal-text-muted))]">Avg: {formatCurrency(platform.avgDonation)}</div>
                       </div>
                     </div>
                   ))}
                   {platformRevenue.length === 0 && (
-                    <div className="text-center py-8 portal-text-muted">
+                    <div className="text-center py-8 text-[hsl(var(--portal-text-muted))]">
                       No platform data available
                     </div>
                   )}
                 </div>
-              </PortalCardContent>
-            </PortalCard>
+              </V3CardContent>
+            </V3Card>
           </div>
         </TabsContent>
 
         <TabsContent value="topics" className="space-y-6">
-          <PortalCard>
-            <PortalCardHeader>
-              <PortalCardTitle className="flex items-center gap-2">
+          <V3Card>
+            <V3CardHeader>
+              <V3CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
                 Top Performing Creative Topics
-              </PortalCardTitle>
-              <p className="text-sm portal-text-muted mt-1">
+              </V3CardTitle>
+              <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
                 Revenue generated by AI-identified creative themes; includes deterministic % and new vs returning donors.
               </p>
-            </PortalCardHeader>
-            <PortalCardContent>
+            </V3CardHeader>
+            <V3CardContent>
               {topicPerformance.length > 0 ? (
                 <div className="space-y-3">
                   {topicPerformance.map((topic, idx) => (
                     <div 
                       key={topic.topic} 
-                      className="flex items-center justify-between p-3 rounded-lg"
-                      style={{ background: 'hsl(var(--portal-bg-elevated))' }}
+                      className="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]"
                     >
                       <div className="flex items-center gap-3">
                         <Badge variant="outline" className="text-xs">
                           #{idx + 1}
                         </Badge>
                         <div>
-                          <div className="font-medium portal-text-primary capitalize">{topic.topic}</div>
-                          <div className="text-sm portal-text-muted">
+                          <div className="font-medium text-[hsl(var(--portal-text-primary))] capitalize">{topic.topic}</div>
+                          <div className="text-sm text-[hsl(var(--portal-text-muted))]">
                             {topic.donations} donations • {topic.deterministicRate}% deterministic • New {topic.newDonors} / Returning {topic.returningDonors}
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold portal-text-primary">{formatCurrency(topic.netRevenue)}</div>
-                        <div className="text-sm portal-text-muted">
+                        <div className="font-bold text-[hsl(var(--portal-text-primary))]">{formatCurrency(topic.netRevenue)}</div>
+                        <div className="text-sm text-[hsl(var(--portal-text-muted))]">
                           Net: {formatCurrency(topic.netRevenue)} · Avg: {formatCurrency(topic.avgDonation)}
                         </div>
                       </div>
@@ -371,98 +376,98 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                   ))}
                 </div>
               ) : (
-                <div className="h-[200px] flex flex-col items-center justify-center portal-text-muted">
+                <div className="h-[200px] flex flex-col items-center justify-center text-[hsl(var(--portal-text-muted))]">
                   <Sparkles className="h-8 w-8 mb-2 opacity-50" />
                   <p>No creative topic data available</p>
                   <p className="text-sm">Sync Meta ads with refcodes to see topic performance</p>
                 </div>
               )}
-            </PortalCardContent>
-          </PortalCard>
+            </V3CardContent>
+          </V3Card>
         </TabsContent>
 
         <TabsContent value="segments" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <PortalCard>
-              <PortalCardHeader>
-                <PortalCardTitle className="flex items-center gap-2">
+            <V3Card>
+              <V3CardHeader>
+                <V3CardTitle className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   Donor Tiers
-                </PortalCardTitle>
-              </PortalCardHeader>
-              <PortalCardContent>
+                </V3CardTitle>
+              </V3CardHeader>
+              <V3CardContent>
                 {segmentBreakdown.length > 0 ? (
-                  <PortalBarChart
+                  <EChartsBarChart
                     data={segmentBreakdown}
+                    xAxisKey="name"
+                    series={[{ dataKey: "value", name: "Donors" }]}
                     height={250}
-                    enableCrossHighlight
                   />
                 ) : (
-                  <div className="h-[250px] flex items-center justify-center portal-text-muted">
+                  <div className="h-[250px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
                     No segment data available
                   </div>
                 )}
-              </PortalCardContent>
-            </PortalCard>
+              </V3CardContent>
+            </V3Card>
 
-            <PortalCard>
-              <PortalCardHeader>
-                <PortalCardTitle className="flex items-center gap-2">
+            <V3Card>
+              <V3CardHeader>
+                <V3CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
                   RFM Score Distribution
-                </PortalCardTitle>
-                <p className="text-sm portal-text-muted mt-1">
+                </V3CardTitle>
+                <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
                   Combined Recency, Frequency, Monetary scores (1-5)
                 </p>
-              </PortalCardHeader>
-              <PortalCardContent>
+              </V3CardHeader>
+              <V3CardContent>
                 {rfmDistribution.some(d => d.value > 0) ? (
-                  <PortalBarChart
+                  <EChartsBarChart
                     data={rfmDistribution}
+                    xAxisKey="name"
+                    series={[{ dataKey: "value", name: "Donors", color: "hsl(var(--portal-success))" }]}
                     height={250}
-                    barColor="hsl(var(--portal-success))"
-                    enableCrossHighlight
                   />
                 ) : (
-                  <div className="h-[250px] flex items-center justify-center portal-text-muted">
+                  <div className="h-[250px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
                     No RFM data available
                   </div>
                 )}
-              </PortalCardContent>
-            </PortalCard>
+              </V3CardContent>
+            </V3Card>
           </div>
 
-          <PortalCard>
-            <PortalCardHeader>
-              <PortalCardTitle>Segment Breakdown</PortalCardTitle>
-            </PortalCardHeader>
-            <PortalCardContent>
+          <V3Card>
+            <V3CardHeader>
+              <V3CardTitle>Segment Breakdown</V3CardTitle>
+            </V3CardHeader>
+            <V3CardContent>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 {segmentBreakdown.map(segment => (
                   <div 
                     key={segment.name}
-                    className="p-4 rounded-lg text-center"
-                    style={{ background: 'hsl(var(--portal-bg-elevated))' }}
+                    className="p-4 rounded-lg text-center bg-[hsl(var(--portal-bg-elevated))]"
                   >
-                    <div className="text-2xl font-bold portal-text-primary">{segment.value}</div>
-                    <div className="text-sm font-medium portal-text-primary">{segment.name}</div>
-                    <div className="text-xs portal-text-muted">{formatCurrency(segment.totalValue)} LTV</div>
+                    <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{segment.value}</div>
+                    <div className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">{segment.name}</div>
+                    <div className="text-xs text-[hsl(var(--portal-text-muted))]">{formatCurrency(segment.totalValue)} LTV</div>
                   </div>
                 ))}
               </div>
-            </PortalCardContent>
-          </PortalCard>
+            </V3CardContent>
+          </V3Card>
         </TabsContent>
 
         <TabsContent value="sms" className="space-y-6">
-          <PortalCard>
-            <PortalCardHeader>
-              <PortalCardTitle className="flex items-center gap-2">
+          <V3Card>
+            <V3CardHeader>
+              <V3CardTitle className="flex items-center gap-2">
                 <Activity className="h-4 w-4" />
                 SMS Funnel
-              </PortalCardTitle>
-            </PortalCardHeader>
-            <PortalCardContent>
+              </V3CardTitle>
+            </V3CardHeader>
+            <V3CardContent>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 {[
                   { label: "Sent", value: smsFunnel.sent },
@@ -471,70 +476,70 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                   { label: "Donated (via journeys)", value: smsFunnel.donated },
                   { label: "Opt-outs", value: smsFunnel.optedOut },
                 ].map(item => (
-                  <div key={item.label} className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
-                    <div className="text-sm portal-text-muted">{item.label}</div>
-                    <div className="text-2xl font-bold portal-text-primary">{item.value.toLocaleString()}</div>
+                  <div key={item.label} className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                    <div className="text-sm text-[hsl(var(--portal-text-muted))]">{item.label}</div>
+                    <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{item.value.toLocaleString()}</div>
                   </div>
                 ))}
               </div>
               <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
-                  <div className="text-sm portal-text-muted">SMS Spend</div>
-                  <div className="text-2xl font-bold portal-text-primary">
+                <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                  <div className="text-sm text-[hsl(var(--portal-text-muted))]">SMS Spend</div>
+                  <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
                     {smsCost >= 1000 ? `$${(smsCost / 1000).toFixed(1)}K` : `$${smsCost.toFixed(0)}`}
                   </div>
                 </div>
-                <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
-                  <div className="text-sm portal-text-muted">Cost / Send</div>
-                  <div className="text-2xl font-bold portal-text-primary">
+                <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                  <div className="text-sm text-[hsl(var(--portal-text-muted))]">Cost / Send</div>
+                  <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
                     {smsSent > 0 ? `$${(smsCost / smsSent).toFixed(3)}` : '$0'}
                   </div>
                 </div>
-                <div className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
-                  <div className="text-sm portal-text-muted">SMS CAC</div>
-                  <div className="text-2xl font-bold portal-text-primary">
+                <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                  <div className="text-sm text-[hsl(var(--portal-text-muted))]">SMS CAC</div>
+                  <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
                     {smsFunnel.donated > 0 ? `$${(smsCost / smsFunnel.donated).toFixed(0)}` : 'N/A'}
                   </div>
-                  <div className="text-xs portal-text-muted">Cost per donating recipient</div>
+                  <div className="text-xs text-[hsl(var(--portal-text-muted))]">Cost per donating recipient</div>
                 </div>
               </div>
-            </PortalCardContent>
-          </PortalCard>
+            </V3CardContent>
+          </V3Card>
         </TabsContent>
 
         <TabsContent value="journeys" className="space-y-6">
-          <PortalCard>
-            <PortalCardHeader>
-              <PortalCardTitle className="flex items-center gap-2">
+          <V3Card>
+            <V3CardHeader>
+              <V3CardTitle className="flex items-center gap-2">
                 <GitBranch className="h-4 w-4" />
                 Recent Journeys (top 10)
-              </PortalCardTitle>
-            </PortalCardHeader>
-            <PortalCardContent>
+              </V3CardTitle>
+            </V3CardHeader>
+            <V3CardContent>
               {groupedJourneys.length === 0 ? (
-                <div className="h-[120px] flex items-center justify-center portal-text-muted">
+                <div className="h-[120px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
                   No journeys found for this range
                 </div>
               ) : (
                 <div className="space-y-4">
                   {groupedJourneys.map(([donorKey, events]) => (
-                    <div key={donorKey} className="p-3 rounded-lg" style={{ background: 'hsl(var(--portal-bg-elevated))' }}>
+                    <div key={donorKey} className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-semibold portal-text-primary">
+                        <div className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">
                           Donor {donorKey.slice(0, 6)}…{donorKey.slice(-4)}
                         </div>
-                        <div className="text-xs portal-text-muted">
+                        <div className="text-xs text-[hsl(var(--portal-text-muted))]">
                           {new Date(events[0].occurred_at).toLocaleString()}
                         </div>
                       </div>
                       <div className="flex flex-col gap-2">
                         {events.slice(0, 6).map((ev, idx) => (
                           <div key={idx} className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-2 portal-text-muted">
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[hsl(var(--portal-bg-tertiary))] text-[10px] font-semibold">
+                            <div className="flex items-center gap-2 text-[hsl(var(--portal-text-muted))]">
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[hsl(var(--portal-bg-surface))] text-[10px] font-semibold">
                                 {ev.event_type === 'donation' ? '$' : ev.event_type === 'sms' ? 'SMS' : 'TP'}
                               </span>
-                              <span className="portal-text-primary">
+                              <span className="text-[hsl(var(--portal-text-primary))]">
                                 {ev.event_type === 'donation'
                                   ? `Donation ${ev.net_amount ? `$${Number(ev.net_amount).toFixed(0)}` : ''}`
                                   : ev.event_type === 'sms'
@@ -542,13 +547,13 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                                   : `Touchpoint ${ev.source || ''}`}
                               </span>
                             </div>
-                            <div className="text-xs portal-text-muted">
+                            <div className="text-xs text-[hsl(var(--portal-text-muted))]">
                               {new Date(ev.occurred_at).toLocaleString()}
                             </div>
                           </div>
                         ))}
                         {events.length > 6 && (
-                          <div className="text-xs portal-text-muted mt-1">
+                          <div className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">
                             +{events.length - 6} more events
                           </div>
                         )}
@@ -557,48 +562,48 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                   ))}
                 </div>
               )}
-            </PortalCardContent>
-          </PortalCard>
+            </V3CardContent>
+          </V3Card>
         </TabsContent>
 
         <TabsContent value="ltv" className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="portal-card p-4">
-              <div className="text-sm portal-text-muted mb-1">Avg LTV 90</div>
-              <div className="text-2xl font-bold portal-text-primary">{formatCurrency(ltvSummary.avgLtv90)}</div>
-            </div>
-            <div className="portal-card p-4">
-              <div className="text-sm portal-text-muted mb-1">Avg LTV 180</div>
-              <div className="text-2xl font-bold portal-text-primary">{formatCurrency(ltvSummary.avgLtv180)}</div>
-            </div>
-            <div className="portal-card p-4">
-              <div className="text-sm portal-text-muted mb-1">High Churn Risk</div>
+            <V3Card className="p-4">
+              <div className="text-sm text-[hsl(var(--portal-text-muted))] mb-1">Avg LTV 90</div>
+              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{formatCurrency(ltvSummary.avgLtv90)}</div>
+            </V3Card>
+            <V3Card className="p-4">
+              <div className="text-sm text-[hsl(var(--portal-text-muted))] mb-1">Avg LTV 180</div>
+              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{formatCurrency(ltvSummary.avgLtv180)}</div>
+            </V3Card>
+            <V3Card className="p-4">
+              <div className="text-sm text-[hsl(var(--portal-text-muted))] mb-1">High Churn Risk</div>
               <div className="text-2xl font-bold text-[hsl(var(--portal-error))]">{ltvSummary.highRisk}</div>
-              <div className="text-xs portal-text-muted">donors (≥70% risk)</div>
-            </div>
-            <div className="portal-card p-4">
-              <div className="text-sm portal-text-muted mb-1">Total Predicted</div>
-              <div className="text-2xl font-bold portal-text-primary">{ltvSummary.total}</div>
-              <div className="text-xs portal-text-muted">donors with predictions</div>
-            </div>
+              <div className="text-xs text-[hsl(var(--portal-text-muted))]">donors (≥70% risk)</div>
+            </V3Card>
+            <V3Card className="p-4">
+              <div className="text-sm text-[hsl(var(--portal-text-muted))] mb-1">Total Predicted</div>
+              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{ltvSummary.total}</div>
+              <div className="text-xs text-[hsl(var(--portal-text-muted))]">donors with predictions</div>
+            </V3Card>
           </div>
-          <PortalCard>
-            <PortalCardHeader>
-              <PortalCardTitle>LTV Distribution</PortalCardTitle>
-              <p className="text-sm portal-text-muted mt-1">
+          <V3Card>
+            <V3CardHeader>
+              <V3CardTitle>LTV Distribution</V3CardTitle>
+              <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
                 Predicted lifetime value cohorts based on RFM scores and historical behavior.
               </p>
-            </PortalCardHeader>
-            <PortalCardContent>
-              <div className="h-[200px] flex items-center justify-center portal-text-muted">
+            </V3CardHeader>
+            <V3CardContent>
+              <div className="h-[200px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
                 <div className="text-center">
                   <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p>LTV distribution chart coming soon</p>
                   <p className="text-sm">Run ML predictions to populate this view</p>
                 </div>
               </div>
-            </PortalCardContent>
-          </PortalCard>
+            </V3CardContent>
+          </V3Card>
         </TabsContent>
       </Tabs>
     </div>

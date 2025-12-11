@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ChevronRight, BarChart3, Sun, Moon, Brain, LayoutDashboard, Layers, RefreshCw } from "lucide-react";
+import { LogOut, ChevronRight, BarChart3, Sun, Moon, Brain, LayoutDashboard, Layers, RefreshCw, Clock } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
 import { useTheme } from "@/components/ThemeProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -26,9 +26,10 @@ import { cn } from "@/lib/utils";
 import { useDashboardStore, useDateRange } from "@/stores/dashboardStore";
 import { Button } from "@/components/ui/button";
 
-// Lazy load Advanced Analytics and Donor Intelligence for performance
+// Lazy load Advanced Analytics, Donor Intelligence, and Heatmap for performance
 const AdvancedAnalytics = lazy(() => import("@/components/analytics/AdvancedAnalytics"));
 const DonorIntelligence = lazy(() => import("@/components/client/DonorIntelligence"));
+const DonationHeatmap = lazy(() => import("@/components/client/DonationHeatmap"));
 
 type Organization = {
   id: string;
@@ -98,6 +99,7 @@ const ClientDashboard = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
   const [showDonorIntelligence, setShowDonorIntelligence] = useState(false);
+  const [showTimeAnalysis, setShowTimeAnalysis] = useState(false);
   
   // V3: Use Zustand store for global date range
   const dateRange = useDateRange();
@@ -517,6 +519,26 @@ const ClientDashboard = () => {
                         startDate={dateRange.startDate}
                         endDate={dateRange.endDate}
                       />
+                    </motion.section>
+
+                    {/* TIME ANALYSIS: Calendar Heatmap */}
+                    <motion.section variants={sectionVariants}>
+                      <CollapsibleSection
+                        title="Time Analysis"
+                        subtitle="Discover peak donation times by day and hour"
+                        icon={Clock}
+                        accent="blue"
+                        isExpanded={showTimeAnalysis}
+                        onToggle={() => setShowTimeAnalysis(!showTimeAnalysis)}
+                      >
+                        <Suspense fallback={<V3SectionSkeleton />}>
+                          <DonationHeatmap
+                            organizationId={organization.id}
+                            startDate={dateRange.startDate}
+                            endDate={dateRange.endDate}
+                          />
+                        </Suspense>
+                      </CollapsibleSection>
                     </motion.section>
 
                     {/* DONOR INTELLIGENCE: Attribution, Segments, Topics */}
