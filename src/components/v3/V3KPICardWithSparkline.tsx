@@ -2,6 +2,7 @@ import * as React from "react";
 import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { V3TrendIndicator } from "./V3TrendIndicator";
+import { V3MetricLabel } from "./V3MetricLabel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import {
@@ -29,6 +30,8 @@ interface V3KPICardWithSparklineProps {
   isLoading?: boolean;
   className?: string;
   onClick?: () => void;
+  /** Show tooltip with metric definition */
+  showDefinition?: boolean;
 }
 
 const accentIconBg: Record<V3KPIAccent, string> = {
@@ -70,6 +73,7 @@ export const V3KPICardWithSparkline: React.FC<V3KPICardWithSparklineProps> = ({
   isLoading = false,
   className,
   onClick,
+  showDefinition = true,
 }) => {
   const isInteractive = !!onClick;
   const chartColor = sparklineColor || accentSparklineColor[accent];
@@ -112,9 +116,7 @@ export const V3KPICardWithSparkline: React.FC<V3KPICardWithSparklineProps> = ({
               aria-hidden="true"
             />
           </div>
-          <span className="text-xs text-[hsl(var(--portal-text-secondary))] uppercase tracking-wide font-medium">
-            {label}
-          </span>
+          <V3MetricLabel label={label} showTooltip={showDefinition} />
         </div>
         {trend && (
           <V3TrendIndicator

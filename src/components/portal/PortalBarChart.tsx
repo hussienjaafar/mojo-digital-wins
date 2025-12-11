@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { ResponsiveChartTooltip } from "@/components/charts/ResponsiveChartTooltip";
 import { getYAxisFormatter, getTooltipFormatter, ValueType } from "@/lib/chart-formatters";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useChartInteractionStore } from "@/stores/chartInteractionStore";
 
 interface DataPoint {
   name: string;
@@ -21,6 +22,8 @@ interface PortalBarChartProps {
   ariaLabel?: string;
   emptyLabel?: string;
   descriptionId?: string;
+  /** Enable cross-highlighting with other charts */
+  enableCrossHighlight?: boolean;
 }
 
 export const PortalBarChart: React.FC<PortalBarChartProps> = ({
@@ -33,12 +36,27 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   ariaLabel,
   emptyLabel = "No data available",
   descriptionId,
+  enableCrossHighlight = false,
 }) => {
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 200 : 250);
+  const setHoveredDataPoint = useChartInteractionStore((state) => state.setHoveredDataPoint);
+  const hoveredDataPoint = useChartInteractionStore((state) => state.hoveredDataPoint);
   
   // Only rotate when there are many items or long labels
   const needsRotation = isMobile && (data.length > 4 || data.some(d => d.name.length > 10));
+
+  const handleBarMouseEnter = React.useCallback((entry: DataPoint) => {
+    if (enableCrossHighlight) {
+      setHoveredDataPoint({ date: entry.name, series: entry.name, value: entry.value });
+    }
+  }, [enableCrossHighlight, setHoveredDataPoint]);
+
+  const handleBarMouseLeave = React.useCallback(() => {
+    if (enableCrossHighlight) {
+      setHoveredDataPoint(null);
+    }
+  }, [enableCrossHighlight, setHoveredDataPoint]);
 
   if (!data || data.length === 0) {
     return (
@@ -99,13 +117,20 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
             fill={barColor} 
             radius={[4, 4, 0, 0]}
             maxBarSize={isMobile ? 30 : 50}
+            onMouseLeave={handleBarMouseLeave}
           >
-            {data.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={barColor}
-              />
-            ))}
+            {data.map((entry, index) => {
+              const isHighlighted = enableCrossHighlight && hoveredDataPoint?.date === entry.name;
+              return (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={isHighlighted ? "hsl(var(--portal-accent-blue))" : barColor}
+                  opacity={enableCrossHighlight && hoveredDataPoint && !isHighlighted ? 0.4 : 1}
+                  onMouseEnter={() => handleBarMouseEnter(entry)}
+                  style={{ cursor: enableCrossHighlight ? 'pointer' : 'default' }}
+                />
+              );
+            })}
             {showValues && (
               <LabelList 
                 dataKey="value" 
