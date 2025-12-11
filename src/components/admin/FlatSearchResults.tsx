@@ -20,10 +20,29 @@ interface FlatSearchResultsProps {
   isEffectivelyExpanded?: boolean;
 }
 
+// Escape HTML entities to prevent XSS
+function escapeHtml(str: string): string {
+  const htmlEntities: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return str.replace(/[&<>"']/g, (char) => htmlEntities[char] || char);
+}
+
+// Escape regex special characters
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function highlightMatch(text: string, search: string): string {
-  if (!search) return text;
-  const regex = new RegExp(`(${search})`, 'gi');
-  return text.replace(regex, '<mark class="bg-primary/30 text-foreground rounded px-0.5 font-semibold">$1</mark>');
+  const escapedText = escapeHtml(text);
+  if (!search) return escapedText;
+  const escapedSearch = escapeRegex(escapeHtml(search));
+  const regex = new RegExp(`(${escapedSearch})`, 'gi');
+  return escapedText.replace(regex, '<mark class="bg-primary/30 text-foreground rounded px-0.5 font-semibold">$1</mark>');
 }
 
 export function FlatSearchResults({

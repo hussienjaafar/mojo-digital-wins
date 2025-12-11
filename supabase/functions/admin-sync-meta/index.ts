@@ -55,8 +55,9 @@ serve(async (req) => {
     
     let isAuthorized = false;
     
-    // Internal sync trigger (from tiered-meta-sync)
-    if (adminKey === 'internal-sync-trigger' || isScheduledJob) {
+    // Internal sync trigger (from tiered-meta-sync) - uses secret instead of hardcoded value
+    const internalTriggerSecret = Deno.env.get('INTERNAL_TRIGGER_SECRET');
+    if ((internalTriggerSecret && adminKey === internalTriggerSecret) || isScheduledJob) {
       isAuthorized = true;
       console.log('[META SYNC] Authorized via internal trigger');
     }
