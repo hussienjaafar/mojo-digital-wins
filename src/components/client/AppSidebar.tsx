@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/fixed-client";
 import {
   Home,
   Bell,
@@ -13,8 +13,6 @@ import {
   Settings,
   Activity,
   ChevronRight,
-  Sparkles,
-  GitBranch,
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,11 +33,8 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ organizationId }: AppSidebarProps) {
-  const { state, isMobile, openMobile } = useSidebar();
+  const { state } = useSidebar();
   const location = useLocation();
-  
-  // On mobile, always show labels when sidebar sheet is open
-  const isCollapsed = isMobile ? false : state === "collapsed";
   const [stats, setStats] = useState({
     alerts: 0,
     actions: 0,
@@ -89,22 +84,47 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
 
   const sections = [
     {
-      label: "Main",
+      label: "Overview",
       items: [
-        { title: "Dashboard", url: "/client/dashboard", icon: Home },
-        { title: "Intelligence", url: "/client/intelligence", icon: Activity },
-        { title: "Creative Intelligence", url: "/client/creative-intelligence", icon: Sparkles },
-        { title: "Attribution", url: "/client/attribution", icon: GitBranch },
-        { title: "Watchlist", url: "/client/watchlist", icon: Eye },
-        { title: "Alerts", url: "/client/alerts", icon: Bell, badge: stats.alerts },
-        { title: "Profile", url: "/client/profile", icon: Settings },
-        { title: "Settings", url: "/client/settings", icon: UserCircle },
+        { title: "Dashboard", url: "/client-dashboard", icon: Home },
+      ],
+    },
+    {
+      label: "Intelligence Hub",
+      items: [
+        { title: "News Feed", url: "/", icon: Activity },
+        { title: "Entity Watchlist", url: "/client-watchlist", icon: Eye },
+        { title: "Polling Intelligence", url: "/polling-intelligence", icon: BarChart3 },
+        { title: "Polling Alerts", url: "/client-polling-alerts", icon: Bell },
+      ],
+    },
+    {
+      label: "Alerts & Actions",
+      items: [
+        { title: "Critical Alerts", url: "/client-alerts", icon: Bell, badge: stats.alerts },
+        { title: "Suggested Actions", url: "/client-actions", icon: Target, badge: stats.actions },
+        { title: "Opportunities", url: "/client-opportunities", icon: DollarSign, badge: stats.opportunities },
+      ],
+    },
+    {
+      label: "Performance",
+      items: [
+        { title: "Demographics", url: "/client-demographics", icon: UserCircle },
+        { title: "Donor Journey", url: "/client-donor-journey", icon: TrendingUp },
+      ],
+    },
+    {
+      label: "Settings",
+      items: [
+        { title: "Profile", url: "/client-profile", icon: Settings },
       ],
     },
   ];
 
+  const isCollapsed = state === "collapsed";
+
   return (
-    <Sidebar collapsible="icon" role="navigation" aria-label="Main navigation" className="portal-sidebar">
+    <Sidebar collapsible="icon">
       <SidebarContent>
         {sections.map((section) => (
           <SidebarGroup key={section.label}>
@@ -122,33 +142,17 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
                       <SidebarMenuButton
                         asChild
                         className={cn(
-                          "hover:bg-muted/50 transition-all duration-300 min-h-[44px]",
+                          "hover:bg-muted/50",
                           active && "bg-secondary/10 text-secondary font-medium hover:bg-secondary/20"
                         )}
-                        tooltip={isCollapsed ? item.title : undefined}
                       >
-                        <Link 
-                          to={item.url} 
-                          className="flex items-center gap-3 transition-all duration-300"
-                          aria-label={item.badge && item.badge > 0 ? `${item.title} (${item.badge} items)` : item.title}
-                          aria-current={active ? 'page' : undefined}
-                        >
-                          <Icon 
-                            className={cn(
-                              "h-5 w-5 transition-all duration-300", 
-                              active && "text-secondary scale-110"
-                            )} 
-                            aria-hidden="true" 
-                          />
+                        <Link to={item.url} className="flex items-center gap-3">
+                          <Icon className={cn("h-5 w-5", active && "text-secondary")} />
                           {!isCollapsed && (
                             <>
                               <span className="flex-1">{item.title}</span>
                               {item.badge !== undefined && item.badge > 0 && (
-                                <Badge 
-                                  variant="destructive" 
-                                  className="ml-auto animate-pulse" 
-                                  aria-label={`${item.badge} unread`}
-                                >
+                                <Badge variant="destructive" className="ml-auto">
                                   {item.badge}
                                 </Badge>
                               )}
