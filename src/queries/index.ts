@@ -52,3 +52,20 @@ export {
   type LtvSummary,
   type DonorIntelligenceData,
 } from "./useDonorIntelligenceQuery";
+
+// KPI drilldown queries
+export {
+  useKpiDrilldownQuery,
+  type KpiBreakdownItem,
+  type KpiTrendPoint,
+  type KpiDrilldownData,
+} from "./useKpiDrilldownQuery";
+
+// Smart Insights queries
+export {
+  useInsightsQuery,
+  type Insight,
+  type InsightType,
+  type InsightPriority,
+  type InsightsData,
+} from "./useInsightsQuery";

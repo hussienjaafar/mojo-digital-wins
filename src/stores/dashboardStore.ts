@@ -2,47 +2,122 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { subDays, format } from 'date-fns';
 
+// ============================================================================
+// Types
+// ============================================================================
+
 export type ChannelFilter = 'all' | 'meta' | 'sms' | 'donations';
 export type ViewMode = 'overview' | 'detailed';
+
+export type KpiKey =
+  | 'netRevenue'
+  | 'netRoi'
+  | 'refundRate'
+  | 'recurringHealth'
+  | 'attributionQuality'
+  | 'uniqueDonors';
+
+export type SeriesKey =
+  | 'donations'
+  | 'netDonations'
+  | 'refunds'
+  | 'metaSpend'
+  | 'smsSpend';
 
 interface DateRange {
   startDate: string;
   endDate: string;
 }
 
+// ============================================================================
+// KPI to Series Mapping (for cross-highlighting)
+// ============================================================================
+
+/**
+ * Maps each KPI to the chart series it relates to.
+ * Used for cross-highlighting: when a KPI is hovered, related series are highlighted.
+ */
+export const KPI_TO_SERIES_MAP: Record<KpiKey, SeriesKey[]> = {
+  netRevenue: ['netDonations'],
+  netRoi: ['metaSpend', 'smsSpend'],
+  refundRate: ['refunds'],
+  recurringHealth: ['donations'],
+  attributionQuality: [], // No direct series mapping
+  uniqueDonors: ['donations'],
+};
+
+/**
+ * Reverse mapping: Series to KPIs
+ * Used when chart series is hovered to highlight related KPIs
+ */
+export const SERIES_TO_KPI_MAP: Record<SeriesKey, KpiKey[]> = {
+  donations: ['recurringHealth', 'uniqueDonors'],
+  netDonations: ['netRevenue'],
+  refunds: ['refundRate'],
+  metaSpend: ['netRoi'],
+  smsSpend: ['netRoi'],
+};
+
+// ============================================================================
+// Store Interface
+// ============================================================================
+
 interface DashboardState {
   // Date range
   dateRange: DateRange;
   setDateRange: (startDate: string, endDate: string) => void;
-  
+
   // Channel filter
   selectedChannel: ChannelFilter;
   setSelectedChannel: (channel: ChannelFilter) => void;
-  
+
   // View mode
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
-  
+
   // Refresh mechanism
   refreshKey: number;
   triggerRefresh: () => void;
-  
+
   // Comparison mode
   comparisonEnabled: boolean;
   toggleComparison: () => void;
-  
-  // Selected KPI for drill-down
-  selectedKPI: string | null;
-  setSelectedKPI: (kpi: string | null) => void;
-  
+
+  // Selected KPI for drill-down (click state)
+  selectedKpiKey: KpiKey | null;
+  setSelectedKpiKey: (kpi: KpiKey | null) => void;
+
+  // Highlighted KPI for cross-highlighting (hover state)
+  highlightedKpiKey: KpiKey | null;
+  setHighlightedKpiKey: (kpi: KpiKey | null) => void;
+
+  // Highlighted date for chart interaction
+  highlightedDate: string | null;
+  setHighlightedDate: (date: string | null) => void;
+
+  // Drilldown drawer open state
+  isDrilldownOpen: boolean;
+  setDrilldownOpen: (open: boolean) => void;
+
+  // Clear all interaction state
+  clearHighlights: () => void;
+
   // Reset to defaults
   resetFilters: () => void;
 }
+
+// ============================================================================
+// Default Values
+// ============================================================================
 
 const getDefaultDateRange = (): DateRange => ({
   startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
   endDate: format(new Date(), 'yyyy-MM-dd'),
 });
+
+// ============================================================================
+// Store
+// ============================================================================
 
 export const useDashboardStore = create<DashboardState>()(
   persist(
@@ -70,22 +145,45 @@ export const useDashboardStore = create<DashboardState>()(
       toggleComparison: () =>
         set((state) => ({ comparisonEnabled: !state.comparisonEnabled })),
 
-      // Selected KPI
-      selectedKPI: null,
-      setSelectedKPI: (kpi) => set({ selectedKPI: kpi }),
+      // Selected KPI (click state - persists until changed)
+      selectedKpiKey: null,
+      setSelectedKpiKey: (kpi) => set({ selectedKpiKey: kpi }),
 
-      // Reset
+      // Highlighted KPI (hover state - transient)
+      highlightedKpiKey: null,
+      setHighlightedKpiKey: (kpi) => set({ highlightedKpiKey: kpi }),
+
+      // Highlighted date
+      highlightedDate: null,
+      setHighlightedDate: (date) => set({ highlightedDate: date }),
+
+      // Drilldown drawer
+      isDrilldownOpen: false,
+      setDrilldownOpen: (open) => set({ isDrilldownOpen: open }),
+
+      // Clear highlights
+      clearHighlights: () =>
+        set({
+          highlightedKpiKey: null,
+          highlightedDate: null,
+        }),
+
+      // Reset all filters
       resetFilters: () =>
         set({
           dateRange: getDefaultDateRange(),
           selectedChannel: 'all',
           viewMode: 'overview',
           comparisonEnabled: false,
-          selectedKPI: null,
+          selectedKpiKey: null,
+          highlightedKpiKey: null,
+          highlightedDate: null,
+          isDrilldownOpen: false,
         }),
     }),
     {
       name: 'dashboard-store',
+      // Only persist user preferences, not transient interaction state
       partialize: (state) => ({
         dateRange: state.dateRange,
         selectedChannel: state.selectedChannel,
@@ -96,9 +194,36 @@ export const useDashboardStore = create<DashboardState>()(
   )
 );
 
-// Selector hooks for optimized re-renders
+// ============================================================================
+// Selector Hooks (for optimized re-renders)
+// ============================================================================
+
 export const useDateRange = () => useDashboardStore((s) => s.dateRange);
 export const useSelectedChannel = () => useDashboardStore((s) => s.selectedChannel);
 export const useViewMode = () => useDashboardStore((s) => s.viewMode);
 export const useRefreshKey = () => useDashboardStore((s) => s.refreshKey);
 export const useComparisonEnabled = () => useDashboardStore((s) => s.comparisonEnabled);
+
+// New selectors for cross-highlighting
+export const useSelectedKpiKey = () => useDashboardStore((s) => s.selectedKpiKey);
+export const useHighlightedKpiKey = () => useDashboardStore((s) => s.highlightedKpiKey);
+export const useHighlightedDate = () => useDashboardStore((s) => s.highlightedDate);
+export const useIsDrilldownOpen = () => useDashboardStore((s) => s.isDrilldownOpen);
+
+/**
+ * Returns the series keys that should be highlighted based on current KPI highlight state
+ */
+export const useHighlightedSeriesKeys = (): SeriesKey[] => {
+  const highlightedKpiKey = useHighlightedKpiKey();
+  if (!highlightedKpiKey) return [];
+  return KPI_TO_SERIES_MAP[highlightedKpiKey] || [];
+};
+
+/**
+ * Returns whether a specific series should be dimmed (not highlighted)
+ */
+export const useIsSeriesDimmed = (seriesKey: SeriesKey): boolean => {
+  const highlightedSeries = useHighlightedSeriesKeys();
+  if (highlightedSeries.length === 0) return false;
+  return !highlightedSeries.includes(seriesKey);
+};

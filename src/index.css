@@ -1,15 +1,12 @@
-/* Import React Grid Layout styles - MUST be before tailwind directives */
+/* All @import statements MUST come first */
 @import './components/dashboard/dashboard-grid.css';
 @import './styles/accessibility.css';
 @import './styles/portal-theme.css';
+@import './styles/focus-visible.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import focus styles */
-@import './styles/focus-visible.css';
-@import './styles/accessibility.css';
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.

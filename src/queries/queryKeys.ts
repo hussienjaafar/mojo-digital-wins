@@ -90,3 +90,26 @@ export const syncKeys = {
   status: (orgId: string) => [...syncKeys.all, 'status', orgId] as const,
   freshness: (orgId: string) => [...syncKeys.all, 'freshness', orgId] as const,
 };
+
+export const kpiKeys = {
+  all: ['kpis'] as const,
+  drilldown: (orgId: string, kpiKey: string, startDate: string, endDate: string) =>
+    [...kpiKeys.all, 'drilldown', orgId, kpiKey, startDate, endDate] as const,
+  summary: (orgId: string, dateRange: { startDate: string; endDate: string }) =>
+    [...kpiKeys.all, 'summary', orgId, dateRange] as const,
+};
+
+// Unified queryKeys object for backwards compatibility
+export const queryKeys = {
+  dashboard: dashboardKeys,
+  donations: donationKeys,
+  meta: metaKeys,
+  sms: smsKeys,
+  channels: channelKeys,
+  alerts: alertKeys,
+  intelligence: intelligenceKeys,
+  hub: hubKeys,
+  trends: trendsKeys,
+  sync: syncKeys,
+  kpis: kpiKeys,
+};

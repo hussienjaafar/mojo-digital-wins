@@ -2,6 +2,12 @@ import * as React from "react";
 import type { EChartsOption, ECharts } from "echarts";
 import { EChartsBase, portalTheme } from "./EChartsBase";
 import { useChartInteractionStore } from "@/stores/chartInteractionStore";
+import {
+  useDashboardStore,
+  useHighlightedSeriesKeys,
+  SERIES_TO_KPI_MAP,
+  type SeriesKey,
+} from "@/stores/dashboardStore";
 import { format } from "date-fns";
 
 export interface LineSeriesConfig {
@@ -20,6 +26,8 @@ export interface LineSeriesConfig {
   };
   stack?: string;
   yAxisIndex?: number;
+  /** SeriesKey for cross-highlighting with KPI cards */
+  seriesKey?: SeriesKey;
 }
 
 export interface AnomalyMarker {
@@ -87,6 +95,19 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
   onDataPointClick,
 }) => {
   const { setHoveredDataPoint, setSelectedTimeRange } = useChartInteractionStore();
+  const highlightedSeriesKeys = useHighlightedSeriesKeys();
+  const { setHighlightedKpiKey } = useDashboardStore();
+
+  // Build a map of series name to seriesKey for quick lookup
+  const seriesNameToKeyMap = React.useMemo(() => {
+    const map = new Map<string, SeriesKey>();
+    series.forEach((s) => {
+      if (s.seriesKey) {
+        map.set(s.name, s.seriesKey);
+      }
+    });
+    return map;
+  }, [series]);
 
   // Calculate rolling average for a series
   const calculateRollingAverage = React.useCallback(
@@ -121,7 +142,16 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     const seriesConfig = series.flatMap((s, index) => {
       const baseColor = s.color || colorPalette[index % colorPalette.length];
       const seriesData = data.map((d) => d[s.dataKey]);
-      
+
+      // Determine if this series should be dimmed based on highlighted KPI
+      const seriesKey = s.seriesKey;
+      const isHighlightActive = highlightedSeriesKeys.length > 0;
+      const isDimmed = isHighlightActive && seriesKey && !highlightedSeriesKeys.includes(seriesKey);
+
+      // Apply dimming opacity
+      const lineOpacity = isDimmed ? 0.2 : 1;
+      const areaOpacity = isDimmed ? 0.02 : (s.areaStyle?.opacity ?? 0.1);
+
       const mainSeries = {
         name: s.name,
         type: "line" as const,
@@ -131,15 +161,17 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
         symbolSize: 6,
         itemStyle: {
           color: baseColor,
+          opacity: lineOpacity,
         },
         lineStyle: {
           width: s.lineStyle?.width ?? 2,
           type: s.lineStyle?.type ?? "solid",
           color: baseColor,
+          opacity: lineOpacity,
         },
         ...(s.type === "area" && {
           areaStyle: {
-            opacity: s.areaStyle?.opacity ?? 0.1,
+            opacity: areaOpacity,
             color: baseColor,
           },
         }),
@@ -341,7 +373,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     };
 
     return result;
-  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, formatValue, showRollingAverage, rollingAveragePeriod, calculateRollingAverage]);
+  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, formatValue, showRollingAverage, rollingAveragePeriod, calculateRollingAverage, highlightedSeriesKeys]);
 
   const handleEvents = React.useMemo(() => {
     const events: Record<string, (params: any) => void> = {};
@@ -354,11 +386,22 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
           series: params.seriesName,
           value: params.value,
         });
+
+        // Cross-highlight KPI cards when hovering chart series
+        const seriesKey = seriesNameToKeyMap.get(params.seriesName);
+        if (seriesKey) {
+          const relatedKpis = SERIES_TO_KPI_MAP[seriesKey];
+          if (relatedKpis && relatedKpis.length > 0) {
+            // Highlight the first related KPI (most relevant)
+            setHighlightedKpiKey(relatedKpis[0]);
+          }
+        }
       }
     };
 
     events.mouseout = () => {
       setHoveredDataPoint(null);
+      setHighlightedKpiKey(null);
     };
 
     if (onDataPointClick) {
@@ -391,7 +434,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     }
 
     return events;
-  }, [data, xAxisKey, showBrush, onBrushEnd, onDataPointClick, setHoveredDataPoint, setSelectedTimeRange]);
+  }, [data, xAxisKey, showBrush, onBrushEnd, onDataPointClick, setHoveredDataPoint, setSelectedTimeRange, seriesNameToKeyMap, setHighlightedKpiKey]);
 
   return (
     <EChartsBase

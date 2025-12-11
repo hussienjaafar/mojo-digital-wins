@@ -15,6 +15,9 @@ export {
 // ECharts components
 export * from "./echarts";
 
+// Tremor components (modern dashboard charts)
+export * from "./tremor";
+
 // Advanced charts
 export { CalendarHeatmap, type CalendarHeatmapProps, type HeatmapDataPoint } from "./CalendarHeatmap";
 

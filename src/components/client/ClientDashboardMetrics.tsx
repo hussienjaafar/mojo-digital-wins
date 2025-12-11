@@ -6,11 +6,11 @@ import {
   V3CardHeader,
   V3CardTitle,
   V3CardContent,
-  V3KPICardWithSparkline,
   V3ChartWrapper,
   V3LoadingState,
   V3ErrorState,
 } from "@/components/v3";
+import { ExpandableKpiCard, type ExpandableKpiAccent } from "@/components/dashboard";
 import { EChartsLineChart, type LineSeriesConfig } from "@/components/charts/echarts";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
 import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, CopyMinus, SlidersHorizontal, ZoomIn } from "lucide-react";
@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useClientDashboardMetricsQuery } from "@/queries";
 import { useHoveredDataPoint } from "@/stores/chartInteractionStore";
+import type { KpiKey, SeriesKey } from "@/stores/dashboardStore";
 
 interface ClientDashboardMetricsProps {
   organizationId: string;
@@ -132,25 +133,26 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     return `$${value.toFixed(0)}`;
   }, []);
 
-  // Memoized ECharts series configuration
+  // Memoized ECharts series configuration with seriesKey for cross-highlighting
   const echartsSeriesConfig = useMemo((): LineSeriesConfig[] => {
     const base: LineSeriesConfig[] = valueMode === "net"
       ? [
-          { dataKey: "netDonations", name: "Net donations", color: palette.net, type: "area", areaStyle: { opacity: 0.1 } },
-          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" } },
-          { dataKey: "metaSpend", name: "Meta spend", color: palette.meta },
-          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms },
+          { dataKey: "netDonations", name: "Net donations", color: palette.net, type: "area", areaStyle: { opacity: 0.1 }, seriesKey: "netDonations" as SeriesKey },
+          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" }, seriesKey: "refunds" as SeriesKey },
+          { dataKey: "metaSpend", name: "Meta spend", color: palette.meta, seriesKey: "metaSpend" as SeriesKey },
+          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms, seriesKey: "smsSpend" as SeriesKey },
         ]
       : [
-          { dataKey: "donations", name: "Gross donations", color: palette.gross, type: "area", areaStyle: { opacity: 0.1 } },
-          { dataKey: "netDonations", name: "Net donations", color: palette.net },
-          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" } },
-          { dataKey: "metaSpend", name: "Meta spend", color: palette.meta },
-          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms },
+          { dataKey: "donations", name: "Gross donations", color: palette.gross, type: "area", areaStyle: { opacity: 0.1 }, seriesKey: "donations" as SeriesKey },
+          { dataKey: "netDonations", name: "Net donations", color: palette.net, seriesKey: "netDonations" as SeriesKey },
+          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" }, seriesKey: "refunds" as SeriesKey },
+          { dataKey: "metaSpend", name: "Meta spend", color: palette.meta, seriesKey: "metaSpend" as SeriesKey },
+          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms, seriesKey: "smsSpend" as SeriesKey },
         ];
-    
+
     if (!showCompare) return base;
-    
+
+    // Comparison series don't need cross-highlighting
     const compare: LineSeriesConfig[] = valueMode === "net"
       ? [
           { dataKey: "netDonationsPrev", name: "Net (prev)", color: palette.netPrev, lineStyle: { type: "dashed", width: 1 } },
@@ -165,73 +167,79 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
           { dataKey: "metaSpendPrev", name: "Meta (prev)", color: palette.metaPrev, lineStyle: { type: "dashed", width: 1 } },
           { dataKey: "smsSpendPrev", name: "SMS (prev)", color: palette.smsPrev, lineStyle: { type: "dashed", width: 1 } },
         ];
-    
+
     return [...base, ...compare];
   }, [showCompare, valueMode]);
 
-  // Hero KPIs configuration with sparkline data
+  // Hero KPIs configuration with sparkline data and kpiKey for cross-highlighting
   const heroKpis = useMemo(() => {
     if (!kpis) return [];
     return [
       {
+        kpiKey: "netRevenue" as KpiKey,
         label: "Net Revenue",
         value: formatCurrency(kpis.totalNetRevenue),
         icon: Wallet,
         trend: { value: Math.round(calcChange(kpis.totalNetRevenue, prevKpis.totalNetRevenue)), isPositive: kpis.totalNetRevenue >= (prevKpis.totalNetRevenue || 0) },
         subtitle: `Gross: ${formatCurrency(kpis.totalRaised)} (${kpis.feePercentage.toFixed(1)}% fees)`,
-        onClick: () => scrollToId("fundraising-chart"),
-        accent: "green" as const,
+        accent: "green" as ExpandableKpiAccent,
         sparklineData: sparklines?.netRevenue || [],
+        description: "Total donations minus processing fees and refunds",
       },
       {
+        kpiKey: "netRoi" as KpiKey,
         label: "Net ROI",
         value: `${kpis.roi.toFixed(1)}x`,
         icon: TrendingUp,
         trend: { value: Math.round(calcChange(kpis.roi, prevKpis.roi)), isPositive: kpis.roi >= (prevKpis.roi || 0) },
         subtitle: `Spend: ${formatCurrency(kpis.totalSpend)}`,
-        onClick: () => scrollToId("channel-performance"),
-        accent: "blue" as const,
+        accent: "blue" as ExpandableKpiAccent,
         sparklineData: sparklines?.roi || [],
+        description: "Return on investment: Net Revenue / Total Spend",
       },
       {
+        kpiKey: "refundRate" as KpiKey,
         label: "Refund Rate",
         value: `${kpis.refundRate.toFixed(1)}%`,
         icon: Target,
         trend: { value: Math.round(calcChange(kpis.refundRate, prevKpis.refundRate)), isPositive: kpis.refundRate <= (prevKpis.refundRate || 0) },
         subtitle: `Refunds: ${formatCurrency(kpis.refundAmount)}`,
-        onClick: () => scrollToId("fundraising-chart"),
-        accent: kpis.refundRate > 5 ? "red" as const : "default" as const,
+        accent: (kpis.refundRate > 5 ? "red" : "default") as ExpandableKpiAccent,
         sparklineData: sparklines?.refundRate || [],
+        description: "Percentage of donations refunded",
       },
       {
+        kpiKey: "recurringHealth" as KpiKey,
         label: "Recurring Health",
         value: formatCurrency(kpis.recurringRaised),
         icon: Repeat,
         trend: { value: Math.round(calcChange(kpis.recurringChurnRate, prevKpis.recurringChurnRate)), isPositive: kpis.recurringChurnRate <= (prevKpis.recurringChurnRate || 0) },
         subtitle: `${kpis.recurringDonations} recurring tx • Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
-        onClick: () => scrollToId("campaign-health"),
-        accent: "amber" as const,
+        accent: "amber" as ExpandableKpiAccent,
         sparklineData: sparklines?.recurringHealth || [],
+        description: "Active recurring donation revenue",
       },
       {
+        kpiKey: "attributionQuality" as KpiKey,
         label: "Attribution Quality",
         value: `${kpis.deterministicRate.toFixed(0)}%`,
         icon: CopyMinus,
         trend: { value: 0, isPositive: true },
         subtitle: "Deterministic (refcode/click)",
-        onClick: () => scrollToId("channel-performance"),
-        accent: "purple" as const,
+        accent: "purple" as ExpandableKpiAccent,
         sparklineData: sparklines?.attributionQuality || [],
+        description: "Percentage of donations with deterministic attribution",
       },
       {
+        kpiKey: "uniqueDonors" as KpiKey,
         label: "Unique Donors",
         value: kpis.uniqueDonors.toLocaleString(),
         icon: Users,
         trend: { value: Math.round(calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors)), isPositive: kpis.uniqueDonors >= (prevKpis.uniqueDonors || 0) },
         subtitle: `New ${kpis.newDonors} / Returning ${kpis.returningDonors}`,
-        onClick: () => scrollToId("campaign-health"),
-        accent: "blue" as const,
+        accent: "blue" as ExpandableKpiAccent,
         sparklineData: sparklines?.uniqueDonors || [],
+        description: "Number of unique donors in period",
       },
     ];
   }, [kpis, prevKpis, calcChange, formatCurrency, sparklines]);
@@ -299,16 +307,17 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         animate="visible"
       >
         {heroKpis.map((metric) => (
-          <motion.div key={metric.label} variants={itemVariants}>
-            <V3KPICardWithSparkline
+          <motion.div key={metric.kpiKey} variants={itemVariants}>
+            <ExpandableKpiCard
+              kpiKey={metric.kpiKey}
               label={metric.label}
               value={metric.value}
               icon={metric.icon}
               trend={metric.trend}
               subtitle={metric.subtitle}
               accent={metric.accent}
-              onClick={metric.onClick}
               sparklineData={metric.sparklineData}
+              description={metric.description}
             />
           </motion.div>
         ))}
