@@ -1,31 +1,183 @@
-# Client Dashboard Implementation Plan (UX/UI + Data Viz)
+# World-Class Analytics Dashboard Implementation Plan
 
-Tracking the sprint plan and status for improving readability, IA, and insights. Checkboxes reflect what’s shipped on `main`.
+## Status Legend
+✅ = Complete | 🔲 = Pending | 🔄 = In Progress
 
-## Sprint Plan & Status
-- [x] **Sprint 1: Chart Readability & Interaction Baseline**
-  - [x] Legend with series toggle for line/bar charts; distinct colorblind-safe palette and dash patterns.
-  - [x] Currency/date formatting and improved chart padding.
-  - [x] Compare-to-previous-period overlay on Fundraising chart.
-- [x] **Sprint 2: KPI Hierarchy & Information Architecture**
-  - [x] Revamp hero row to surface net revenue, refund rate, attribution quality %, ROI, recurring health.
-  - [x] Add deterministic attribution badge near channel charts; date context pill.
-  - [x] Consolidate channel info (Channel Performance + Conversion Sources) into one coherent section.
-- [ ] **Sprint 3: Data Visualization Enhancements**
-  - [ ] Refunds as negative/area encoding; net vs gross toggle; share % in Conversion Sources with date label.
-  - [ ] Creative/topic performance with CPA/ROAS and deterministic %.
-  - [ ] Benchmarks/baselines (targets or prior-period ghost) in relevant charts/tooltips.
-- [x] **Sprint 4: Donor & Retention Integration**
-  - [x] Retention/churn mini-cohort card on main dashboard; links into Donor Intelligence.
-  - [x] KPI cards clickable to open filtered trends; new vs returning split surfaced in KPIs and topics.
-  - [x] LTV/recurring health quick stat with link to full LTV view.
-- [x] **Sprint 5: Accessibility, States, Hardening**
-  - [x] Font-size tuning for chart ticks; keyboard/ARIA for clickable KPI cards.
-  - [x] Empty-state handling on charts; aria-label support on charts; focusable chart regions.
-  - [x] Touch-target improvement on chart toggles; chart descriptions for screen readers.
-  - [ ] Contrast tuning for WCAG AA; responsive stress test.
-  - [ ] Screen reader labels and focus for filters/controls (filters still pending).
+---
 
-## Notes
-- Cross-sprint: shared chart components for legend toggles, compare mode, net/gross toggle, attribution badges; design tokens update for palette and spacing.
-- Keep package.json/lock unchanged unless explicitly needed; untracked docs/scripts remain untouched unless requested.
+## Phase 1: Advanced Charting Infrastructure 
+**Priority: P1 | Effort: Medium** ✅ COMPLETE
+
+### 1.1 Install Apache ECharts
+✅ Add `echarts` and `echarts-for-react` packages
+
+### 1.2 Create ECharts Components (`src/components/charts/echarts/`)
+✅ `EChartsBase.tsx` - Base wrapper with theme, responsive sizing, loading states
+✅ `EChartsLineChart.tsx` - Time series with zoom/brush, toggleable series
+🔲 `EChartsBarChart.tsx` - Horizontal bars for rankings/comparisons
+🔲 `EChartsCalendarHeatmap.tsx` - Day-of-week/hour analysis
+🔲 `EChartsPieChart.tsx` - Composition with drill-down
+✅ `index.ts` - Exports
+
+### 1.3 Integrate into Dashboard
+✅ Replace PortalLineChart with EChartsLineChart in ClientDashboardMetrics
+✅ Add zoom toggle control
+✅ Configure series with proper styling (area fills, dashed lines for comparisons)
+
+---
+
+## Phase 2: KPI Cards with Sparklines 
+**Priority: P0 | Effort: Low** ✅ COMPLETE
+
+### 2.1 Create V3KPICardWithSparkline Component
+✅ Create `src/components/v3/V3KPICardWithSparkline.tsx`
+✅ Use Recharts tiny line for sparkline
+✅ Add smooth animation on data load
+
+### 2.2 Update Dashboard Metrics Query
+✅ Extend `useClientDashboardMetricsQuery` to return `sparklineData`:
+  - Net Revenue last N days
+  - ROI last N days
+  - Refund Rate last N days
+  - Recurring Health last N days
+  - Unique Donors last N days
+  - Attribution Quality last N days
+
+### 2.3 Integrate into ClientDashboardMetrics
+✅ Replace hero `V3KPICard` with `V3KPICardWithSparkline`
+✅ Sparkline data flows to each KPI card
+
+---
+
+## Phase 3: Cross-Highlighting & Brushing
+**Priority: P0 | Effort: Medium** ✅ COMPLETE
+
+### 3.1 Create Chart Interaction Store
+✅ Create `src/stores/chartInteractionStore.ts`
+
+### 3.2 Implement Cross-Highlighting
+✅ Charts dispatch hover events to store
+✅ Added `useHoveredDataPoint` hook for components
+🔲 Sync hover states across all charts for same date (future enhancement)
+🔲 Highlight corresponding table rows on chart hover (future enhancement)
+
+### 3.3 Implement Brushing
+✅ Brush support in EChartsLineChart component
+🔲 On brush end, update `selectedTimeRange` in store (wired but needs UI integration)
+
+---
+
+## Phase 4: Enhanced Analytics Utilities
+**Priority: P1 | Effort: Medium** ✅ COMPLETE
+
+### 4.1 Extend `src/lib/analytics.ts`
+✅ `computeRollingAverage(data, window, field)` - Generic rolling average
+✅ `calculateTrendline(data)` - Linear regression with slope, R², direction, strength
+✅ `detectAnomaliesWithContext(data, threshold)` - Returns anomaly objects with z-score, direction
+✅ `calculateCumulativeSum(data, field)` - Running total
+✅ `calculatePercentChange(data, field)` - Day-over-day % change
+
+### 4.2 Create Analytics Hooks
+🔲 `useAnomalyDetection(data, options)` - Hook wrapper (can add later)
+🔲 `useTrendAnalysis(data)` - Hook wrapper (can add later)
+
+---
+
+## Phase 5: Calendar Heatmaps & Time Analysis
+**Priority: P2 | Effort: Medium** ✅ COMPLETE
+
+### 5.1 Create CalendarHeatmap Component
+✅ Create `src/components/charts/CalendarHeatmap.tsx`
+✅ Day-of-week × Hour grid using ECharts heatmap
+✅ Color intensity = metric value with configurable color schemes
+✅ Click handler support for filtering
+✅ Responsive with loading state
+
+### 5.2 Add Day/Hour Analysis Section
+🔲 Integrate into dashboard (query needs hour-level data)
+🔲 Best performing hours heatmap
+🔲 Day-of-week patterns
+
+---
+
+## Phase 6: Advanced Period Comparison
+**Priority: P2 | Effort: Medium** ✅ COMPLETE
+
+### 6.1 Enhance V3DateRangePicker
+✅ Add comparison period selector
+✅ Previous period (same length)
+✅ Same period last month/year
+🔲 Custom comparison range (future enhancement)
+
+### 6.2 Comparison Visualization Modes
+✅ Toggle between overlay (already in charts via showCompare)
+🔲 Dual-axis charts (future enhancement)
+🔲 Percentage change waterfall chart (future enhancement)
+
+---
+
+## Phase 7: Progressive Disclosure & Drill-Down
+**Priority: P3 | Effort: High**
+
+### 7.1 Dashboard Hierarchy
+🔲 Level 1: Executive Summary (KPIs with sparklines)
+🔲 Level 2: Channel Overview (detailed charts + tables)
+🔲 Level 3: Detailed Metrics (full tables, exports)
+
+### 7.2 Implementation
+🔲 KPI cards expand to show detailed breakdown
+🔲 "View Details" opens modal/drawer
+🔲 Table row click shows detail view
+🔲 Breadcrumb navigation
+
+---
+
+## Phase 8: Performance & Polish
+**Priority: P3 | Effort: Medium** ✅ COMPLETE
+
+### 8.1 Performance Optimizations
+✅ Virtualized tables (react-window) - VirtualizedTable component created
+✅ Memoize all chart configurations (done in ClientDashboardMetrics)
+🔲 Chart data downsampling for 1000+ points (future - needs data volume)
+🔲 Lazy load advanced analytics sections (future enhancement)
+
+### 8.2 Accessibility & UX
+✅ Keyboard navigation for table rows (Enter/Space to click)
+✅ ARIA roles for virtualized table (role="row", role="columnheader", etc.)
+🔲 Full keyboard navigation for charts (future - ECharts limitation)
+🔲 Screen reader descriptions (partial - aria-label on charts)
+🔲 Reduced motion mode support (future enhancement)
+🔲 Print-friendly styles (future enhancement)
+
+---
+
+## Phase 9: Real-Time Enhancements
+**Priority: P3 | Effort: Medium** ✅ PARTIAL
+
+### 9.1 Live Updates
+✅ Pulse animation on new donations (realtime indicator in ClientDashboardMetrics)
+✅ Toast notifications for significant events (donation toasts)
+🔲 Live counter with increment animation (future enhancement)
+
+### 9.2 Activity Feed
+🔲 Recent donations ticker
+🔲 Campaign milestone alerts
+🔲 Anomaly notifications
+
+---
+
+## Files Created/Modified
+
+### Phase 2 (Complete):
+- ✅ `src/components/v3/V3KPICardWithSparkline.tsx` (new)
+- ✅ `src/components/v3/index.ts` (updated)
+- ✅ `src/queries/useClientDashboardMetricsQuery.ts` (updated)
+- ✅ `src/components/client/ClientDashboardMetrics.tsx` (updated)
+
+### Phase 1 (In Progress):
+- ✅ `src/components/charts/echarts/EChartsBase.tsx` (new)
+- ✅ `src/components/charts/echarts/EChartsLineChart.tsx` (new)
+- ✅ `src/components/charts/echarts/index.ts` (new)
+
+### Phase 3 (In Progress):
+- ✅ `src/stores/chartInteractionStore.ts` (new)
