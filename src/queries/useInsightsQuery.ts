@@ -196,10 +196,10 @@ async function fetchInsights(
   const prevStartDate = format(subDays(parseISO(startDate), daysDiff + 1), "yyyy-MM-dd");
   const prevEndDate = format(subDays(parseISO(startDate), 1), "yyyy-MM-dd");
 
-  // Fetch daily donation data for anomaly and trend detection
+  // Fetch daily donation data for anomaly and trend detection (using correct column names)
   const { data: dailyData } = await supabase
     .from("actblue_transactions")
-    .select("transaction_date, amount, fee_amount, status, recurring_status, refcode")
+    .select("transaction_date, amount, fee, is_recurring, refcode")
     .eq("organization_id", organizationId)
     .gte("transaction_date", startDate)
     .lte("transaction_date", `${endDate}T23:59:59`)
@@ -208,7 +208,7 @@ async function fetchInsights(
   // Fetch previous period data
   const { data: prevData } = await supabase
     .from("actblue_transactions")
-    .select("transaction_date, amount, fee_amount, status, recurring_status")
+    .select("transaction_date, amount, fee, is_recurring")
     .eq("organization_id", organizationId)
     .gte("transaction_date", prevStartDate)
     .lte("transaction_date", `${prevEndDate}T23:59:59`);
@@ -219,7 +219,7 @@ async function fetchInsights(
     const date = format(parseISO(tx.transaction_date), "yyyy-MM-dd");
     const current = dailyMap.get(date) || { gross: 0, net: 0, count: 0 };
     current.gross += Number(tx.amount) || 0;
-    current.net += (Number(tx.amount) || 0) - (Number(tx.fee_amount) || 0);
+    current.net += (Number(tx.amount) || 0) - (Number(tx.fee) || 0);
     current.count += 1;
     dailyMap.set(date, current);
   });
@@ -253,10 +253,10 @@ async function fetchInsights(
 
   // Calculate period totals
   const currentTotal = (dailyData || []).reduce((sum, tx) =>
-    sum + (Number(tx.amount) || 0) - (Number(tx.fee_amount) || 0), 0
+    sum + (Number(tx.amount) || 0) - (Number(tx.fee) || 0), 0
   );
   const prevTotal = (prevData || []).reduce((sum, tx) =>
-    sum + (Number(tx.amount) || 0) - (Number(tx.fee_amount) || 0), 0
+    sum + (Number(tx.amount) || 0) - (Number(tx.fee) || 0), 0
   );
 
   // Generate milestone insight
@@ -270,7 +270,7 @@ async function fetchInsights(
   // Calculate opportunity metrics
   const totalCount = (dailyData || []).length;
   const withRefcode = (dailyData || []).filter(tx => tx.refcode).length;
-  const recurringCount = (dailyData || []).filter(tx => tx.recurring_status === "active").length;
+  const recurringCount = (dailyData || []).filter(tx => tx.is_recurring === true).length;
 
   const refcodeRate = totalCount > 0 ? (withRefcode / totalCount) * 100 : 0;
   const recurringRate = totalCount > 0 ? (recurringCount / totalCount) * 100 : 0;

@@ -115,9 +115,7 @@ export const TremorAreaChart: React.FC<TremorAreaChartProps> = ({
         animationDuration={animationDuration}
         connectNulls={connectNulls}
         allowDecimals={allowDecimals}
-        fill={fill}
         stack={type === "stacked" || type === "percent"}
-        relative={type === "percent"}
         curveType={curveType}
         minValue={minValue}
         maxValue={maxValue}

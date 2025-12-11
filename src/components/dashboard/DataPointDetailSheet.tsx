@@ -89,27 +89,27 @@ async function fetchDataPointDetails(
   const startOfDay = `${date}T00:00:00`;
   const endOfDay = `${date}T23:59:59`;
 
-  // Fetch transactions for the day
+  // Fetch transactions for the day (using correct column names from schema)
   const { data: transactions } = await supabase
     .from("actblue_transactions")
-    .select("id, amount, fee_amount, donor_name, refcode, transaction_date")
+    .select("id, amount, fee, donor_name, refcode, transaction_date")
     .eq("organization_id", organizationId)
     .gte("transaction_date", startOfDay)
     .lte("transaction_date", endOfDay)
     .order("transaction_date", { ascending: false })
     .limit(10);
 
-  // Fetch meta metrics for the day
-  const { data: metaMetrics } = await supabase
-    .from("meta_daily_metrics")
-    .select("spend, impressions, clicks, conversions")
+  // Fetch daily aggregated metrics for the day
+  const { data: dailyMetrics } = await supabase
+    .from("daily_aggregated_metrics")
+    .select("total_ad_spend, meta_impressions, meta_clicks")
     .eq("organization_id", organizationId)
     .eq("date", date)
-    .single();
+    .maybeSingle();
 
   // Calculate aggregates
   const totalGross = (transactions || []).reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  const totalFees = (transactions || []).reduce((sum, tx) => sum + Number(tx.fee_amount || 0), 0);
+  const totalFees = (transactions || []).reduce((sum, tx) => sum + Number(tx.fee || 0), 0);
   const totalNet = totalGross - totalFees;
   const donationCount = transactions?.length || 0;
 
@@ -121,12 +121,11 @@ async function fetchDataPointDetails(
     { label: "Avg Donation", value: formatValue(donationCount > 0 ? totalGross / donationCount : 0, "currency"), type: "currency" as const },
   ];
 
-  if (metaMetrics) {
+  if (dailyMetrics) {
     metrics.push(
-      { label: "Meta Spend", value: formatValue(Number(metaMetrics.spend || 0), "currency"), type: "currency" as const },
-      { label: "Impressions", value: Number(metaMetrics.impressions || 0), type: "number" as const },
-      { label: "Clicks", value: Number(metaMetrics.clicks || 0), type: "number" as const },
-      { label: "Meta Conversions", value: Number(metaMetrics.conversions || 0), type: "number" as const }
+      { label: "Ad Spend", value: formatValue(Number(dailyMetrics.total_ad_spend || 0), "currency"), type: "currency" as const },
+      { label: "Impressions", value: Number(dailyMetrics.meta_impressions || 0), type: "number" as const },
+      { label: "Clicks", value: Number(dailyMetrics.meta_clicks || 0), type: "number" as const }
     );
   }
 
