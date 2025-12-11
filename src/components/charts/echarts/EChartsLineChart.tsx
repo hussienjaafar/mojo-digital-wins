@@ -48,6 +48,10 @@ export interface EChartsLineChartProps {
   };
   dualYAxis?: boolean;
   anomalyMarkers?: AnomalyMarker[];
+  /** Show rolling average overlay */
+  showRollingAverage?: boolean;
+  /** Period for rolling average calculation */
+  rollingAveragePeriod?: number;
   onBrushEnd?: (range: { start: string; end: string }) => void;
   onDataPointClick?: (params: { dataIndex: number; seriesName: string; value: any }) => void;
 }
@@ -77,10 +81,25 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
   yAxisConfig,
   dualYAxis = false,
   anomalyMarkers = [],
+  showRollingAverage = false,
+  rollingAveragePeriod = 7,
   onBrushEnd,
   onDataPointClick,
 }) => {
   const { setHoveredDataPoint, setSelectedTimeRange } = useChartInteractionStore();
+
+  // Calculate rolling average for a series
+  const calculateRollingAverage = React.useCallback(
+    (values: number[], period: number): (number | null)[] => {
+      return values.map((_, index) => {
+        if (index < period - 1) return null;
+        const slice = values.slice(index - period + 1, index + 1);
+        const sum = slice.reduce((a, b) => a + (b || 0), 0);
+        return sum / period;
+      });
+    },
+    []
+  );
 
   const formatValue = React.useCallback((value: number) => {
     if (valueType === "currency") {
@@ -99,37 +118,75 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
   const option = React.useMemo<EChartsOption>(() => {
     const xAxisData = data.map((d) => d[xAxisKey]);
 
-    const seriesConfig = series.map((s, index) => ({
-      name: s.name,
-      type: "line" as const,
-      data: data.map((d) => d[s.dataKey]),
-      smooth: s.smooth ?? true,
-      showSymbol: s.showSymbol ?? false,
-      symbolSize: 6,
-      itemStyle: {
-        color: s.color || colorPalette[index % colorPalette.length],
-      },
-      lineStyle: {
-        width: s.lineStyle?.width ?? 2,
-        type: s.lineStyle?.type ?? "solid",
-        color: s.color || colorPalette[index % colorPalette.length],
-      },
-      ...(s.type === "area" && {
-        areaStyle: {
-          opacity: s.areaStyle?.opacity ?? 0.1,
-          color: s.color || colorPalette[index % colorPalette.length],
-        },
-      }),
-      stack: s.stack,
-      yAxisIndex: s.yAxisIndex ?? 0,
-      emphasis: {
-        focus: "series" as const,
+    const seriesConfig = series.flatMap((s, index) => {
+      const baseColor = s.color || colorPalette[index % colorPalette.length];
+      const seriesData = data.map((d) => d[s.dataKey]);
+      
+      const mainSeries = {
+        name: s.name,
+        type: "line" as const,
+        data: seriesData,
+        smooth: s.smooth ?? true,
+        showSymbol: s.showSymbol ?? false,
+        symbolSize: 6,
         itemStyle: {
-          shadowBlur: 10,
-          shadowColor: "rgba(0, 0, 0, 0.3)",
+          color: baseColor,
         },
-      },
-    }));
+        lineStyle: {
+          width: s.lineStyle?.width ?? 2,
+          type: s.lineStyle?.type ?? "solid",
+          color: baseColor,
+        },
+        ...(s.type === "area" && {
+          areaStyle: {
+            opacity: s.areaStyle?.opacity ?? 0.1,
+            color: baseColor,
+          },
+        }),
+        stack: s.stack,
+        yAxisIndex: s.yAxisIndex ?? 0,
+        emphasis: {
+          focus: "series" as const,
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: "rgba(0, 0, 0, 0.3)",
+          },
+        },
+      };
+
+      // Add rolling average series if enabled
+      if (showRollingAverage) {
+        const rollingData = calculateRollingAverage(
+          seriesData.map((v) => (typeof v === "number" ? v : 0)),
+          rollingAveragePeriod
+        );
+        
+        const rollingSeries = {
+          name: `${s.name} (${rollingAveragePeriod}d avg)`,
+          type: "line" as const,
+          data: rollingData,
+          smooth: true,
+          showSymbol: false,
+          itemStyle: {
+            color: baseColor,
+          },
+          lineStyle: {
+            width: 2,
+            type: "dashed" as const,
+            color: baseColor,
+            opacity: 0.6,
+          },
+          yAxisIndex: s.yAxisIndex ?? 0,
+          emphasis: {
+            focus: "series" as const,
+          },
+        };
+        
+        return [mainSeries, rollingSeries];
+      }
+
+      return [mainSeries];
+    });
 
     const yAxes = dualYAxis
       ? [
@@ -284,7 +341,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     };
 
     return result;
-  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, formatValue]);
+  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, formatValue, showRollingAverage, rollingAveragePeriod, calculateRollingAverage]);
 
   const handleEvents = React.useMemo(() => {
     const events: Record<string, (params: any) => void> = {};

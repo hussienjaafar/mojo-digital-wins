@@ -1,5 +1,14 @@
 // Query key factories
 export * from "./queryKeys";
+
+// Query hooks
+export * from "./useClientDashboardMetricsQuery";
+export * from "./useMetaAdsMetricsQuery";
+export * from "./useSMSMetricsQuery";
+export * from "./useIntelligenceHubQuery";
+export * from "./useDonorIntelligenceQuery";
+export * from "./useCreativeInsightsQuery";
+export * from "./queryKeys";
 export * from "./useClientDashboardMetricsQuery";
 
 // Dashboard queries

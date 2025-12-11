@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,27 +15,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useCreativeInsightsQuery, useRefreshCreativeInsights, type CreativeLearning } from "@/queries/useCreativeInsightsQuery";
 
 type Props = {
   organizationId: string;
-};
-
-type Learning = {
-  id: string;
-  channel: string;
-  topic: string | null;
-  tone: string | null;
-  urgency_level: string | null;
-  call_to_action: string | null;
-  emotional_appeal: string | null;
-  optimal_hour: number | null;
-  optimal_day: number | null;
-  avg_click_rate: number | null;
-  avg_conversion_rate: number | null;
-  avg_roas: number | null;
-  effectiveness_score: number | null;
-  confidence_level: number | null;
-  sample_size: number | null;
 };
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -60,7 +42,7 @@ function EffectivenessBar({ score }: { score: number | null }) {
       <div 
         className={cn(
           "h-2 rounded-full transition-all",
-          percent >= 70 ? "bg-green-500" : percent >= 40 ? "bg-yellow-500" : "bg-red-500"
+          percent >= 70 ? "bg-[hsl(var(--portal-success))]" : percent >= 40 ? "bg-[hsl(var(--portal-warning))]" : "bg-[hsl(var(--portal-error))]"
         )}
         style={{ width: `${percent}%` }}
       />
@@ -69,71 +51,21 @@ function EffectivenessBar({ score }: { score: number | null }) {
 }
 
 export function CreativeInsights({ organizationId }: Props) {
-  const [learnings, setLearnings] = useState<Learning[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeChannel, setActiveChannel] = useState<string>("all");
-
-  const loadLearnings = useCallback(async () => {
-    try {
-      let query = supabase
-        .from("creative_performance_learnings")
-        .select("*")
-        .order("effectiveness_score", { ascending: false, nullsFirst: false })
-        .limit(50);
-
-      // Try org-specific first, fall back to global
-      const { data: orgData, error: orgError } = await query
-        .eq("organization_id", organizationId);
-
-      if (orgError) {
-        console.error("Error loading org learnings:", orgError);
-      }
-
-      // Also get global learnings
-      const { data: globalData, error: globalError } = await supabase
-        .from("creative_performance_learnings")
-        .select("*")
-        .is("organization_id", null)
-        .order("effectiveness_score", { ascending: false, nullsFirst: false })
-        .limit(20);
-
-      if (globalError) {
-        console.error("Error loading global learnings:", globalError);
-      }
-
-      // Combine and dedupe
-      const combined = [...(orgData || []), ...(globalData || [])];
-      setLearnings(combined);
-    } catch (error) {
-      console.error("Failed to load learnings:", error);
-    }
-  }, [organizationId]);
-
-  useEffect(() => {
-    setIsLoading(true);
-    loadLearnings().finally(() => setIsLoading(false));
-  }, [loadLearnings]);
+  
+  const { data: learnings = [], isLoading } = useCreativeInsightsQuery(organizationId);
+  const refreshMutation = useRefreshCreativeInsights(organizationId);
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
     try {
-      // Trigger learning calculation
-      const { error } = await supabase.functions.invoke("calculate-creative-learnings", {
-        body: { organization_id: organizationId }
-      });
-      
-      if (error) throw error;
-      
-      await loadLearnings();
+      await refreshMutation.mutateAsync();
       toast.success("Creative insights refreshed");
     } catch (err) {
       console.error("Refresh error:", err);
       toast.error("Failed to refresh insights");
-    } finally {
-      setIsRefreshing(false);
     }
   };
+
 
   const filteredLearnings = activeChannel === "all" 
     ? learnings 
@@ -189,10 +121,10 @@ export function CreativeInsights({ organizationId }: Props) {
             variant="ghost"
             size="icon"
             onClick={handleRefresh}
-            disabled={isRefreshing}
+            disabled={refreshMutation.isPending}
             className="h-8 w-8"
           >
-            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+            <RefreshCw className={cn("h-4 w-4", refreshMutation.isPending && "animate-spin")} />
           </Button>
         </div>
       </CardHeader>

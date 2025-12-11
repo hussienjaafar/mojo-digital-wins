@@ -5,6 +5,7 @@ import { V3TrendIndicator } from "./V3TrendIndicator";
 import { V3MetricLabel } from "./V3MetricLabel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import {
   LineChart,
   Line,
@@ -77,12 +78,29 @@ export const V3KPICardWithSparkline: React.FC<V3KPICardWithSparklineProps> = ({
 }) => {
   const isInteractive = !!onClick;
   const chartColor = sparklineColor || accentSparklineColor[accent];
+  const prefersReducedMotion = useReducedMotion();
 
   // Transform sparkline data for Recharts
   const chartData = React.useMemo(() => {
     if (!sparklineData || sparklineData.length === 0) return [];
     return sparklineData.map((value, index) => ({ index, value }));
   }, [sparklineData]);
+
+  // Reduced motion variants
+  const motionProps = prefersReducedMotion
+    ? {}
+    : {
+        whileHover: { scale: 1.01 },
+        whileTap: { scale: 0.99 },
+      };
+  
+  const sparklineMotion = prefersReducedMotion
+    ? { opacity: 1 }
+    : { opacity: 0, transition: { delay: 0.1, duration: 0.3 } };
+  
+  const sparklineAnimateTo = prefersReducedMotion
+    ? { opacity: 1 }
+    : { opacity: 1, transition: { delay: 0.1, duration: 0.3 } };
 
   if (isLoading) {
     return (
@@ -138,9 +156,8 @@ export const V3KPICardWithSparkline: React.FC<V3KPICardWithSparklineProps> = ({
       {chartData.length > 0 && (
         <motion.div
           className="h-10 mt-2 -mx-1"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.3 }}
+          initial={sparklineMotion}
+          animate={sparklineAnimateTo}
         >
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
@@ -205,8 +222,7 @@ export const V3KPICardWithSparkline: React.FC<V3KPICardWithSparklineProps> = ({
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue))] focus-visible:ring-offset-2"
         )}
         aria-label={`${label}: ${value}. Click for details.`}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
+        {...motionProps}
       >
         {content}
       </motion.button>
