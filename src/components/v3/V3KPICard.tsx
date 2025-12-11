@@ -2,6 +2,7 @@ import * as React from "react";
 import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { V3TrendIndicator } from "./V3TrendIndicator";
+import { V3MetricLabel } from "./V3MetricLabel";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export type V3KPIAccent = "blue" | "green" | "purple" | "amber" | "red" | "default";
@@ -20,6 +21,8 @@ interface V3KPICardProps {
   isLoading?: boolean;
   className?: string;
   onClick?: () => void;
+  /** Show tooltip with metric definition */
+  showDefinition?: boolean;
 }
 
 const accentIconBg: Record<V3KPIAccent, string> = {
@@ -50,6 +53,7 @@ export const V3KPICard: React.FC<V3KPICardProps> = ({
   isLoading = false,
   className,
   onClick,
+  showDefinition = true,
 }) => {
   const isInteractive = !!onClick;
 
@@ -83,9 +87,7 @@ export const V3KPICard: React.FC<V3KPICardProps> = ({
             aria-hidden="true"
           />
         </div>
-        <span className="text-xs text-[hsl(var(--portal-text-secondary))] uppercase tracking-wide font-medium">
-          {label}
-        </span>
+        <V3MetricLabel label={label} showTooltip={showDefinition} />
       </div>
       <div
         className="text-xl font-bold text-[hsl(var(--portal-text-primary))] leading-tight"

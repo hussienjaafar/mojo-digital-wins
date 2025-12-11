@@ -27,3 +27,19 @@ export {
   type SMSDailyMetric,
   type SMSMetricsResult,
 } from "./useSMSMetricsQuery";
+
+// Intelligence queries
+export {
+  useIntelligenceHubQuery,
+  hubKeys,
+  type IntelligenceHubStats,
+} from "./useIntelligenceHubQuery";
+export {
+  useDonorIntelligenceQuery,
+  type AttributionData,
+  type DonorSegment,
+  type SmsFunnel,
+  type JourneyEvent,
+  type LtvSummary,
+  type DonorIntelligenceData,
+} from "./useDonorIntelligenceQuery";

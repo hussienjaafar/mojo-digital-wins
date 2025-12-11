@@ -73,6 +73,11 @@ export const intelligenceKeys = {
     [...intelligenceKeys.all, 'opportunities', orgId] as const,
 };
 
+export const hubKeys = {
+  all: ['hub'] as const,
+  stats: (orgId: string) => [...hubKeys.all, 'stats', orgId] as const,
+};
+
 export const trendsKeys = {
   all: ['trends'] as const,
   topics: (limit?: number) => [...trendsKeys.all, 'topics', limit] as const,

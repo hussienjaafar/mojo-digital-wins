@@ -1,8 +1,8 @@
-import { useEffect, useState, memo } from "react";
+import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { useIntelligenceHubQuery } from "@/queries";
 import {
   Eye,
   TrendingUp,
@@ -20,86 +20,9 @@ interface IntelligenceHubProps {
   organizationId: string;
 }
 
-interface HubStats {
-  watchlistCount: number;
-  trendingTopics: number;
-  criticalAlerts: number;
-  suggestedActions: number;
-  opportunities: number;
-  latestTrend?: string;
-}
-
 export const IntelligenceHub = memo(({ organizationId }: IntelligenceHubProps) => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState<HubStats>({
-    watchlistCount: 0,
-    trendingTopics: 0,
-    criticalAlerts: 0,
-    suggestedActions: 0,
-    opportunities: 0,
-  });
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    loadStats();
-  }, [organizationId]);
-
-  const loadStats = async () => {
-    try {
-      // Use any to bypass TypeScript checks for tables not in types
-      const sb = supabase as any;
-
-      // Load watchlist count
-      const { count: watchlistCount } = await sb
-        .from('entity_watchlist')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .eq('is_active', true);
-
-      // Load trending topics
-      const { data: trends } = await sb
-        .from('bluesky_trends')
-        .select('topic')
-        .eq('is_trending', true)
-        .order('velocity', { ascending: false })
-        .limit(1);
-
-      // Load critical alerts  
-      const { count: alertCount } = await sb
-        .from('client_entity_alerts')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .eq('is_read', false)
-        .in('severity', ['critical', 'high']);
-
-      // Load suggested actions
-      const { count: actionCount } = await sb
-        .from('suggested_actions')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .eq('status', 'pending');
-
-      // Load opportunities
-      const { count: opportunityCount } = await sb
-        .from('fundraising_opportunities')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .eq('is_active', true);
-
-      setStats({
-        watchlistCount: watchlistCount || 0,
-        trendingTopics: trends?.length || 0,
-        criticalAlerts: alertCount || 0,
-        suggestedActions: actionCount || 0,
-        opportunities: opportunityCount || 0,
-        latestTrend: trends?.[0]?.topic,
-      });
-    } catch (error) {
-      console.error('Error loading intelligence hub stats:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data: stats, isLoading } = useIntelligenceHubQuery(organizationId);
 
   const features = [
     {
@@ -107,7 +30,7 @@ export const IntelligenceHub = memo(({ organizationId }: IntelligenceHubProps) =
       description: "Track mentions of key people, organizations, and topics",
       icon: Eye,
       path: "/client-watchlist",
-      stat: stats.watchlistCount,
+      stat: stats?.watchlistCount ?? 0,
       statLabel: "tracked entities",
       color: "text-info",
       bgColor: "bg-info/10",
@@ -117,11 +40,11 @@ export const IntelligenceHub = memo(({ organizationId }: IntelligenceHubProps) =
       description: "Real-time social media trend analysis",
       icon: TrendingUp,
       path: "/",
-      stat: stats.trendingTopics,
+      stat: stats?.trendingTopics ?? 0,
       statLabel: "active trends",
       color: "text-secondary",
       bgColor: "bg-secondary/10",
-      subtitle: stats.latestTrend,
+      subtitle: stats?.latestTrend,
     },
     {
       title: "Polling Intelligence",
@@ -141,7 +64,7 @@ export const IntelligenceHub = memo(({ organizationId }: IntelligenceHubProps) =
       description: "Urgent items requiring immediate attention",
       icon: Bell,
       path: "/client-alerts",
-      count: stats.criticalAlerts,
+      count: stats?.criticalAlerts ?? 0,
       variant: "destructive" as const,
       color: "text-severity-critical",
       bgColor: "bg-severity-critical/10",
@@ -151,7 +74,7 @@ export const IntelligenceHub = memo(({ organizationId }: IntelligenceHubProps) =
       description: "AI-generated recommendations for your campaigns",
       icon: Target,
       path: "/client-actions",
-      count: stats.suggestedActions,
+      count: stats?.suggestedActions ?? 0,
       variant: "secondary" as const,
       color: "text-info",
       bgColor: "bg-info/10",
@@ -161,7 +84,7 @@ export const IntelligenceHub = memo(({ organizationId }: IntelligenceHubProps) =
       description: "Fundraising and engagement opportunities",
       icon: DollarSign,
       path: "/client-opportunities",
-      count: stats.opportunities,
+      count: stats?.opportunities ?? 0,
       variant: "default" as const,
       color: "text-success",
       bgColor: "bg-success/10",
