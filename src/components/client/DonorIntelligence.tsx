@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { V3Card, V3CardHeader, V3CardTitle, V3CardContent, V3KPICard, V3LoadingState, V3ChartWrapper } from "@/components/v3";
 import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardContent } from "@/components/portal/PortalCard";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
 import { Badge } from "@/components/ui/badge";
@@ -178,13 +179,9 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="portal-card p-6 animate-pulse">
-            <div className="h-4 w-32 bg-[hsl(var(--portal-bg-elevated))] rounded mb-4" />
-            <div className="h-48 bg-[hsl(var(--portal-bg-elevated))] rounded" />
-          </div>
-        ))}
+      <div className="space-y-6">
+        <V3LoadingState variant="kpi-grid" count={4} />
+        <V3LoadingState variant="chart" height={280} />
       </div>
     );
   }
@@ -193,54 +190,34 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
     <div className="space-y-6">
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="portal-card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Target className="h-4 w-4 text-[hsl(var(--portal-accent))]" />
-            <span className="text-sm portal-text-muted">Attributed</span>
-          </div>
-          <div className="text-2xl font-bold portal-text-primary">
-            {attributionData.filter(d => d.attributed_platform).length}
-          </div>
-          <div className="text-xs portal-text-muted">
-            of {attributionData.length} donations
-          </div>
-        </div>
-        <div className="portal-card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="h-4 w-4 text-[hsl(var(--portal-accent))]" />
-            <span className="text-sm portal-text-muted">Topics Linked</span>
-          </div>
-          <div className="text-2xl font-bold portal-text-primary">
-            {attributionData.filter(d => d.creative_topic).length}
-          </div>
-          <div className="text-xs portal-text-muted">
-            donations with creative topic
-          </div>
-        </div>
-        <div className="portal-card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="h-4 w-4 text-[hsl(var(--portal-accent))]" />
-            <span className="text-sm portal-text-muted">Total Donors</span>
-          </div>
-          <div className="text-2xl font-bold portal-text-primary">
-            {segmentData.length.toLocaleString()}
-          </div>
-          <div className="text-xs portal-text-muted">
-            in database
-          </div>
-        </div>
-        <div className="portal-card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="h-4 w-4 text-[hsl(var(--portal-accent))]" />
-            <span className="text-sm portal-text-muted">Major Donors</span>
-          </div>
-          <div className="text-2xl font-bold portal-text-primary">
-            {segmentData.filter(d => d.donor_tier === 'major').length}
-          </div>
-          <div className="text-xs portal-text-muted">
-            $1,000+ lifetime
-          </div>
-        </div>
+        <V3KPICard
+          icon={Target}
+          label="Attributed"
+          value={attributionData.filter(d => d.attributed_platform).length}
+          subtitle={`of ${attributionData.length} donations`}
+          accent="blue"
+        />
+        <V3KPICard
+          icon={Sparkles}
+          label="Topics Linked"
+          value={attributionData.filter(d => d.creative_topic).length}
+          subtitle="donations with creative topic"
+          accent="purple"
+        />
+        <V3KPICard
+          icon={Users}
+          label="Total Donors"
+          value={segmentData.length.toLocaleString()}
+          subtitle="in database"
+          accent="green"
+        />
+        <V3KPICard
+          icon={DollarSign}
+          label="Major Donors"
+          value={segmentData.filter(d => d.donor_tier === 'major').length}
+          subtitle="$1,000+ lifetime"
+          accent="amber"
+        />
       </div>
 
       <Tabs defaultValue="attribution" className="space-y-4">

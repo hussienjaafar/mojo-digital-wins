@@ -5,21 +5,23 @@ import {
   V3CardContent,
   V3CardHeader,
   V3CardTitle,
-  V3KPICard,
+  V3KPICardWithSparkline,
   V3ChartWrapper,
   V3LoadingState,
   V3ErrorState,
   V3EmptyState,
+  V3InsightBadge,
 } from "@/components/v3";
 import { PortalBadge } from "@/components/portal/PortalBadge";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
 import { Target, MousePointer, Eye, DollarSign, TrendingUp, BarChart3, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, parseISO } from "date-fns";
-import { PortalLineChart } from "@/components/portal/PortalLineChart";
-import { PortalMultiBarChart } from "@/components/portal/PortalMultiBarChart";
+import { EChartsLineChart } from "@/components/charts/echarts";
+import { EChartsBarChart } from "@/components/charts/echarts";
 import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
 import { useMetaAdsMetricsQuery } from "@/queries";
+import { useAnomalyDetection } from "@/hooks/useAnomalyDetection";
 import { useState } from "react";
 
 type Props = {
@@ -156,10 +158,20 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
   // Prepare trend chart data
   const trendChartData = useMemo(() => dailyMetrics.map(d => ({
-    name: format(parseISO(d.date), 'MMM d'),
-    Spend: d.spend,
-    Conversions: d.conversions,
+    date: format(parseISO(d.date), 'MMM d'),
+    spend: d.spend,
+    conversions: d.conversions,
   })), [dailyMetrics]);
+
+  // Sparkline data for KPIs
+  const spendSparkline = useMemo(() => dailyMetrics.slice(-14).map(d => d.spend), [dailyMetrics]);
+  const conversionSparkline = useMemo(() => dailyMetrics.slice(-14).map(d => d.conversions), [dailyMetrics]);
+
+  // Anomaly detection for spend
+  const spendAnalysis = useAnomalyDetection(
+    dailyMetrics.map(d => ({ date: d.date, value: d.spend })),
+    { threshold: 2 }
+  );
 
   // Show loading state
   if (isLoading) {
@@ -209,7 +221,7 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
         animate="visible"
       >
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <V3KPICardWithSparkline
             icon={DollarSign}
             label="ROAS"
             value={`${roas.toFixed(2)}x`}
@@ -218,25 +230,27 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
           />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <V3KPICardWithSparkline
             icon={DollarSign}
             label="Spend"
             value={`$${totals.spend.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
             trend={{ value: calcChange(totals.spend, previousTotals.spend), isPositive: totals.spend <= previousTotals.spend }}
+            sparklineData={spendSparkline}
             accent="blue"
           />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <V3KPICardWithSparkline
             icon={Target}
             label="Conversions"
             value={totals.conversions.toLocaleString()}
             trend={{ value: calcChange(totals.conversions, previousTotals.conversions) }}
+            sparklineData={conversionSparkline}
             accent="green"
           />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <V3KPICardWithSparkline
             icon={MousePointer}
             label="CTR"
             value={`${avgCTR.toFixed(2)}%`}
@@ -245,7 +259,7 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
           />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <V3KPICardWithSparkline
             icon={Eye}
             label="CPM"
             value={`$${cpm.toFixed(2)}`}
@@ -254,6 +268,17 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
           />
         </motion.div>
       </motion.div>
+
+      {/* Insights */}
+      {spendAnalysis.insights.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {spendAnalysis.insights.map((insight, i) => (
+            <V3InsightBadge key={i} type={insight.type}>
+              {insight.message}
+            </V3InsightBadge>
+          ))}
+        </div>
+      )}
 
       {/* Performance Trend Chart */}
       {trendChartData.length > 0 && (
@@ -264,14 +289,17 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Line chart displaying daily spend and conversion trends for Meta advertising campaigns"
           accent="blue"
         >
-          <PortalLineChart
+          <EChartsLineChart
             data={trendChartData}
-            lines={[
-              { dataKey: "Spend", name: "Spend", stroke: CHART_COLORS.spend, valueType: "currency" },
-              { dataKey: "Conversions", name: "Conversions", stroke: CHART_COLORS.conversions, valueType: "number" },
+            xAxisKey="date"
+            series={[
+              { dataKey: "spend", name: "Spend", color: CHART_COLORS.spend, type: "area" },
+              { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.conversions, yAxisIndex: 1 },
             ]}
             valueType="currency"
-            ariaLabel="Meta Ads performance trend showing spend and conversions over time"
+            dualYAxis
+            showZoom
+            height={280}
           />
         </V3ChartWrapper>
       )}
@@ -285,14 +313,15 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Bar chart comparing spend and conversions across top performing Meta campaigns"
           accent="blue"
         >
-          <PortalMultiBarChart
+          <EChartsBarChart
             data={campaignBreakdownData}
-            bars={[
-              { dataKey: "spend", name: "Spend", fill: CHART_COLORS.spend, valueType: "currency" },
-              { dataKey: "conversions", name: "Conversions", fill: CHART_COLORS.conversions, valueType: "number" },
+            xAxisKey="name"
+            series={[
+              { dataKey: "spend", name: "Spend", color: CHART_COLORS.spend },
+              { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.conversions },
             ]}
             valueType="currency"
-            ariaLabel="Campaign breakdown showing spend and conversions by campaign"
+            height={280}
           />
         </V3ChartWrapper>
       )}

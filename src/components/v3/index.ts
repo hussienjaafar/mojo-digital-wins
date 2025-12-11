@@ -24,3 +24,4 @@ export { V3PageContainer, V3PageSection } from "./V3PageContainer";
 export { V3DateRangePicker } from "./V3DateRangePicker";
 export { V3MetricLabel } from "./V3MetricLabel";
 export { V3HighlightableRow } from "./V3HighlightableRow";
+export { V3InsightBadge, type InsightType } from "./V3InsightBadge";
