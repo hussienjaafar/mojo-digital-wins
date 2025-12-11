@@ -1,6 +1,6 @@
 import * as React from "react";
-import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
-import { Calendar as CalendarIcon, ChevronDown } from "lucide-react";
+import { format, subDays, startOfMonth, endOfMonth, subMonths, subYears, differenceInDays } from "date-fns";
+import { Calendar as CalendarIcon, ChevronDown, GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -19,6 +19,7 @@ import {
 import { useDashboardStore } from "@/stores/dashboardStore";
 
 type PresetKey = 'today' | '7d' | '14d' | '30d' | '90d' | 'mtd' | 'last-month' | 'custom';
+type CompareMode = 'none' | 'previous' | 'last-month' | 'last-year';
 
 interface Preset {
   label: string;
@@ -63,17 +64,53 @@ const presets: Record<PresetKey, Preset> = {
   },
 };
 
+const compareModes: Record<CompareMode, { label: string; getRange: (start: Date, end: Date) => { start: Date; end: Date } | null }> = {
+  none: {
+    label: "No comparison",
+    getRange: () => null,
+  },
+  previous: {
+    label: "Previous period",
+    getRange: (start, end) => {
+      const days = differenceInDays(end, start) + 1;
+      return {
+        start: subDays(start, days),
+        end: subDays(start, 1),
+      };
+    },
+  },
+  "last-month": {
+    label: "Same period last month",
+    getRange: (start, end) => ({
+      start: subMonths(start, 1),
+      end: subMonths(end, 1),
+    }),
+  },
+  "last-year": {
+    label: "Same period last year",
+    getRange: (start, end) => ({
+      start: subYears(start, 1),
+      end: subYears(end, 1),
+    }),
+  },
+};
+
 interface V3DateRangePickerProps {
   className?: string;
   showPresets?: boolean;
+  showCompareSelector?: boolean;
+  onCompareChange?: (compareRange: { start: Date; end: Date } | null, mode: CompareMode) => void;
 }
 
 export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
   className,
   showPresets = true,
+  showCompareSelector = false,
+  onCompareChange,
 }) => {
   const { dateRange, setDateRange } = useDashboardStore();
   const [selectedPreset, setSelectedPreset] = React.useState<PresetKey>("30d");
+  const [compareMode, setCompareMode] = React.useState<CompareMode>("none");
   const [isOpen, setIsOpen] = React.useState(false);
 
   const startDate = new Date(dateRange.startDate);
@@ -96,6 +133,20 @@ export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
       setSelectedPreset("custom");
     }
   };
+
+  const handleCompareModeChange = (mode: CompareMode) => {
+    setCompareMode(mode);
+    const compareRange = compareModes[mode].getRange(startDate, endDate);
+    onCompareChange?.(compareRange, mode);
+  };
+
+  // Update compare range when date range changes
+  React.useEffect(() => {
+    if (compareMode !== "none" && onCompareChange) {
+      const compareRange = compareModes[compareMode].getRange(startDate, endDate);
+      onCompareChange(compareRange, compareMode);
+    }
+  }, [dateRange.startDate, dateRange.endDate, compareMode]);
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
@@ -145,8 +196,27 @@ export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
           />
         </PopoverContent>
       </Popover>
+
+      {showCompareSelector && (
+        <Select value={compareMode} onValueChange={(v) => handleCompareModeChange(v as CompareMode)}>
+          <SelectTrigger className="w-[180px] h-9 bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]">
+            <GitCompare className="mr-2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(compareModes).map(([key, mode]) => (
+              <SelectItem key={key} value={key}>
+                {mode.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
     </div>
   );
 };
 
 V3DateRangePicker.displayName = "V3DateRangePicker";
+
+// Export types for external use
+export type { CompareMode };
