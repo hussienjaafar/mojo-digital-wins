@@ -8,6 +8,7 @@ import { Download, MapPin, Briefcase, Users, DollarSign, TrendingUp } from "luci
 import { Session } from "@supabase/supabase-js";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { ClientLayout } from "@/components/client/ClientLayout";
+import { getChartColors } from "@/lib/design-tokens";
 
 type Organization = {
   id: string;
@@ -24,7 +25,8 @@ type DonorStats = {
   channelData: Array<{ channel: string; count: number; revenue: number }>;
 };
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+// Use design system chart colors
+const COLORS = getChartColors();
 
 const ClientDemographics = () => {
   const navigate = useNavigate();

@@ -1,8 +1,24 @@
 import { http, HttpResponse } from 'msw';
+import {
+  mockClientAlerts,
+  mockSuggestedActions,
+  mockOpportunities,
+  mockWatchlistEntities,
+  mockDonorSegments,
+  mockAttributionTouchpoints,
+  mockLtvPredictions,
+  mockMetaAdMetrics,
+  mockSmsCampaigns,
+  mockDonationTransactions,
+  TEST_ORG_ID,
+} from './fixtures';
 
 const SUPABASE_URL = 'https://nuclmzoasgydubdshtab.supabase.co';
 
-// Mock attribution data
+// ============================================================================
+// Legacy Mock Data (kept for backwards compatibility)
+// ============================================================================
+
 export const mockAttributionMappings = [
   {
     id: 'attr-1',
@@ -15,31 +31,8 @@ export const mockAttributionMappings = [
     utm_campaign: 'fall_fundraiser',
     created_at: '2024-01-01T00:00:00Z',
   },
-  {
-    id: 'attr-2',
-    organization_id: 'org-1',
-    meta_campaign_id: null,
-    switchboard_campaign_id: 'sms-456',
-    refcode: 'SMS_GOTV_2024',
-    utm_source: 'switchboard',
-    utm_medium: 'sms',
-    utm_campaign: 'gotv_campaign',
-    created_at: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: 'attr-3',
-    organization_id: 'org-1',
-    meta_campaign_id: 'meta-789',
-    switchboard_campaign_id: 'sms-789',
-    refcode: 'MULTI_TOUCH',
-    utm_source: 'facebook',
-    utm_medium: 'cpc',
-    utm_campaign: 'multi_touch',
-    created_at: '2024-01-01T00:00:00Z',
-  },
 ];
 
-// Mock donations/transactions
 export const mockTransactions = [
   {
     id: 'txn-1',
@@ -54,35 +47,8 @@ export const mockTransactions = [
     is_recurring: false,
     created_at: '2024-01-15T10:00:00Z',
   },
-  {
-    id: 'txn-2',
-    transaction_id: 'AB-12346',
-    organization_id: 'org-1',
-    amount: 100,
-    refcode: 'SMS_GOTV_2024',
-    donor_email: 'donor2@example.com',
-    donor_name: 'Jane Smith',
-    transaction_date: '2024-01-16T11:00:00Z',
-    source_campaign: 'gotv_campaign',
-    is_recurring: false,
-    created_at: '2024-01-16T11:00:00Z',
-  },
-  {
-    id: 'txn-3',
-    transaction_id: 'AB-12347',
-    organization_id: 'org-1',
-    amount: 250,
-    refcode: 'MULTI_TOUCH',
-    donor_email: 'donor3@example.com',
-    donor_name: 'Bob Johnson',
-    transaction_date: '2024-01-17T12:00:00Z',
-    source_campaign: 'multi_touch',
-    is_recurring: false,
-    created_at: '2024-01-17T12:00:00Z',
-  },
 ];
 
-// Mock Meta Ad metrics
 export const mockMetaMetrics = [
   {
     id: 'meta-1',
@@ -96,21 +62,8 @@ export const mockMetaMetrics = [
     conversion_value: 500,
     synced_at: '2024-01-15T23:00:00Z',
   },
-  {
-    id: 'meta-2',
-    organization_id: 'org-1',
-    campaign_id: 'meta-789',
-    date: '2024-01-17',
-    spend: 800,
-    impressions: 15000,
-    clicks: 400,
-    conversions: 15,
-    conversion_value: 1250,
-    synced_at: '2024-01-17T23:00:00Z',
-  },
 ];
 
-// Mock SMS metrics
 export const mockSMSMetrics = [
   {
     id: 'sms-1',
@@ -125,22 +78,8 @@ export const mockSMSMetrics = [
     amount_raised: 500,
     synced_at: '2024-01-16T23:00:00Z',
   },
-  {
-    id: 'sms-2',
-    organization_id: 'org-1',
-    campaign_id: 'sms-789',
-    date: '2024-01-17',
-    messages_sent: 1500,
-    messages_delivered: 1450,
-    clicks: 120,
-    conversions: 8,
-    cost: 150,
-    amount_raised: 1000,
-    synced_at: '2024-01-17T23:00:00Z',
-  },
 ];
 
-// Mock ROI analytics
 export const mockROIAnalytics = [
   {
     id: 'roi-1',
@@ -148,61 +87,211 @@ export const mockROIAnalytics = [
     campaign_id: 'multi-touch-journey',
     platform: 'combined',
     date: '2024-01-17',
-    first_touch_attribution: 250, // Full credit to Meta (first touch)
-    last_touch_attribution: 250, // Full credit to SMS (last touch)
-    linear_attribution: 125, // Split evenly between Meta and SMS
-    position_based_attribution: 175, // 40% first, 40% last, 20% middle
-    time_decay_attribution: 100, // More credit to recent (SMS)
+    first_touch_attribution: 250,
+    last_touch_attribution: 250,
+    linear_attribution: 125,
+    position_based_attribution: 175,
+    time_decay_attribution: 100,
     created_at: '2024-01-17T23:00:00Z',
   },
 ];
 
+// ============================================================================
+// Handlers
+// ============================================================================
+
 export const handlers = [
-  // Campaign attribution endpoints
+  // -------------------------------------------------------------------------
+  // Client Alerts (actual table: client_entity_alerts)
+  // -------------------------------------------------------------------------
+  http.get(`${SUPABASE_URL}/rest/v1/client_entity_alerts`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      return HttpResponse.json(mockClientAlerts);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  http.patch(`${SUPABASE_URL}/rest/v1/client_entity_alerts`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json({ ...mockClientAlerts[0], ...body });
+  }),
+
+  // -------------------------------------------------------------------------
+  // Suggested Actions
+  // -------------------------------------------------------------------------
+  http.get(`${SUPABASE_URL}/rest/v1/suggested_actions`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      return HttpResponse.json(mockSuggestedActions);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  http.patch(`${SUPABASE_URL}/rest/v1/suggested_actions`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json({ ...mockSuggestedActions[0], ...body });
+  }),
+
+  // -------------------------------------------------------------------------
+  // Opportunities (actual table: fundraising_opportunities)
+  // -------------------------------------------------------------------------
+  http.get(`${SUPABASE_URL}/rest/v1/fundraising_opportunities`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      return HttpResponse.json(mockOpportunities);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  http.patch(`${SUPABASE_URL}/rest/v1/fundraising_opportunities`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json({ ...mockOpportunities[0], ...body });
+  }),
+
+  // -------------------------------------------------------------------------
+  // Watchlist Entities (actual table: entity_watchlist)
+  // -------------------------------------------------------------------------
+  http.get(`${SUPABASE_URL}/rest/v1/entity_watchlist`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      return HttpResponse.json(mockWatchlistEntities);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  http.post(`${SUPABASE_URL}/rest/v1/entity_watchlist`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    const newEntity = {
+      id: `watch-${Date.now()}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      ...body,
+    };
+    return HttpResponse.json(newEntity, { status: 201 });
+  }),
+
+  http.delete(`${SUPABASE_URL}/rest/v1/entity_watchlist`, () => {
+    return HttpResponse.json({}, { status: 204 });
+  }),
+
+  // -------------------------------------------------------------------------
+  // Donor Journey / Segments
+  // -------------------------------------------------------------------------
+  http.get(`${SUPABASE_URL}/rest/v1/donor_segments`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      return HttpResponse.json(mockDonorSegments);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  http.get(`${SUPABASE_URL}/rest/v1/attribution_touchpoints`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      return HttpResponse.json(mockAttributionTouchpoints);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  http.get(`${SUPABASE_URL}/rest/v1/donor_ltv_predictions`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      return HttpResponse.json(mockLtvPredictions);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  http.get(`${SUPABASE_URL}/rest/v1/donor_journeys`, () => {
+    return HttpResponse.json([]);
+  }),
+
+  // -------------------------------------------------------------------------
+  // Channel Summaries
+  // -------------------------------------------------------------------------
+  http.get(`${SUPABASE_URL}/rest/v1/meta_ad_metrics`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      return HttpResponse.json(mockMetaAdMetrics);
+    }
+    // Legacy support
+    return HttpResponse.json(mockMetaMetrics);
+  }),
+
+  http.get(`${SUPABASE_URL}/rest/v1/sms_campaigns`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      return HttpResponse.json(mockSmsCampaigns);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  http.get(`${SUPABASE_URL}/rest/v1/actblue_transactions_secure`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      return HttpResponse.json(mockDonationTransactions);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  // -------------------------------------------------------------------------
+  // Legacy Endpoints
+  // -------------------------------------------------------------------------
   http.get(`${SUPABASE_URL}/rest/v1/campaign_attribution`, () => {
     return HttpResponse.json(mockAttributionMappings);
   }),
 
   http.post(`${SUPABASE_URL}/rest/v1/campaign_attribution`, async ({ request }) => {
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const newMapping = {
       id: `attr-${Date.now()}`,
       created_at: new Date().toISOString(),
-      ...(body as object),
+      ...body,
     };
     return HttpResponse.json(newMapping, { status: 201 });
   }),
 
   http.patch(`${SUPABASE_URL}/rest/v1/campaign_attribution`, async ({ request }) => {
-    const body = await request.json() as Record<string, any>;
-    return HttpResponse.json({ ...mockAttributionMappings[0], ...(body as object) });
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json({ ...mockAttributionMappings[0], ...body });
   }),
 
   http.delete(`${SUPABASE_URL}/rest/v1/campaign_attribution`, () => {
     return HttpResponse.json({}, { status: 204 });
   }),
 
-  // Transaction endpoints
   http.get(`${SUPABASE_URL}/rest/v1/actblue_transactions`, () => {
     return HttpResponse.json(mockTransactions);
   }),
 
-  // Meta ad metrics endpoints
-  http.get(`${SUPABASE_URL}/rest/v1/meta_ad_metrics`, () => {
-    return HttpResponse.json(mockMetaMetrics);
-  }),
-
-  // SMS metrics endpoints
   http.get(`${SUPABASE_URL}/rest/v1/sms_campaign_metrics`, () => {
     return HttpResponse.json(mockSMSMetrics);
   }),
 
-  // ROI analytics endpoints
   http.get(`${SUPABASE_URL}/rest/v1/roi_analytics`, () => {
     return HttpResponse.json(mockROIAnalytics);
   }),
 
-  // Meta campaigns
   http.get(`${SUPABASE_URL}/rest/v1/meta_campaigns`, () => {
     return HttpResponse.json([
       {
@@ -213,18 +302,12 @@ export const handlers = [
         status: 'ACTIVE',
         objective: 'CONVERSIONS',
       },
-      {
-        id: 'meta-camp-2',
-        campaign_id: 'meta-789',
-        campaign_name: 'Multi-Touch Campaign',
-        organization_id: 'org-1',
-        status: 'ACTIVE',
-        objective: 'CONVERSIONS',
-      },
     ]);
   }),
 
-  // Auth endpoints
+  // -------------------------------------------------------------------------
+  // Auth
+  // -------------------------------------------------------------------------
   http.post(`${SUPABASE_URL}/auth/v1/token`, () => {
     return HttpResponse.json({
       access_token: 'mock-access-token',

@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useClientDashboardMetricsQuery } from "@/queries";
 import { useHoveredDataPoint } from "@/stores/chartInteractionStore";
 import type { KpiKey, SeriesKey } from "@/stores/dashboardStore";
+import { cssVar, colors } from "@/lib/design-tokens";
 
 interface ClientDashboardMetricsProps {
   organizationId: string;
@@ -28,17 +29,18 @@ interface ClientDashboardMetricsProps {
   endDate: string;
 }
 
+// Semantic chart palette using design system tokens
 const palette = {
-  gross: "#0D9488",
-  net: "#0EA5E9",
-  refunds: "#DC2626",
-  meta: "#2563EB",
-  sms: "#8B5CF6",
-  grossPrev: "#0D948888",
-  netPrev: "#0EA5E988",
-  refundsPrev: "#DC262688",
-  metaPrev: "#2563EB88",
-  smsPrev: "#8B5CF688",
+  gross: cssVar(colors.status.success),
+  net: cssVar(colors.accent.blue),
+  refunds: cssVar(colors.status.error),
+  meta: cssVar(colors.accent.blue),
+  sms: cssVar(colors.accent.purple),
+  grossPrev: cssVar(colors.status.success, 0.5),
+  netPrev: cssVar(colors.accent.blue, 0.5),
+  refundsPrev: cssVar(colors.status.error, 0.5),
+  metaPrev: cssVar(colors.accent.blue, 0.5),
+  smsPrev: cssVar(colors.accent.purple, 0.5),
 };
 
 

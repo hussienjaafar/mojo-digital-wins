@@ -2,6 +2,7 @@ import * as React from "react";
 import type { EChartsOption } from "echarts";
 import { EChartsBase } from "./echarts/EChartsBase";
 import { cn } from "@/lib/utils";
+import { cssVar, colors } from "@/lib/design-tokens";
 
 export interface HeatmapDataPoint {
   dayOfWeek: number; // 0 = Sunday, 6 = Saturday
@@ -21,15 +22,16 @@ export interface CalendarHeatmapProps {
 }
 
 const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const hourLabels = Array.from({ length: 24 }, (_, i) => 
+const hourLabels = Array.from({ length: 24 }, (_, i) =>
   i === 0 ? "12a" : i < 12 ? `${i}a` : i === 12 ? "12p" : `${i - 12}p`
 );
 
+// Color schemes using design system tokens
 const colorSchemes = {
-  blue: ["hsl(var(--portal-bg-elevated))", "#0EA5E9"],
-  green: ["hsl(var(--portal-bg-elevated))", "#10B981"],
-  purple: ["hsl(var(--portal-bg-elevated))", "#8B5CF6"],
-  orange: ["hsl(var(--portal-bg-elevated))", "#F59E0B"],
+  blue: [cssVar(colors.bg.elevated), cssVar(colors.accent.blue)],
+  green: [cssVar(colors.bg.elevated), cssVar(colors.status.success)],
+  purple: [cssVar(colors.bg.elevated), cssVar(colors.accent.purple)],
+  orange: [cssVar(colors.bg.elevated), cssVar(colors.status.warning)],
 };
 
 export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({

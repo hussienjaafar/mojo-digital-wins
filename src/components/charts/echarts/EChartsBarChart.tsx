@@ -2,6 +2,7 @@ import * as React from "react";
 import type { EChartsOption } from "echarts";
 import { EChartsBase } from "./EChartsBase";
 import { useChartInteractionStore } from "@/stores/chartInteractionStore";
+import { getChartColors } from "@/lib/design-tokens";
 
 export interface BarSeriesConfig {
   dataKey: string;
@@ -26,14 +27,8 @@ export interface EChartsBarChartProps {
   onBarClick?: (params: { dataIndex: number; seriesName: string; value: any; name: string }) => void;
 }
 
-const colorPalette = [
-  "#0EA5E9", // blue
-  "#10B981", // green
-  "#8B5CF6", // purple
-  "#F59E0B", // amber
-  "#EF4444", // red
-  "#6B7280", // gray
-];
+// Use design system chart colors
+const colorPalette = getChartColors();
 
 export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
   data,

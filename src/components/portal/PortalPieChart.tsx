@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recha
 import { ResponsiveChartTooltip } from "@/components/charts/ResponsiveChartTooltip";
 import { formatValue, ValueType } from "@/lib/chart-formatters";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { getChartColors } from "@/lib/design-tokens";
 
 interface PieDataItem {
   name: string;
@@ -26,18 +27,8 @@ interface PortalPieChartProps {
   labelThreshold?: number;
 }
 
-const PORTAL_COLORS = [
-  "hsl(var(--portal-accent-blue))",
-  "hsl(var(--portal-accent-green))",
-  "hsl(var(--portal-accent-purple))",
-  "hsl(var(--portal-accent-amber))",
-  "hsl(var(--portal-accent-red))",
-  "hsl(217, 91%, 65%)",
-  "hsl(142, 71%, 50%)",
-  "hsl(262, 83%, 62%)",
-  "hsl(38, 92%, 55%)",
-  "hsl(0, 84%, 65%)",
-];
+// Use design system chart colors
+const PORTAL_COLORS = getChartColors();
 
 export const PortalPieChart: React.FC<PortalPieChartProps> = ({
   data,

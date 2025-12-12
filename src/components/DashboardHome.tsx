@@ -39,6 +39,7 @@ import {
   Area,
   AreaChart
 } from "recharts";
+import { getChartColors } from "@/lib/design-tokens";
 
 interface DashboardStats {
   totalClients: number;
@@ -66,7 +67,8 @@ interface CampaignPerformance {
   roi: number;
 }
 
-const COLORS = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b'];
+// Use design system chart colors
+const COLORS = getChartColors();
 
 export function DashboardHome() {
   const navigate = useNavigate();

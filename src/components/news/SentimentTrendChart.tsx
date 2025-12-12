@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { format, subDays } from "date-fns";
 import { LoadingCard } from "@/components/ui/loading-spinner";
+import { cssVar, colors } from "@/lib/design-tokens";
 
 export function SentimentTrendChart() {
   const [data, setData] = useState<any[]>([]);
@@ -149,37 +150,37 @@ export function SentimentTrendChart() {
                 className="text-xs"
                 tick={{ fill: 'hsl(var(--muted-foreground))' }}
               />
-              <Tooltip 
+              <Tooltip
                 contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
+                  backgroundColor: cssVar(colors.bg.elevated),
+                  border: `1px solid ${cssVar(colors.border.default)}`,
                   borderRadius: '8px'
                 }}
               />
               <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="positive" 
-                stroke="hsl(142, 76%, 36%)" 
+              <Line
+                type="monotone"
+                dataKey="positive"
+                stroke={cssVar(colors.status.success)}
                 strokeWidth={2}
                 name="Positive (%)"
-                dot={{ fill: 'hsl(142, 76%, 36%)' }}
+                dot={{ fill: cssVar(colors.status.success) }}
               />
-              <Line 
-                type="monotone" 
-                dataKey="neutral" 
-                stroke="hsl(215, 16%, 47%)" 
+              <Line
+                type="monotone"
+                dataKey="neutral"
+                stroke={cssVar(colors.text.muted)}
                 strokeWidth={2}
                 name="Neutral (%)"
-                dot={{ fill: 'hsl(215, 16%, 47%)' }}
+                dot={{ fill: cssVar(colors.text.muted) }}
               />
-              <Line 
-                type="monotone" 
-                dataKey="negative" 
-                stroke="hsl(0, 84%, 60%)" 
+              <Line
+                type="monotone"
+                dataKey="negative"
+                stroke={cssVar(colors.status.error)}
                 strokeWidth={2}
                 name="Negative (%)"
-                dot={{ fill: 'hsl(0, 84%, 60%)' }}
+                dot={{ fill: cssVar(colors.status.error) }}
               />
             </LineChart>
           </ResponsiveContainer>

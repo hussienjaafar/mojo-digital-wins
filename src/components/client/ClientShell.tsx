@@ -242,15 +242,27 @@ export const ClientShell = ({
   if (isLoading || !organization) {
     return (
       <div className="portal-theme portal-bg min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
+        {/* Accessibility: Ensure <main> and <h1> exist during loading for WCAG compliance */}
+        <main
+          id="main-content"
+          role="main"
+          className="text-center space-y-4"
+        >
+          {/* Visually hidden h1 for screen readers during loading state */}
+          <h1 className="sr-only">
+            {pageTitle || "Loading dashboard"}
+          </h1>
           <motion.div
             className="w-16 h-16 border-4 border-t-transparent rounded-full mx-auto"
             style={{ borderColor: "hsl(var(--portal-accent-blue))" }}
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+            aria-hidden="true"
           />
-          <p className="portal-text-secondary font-medium">Loading...</p>
-        </div>
+          <p className="portal-text-secondary font-medium" aria-live="polite">
+            Loading...
+          </p>
+        </main>
       </div>
     );
   }

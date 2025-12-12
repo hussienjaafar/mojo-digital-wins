@@ -28,3 +28,12 @@ dist-ssr
 .env.local
 .supabase
 supabase/.temp
+
+# Reports - exclude large JSON files, keep summary
+reports/*.json
+reports/*.txt
+reports/*.html
+!reports/BASELINE_SUMMARY.md
+
+# Test coverage
+coverage/

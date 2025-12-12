@@ -5,14 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { 
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
-  ComposedChart, Area, XAxis, YAxis, CartesianGrid, 
-  Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter 
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  ComposedChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter
 } from "recharts";
-import { 
+import {
   TrendingUp, TrendingDown, DollarSign, Eye, MousePointer,
-  Target, AlertCircle, ChevronDown, ChevronUp, Download, 
+  Target, AlertCircle, ChevronDown, ChevronUp, Download,
   Filter, RefreshCw, Wifi, WifiOff, Image, Video, Grid3x3,
   Smartphone, Monitor, TabletSmartphone
 } from "lucide-react";
@@ -21,6 +21,7 @@ import { useRealtimeMetrics } from "@/hooks/useRealtimeMetrics";
 import PullToRefresh from "@/components/PullToRefresh";
 import { toast } from "sonner";
 import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
+import { cssVar, colors } from "@/lib/design-tokens";
 
 type Props = {
   organizationId: string;
@@ -49,14 +50,15 @@ type AggregatedMetric = {
   top_device?: string;
 };
 
+// Chart colors using design system tokens
 const CHART_COLORS = {
-  primary: "hsl(var(--primary))",
-  secondary: "hsl(var(--secondary))",
-  accent: "hsl(var(--accent))",
-  success: "hsl(142, 76%, 36%)",
-  warning: "hsl(38, 92%, 50%)",
-  danger: "hsl(0, 84%, 60%)",
-  muted: "hsl(var(--muted-foreground))",
+  primary: cssVar(colors.accent.blue),
+  secondary: cssVar(colors.accent.purple),
+  accent: cssVar(colors.status.info),
+  success: cssVar(colors.status.success),
+  warning: cssVar(colors.status.warning),
+  danger: cssVar(colors.status.error),
+  muted: cssVar(colors.text.muted),
 };
 
 const CREATIVE_TYPE_COLORS = {

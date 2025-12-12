@@ -1,7 +1,6 @@
 import * as React from "react";
 import { type LucideIcon, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { motion } from "framer-motion";
-import { LineChart, Line, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 import { cn } from "@/lib/utils";
 import { cssVar, colors, spacing, radius } from "@/lib/design-tokens";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -118,7 +117,7 @@ const accentConfig: Record<HeroKpiAccent, {
 };
 
 // ============================================================================
-// Sparkline Component
+// Sparkline Component (Lazy Loaded)
 // ============================================================================
 
 interface SparklineProps {
@@ -127,6 +126,78 @@ interface SparklineProps {
   ariaLabel: string;
 }
 
+/**
+ * Skeleton shown while Recharts loads
+ */
+const SparklineSkeleton: React.FC<{ ariaLabel: string }> = ({ ariaLabel }) => (
+  <div
+    className="h-10 w-full flex items-center justify-center"
+    role="figure"
+    aria-label={ariaLabel}
+  >
+    <Skeleton className="w-full h-8 rounded" />
+  </div>
+);
+
+/**
+ * Lazy-loaded Sparkline inner component
+ * Recharts is only imported when this component renders
+ */
+const LazySparklineInner = React.lazy(() =>
+  import("recharts").then((mod) => ({
+    default: function SparklineInner({
+      data,
+      color,
+      ariaLabel,
+    }: SparklineProps & { data: SparklineDataPoint[] }) {
+      const { ResponsiveContainer, LineChart, Line, Tooltip } = mod;
+
+      return (
+        <div className="h-10 w-full" role="figure" aria-label={ariaLabel}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data}>
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const point = payload[0].payload as SparklineDataPoint;
+                  return (
+                    <div className="rounded-md px-2 py-1 text-xs bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))] shadow-lg">
+                      <span className="font-medium text-[hsl(var(--portal-text-primary))]">
+                        {typeof point.value === "number"
+                          ? point.value.toLocaleString()
+                          : point.value}
+                      </span>
+                      <span className="text-[hsl(var(--portal-text-muted))] ml-1">
+                        {point.date}
+                      </span>
+                    </div>
+                  );
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={color}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{
+                  r: 3,
+                  fill: color,
+                  stroke: "hsl(var(--portal-bg-secondary))",
+                  strokeWidth: 2,
+                }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      );
+    },
+  }))
+);
+
+/**
+ * Sparkline wrapper with lazy loading and Suspense
+ */
 const Sparkline: React.FC<SparklineProps> = ({ data, color, ariaLabel }) => {
   const normalizedData = React.useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -142,45 +213,13 @@ const Sparkline: React.FC<SparklineProps> = ({ data, color, ariaLabel }) => {
   if (normalizedData.length < 2) return null;
 
   return (
-    <div
-      className="h-10 w-full"
-      role="figure"
-      aria-label={ariaLabel}
-    >
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={normalizedData}>
-          <RechartsTooltip
-            content={({ active, payload }) => {
-              if (!active || !payload?.length) return null;
-              const point = payload[0].payload as SparklineDataPoint;
-              return (
-                <div className="rounded-md px-2 py-1 text-xs bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))] shadow-lg">
-                  <span className="font-medium text-[hsl(var(--portal-text-primary))]">
-                    {typeof point.value === "number" ? point.value.toLocaleString() : point.value}
-                  </span>
-                  <span className="text-[hsl(var(--portal-text-muted))] ml-1">
-                    {point.date}
-                  </span>
-                </div>
-              );
-            }}
-          />
-          <Line
-            type="monotone"
-            dataKey="value"
-            stroke={color}
-            strokeWidth={2}
-            dot={false}
-            activeDot={{
-              r: 3,
-              fill: color,
-              stroke: "hsl(var(--portal-bg-secondary))",
-              strokeWidth: 2,
-            }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+    <React.Suspense fallback={<SparklineSkeleton ariaLabel={ariaLabel} />}>
+      <LazySparklineInner
+        data={normalizedData}
+        color={color}
+        ariaLabel={ariaLabel}
+      />
+    </React.Suspense>
   );
 };
 

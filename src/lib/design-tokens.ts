@@ -219,6 +219,47 @@ export const zIndexVars = {
 } as const;
 
 // ============================================================================
+// Chart Tokens
+// ============================================================================
+
+/**
+ * Chart-specific color tokens for consistent data visualization
+ * Use chartColors for Recharts/ECharts series colors
+ */
+export const chartColors = {
+  /** Primary series colors - use for pie charts, bar series, line series */
+  series: [
+    colors.accent.blue,      // Primary - blue
+    colors.accent.purple,    // Secondary - purple
+    colors.status.success,   // Tertiary - green
+    colors.status.warning,   // Quaternary - amber
+    colors.status.error,     // Quinary - red
+    colors.status.info,      // Senary - cyan
+  ],
+  /** Grid line color */
+  grid: colors.border.default,
+  /** Axis text color */
+  axis: colors.text.muted,
+  /** Tooltip background */
+  tooltipBg: colors.bg.elevated,
+  /** Tooltip border */
+  tooltipBorder: colors.border.default,
+} as const;
+
+/**
+ * Get chart colors as CSS variable values (for inline styles)
+ * @example getChartColors() -> ['hsl(var(--portal-accent-blue))', ...]
+ */
+export const getChartColors = (): string[] =>
+  chartColors.series.map(token => cssVar(token));
+
+/**
+ * Get a single chart color by index (wraps around if index > series length)
+ */
+export const getChartColor = (index: number): string =>
+  cssVar(chartColors.series[index % chartColors.series.length]);
+
+// ============================================================================
 // Combined Tokens Object
 // ============================================================================
 
@@ -237,6 +278,7 @@ export const tokens = {
   transitionDurations,
   zIndex,
   zIndexVars,
+  chartColors,
 } as const;
 
 // ============================================================================

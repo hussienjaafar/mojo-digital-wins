@@ -10,6 +10,7 @@ import {
 import { ResponsiveChartTooltip } from "./ResponsiveChartTooltip";
 import { formatValue, ValueType } from "@/lib/chart-formatters";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { getChartColors } from "@/lib/design-tokens";
 
 interface PieDataItem {
   name: string;
@@ -29,18 +30,8 @@ interface ResponsivePieChartProps {
   labelThreshold?: number;
 }
 
-const DEFAULT_COLORS = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
-  "hsl(217, 91%, 60%)",
-  "hsl(142, 71%, 45%)",
-  "hsl(38, 92%, 50%)",
-  "hsl(0, 84%, 60%)",
-  "hsl(262, 83%, 58%)",
-];
+// Use design system chart colors
+const DEFAULT_COLORS = getChartColors();
 
 /**
  * Mobile-optimized pie chart with proper formatting and responsive behavior
