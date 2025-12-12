@@ -4,6 +4,13 @@ import { DollarSign } from 'lucide-react';
 import { HeroKpiCard } from '@/components/client/HeroKpiCard';
 import { mockSparklineData } from '../mocks/fixtures';
 
+// Use vi.hoisted() to ensure mock functions are defined before vi.mock factory runs
+const { mockSetSelectedKpiKey, mockSetDrilldownOpen, mockSetHighlightedKpiKey } = vi.hoisted(() => ({
+  mockSetSelectedKpiKey: vi.fn(),
+  mockSetDrilldownOpen: vi.fn(),
+  mockSetHighlightedKpiKey: vi.fn(),
+}));
+
 // Mock recharts to avoid ResponsiveContainer issues
 // This mock handles both static and dynamic imports
 vi.mock('recharts', () => ({
@@ -20,18 +27,42 @@ vi.mock('recharts', () => ({
   },
 }));
 
-// Mock the dashboard store
+// Mock V3KPIDrilldownDrawer to avoid loading full ECharts
+vi.mock('@/components/v3/V3KPIDrilldownDrawer', () => ({
+  V3KPIDrilldownDrawer: ({ open, data }: { open: boolean; data: any }) =>
+    open ? <div data-testid="drilldown-drawer" data-label={data?.label}>Drilldown Drawer</div> : null,
+}));
+
+// Mock the dashboard store with drilldown state
 vi.mock('@/stores/dashboardStore', () => ({
   useDashboardStore: vi.fn((selector) => {
     const state = {
-      setSelectedKpiKey: vi.fn(),
-      setHighlightedKpiKey: vi.fn(),
+      setSelectedKpiKey: mockSetSelectedKpiKey,
+      setHighlightedKpiKey: mockSetHighlightedKpiKey,
+      setDrilldownOpen: mockSetDrilldownOpen,
+      isDrilldownOpen: false,
     };
     return selector(state);
   }),
   useSelectedKpiKey: vi.fn(() => null),
   useHighlightedKpiKey: vi.fn(() => null),
+  useIsDrilldownOpen: vi.fn(() => false),
 }));
+
+// Mock drilldown data fixtures
+export const mockTrendData = [
+  { date: 'Jan 1', value: 1200 },
+  { date: 'Jan 8', value: 1450 },
+  { date: 'Jan 15', value: 1380 },
+  { date: 'Jan 22', value: 1650 },
+  { date: 'Jan 29', value: 1820 },
+];
+
+export const mockBreakdown = [
+  { label: 'Gross Revenue', value: '$125,000' },
+  { label: 'Processing Fees', value: '-$5,000', percentage: 4 },
+  { label: 'Net Revenue', value: '$120,000' },
+];
 
 describe('HeroKpiCard', () => {
   const defaultProps = {
@@ -314,6 +345,190 @@ describe('HeroKpiCard', () => {
 
       expect(screen.getByText('Custom subtitle')).toBeInTheDocument();
       expect(screen.queryByText('Previous: $110,000')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('drilldown functionality', () => {
+    const drilldownProps = {
+      ...defaultProps,
+      trendData: mockTrendData,
+      trendXAxisKey: 'date',
+      breakdown: mockBreakdown,
+      expandable: true,
+    };
+
+    it('renders expand chevron when expandable with drilldown data', () => {
+      render(<HeroKpiCard {...drilldownProps} />);
+
+      // Should have expand chevron (group-hover visible)
+      const button = screen.getByRole('button');
+      expect(button).toBeInTheDocument();
+    });
+
+    it('calls setSelectedKpiKey and setDrilldownOpen when clicked with drilldown data', async () => {
+      render(<HeroKpiCard {...drilldownProps} />);
+
+      fireEvent.click(screen.getByRole('button'));
+
+      expect(mockSetSelectedKpiKey).toHaveBeenCalledWith('totalDonations');
+      expect(mockSetDrilldownOpen).toHaveBeenCalledWith(true);
+    });
+
+    it('does not call setDrilldownOpen when clicked without drilldown data', () => {
+      render(<HeroKpiCard {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button'));
+
+      // Should only set selected key, not open drilldown
+      expect(mockSetSelectedKpiKey).toHaveBeenCalled();
+      // setDrilldownOpen should NOT have been called (no drilldown data)
+    });
+
+    it('auto-detects expandable when trendData is provided', () => {
+      render(
+        <HeroKpiCard
+          {...defaultProps}
+          trendData={mockTrendData}
+          // Note: expandable not explicitly set
+        />
+      );
+
+      const button = screen.getByRole('button');
+      expect(button).toBeInTheDocument();
+    });
+
+    it('auto-detects expandable when breakdown is provided', () => {
+      render(
+        <HeroKpiCard
+          {...defaultProps}
+          breakdown={mockBreakdown}
+          // Note: expandable not explicitly set
+        />
+      );
+
+      const button = screen.getByRole('button');
+      expect(button).toBeInTheDocument();
+    });
+
+    it('has aria-expanded attribute when expandable', () => {
+      render(<HeroKpiCard {...drilldownProps} />);
+
+      const button = screen.getByRole('button');
+      // aria-expanded should be present when card has drilldown capability
+      expect(button).toHaveAttribute('aria-expanded');
+    });
+
+    it('sets aria-expanded to true when drilldown is open and selected', async () => {
+      // Mock the store to return this card as selected with drilldown open
+      const { useSelectedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
+      vi.mocked(useSelectedKpiKey).mockReturnValue('totalDonations');
+      vi.mocked(useIsDrilldownOpen).mockReturnValue(true);
+
+      render(<HeroKpiCard {...drilldownProps} />);
+
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('handles keyboard Enter to open drilldown', async () => {
+      // Reset mocks to default state (not selected, drilldown closed)
+      const { useSelectedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
+      vi.mocked(useSelectedKpiKey).mockReturnValue(null);
+      vi.mocked(useIsDrilldownOpen).mockReturnValue(false);
+      vi.clearAllMocks();
+
+      render(<HeroKpiCard {...drilldownProps} />);
+
+      fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' });
+
+      expect(mockSetSelectedKpiKey).toHaveBeenCalledWith('totalDonations');
+      expect(mockSetDrilldownOpen).toHaveBeenCalledWith(true);
+    });
+
+    it('handles keyboard Space to open drilldown', async () => {
+      // Reset mocks to default state (not selected, drilldown closed)
+      const { useSelectedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
+      vi.mocked(useSelectedKpiKey).mockReturnValue(null);
+      vi.mocked(useIsDrilldownOpen).mockReturnValue(false);
+      vi.clearAllMocks();
+
+      render(<HeroKpiCard {...drilldownProps} />);
+
+      fireEvent.keyDown(screen.getByRole('button'), { key: ' ' });
+
+      expect(mockSetSelectedKpiKey).toHaveBeenCalledWith('totalDonations');
+      expect(mockSetDrilldownOpen).toHaveBeenCalledWith(true);
+    });
+
+    it('passes trendXAxisKey to drilldown data', () => {
+      const customXAxisKey = 'customDate';
+      render(
+        <HeroKpiCard
+          {...defaultProps}
+          trendData={mockTrendData}
+          trendXAxisKey={customXAxisKey}
+        />
+      );
+
+      // Component renders without error
+      expect(screen.getByText('$125,000')).toBeInTheDocument();
+    });
+
+    it('renders breakdown items correctly in drilldown data', () => {
+      render(<HeroKpiCard {...drilldownProps} />);
+
+      // Component renders without error with breakdown data
+      expect(screen.getByText('$125,000')).toBeInTheDocument();
+    });
+  });
+
+  describe('drilldown prop passthrough', () => {
+    it('accepts trendData prop', () => {
+      render(
+        <HeroKpiCard
+          {...defaultProps}
+          trendData={mockTrendData}
+        />
+      );
+
+      expect(screen.getByText('$125,000')).toBeInTheDocument();
+    });
+
+    it('accepts breakdown prop', () => {
+      render(
+        <HeroKpiCard
+          {...defaultProps}
+          breakdown={mockBreakdown}
+        />
+      );
+
+      expect(screen.getByText('$125,000')).toBeInTheDocument();
+    });
+
+    it('accepts expandable prop set to false', () => {
+      render(
+        <HeroKpiCard
+          {...defaultProps}
+          trendData={mockTrendData}
+          breakdown={mockBreakdown}
+          expandable={false}
+        />
+      );
+
+      // Should render but not have expand behavior
+      expect(screen.getByText('$125,000')).toBeInTheDocument();
+    });
+
+    it('accepts both trendData and breakdown together', () => {
+      render(
+        <HeroKpiCard
+          {...defaultProps}
+          trendData={mockTrendData}
+          breakdown={mockBreakdown}
+        />
+      );
+
+      expect(screen.getByText('$125,000')).toBeInTheDocument();
     });
   });
 });

@@ -1,14 +1,14 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronRight, BarChart3, Brain, LayoutDashboard, Layers, RefreshCw, Clock } from "lucide-react";
+import { ChevronRight, BarChart3, Brain, LayoutDashboard, Layers, Clock } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { OnboardingWizard } from "@/components/client/OnboardingWizard";
-import { ClientDashboardMetrics } from "@/components/client/ClientDashboardMetrics";
+import { ClientDashboardCharts } from "@/components/client/ClientDashboardCharts";
 import { ConsolidatedChannelMetrics } from "@/components/client/ConsolidatedChannelMetrics";
 import SyncControls from "@/components/client/SyncControls";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   V3Card,
@@ -18,7 +18,11 @@ import {
 } from "@/components/v3";
 import { cn } from "@/lib/utils";
 import { useDashboardStore, useDateRange } from "@/stores/dashboardStore";
-import { Button } from "@/components/ui/button";
+import { DashboardTopSection } from "@/components/client/DashboardTopSection";
+import { useClientDashboardMetricsQuery } from "@/queries";
+import { buildHeroKpis } from "@/utils/buildHeroKpis";
+import { logger } from "@/lib/logger";
+import { toast } from "sonner";
 
 // Lazy load Advanced Analytics, Donor Intelligence, and Heatmap for performance
 const AdvancedAnalytics = lazy(() => import("@/components/analytics/AdvancedAnalytics"));
@@ -199,10 +203,73 @@ const ClientDashboard = () => {
   const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
   const [showDonorIntelligence, setShowDonorIntelligence] = useState(false);
   const [showTimeAnalysis, setShowTimeAnalysis] = useState(false);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
   // V3: Use Zustand store for global date range
   const dateRange = useDateRange();
   const triggerRefresh = useDashboardStore((s) => s.triggerRefresh);
+
+  // Data fetching with TanStack Query
+  const { data, isLoading, error, refetch, dataUpdatedAt } = useClientDashboardMetricsQuery(organizationId);
+
+  // Build hero KPIs from query data
+  const heroKpis = useMemo(() => {
+    if (!data?.kpis) return [];
+    return buildHeroKpis({
+      kpis: data.kpis,
+      prevKpis: data.prevKpis || {},
+      sparklines: data.sparklines,
+      timeSeries: data.timeSeries || [],
+      metaSpend: data.metaSpend,
+      smsSpend: 0, // SMS spend not directly exposed, calculated in kpis.totalSpend
+      metaConversions: data.metaConversions,
+      smsConversions: data.smsConversions,
+      directDonations: data.directDonations,
+    });
+  }, [data]);
+
+  // Real-time subscription for live donation updates
+  useEffect(() => {
+    if (!organizationId) return;
+
+    const channel = supabase
+      .channel(`dashboard-realtime-${organizationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'actblue_transactions',
+          filter: `organization_id=eq.${organizationId}`,
+        },
+        (payload) => {
+          logger.info('New donation received via realtime', payload.new);
+          const newDonation = payload.new as any;
+
+          // Check if donation falls within current date range
+          const txDate = newDonation.transaction_date;
+          if (txDate >= dateRange.startDate && txDate <= `${dateRange.endDate}T23:59:59`) {
+            refetch();
+            toast.success(`New donation: $${Number(newDonation.amount).toFixed(2)}`, {
+              description: newDonation.donor_name || 'Anonymous donor',
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setIsRealtimeConnected(true);
+          logger.info('Dashboard realtime connected');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setIsRealtimeConnected(false);
+          logger.warn('Dashboard realtime disconnected');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [organizationId, dateRange.startDate, dateRange.endDate, refetch]);
 
   useEffect(() => {
     if (organizationId) {
@@ -245,38 +312,45 @@ const ClientDashboard = () => {
               animate="visible"
               className="space-y-6"
             >
-              {/* AT A GLANCE: Performance Overview */}
+              {/* AT A GLANCE: Performance Overview - Premium Header + KPIs */}
               <motion.section variants={sectionVariants}>
-                <V3SectionHeader
+                <DashboardTopSection
                   title="Performance Overview"
                   subtitle="Key performance indicators for your campaign"
                   icon={LayoutDashboard}
-                  actions={
-                    <div className="flex items-center gap-2">
-                      <V3DateRangePicker />
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={triggerRefresh}
-                            className="h-9 px-3 bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-hover))]"
-                          >
-                            <RefreshCw className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Refresh data</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  }
-                  className="mb-4"
-                />
-                <ClientDashboardMetrics
-                  organizationId={organizationId}
-                  startDate={dateRange.startDate}
-                  endDate={dateRange.endDate}
+                  isLive={isRealtimeConnected}
+                  lastUpdated={dataUpdatedAt ? new Date(dataUpdatedAt) : undefined}
+                  controls={<V3DateRangePicker />}
+                  kpis={heroKpis}
+                  isLoading={isLoading}
+                  error={error instanceof Error ? error.message : error ? String(error) : null}
+                  onRetry={() => refetch()}
+                  onRefresh={() => {
+                    triggerRefresh();
+                    refetch();
+                  }}
+                  showRefresh
+                  gridColumns={{ mobile: 2, tablet: 3, desktop: 6 }}
                 />
               </motion.section>
+
+              {/* Charts Section */}
+              {data && (
+                <motion.section variants={sectionVariants}>
+                  <ClientDashboardCharts
+                    kpis={data.kpis}
+                    timeSeries={data.timeSeries}
+                    channelBreakdown={data.channelBreakdown}
+                    metaSpend={data.metaSpend}
+                    metaConversions={data.metaConversions}
+                    smsConversions={data.smsConversions}
+                    smsMessagesSent={data.smsMessagesSent}
+                    directDonations={data.directDonations}
+                    startDate={dateRange.startDate}
+                    endDate={dateRange.endDate}
+                  />
+                </motion.section>
+              )}
 
               {/* DEEP DIVE: Channel Details */}
               <motion.section variants={sectionVariants}>

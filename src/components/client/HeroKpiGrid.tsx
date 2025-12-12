@@ -2,7 +2,7 @@ import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type LucideIcon, AlertCircle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HeroKpiCard, type HeroKpiAccent, type SparklineDataPoint } from "./HeroKpiCard";
+import { HeroKpiCard, type HeroKpiAccent, type SparklineDataPoint, type BreakdownItem } from "./HeroKpiCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import type { KpiKey } from "@/stores/dashboardStore";
@@ -36,6 +36,16 @@ export interface HeroKpiData {
   sparklineData?: SparklineDataPoint[] | number[];
   /** Description for tooltip */
   description?: string;
+
+  // ========== Drilldown Props ==========
+  /** Time series data for drill-down chart */
+  trendData?: Record<string, unknown>[];
+  /** X-axis key for trend data (default: "date") */
+  trendXAxisKey?: string;
+  /** Breakdown items for drill-down table */
+  breakdown?: BreakdownItem[];
+  /** Whether card is expandable (auto-detected if trendData or breakdown present) */
+  expandable?: boolean;
 }
 
 export interface HeroKpiGridProps {
@@ -268,6 +278,11 @@ export const HeroKpiGrid: React.FC<HeroKpiGridProps> = ({
               accent={kpi.accent}
               sparklineData={kpi.sparklineData}
               description={kpi.description}
+              // Drilldown props
+              trendData={kpi.trendData}
+              trendXAxisKey={kpi.trendXAxisKey ?? "date"}
+              breakdown={kpi.breakdown}
+              expandable={kpi.expandable ?? Boolean(kpi.trendData || kpi.breakdown)}
             />
           </motion.div>
         ))}

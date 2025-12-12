@@ -1,30 +1,30 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useMemo, useCallback } from "react";
 import {
   V3Card,
   V3CardHeader,
   V3CardTitle,
   V3CardContent,
   V3ChartWrapper,
-  V3LoadingState,
-  V3ErrorState,
 } from "@/components/v3";
-import { HeroKpiGrid, type HeroKpiData } from "@/components/client/HeroKpiGrid";
-import type { HeroKpiAccent } from "@/components/client/HeroKpiCard";
 import { EChartsLineChart, type LineSeriesConfig } from "@/components/charts/echarts";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
-import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, CopyMinus, SlidersHorizontal, ZoomIn } from "lucide-react";
+import { DollarSign, TrendingUp, Target, MessageSquare, CopyMinus, SlidersHorizontal, ZoomIn } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { logger } from "@/lib/logger";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useClientDashboardMetricsQuery } from "@/queries";
 import { useHoveredDataPoint } from "@/stores/chartInteractionStore";
-import type { KpiKey, SeriesKey } from "@/stores/dashboardStore";
+import type { SeriesKey } from "@/stores/dashboardStore";
 import { cssVar, colors } from "@/lib/design-tokens";
+import type { DashboardKPIs, DashboardTimeSeriesPoint, ChannelBreakdown } from "@/queries/useClientDashboardMetricsQuery";
 
-interface ClientDashboardMetricsProps {
-  organizationId: string;
+interface ClientDashboardChartsProps {
+  kpis: DashboardKPIs;
+  timeSeries: DashboardTimeSeriesPoint[];
+  channelBreakdown: ChannelBreakdown[];
+  metaSpend: number;
+  metaConversions: number;
+  smsConversions: number;
+  smsMessagesSent: number;
+  directDonations: number;
   startDate: string;
   endDate: string;
 }
@@ -43,78 +43,24 @@ const palette = {
   smsPrev: cssVar(colors.accent.purple, 0.5),
 };
 
-
-export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: ClientDashboardMetricsProps) => {
-  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+export const ClientDashboardCharts = ({
+  kpis,
+  timeSeries,
+  channelBreakdown,
+  metaSpend,
+  metaConversions,
+  smsConversions,
+  smsMessagesSent,
+  directDonations,
+  startDate,
+  endDate,
+}: ClientDashboardChartsProps) => {
   const [showCompare, setShowCompare] = useState(false);
   const [valueMode, setValueMode] = useState<"both" | "net">("both");
   const [showZoom, setShowZoom] = useState(false);
-  
+
   // Cross-highlighting state from store
   const hoveredDataPoint = useHoveredDataPoint();
-
-  // Use TanStack Query hook
-  const { data, isLoading, error, refetch } = useClientDashboardMetricsQuery(organizationId);
-
-  const kpis = data?.kpis;
-  const prevKpis = data?.prevKpis || {};
-  const timeSeriesData = data?.timeSeries || [];
-  const channelBreakdown = data?.channelBreakdown || [];
-  const sparklines = data?.sparklines;
-
-  const scrollToId = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  // Real-time subscription for live donation updates
-  useEffect(() => {
-    const channel = supabase
-      .channel(`dashboard-realtime-${organizationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'actblue_transactions',
-          filter: `organization_id=eq.${organizationId}`,
-        },
-        (payload) => {
-          logger.info('New donation received via realtime', payload.new);
-          const newDonation = payload.new as any;
-          
-          // Check if donation falls within current date range
-          const txDate = newDonation.transaction_date;
-          if (txDate >= startDate && txDate <= `${endDate}T23:59:59`) {
-            // Refetch data to update KPIs
-            refetch();
-            
-            toast.success(`New donation: $${Number(newDonation.amount).toFixed(2)}`, {
-              description: newDonation.donor_name || 'Anonymous donor',
-            });
-          }
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setIsRealtimeConnected(true);
-          logger.info('Dashboard realtime connected');
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setIsRealtimeConnected(false);
-          logger.warn('Dashboard realtime disconnected');
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [organizationId, startDate, endDate, refetch]);
-
-  // Calculate percentage change
-  const calcChange = useCallback((current: number, previous: number | undefined) => {
-    if (!previous || previous === 0) return current > 0 ? 100 : 0;
-    return ((current - previous) / previous) * 100;
-  }, []);
 
   const formatCurrency = useCallback((value: number) => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
@@ -160,229 +106,8 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     return [...base, ...compare];
   }, [showCompare, valueMode]);
 
-  // Build trend data for drilldown from time series
-  const buildTrendData = useCallback((dataKey: string) => {
-    if (!timeSeriesData || timeSeriesData.length === 0) return undefined;
-    return timeSeriesData.map((d: any) => ({
-      date: d.name,
-      value: d[dataKey] ?? 0,
-    }));
-  }, [timeSeriesData]);
-
-  // Hero KPIs configuration with sparkline data and kpiKey for cross-highlighting
-  const heroKpis: HeroKpiData[] = useMemo(() => {
-    if (!kpis) return [];
-    return [
-      {
-        kpiKey: "netRevenue" as KpiKey,
-        label: "Net Revenue",
-        value: formatCurrency(kpis.totalNetRevenue),
-        icon: Wallet,
-        trend: {
-          value: Math.round(calcChange(kpis.totalNetRevenue, prevKpis.totalNetRevenue)),
-          isPositive: kpis.totalNetRevenue >= (prevKpis.totalNetRevenue || 0),
-          label: "vs prev",
-        },
-        previousValue: prevKpis.totalNetRevenue ? formatCurrency(prevKpis.totalNetRevenue) : undefined,
-        subtitle: `Gross: ${formatCurrency(kpis.totalRaised)} (${kpis.feePercentage.toFixed(1)}% fees)`,
-        accent: "green" as HeroKpiAccent,
-        sparklineData: sparklines?.netRevenue || [],
-        description: "Total donations minus processing fees and refunds",
-        // Drilldown data
-        trendData: buildTrendData("netDonations"),
-        trendXAxisKey: "date",
-        breakdown: [
-          { label: "Gross Revenue", value: formatCurrency(kpis.totalRaised) },
-          { label: "Processing Fees", value: `-${formatCurrency(kpis.processingFees || 0)}`, percentage: kpis.feePercentage },
-          { label: "Refunds", value: `-${formatCurrency(kpis.refundAmount)}`, percentage: kpis.refundRate },
-          { label: "Net Revenue", value: formatCurrency(kpis.totalNetRevenue) },
-        ],
-      },
-      {
-        kpiKey: "netRoi" as KpiKey,
-        label: "Net ROI",
-        value: `${kpis.roi.toFixed(1)}x`,
-        icon: TrendingUp,
-        trend: {
-          value: Math.round(calcChange(kpis.roi, prevKpis.roi)),
-          isPositive: kpis.roi >= (prevKpis.roi || 0),
-          label: "vs prev",
-        },
-        previousValue: prevKpis.roi ? `${prevKpis.roi.toFixed(1)}x` : undefined,
-        subtitle: `Spend: ${formatCurrency(kpis.totalSpend)}`,
-        accent: "blue" as HeroKpiAccent,
-        sparklineData: sparklines?.roi || [],
-        description: "Return on investment: Net Revenue / Total Spend",
-        // Drilldown data
-        trendData: buildTrendData("netDonations"),
-        trendXAxisKey: "date",
-        breakdown: [
-          { label: "Net Revenue", value: formatCurrency(kpis.totalNetRevenue) },
-          { label: "Meta Ad Spend", value: formatCurrency(data?.metaSpend || 0) },
-          { label: "SMS Spend", value: formatCurrency(data?.smsSpend || 0) },
-          { label: "Total Spend", value: formatCurrency(kpis.totalSpend) },
-          { label: "ROI Multiplier", value: `${kpis.roi.toFixed(2)}x` },
-        ],
-      },
-      {
-        kpiKey: "refundRate" as KpiKey,
-        label: "Refund Rate",
-        value: `${kpis.refundRate.toFixed(1)}%`,
-        icon: Target,
-        trend: {
-          value: Math.round(calcChange(kpis.refundRate, prevKpis.refundRate)),
-          isPositive: kpis.refundRate <= (prevKpis.refundRate || 0),
-          label: "vs prev",
-        },
-        previousValue: prevKpis.refundRate ? `${prevKpis.refundRate.toFixed(1)}%` : undefined,
-        subtitle: `Refunds: ${formatCurrency(kpis.refundAmount)}`,
-        accent: (kpis.refundRate > 5 ? "red" : "default") as HeroKpiAccent,
-        sparklineData: sparklines?.refundRate || [],
-        description: "Percentage of donations refunded",
-        // Drilldown data
-        trendData: buildTrendData("refunds"),
-        trendXAxisKey: "date",
-        breakdown: [
-          { label: "Total Refunded", value: formatCurrency(kpis.refundAmount) },
-          { label: "Refund Rate", value: `${kpis.refundRate.toFixed(2)}%` },
-          { label: "Total Donations", value: formatCurrency(kpis.totalRaised) },
-        ],
-      },
-      {
-        kpiKey: "recurringHealth" as KpiKey,
-        label: "Recurring Health",
-        value: formatCurrency(kpis.recurringRaised),
-        icon: Repeat,
-        trend: {
-          value: Math.round(calcChange(kpis.recurringChurnRate, prevKpis.recurringChurnRate)),
-          isPositive: kpis.recurringChurnRate <= (prevKpis.recurringChurnRate || 0),
-          label: "churn",
-        },
-        previousValue: prevKpis.recurringRaised ? formatCurrency(prevKpis.recurringRaised) : undefined,
-        subtitle: `${kpis.recurringDonations} recurring tx • Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
-        accent: "amber" as HeroKpiAccent,
-        sparklineData: sparklines?.recurringHealth || [],
-        description: "Active recurring donation revenue",
-        // Drilldown data
-        trendData: buildTrendData("donations"),
-        trendXAxisKey: "date",
-        breakdown: [
-          { label: "Recurring Revenue", value: formatCurrency(kpis.recurringRaised) },
-          { label: "Recurring Transactions", value: kpis.recurringDonations.toLocaleString() },
-          { label: "Recurring %", value: `${kpis.recurringPercentage.toFixed(1)}%` },
-          { label: "Churn Rate", value: `${kpis.recurringChurnRate.toFixed(1)}%` },
-        ],
-      },
-      {
-        kpiKey: "attributionQuality" as KpiKey,
-        label: "Attribution Quality",
-        value: `${kpis.deterministicRate.toFixed(0)}%`,
-        icon: CopyMinus,
-        trend: { value: 0, isPositive: true },
-        subtitle: "Deterministic (refcode/click)",
-        accent: "purple" as HeroKpiAccent,
-        sparklineData: sparklines?.attributionQuality || [],
-        description: "Percentage of donations with deterministic attribution",
-        // Drilldown data
-        breakdown: [
-          { label: "Deterministic Rate", value: `${kpis.deterministicRate.toFixed(1)}%` },
-          { label: "Meta Conversions", value: (data?.metaConversions || 0).toLocaleString() },
-          { label: "SMS Conversions", value: (data?.smsConversions || 0).toLocaleString() },
-          { label: "Direct Donations", value: (data?.directDonations || 0).toLocaleString() },
-        ],
-      },
-      {
-        kpiKey: "uniqueDonors" as KpiKey,
-        label: "Unique Donors",
-        value: kpis.uniqueDonors.toLocaleString(),
-        icon: Users,
-        trend: {
-          value: Math.round(calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors)),
-          isPositive: kpis.uniqueDonors >= (prevKpis.uniqueDonors || 0),
-          label: "vs prev",
-        },
-        previousValue: prevKpis.uniqueDonors ? prevKpis.uniqueDonors.toLocaleString() : undefined,
-        subtitle: `New ${kpis.newDonors} / Returning ${kpis.returningDonors}`,
-        accent: "blue" as HeroKpiAccent,
-        sparklineData: sparklines?.uniqueDonors || [],
-        description: "Number of unique donors in period",
-        // Drilldown data
-        trendData: buildTrendData("donations"),
-        trendXAxisKey: "date",
-        breakdown: [
-          { label: "Unique Donors", value: kpis.uniqueDonors.toLocaleString() },
-          { label: "New Donors", value: kpis.newDonors.toLocaleString() },
-          { label: "Returning Donors", value: kpis.returningDonors.toLocaleString() },
-          { label: "Average Donation", value: formatCurrency(kpis.avgDonation) },
-        ],
-      },
-    ];
-  }, [kpis, prevKpis, calcChange, formatCurrency, sparklines, buildTrendData, data]);
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <V3LoadingState variant="kpi-grid" count={6} />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <V3LoadingState variant="chart" height={320} />
-          </div>
-          <V3LoadingState variant="chart" height={320} />
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <V3ErrorState
-        title="Failed to load dashboard metrics"
-        message={error instanceof Error ? error.message : 'An error occurred'}
-        onRetry={() => refetch()}
-      />
-    );
-  }
-
-  if (!kpis) {
-    return null;
-  }
-
   return (
     <div className="space-y-6">
-      {/* Realtime Connection Indicator */}
-      <div className="flex items-center gap-2 text-sm">
-        {isRealtimeConnected ? (
-          <>
-            <Wifi className="h-4 w-4 text-[hsl(var(--portal-success))]" />
-            <span className="text-[hsl(var(--portal-text-muted))]">Live updates enabled</span>
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[hsl(var(--portal-success))] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[hsl(var(--portal-success))]"></span>
-            </span>
-          </>
-        ) : (
-          <>
-            <WifiOff className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
-            <span className="text-[hsl(var(--portal-text-muted))]">Connecting...</span>
-          </>
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 text-xs text-[hsl(var(--portal-text-muted))]">
-        <span className="px-2 py-1 rounded-md border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
-          Range: {format(parseISO(startDate), 'MMM d')} – {format(parseISO(endDate), 'MMM d')}
-        </span>
-      </div>
-
-      {/* Hero KPI Grid */}
-      <HeroKpiGrid
-        data={heroKpis}
-        isLoading={false}
-        mobileColumns={2}
-        tabletColumns={3}
-        desktopColumns={6}
-      />
-
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Fundraising Trend - Main Chart */}
@@ -469,7 +194,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
             </div>
           </div>
           <EChartsLineChart
-            data={timeSeriesData}
+            data={timeSeries}
             xAxisKey="name"
             series={echartsSeriesConfig}
             height={280}
@@ -500,12 +225,12 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Meta Ads</p>
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                    {formatCurrency(data?.metaSpend || 0)} spent
+                    {formatCurrency(metaSpend)} spent
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
-                    {data?.metaConversions || 0}
+                    {metaConversions}
                   </p>
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">conversions</p>
                 </div>
@@ -519,12 +244,12 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">SMS Campaigns</p>
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                    {(data?.smsMessagesSent || 0).toLocaleString()} sent
+                    {smsMessagesSent.toLocaleString()} sent
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
-                    {data?.smsConversions || 0}
+                    {smsConversions}
                   </p>
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">conversions</p>
                 </div>
@@ -541,7 +266,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
-                    {data?.directDonations || 0}
+                    {directDonations}
                   </p>
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">donations</p>
                 </div>
@@ -625,8 +350,8 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
               <div className="text-center">
                 <p className={cn(
                   "text-xl font-semibold",
-                  kpis.recurringChurnRate > 5 
-                    ? "text-[hsl(var(--portal-error))]" 
+                  kpis.recurringChurnRate > 5
+                    ? "text-[hsl(var(--portal-error))]"
                     : "text-[hsl(var(--portal-text-primary))]"
                 )}>
                   {kpis.recurringChurnRate.toFixed(1)}%

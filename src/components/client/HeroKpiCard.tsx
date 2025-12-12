@@ -1,6 +1,6 @@
 import * as React from "react";
-import { type LucideIcon, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { motion } from "framer-motion";
+import { type LucideIcon, TrendingUp, TrendingDown, Minus, ChevronRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { cssVar, colors, spacing, radius } from "@/lib/design-tokens";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,8 +14,11 @@ import {
   useDashboardStore,
   useSelectedKpiKey,
   useHighlightedKpiKey,
+  useIsDrilldownOpen,
   type KpiKey,
 } from "@/stores/dashboardStore";
+import { V3KPIDrilldownDrawer, type KPIDrilldownData } from "@/components/v3/V3KPIDrilldownDrawer";
+import type { LineSeriesConfig } from "@/components/charts/echarts";
 
 // ============================================================================
 // Types
@@ -26,6 +29,13 @@ export type HeroKpiAccent = "blue" | "green" | "purple" | "amber" | "red" | "def
 export interface SparklineDataPoint {
   date: string;
   value: number;
+}
+
+/** Breakdown item for drilldown table */
+export interface BreakdownItem {
+  label: string;
+  value: string | number;
+  percentage?: number;
 }
 
 export interface HeroKpiCardProps {
@@ -59,6 +69,16 @@ export interface HeroKpiCardProps {
   onClick?: () => void;
   /** Additional className */
   className?: string;
+
+  // ========== Drilldown Props ==========
+  /** Time series data for drill-down chart */
+  trendData?: Record<string, unknown>[];
+  /** X-axis key for trend data (default: "date") */
+  trendXAxisKey?: string;
+  /** Breakdown items for drill-down table */
+  breakdown?: BreakdownItem[];
+  /** Whether card is expandable (auto-detected if trendData or breakdown present) */
+  expandable?: boolean;
 }
 
 // ============================================================================
@@ -295,19 +315,86 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
   isLoading,
   onClick,
   className,
+  // Drilldown props
+  trendData,
+  trendXAxisKey = "date",
+  breakdown,
+  expandable,
 }) => {
+  const cardRef = React.useRef<HTMLElement>(null);
   const setSelectedKpi = useDashboardStore((s) => s.setSelectedKpiKey);
   const setHighlightedKpi = useDashboardStore((s) => s.setHighlightedKpiKey);
+  const setDrilldownOpen = useDashboardStore((s) => s.setDrilldownOpen);
   const selectedKpiKey = useSelectedKpiKey();
   const highlightedKpiKey = useHighlightedKpiKey();
+  const isDrilldownOpen = useIsDrilldownOpen();
 
   const isSelected = selectedKpiKey === kpiKey;
   const isHighlighted = highlightedKpiKey === kpiKey;
   const config = accentConfig[accent];
 
+  // Auto-detect if expandable based on drilldown data
+  const isExpandable = expandable ?? Boolean(trendData || breakdown);
+  const hasDrilldownData = Boolean(trendData || breakdown);
+
+  // Build drilldown data for the drawer
+  const drilldownData = React.useMemo((): KPIDrilldownData | null => {
+    if (!hasDrilldownData) return null;
+
+    // Determine series color based on accent
+    const seriesColor =
+      accent === "green" ? "hsl(var(--portal-success))" :
+      accent === "purple" ? "hsl(var(--portal-accent-purple))" :
+      accent === "amber" ? "hsl(var(--portal-warning))" :
+      accent === "red" ? "hsl(var(--portal-error))" :
+      "hsl(var(--portal-accent-blue))";
+
+    return {
+      label,
+      value,
+      icon: Icon,
+      trend,
+      description,
+      timeSeriesData: trendData,
+      timeSeriesConfig: trendData ? {
+        xAxisKey: trendXAxisKey,
+        series: [{
+          dataKey: "value",
+          name: label,
+          color: seriesColor,
+          type: "area",
+          areaStyle: { opacity: 0.1 },
+        }] as LineSeriesConfig[],
+      } : undefined,
+      breakdown,
+    };
+  }, [label, value, Icon, trend, description, trendData, trendXAxisKey, breakdown, accent, hasDrilldownData]);
+
   const handleClick = () => {
-    setSelectedKpi(isSelected ? null : kpiKey);
+    if (isExpandable && hasDrilldownData) {
+      if (isSelected && isDrilldownOpen) {
+        // Close drawer if already selected and open
+        setDrilldownOpen(false);
+        setSelectedKpi(null);
+      } else {
+        // Open drawer and select this KPI
+        setSelectedKpi(kpiKey);
+        setDrilldownOpen(true);
+      }
+    } else {
+      // Toggle selection for non-expandable cards (cross-highlighting)
+      setSelectedKpi(isSelected ? null : kpiKey);
+    }
     onClick?.();
+  };
+
+  const handleDrawerOpenChange = (open: boolean) => {
+    setDrilldownOpen(open);
+    if (!open) {
+      setSelectedKpi(null);
+      // Restore focus to the card after drawer closes
+      cardRef.current?.focus();
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -331,9 +418,10 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
 
   const cardContent = (
     <motion.article
+      ref={cardRef}
       className={cn(
         // Base styles using tokens
-        "relative p-4 rounded-xl border cursor-pointer",
+        "group relative p-4 rounded-xl border cursor-pointer",
         "bg-[hsl(var(--portal-bg-secondary))]",
         "border-[hsl(var(--portal-border))]",
         // Transitions
@@ -365,7 +453,8 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
       tabIndex={0}
       role="button"
       aria-pressed={isSelected}
-      aria-label={`${label}: ${value}${trend ? `, ${trend.value > 0 ? "up" : "down"} ${Math.abs(trend.value)}%` : ""}`}
+      aria-expanded={isExpandable ? (isSelected && isDrilldownOpen) : undefined}
+      aria-label={`${label}: ${value}${trend ? `, ${trend.value > 0 ? "up" : "down"} ${Math.abs(trend.value)}%` : ""}${isExpandable ? ", click to expand details" : ""}`}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       initial={{ opacity: 0, y: 10 }}
@@ -454,27 +543,62 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
           exit={{ opacity: 0 }}
         />
       )}
+
+      {/* Expand affordance (chevron) - shows on hover for expandable cards */}
+      {isExpandable && (
+        <motion.div
+          className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"
+          initial={{ opacity: 0, x: -4 }}
+          whileHover={{ opacity: 1, x: 0 }}
+        >
+          <ChevronRight
+            className={cn(
+              "h-4 w-4 text-[hsl(var(--portal-text-muted))]",
+              "transition-transform duration-200",
+              isSelected && isDrilldownOpen && "rotate-90"
+            )}
+            aria-hidden="true"
+          />
+        </motion.div>
+      )}
     </motion.article>
   );
 
-  // Wrap with tooltip if description provided
-  if (description) {
-    return (
-      <TooltipProvider delayDuration={400}>
-        <Tooltip>
-          <TooltipTrigger asChild>{cardContent}</TooltipTrigger>
-          <TooltipContent
-            side="bottom"
-            className="max-w-xs text-sm bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
-          >
-            <p>{description}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
+  // Render with tooltip and/or drawer
+  const renderContent = () => {
+    // Wrap with tooltip if description provided
+    if (description) {
+      return (
+        <TooltipProvider delayDuration={400}>
+          <Tooltip>
+            <TooltipTrigger asChild>{cardContent}</TooltipTrigger>
+            <TooltipContent
+              side="bottom"
+              className="max-w-xs text-sm bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+            >
+              <p>{description}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+    return cardContent;
+  };
 
-  return cardContent;
+  return (
+    <>
+      {renderContent()}
+
+      {/* Drilldown Drawer - only render for this card if selected */}
+      {isExpandable && drilldownData && (
+        <V3KPIDrilldownDrawer
+          open={isSelected && isDrilldownOpen}
+          onOpenChange={handleDrawerOpenChange}
+          data={drilldownData}
+        />
+      )}
+    </>
+  );
 };
 
 export default HeroKpiCard;
