@@ -9,8 +9,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { BarChart3 } from 'lucide-react';
+import { ChartPanel } from '@/components/charts/ChartPanel';
 import { ResponsiveChartTooltip } from '@/components/charts/ResponsiveChartTooltip';
 import { getYAxisFormatter, formatValue, ValueType, reduceDataPoints } from '@/lib/chart-formatters';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -25,6 +25,9 @@ type Props = {
   previousLabel?: string;
   xAxisKey?: string;
   valueType?: ValueType;
+  isLoading?: boolean;
+  error?: Error | string | null;
+  onRetry?: () => void;
 };
 
 export const ComparisonChart = memo(({
@@ -37,9 +40,12 @@ export const ComparisonChart = memo(({
   previousLabel = 'Previous Period',
   xAxisKey = 'date',
   valueType = 'number',
+  isLoading = false,
+  error,
+  onRetry,
 }: Props) => {
   const isMobile = useIsMobile();
-  const chartHeight = isMobile ? 220 : 300;
+  const chartHeight = isMobile ? 220 : 280;
 
   // Reduce data points on mobile
   const chartData = useMemo(() => {
@@ -50,11 +56,12 @@ export const ComparisonChart = memo(({
   }, [data, isMobile]);
 
   // Calculate overall change
-  const currentTotal = data.reduce((sum, item) => sum + (item[currentKey] || 0), 0);
-  const previousTotal = data.reduce((sum, item) => sum + (item[previousKey] || 0), 0);
-  const overallChange = previousTotal !== 0 
-    ? ((currentTotal - previousTotal) / previousTotal) * 100 
-    : 0;
+  const { currentTotal, previousTotal, overallChange } = useMemo(() => {
+    const current = data.reduce((sum, item) => sum + (item[currentKey] || 0), 0);
+    const previous = data.reduce((sum, item) => sum + (item[previousKey] || 0), 0);
+    const change = previous !== 0 ? ((current - previous) / previous) * 100 : 0;
+    return { currentTotal: current, previousTotal: previous, overallChange: change };
+  }, [data, currentKey, previousKey]);
 
   const formatXAxis = (value: string) => {
     try {
@@ -65,34 +72,39 @@ export const ComparisonChart = memo(({
     }
   };
 
+  const isEmpty = !data || data.length === 0;
+
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <CardTitle className="text-base sm:text-lg">{title}</CardTitle>
-            {description && <CardDescription className="text-xs sm:text-sm">{description}</CardDescription>}
-          </div>
-          <Badge variant={overallChange >= 0 ? 'default' : 'destructive'} className="flex-shrink-0">
-            {overallChange >= 0 ? '+' : ''}{overallChange.toFixed(1)}%
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
+    <ChartPanel
+      title={title}
+      description={description}
+      icon={BarChart3}
+      trend={{
+        value: overallChange,
+        isPositive: overallChange >= 0,
+      }}
+      isLoading={isLoading}
+      error={error}
+      onRetry={onRetry}
+      isEmpty={isEmpty}
+      emptyMessage="No comparison data available for this period"
+      minHeight={chartHeight + 80} // Extra for summary
+    >
+      <div className="space-y-4">
         <div style={{ height: chartHeight }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 8, right: isMobile ? 8 : 16, bottom: 4, left: isMobile ? -12 : 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--portal-border))" opacity={0.4} vertical={false} />
               <XAxis
                 dataKey={xAxisKey}
-                tick={{ fontSize: isMobile ? 10 : 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: isMobile ? 10 : 11, fill: "hsl(var(--portal-text-muted))" }}
                 tickLine={false}
-                axisLine={{ stroke: "hsl(var(--border))", opacity: 0.5 }}
+                axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
                 tickFormatter={formatXAxis}
                 interval={isMobile ? "preserveStartEnd" : "equidistantPreserveStart"}
               />
               <YAxis
-                tick={{ fontSize: isMobile ? 10 : 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: isMobile ? 10 : 11, fill: "hsl(var(--portal-text-muted))" }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={getYAxisFormatter(valueType)}
@@ -102,14 +114,14 @@ export const ComparisonChart = memo(({
               <Legend wrapperStyle={{ fontSize: isMobile ? 10 : 12 }} iconSize={isMobile ? 8 : 10} />
               <Bar
                 dataKey={currentKey}
-                fill="hsl(var(--primary))"
+                fill="hsl(var(--portal-accent-blue))"
                 name={currentLabel}
                 radius={[4, 4, 0, 0]}
                 maxBarSize={isMobile ? 25 : 40}
               />
               <Bar
                 dataKey={previousKey}
-                fill="hsl(var(--muted-foreground))"
+                fill="hsl(var(--portal-text-muted))"
                 name={previousLabel}
                 opacity={0.6}
                 radius={[4, 4, 0, 0]}
@@ -120,22 +132,22 @@ export const ComparisonChart = memo(({
         </div>
 
         {/* Summary */}
-        <div className="mt-4 grid grid-cols-2 gap-4 pt-4 border-t">
+        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[hsl(var(--portal-border)/0.5)]">
           <div>
-            <div className="text-xs sm:text-sm text-muted-foreground">{currentLabel}</div>
-            <div className="text-lg sm:text-2xl font-bold">
+            <div className="text-xs sm:text-sm text-[hsl(var(--portal-text-muted))]">{currentLabel}</div>
+            <div className="text-lg sm:text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
               {formatValue(currentTotal, valueType)}
             </div>
           </div>
           <div>
-            <div className="text-xs sm:text-sm text-muted-foreground">{previousLabel}</div>
-            <div className="text-lg sm:text-2xl font-bold">
+            <div className="text-xs sm:text-sm text-[hsl(var(--portal-text-muted))]">{previousLabel}</div>
+            <div className="text-lg sm:text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
               {formatValue(previousTotal, valueType)}
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </ChartPanel>
   );
 });
 

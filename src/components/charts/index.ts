@@ -21,6 +21,14 @@ export * from "./tremor";
 // Advanced charts
 export { CalendarHeatmap, type CalendarHeatmapProps, type HeatmapDataPoint } from "./CalendarHeatmap";
 
+// Chart shell components
+export {
+  ChartPanel,
+  type ChartPanelProps,
+  type ChartPanelStatus,
+  type ChartPanelTrend
+} from "./ChartPanel";
+
 // Re-export formatters for convenience
 export { 
   formatCurrency, 

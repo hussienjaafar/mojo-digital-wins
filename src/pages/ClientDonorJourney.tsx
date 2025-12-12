@@ -1,348 +1,748 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { ArrowRight, DollarSign, Target, MessageSquare, Mail, MousePointerClick } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { format, formatDistanceToNow } from "date-fns";
+import {
+  Users,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Target,
+  RefreshCw,
+  Filter,
+  ArrowRight,
+  MessageSquare,
+  Mail,
+  MousePointerClick,
+  Clock,
+  Activity,
+  ChevronRight,
+  Layers,
+  Heart,
+  type LucideIcon,
+} from "lucide-react";
+import { ClientShell } from "@/components/client/ClientShell";
+import { ChartPanel } from "@/components/charts/ChartPanel";
+import { DonorSegmentCard } from "@/components/client/DonorSegmentCard";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { Session } from "@supabase/supabase-js";
-import { ClientLayout } from "@/components/client/ClientLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { useClientOrganization } from "@/hooks/useClientOrganization";
+import {
+  useDonorJourneyQuery,
+  useRefreshJourneyData,
+  type DonorJourneyRecord,
+  type DonorSegmentSummary,
+  type FunnelStage,
+} from "@/queries/useDonorJourneyQuery";
 
-type Organization = {
-  id: string;
-  name: string;
-  logo_url: string | null;
-};
+// ============================================================================
+// Local Components
+// ============================================================================
 
-type TouchpointType = {
-  id: string;
-  touchpoint_type: string;
-  occurred_at: string;
-  utm_source: string | null;
-  utm_medium: string | null;
-  utm_campaign: string | null;
-  metadata: any;
-};
+interface MetricChipProps {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+  variant?: "default" | "success" | "warning" | "error" | "info";
+}
 
-type DonorJourney = {
-  donor_email: string;
-  transaction_date: string;
-  amount: number;
-  touchpoints: TouchpointType[];
-  attribution_weights: {
-    first_touch: number;
-    middle_touch: number;
-    last_touch: number;
+const MetricChip = ({ label, value, icon: Icon, variant = "default" }: MetricChipProps) => {
+  const variantStyles = {
+    default: "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]",
+    success: "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
+    warning: "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]",
+    error: "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))]",
+    info: "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))]",
   };
-};
-
-const getTouchpointIcon = (type: string) => {
-  switch (type) {
-    case 'meta_ad_click':
-      return <MousePointerClick className="h-5 w-5 text-info" />;
-    case 'sms_send':
-      return <MessageSquare className="h-5 w-5 text-success" />;
-    case 'email_open':
-    case 'email_click':
-      return <Mail className="h-5 w-5 text-secondary" />;
-    default:
-      return <Target className="h-5 w-5 text-muted-foreground" />;
-  }
-};
-
-const getTouchpointColor = (type: string) => {
-  switch (type) {
-    case 'meta_ad_click':
-      return 'bg-info/10 text-info border-info/20';
-    case 'sms_send':
-      return 'bg-success/10 text-success border-success/20';
-    case 'email_open':
-    case 'email_click':
-      return 'bg-secondary/10 text-secondary border-secondary/20';
-    default:
-      return 'bg-muted/50 text-muted-foreground border-border';
-  }
-};
-
-const ClientDonorJourney = () => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [session, setSession] = useState<Session | null>(null);
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [journeys, setJourneys] = useState<DonorJourney[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [minAmount, setMinAmount] = useState("0");
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (!session) {
-        navigate("/client-login");
-      }
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (!session) {
-        navigate("/client-login");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  useEffect(() => {
-    if (session?.user) {
-      loadData();
-    }
-  }, [session, minAmount]);
-
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Load organization
-      const { data: clientUser } = await (supabase as any)
-        .from('client_users')
-        .select('organization_id')
-        .eq('id', session?.user?.id)
-        .maybeSingle();
-
-      if (!clientUser) throw new Error("Organization not found");
-
-      const { data: org } = await (supabase as any)
-        .from('client_organizations')
-        .select('*')
-        .eq('id', clientUser.organization_id)
-        .maybeSingle();
-
-      setOrganization(org);
-
-      // Load transactions (using secure view for defense-in-depth PII protection)
-      const { data: transactions } = await (supabase as any)
-        .from('actblue_transactions_secure')
-        .select('*')
-        .eq('organization_id', clientUser.organization_id)
-        .gte('amount', Number(minAmount))
-        .order('transaction_date', { ascending: false })
-        .limit(20);
-
-      if (!transactions) {
-        setJourneys([]);
-        return;
-      }
-
-      // For each transaction, load attribution touchpoints
-      const journeysData: DonorJourney[] = [];
-      
-      for (const transaction of transactions) {
-        // Load touchpoints for this donor
-        const { data: touchpoints } = await (supabase as any)
-          .from('attribution_touchpoints')
-          .select('*')
-          .eq('organization_id', clientUser.organization_id)
-          .eq('donor_email', transaction.donor_email)
-          .lte('occurred_at', transaction.transaction_date)
-          .order('occurred_at', { ascending: true });
-
-        if (touchpoints && touchpoints.length > 0) {
-          // Calculate attribution weights (40% first, 20% middle each, 40% last)
-          const weights = {
-            first_touch: 0.4 * transaction.amount,
-            middle_touch: touchpoints.length > 2 ? (0.2 * transaction.amount) / (touchpoints.length - 2) : 0,
-            last_touch: 0.4 * transaction.amount,
-          };
-
-          journeysData.push({
-            donor_email: transaction.donor_email,
-            transaction_date: transaction.transaction_date,
-            amount: transaction.amount,
-            touchpoints,
-            attribution_weights: weights,
-          });
-        }
-      }
-
-      setJourneys(journeysData);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (isLoading || !organization) {
-    return null;
-  }
 
   return (
-    <ClientLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h2 className="text-2xl font-bold mb-6">Donor Journey & Attribution</h2>
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Filter Journeys</CardTitle>
-            <CardDescription>View donor touchpoints leading to conversions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">Minimum Donation Amount</label>
-                <Select value={minAmount} onValueChange={setMinAmount}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">All Amounts</SelectItem>
-                    <SelectItem value="25">$25+</SelectItem>
-                    <SelectItem value="50">$50+</SelectItem>
-                    <SelectItem value="100">$100+</SelectItem>
-                    <SelectItem value="250">$250+</SelectItem>
-                    <SelectItem value="500">$500+</SelectItem>
-                  </SelectContent>
-                </Select>
+    <div
+      className={cn(
+        "flex items-center gap-2 px-3 py-2 rounded-lg",
+        variantStyles[variant]
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <div className="flex flex-col">
+        <span className="text-xs opacity-80">{label}</span>
+        <span className="font-semibold tabular-nums">{value}</span>
+      </div>
+    </div>
+  );
+};
+
+interface FilterPillProps {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+  count?: number;
+}
+
+const FilterPill = ({ label, isActive, onClick, count }: FilterPillProps) => (
+  <button
+    onClick={onClick}
+    className={cn(
+      "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+      "border focus:outline-none focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.5)]",
+      isActive
+        ? "bg-[hsl(var(--portal-accent-blue))] text-white border-transparent"
+        : "bg-transparent text-[hsl(var(--portal-text-secondary))] border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"
+    )}
+    aria-pressed={isActive}
+  >
+    {label}
+    {count !== undefined && (
+      <span
+        className={cn(
+          "ml-1.5 px-1.5 py-0.5 rounded-full text-xs",
+          isActive
+            ? "bg-white/20 text-white"
+            : "bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-muted))]"
+        )}
+      >
+        {count}
+      </span>
+    )}
+  </button>
+);
+
+// ============================================================================
+// Touchpoint Icon Helper
+// ============================================================================
+
+const getTouchpointIcon = (type: string): LucideIcon => {
+  switch (type) {
+    case "meta_ad_click":
+      return MousePointerClick;
+    case "sms_send":
+      return MessageSquare;
+    case "email_open":
+    case "email_click":
+      return Mail;
+    default:
+      return Target;
+  }
+};
+
+const getTouchpointColor = (type: string): string => {
+  switch (type) {
+    case "meta_ad_click":
+      return "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] border-[hsl(var(--portal-accent-blue)/0.2)]";
+    case "sms_send":
+      return "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]";
+    case "email_open":
+    case "email_click":
+      return "bg-[hsl(var(--portal-accent-purple)/0.1)] text-[hsl(var(--portal-accent-purple))] border-[hsl(var(--portal-accent-purple)/0.2)]";
+    default:
+      return "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-muted))] border-[hsl(var(--portal-border))]";
+  }
+};
+
+// ============================================================================
+// Journey Card Component
+// ============================================================================
+
+interface JourneyCardProps {
+  journey: DonorJourneyRecord;
+  onSelect: (journey: DonorJourneyRecord) => void;
+}
+
+const JourneyCard = ({ journey, onSelect }: JourneyCardProps) => {
+  const timeAgo = formatDistanceToNow(new Date(journey.transaction_date), { addSuffix: true });
+
+  return (
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.2 }}
+      className={cn(
+        "group relative rounded-xl border bg-[hsl(var(--portal-bg-elevated))]",
+        "border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]",
+        "transition-all duration-200 hover:shadow-md cursor-pointer"
+      )}
+      onClick={() => onSelect(journey)}
+      role="article"
+      aria-label={`Donor journey: ${journey.donor_email}`}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(journey);
+        }
+      }}
+    >
+      {/* Accent border top */}
+      <div className="absolute top-0 left-4 right-4 h-0.5 rounded-full bg-[hsl(var(--portal-success)/0.5)]" />
+
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-[hsl(var(--portal-text-primary))] truncate">
+              {journey.donor_email}
+            </h3>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))] flex items-center gap-1 mt-0.5">
+              <Clock className="h-3 w-3" aria-hidden="true" />
+              {timeAgo}
+            </p>
+          </div>
+
+          <div className="text-right shrink-0">
+            <div className="flex items-center gap-1 text-xl font-bold text-[hsl(var(--portal-success))]">
+              <DollarSign className="h-5 w-5" aria-hidden="true" />
+              {journey.amount.toFixed(2)}
+            </div>
+            <Badge
+              variant="outline"
+              className="text-xs border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-secondary))]"
+            >
+              {journey.touchpoints.length} touchpoints
+            </Badge>
+          </div>
+        </div>
+
+        {/* Touchpoint Preview */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {journey.touchpoints.slice(0, 4).map((tp, idx) => {
+            const Icon = getTouchpointIcon(tp.touchpoint_type);
+            return (
+              <Badge
+                key={tp.id}
+                variant="outline"
+                className={cn("text-xs shrink-0", getTouchpointColor(tp.touchpoint_type))}
+              >
+                <Icon className="h-3 w-3 mr-1" aria-hidden="true" />
+                {tp.touchpoint_type.replace("_", " ")}
+              </Badge>
+            );
+          })}
+          {journey.touchpoints.length > 4 && (
+            <Badge
+              variant="outline"
+              className="text-xs border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))]"
+            >
+              +{journey.touchpoints.length - 4} more
+            </Badge>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end pt-3 mt-3 border-t border-[hsl(var(--portal-border)/0.5)]">
+          <div className="flex items-center gap-1 text-sm text-[hsl(var(--portal-text-muted))] group-hover:text-[hsl(var(--portal-accent-blue))] transition-colors">
+            <span className="hidden sm:inline">View journey</span>
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </div>
+        </div>
+      </div>
+    </motion.article>
+  );
+};
+
+// ============================================================================
+// Funnel Stage Component
+// ============================================================================
+
+interface FunnelStageBarProps {
+  stage: FunnelStage;
+  maxCount: number;
+}
+
+const FunnelStageBar = ({ stage, maxCount }: FunnelStageBarProps) => {
+  const widthPercent = maxCount > 0 ? (stage.count / maxCount) * 100 : 0;
+
+  const stageColors: Record<string, string> = {
+    awareness: "bg-[hsl(var(--portal-accent-blue))]",
+    engagement: "bg-[hsl(var(--portal-accent-purple))]",
+    conversion: "bg-[hsl(var(--portal-success))]",
+    retention: "bg-[hsl(var(--portal-warning))]",
+    advocacy: "bg-[hsl(var(--portal-error))]",
+  };
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="w-24 shrink-0">
+        <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+          {stage.label}
+        </span>
+      </div>
+      <div className="flex-1 h-8 bg-[hsl(var(--portal-bg-tertiary))] rounded-lg overflow-hidden relative">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${widthPercent}%` }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className={cn("h-full rounded-lg", stageColors[stage.stage] || "bg-[hsl(var(--portal-accent-blue))]")}
+        />
+        <div className="absolute inset-0 flex items-center justify-between px-3">
+          <span className="text-xs font-medium text-white drop-shadow-sm">
+            {stage.count.toLocaleString()}
+          </span>
+          {stage.dropoffRate > 0 && (
+            <span className="text-xs text-[hsl(var(--portal-text-muted))]">
+              -{stage.dropoffRate}%
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="w-16 shrink-0 text-right">
+        <span className="text-sm font-semibold text-[hsl(var(--portal-success))] tabular-nums">
+          ${(stage.value / 1000).toFixed(1)}k
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// Journey Detail Dialog
+// ============================================================================
+
+interface JourneyDetailDialogProps {
+  journey: DonorJourneyRecord | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+const JourneyDetailDialog = ({ journey, open, onOpenChange }: JourneyDetailDialogProps) => {
+  if (!journey) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-[hsl(var(--portal-bg-primary))] border-[hsl(var(--portal-border))]">
+        <DialogHeader>
+          <DialogTitle className="text-[hsl(var(--portal-text-primary))]">
+            Donor Journey
+          </DialogTitle>
+          <DialogDescription className="text-[hsl(var(--portal-text-muted))]">
+            {journey.donor_email} - {format(new Date(journey.transaction_date), "MMM d, yyyy h:mm a")}
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Donation Summary */}
+        <div className="flex items-center justify-between p-4 rounded-lg bg-[hsl(var(--portal-success)/0.1)] border border-[hsl(var(--portal-success)/0.2)]">
+          <div>
+            <p className="text-sm text-[hsl(var(--portal-text-muted))]">Total Donation</p>
+            <p className="text-2xl font-bold text-[hsl(var(--portal-success))]">
+              ${journey.amount.toFixed(2)}
+            </p>
+          </div>
+          <Badge className="bg-[hsl(var(--portal-success))] text-white">
+            {journey.touchpoints.length} Touchpoints
+          </Badge>
+        </div>
+
+        {/* Attribution Model */}
+        <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
+          <h4 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-3">
+            Attribution Model (40/20/40)
+          </h4>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-[hsl(var(--portal-accent-blue))]">40%</div>
+              <div className="text-xs text-[hsl(var(--portal-text-muted))]">First Touch</div>
+              <div className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                ${journey.attribution_weights.first_touch.toFixed(2)}
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Attribution Model Info */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Multi-Touch Attribution Model</CardTitle>
-            <CardDescription>40% First Touch • 20% Middle Touches • 40% Last Touch</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-info">40%</div>
-                <div className="text-sm text-muted-foreground">First Touch</div>
-                <p className="text-xs mt-1">Initial awareness</p>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-success">20%</div>
-                <div className="text-sm text-muted-foreground">Middle Touches</div>
-                <p className="text-xs mt-1">Nurturing phase</p>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-secondary">40%</div>
-                <div className="text-sm text-muted-foreground">Last Touch</div>
-                <p className="text-xs mt-1">Final conversion</p>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-[hsl(var(--portal-success))]">20%</div>
+              <div className="text-xs text-[hsl(var(--portal-text-muted))]">Middle Touches</div>
+              <div className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                ${(journey.attribution_weights.middle_touch * Math.max(0, journey.touchpoints.length - 2)).toFixed(2)}
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-[hsl(var(--portal-accent-purple))]">40%</div>
+              <div className="text-xs text-[hsl(var(--portal-text-muted))]">Last Touch</div>
+              <div className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                ${journey.attribution_weights.last_touch.toFixed(2)}
+              </div>
+            </div>
+          </div>
+        </div>
 
-        {/* Donor Journeys */}
-        {journeys.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Target className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No donor journeys found</h3>
-              <p className="text-muted-foreground text-center">
-                Attribution data will appear here once touchpoints are tracked
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-6">
-            {journeys.map((journey, index) => (
-              <Card key={index}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{journey.donor_email}</CardTitle>
-                      <CardDescription>
-                        {format(new Date(journey.transaction_date), 'MMM d, yyyy h:mm a')}
-                      </CardDescription>
-                    </div>
-                    <div className="text-right">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-success" />
-                        <span className="text-2xl font-bold text-success">
-                          ${journey.amount.toFixed(2)}
-                        </span>
-                      </div>
-                      <Badge className="mt-1">{journey.touchpoints.length} touchpoints</Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {/* Journey Timeline */}
-                  <div className="relative">
-                    <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border" />
-                    <div className="space-y-6">
-                      {journey.touchpoints.map((touchpoint, tIndex) => {
-                        const isFirst = tIndex === 0;
-                        const isLast = tIndex === journey.touchpoints.length - 1;
-                        const weight = isFirst 
-                          ? journey.attribution_weights.first_touch 
-                          : isLast 
-                          ? journey.attribution_weights.last_touch 
-                          : journey.attribution_weights.middle_touch;
+        {/* Journey Timeline */}
+        <div className="relative">
+          <h4 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-4">
+            Journey Timeline
+          </h4>
+          <div className="absolute left-6 top-10 bottom-4 w-0.5 bg-[hsl(var(--portal-border))]" />
+          <div className="space-y-4">
+            {journey.touchpoints.map((touchpoint, idx) => {
+              const isFirst = idx === 0;
+              const isLast = idx === journey.touchpoints.length - 1;
+              const Icon = getTouchpointIcon(touchpoint.touchpoint_type);
+              const weight = isFirst
+                ? journey.attribution_weights.first_touch
+                : isLast
+                ? journey.attribution_weights.last_touch
+                : journey.attribution_weights.middle_touch;
 
-                        return (
-                          <div key={touchpoint.id} className="relative flex items-start gap-4">
-                            <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-background border-2 border-primary">
-                              {getTouchpointIcon(touchpoint.touchpoint_type)}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Badge variant="outline" className={getTouchpointColor(touchpoint.touchpoint_type)}>
-                                  {touchpoint.touchpoint_type.replace('_', ' ')}
-                                </Badge>
-                                {isFirst && <Badge className="bg-info/10 text-info border-info/20">First Touch (40%)</Badge>}
-                                {isLast && <Badge className="bg-secondary/10 text-secondary border-secondary/20">Last Touch (40%)</Badge>}
-                                {!isFirst && !isLast && <Badge variant="secondary">Middle (20%)</Badge>}
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                {format(new Date(touchpoint.occurred_at), 'MMM d, yyyy h:mm a')}
-                              </p>
-                              {(touchpoint.utm_source || touchpoint.utm_campaign) && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  {touchpoint.utm_source && `Source: ${touchpoint.utm_source}`}
-                                  {touchpoint.utm_campaign && ` • Campaign: ${touchpoint.utm_campaign}`}
-                                </div>
-                              )}
-                              <div className="text-sm font-semibold text-primary mt-1">
-                                Attribution: ${weight.toFixed(2)}
-                              </div>
-                            </div>
-                            {tIndex < journey.touchpoints.length - 1 && (
-                              <ArrowRight className="h-5 w-5 text-muted-foreground mt-3" />
-                            )}
-                          </div>
-                        );
-                      })}
-                      {/* Final Conversion */}
-                      <div className="relative flex items-start gap-4">
-                        <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-success text-success-foreground">
-                          <DollarSign className="h-6 w-6" />
-                        </div>
-                        <div className="flex-1">
-                          <Badge className="bg-success/10 text-success border-success/20 mb-1">Donation</Badge>
-                          <p className="text-lg font-bold">${journey.amount.toFixed(2)}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(journey.transaction_date), 'MMM d, yyyy h:mm a')}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+              return (
+                <div key={touchpoint.id} className="relative flex items-start gap-4">
+                  <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-[hsl(var(--portal-bg-elevated))] border-2 border-[hsl(var(--portal-accent-blue))]">
+                    <Icon className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" aria-hidden="true" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex-1 pt-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className={getTouchpointColor(touchpoint.touchpoint_type)}>
+                        {touchpoint.touchpoint_type.replace("_", " ")}
+                      </Badge>
+                      {isFirst && (
+                        <Badge className="bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] border border-[hsl(var(--portal-accent-blue)/0.2)]">
+                          First Touch (40%)
+                        </Badge>
+                      )}
+                      {isLast && (
+                        <Badge className="bg-[hsl(var(--portal-accent-purple)/0.1)] text-[hsl(var(--portal-accent-purple))] border border-[hsl(var(--portal-accent-purple)/0.2)]">
+                          Last Touch (40%)
+                        </Badge>
+                      )}
+                      {!isFirst && !isLast && (
+                        <Badge variant="secondary">Middle (20%)</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">
+                      {format(new Date(touchpoint.occurred_at), "MMM d, yyyy h:mm a")}
+                    </p>
+                    {(touchpoint.utm_source || touchpoint.utm_campaign) && (
+                      <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-0.5">
+                        {touchpoint.utm_source && `Source: ${touchpoint.utm_source}`}
+                        {touchpoint.utm_campaign && ` • Campaign: ${touchpoint.utm_campaign}`}
+                      </p>
+                    )}
+                    <p className="text-sm font-medium text-[hsl(var(--portal-accent-blue))] mt-1">
+                      Attribution: ${weight.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Final Conversion */}
+            <div className="relative flex items-start gap-4">
+              <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-[hsl(var(--portal-success))]">
+                <DollarSign className="h-6 w-6 text-white" aria-hidden="true" />
+              </div>
+              <div className="flex-1 pt-1">
+                <Badge className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border border-[hsl(var(--portal-success)/0.2)]">
+                  Donation
+                </Badge>
+                <p className="text-lg font-bold text-[hsl(var(--portal-success))] mt-1">
+                  ${journey.amount.toFixed(2)}
+                </p>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                  {format(new Date(journey.transaction_date), "MMM d, yyyy h:mm a")}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ============================================================================
+// Main Page Component
+// ============================================================================
+
+const ClientDonorJourney = () => {
+  const { toast } = useToast();
+  const { organizationId } = useClientOrganization();
+
+  // State
+  const [minAmount, setMinAmount] = useState(0);
+  const [activeTab, setActiveTab] = useState<"journeys" | "segments">("journeys");
+  const [selectedJourney, setSelectedJourney] = useState<DonorJourneyRecord | null>(null);
+  const [selectedSegment, setSelectedSegment] = useState<DonorSegmentSummary | null>(null);
+
+  // Query
+  const {
+    data,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+    dataUpdatedAt,
+  } = useDonorJourneyQuery(organizationId, minAmount);
+
+  const refreshMutation = useRefreshJourneyData(organizationId);
+
+  // Derived data
+  const stats = data?.stats;
+  const journeys = data?.journeys || [];
+  const segments = data?.segments || [];
+  const funnel = data?.funnel || [];
+
+  const maxFunnelCount = useMemo(
+    () => Math.max(...funnel.map((f) => f.count), 1),
+    [funnel]
+  );
+
+  // Handlers
+  const handleRefresh = useCallback(async () => {
+    try {
+      await refreshMutation.mutateAsync();
+      toast({
+        title: "Journey data refreshed",
+        description: "The donor journey analytics have been updated.",
+      });
+    } catch {
+      toast({
+        title: "Refresh failed",
+        description: "Unable to refresh journey data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [refreshMutation, toast]);
+
+  const handleInviteToCampaign = useCallback((segment: DonorSegmentSummary) => {
+    toast({
+      title: "Campaign invitation",
+      description: `Preparing to invite ${segment.count} donors from "${segment.name}" segment.`,
+    });
+  }, [toast]);
+
+  // Amount filter options
+  const amountFilters = [
+    { label: "All", value: 0 },
+    { label: "$25+", value: 25 },
+    { label: "$50+", value: 50 },
+    { label: "$100+", value: 100 },
+    { label: "$250+", value: 250 },
+  ];
+
+  return (
+    <ClientShell pageTitle="Donor Journey" showDateControls={false}>
+      <div className="space-y-6">
+        {/* Hero Panel */}
+        <ChartPanel
+          title="Donor Journey & Attribution"
+          description="Multi-touch attribution insights and donor lifecycle analytics"
+          icon={Activity}
+          isLoading={isLoading}
+          error={error}
+          onRetry={refetch}
+          minHeight={120}
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isFetching}
+              className="gap-2"
+            >
+              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+              Refresh
+            </Button>
+          }
+        >
+          <div className="flex flex-wrap gap-3">
+            <MetricChip
+              label="Total Donors"
+              value={stats?.totalDonors.toLocaleString() || "0"}
+              icon={Users}
+            />
+            <MetricChip
+              label="New vs Returning"
+              value={`${stats?.newVsReturningRatio.toFixed(0)}% new`}
+              icon={TrendingUp}
+              variant="info"
+            />
+            <MetricChip
+              label="Retention Rate"
+              value={`${stats?.retentionMetrics.retentionRate.toFixed(0)}%`}
+              icon={Heart}
+              variant={
+                (stats?.retentionMetrics.retentionRate || 0) >= 50
+                  ? "success"
+                  : "warning"
+              }
+            />
+            <MetricChip
+              label="Avg Donation"
+              value={`$${stats?.avgDonation.toFixed(0) || "0"}`}
+              icon={DollarSign}
+              variant="success"
+            />
+            <MetricChip
+              label="Avg Touchpoints"
+              value={stats?.avgTouchpointsBeforeConversion.toFixed(1) || "0"}
+              icon={Layers}
+            />
+          </div>
+        </ChartPanel>
+
+        {/* Filter Bar */}
+        <div className="flex flex-wrap items-center gap-3 px-1">
+          <div className="flex items-center gap-2 text-sm text-[hsl(var(--portal-text-muted))]">
+            <Filter className="h-4 w-4" />
+            <span>Min Amount:</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {amountFilters.map((filter) => (
+              <FilterPill
+                key={filter.value}
+                label={filter.label}
+                isActive={minAmount === filter.value}
+                onClick={() => setMinAmount(filter.value)}
+              />
             ))}
           </div>
+        </div>
+
+        {/* Journey Funnel Panel */}
+        <ChartPanel
+          title="Conversion Funnel"
+          description="Donor progression through acquisition stages"
+          icon={Target}
+          isLoading={isLoading}
+          isEmpty={funnel.length === 0}
+          emptyMessage="No funnel data available"
+          minHeight={200}
+          status={
+            funnel.length > 0 && funnel[2]?.percentage >= 30
+              ? { text: "Healthy", variant: "success" }
+              : funnel.length > 0
+              ? { text: "Needs Attention", variant: "warning" }
+              : undefined
+          }
+        >
+          <div className="space-y-3">
+            {funnel.map((stage) => (
+              <FunnelStageBar key={stage.stage} stage={stage} maxCount={maxFunnelCount} />
+            ))}
+          </div>
+        </ChartPanel>
+
+        {/* Journeys & Segments Tabs */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "journeys" | "segments")}>
+          <TabsList className="bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
+            <TabsTrigger
+              value="journeys"
+              className="data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white"
+            >
+              Recent Journeys
+              {journeys.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {journeys.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="segments"
+              className="data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white"
+            >
+              Donor Segments
+              {segments.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {segments.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="journeys" className="mt-4">
+            <ChartPanel
+              title="Recent Donor Journeys"
+              description="Multi-touch attribution paths leading to conversions"
+              icon={ArrowRight}
+              isLoading={isLoading}
+              isEmpty={journeys.length === 0}
+              emptyMessage="No donor journeys found for the selected filters"
+              minHeight={300}
+            >
+              <ScrollArea className="h-[400px] pr-4">
+                <AnimatePresence mode="popLayout">
+                  <div className="space-y-4">
+                    {journeys.map((journey) => (
+                      <JourneyCard
+                        key={journey.id}
+                        journey={journey}
+                        onSelect={setSelectedJourney}
+                      />
+                    ))}
+                  </div>
+                </AnimatePresence>
+              </ScrollArea>
+            </ChartPanel>
+          </TabsContent>
+
+          <TabsContent value="segments" className="mt-4">
+            <ChartPanel
+              title="Donor Segments"
+              description="Behavioral cohorts and retention insights"
+              icon={Users}
+              isLoading={isLoading}
+              isEmpty={segments.length === 0}
+              emptyMessage="No donor segments available"
+              minHeight={300}
+            >
+              <ScrollArea className="h-[400px] pr-4">
+                <AnimatePresence mode="popLayout">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {segments.map((segment) => (
+                      <DonorSegmentCard
+                        key={segment.id}
+                        segment={segment}
+                        onSelect={setSelectedSegment}
+                        onInviteToCampaign={handleInviteToCampaign}
+                      />
+                    ))}
+                  </div>
+                </AnimatePresence>
+              </ScrollArea>
+            </ChartPanel>
+          </TabsContent>
+        </Tabs>
+
+        {/* Attribution Model Info */}
+        <ChartPanel
+          title="Multi-Touch Attribution Model"
+          description="40% First Touch • 20% Middle Touches • 40% Last Touch"
+          icon={Layers}
+          minHeight={100}
+        >
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
+              <div className="text-3xl font-bold text-[hsl(var(--portal-accent-blue))]">40%</div>
+              <div className="text-sm text-[hsl(var(--portal-text-muted))]">First Touch</div>
+              <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Initial awareness</p>
+            </div>
+            <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-success)/0.1)]">
+              <div className="text-3xl font-bold text-[hsl(var(--portal-success))]">20%</div>
+              <div className="text-sm text-[hsl(var(--portal-text-muted))]">Middle Touches</div>
+              <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Nurturing phase</p>
+            </div>
+            <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]">
+              <div className="text-3xl font-bold text-[hsl(var(--portal-accent-purple))]">40%</div>
+              <div className="text-sm text-[hsl(var(--portal-text-muted))]">Last Touch</div>
+              <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Final conversion</p>
+            </div>
+          </div>
+        </ChartPanel>
+
+        {/* Data Freshness */}
+        {dataUpdatedAt > 0 && (
+          <p className="text-xs text-[hsl(var(--portal-text-muted))] text-center">
+            Data updated {formatDistanceToNow(dataUpdatedAt, { addSuffix: true })}
+          </p>
         )}
       </div>
-    </ClientLayout>
+
+      {/* Journey Detail Dialog */}
+      <JourneyDetailDialog
+        journey={selectedJourney}
+        open={!!selectedJourney}
+        onOpenChange={(open) => !open && setSelectedJourney(null)}
+      />
+    </ClientShell>
   );
 };
 

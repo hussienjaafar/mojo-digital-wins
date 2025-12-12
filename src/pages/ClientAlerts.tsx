@@ -1,574 +1,609 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { Bell, Filter, CheckCircle, AlertTriangle, Info, TrendingUp } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
-import { Session } from "@supabase/supabase-js";
-import { ClientLayout } from "@/components/client/ClientLayout";
-import { motion } from "framer-motion";
 import {
-  V3Card,
-  V3CardContent,
-  V3CardHeader,
-  V3CardTitle,
-  V3CardDescription,
-  V3KPICard,
-  V3PageContainer,
-  V3LoadingState,
-  V3EmptyState,
-} from "@/components/v3";
+  Bell,
+  AlertTriangle,
+  TrendingUp,
+  Activity,
+  Zap,
+  RefreshCw,
+  CheckCircle,
+  Filter,
+  Info,
+  Eye,
+} from "lucide-react";
+
+import { ClientShell } from "@/components/client/ClientShell";
+import { ChartPanel } from "@/components/charts/ChartPanel";
+import { AlertCard } from "@/components/client/AlertCard";
+import { useClientOrganization } from "@/hooks/useClientOrganization";
+import {
+  useClientAlertsQuery,
+  useMarkAlertRead,
+  useMarkAllAlertsRead,
+  useDismissAlert,
+  type AlertSeverity,
+  type AlertType,
+  type ClientAlert,
+} from "@/queries/useClientAlertsQuery";
+import { useToast } from "@/hooks/use-toast";
+
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
-type Alert = {
-  id: string;
-  entity_name: string;
-  alert_type: string;
-  severity: string;
-  actionable_score: number;
-  is_actionable: boolean;
-  is_read: boolean;
-  velocity: number;
-  current_mentions: number;
-  suggested_action: string | null;
-  sample_sources: any;
-  triggered_at: string;
-  created_at: string;
+// ============================================================================
+// Types & Constants
+// ============================================================================
+
+type FilterTypeOption = AlertType | "all";
+type FilterSeverityOption = AlertSeverity | "all";
+
+const TYPE_OPTIONS: { value: FilterTypeOption; label: string; icon: typeof Activity }[] = [
+  { value: "all", label: "All Types", icon: Filter },
+  { value: "watchlist_match", label: "Watchlist", icon: Eye },
+  { value: "velocity_spike", label: "Velocity Spike", icon: Zap },
+  { value: "trending", label: "Trending", icon: TrendingUp },
+  { value: "sentiment_shift", label: "Sentiment", icon: Activity },
+];
+
+const SEVERITY_OPTIONS: { value: FilterSeverityOption; label: string }[] = [
+  { value: "all", label: "All Severity" },
+  { value: "high", label: "Critical" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+];
+
+// ============================================================================
+// Sub-components
+// ============================================================================
+
+interface MetricChipProps {
+  label: string;
+  value: string | number;
+  icon: typeof Bell;
+  variant?: "default" | "success" | "warning" | "error" | "info";
+}
+
+const MetricChip = ({ label, value, icon: Icon, variant = "default" }: MetricChipProps) => {
+  const variantStyles = {
+    default: "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]",
+    success: "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
+    warning: "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]",
+    error: "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))]",
+    info: "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))]",
+  };
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 px-3 py-2 rounded-lg",
+        variantStyles[variant]
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <div className="flex flex-col">
+        <span className="text-xs text-[hsl(var(--portal-text-muted))]">{label}</span>
+        <span className="font-semibold tabular-nums">{value}</span>
+      </div>
+    </div>
+  );
 };
 
-type Organization = {
-  id: string;
-  name: string;
-  logo_url: string | null;
+interface FilterPillProps {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+  count?: number;
+  variant?: "default" | "error" | "warning";
+}
+
+const FilterPill = ({ label, isActive, onClick, count, variant = "default" }: FilterPillProps) => {
+  const activeStyles = {
+    default: "bg-[hsl(var(--portal-accent-blue))] text-white border-transparent",
+    error: "bg-[hsl(var(--portal-error))] text-white border-transparent",
+    warning: "bg-[hsl(var(--portal-warning))] text-white border-transparent",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+        "border focus:outline-none focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.5)]",
+        isActive
+          ? activeStyles[variant]
+          : "bg-transparent text-[hsl(var(--portal-text-secondary))] border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"
+      )}
+      aria-pressed={isActive}
+    >
+      {label}
+      {count !== undefined && (
+        <span className={cn("ml-1.5", isActive ? "opacity-80" : "opacity-60")}>
+          ({count})
+        </span>
+      )}
+    </button>
+  );
 };
 
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 },
-  },
+// ============================================================================
+// Alert Detail Dialog
+// ============================================================================
+
+interface AlertDetailDialogProps {
+  alert: ClientAlert | null;
+  onClose: () => void;
+  onMarkRead: (id: string) => void;
+  isMarkingRead: boolean;
+}
+
+const AlertDetailDialog = ({ alert, onClose, onMarkRead, isMarkingRead }: AlertDetailDialogProps) => {
+  const navigate = useNavigate();
+
+  if (!alert) return null;
+
+  const getSeverityStyles = (severity: AlertSeverity) => {
+    switch (severity) {
+      case "high":
+        return {
+          bg: "bg-[hsl(var(--portal-error)/0.1)]",
+          text: "text-[hsl(var(--portal-error))]",
+          border: "border-[hsl(var(--portal-error)/0.2)]",
+          icon: AlertTriangle,
+        };
+      case "medium":
+        return {
+          bg: "bg-[hsl(var(--portal-warning)/0.1)]",
+          text: "text-[hsl(var(--portal-warning))]",
+          border: "border-[hsl(var(--portal-warning)/0.2)]",
+          icon: Info,
+        };
+      default:
+        return {
+          bg: "bg-[hsl(var(--portal-accent-blue)/0.1)]",
+          text: "text-[hsl(var(--portal-accent-blue))]",
+          border: "border-[hsl(var(--portal-accent-blue)/0.2)]",
+          icon: Info,
+        };
+    }
+  };
+
+  const severityStyles = getSeverityStyles(alert.severity);
+  const SeverityIcon = severityStyles.icon;
+
+  return (
+    <Dialog open={!!alert} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+        <DialogHeader>
+          <DialogTitle className="text-[hsl(var(--portal-text-primary))]">
+            {alert.entity_name}
+          </DialogTitle>
+          <DialogDescription className="text-[hsl(var(--portal-text-secondary))] capitalize">
+            {alert.alert_type.replace(/_/g, " ")}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge
+              variant="outline"
+              className={cn("text-xs", severityStyles.bg, severityStyles.text, severityStyles.border)}
+            >
+              <SeverityIcon className="h-3 w-3 mr-1" aria-hidden="true" />
+              {alert.severity === "high" ? "Critical" : alert.severity}
+            </Badge>
+            {alert.is_actionable && (
+              <Badge className="text-xs bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border border-[hsl(var(--portal-success)/0.2)]">
+                Actionable (Score: {alert.actionable_score})
+              </Badge>
+            )}
+            {!alert.is_read && (
+              <Badge className="bg-[hsl(var(--portal-accent-blue))] text-white text-xs">
+                Unread
+              </Badge>
+            )}
+          </div>
+
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-2 gap-4 py-4 border-y border-[hsl(var(--portal-border))]">
+            <div>
+              <p className="text-sm text-[hsl(var(--portal-text-muted))]">Current Mentions</p>
+              <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                {alert.current_mentions || 0}
+              </p>
+            </div>
+            {alert.velocity && alert.velocity > 0 && (
+              <div>
+                <p className="text-sm text-[hsl(var(--portal-text-muted))]">Velocity</p>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                  {alert.velocity.toFixed(1)}/hr
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Suggested Action */}
+          {alert.suggested_action && (
+            <div>
+              <h4 className="font-semibold mb-2 text-[hsl(var(--portal-text-primary))]">
+                Suggested Action
+              </h4>
+              <p className="text-sm text-[hsl(var(--portal-text-secondary))]">
+                {alert.suggested_action}
+              </p>
+            </div>
+          )}
+
+          {/* Timestamp */}
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+            Triggered: {format(new Date(alert.created_at), "MMM d, yyyy h:mm a")}
+          </p>
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-2">
+            {!alert.is_read && (
+              <Button
+                onClick={() => {
+                  onMarkRead(alert.id);
+                  onClose();
+                }}
+                disabled={isMarkingRead}
+                className="flex-1 min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" aria-hidden="true" />
+                Mark as Read
+              </Button>
+            )}
+            {alert.is_actionable && (
+              <Button
+                variant="outline"
+                onClick={() => navigate("/client/actions")}
+                className="flex-1 min-h-[44px] border-[hsl(var(--portal-border))] hover:bg-[hsl(var(--portal-bg-hover))]"
+              >
+                View Actions
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="min-h-[44px] border-[hsl(var(--portal-border))]"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" as const } },
-};
+// ============================================================================
+// Main Component
+// ============================================================================
 
 const ClientAlerts = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [session, setSession] = useState<Session | null>(null);
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [filteredAlerts, setFilteredAlerts] = useState<Alert[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
-  const [filterType, setFilterType] = useState("all");
-  const [filterSeverity, setFilterSeverity] = useState("all");
+  const { organization, isLoading: orgLoading } = useClientOrganization();
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (!session) {
-        navigate("/client-login");
+  // Query and mutations
+  const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useClientAlertsQuery(
+    organization?.id
+  );
+  const markReadMutation = useMarkAlertRead(organization?.id);
+  const markAllReadMutation = useMarkAllAlertsRead(organization?.id);
+  const dismissMutation = useDismissAlert(organization?.id);
+
+  // Local state
+  const [selectedAlert, setSelectedAlert] = useState<ClientAlert | null>(null);
+  const [filterType, setFilterType] = useState<FilterTypeOption>("all");
+  const [filterSeverity, setFilterSeverity] = useState<FilterSeverityOption>("all");
+
+  // Filter alerts (exclude dismissed)
+  const filteredAlerts = useMemo(() => {
+    if (!data?.alerts) return [];
+
+    return data.alerts
+      .filter((a) => !a.is_dismissed)
+      .filter((a) => filterType === "all" || a.alert_type === filterType)
+      .filter((a) => filterSeverity === "all" || a.severity === filterSeverity);
+  }, [data?.alerts, filterType, filterSeverity]);
+
+  // Watchlist alerts for the tab
+  const watchlistAlerts = useMemo(() => {
+    if (!data?.alerts) return [];
+    return data.alerts.filter((a) => !a.is_dismissed && a.alert_type === "watchlist_match");
+  }, [data?.alerts]);
+
+  // Handlers
+  const handleMarkRead = useCallback(
+    async (id: string) => {
+      try {
+        await markReadMutation.mutateAsync(id);
+        toast({
+          title: "Marked as Read",
+          description: "Alert has been marked as read",
+        });
+      } catch (err: any) {
+        toast({
+          title: "Error",
+          description: err.message || "Failed to mark alert as read",
+          variant: "destructive",
+        });
       }
-    });
+    },
+    [markReadMutation, toast]
+  );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (!session) {
-        navigate("/client-login");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  useEffect(() => {
-    if (session?.user) {
-      loadData();
-    }
-  }, [session]);
-
-  useEffect(() => {
-    applyFilters();
-  }, [alerts, filterType, filterSeverity]);
-
-  const loadData = async () => {
+  const handleMarkAllRead = useCallback(async () => {
     try {
-      setIsLoading(true);
-      
-      const { data: clientUser } = await (supabase as any)
-        .from('client_users')
-        .select('organization_id')
-        .eq('id', session?.user?.id)
-        .maybeSingle();
-
-      if (!clientUser) throw new Error("Organization not found");
-
-      const { data: org } = await (supabase as any)
-        .from('client_organizations')
-        .select('*')
-        .eq('id', clientUser.organization_id)
-        .maybeSingle();
-
-      if (!org) throw new Error("Organization not found");
-      setOrganization(org);
-
-      const { data: alertsData, error } = await (supabase as any)
-        .from('client_entity_alerts')
-        .select('*')
-        .eq('organization_id', clientUser.organization_id)
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-      setAlerts(alertsData || []);
-    } catch (error: any) {
+      await markAllReadMutation.mutateAsync();
       toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
+        title: "All Marked Read",
+        description: "All alerts have been marked as read",
       });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
-    let filtered = [...alerts];
-
-    if (filterType !== "all") {
-      filtered = filtered.filter(a => a.alert_type === filterType);
-    }
-
-    if (filterSeverity !== "all") {
-      filtered = filtered.filter(a => a.severity === filterSeverity);
-    }
-
-    setFilteredAlerts(filtered);
-  };
-
-  const markAsRead = async (id: string) => {
-    try {
-      const { error } = await (supabase as any)
-        .from('client_entity_alerts')
-        .update({ is_read: true })
-        .eq('id', id);
-
-      if (error) throw error;
-      loadData();
-    } catch (error: any) {
+    } catch (err: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: err.message || "Failed to mark all alerts as read",
         variant: "destructive",
       });
     }
-  };
+  }, [markAllReadMutation, toast]);
 
-  const getSeverityIcon = (severity: string) => {
-    switch (severity) {
-      case "high":
-        return <AlertTriangle className="h-4 w-4 text-[hsl(var(--portal-error))]" />;
-      case "medium":
-        return <Info className="h-4 w-4 text-[hsl(var(--portal-warning))]" />;
-      default:
-        return <Info className="h-4 w-4 text-[hsl(var(--portal-accent-blue))]" />;
-    }
-  };
+  const handleDismiss = useCallback(
+    async (id: string) => {
+      try {
+        await dismissMutation.mutateAsync(id);
+        toast({
+          title: "Alert Dismissed",
+          description: "Alert has been dismissed",
+        });
+      } catch (err: any) {
+        toast({
+          title: "Error",
+          description: err.message || "Failed to dismiss alert",
+          variant: "destructive",
+        });
+      }
+    },
+    [dismissMutation, toast]
+  );
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case "high":
-        return "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))] border-[hsl(var(--portal-error)/0.2)]";
-      case "medium":
-        return "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))] border-[hsl(var(--portal-warning)/0.2)]";
-      default:
-        return "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] border-[hsl(var(--portal-accent-blue)/0.2)]";
-    }
-  };
-
-  const getAccentFromSeverity = (severity: string): "red" | "amber" | "blue" => {
-    switch (severity) {
-      case "high": return "red";
-      case "medium": return "amber";
-      default: return "blue";
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <ClientLayout>
-        <V3PageContainer icon={Bell} title="Alerts" description="Loading...">
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <V3LoadingState variant="kpi" />
-              <V3LoadingState variant="kpi" />
-              <V3LoadingState variant="kpi" />
-            </div>
-            <V3LoadingState variant="channel" />
-            <V3LoadingState variant="channel" />
-          </div>
-        </V3PageContainer>
-      </ClientLayout>
-    );
-  }
-
-  if (!organization) {
-    return (
-      <ClientLayout>
-        <V3PageContainer icon={Bell} title="Alerts" description="Error">
-          <V3EmptyState
-            icon={AlertTriangle}
-            title="Organization Not Found"
-            description="Unable to load your organization details."
-            accent="red"
-          />
-        </V3PageContainer>
-      </ClientLayout>
-    );
-  }
-
-  const unreadCount = alerts.filter(a => !a.is_read).length;
-  const actionableCount = alerts.filter(a => a.is_actionable).length;
-  const watchlistAlerts = alerts.filter(a => a.alert_type === "watchlist_match");
+  const stats = data?.stats;
+  const isPageLoading = orgLoading || isLoading;
 
   return (
-    <ClientLayout>
-      <V3PageContainer
-        icon={Bell}
-        title="Alerts"
-        description={`${unreadCount} unread alerts`}
-        animate={false}
-      >
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="space-y-6"
+    <ClientShell pageTitle="Critical Alerts" showDateControls={false}>
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
+        {/* Hero Panel */}
+        <ChartPanel
+          title="Alert Intelligence"
+          description="Monitor critical events and actionable opportunities"
+          icon={Bell}
+          isLoading={isPageLoading}
+          error={error}
+          onRetry={refetch}
+          actions={
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="gap-2 border-[hsl(var(--portal-border))] hover:bg-[hsl(var(--portal-bg-hover))]"
+              >
+                <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
+              {(stats?.unread ?? 0) > 0 && (
+                <Button
+                  onClick={handleMarkAllRead}
+                  size="sm"
+                  disabled={markAllReadMutation.isPending}
+                  className="gap-2 bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="hidden sm:inline">Mark All Read</span>
+                </Button>
+              )}
+            </div>
+          }
+          minHeight={120}
         >
-          {/* Stats KPIs */}
-          <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <V3KPICard
-              icon={Bell}
+          {/* Hero Metrics */}
+          <div className="flex flex-wrap gap-3">
+            <MetricChip
               label="Unread Alerts"
-              value={unreadCount.toString()}
-              accent="blue"
+              value={stats?.unread ?? 0}
+              icon={Bell}
+              variant="info"
             />
-            <V3KPICard
-              icon={TrendingUp}
-              label="Actionable"
-              value={actionableCount.toString()}
-              accent="green"
-            />
-            <V3KPICard
+            <MetricChip
+              label="Critical"
+              value={stats?.critical ?? 0}
               icon={AlertTriangle}
-              label="Watchlist Matches"
-              value={watchlistAlerts.length.toString()}
-              accent="amber"
+              variant="error"
             />
-          </motion.div>
+            <MetricChip
+              label="Actionable"
+              value={`${stats?.actionablePercent ?? 0}%`}
+              icon={TrendingUp}
+              variant="success"
+            />
+            <MetricChip
+              label="Avg Score"
+              value={stats?.avgActionableScore ?? 0}
+              icon={Activity}
+              variant="default"
+            />
+          </div>
+        </ChartPanel>
 
-          {/* Filters */}
-          <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-2 p-4 bg-[hsl(var(--portal-bg-elevated))] rounded-lg border border-[hsl(var(--portal-border))]">
-            <Filter className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={filterType === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterType("all")}
-                className="min-h-[36px]"
-              >
-                All
-              </Button>
-              <Button
-                variant={filterType === "watchlist_match" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterType("watchlist_match")}
-                className="min-h-[36px]"
-              >
-                Watchlist
-              </Button>
-              <Button
-                variant={filterType === "velocity_spike" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterType("velocity_spike")}
-                className="min-h-[36px]"
-              >
-                Velocity Spike
-              </Button>
-              <Button
-                variant={filterType === "trending" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterType("trending")}
-                className="min-h-[36px]"
-              >
-                Trending
-              </Button>
-            </div>
-            
-            <div className="w-px h-6 bg-[hsl(var(--portal-border))] mx-2" />
-            
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={filterSeverity === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterSeverity("all")}
-                className="min-h-[36px]"
-              >
-                All Severity
-              </Button>
-              <Button
-                variant={filterSeverity === "high" ? "destructive" : "outline"}
-                size="sm"
-                onClick={() => setFilterSeverity("high")}
-                className="min-h-[36px]"
-              >
-                High
-              </Button>
-              <Button
-                variant={filterSeverity === "medium" ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => setFilterSeverity("medium")}
-                className="min-h-[36px]"
-              >
-                Medium
-              </Button>
-            </div>
-          </motion.div>
+        {/* Filters Panel */}
+        <div className="flex flex-wrap items-center gap-4 p-4 bg-[hsl(var(--portal-bg-elevated))] rounded-xl border border-[hsl(var(--portal-border))]">
+          <div className="flex items-center gap-2 text-[hsl(var(--portal-text-muted))]">
+            <Filter className="h-4 w-4" aria-hidden="true" />
+            <span className="text-sm font-medium">Filters:</span>
+          </div>
 
-          {/* Alerts List */}
-          <motion.div variants={itemVariants}>
-            <Tabs defaultValue="all" className="w-full">
-              <TabsList className="h-auto bg-[hsl(var(--portal-bg-elevated))]">
-                <TabsTrigger value="all" className="min-h-[44px] px-4">
-                  All Intelligence ({filteredAlerts.length})
-                </TabsTrigger>
-                <TabsTrigger value="watchlist" className="min-h-[44px] px-4">
-                  My Watchlist ({watchlistAlerts.length})
-                </TabsTrigger>
-              </TabsList>
+          {/* Type Filters */}
+          <div className="flex flex-wrap gap-2">
+            {TYPE_OPTIONS.map(({ value, label }) => (
+              <FilterPill
+                key={value}
+                label={label}
+                isActive={filterType === value}
+                onClick={() => setFilterType(value)}
+                count={
+                  value === "all"
+                    ? stats?.total
+                    : stats?.byType[value as AlertType]
+                }
+              />
+            ))}
+          </div>
 
-              <TabsContent value="all" className="mt-6">
-                <div className="space-y-4">
-                  {filteredAlerts.length === 0 ? (
-                    <V3EmptyState
-                      icon={Bell}
-                      title="No alerts"
-                      description="You're all caught up! New alerts will appear here when relevant activity is detected."
-                      accent="blue"
-                    />
-                  ) : (
-                    filteredAlerts.map((alert) => (
-                      <motion.div
-                        key={alert.id}
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                      >
-                        <V3Card 
-                          accent={getAccentFromSeverity(alert.severity)}
-                          interactive
-                          className={cn(
-                            "cursor-pointer",
-                            !alert.is_read && "ring-2 ring-[hsl(var(--portal-accent-blue))]"
-                          )}
-                          onClick={() => setSelectedAlert(alert)}
-                        >
-                          <V3CardHeader>
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  {!alert.is_read && (
-                                    <Badge className="bg-[hsl(var(--portal-accent-blue))] text-white">New</Badge>
-                                  )}
-                                  {alert.is_actionable && (
-                                    <Badge className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]">
-                                      Actionable
-                                    </Badge>
-                                  )}
-                                  <Badge variant="outline" className={getSeverityColor(alert.severity || 'low')}>
-                                    {getSeverityIcon(alert.severity || 'low')}
-                                    <span className="ml-1">{alert.severity || 'low'}</span>
-                                  </Badge>
-                                </div>
-                                <V3CardTitle className="text-lg">{alert.entity_name}</V3CardTitle>
-                                <V3CardDescription>{alert.alert_type}</V3CardDescription>
-                              </div>
-                              {alert.actionable_score > 0 && (
-                                <div className="text-right">
-                                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Score</p>
-                                  <p className="text-2xl font-bold text-[hsl(var(--portal-accent-blue))]">{alert.actionable_score}</p>
-                                </div>
-                              )}
-                            </div>
-                          </V3CardHeader>
-                          <V3CardContent>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-[hsl(var(--portal-text-muted))]">Mentions:</span>
-                                <span className="font-medium text-[hsl(var(--portal-text-primary))]">{alert.current_mentions || 0}</span>
-                              </div>
-                              {alert.velocity && (
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-[hsl(var(--portal-text-muted))]">Velocity:</span>
-                                  <span className="font-medium text-[hsl(var(--portal-text-primary))]">{alert.velocity.toFixed(1)}/hr</span>
-                                </div>
-                              )}
-                              <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                                {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
-                              </p>
-                            </div>
-                          </V3CardContent>
-                        </V3Card>
-                      </motion.div>
-                    ))
-                  )}
+          <div className="w-px h-6 bg-[hsl(var(--portal-border))] mx-1" />
+
+          {/* Severity Filters */}
+          <div className="flex flex-wrap gap-2">
+            {SEVERITY_OPTIONS.map(({ value, label }) => (
+              <FilterPill
+                key={value}
+                label={label}
+                isActive={filterSeverity === value}
+                onClick={() => setFilterSeverity(value)}
+                variant={value === "high" ? "error" : value === "medium" ? "warning" : "default"}
+                count={
+                  value === "all"
+                    ? undefined
+                    : stats?.bySeverity[value as AlertSeverity]
+                }
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Alerts List Panel */}
+        <ChartPanel
+          title="Active Alerts"
+          description={`${filteredAlerts.length} alerts matching your filters`}
+          icon={Activity}
+          isLoading={isPageLoading}
+          isEmpty={data?.alerts.filter((a) => !a.is_dismissed).length === 0}
+          emptyMessage="No alerts at this time. You're all caught up!"
+          minHeight={400}
+        >
+          <Tabs defaultValue="all" className="w-full">
+            <TabsList className="h-auto bg-[hsl(var(--portal-bg-tertiary))] mb-4">
+              <TabsTrigger value="all" className="min-h-[44px] px-4 data-[state=active]:bg-[hsl(var(--portal-bg-elevated))]">
+                All Intelligence ({filteredAlerts.length})
+              </TabsTrigger>
+              <TabsTrigger value="watchlist" className="min-h-[44px] px-4 data-[state=active]:bg-[hsl(var(--portal-bg-elevated))]">
+                My Watchlist ({watchlistAlerts.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="all" className="mt-0">
+              {filteredAlerts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Bell className="h-12 w-12 text-[hsl(var(--portal-text-muted))] mb-4" />
+                  <p className="text-[hsl(var(--portal-text-secondary))]">
+                    No alerts match your current filters
+                  </p>
+                  <Button
+                    variant="link"
+                    onClick={() => {
+                      setFilterType("all");
+                      setFilterSeverity("all");
+                    }}
+                    className="mt-2 text-[hsl(var(--portal-accent-blue))]"
+                  >
+                    Clear filters
+                  </Button>
                 </div>
-              </TabsContent>
+              ) : (
+                <ScrollArea className="h-[600px] pr-4">
+                  <div className="space-y-4">
+                    <AnimatePresence mode="popLayout">
+                      {filteredAlerts.map((alert) => (
+                        <AlertCard
+                          key={alert.id}
+                          alert={alert}
+                          onSelect={setSelectedAlert}
+                          onMarkRead={handleMarkRead}
+                          onDismiss={handleDismiss}
+                          isMarkingRead={markReadMutation.isPending}
+                          isDismissing={dismissMutation.isPending}
+                        />
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                </ScrollArea>
+              )}
+            </TabsContent>
 
-              <TabsContent value="watchlist" className="mt-6">
-                <div className="space-y-4">
-                  {watchlistAlerts.length === 0 ? (
-                    <V3EmptyState
-                      icon={Filter}
-                      title="No watchlist alerts"
-                      description="Add entities to your watchlist to start receiving alerts"
-                      action={
-                        <Button 
-                          onClick={() => navigate('/client/watchlist')}
-                          className="min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue)/0.9)] text-white"
-                        >
-                          Manage Watchlist
-                        </Button>
-                      }
-                      accent="amber"
-                    />
-                  ) : (
-                    watchlistAlerts.map((alert) => (
-                      <motion.div
-                        key={alert.id}
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                      >
-                        <V3Card 
-                          accent={getAccentFromSeverity(alert.severity)}
-                          interactive
-                          className={cn(
-                            "cursor-pointer",
-                            !alert.is_read && "ring-2 ring-[hsl(var(--portal-accent-blue))]"
-                          )}
-                          onClick={() => setSelectedAlert(alert)}
-                        >
-                          <V3CardHeader>
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  {!alert.is_read && (
-                                    <Badge className="bg-[hsl(var(--portal-accent-blue))] text-white">New</Badge>
-                                  )}
-                                  {alert.is_actionable && (
-                                    <Badge className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]">
-                                      Actionable
-                                    </Badge>
-                                  )}
-                                </div>
-                                <V3CardTitle className="text-lg">{alert.entity_name}</V3CardTitle>
-                              </div>
-                              {alert.actionable_score > 0 && (
-                                <div className="text-right">
-                                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Score</p>
-                                  <p className="text-2xl font-bold text-[hsl(var(--portal-accent-blue))]">{alert.actionable_score}</p>
-                                </div>
-                              )}
-                            </div>
-                          </V3CardHeader>
-                          <V3CardContent>
-                            <p className="text-sm text-[hsl(var(--portal-text-muted))]">
-                              {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
-                            </p>
-                          </V3CardContent>
-                        </V3Card>
-                      </motion.div>
-                    ))
-                  )}
+            <TabsContent value="watchlist" className="mt-0">
+              {watchlistAlerts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Eye className="h-12 w-12 text-[hsl(var(--portal-text-muted))] mb-4" />
+                  <p className="text-[hsl(var(--portal-text-secondary))]">
+                    No watchlist alerts at this time
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate("/client/watchlist")}
+                    className="mt-4 min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white border-0"
+                  >
+                    Manage Watchlist
+                  </Button>
                 </div>
-              </TabsContent>
-            </Tabs>
-          </motion.div>
-        </motion.div>
-      </V3PageContainer>
+              ) : (
+                <ScrollArea className="h-[600px] pr-4">
+                  <div className="space-y-4">
+                    <AnimatePresence mode="popLayout">
+                      {watchlistAlerts.map((alert) => (
+                        <AlertCard
+                          key={alert.id}
+                          alert={alert}
+                          onSelect={setSelectedAlert}
+                          onMarkRead={handleMarkRead}
+                          onDismiss={handleDismiss}
+                          isMarkingRead={markReadMutation.isPending}
+                          isDismissing={dismissMutation.isPending}
+                        />
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                </ScrollArea>
+              )}
+            </TabsContent>
+          </Tabs>
+        </ChartPanel>
+      </div>
 
       {/* Alert Detail Dialog */}
-      <Dialog open={!!selectedAlert} onOpenChange={() => setSelectedAlert(null)}>
-        <DialogContent className="max-w-2xl bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
-          <DialogHeader>
-            <DialogTitle className="text-[hsl(var(--portal-text-primary))]">{selectedAlert?.entity_name}</DialogTitle>
-            <DialogDescription className="text-[hsl(var(--portal-text-secondary))]">{selectedAlert?.alert_type}</DialogDescription>
-          </DialogHeader>
-          {selectedAlert && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className={getSeverityColor(selectedAlert.severity || 'low')}>
-                  {getSeverityIcon(selectedAlert.severity || 'low')}
-                  <span className="ml-1">{selectedAlert.severity || 'low'}</span>
-                </Badge>
-                {selectedAlert.is_actionable && (
-                  <Badge className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]">
-                    Actionable (Score: {selectedAlert.actionable_score})
-                  </Badge>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 py-4 border-y border-[hsl(var(--portal-border))]">
-                <div>
-                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Current Mentions</p>
-                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{selectedAlert.current_mentions || 0}</p>
-                </div>
-                {selectedAlert.velocity && (
-                  <div>
-                    <p className="text-sm text-[hsl(var(--portal-text-muted))]">Velocity</p>
-                    <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{selectedAlert.velocity.toFixed(1)}/hr</p>
-                  </div>
-                )}
-              </div>
-
-              {selectedAlert.suggested_action && (
-                <div>
-                  <h4 className="font-semibold mb-2 text-[hsl(var(--portal-text-primary))]">Suggested Action</h4>
-                  <p className="text-sm text-[hsl(var(--portal-text-secondary))]">{selectedAlert.suggested_action}</p>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <Button onClick={() => {
-                  markAsRead(selectedAlert.id);
-                  setSelectedAlert(null);
-                }} className="flex-1 min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue)/0.9)] text-white">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Mark as Read
-                </Button>
-                {selectedAlert.is_actionable && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => navigate('/client/actions')} 
-                    className="flex-1 min-h-[44px] border-[hsl(var(--portal-border))] hover:bg-[hsl(var(--portal-bg-hover))]"
-                  >
-                    View Actions
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </ClientLayout>
+      <AlertDetailDialog
+        alert={selectedAlert}
+        onClose={() => setSelectedAlert(null)}
+        onMarkRead={handleMarkRead}
+        isMarkingRead={markReadMutation.isPending}
+      />
+    </ClientShell>
   );
 };
 

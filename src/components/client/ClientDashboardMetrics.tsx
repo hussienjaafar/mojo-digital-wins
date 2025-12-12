@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { motion } from "framer-motion";
 import {
   V3Card,
   V3CardHeader,
@@ -10,7 +9,8 @@ import {
   V3LoadingState,
   V3ErrorState,
 } from "@/components/v3";
-import { ExpandableKpiCard, type ExpandableKpiAccent } from "@/components/dashboard";
+import { HeroKpiGrid, type HeroKpiData } from "@/components/client/HeroKpiGrid";
+import type { HeroKpiAccent } from "@/components/client/HeroKpiCard";
 import { EChartsLineChart, type LineSeriesConfig } from "@/components/charts/echarts";
 import { PortalBarChart } from "@/components/portal/PortalBarChart";
 import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, CopyMinus, SlidersHorizontal, ZoomIn } from "lucide-react";
@@ -41,19 +41,6 @@ const palette = {
   smsPrev: "#8B5CF688",
 };
 
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.05 },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
-};
 
 export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: ClientDashboardMetricsProps) => {
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
@@ -172,7 +159,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
   }, [showCompare, valueMode]);
 
   // Hero KPIs configuration with sparkline data and kpiKey for cross-highlighting
-  const heroKpis = useMemo(() => {
+  const heroKpis: HeroKpiData[] = useMemo(() => {
     if (!kpis) return [];
     return [
       {
@@ -180,9 +167,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         label: "Net Revenue",
         value: formatCurrency(kpis.totalNetRevenue),
         icon: Wallet,
-        trend: { value: Math.round(calcChange(kpis.totalNetRevenue, prevKpis.totalNetRevenue)), isPositive: kpis.totalNetRevenue >= (prevKpis.totalNetRevenue || 0) },
+        trend: {
+          value: Math.round(calcChange(kpis.totalNetRevenue, prevKpis.totalNetRevenue)),
+          isPositive: kpis.totalNetRevenue >= (prevKpis.totalNetRevenue || 0),
+          label: "vs prev",
+        },
+        previousValue: prevKpis.totalNetRevenue ? formatCurrency(prevKpis.totalNetRevenue) : undefined,
         subtitle: `Gross: ${formatCurrency(kpis.totalRaised)} (${kpis.feePercentage.toFixed(1)}% fees)`,
-        accent: "green" as ExpandableKpiAccent,
+        accent: "green" as HeroKpiAccent,
         sparklineData: sparklines?.netRevenue || [],
         description: "Total donations minus processing fees and refunds",
       },
@@ -191,9 +183,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         label: "Net ROI",
         value: `${kpis.roi.toFixed(1)}x`,
         icon: TrendingUp,
-        trend: { value: Math.round(calcChange(kpis.roi, prevKpis.roi)), isPositive: kpis.roi >= (prevKpis.roi || 0) },
+        trend: {
+          value: Math.round(calcChange(kpis.roi, prevKpis.roi)),
+          isPositive: kpis.roi >= (prevKpis.roi || 0),
+          label: "vs prev",
+        },
+        previousValue: prevKpis.roi ? `${prevKpis.roi.toFixed(1)}x` : undefined,
         subtitle: `Spend: ${formatCurrency(kpis.totalSpend)}`,
-        accent: "blue" as ExpandableKpiAccent,
+        accent: "blue" as HeroKpiAccent,
         sparklineData: sparklines?.roi || [],
         description: "Return on investment: Net Revenue / Total Spend",
       },
@@ -202,9 +199,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         label: "Refund Rate",
         value: `${kpis.refundRate.toFixed(1)}%`,
         icon: Target,
-        trend: { value: Math.round(calcChange(kpis.refundRate, prevKpis.refundRate)), isPositive: kpis.refundRate <= (prevKpis.refundRate || 0) },
+        trend: {
+          value: Math.round(calcChange(kpis.refundRate, prevKpis.refundRate)),
+          isPositive: kpis.refundRate <= (prevKpis.refundRate || 0),
+          label: "vs prev",
+        },
+        previousValue: prevKpis.refundRate ? `${prevKpis.refundRate.toFixed(1)}%` : undefined,
         subtitle: `Refunds: ${formatCurrency(kpis.refundAmount)}`,
-        accent: (kpis.refundRate > 5 ? "red" : "default") as ExpandableKpiAccent,
+        accent: (kpis.refundRate > 5 ? "red" : "default") as HeroKpiAccent,
         sparklineData: sparklines?.refundRate || [],
         description: "Percentage of donations refunded",
       },
@@ -213,9 +215,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         label: "Recurring Health",
         value: formatCurrency(kpis.recurringRaised),
         icon: Repeat,
-        trend: { value: Math.round(calcChange(kpis.recurringChurnRate, prevKpis.recurringChurnRate)), isPositive: kpis.recurringChurnRate <= (prevKpis.recurringChurnRate || 0) },
+        trend: {
+          value: Math.round(calcChange(kpis.recurringChurnRate, prevKpis.recurringChurnRate)),
+          isPositive: kpis.recurringChurnRate <= (prevKpis.recurringChurnRate || 0),
+          label: "churn",
+        },
+        previousValue: prevKpis.recurringRaised ? formatCurrency(prevKpis.recurringRaised) : undefined,
         subtitle: `${kpis.recurringDonations} recurring tx • Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
-        accent: "amber" as ExpandableKpiAccent,
+        accent: "amber" as HeroKpiAccent,
         sparklineData: sparklines?.recurringHealth || [],
         description: "Active recurring donation revenue",
       },
@@ -226,7 +233,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         icon: CopyMinus,
         trend: { value: 0, isPositive: true },
         subtitle: "Deterministic (refcode/click)",
-        accent: "purple" as ExpandableKpiAccent,
+        accent: "purple" as HeroKpiAccent,
         sparklineData: sparklines?.attributionQuality || [],
         description: "Percentage of donations with deterministic attribution",
       },
@@ -235,9 +242,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         label: "Unique Donors",
         value: kpis.uniqueDonors.toLocaleString(),
         icon: Users,
-        trend: { value: Math.round(calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors)), isPositive: kpis.uniqueDonors >= (prevKpis.uniqueDonors || 0) },
+        trend: {
+          value: Math.round(calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors)),
+          isPositive: kpis.uniqueDonors >= (prevKpis.uniqueDonors || 0),
+          label: "vs prev",
+        },
+        previousValue: prevKpis.uniqueDonors ? prevKpis.uniqueDonors.toLocaleString() : undefined,
         subtitle: `New ${kpis.newDonors} / Returning ${kpis.returningDonors}`,
-        accent: "blue" as ExpandableKpiAccent,
+        accent: "blue" as HeroKpiAccent,
         sparklineData: sparklines?.uniqueDonors || [],
         description: "Number of unique donors in period",
       },
@@ -299,29 +311,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         </span>
       </div>
 
-      {/* Hero KPI Cards */}
-      <motion.div
-        className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        {heroKpis.map((metric) => (
-          <motion.div key={metric.kpiKey} variants={itemVariants}>
-            <ExpandableKpiCard
-              kpiKey={metric.kpiKey}
-              label={metric.label}
-              value={metric.value}
-              icon={metric.icon}
-              trend={metric.trend}
-              subtitle={metric.subtitle}
-              accent={metric.accent}
-              sparklineData={metric.sparklineData}
-              description={metric.description}
-            />
-          </motion.div>
-        ))}
-      </motion.div>
+      {/* Hero KPI Grid */}
+      <HeroKpiGrid
+        data={heroKpis}
+        isLoading={false}
+        mobileColumns={2}
+        tabletColumns={3}
+        desktopColumns={6}
+      />
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

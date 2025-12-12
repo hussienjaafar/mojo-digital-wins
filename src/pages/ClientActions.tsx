@@ -1,496 +1,686 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { Copy, Lightbulb, TrendingUp, Target, MessageSquare, Check, Zap, Clock } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { Progress } from "@/components/ui/progress";
-import { Session } from "@supabase/supabase-js";
-import { ClientLayout } from "@/components/client/ClientLayout";
 import { motion, AnimatePresence } from "framer-motion";
+import { format } from "date-fns";
 import {
-  V3Card,
-  V3CardContent,
-  V3CardHeader,
-  V3KPICard,
-  V3PageContainer,
-  V3SectionHeader,
-  V3LoadingState,
-  V3EmptyState,
-} from "@/components/v3";
+  Zap,
+  Lightbulb,
+  Check,
+  RefreshCw,
+  Filter,
+  Target,
+  TrendingUp,
+  MessageSquare,
+  Clock,
+  Copy,
+  AlertCircle,
+  X,
+} from "lucide-react";
+
+import { ClientShell } from "@/components/client/ClientShell";
+import { ChartPanel } from "@/components/charts/ChartPanel";
+import { ActionCard } from "@/components/client/ActionCard";
+import { useClientOrganization } from "@/hooks/useClientOrganization";
+import {
+  useSuggestedActionsQuery,
+  useMarkActionUsed,
+  useMarkAllActionsUsed,
+  useDismissAction,
+  type SuggestedAction,
+} from "@/queries/useSuggestedActionsQuery";
+import { useToast } from "@/hooks/use-toast";
+
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
-type SuggestedAction = {
-  id: string;
-  alert_id: string;
-  topic: string;
-  action_type: string;
-  sms_copy: string;
-  topic_relevance_score: number;
-  urgency_score: number;
-  estimated_impact: string;
-  value_proposition: string;
-  target_audience: string;
-  historical_context: string | null;
-  character_count: number;
-  is_used: boolean;
-  is_dismissed: boolean;
-  created_at: string;
-  alert?: {
-    entity_name: string;
-    actionable_score: number;
+// ============================================================================
+// Types & Constants
+// ============================================================================
+
+type FilterStatus = "all" | "pending" | "used";
+type FilterType = "all" | string;
+
+const STATUS_OPTIONS: { value: FilterStatus; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "pending", label: "Pending" },
+  { value: "used", label: "Used" },
+];
+
+// ============================================================================
+// Sub-components
+// ============================================================================
+
+interface MetricChipProps {
+  label: string;
+  value: string | number;
+  icon: typeof Zap;
+  variant?: "default" | "success" | "warning" | "error" | "info";
+}
+
+const MetricChip = ({ label, value, icon: Icon, variant = "default" }: MetricChipProps) => {
+  const variantStyles = {
+    default: "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]",
+    success: "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
+    warning: "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]",
+    error: "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))]",
+    info: "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))]",
   };
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 px-3 py-2 rounded-lg",
+        variantStyles[variant]
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <div className="flex flex-col">
+        <span className="text-xs text-[hsl(var(--portal-text-muted))]">{label}</span>
+        <span className="font-semibold tabular-nums">{value}</span>
+      </div>
+    </div>
+  );
 };
 
-type Organization = {
-  id: string;
-  name: string;
-  logo_url: string | null;
-};
+interface FilterPillProps {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+  count?: number;
+}
 
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.05,
+const FilterPill = ({ label, isActive, onClick, count }: FilterPillProps) => (
+  <button
+    onClick={onClick}
+    className={cn(
+      "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+      "border focus:outline-none focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.5)]",
+      isActive
+        ? "bg-[hsl(var(--portal-accent-blue))] text-white border-transparent"
+        : "bg-transparent text-[hsl(var(--portal-text-secondary))] border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"
+    )}
+    aria-pressed={isActive}
+  >
+    {label}
+    {count !== undefined && (
+      <span className={cn("ml-1.5", isActive ? "opacity-80" : "opacity-60")}>
+        ({count})
+      </span>
+    )}
+  </button>
+);
+
+// ============================================================================
+// Action Detail Dialog
+// ============================================================================
+
+interface ActionDetailDialogProps {
+  action: SuggestedAction | null;
+  onClose: () => void;
+  onCopy: (action: SuggestedAction) => Promise<void>;
+  onDismiss: (id: string) => void;
+  isCopying: boolean;
+}
+
+const ActionDetailDialog = ({
+  action,
+  onClose,
+  onCopy,
+  onDismiss,
+  isCopying,
+}: ActionDetailDialogProps) => {
+  const [copied, setCopied] = useState(false);
+
+  if (!action) return null;
+
+  const handleCopy = async () => {
+    try {
+      await onCopy(action);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Error handled in parent
+    }
+  };
+
+  const urgencyLevel =
+    action.urgency_score >= 70 ? "high" : action.urgency_score >= 40 ? "medium" : "low";
+
+  const urgencyStyles = {
+    high: {
+      bg: "bg-[hsl(var(--portal-error)/0.1)]",
+      text: "text-[hsl(var(--portal-error))]",
+      border: "border-[hsl(var(--portal-error)/0.2)]",
     },
-  },
+    medium: {
+      bg: "bg-[hsl(var(--portal-warning)/0.1)]",
+      text: "text-[hsl(var(--portal-warning))]",
+      border: "border-[hsl(var(--portal-warning)/0.2)]",
+    },
+    low: {
+      bg: "bg-[hsl(var(--portal-accent-blue)/0.1)]",
+      text: "text-[hsl(var(--portal-accent-blue))]",
+      border: "border-[hsl(var(--portal-accent-blue)/0.2)]",
+    },
+  };
+
+  const styles = urgencyStyles[urgencyLevel];
+
+  return (
+    <Dialog open={!!action} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+        <DialogHeader>
+          <DialogTitle className="text-[hsl(var(--portal-text-primary))] pr-8">
+            {action.topic}
+          </DialogTitle>
+          <DialogDescription className="text-[hsl(var(--portal-text-secondary))]">
+            {action.action_type} • Generated {format(new Date(action.created_at), "MMM d, yyyy h:mm a")}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge
+              variant="outline"
+              className={cn("text-xs", styles.bg, styles.text, styles.border)}
+            >
+              <Zap className="h-3 w-3 mr-1" aria-hidden="true" />
+              {urgencyLevel === "high" ? "Urgent" : urgencyLevel === "medium" ? "Medium" : "Low"} Priority
+            </Badge>
+            {action.topic_relevance_score >= 70 && (
+              <Badge className="text-xs bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border border-[hsl(var(--portal-success)/0.2)]">
+                High Relevance
+              </Badge>
+            )}
+            {action.is_used && (
+              <Badge className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border border-[hsl(var(--portal-success)/0.2)]">
+                <Check className="h-3 w-3 mr-1" />
+                Used
+              </Badge>
+            )}
+          </div>
+
+          {/* Entity Context */}
+          {action.alert?.entity_name && (
+            <div className="bg-[hsl(var(--portal-bg-tertiary)/0.5)] rounded-lg p-3 border border-[hsl(var(--portal-border)/0.5)]">
+              <p className="text-sm text-[hsl(var(--portal-text-secondary))]">
+                Related to: <span className="font-medium text-[hsl(var(--portal-text-primary))]">{action.alert.entity_name}</span>
+                {action.alert.actionable_score > 0 && (
+                  <span className="text-[hsl(var(--portal-text-muted))]">
+                    {" "}(Actionable Score: {action.alert.actionable_score})
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* SMS Preview */}
+          <div className="bg-[hsl(var(--portal-bg-tertiary)/0.5)] rounded-lg p-4 border border-[hsl(var(--portal-border)/0.5)]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                SMS Text Preview
+              </span>
+              <Badge
+                variant="outline"
+                className="bg-transparent border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-secondary))]"
+              >
+                {action.character_count}/160
+              </Badge>
+            </div>
+            <p className="text-sm font-mono text-[hsl(var(--portal-text-primary))] whitespace-pre-wrap">
+              {action.sms_copy}
+            </p>
+            <Progress
+              value={(action.character_count / 160) * 100}
+              className="h-1 mt-3"
+            />
+          </div>
+
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-2 gap-4 py-4 border-y border-[hsl(var(--portal-border))]">
+            <div>
+              <p className="text-sm text-[hsl(var(--portal-text-muted))] mb-1">Relevance Score</p>
+              <div className="flex items-center gap-2">
+                <Progress value={action.topic_relevance_score} className="h-2 flex-1" />
+                <span className="text-lg font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                  {action.topic_relevance_score}%
+                </span>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-[hsl(var(--portal-text-muted))] mb-1">Urgency Score</p>
+              <div className="flex items-center gap-2">
+                <Progress value={action.urgency_score} className="h-2 flex-1" />
+                <span className="text-lg font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                  {action.urgency_score}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-1">
+                Estimated Impact
+              </p>
+              <Badge
+                variant="secondary"
+                className="bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]"
+              >
+                <Target className="h-3 w-3 mr-1" />
+                {action.estimated_impact}
+              </Badge>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-1">
+                Value Proposition
+              </p>
+              <p className="text-sm text-[hsl(var(--portal-text-secondary))]">
+                {action.value_proposition}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-1">
+                Target Audience
+              </p>
+              <p className="text-sm text-[hsl(var(--portal-text-secondary))]">
+                {action.target_audience}
+              </p>
+            </div>
+
+            {action.historical_context && (
+              <div>
+                <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-1">
+                  Historical Context
+                </p>
+                <p className="text-xs text-[hsl(var(--portal-text-secondary))]">
+                  {action.historical_context}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-4">
+            {!action.is_used && (
+              <>
+                <Button
+                  onClick={handleCopy}
+                  disabled={isCopying || copied}
+                  className={cn(
+                    "flex-1 min-h-[44px]",
+                    copied
+                      ? "bg-[hsl(var(--portal-success))] hover:bg-[hsl(var(--portal-success))]"
+                      : "bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))]",
+                    "text-white"
+                  )}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy SMS Text
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    onDismiss(action.id);
+                    onClose();
+                  }}
+                  className="min-h-[44px] border-[hsl(var(--portal-border))] hover:bg-[hsl(var(--portal-error)/0.1)] hover:text-[hsl(var(--portal-error))] hover:border-[hsl(var(--portal-error)/0.3)]"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Dismiss
+                </Button>
+              </>
+            )}
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="min-h-[44px] border-[hsl(var(--portal-border))]"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.3, ease: "easeOut" as const },
-  },
-};
+// ============================================================================
+// Main Component
+// ============================================================================
 
 const ClientActions = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [session, setSession] = useState<Session | null>(null);
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [actions, setActions] = useState<SuggestedAction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { organization, isLoading: orgLoading } = useClientOrganization();
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (!session) {
-        navigate("/client-login");
+  // Query and mutations
+  const { data, isLoading, isFetching, error, refetch } = useSuggestedActionsQuery(
+    organization?.id
+  );
+  const markUsedMutation = useMarkActionUsed(organization?.id);
+  const markAllUsedMutation = useMarkAllActionsUsed(organization?.id);
+  const dismissMutation = useDismissAction(organization?.id);
+
+  // Local state
+  const [selectedAction, setSelectedAction] = useState<SuggestedAction | null>(null);
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>("pending");
+  const [filterType, setFilterType] = useState<FilterType>("all");
+
+  // Filter actions (exclude dismissed for main view)
+  const filteredActions = useMemo(() => {
+    if (!data?.actions) return [];
+
+    return data.actions
+      .filter((a) => !a.is_dismissed)
+      .filter((a) => {
+        if (filterStatus === "pending") return !a.is_used;
+        if (filterStatus === "used") return a.is_used;
+        return true;
+      })
+      .filter((a) => filterType === "all" || a.action_type === filterType);
+  }, [data?.actions, filterStatus, filterType]);
+
+  // Get unique action types for filter
+  const actionTypes = useMemo(() => {
+    if (!data?.actions) return [];
+    const types = new Set(data.actions.map((a) => a.action_type).filter(Boolean));
+    return Array.from(types);
+  }, [data?.actions]);
+
+  // Handlers
+  const handleCopy = useCallback(
+    async (action: SuggestedAction) => {
+      try {
+        await navigator.clipboard.writeText(action.sms_copy);
+        await markUsedMutation.mutateAsync(action.id);
+        toast({
+          title: "Copied to Clipboard",
+          description: "SMS text copied and marked as used",
+        });
+      } catch (err: any) {
+        toast({
+          title: "Error",
+          description: err.message || "Failed to copy text",
+          variant: "destructive",
+        });
+        throw err;
       }
-    });
+    },
+    [markUsedMutation, toast]
+  );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (!session) {
-        navigate("/client-login");
+  const handleMarkAllUsed = useCallback(async () => {
+    try {
+      await markAllUsedMutation.mutateAsync();
+      toast({
+        title: "All Marked Used",
+        description: "All pending actions have been marked as used",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to mark all as used",
+        variant: "destructive",
+      });
+    }
+  }, [markAllUsedMutation, toast]);
+
+  const handleDismiss = useCallback(
+    async (id: string) => {
+      try {
+        await dismissMutation.mutateAsync(id);
+        toast({
+          title: "Action Dismissed",
+          description: "This suggestion has been hidden",
+        });
+      } catch (err: any) {
+        toast({
+          title: "Error",
+          description: err.message || "Failed to dismiss action",
+          variant: "destructive",
+        });
       }
-    });
+    },
+    [dismissMutation, toast]
+  );
 
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  useEffect(() => {
-    if (session?.user) {
-      loadData();
-    }
-  }, [session]);
-
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-
-      const { data: clientUser } = await (supabase as any)
-        .from('client_users')
-        .select('organization_id')
-        .eq('id', session?.user?.id)
-        .maybeSingle();
-
-      if (!clientUser) throw new Error("Organization not found");
-
-      const { data: org } = await (supabase as any)
-        .from('client_organizations')
-        .select('*')
-        .eq('id', clientUser.organization_id)
-        .maybeSingle();
-
-      if (!org) throw new Error("Organization not found");
-      setOrganization(org);
-
-      const { data: actionsData, error } = await (supabase as any)
-        .from('suggested_actions')
-        .select(`
-          *,
-          alert:client_entity_alerts(entity_name, actionable_score)
-        `)
-        .eq('organization_id', clientUser.organization_id)
-        .eq('is_dismissed', false)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-      setActions(actionsData || []);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCopy = async (action: SuggestedAction) => {
-    try {
-      await navigator.clipboard.writeText(action.sms_copy);
-      setCopiedId(action.id);
-
-      const { error } = await (supabase as any)
-        .from('suggested_actions')
-        .update({ is_used: true, used_at: new Date().toISOString() })
-        .eq('id', action.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Copied to clipboard",
-        description: "SMS text copied successfully",
-      });
-
-      setTimeout(() => setCopiedId(null), 2000);
-      loadData();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDismiss = async (id: string) => {
-    try {
-      const { error } = await (supabase as any)
-        .from('suggested_actions')
-        .update({ is_dismissed: true })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Action dismissed",
-        description: "This suggestion has been hidden",
-      });
-
-      loadData();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const usedActions = actions.filter(a => a.is_used);
-  const pendingActions = actions.filter(a => !a.is_used);
+  const stats = data?.stats;
+  const isPageLoading = orgLoading || isLoading;
 
   return (
-    <ClientLayout>
-      <V3PageContainer
-        icon={Zap}
-        title="Suggested Actions"
-        description="AI-generated campaign suggestions based on your alerts"
-        animate={false}
-      >
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="space-y-6"
-        >
-
-        {/* Loading State */}
-        {isLoading && (
-          <motion.div variants={itemVariants} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <V3LoadingState variant="kpi" />
-              <V3LoadingState variant="kpi" />
-              <V3LoadingState variant="kpi" />
+    <ClientShell pageTitle="Suggested Actions" showDateControls={false}>
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
+        {/* Hero Panel */}
+        <ChartPanel
+          title="AI-Powered Suggestions"
+          description="Campaign recommendations based on your alerts and intelligence"
+          icon={Zap}
+          isLoading={isPageLoading}
+          error={error}
+          onRetry={refetch}
+          actions={
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="gap-2 border-[hsl(var(--portal-border))] hover:bg-[hsl(var(--portal-bg-hover))]"
+              >
+                <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
+              {(stats?.pending ?? 0) > 0 && (
+                <Button
+                  onClick={handleMarkAllUsed}
+                  size="sm"
+                  disabled={markAllUsedMutation.isPending}
+                  className="gap-2 bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white"
+                >
+                  <Check className="h-4 w-4" />
+                  <span className="hidden sm:inline">Mark All Used</span>
+                </Button>
+              )}
             </div>
-            <V3LoadingState variant="channel" />
-            <V3LoadingState variant="channel" />
-          </motion.div>
-        )}
+          }
+          minHeight={120}
+        >
+          {/* Hero Metrics */}
+          <div className="flex flex-wrap gap-3">
+            <MetricChip
+              label="Pending Actions"
+              value={stats?.pending ?? 0}
+              icon={Lightbulb}
+              variant="warning"
+            />
+            <MetricChip
+              label="Used This Period"
+              value={stats?.used ?? 0}
+              icon={Check}
+              variant="success"
+            />
+            <MetricChip
+              label="High Urgency"
+              value={stats?.highUrgencyCount ?? 0}
+              icon={Zap}
+              variant="error"
+            />
+            <MetricChip
+              label="Avg Relevance"
+              value={`${stats?.avgRelevance ?? 0}%`}
+              icon={Target}
+              variant="info"
+            />
+          </div>
+        </ChartPanel>
 
-        {!isLoading && (
-          <>
-            {/* Stats KPIs */}
-            <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <V3KPICard
-                icon={Lightbulb}
-                label="Pending Actions"
-                value={pendingActions.length.toString()}
-                accent="amber"
-              />
-              <V3KPICard
-                icon={Check}
-                label="Used This Week"
-                value={usedActions.length.toString()}
-                accent="green"
-              />
-              <V3KPICard
-                icon={MessageSquare}
-                label="Total Generated"
-                value={actions.length.toString()}
-                accent="blue"
-              />
-            </motion.div>
+        {/* Filters Panel */}
+        <div className="flex flex-wrap items-center gap-4 p-4 bg-[hsl(var(--portal-bg-elevated))] rounded-xl border border-[hsl(var(--portal-border))]">
+          <div className="flex items-center gap-2 text-[hsl(var(--portal-text-muted))]">
+            <Filter className="h-4 w-4" aria-hidden="true" />
+            <span className="text-sm font-medium">Filters:</span>
+          </div>
 
-            {/* Actions List */}
-            {pendingActions.length === 0 ? (
-              <motion.div variants={itemVariants}>
-                <V3EmptyState
-                  icon={Lightbulb}
-                  title="No pending suggestions"
-                  description="New AI-generated action suggestions will appear here based on your alerts"
-                  action={
+          {/* Status Filters */}
+          <div className="flex flex-wrap gap-2">
+            {STATUS_OPTIONS.map(({ value, label }) => (
+              <FilterPill
+                key={value}
+                label={label}
+                isActive={filterStatus === value}
+                onClick={() => setFilterStatus(value)}
+                count={
+                  value === "all"
+                    ? stats?.total
+                    : value === "pending"
+                    ? stats?.pending
+                    : stats?.used
+                }
+              />
+            ))}
+          </div>
+
+          {actionTypes.length > 1 && (
+            <>
+              <div className="w-px h-6 bg-[hsl(var(--portal-border))] mx-1" />
+
+              {/* Type Filters */}
+              <div className="flex flex-wrap gap-2">
+                <FilterPill
+                  label="All Types"
+                  isActive={filterType === "all"}
+                  onClick={() => setFilterType("all")}
+                />
+                {actionTypes.map((type) => (
+                  <FilterPill
+                    key={type}
+                    label={type}
+                    isActive={filterType === type}
+                    onClick={() => setFilterType(type)}
+                    count={stats?.byType[type]}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Actions List Panel */}
+        <ChartPanel
+          title="Action Suggestions"
+          description={`${filteredActions.length} ${filterStatus === "all" ? "total" : filterStatus} actions`}
+          icon={MessageSquare}
+          isLoading={isPageLoading}
+          isEmpty={data?.actions.filter((a) => !a.is_dismissed).length === 0}
+          emptyMessage="No action suggestions yet. New AI-generated suggestions will appear here based on your alerts."
+          minHeight={400}
+        >
+          <Tabs value={filterStatus} onValueChange={(v) => setFilterStatus(v as FilterStatus)} className="w-full">
+            <TabsList className="h-auto bg-[hsl(var(--portal-bg-tertiary))] mb-4">
+              <TabsTrigger
+                value="pending"
+                className="min-h-[44px] px-4 data-[state=active]:bg-[hsl(var(--portal-bg-elevated))]"
+              >
+                Pending ({stats?.pending ?? 0})
+              </TabsTrigger>
+              <TabsTrigger
+                value="used"
+                className="min-h-[44px] px-4 data-[state=active]:bg-[hsl(var(--portal-bg-elevated))]"
+              >
+                Used ({stats?.used ?? 0})
+              </TabsTrigger>
+              <TabsTrigger
+                value="all"
+                className="min-h-[44px] px-4 data-[state=active]:bg-[hsl(var(--portal-bg-elevated))]"
+              >
+                All ({stats?.total ?? 0})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value={filterStatus} className="mt-0">
+              {filteredActions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Lightbulb className="h-12 w-12 text-[hsl(var(--portal-text-muted))] mb-4" />
+                  <p className="text-[hsl(var(--portal-text-secondary))]">
+                    {filterStatus === "pending"
+                      ? "No pending actions. Check back later for new suggestions!"
+                      : filterStatus === "used"
+                      ? "No used actions yet."
+                      : "No actions match your filters."}
+                  </p>
+                  {filterStatus === "pending" && (
                     <Button
-                      onClick={() => navigate('/client/alerts')}
-                      className="min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue)/0.9)] text-white"
+                      variant="outline"
+                      onClick={() => navigate("/client/alerts")}
+                      className="mt-4 min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white border-0"
                     >
                       View Alerts
                     </Button>
-                  }
-                  accent="amber"
-                />
-              </motion.div>
-            ) : (
-              <motion.div variants={containerVariants} className="space-y-4">
-                {pendingActions.map((action, index) => (
-                  <motion.div key={action.id} variants={itemVariants}>
-                    <V3Card
-                      accent={action.urgency_score >= 70 ? "red" : action.topic_relevance_score >= 70 ? "green" : "blue"}
-                      interactive
-                    >
-                      <V3CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <Badge className="bg-[hsl(var(--portal-accent-blue))] text-white">
-                                {action.action_type}
-                              </Badge>
-                              {action.topic_relevance_score >= 70 && (
-                                <Badge className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]">
-                                  High Relevance
-                                </Badge>
-                              )}
-                              {action.urgency_score >= 70 && (
-                                <Badge className="bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))] border-[hsl(var(--portal-error)/0.2)]">
-                                  Urgent
-                                </Badge>
-                              )}
-                            </div>
-                            <h3 className="text-lg font-semibold text-[hsl(var(--portal-text-primary))] line-clamp-2">
-                              {action.topic}
-                            </h3>
-                            {action.alert?.entity_name && (
-                              <p className="text-sm text-[hsl(var(--portal-text-secondary))] mt-1">
-                                Related to: {action.alert.entity_name}
-                              </p>
-                            )}
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-xs text-[hsl(var(--portal-text-muted))]">Relevance</p>
-                            <p className="text-2xl font-bold text-[hsl(var(--portal-accent-blue))] tabular-nums">
-                              {action.topic_relevance_score}%
-                            </p>
-                          </div>
-                        </div>
-                      </V3CardHeader>
-
-                      <V3CardContent className="space-y-4">
-                        {/* SMS Preview */}
-                        <div className="bg-[hsl(var(--portal-bg-elevated))] rounded-lg p-4 border border-[hsl(var(--portal-border))]">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
-                              SMS Text Preview
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="bg-transparent border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-secondary))]"
-                            >
-                              {action.character_count}/160
-                            </Badge>
-                          </div>
-                          <p className="text-sm font-mono text-[hsl(var(--portal-text-primary))]">
-                            {action.sms_copy}
-                          </p>
-                          <Progress
-                            value={(action.character_count / 160) * 100}
-                            className="h-1 mt-2"
-                          />
-                        </div>
-
-                        {/* Scores Grid */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <TrendingUp className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
-                              <span className="text-sm text-[hsl(var(--portal-text-secondary))]">
-                                Urgency Score
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Progress value={action.urgency_score} className="h-2 flex-1" />
-                              <span className="text-sm font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
-                                {action.urgency_score}%
-                              </span>
-                            </div>
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <Target className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
-                              <span className="text-sm text-[hsl(var(--portal-text-secondary))]">
-                                Impact
-                              </span>
-                            </div>
-                            <Badge
-                              variant="secondary"
-                              className="bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]"
-                            >
-                              {action.estimated_impact}
-                            </Badge>
-                          </div>
-                        </div>
-
-                        {/* Value Prop & Audience */}
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-1">
-                              Value Proposition
-                            </p>
-                            <p className="text-sm text-[hsl(var(--portal-text-secondary))]">
-                              {action.value_proposition}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-1">
-                              Target Audience
-                            </p>
-                            <p className="text-sm text-[hsl(var(--portal-text-secondary))]">
-                              {action.target_audience}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Historical Context */}
-                        {action.historical_context && (
-                          <div className="border-t border-[hsl(var(--portal-border))] pt-4">
-                            <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-1">
-                              Historical Context
-                            </p>
-                            <p className="text-xs text-[hsl(var(--portal-text-secondary))]">
-                              {action.historical_context}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Actions */}
-                        <div className="flex gap-3 pt-4 border-t border-[hsl(var(--portal-border))]">
-                          <motion.div className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                            <Button
-                              onClick={() => handleCopy(action)}
-                              className="w-full min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue)/0.9)] text-white"
-                              disabled={copiedId === action.id}
-                            >
-                              {copiedId === action.id ? (
-                                <>
-                                  <Check className="h-4 w-4 mr-2" />
-                                  Copied!
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="h-4 w-4 mr-2" />
-                                  Copy SMS Text
-                                </>
-                              )}
-                            </Button>
-                          </motion.div>
-                          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                            <Button
-                              variant="outline"
-                              onClick={() => handleDismiss(action.id)}
-                              className="min-h-[44px] min-w-[44px] border-[hsl(var(--portal-border))] hover:bg-[hsl(var(--portal-bg-elevated))]"
-                            >
-                              Dismiss
-                            </Button>
-                          </motion.div>
-                        </div>
-
-                        <p className="text-xs text-[hsl(var(--portal-text-muted))] text-center flex items-center justify-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Generated {format(new Date(action.created_at), 'MMM d, yyyy h:mm a')}
-                        </p>
-                      </V3CardContent>
-                    </V3Card>
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
-
-            {/* Used Actions Section */}
-            {usedActions.length > 0 && (
-              <motion.div variants={itemVariants} className="mt-12">
-                <V3SectionHeader
-                  title="Recently Used"
-                  subtitle="Actions you've already implemented"
-                  icon={Check}
-                  className="mb-4"
-                />
-                <div className="grid gap-4 md:grid-cols-2">
-                  {usedActions.slice(0, 6).map((action) => (
-                    <motion.div key={action.id} variants={itemVariants}>
-                      <V3Card accent="green" className="opacity-75">
-                        <V3CardHeader className="pb-2">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-base font-semibold text-[hsl(var(--portal-text-primary))] line-clamp-1">
-                              {action.topic}
-                            </h4>
-                            <Badge className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]">
-                              <Check className="h-3 w-3 mr-1" />
-                              Used
-                            </Badge>
-                          </div>
-                        </V3CardHeader>
-                        <V3CardContent>
-                          <p className="text-sm text-[hsl(var(--portal-text-secondary))] line-clamp-2">
-                            {action.sms_copy}
-                          </p>
-                          <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-2">
-                            Used {format(new Date(action.created_at), 'MMM d, yyyy')}
-                          </p>
-                        </V3CardContent>
-                      </V3Card>
-                    </motion.div>
-                  ))}
+                  )}
                 </div>
-              </motion.div>
-            )}
-          </>
-        )}
-        </motion.div>
-      </V3PageContainer>
-    </ClientLayout>
+              ) : (
+                <ScrollArea className="h-[600px] pr-4">
+                  <div className={cn(
+                    filterStatus === "used"
+                      ? "grid gap-4 sm:grid-cols-2"
+                      : "space-y-4"
+                  )}>
+                    <AnimatePresence mode="popLayout">
+                      {filteredActions.map((action) => (
+                        <ActionCard
+                          key={action.id}
+                          action={action}
+                          onSelect={setSelectedAction}
+                          onCopy={handleCopy}
+                          onDismiss={handleDismiss}
+                          isCopying={markUsedMutation.isPending}
+                          isDismissing={dismissMutation.isPending}
+                          variant={action.is_used ? "compact" : "full"}
+                        />
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                </ScrollArea>
+              )}
+            </TabsContent>
+          </Tabs>
+        </ChartPanel>
+      </div>
+
+      {/* Action Detail Dialog */}
+      <ActionDetailDialog
+        action={selectedAction}
+        onClose={() => setSelectedAction(null)}
+        onCopy={handleCopy}
+        onDismiss={handleDismiss}
+        isCopying={markUsedMutation.isPending}
+      />
+    </ClientShell>
   );
 };
 

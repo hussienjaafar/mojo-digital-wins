@@ -18,7 +18,8 @@
   --portal-bg-primary: 210 20% 98%;          /* #F8FAFC - Main background */
   --portal-bg-secondary: 0 0% 100%;          /* #FFFFFF - Card background */
   --portal-bg-tertiary: 210 20% 96%;         /* #F1F5F9 - Elevated surfaces */
-  --portal-bg-elevated: 210 15% 93%;         /* #E8EDF2 - Hover states */
+  --portal-bg-elevated: 210 15% 93%;         /* #E8EDF2 - Elevated surfaces */
+  --portal-bg-hover: 210 15% 90%;            /* #E2E8EE - Hover states */
   
   /* Visible borders for light mode */
   --portal-border: 214 20% 85%;              /* #D1D9E0 - Clear borders */
@@ -99,7 +100,8 @@
   --portal-bg-primary: 220 15% 8%;           /* #121418 - Ultra deep */
   --portal-bg-secondary: 220 15% 12%;        /* #1A1D24 - Card background */
   --portal-bg-tertiary: 220 15% 16%;         /* #24282F - Elevated surfaces */
-  --portal-bg-elevated: 220 15% 20%;         /* #2E333B - Hover states */
+  --portal-bg-elevated: 220 15% 20%;         /* #2E333B - Elevated surfaces */
+  --portal-bg-hover: 220 15% 24%;            /* #363C46 - Hover states */
   
   /* Subtle borders for dark mode */
   --portal-border: 220 15% 25%;              /* #3A4049 - Visible borders */

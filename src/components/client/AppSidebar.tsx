@@ -1,18 +1,20 @@
 import { Link, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Home,
+  LayoutDashboard,
   Bell,
   Eye,
   Target,
   TrendingUp,
   BarChart3,
-  DollarSign,
-  UserCircle,
+  Users,
   Settings,
-  Activity,
-  ChevronRight,
+  Zap,
+  GitBranch,
+  Sparkles,
+  Brain,
+  User,
 } from "lucide-react";
 import {
   Sidebar,
@@ -27,6 +29,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import type { SidebarNavSection } from "@/lib/design-tokens";
 
 interface AppSidebarProps {
   organizationId?: string;
@@ -82,91 +85,139 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const sections = [
+  // New Information Architecture structure
+  const sections = useMemo(() => [
     {
       label: "Overview",
       items: [
-        { title: "Dashboard", url: "/client-dashboard", icon: Home },
+        { title: "Dashboard", url: "/client-dashboard", icon: LayoutDashboard },
       ],
     },
     {
-      label: "Intelligence Hub",
+      label: "Acquisition",
       items: [
-        { title: "News Feed", url: "/", icon: Activity },
-        { title: "Entity Watchlist", url: "/client-watchlist", icon: Eye },
-        { title: "Polling Intelligence", url: "/polling-intelligence", icon: BarChart3 },
-        { title: "Polling Alerts", url: "/client-polling-alerts", icon: Bell },
+        { title: "Opportunities", url: "/client-opportunities", icon: Target, badge: stats.opportunities },
+        { title: "Suggested Actions", url: "/client-actions", icon: Zap, badge: stats.actions },
       ],
     },
     {
-      label: "Alerts & Actions",
+      label: "Donors",
       items: [
-        { title: "Critical Alerts", url: "/client-alerts", icon: Bell, badge: stats.alerts },
-        { title: "Suggested Actions", url: "/client-actions", icon: Target, badge: stats.actions },
-        { title: "Opportunities", url: "/client-opportunities", icon: DollarSign, badge: stats.opportunities },
-      ],
-    },
-    {
-      label: "Performance",
-      items: [
-        { title: "Demographics", url: "/client-demographics", icon: UserCircle },
+        { title: "Demographics", url: "/client-demographics", icon: Users },
         { title: "Donor Journey", url: "/client-donor-journey", icon: TrendingUp },
+        { title: "Donor Intelligence", url: "/client-intelligence", icon: Brain },
+      ],
+    },
+    {
+      label: "Attribution",
+      items: [
+        { title: "Attribution", url: "/client-attribution", icon: GitBranch },
+      ],
+    },
+    {
+      label: "Creative Intelligence",
+      items: [
+        { title: "Creative Analysis", url: "/client-creative-intelligence", icon: Sparkles },
+      ],
+    },
+    {
+      label: "Watchlist & Alerts",
+      items: [
+        { title: "Entity Watchlist", url: "/client-watchlist", icon: Eye },
+        { title: "Critical Alerts", url: "/client-alerts", icon: Bell, badge: stats.alerts },
+        { title: "Polling Alerts", url: "/client-polling-alerts", icon: BarChart3 },
       ],
     },
     {
       label: "Settings",
       items: [
-        { title: "Profile", url: "/client-profile", icon: Settings },
+        { title: "Profile", url: "/client-profile", icon: User },
+        { title: "Settings", url: "/client-settings", icon: Settings },
       ],
     },
-  ];
+  ], [stats]);
 
   const isCollapsed = state === "collapsed";
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="portal-sidebar">
       <SidebarContent>
-        {sections.map((section) => (
-          <SidebarGroup key={section.label}>
-            <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider">
-              {section.label}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  const active = isActive(item.url);
-                  
-                  return (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        className={cn(
-                          "hover:bg-muted/50",
-                          active && "bg-secondary/10 text-secondary font-medium hover:bg-secondary/20"
-                        )}
-                      >
-                        <Link to={item.url} className="flex items-center gap-3">
-                          <Icon className={cn("h-5 w-5", active && "text-secondary")} />
-                          {!isCollapsed && (
-                            <>
-                              <span className="flex-1">{item.title}</span>
-                              {item.badge !== undefined && item.badge > 0 && (
-                                <Badge variant="destructive" className="ml-auto">
-                                  {item.badge}
-                                </Badge>
-                              )}
-                            </>
+        <nav role="navigation" aria-label="Client navigation">
+          {sections.map((section) => (
+            <SidebarGroup key={section.label}>
+              <SidebarGroupLabel
+                className="text-xs font-semibold uppercase tracking-wider portal-text-muted"
+              >
+                {section.label}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.url);
+                    const hasBadge = item.badge !== undefined && item.badge > 0;
+
+                    return (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={isCollapsed ? item.title : undefined}
+                          className={cn(
+                            "relative transition-colors",
+                            "hover:bg-[hsl(var(--portal-bg-hover))]",
+                            active && [
+                              "bg-[hsl(var(--portal-accent-blue)/0.1)]",
+                              "text-[hsl(var(--portal-accent-blue))]",
+                              "font-medium",
+                              "hover:bg-[hsl(var(--portal-accent-blue)/0.15)]",
+                              "border-l-2 border-[hsl(var(--portal-accent-blue))]",
+                            ]
                           )}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+                        >
+                          <Link
+                            to={item.url}
+                            className="flex items-center gap-3"
+                            aria-current={active ? "page" : undefined}
+                          >
+                            <Icon
+                              className={cn(
+                                "h-5 w-5 shrink-0",
+                                active
+                                  ? "text-[hsl(var(--portal-accent-blue))]"
+                                  : "text-[hsl(var(--portal-text-secondary))]"
+                              )}
+                              aria-hidden="true"
+                            />
+                            {!isCollapsed && (
+                              <>
+                                <span className="flex-1 truncate">{item.title}</span>
+                                {hasBadge && (
+                                  <Badge
+                                    variant="destructive"
+                                    className="ml-auto shrink-0 h-5 min-w-[1.25rem] px-1.5"
+                                  >
+                                    {item.badge}
+                                  </Badge>
+                                )}
+                              </>
+                            )}
+                            {/* Badge dot indicator when collapsed */}
+                            {isCollapsed && hasBadge && (
+                              <span
+                                className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive"
+                                aria-label={`${item.badge} notifications`}
+                              />
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
+        </nav>
       </SidebarContent>
     </Sidebar>
   );

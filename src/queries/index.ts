@@ -13,7 +13,15 @@ export * from "./useClientDashboardMetricsQuery";
 
 // Dashboard queries
 export { useDashboardKPIsQuery } from "./useDashboardKPIsQuery";
-export { useChannelSummariesQuery, type ChannelSummary } from "./useChannelSummariesQuery";
+export {
+  useChannelSummariesQuery,
+  useChannelSummariesLegacy,
+  type MetaSummary,
+  type SmsSummary,
+  type DonationsSummary,
+  type ChannelSummariesData,
+  type ChannelSummariesQueryResult,
+} from "./useChannelSummariesQuery";
 export {
   useDonationMetricsQuery,
   useDonationTimeSeriesQuery,
@@ -69,3 +77,91 @@ export {
   type InsightPriority,
   type InsightsData,
 } from "./useInsightsQuery";
+
+// Watchlist queries
+export {
+  useWatchlistQuery,
+  useAddWatchlistEntity,
+  useDeleteWatchlistEntity,
+  useToggleSentimentAlerts,
+  useUpdateAlertThreshold,
+  watchlistKeys,
+  type WatchlistEntity,
+  type EntityType,
+  type WatchlistStats,
+  type WatchlistData,
+  type WatchlistQueryResult,
+  type AddEntityInput,
+} from "./useWatchlistQuery";
+
+// Client Alerts queries
+export {
+  useClientAlertsQuery,
+  useMarkAlertRead,
+  useMarkAllAlertsRead,
+  useDismissAlert,
+  useToggleAlertActionable,
+  clientAlertsKeys,
+  type ClientAlert,
+  type AlertSeverity,
+  type AlertType,
+  type AlertStats,
+  type ClientAlertsData,
+  type ClientAlertsQueryResult,
+} from "./useClientAlertsQuery";
+
+// Suggested Actions queries
+export {
+  useSuggestedActionsQuery,
+  useMarkActionUsed,
+  useMarkAllActionsUsed,
+  useDismissAction,
+  useUndoDismissAction,
+  suggestedActionsKeys,
+  getUrgencyLevel,
+  type SuggestedAction,
+  type ActionStatus,
+  type ActionType as SuggestedActionType,
+  type UrgencyLevel,
+  type ActionStats,
+  type SuggestedActionsData,
+  type SuggestedActionsQueryResult,
+} from "./useSuggestedActionsQuery";
+
+// Opportunities queries
+export {
+  useOpportunitiesQuery,
+  useMarkOpportunityComplete,
+  useDismissOpportunity,
+  useAssignOpportunity,
+  useUpdateOpportunityNotes,
+  useReactivateOpportunity,
+  opportunitiesKeys,
+  getPriorityLevel,
+  type Opportunity,
+  type OpportunityStatus,
+  type OpportunityType,
+  type PriorityLevel,
+  type OpportunityStats,
+  type OpportunitiesData,
+  type OpportunitiesQueryResult,
+} from "./useOpportunitiesQuery";
+
+// Donor Journey queries
+export {
+  useDonorJourneyQuery,
+  useRefreshJourneyData,
+  useFlagCohort,
+  donorJourneyKeys,
+  type JourneyStage,
+  type CohortType,
+  type SegmentHealth,
+  type TouchpointSummary,
+  type DonorJourneyRecord,
+  type DonorSegmentSummary,
+  type FunnelStage,
+  type RetentionMetrics,
+  type JourneyStats,
+  type DonorJourneyData,
+  type DonorJourneyQueryResult,
+} from "./useDonorJourneyQuery";
