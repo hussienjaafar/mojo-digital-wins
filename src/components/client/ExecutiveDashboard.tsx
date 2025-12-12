@@ -1,13 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
-  Target, 
-  Users, 
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { format, subDays, parseISO, formatDistanceToNow } from "date-fns";
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Target,
+  Users,
   Activity,
   AlertCircle,
   CheckCircle2,
@@ -16,42 +15,41 @@ import {
   RefreshCw,
   Wifi,
   WifiOff,
+  Download,
   ArrowUpRight,
   ArrowDownRight,
-  Minus
+  Minus,
+  BarChart3,
+  PieChart,
+  type LucideIcon,
 } from "lucide-react";
+import { ClientShell } from "@/components/client/ClientShell";
+import { ChartPanel } from "@/components/charts/ChartPanel";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { useClientOrganization } from "@/hooks/useClientOrganization";
+import { useDashboardStore } from "@/stores/dashboardStore";
 import { useRealtimeMetrics } from "@/hooks/useRealtimeMetrics";
-import { 
+import {
   ComposedChart,
-  Bar, 
+  Bar,
   Line,
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
-import { format, subDays, parseISO } from "date-fns";
 import { ResponsiveBarChart, ResponsivePieChart, ResponsiveChartTooltip } from "@/components/charts";
-import { formatCurrency, getYAxisFormatter } from "@/lib/chart-formatters";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { getYAxisFormatter } from "@/lib/chart-formatters";
 
-type Props = {
-  organizationId: string;
-  startDate: string;
-  endDate: string;
-};
-
-type KPICardProps = {
-  title: string;
-  value: string | number;
-  change: number;
-  trend: "up" | "down" | "neutral";
-  icon: React.ReactNode;
-  description?: string;
-  onClick?: () => void;
-};
+// ============================================================================
+// Types
+// ============================================================================
 
 type Alert = {
   id: string;
@@ -61,19 +59,217 @@ type Alert = {
   timestamp: Date;
 };
 
-const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+// ============================================================================
+// Constants
+// ============================================================================
 
-const ExecutiveDashboard = ({ organizationId, startDate, endDate }: Props) => {
-  const { 
-    metaMetrics, 
-    smsMetrics, 
-    transactions, 
+const CHART_COLORS = [
+  "hsl(var(--portal-accent-blue))",
+  "hsl(var(--portal-accent-purple))",
+  "hsl(var(--portal-success))",
+  "hsl(var(--portal-warning))",
+  "hsl(var(--portal-error))",
+];
+
+// ============================================================================
+// Local Components
+// ============================================================================
+
+interface MetricChipProps {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+  change?: number;
+  variant?: "default" | "success" | "warning" | "error" | "info";
+  description?: string;
+}
+
+const MetricChip = ({
+  label,
+  value,
+  icon: Icon,
+  change,
+  variant = "default",
+  description,
+}: MetricChipProps) => {
+  const variantStyles = {
+    default: "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]",
+    success: "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
+    warning: "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]",
+    error: "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))]",
+    info: "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))]",
+  };
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 px-4 py-3 rounded-xl border border-[hsl(var(--portal-border)/0.5)]",
+        variantStyles[variant]
+      )}
+    >
+      <div className="p-2 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+        <Icon className="h-5 w-5" aria-hidden="true" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <span className="text-xs opacity-80 block">{label}</span>
+        <span className="font-bold text-lg tabular-nums">{value}</span>
+        {description && (
+          <span className="text-xs opacity-70 block truncate">{description}</span>
+        )}
+      </div>
+      {change !== undefined && (
+        <div
+          className={cn(
+            "flex items-center text-xs font-medium",
+            change > 0
+              ? "text-[hsl(var(--portal-success))]"
+              : change < 0
+              ? "text-[hsl(var(--portal-error))]"
+              : "text-[hsl(var(--portal-text-muted))]"
+          )}
+        >
+          {change > 0 ? (
+            <ArrowUpRight className="h-3 w-3 mr-0.5" />
+          ) : change < 0 ? (
+            <ArrowDownRight className="h-3 w-3 mr-0.5" />
+          ) : (
+            <Minus className="h-3 w-3 mr-0.5" />
+          )}
+          {change > 0 ? "+" : ""}
+          {change.toFixed(1)}%
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface ConnectionStatusProps {
+  isConnected: boolean;
+  lastUpdate: Date | null;
+}
+
+const ConnectionStatus = ({ isConnected, lastUpdate }: ConnectionStatusProps) => (
+  <div className="flex items-center gap-3">
+    <div
+      className={cn(
+        "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium",
+        isConnected
+          ? "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]"
+          : "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))]"
+      )}
+    >
+      {isConnected ? (
+        <>
+          <Wifi className="h-4 w-4" aria-hidden="true" />
+          <span>Live</span>
+        </>
+      ) : (
+        <>
+          <WifiOff className="h-4 w-4" aria-hidden="true" />
+          <span>Offline</span>
+        </>
+      )}
+    </div>
+    {lastUpdate && (
+      <div className="flex items-center gap-1.5 text-sm text-[hsl(var(--portal-text-muted))]">
+        <Clock className="h-4 w-4" aria-hidden="true" />
+        <span>{format(lastUpdate, "HH:mm:ss")}</span>
+      </div>
+    )}
+  </div>
+);
+
+interface AlertItemProps {
+  alert: Alert;
+  onAcknowledge?: (id: string) => void;
+}
+
+const AlertItem = ({ alert, onAcknowledge }: AlertItemProps) => {
+  const typeConfig = {
+    success: {
+      bg: "bg-[hsl(var(--portal-success)/0.1)]",
+      border: "border-[hsl(var(--portal-success)/0.2)]",
+      icon: CheckCircle2,
+      iconColor: "text-[hsl(var(--portal-success))]",
+    },
+    warning: {
+      bg: "bg-[hsl(var(--portal-warning)/0.1)]",
+      border: "border-[hsl(var(--portal-warning)/0.2)]",
+      icon: AlertCircle,
+      iconColor: "text-[hsl(var(--portal-warning))]",
+    },
+    danger: {
+      bg: "bg-[hsl(var(--portal-error)/0.1)]",
+      border: "border-[hsl(var(--portal-error)/0.2)]",
+      icon: AlertCircle,
+      iconColor: "text-[hsl(var(--portal-error))]",
+    },
+    info: {
+      bg: "bg-[hsl(var(--portal-accent-blue)/0.1)]",
+      border: "border-[hsl(var(--portal-accent-blue)/0.2)]",
+      icon: AlertCircle,
+      iconColor: "text-[hsl(var(--portal-accent-blue))]",
+    },
+  };
+
+  const config = typeConfig[alert.type];
+  const Icon = config.icon;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      className={cn(
+        "flex items-start gap-3 p-3 rounded-lg border",
+        config.bg,
+        config.border
+      )}
+    >
+      <Icon className={cn("h-5 w-5 shrink-0 mt-0.5", config.iconColor)} aria-hidden="true" />
+      <div className="flex-1 min-w-0">
+        <h4 className="font-semibold text-sm text-[hsl(var(--portal-text-primary))]">
+          {alert.title}
+        </h4>
+        <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-0.5">
+          {alert.message}
+        </p>
+      </div>
+      {onAcknowledge && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onAcknowledge(alert.id)}
+          className="shrink-0 h-7 px-2 text-xs"
+        >
+          Acknowledge
+        </Button>
+      )}
+    </motion.div>
+  );
+};
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+const ExecutiveDashboard = () => {
+  const { toast } = useToast();
+  const { organizationId } = useClientOrganization();
+  const { startDate, endDate } = useDashboardStore();
+
+  // Use realtime metrics hook
+  const {
+    metaMetrics,
+    smsMetrics,
+    transactions,
     roiAnalytics,
-    isConnected, 
-    lastUpdate, 
-    isLoading 
-  } = useRealtimeMetrics(organizationId, startDate, endDate);
+    isConnected,
+    lastUpdate,
+    isLoading,
+  } = useRealtimeMetrics(organizationId || "", startDate, endDate);
 
+  // State
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
@@ -86,27 +282,28 @@ const ExecutiveDashboard = ({ organizationId, startDate, endDate }: Props) => {
     const roi = totalSpend > 0 ? ((totalRevenue - totalSpend) / totalSpend) * 100 : 0;
     const totalDonations = transactions.length;
     const avgDonation = totalDonations > 0 ? totalRevenue / totalDonations : 0;
-    
-    // Calculate engagement metrics
+
+    // Engagement metrics
     const totalImpressions = metaMetrics.reduce((sum, m) => sum + Number(m.impressions || 0), 0);
     const totalClicks = metaMetrics.reduce((sum, m) => sum + Number(m.clicks || 0), 0);
     const metaCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
-    
+
     const totalSmsSent = smsMetrics.reduce((sum, m) => sum + Number(m.messages_sent || 0), 0);
     const totalSmsDelivered = smsMetrics.reduce((sum, m) => sum + Number(m.messages_delivered || 0), 0);
     const smsDeliveryRate = totalSmsSent > 0 ? (totalSmsDelivered / totalSmsSent) * 100 : 0;
 
-    // Calculate previous period for comparison
+    // Period comparison
     const midDate = new Date((new Date(startDate).getTime() + new Date(endDate).getTime()) / 2);
     const currentPeriodRevenue = transactions
-      .filter(t => new Date(t.transaction_date) >= midDate)
+      .filter((t) => new Date(t.transaction_date) >= midDate)
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const previousPeriodRevenue = transactions
-      .filter(t => new Date(t.transaction_date) < midDate)
+      .filter((t) => new Date(t.transaction_date) < midDate)
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const revenueChange = previousPeriodRevenue > 0 
-      ? ((currentPeriodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100 
-      : 0;
+    const revenueChange =
+      previousPeriodRevenue > 0
+        ? ((currentPeriodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100
+        : 0;
 
     return {
       totalRevenue,
@@ -120,431 +317,400 @@ const ExecutiveDashboard = ({ organizationId, startDate, endDate }: Props) => {
       totalAdSpend,
       totalSmsCost,
     };
-  }, [metaMetrics, smsMetrics, transactions]);
+  }, [metaMetrics, smsMetrics, transactions, startDate, endDate]);
 
   // Attribution analysis
   const attributionData = useMemo(() => {
     if (roiAnalytics.length === 0) return [];
-    
-    const platforms = ['meta', 'sms', 'actblue'];
-    return platforms.map(platform => {
-      const data = roiAnalytics.filter(r => r.platform === platform);
+
+    const platforms = ["meta", "sms", "actblue"];
+    return platforms.map((platform) => {
+      const data = roiAnalytics.filter((r) => r.platform === platform);
       const firstTouch = data.reduce((sum, r) => sum + Number(r.first_touch_attribution || 0), 0);
       const lastTouch = data.reduce((sum, r) => sum + Number(r.last_touch_attribution || 0), 0);
       const linear = data.reduce((sum, r) => sum + Number(r.linear_attribution || 0), 0);
-      
-      return {
-        name: platform.toUpperCase(),
-        firstTouch,
-        lastTouch,
-        linear,
-      };
+
+      return { name: platform.toUpperCase(), firstTouch, lastTouch, linear };
     });
   }, [roiAnalytics]);
 
-  // Multi-platform performance timeline
+  // Performance timeline
   const performanceTimeline = useMemo(() => {
     const dateMap = new Map<string, any>();
-    
-    metaMetrics.forEach(m => {
+
+    metaMetrics.forEach((m) => {
       const date = m.date;
       if (!dateMap.has(date)) {
         dateMap.set(date, { date, metaSpend: 0, smsSpend: 0, revenue: 0 });
       }
-      const entry = dateMap.get(date);
-      entry.metaSpend += Number(m.spend || 0);
+      dateMap.get(date).metaSpend += Number(m.spend || 0);
     });
-    
-    smsMetrics.forEach(m => {
+
+    smsMetrics.forEach((m) => {
       const date = m.date;
       if (!dateMap.has(date)) {
         dateMap.set(date, { date, metaSpend: 0, smsSpend: 0, revenue: 0 });
       }
-      const entry = dateMap.get(date);
-      entry.smsSpend += Number(m.cost || 0);
+      dateMap.get(date).smsSpend += Number(m.cost || 0);
     });
-    
-    transactions.forEach(t => {
-      const date = format(parseISO(t.transaction_date), 'yyyy-MM-dd');
+
+    transactions.forEach((t) => {
+      const date = format(parseISO(t.transaction_date), "yyyy-MM-dd");
       if (!dateMap.has(date)) {
         dateMap.set(date, { date, metaSpend: 0, smsSpend: 0, revenue: 0 });
       }
-      const entry = dateMap.get(date);
-      entry.revenue += Number(t.amount || 0);
+      dateMap.get(date).revenue += Number(t.amount || 0);
     });
-    
+
     return Array.from(dateMap.values())
       .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(-30); // Last 30 days
+      .slice(-30);
   }, [metaMetrics, smsMetrics, transactions]);
 
   // Generate intelligent alerts
   useEffect(() => {
     const newAlerts: Alert[] = [];
-    
-    // ROI threshold alert
+
     if (kpis.roi < 100) {
       newAlerts.push({
-        id: 'roi-low',
-        type: 'warning',
-        title: 'ROI Below Target',
+        id: "roi-low",
+        type: "warning",
+        title: "ROI Below Target",
         message: `Current ROI is ${kpis.roi.toFixed(1)}%. Consider optimizing campaign spend.`,
         timestamp: new Date(),
       });
     } else if (kpis.roi > 200) {
       newAlerts.push({
-        id: 'roi-high',
-        type: 'success',
-        title: 'Exceptional ROI',
+        id: "roi-high",
+        type: "success",
+        title: "Exceptional ROI",
         message: `ROI is ${kpis.roi.toFixed(1)}%. Campaigns are performing excellently!`,
         timestamp: new Date(),
       });
     }
-    
-    // SMS delivery rate alert
+
     if (kpis.smsDeliveryRate < 95 && kpis.smsDeliveryRate > 0) {
       newAlerts.push({
-        id: 'sms-delivery',
-        type: 'warning',
-        title: 'Low SMS Delivery Rate',
+        id: "sms-delivery",
+        type: "warning",
+        title: "Low SMS Delivery Rate",
         message: `SMS delivery rate is ${kpis.smsDeliveryRate.toFixed(1)}%. Check contact list quality.`,
         timestamp: new Date(),
       });
     }
-    
-    // Budget efficiency alert
+
     const efficiency = kpis.totalRevenue > 0 ? (kpis.totalSpend / kpis.totalRevenue) * 100 : 0;
     if (efficiency > 50) {
       newAlerts.push({
-        id: 'budget-efficiency',
-        type: 'info',
-        title: 'Budget Efficiency Notice',
+        id: "budget-efficiency",
+        type: "info",
+        title: "Budget Efficiency Notice",
         message: `Spending ${efficiency.toFixed(1)}% of revenue. Review campaign allocations.`,
         timestamp: new Date(),
       });
     }
-    
-    // Recent donation alert
-    const recentDonations = transactions.filter(t => 
-      new Date(t.transaction_date) > subDays(new Date(), 1)
+
+    const recentDonations = transactions.filter(
+      (t) => new Date(t.transaction_date) > subDays(new Date(), 1)
     );
     if (recentDonations.length > 10) {
       newAlerts.push({
-        id: 'recent-activity',
-        type: 'success',
-        title: 'High Activity',
+        id: "recent-activity",
+        type: "success",
+        title: "High Activity",
         message: `${recentDonations.length} donations in the last 24 hours!`,
         timestamp: new Date(),
       });
     }
-    
+
     setAlerts(newAlerts);
   }, [kpis, transactions]);
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    if (!autoRefresh) return;
-    
-    const interval = setInterval(() => {
-      // Trigger a subtle re-render
-      setAlerts(prev => [...prev]);
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
+  // Handlers
+  const handleRefresh = useCallback(() => {
+    window.location.reload();
+  }, []);
 
-  const KPICard = ({ title, value, change, trend, icon, description, onClick }: KPICardProps) => (
-    <Card 
-      className={`transition-all hover:shadow-lg ${onClick ? 'cursor-pointer' : ''}`}
-      onClick={onClick}
-    >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        {icon}
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {description && (
-          <p className="text-xs text-muted-foreground mt-1">{description}</p>
-        )}
-        <div className="flex items-center mt-2 text-xs">
-          {trend === 'up' && (
-            <>
-              <ArrowUpRight className="w-4 h-4 text-success mr-1" />
-              <span className="text-success font-medium">+{Math.abs(change).toFixed(1)}%</span>
-            </>
-          )}
-          {trend === 'down' && (
-            <>
-              <ArrowDownRight className="w-4 h-4 text-destructive mr-1" />
-              <span className="text-destructive font-medium">-{Math.abs(change).toFixed(1)}%</span>
-            </>
-          )}
-          {trend === 'neutral' && (
-            <>
-              <Minus className="w-4 h-4 text-muted-foreground mr-1" />
-              <span className="text-muted-foreground font-medium">0%</span>
-            </>
-          )}
-          <span className="text-muted-foreground ml-2">vs previous period</span>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const handleExport = useCallback(() => {
+    toast({
+      title: "Exporting snapshot",
+      description: "Your executive dashboard export is being prepared.",
+    });
+  }, [toast]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2" />
-          <p className="text-muted-foreground">Loading executive dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleAcknowledgeAlert = useCallback((id: string) => {
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
+  // Format currency
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
 
   return (
-    <div className="space-y-6">
-      {/* Header with Real-time Status */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Executive Dashboard</h2>
-          <p className="text-muted-foreground">Real-time analytics and performance insights</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Connection Status */}
-          <div className="flex items-center gap-2 text-sm">
-            {isConnected ? (
-              <>
-                <Wifi className="w-4 h-4 text-success" />
-                <span className="text-success font-medium">Live</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-4 h-4 text-destructive" />
-                <span className="text-destructive font-medium">Offline</span>
-              </>
-            )}
+    <ClientShell pageTitle="Executive Dashboard" showDateControls={false}>
+      <div className="space-y-6">
+        {/* Hero Panel */}
+        <ChartPanel
+          title="Executive Overview"
+          description="Real-time analytics and performance insights"
+          icon={Activity}
+          isLoading={isLoading}
+          minHeight={160}
+          actions={
+            <div className="flex items-center gap-2">
+              <ConnectionStatus isConnected={isConnected} lastUpdate={lastUpdate} />
+              <Button
+                variant={autoRefresh ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className="gap-2"
+              >
+                <RefreshCw
+                  className={cn("h-4 w-4", autoRefresh && "animate-spin")}
+                  aria-hidden="true"
+                />
+                Auto-refresh
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
+                <Download className="h-4 w-4" aria-hidden="true" />
+                Export
+              </Button>
+            </div>
+          }
+        >
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <MetricChip
+              label="Total Revenue"
+              value={formatCurrency(kpis.totalRevenue)}
+              icon={DollarSign}
+              change={kpis.revenueChange}
+              variant="success"
+              description={`${kpis.totalDonations} donations`}
+            />
+            <MetricChip
+              label="ROI"
+              value={`${kpis.roi.toFixed(1)}%`}
+              icon={Target}
+              change={kpis.roi - 150}
+              variant={kpis.roi > 150 ? "success" : kpis.roi < 100 ? "error" : "warning"}
+              description="Multi-attribution"
+            />
+            <MetricChip
+              label="Total Donations"
+              value={kpis.totalDonations.toLocaleString()}
+              icon={Users}
+              variant="info"
+            />
+            <MetricChip
+              label="Avg Donation"
+              value={formatCurrency(kpis.avgDonation)}
+              icon={Zap}
+              variant="default"
+            />
+            <MetricChip
+              label="Meta CTR"
+              value={`${kpis.metaCTR.toFixed(2)}%`}
+              icon={TrendingUp}
+              change={kpis.metaCTR - 2}
+              variant={kpis.metaCTR > 2 ? "success" : "warning"}
+            />
+            <MetricChip
+              label="SMS Delivery"
+              value={`${kpis.smsDeliveryRate.toFixed(1)}%`}
+              icon={Activity}
+              variant={kpis.smsDeliveryRate >= 95 ? "success" : "warning"}
+            />
           </div>
-          
-          {/* Last Update */}
-          {lastUpdate && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="w-4 h-4" />
-              <span>{format(lastUpdate, 'HH:mm:ss')}</span>
-            </div>
-          )}
-          
-          {/* Auto-refresh Toggle */}
-          <Button
-            variant={autoRefresh ? "default" : "outline"}
-            size="sm"
-            onClick={() => setAutoRefresh(!autoRefresh)}
+        </ChartPanel>
+
+        {/* Alerts Panel */}
+        {alerts.length > 0 && (
+          <ChartPanel
+            title="Intelligent Alerts & Insights"
+            description="AI-generated performance recommendations"
+            icon={AlertCircle}
+            minHeight={100}
+            status={
+              alerts.some((a) => a.type === "warning" || a.type === "danger")
+                ? { text: "Action Needed", variant: "warning" }
+                : { text: "All Good", variant: "success" }
+            }
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
-            Auto-refresh
-          </Button>
-        </div>
-      </div>
+            <AnimatePresence mode="popLayout">
+              <div className="space-y-3">
+                {alerts.map((alert) => (
+                  <AlertItem
+                    key={alert.id}
+                    alert={alert}
+                    onAcknowledge={handleAcknowledgeAlert}
+                  />
+                ))}
+              </div>
+            </AnimatePresence>
+          </ChartPanel>
+        )}
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KPICard
-          title="Total Revenue"
-          value={`$${kpis.totalRevenue.toLocaleString()}`}
-          change={kpis.revenueChange}
-          trend={kpis.revenueChange > 0 ? 'up' : kpis.revenueChange < 0 ? 'down' : 'neutral'}
-          icon={<DollarSign className="w-4 h-4 text-muted-foreground" />}
-          description={`${kpis.totalDonations} total donations`}
-        />
-        
-        <KPICard
-          title="ROI Performance"
-          value={`${kpis.roi.toFixed(1)}%`}
-          change={kpis.roi - 150} // Compare to 150% target
-          trend={kpis.roi > 150 ? 'up' : kpis.roi < 100 ? 'down' : 'neutral'}
-          icon={<Target className="w-4 h-4 text-muted-foreground" />}
-          description="Multi-attribution model"
-        />
-        
-        <KPICard
-          title="Campaign Efficiency"
-          value={`$${kpis.avgDonation.toFixed(2)}`}
-          change={10.5}
-          trend="up"
-          icon={<Zap className="w-4 h-4 text-muted-foreground" />}
-          description="Average donation amount"
-        />
-        
-        <KPICard
-          title="Audience Engagement"
-          value={`${kpis.metaCTR.toFixed(2)}%`}
-          change={kpis.metaCTR - 2} // Compare to 2% target
-          trend={kpis.metaCTR > 2 ? 'up' : 'down'}
-          icon={<Users className="w-4 h-4 text-muted-foreground" />}
-          description={`${kpis.smsDeliveryRate.toFixed(1)}% SMS delivery`}
-        />
-      </div>
-
-      {/* Alerts & Insights Panel */}
-      {alerts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5" />
-              Intelligent Alerts & Insights
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg border ${
-                    alert.type === 'success'
-                      ? 'bg-success/5 border-success/20 dark:bg-success/10 dark:border-success/20'
-                      : alert.type === 'warning'
-                      ? 'bg-warning/5 border-warning/20 dark:bg-warning/10 dark:border-warning/20'
-                      : alert.type === 'danger'
-                      ? 'bg-destructive/5 border-destructive/20 dark:bg-destructive/10 dark:border-destructive/20'
-                      : 'bg-info/5 border-info/20 dark:bg-info/10 dark:border-info/20'
-                  }`}
-                >
-                  {alert.type === 'success' ? (
-                    <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-sm">{alert.title}</h4>
-                    <p className="text-sm text-muted-foreground mt-1">{alert.message}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Multi-platform Performance Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Multi-Platform Performance Timeline</CardTitle>
-          <CardDescription>Revenue vs Marketing Spend (Last 30 Days)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 sm:h-80">
+        {/* Performance Timeline Panel */}
+        <ChartPanel
+          title="Multi-Platform Performance Timeline"
+          description="Revenue vs marketing spend (Last 30 days)"
+          icon={BarChart3}
+          isLoading={isLoading}
+          isEmpty={performanceTimeline.length === 0}
+          emptyMessage="No performance data available for this period"
+          minHeight={320}
+          status={
+            lastUpdate
+              ? {
+                  text: `Updated ${formatDistanceToNow(lastUpdate, { addSuffix: true })}`,
+                  variant: "info",
+                }
+              : undefined
+          }
+        >
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={performanceTimeline}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} vertical={false} />
-                <XAxis 
-                  dataKey="date" 
-                  tickFormatter={(value) => format(parseISO(value), 'MMM d')}
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                  axisLine={{ stroke: "hsl(var(--border))", opacity: 0.5 }}
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(var(--portal-border))"
+                  opacity={0.4}
+                  vertical={false}
                 />
-                <YAxis 
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={(value) => format(parseISO(value), "MMM d")}
+                  tick={{ fontSize: 10, fill: "hsl(var(--portal-text-muted))" }}
+                  tickLine={false}
+                  axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: "hsl(var(--portal-text-muted))" }}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={getYAxisFormatter('currency')}
+                  tickFormatter={getYAxisFormatter("currency")}
                 />
-                <Tooltip 
+                <Tooltip
                   content={<ResponsiveChartTooltip valueType="currency" />}
-                  cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }}
+                  cursor={{ fill: "hsl(var(--portal-bg-tertiary))", opacity: 0.3 }}
                 />
-                <Legend 
-                  wrapperStyle={{ fontSize: 11 }}
-                  iconSize={10}
+                <Legend wrapperStyle={{ fontSize: 11 }} iconSize={10} />
+                <Bar
+                  dataKey="metaSpend"
+                  fill={CHART_COLORS[0]}
+                  name="Meta Ads Spend"
+                  radius={[4, 4, 0, 0]}
                 />
-                <Bar dataKey="metaSpend" fill={COLORS[0]} name="Meta Ads Spend" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="smsSpend" fill={COLORS[1]} name="SMS Spend" radius={[4, 4, 0, 0]} />
-                <Line 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stroke={COLORS[2]} 
+                <Bar
+                  dataKey="smsSpend"
+                  fill={CHART_COLORS[1]}
+                  name="SMS Spend"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke={CHART_COLORS[2]}
                   strokeWidth={2.5}
                   name="Revenue"
                   dot={false}
-                  activeDot={{ fill: COLORS[2], r: 5, strokeWidth: 2 }}
+                  activeDot={{ fill: CHART_COLORS[2], r: 5, strokeWidth: 2 }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-        </CardContent>
-      </Card>
+        </ChartPanel>
 
-      {/* Attribution Analysis */}
-      {attributionData.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Attribution Funnel Analysis</CardTitle>
-              <CardDescription>Multi-touch attribution by platform</CardDescription>
-            </CardHeader>
-            <CardContent>
+        {/* Attribution Analysis */}
+        {attributionData.length > 0 && (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ChartPanel
+              title="Attribution Funnel Analysis"
+              description="Multi-touch attribution by platform"
+              icon={BarChart3}
+              isLoading={isLoading}
+              minHeight={280}
+            >
               <ResponsiveBarChart
                 data={attributionData}
                 bars={[
-                  { dataKey: "firstTouch", name: "First Touch", color: COLORS[0], valueType: "currency" },
-                  { dataKey: "lastTouch", name: "Last Touch", color: COLORS[1], valueType: "currency" },
-                  { dataKey: "linear", name: "Linear", color: COLORS[2], valueType: "currency" },
+                  { dataKey: "firstTouch", name: "First Touch", color: CHART_COLORS[0], valueType: "currency" },
+                  { dataKey: "lastTouch", name: "Last Touch", color: CHART_COLORS[1], valueType: "currency" },
+                  { dataKey: "linear", name: "Linear", color: CHART_COLORS[2], valueType: "currency" },
                 ]}
                 valueType="currency"
-                height={256}
+                height={240}
               />
-            </CardContent>
-          </Card>
+            </ChartPanel>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Platform Distribution</CardTitle>
-              <CardDescription>Revenue attribution breakdown</CardDescription>
-            </CardHeader>
-            <CardContent>
+            <ChartPanel
+              title="Platform Distribution"
+              description="Revenue attribution breakdown"
+              icon={PieChart}
+              isLoading={isLoading}
+              minHeight={280}
+            >
               <ResponsivePieChart
-                data={attributionData.map(d => ({ name: d.name, value: d.linear }))}
+                data={attributionData.map((d) => ({ name: d.name, value: d.linear }))}
                 valueType="currency"
-                colors={COLORS}
-                height={256}
+                colors={CHART_COLORS}
+                height={240}
               />
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Real-time Activity Feed */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5" />
-            Recent Activity
-          </CardTitle>
-          <CardDescription>Latest donations and campaign updates</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {transactions.slice(0, 10).map((tx) => (
-              <div key={tx.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-                  <div>
-                    <p className="text-sm font-medium">${Number(tx.amount).toFixed(2)} donation</p>
-                    <p className="text-xs text-muted-foreground">
-                      {tx.donor_name || 'Anonymous'} • {format(parseISO(tx.transaction_date), 'MMM d, HH:mm')}
-                    </p>
-                  </div>
-                </div>
-                {tx.is_recurring && (
-                  <Badge variant="secondary" className="text-xs">Recurring</Badge>
-                )}
-              </div>
-            ))}
+            </ChartPanel>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        )}
+
+        {/* Recent Activity Feed */}
+        <ChartPanel
+          title="Recent Activity"
+          description="Latest donations and campaign updates"
+          icon={Activity}
+          isLoading={isLoading}
+          isEmpty={transactions.length === 0}
+          emptyMessage="No recent activity"
+          minHeight={200}
+        >
+          <ScrollArea className="h-64">
+            <div className="space-y-2 pr-4">
+              {transactions.slice(0, 15).map((tx) => (
+                <motion.div
+                  key={tx.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--portal-bg-tertiary)/0.5)] hover:bg-[hsl(var(--portal-bg-tertiary))] transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-[hsl(var(--portal-success))] animate-pulse" />
+                    <div>
+                      <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                        ${Number(tx.amount).toFixed(2)} donation
+                      </p>
+                      <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                        {tx.donor_name || "Anonymous"} •{" "}
+                        {format(parseISO(tx.transaction_date), "MMM d, HH:mm")}
+                      </p>
+                    </div>
+                  </div>
+                  {tx.is_recurring && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs border-[hsl(var(--portal-accent-blue)/0.3)] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-accent-blue)/0.1)]"
+                    >
+                      Recurring
+                    </Badge>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </ScrollArea>
+        </ChartPanel>
+      </div>
+    </ClientShell>
   );
 };
 
