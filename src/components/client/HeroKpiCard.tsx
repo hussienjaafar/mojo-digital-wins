@@ -404,7 +404,7 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
       // Toggle selection for non-expandable cards (cross-highlighting)
       setSelectedKpi(isSelected ? null : kpiKey);
     }
-    onClick?.();
+    if (onClick) onClick();
   };
 
   // Close inline expansion handler

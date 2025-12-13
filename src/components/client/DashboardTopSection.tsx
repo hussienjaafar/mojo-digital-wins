@@ -51,6 +51,8 @@ export interface DashboardTopSectionProps {
     tablet?: 2 | 3 | 4;
     desktop?: 3 | 4 | 5 | 6;
   };
+  /** Expansion mode for KPI cards: "drawer" or "inline" */
+  expansionMode?: "drawer" | "inline";
   /** Additional className */
   className?: string;
 }
@@ -132,6 +134,7 @@ export const DashboardTopSection: React.FC<DashboardTopSectionProps> = ({
   showRefresh = false,
   isRefreshing = false,
   gridColumns = { mobile: 2, tablet: 3, desktop: 6 },
+  expansionMode = "drawer",
   className = undefined,
 }) => {
   // Build the actions slot with refresh button and custom controls
@@ -178,6 +181,7 @@ export const DashboardTopSection: React.FC<DashboardTopSectionProps> = ({
         mobileColumns={gridColumns.mobile}
         tabletColumns={gridColumns.tablet}
         desktopColumns={gridColumns.desktop}
+        expansionMode={expansionMode}
       />
     </motion.section>
   );

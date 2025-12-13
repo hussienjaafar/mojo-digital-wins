@@ -331,6 +331,7 @@ const ClientDashboard = () => {
                   }}
                   showRefresh
                   gridColumns={{ mobile: 2, tablet: 3, desktop: 6 }}
+                  expansionMode="inline"
                 />
               </motion.section>
 
