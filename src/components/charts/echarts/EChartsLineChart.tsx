@@ -175,8 +175,15 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
         emphasis: {
           focus: "series" as const,
           itemStyle: {
-            shadowBlur: 10,
-            shadowColor: "rgba(0, 0, 0, 0.3)",
+            // Enhanced shadow for both light and dark mode visibility
+            shadowBlur: 12,
+            shadowColor: "rgba(0, 0, 0, 0.5)",
+            // Add a bright border ring for dark mode visibility
+            borderColor: baseColor,
+            borderWidth: 2,
+          },
+          lineStyle: {
+            width: (s.lineStyle?.width ?? 2) + 1,
           },
         },
       };

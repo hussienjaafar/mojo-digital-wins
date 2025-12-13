@@ -109,7 +109,13 @@ export const V3SectionHeader: React.FC<V3SectionHeaderProps> = ({
       className={cn(
         "flex flex-col sm:flex-row sm:items-center sm:justify-between",
         styles.gap,
-        isPremium && "pb-4 border-b border-[hsl(var(--portal-border))]",
+        isPremium && [
+          "pb-4",
+          // Gradient border accent for premium mode - matches hero KPI card styling
+          "border-b-2 border-b-transparent",
+          "bg-[length:100%_2px] bg-no-repeat bg-bottom",
+          "bg-gradient-to-r from-[hsl(var(--portal-accent-blue)/0.3)] via-[hsl(var(--portal-accent-purple)/0.2)] to-transparent",
+        ],
         className
       )}
     >
@@ -117,10 +123,18 @@ export const V3SectionHeader: React.FC<V3SectionHeaderProps> = ({
         {Icon && (
           <div
             className={cn(
-              "p-1.5 rounded-lg",
+              "rounded-xl transition-all duration-200",
               isPremium
-                ? "bg-gradient-to-br from-[hsl(var(--portal-accent-blue)/0.2)] to-[hsl(var(--portal-accent-purple)/0.1)]"
-                : "bg-[hsl(var(--portal-bg-elevated))]"
+                ? [
+                    "p-2.5",
+                    "bg-gradient-to-br from-[hsl(var(--portal-accent-blue)/0.15)] to-[hsl(var(--portal-accent-purple)/0.08)]",
+                    "border border-[hsl(var(--portal-accent-blue)/0.2)]",
+                    "shadow-[0_0_20px_hsl(var(--portal-accent-blue)/0.12)]",
+                  ]
+                : [
+                    "p-1.5",
+                    "bg-[hsl(var(--portal-bg-elevated))]",
+                  ]
             )}
           >
             <Icon

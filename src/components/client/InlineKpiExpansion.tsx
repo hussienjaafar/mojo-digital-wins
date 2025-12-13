@@ -10,6 +10,8 @@ import type { BreakdownItem } from "./HeroKpiCard";
 // Types
 // ============================================================================
 
+export type ValueType = "currency" | "percent" | "number";
+
 export interface InlineKpiExpansionProps {
   /** KPI label */
   label: string;
@@ -33,6 +35,8 @@ export interface InlineKpiExpansionProps {
   breakdown?: BreakdownItem[];
   /** Accent color */
   accent?: "blue" | "green" | "purple" | "amber" | "red" | "default";
+  /** Value type for chart formatting */
+  valueType?: ValueType;
   /** Close handler */
   onClose: () => void;
   /** Loading state */
@@ -93,6 +97,7 @@ interface InlineChartProps {
   xAxisKey: string;
   color: string;
   label: string;
+  valueType?: ValueType;
 }
 
 const ChartSkeleton: React.FC = () => (
@@ -103,7 +108,7 @@ const ChartSkeleton: React.FC = () => (
 
 const LazyInlineChart = React.lazy(() =>
   import("recharts").then((mod) => ({
-    default: function InlineChart({ data, xAxisKey, color, label }: InlineChartProps) {
+    default: function InlineChart({ data, xAxisKey, color, label, valueType = "number" }: InlineChartProps) {
       const {
         ResponsiveContainer,
         AreaChart,
@@ -113,6 +118,20 @@ const LazyInlineChart = React.lazy(() =>
         CartesianGrid,
         Tooltip,
       } = mod;
+
+      // Format value based on type
+      const formatValue = (value: number): string => {
+        if (valueType === "currency") {
+          if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+          if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(1)}K`;
+          return `$${value.toFixed(0)}`;
+        }
+        if (valueType === "percent") {
+          return `${value.toFixed(1)}%`;
+        }
+        if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
+        return value.toFixed(0);
+      };
 
       // Format data for chart
       const chartData = data.map((d) => ({
@@ -155,13 +174,9 @@ const LazyInlineChart = React.lazy(() =>
                 tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
-                width={50}
+                width={60}
                 tickFormatter={(value) =>
-                  typeof value === "number"
-                    ? value >= 1000
-                      ? `${(value / 1000).toFixed(0)}K`
-                      : value.toString()
-                    : value
+                  typeof value === "number" ? formatValue(value) : value
                 }
               />
               <Tooltip
@@ -179,6 +194,7 @@ const LazyInlineChart = React.lazy(() =>
                 itemStyle={{
                   color: "hsl(var(--portal-text-secondary))",
                 }}
+                formatter={(value: number) => [formatValue(value), label]}
                 cursor={{
                   stroke: color,
                   strokeWidth: 1,
@@ -193,10 +209,14 @@ const LazyInlineChart = React.lazy(() =>
                 fill={`url(#gradient-${label})`}
                 dot={false}
                 activeDot={{
-                  r: 5,
+                  r: 6,
                   fill: color,
                   stroke: "hsl(var(--portal-bg-secondary))",
                   strokeWidth: 2,
+                  // Enhanced glow for dark mode visibility
+                  style: {
+                    filter: "drop-shadow(0 0 6px currentColor)",
+                  },
                 }}
               />
             </AreaChart>
@@ -313,6 +333,7 @@ export const InlineKpiExpansion: React.FC<InlineKpiExpansionProps> = ({
   trendXAxisKey = "date",
   breakdown,
   accent = "blue",
+  valueType = "currency",
   onClose,
   isLoading = false,
 }) => {
@@ -452,6 +473,7 @@ export const InlineKpiExpansion: React.FC<InlineKpiExpansionProps> = ({
                   xAxisKey={trendXAxisKey}
                   color={chartColor}
                   label={label}
+                  valueType={valueType}
                 />
               </React.Suspense>
             </div>

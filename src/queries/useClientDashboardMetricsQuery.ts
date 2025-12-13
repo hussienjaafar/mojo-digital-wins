@@ -47,13 +47,18 @@ export interface ChannelBreakdown {
   label: string;
 }
 
+export interface SparklineDataPoint {
+  date: string;
+  value: number;
+}
+
 export interface SparklineData {
-  netRevenue: number[];
-  roi: number[];
-  refundRate: number[];
-  recurringHealth: number[];
-  uniqueDonors: number[];
-  attributionQuality: number[];
+  netRevenue: SparklineDataPoint[];
+  roi: SparklineDataPoint[];
+  refundRate: SparklineDataPoint[];
+  recurringHealth: SparklineDataPoint[];
+  uniqueDonors: SparklineDataPoint[];
+  attributionQuality: SparklineDataPoint[];
 }
 
 interface DashboardMetricsResult {
@@ -280,37 +285,55 @@ async function fetchDashboardMetrics(
     { name: `Direct (${pct(directDonationCount)}%)`, value: directDonationCount, label: `${directDonationCount}` },
   ];
 
-  // Build sparkline data from time series (last 7-14 days depending on range)
+  // Build sparkline data from time series with calendar dates
   const sparklines: SparklineData = {
-    netRevenue: timeSeries.map(d => d.netDonations),
+    netRevenue: timeSeries.map((d, i) => ({
+      date: format(days[i], 'MMM d'),
+      value: d.netDonations,
+    })),
     roi: timeSeries.map((d, i) => {
       const daySpend = d.metaSpend + d.smsSpend;
-      return daySpend > 0 ? d.netDonations / daySpend : 0;
+      return {
+        date: format(days[i], 'MMM d'),
+        value: daySpend > 0 ? d.netDonations / daySpend : 0,
+      };
     }),
-    refundRate: timeSeries.map(d => {
+    refundRate: timeSeries.map((d, i) => {
       const gross = d.donations;
       const refundAbs = Math.abs(d.refunds);
-      return gross > 0 ? (refundAbs / gross) * 100 : 0;
+      return {
+        date: format(days[i], 'MMM d'),
+        value: gross > 0 ? (refundAbs / gross) * 100 : 0,
+      };
     }),
     recurringHealth: timeSeries.map((d, i) => {
       // Use the daily recurring donations portion
-      const dayDonations = donations.filter((don: any) => 
+      const dayDonations = donations.filter((don: any) =>
         don.transaction_date?.startsWith(format(days[i], 'yyyy-MM-dd')) && don.is_recurring
       );
-      return dayDonations.reduce((sum: number, don: any) => sum + Number(don.net_amount ?? don.amount ?? 0), 0);
+      return {
+        date: format(days[i], 'MMM d'),
+        value: dayDonations.reduce((sum: number, don: any) => sum + Number(don.net_amount ?? don.amount ?? 0), 0),
+      };
     }),
     uniqueDonors: timeSeries.map((d, i) => {
-      const dayDonations = donations.filter((don: any) => 
+      const dayDonations = donations.filter((don: any) =>
         don.transaction_date?.startsWith(format(days[i], 'yyyy-MM-dd'))
       );
-      return new Set(dayDonations.map((don: any) => don.donor_id_hash || don.donor_email)).size;
+      return {
+        date: format(days[i], 'MMM d'),
+        value: new Set(dayDonations.map((don: any) => don.donor_id_hash || don.donor_email)).size,
+      };
     }),
     attributionQuality: timeSeries.map((d, i) => {
-      const dayDonations = donations.filter((don: any) => 
+      const dayDonations = donations.filter((don: any) =>
         don.transaction_date?.startsWith(format(days[i], 'yyyy-MM-dd'))
       );
       const attributed = dayDonations.filter((don: any) => don.refcode || don.source_campaign).length;
-      return dayDonations.length > 0 ? (attributed / dayDonations.length) * 100 : 0;
+      return {
+        date: format(days[i], 'MMM d'),
+        value: dayDonations.length > 0 ? (attributed / dayDonations.length) * 100 : 0,
+      };
     }),
   };
 

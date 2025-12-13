@@ -51,7 +51,8 @@ export const portalTheme = {
     textStyle: {
       color: "hsl(var(--portal-text-primary))",
     },
-    extraCssText: "box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 8px;",
+    // Enhanced shadow for better visibility in both light and dark mode
+    extraCssText: "box-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.05); border-radius: 8px; backdrop-filter: blur(8px);",
   },
   grid: {
     borderColor: "hsl(var(--portal-border))",

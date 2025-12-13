@@ -152,7 +152,19 @@ export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
     <div className={cn("flex items-center gap-2", className)}>
       {showPresets && (
         <Select value={selectedPreset} onValueChange={(v) => handlePresetChange(v as PresetKey)}>
-          <SelectTrigger className="w-[140px] h-9 bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]">
+          <SelectTrigger
+            className={cn(
+              "w-[140px] h-9",
+              "bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]",
+              "text-[hsl(var(--portal-text-primary))]",
+              // Premium hover styling matching hero KPI cards
+              "transition-all duration-200",
+              "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
+              "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
+              "focus:border-[hsl(var(--portal-accent-blue))]",
+              "focus:shadow-[0_0_16px_hsl(var(--portal-accent-blue)/0.12)]"
+            )}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -171,18 +183,34 @@ export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
             variant="outline"
             className={cn(
               "h-9 justify-start text-left font-normal",
-              "bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]",
-              "text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-hover))]"
+              "bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]",
+              "text-[hsl(var(--portal-text-primary))]",
+              // Premium hover styling matching hero KPI cards
+              "transition-all duration-200",
+              "hover:bg-[hsl(var(--portal-bg-hover))]",
+              "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
+              "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
+              // Active/open state
+              isOpen && [
+                "border-[hsl(var(--portal-accent-blue))]",
+                "shadow-[0_0_16px_hsl(var(--portal-accent-blue)/0.12)]",
+              ]
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+            <CalendarIcon className={cn(
+              "mr-2 h-4 w-4 transition-colors duration-200",
+              isOpen ? "text-[hsl(var(--portal-accent-blue))]" : "text-[hsl(var(--portal-text-muted))]"
+            )} />
             <span className="hidden sm:inline">
               {format(startDate, "MMM d, yyyy")} - {format(endDate, "MMM d, yyyy")}
             </span>
             <span className="sm:hidden">
               {format(startDate, "MMM d")} - {format(endDate, "MMM d")}
             </span>
-            <ChevronDown className="ml-2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+            <ChevronDown className={cn(
+              "ml-2 h-4 w-4 transition-transform duration-200",
+              isOpen ? "rotate-180 text-[hsl(var(--portal-accent-blue))]" : "text-[hsl(var(--portal-text-muted))]"
+            )} />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
@@ -199,8 +227,28 @@ export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
 
       {showCompareSelector && (
         <Select value={compareMode} onValueChange={(v) => handleCompareModeChange(v as CompareMode)}>
-          <SelectTrigger className="w-[180px] h-9 bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]">
-            <GitCompare className="mr-2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+          <SelectTrigger
+            className={cn(
+              "w-[180px] h-9",
+              "bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]",
+              "text-[hsl(var(--portal-text-primary))]",
+              // Premium hover styling matching hero KPI cards
+              "transition-all duration-200",
+              "hover:border-[hsl(var(--portal-accent-purple)/0.5)]",
+              "hover:shadow-[0_0_12px_hsl(var(--portal-accent-purple)/0.08)]",
+              "focus:border-[hsl(var(--portal-accent-purple))]",
+              "focus:shadow-[0_0_16px_hsl(var(--portal-accent-purple)/0.12)]",
+              // Active state when comparing
+              compareMode !== "none" && [
+                "border-[hsl(var(--portal-accent-purple)/0.5)]",
+                "bg-[hsl(var(--portal-accent-purple)/0.05)]",
+              ]
+            )}
+          >
+            <GitCompare className={cn(
+              "mr-2 h-4 w-4 transition-colors duration-200",
+              compareMode !== "none" ? "text-[hsl(var(--portal-accent-purple))]" : "text-[hsl(var(--portal-text-muted))]"
+            )} />
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -18,8 +18,18 @@ import {
   type KpiKey,
 } from "@/stores/dashboardStore";
 import { V3KPIDrilldownDrawer, type KPIDrilldownData } from "@/components/v3/V3KPIDrilldownDrawer";
-import { InlineKpiExpansion } from "./InlineKpiExpansion";
+import { InlineKpiExpansion, type ValueType } from "./InlineKpiExpansion";
 import type { LineSeriesConfig } from "@/components/charts/echarts";
+
+// KPI to ValueType mapping for chart formatting
+const KPI_VALUE_TYPE_MAP: Partial<Record<KpiKey, ValueType>> = {
+  netRevenue: "currency",
+  netRoi: "number", // ROI multiplier like 2.5x
+  refundRate: "percent",
+  recurringHealth: "currency",
+  attributionQuality: "percent",
+  uniqueDonors: "number",
+};
 
 // ============================================================================
 // Types
@@ -206,10 +216,14 @@ const LazySparklineInner = React.lazy(() =>
                 strokeWidth={2}
                 dot={false}
                 activeDot={{
-                  r: 3,
+                  r: 4,
                   fill: color,
                   stroke: "hsl(var(--portal-bg-secondary))",
                   strokeWidth: 2,
+                  // CSS filter for glow effect in dark mode
+                  style: {
+                    filter: "drop-shadow(0 0 4px currentColor)",
+                  },
                 }}
               />
             </LineChart>
@@ -611,6 +625,7 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
             trendXAxisKey={trendXAxisKey}
             breakdown={breakdown}
             accent={accent}
+            valueType={KPI_VALUE_TYPE_MAP[kpiKey] || "currency"}
             onClose={handleInlineClose}
           />
         )}
