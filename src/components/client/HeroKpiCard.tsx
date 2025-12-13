@@ -554,12 +554,13 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
         {label}
       </p>
 
-      {/* Subtitle / Previous Value */}
-      {(subtitle || previousValue) && (
-        <p className="text-xs text-[hsl(var(--portal-text-muted))] mb-3 truncate">
-          {subtitle || (previousValue && `Previous: ${previousValue}`)}
-        </p>
-      )}
+      {/* Subtitle / Previous Value - Always render for consistent card height */}
+      <p className={cn(
+        "text-xs text-[hsl(var(--portal-text-muted))] mb-3 truncate",
+        "min-h-[var(--portal-space-md)]" // Token-based min-height (16px) for alignment
+      )}>
+        {subtitle || (previousValue ? `Previous: ${previousValue}` : "—")}
+      </p>
 
       {/* Sparkline */}
       {sparklineData && sparklineData.length > 0 && (

@@ -937,6 +937,91 @@
   }
 }
 
+/* === PORTAL CALENDAR PANEL === */
+/* Solid, opaque styling for react-day-picker calendar panels */
+
+.portal-calendar-panel {
+  background: hsl(var(--portal-bg-secondary)) !important;
+  border: 1px solid hsl(var(--portal-border));
+  border-radius: var(--portal-radius-lg);
+  box-shadow: var(--portal-shadow-lg);
+  padding: var(--portal-space-md);
+}
+
+/* Ensure all calendar internal elements inherit proper backgrounds */
+.portal-calendar-panel .rdp-months,
+.portal-calendar-panel .rdp-month,
+.portal-calendar-panel .rdp-table,
+.portal-calendar-panel .rdp-head,
+.portal-calendar-panel .rdp-tbody {
+  background: transparent;
+}
+
+/* Calendar caption/header styling */
+.portal-calendar-panel .rdp-caption {
+  color: hsl(var(--portal-text-primary));
+  font-weight: 600;
+}
+
+/* Calendar day cells */
+.portal-calendar-panel .rdp-day {
+  color: hsl(var(--portal-text-primary));
+  border-radius: var(--portal-radius-sm);
+  transition: all var(--portal-transition-fast);
+}
+
+.portal-calendar-panel .rdp-day:hover:not(.rdp-day_selected) {
+  background: hsl(var(--portal-bg-hover));
+}
+
+.portal-calendar-panel .rdp-day_selected {
+  background: hsl(var(--portal-accent-blue)) !important;
+  color: white !important;
+}
+
+.portal-calendar-panel .rdp-day_today {
+  background: hsl(var(--portal-bg-elevated));
+  font-weight: 600;
+}
+
+.portal-calendar-panel .rdp-day_outside {
+  color: hsl(var(--portal-text-muted));
+  opacity: 0.5;
+}
+
+/* Range selection styling */
+.portal-calendar-panel .rdp-day_range_middle {
+  background: hsl(var(--portal-accent-blue) / 0.1);
+  color: hsl(var(--portal-text-primary));
+}
+
+/* Head cells (day names) */
+.portal-calendar-panel .rdp-head_cell {
+  color: hsl(var(--portal-text-muted));
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Navigation buttons */
+.portal-calendar-panel .rdp-nav_button {
+  color: hsl(var(--portal-text-muted));
+  border: 1px solid hsl(var(--portal-border));
+  border-radius: var(--portal-radius-sm);
+  transition: all var(--portal-transition-fast);
+}
+
+.portal-calendar-panel .rdp-nav_button:hover {
+  background: hsl(var(--portal-bg-hover));
+  color: hsl(var(--portal-text-primary));
+  border-color: hsl(var(--portal-border-hover));
+}
+
+/* Dark mode calendar adjustments */
+.dark .portal-calendar-panel {
+  background: hsl(var(--portal-bg-secondary)) !important;
+  border-color: hsl(var(--portal-border));
+}
+
 /* === RESPONSIVE UTILITIES === */
 @media (max-width: 768px) {
   .portal-card {

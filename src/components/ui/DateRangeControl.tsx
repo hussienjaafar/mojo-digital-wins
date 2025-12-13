@@ -233,9 +233,9 @@ const PortalCalendar: React.FC<PortalCalendarProps> = ({
       defaultMonth={defaultMonth}
       showOutsideDays
       className={cn(
-        "p-[var(--portal-space-md)]",
-        "bg-[hsl(var(--portal-bg-secondary))]",
-        "rounded-[var(--portal-radius-lg)]"
+        // Apply portal calendar panel class for solid, opaque styling
+        "portal-calendar-panel",
+        "p-[var(--portal-space-md)]"
       )}
       classNames={{
         months: "flex flex-col sm:flex-row gap-[var(--portal-space-lg)]",
