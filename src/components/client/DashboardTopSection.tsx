@@ -2,9 +2,11 @@ import * as React from "react";
 import { type LucideIcon, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { V3SectionHeader } from "@/components/v3/V3SectionHeader";
 import { HeroKpiGrid, type HeroKpiData } from "./HeroKpiGrid";
 import { Button } from "@/components/ui/button";
+import { StatusChip } from "@/components/ui/StatusChip";
+import { HeaderCard } from "@/components/layout/HeaderCard";
+import { TitleBlock } from "@/components/dashboard/TitleBlock";
 import {
   Tooltip,
   TooltipContent,
@@ -92,10 +94,22 @@ const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing }) 
           onClick={onClick}
           disabled={isRefreshing}
           className={cn(
+            // Size and shape
             "h-9 w-9 p-0",
+            "rounded-[var(--portal-radius-sm)]",
+            // Colors
+            "bg-[hsl(var(--portal-bg-secondary))]",
             "border-[hsl(var(--portal-border))]",
+            "text-[hsl(var(--portal-text-muted))]",
+            // Hover state
             "hover:bg-[hsl(var(--portal-bg-hover))]",
-            "hover:border-[hsl(var(--portal-accent-blue))]"
+            "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
+            "hover:text-[hsl(var(--portal-text-primary))]",
+            "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
+            // Transitions
+            "transition-all duration-[var(--portal-transition-base)]",
+            // Disabled state
+            "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
           aria-label="Refresh data"
         >
@@ -107,12 +121,71 @@ const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing }) 
           />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="bottom">
+      <TooltipContent
+        side="bottom"
+        className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
+      >
         <p>Refresh data</p>
       </TooltipContent>
     </Tooltip>
   </TooltipProvider>
 );
+
+// ============================================================================
+// Status Badge Builder
+// ============================================================================
+
+interface StatusBadgeProps {
+  isLive?: boolean;
+  lastUpdated?: Date;
+  badges?: React.ReactNode[];
+}
+
+const StatusBadges: React.FC<StatusBadgeProps> = ({ isLive, lastUpdated, badges }) => {
+  const hasStatus = isLive || lastUpdated || (badges && badges.length > 0);
+  if (!hasStatus) return null;
+
+  return (
+    <div className="flex items-center gap-[var(--portal-space-xs)] flex-wrap">
+      {isLive && <StatusChip variant="live" />}
+      {!isLive && lastUpdated && (
+        <StatusChip variant="updated" timestamp={lastUpdated} />
+      )}
+      {badges?.map((badge, index) => (
+        <React.Fragment key={index}>{badge}</React.Fragment>
+      ))}
+    </div>
+  );
+};
+
+// ============================================================================
+// Controls Section Component
+// ============================================================================
+
+interface ControlsSectionProps {
+  controls?: React.ReactNode;
+  showRefresh?: boolean;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+}
+
+const ControlsSection: React.FC<ControlsSectionProps> = ({
+  controls,
+  showRefresh,
+  onRefresh,
+  isRefreshing,
+}) => {
+  if (!controls && !showRefresh) return null;
+
+  return (
+    <div className="flex items-center gap-[var(--portal-space-xs)]">
+      {controls}
+      {showRefresh && onRefresh && (
+        <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
+      )}
+    </div>
+  );
+};
 
 // ============================================================================
 // Main Component
@@ -137,40 +210,79 @@ export const DashboardTopSection: React.FC<DashboardTopSectionProps> = ({
   expansionMode = "drawer",
   className = undefined,
 }) => {
-  // Build the actions slot with refresh button and custom controls
-  const actionsContent = React.useMemo(() => {
-    if (!showRefresh && !controls) return null;
-
-    return (
-      <div className="flex items-center gap-2">
-        {controls}
-        {showRefresh && onRefresh && (
-          <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
-        )}
-      </div>
-    );
-  }, [controls, showRefresh, onRefresh, isRefreshing]);
+  // Build status badge for TitleBlock
+  const statusBadge = React.useMemo(() => {
+    if (!isLive && !lastUpdated) return undefined;
+    if (isLive) return <StatusChip variant="live" />;
+    if (lastUpdated) return <StatusChip variant="updated" timestamp={lastUpdated} />;
+    return undefined;
+  }, [isLive, lastUpdated]);
 
   return (
     <motion.section
-      className={cn("space-y-6", className)}
+      className={cn("space-y-[var(--portal-space-lg)]", className)}
       variants={sectionVariants}
       initial="hidden"
       animate="visible"
       aria-label={title}
     >
-      {/* Premium Header */}
-      <V3SectionHeader
-        title={title}
-        subtitle={subtitle}
-        icon={icon}
-        size="lg"
-        variant="premium"
-        isLive={isLive}
-        lastUpdated={lastUpdated}
-        badges={badges}
-        actions={actionsContent}
-      />
+      {/* Premium Header Card */}
+      <HeaderCard
+        elevation="elevated"
+        border="gradient"
+        padding="md"
+        className="overflow-hidden"
+      >
+        {/* Header Layout: Title Left, Controls Right */}
+        <div className={cn(
+          "flex flex-col gap-[var(--portal-space-md)]",
+          "sm:flex-row sm:items-center sm:justify-between"
+        )}>
+          {/* Left: Title Block with Icon and Status */}
+          <div className="flex flex-col gap-[var(--portal-space-sm)]">
+            <TitleBlock
+              title={title}
+              subtitle={subtitle}
+              icon={icon}
+              iconVariant="gradient"
+              size="lg"
+              statusBadge={statusBadge}
+            />
+
+            {/* Additional badges row (mobile: stacked below title) */}
+            {badges && badges.length > 0 && (
+              <div className="flex items-center gap-[var(--portal-space-xs)] flex-wrap sm:hidden">
+                {badges.map((badge, index) => (
+                  <React.Fragment key={index}>{badge}</React.Fragment>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Right: Controls */}
+          <div className={cn(
+            "flex flex-col gap-[var(--portal-space-sm)]",
+            "sm:flex-row sm:items-center"
+          )}>
+            {/* Additional badges (desktop: inline with controls) */}
+            {badges && badges.length > 0 && (
+              <div className="hidden sm:flex items-center gap-[var(--portal-space-xs)]">
+                {badges.map((badge, index) => (
+                  <React.Fragment key={index}>{badge}</React.Fragment>
+                ))}
+              </div>
+            )}
+
+            {/* Date picker and refresh button */}
+            <ControlsSection
+              controls={controls}
+              showRefresh={showRefresh}
+              onRefresh={onRefresh}
+              isRefreshing={isRefreshing}
+            />
+          </div>
+        </div>
+      </HeaderCard>
 
       {/* Hero KPI Grid */}
       <HeroKpiGrid

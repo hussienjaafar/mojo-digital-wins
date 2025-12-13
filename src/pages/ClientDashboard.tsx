@@ -14,8 +14,8 @@ import {
   V3Card,
   V3SectionHeader,
   V3LoadingState,
-  V3DateRangePicker,
 } from "@/components/v3";
+import { DateRangeControl } from "@/components/ui/DateRangeControl";
 import { cn } from "@/lib/utils";
 import { useDashboardStore, useDateRange } from "@/stores/dashboardStore";
 import { DashboardTopSection } from "@/components/client/DashboardTopSection";
@@ -320,7 +320,7 @@ const ClientDashboard = () => {
                   icon={LayoutDashboard}
                   isLive={isRealtimeConnected}
                   lastUpdated={dataUpdatedAt ? new Date(dataUpdatedAt) : undefined}
-                  controls={<V3DateRangePicker />}
+                  controls={<DateRangeControl pillPresets={["7d", "14d", "30d", "90d"]} />}
                   kpis={heroKpis}
                   isLoading={isLoading}
                   error={error instanceof Error ? error.message : error ? String(error) : null}

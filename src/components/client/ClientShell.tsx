@@ -18,7 +18,7 @@ import { SkipNavigation } from "@/components/accessibility/SkipNavigation";
 import { OrganizationSelector } from "@/components/client/OrganizationSelector";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { V3DateRangePicker } from "@/components/v3";
+import { DateRangeControl } from "@/components/ui/DateRangeControl";
 import { cn } from "@/lib/utils";
 
 // ============================================================================
@@ -340,7 +340,7 @@ export const ClientShell = ({
                       {/* Date Range Picker */}
                       {showDateControls && (
                         <div className="hidden sm:block">
-                          <V3DateRangePicker />
+                          <DateRangeControl size="sm" />
                         </div>
                       )}
 

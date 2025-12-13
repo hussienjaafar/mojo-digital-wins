@@ -73,25 +73,31 @@ export const colors = {
 } as const;
 
 // ============================================================================
-// Spacing Tokens
+// Spacing Tokens (8px grid system)
 // ============================================================================
 
 export const spacing = {
-  xs: '0.5rem',    // 8px
-  sm: '0.75rem',   // 12px
-  md: '1rem',      // 16px
-  lg: '1.5rem',    // 24px
-  xl: '2rem',      // 32px
-  '2xl': '3rem',   // 48px
+  '2xs': '0.25rem',  // 4px - fine adjustments
+  xs: '0.5rem',      // 8px
+  sm: '0.75rem',     // 12px
+  md: '1rem',        // 16px
+  lg: '1.5rem',      // 24px
+  xl: '2rem',        // 32px
+  '2xl': '2.5rem',   // 40px
+  '3xl': '3rem',     // 48px
+  '4xl': '4rem',     // 64px
 } as const;
 
 export const spacingVars = {
+  '2xs': 'portal-space-2xs',
   xs: 'portal-space-xs',
   sm: 'portal-space-sm',
   md: 'portal-space-md',
   lg: 'portal-space-lg',
   xl: 'portal-space-xl',
   '2xl': 'portal-space-2xl',
+  '3xl': 'portal-space-3xl',
+  '4xl': 'portal-space-4xl',
 } as const;
 
 // ============================================================================
@@ -154,23 +160,43 @@ export const fontSizeVars = {
 } as const;
 
 // ============================================================================
-// Shadow Tokens
+// Shadow Tokens (Elevation System)
 // ============================================================================
 
 export const shadows = {
+  // Elevation levels
+  none: 'none',
   sm: '0 1px 3px hsl(215 25% 15% / 0.08), 0 1px 2px hsl(215 25% 15% / 0.06)',
   md: '0 4px 6px hsl(215 25% 15% / 0.08), 0 2px 4px hsl(215 25% 15% / 0.06)',
   lg: '0 10px 15px hsl(215 25% 15% / 0.1), 0 4px 6px hsl(215 25% 15% / 0.05)',
+  xl: '0 20px 25px hsl(215 25% 15% / 0.12), 0 10px 10px hsl(215 25% 15% / 0.06)',
+  // Glow effects
   glow: '0 0 20px hsl(213 90% 45% / 0.2)',
   glowStrong: '0 0 30px hsl(213 90% 45% / 0.25)',
+  glowPurple: '0 0 20px hsl(270 70% 55% / 0.2)',
+  glowSuccess: '0 0 16px hsl(150 70% 50% / 0.25)',
+  // Inner shadows for depth
+  inset: 'inset 0 1px 2px hsl(215 25% 15% / 0.05)',
+  // Card elevation presets
+  card: '0 1px 3px hsl(215 25% 15% / 0.06), 0 1px 2px hsl(215 25% 15% / 0.04)',
+  cardHover: '0 8px 16px hsl(215 25% 15% / 0.1), 0 4px 8px hsl(215 25% 15% / 0.06)',
+  cardElevated: '0 4px 12px hsl(215 25% 15% / 0.08), 0 2px 6px hsl(215 25% 15% / 0.05)',
 } as const;
 
 export const shadowVars = {
+  none: 'portal-shadow-none',
   sm: 'portal-shadow-sm',
   md: 'portal-shadow-md',
   lg: 'portal-shadow-lg',
+  xl: 'portal-shadow-xl',
   glow: 'portal-shadow-glow',
   glowStrong: 'portal-shadow-glow-strong',
+  glowPurple: 'portal-shadow-glow-purple',
+  glowSuccess: 'portal-shadow-glow-success',
+  inset: 'portal-shadow-inset',
+  card: 'portal-shadow-card',
+  cardHover: 'portal-shadow-card-hover',
+  cardElevated: 'portal-shadow-card-elevated',
 } as const;
 
 // ============================================================================
@@ -260,6 +286,134 @@ export const getChartColor = (index: number): string =>
   cssVar(chartColors.series[index % chartColors.series.length]);
 
 // ============================================================================
+// Sidebar Navigation Types
+// ============================================================================
+
+export interface SidebarNavItem {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: number;
+  badgeVariant?: 'default' | 'destructive' | 'success' | 'warning';
+}
+
+export interface SidebarNavSection {
+  label: string;
+  items: SidebarNavItem[];
+}
+
+// ============================================================================
+// Component-Specific Tokens
+// ============================================================================
+
+/**
+ * StatusChip component tokens
+ * Variants: live (pulsing green), updated (static blue), syncing (animated blue)
+ */
+export const statusChip = {
+  /** Padding inside the chip */
+  padding: { x: spacing.sm, y: spacing['2xs'] },
+  /** Border radius for pill shape */
+  radius: radius.full,
+  /** Font size for chip text */
+  fontSize: typography.fontSize.xs,
+  /** Dot indicator size */
+  dotSize: '6px',
+  /** Minimum height for touch target */
+  minHeight: '24px',
+  /** Gap between dot and text */
+  gap: spacing['2xs'],
+  /** Variants with color tokens */
+  variants: {
+    live: {
+      bg: 'portal-success',
+      bgOpacity: 0.12,
+      text: 'portal-success',
+      dotColor: 'portal-success',
+      hasPulse: true,
+    },
+    updated: {
+      bg: 'portal-accent-blue',
+      bgOpacity: 0.1,
+      text: 'portal-text-muted',
+      dotColor: null,
+      hasPulse: false,
+    },
+    syncing: {
+      bg: 'portal-accent-blue',
+      bgOpacity: 0.1,
+      text: 'portal-accent-blue',
+      dotColor: 'portal-accent-blue',
+      hasPulse: true,
+    },
+  },
+} as const;
+
+/**
+ * HeaderCard component tokens
+ * Elevation and border variants for card containers
+ */
+export const headerCard = {
+  /** Padding options */
+  padding: {
+    sm: spacing.md,
+    md: spacing.lg,
+    lg: spacing.xl,
+  },
+  /** Border radius */
+  radius: radius.lg,
+  /** Background color token */
+  bg: 'portal-bg-secondary',
+  /** Border variants */
+  borderVariants: {
+    none: 'transparent',
+    subtle: 'portal-border',
+    accent: 'portal-accent-blue',
+    gradient: 'linear-gradient(135deg, hsl(var(--portal-accent-blue)/0.3), hsl(var(--portal-accent-purple)/0.2))',
+  },
+  /** Elevation (shadow) variants */
+  elevationVariants: {
+    flat: shadows.none,
+    raised: shadows.card,
+    elevated: shadows.cardElevated,
+    floating: shadows.lg,
+  },
+} as const;
+
+/**
+ * TitleBlock component tokens
+ * Typography and layout for section headers
+ */
+export const titleBlock = {
+  /** Icon container sizing */
+  iconContainer: {
+    size: '40px',
+    radius: radius.md,
+    padding: spacing.xs,
+  },
+  /** Title typography */
+  title: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.semibold,
+    lineHeight: typography.lineHeight.snug,
+    color: 'portal-text-primary',
+  },
+  /** Subtitle typography */
+  subtitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.normal,
+    lineHeight: typography.lineHeight.normal,
+    color: 'portal-text-muted',
+  },
+  /** Spacing between elements */
+  spacing: {
+    iconToText: spacing.sm,
+    titleToSubtitle: spacing['2xs'],
+    titleToStatus: spacing.sm,
+  },
+} as const;
+
+// ============================================================================
 // Combined Tokens Object
 // ============================================================================
 
@@ -279,24 +433,11 @@ export const tokens = {
   zIndex,
   zIndexVars,
   chartColors,
+  // Component-specific tokens
+  statusChip,
+  headerCard,
+  titleBlock,
 } as const;
-
-// ============================================================================
-// Sidebar Navigation Types
-// ============================================================================
-
-export interface SidebarNavItem {
-  title: string;
-  url: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: number;
-  badgeVariant?: 'default' | 'destructive' | 'success' | 'warning';
-}
-
-export interface SidebarNavSection {
-  label: string;
-  items: SidebarNavItem[];
-}
 
 // ============================================================================
 // Type Exports
@@ -309,3 +450,6 @@ export type ShadowToken = keyof typeof shadows;
 export type TransitionToken = keyof typeof transitions;
 export type ZIndexToken = keyof typeof zIndex;
 export type FontSizeToken = keyof typeof typography.fontSize;
+export type StatusChipVariant = keyof typeof statusChip.variants;
+export type HeaderCardBorderVariant = keyof typeof headerCard.borderVariants;
+export type HeaderCardElevation = keyof typeof headerCard.elevationVariants;

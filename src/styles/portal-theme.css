@@ -48,20 +48,31 @@
   --portal-gradient-subtle: linear-gradient(180deg, hsl(210 20% 98%) 0%, hsl(210 20% 96%) 100%);
   --portal-gradient-progress: conic-gradient(from 0deg, hsl(213 90% 45%) 0%, hsl(213 90% 45%) var(--progress, 50%), transparent var(--progress, 50%), transparent 100%);
   
-  /* === PORTAL SHADOWS - LIGHT MODE === */
+  /* === PORTAL SHADOWS - LIGHT MODE (Elevation System) === */
+  --portal-shadow-none: none;
   --portal-shadow-sm: 0 1px 3px hsl(215 25% 15% / 0.08), 0 1px 2px hsl(215 25% 15% / 0.06);
   --portal-shadow-md: 0 4px 6px hsl(215 25% 15% / 0.08), 0 2px 4px hsl(215 25% 15% / 0.06);
   --portal-shadow-lg: 0 10px 15px hsl(215 25% 15% / 0.1), 0 4px 6px hsl(215 25% 15% / 0.05);
+  --portal-shadow-xl: 0 20px 25px hsl(215 25% 15% / 0.12), 0 10px 10px hsl(215 25% 15% / 0.06);
   --portal-shadow-glow: 0 0 20px hsl(213 90% 45% / 0.2);
   --portal-shadow-glow-strong: 0 0 30px hsl(213 90% 45% / 0.25);
+  --portal-shadow-glow-purple: 0 0 20px hsl(270 70% 55% / 0.2);
+  --portal-shadow-glow-success: 0 0 16px hsl(150 70% 50% / 0.25);
+  --portal-shadow-inset: inset 0 1px 2px hsl(215 25% 15% / 0.05);
+  --portal-shadow-card: 0 1px 3px hsl(215 25% 15% / 0.06), 0 1px 2px hsl(215 25% 15% / 0.04);
+  --portal-shadow-card-hover: 0 8px 16px hsl(215 25% 15% / 0.1), 0 4px 8px hsl(215 25% 15% / 0.06);
+  --portal-shadow-card-elevated: 0 4px 12px hsl(215 25% 15% / 0.08), 0 2px 6px hsl(215 25% 15% / 0.05);
   
-  /* === PORTAL SPACING === */
+  /* === PORTAL SPACING (8px grid system) === */
+  --portal-space-2xs: 0.25rem;  /* 4px - fine adjustments */
   --portal-space-xs: 0.5rem;    /* 8px */
   --portal-space-sm: 0.75rem;   /* 12px */
   --portal-space-md: 1rem;      /* 16px */
   --portal-space-lg: 1.5rem;    /* 24px */
   --portal-space-xl: 2rem;      /* 32px */
-  --portal-space-2xl: 3rem;     /* 48px */
+  --portal-space-2xl: 2.5rem;   /* 40px */
+  --portal-space-3xl: 3rem;     /* 48px */
+  --portal-space-4xl: 4rem;     /* 64px */
   
   /* === PORTAL BORDER RADIUS === */
   --portal-radius-sm: 0.5rem;   /* 8px */
@@ -129,12 +140,20 @@
   --portal-gradient-accent: linear-gradient(135deg, hsl(213 100% 55%) 0%, hsl(213 100% 65%) 100%);
   --portal-gradient-subtle: linear-gradient(180deg, hsl(220 15% 8%) 0%, hsl(220 15% 12%) 100%);
   
-  /* === PORTAL SHADOWS - DARK MODE === */
+  /* === PORTAL SHADOWS - DARK MODE (Elevation System) === */
+  --portal-shadow-none: none;
   --portal-shadow-sm: 0 2px 8px hsl(0 0% 0% / 0.4);
   --portal-shadow-md: 0 4px 16px hsl(0 0% 0% / 0.5);
   --portal-shadow-lg: 0 8px 32px hsl(0 0% 0% / 0.6);
+  --portal-shadow-xl: 0 16px 48px hsl(0 0% 0% / 0.7);
   --portal-shadow-glow: 0 0 24px hsl(213 100% 60% / 0.35);
   --portal-shadow-glow-strong: 0 0 40px hsl(213 100% 60% / 0.45);
+  --portal-shadow-glow-purple: 0 0 24px hsl(270 70% 55% / 0.35);
+  --portal-shadow-glow-success: 0 0 20px hsl(150 70% 50% / 0.35);
+  --portal-shadow-inset: inset 0 1px 3px hsl(0 0% 0% / 0.2);
+  --portal-shadow-card: 0 2px 8px hsl(0 0% 0% / 0.35), 0 1px 4px hsl(0 0% 0% / 0.25);
+  --portal-shadow-card-hover: 0 12px 24px hsl(0 0% 0% / 0.5), 0 6px 12px hsl(0 0% 0% / 0.35);
+  --portal-shadow-card-elevated: 0 6px 20px hsl(0 0% 0% / 0.45), 0 3px 10px hsl(0 0% 0% / 0.3);
 }
 
 /* === PORTAL LAYOUT CLASSES === */
