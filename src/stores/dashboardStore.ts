@@ -34,28 +34,34 @@ interface DateRange {
 // ============================================================================
 
 /**
- * Maps each KPI to the chart series it relates to.
+ * Maps each KPI to the chart series it directly represents.
  * Used for cross-highlighting: when a KPI is hovered, related series are highlighted.
+ *
+ * IMPORTANT: Only map KPIs to series that directly display the same data.
+ * Calculated metrics (ROI, attribution scores) should have empty arrays
+ * to avoid highlighting unrelated series.
  */
 export const KPI_TO_SERIES_MAP: Record<KpiKey, SeriesKey[]> = {
   netRevenue: ['netDonations'],
-  netRoi: ['metaSpend', 'smsSpend'],
+  netRoi: [], // Calculated metric - no direct series representation
   refundRate: ['refunds'],
   recurringHealth: ['donations'],
-  attributionQuality: [], // No direct series mapping
+  attributionQuality: [], // Calculated metric - no direct series representation
   uniqueDonors: ['donations'],
 };
 
 /**
  * Reverse mapping: Series to KPIs
  * Used when chart series is hovered to highlight related KPIs
+ *
+ * Only includes mappings where the series directly represents the KPI data.
  */
 export const SERIES_TO_KPI_MAP: Record<SeriesKey, KpiKey[]> = {
   donations: ['recurringHealth', 'uniqueDonors'],
   netDonations: ['netRevenue'],
   refunds: ['refundRate'],
-  metaSpend: ['netRoi'],
-  smsSpend: ['netRoi'],
+  metaSpend: [], // Spend series - no direct KPI (ROI is calculated)
+  smsSpend: [], // Spend series - no direct KPI (ROI is calculated)
 };
 
 // ============================================================================

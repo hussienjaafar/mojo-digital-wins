@@ -233,13 +233,20 @@ export const DashboardTopSection: React.FC<DashboardTopSectionProps> = ({
         padding="md"
         className="overflow-hidden"
       >
-        {/* Header Layout: Title Left, Controls Right */}
+        {/* Header Layout: Title Left, Controls Right
+            - Mobile (<640px): Stack vertically
+            - Tablet (640-1024px): Row layout but controls may wrap
+            - Desktop (>1024px): Full row layout */}
         <div className={cn(
+          // Base: Stack vertically on mobile
           "flex flex-col gap-[var(--portal-space-md)]",
-          "sm:flex-row sm:items-center sm:justify-between"
+          // Tablet+: Row layout with wrap support
+          "sm:flex-row sm:items-start sm:justify-between sm:flex-wrap",
+          // Desktop: Align items center
+          "lg:items-center lg:flex-nowrap"
         )}>
           {/* Left: Title Block with Icon and Status */}
-          <div className="flex flex-col gap-[var(--portal-space-sm)]">
+          <div className="flex flex-col gap-[var(--portal-space-sm)] min-w-0 flex-shrink-0">
             <TitleBlock
               title={title}
               subtitle={subtitle}
@@ -249,9 +256,9 @@ export const DashboardTopSection: React.FC<DashboardTopSectionProps> = ({
               statusBadge={statusBadge}
             />
 
-            {/* Additional badges row (mobile: stacked below title) */}
+            {/* Additional badges row (mobile & tablet: stacked below title) */}
             {badges && badges.length > 0 && (
-              <div className="flex items-center gap-[var(--portal-space-xs)] flex-wrap sm:hidden">
+              <div className="flex items-center gap-[var(--portal-space-xs)] flex-wrap lg:hidden">
                 {badges.map((badge, index) => (
                   <React.Fragment key={index}>{badge}</React.Fragment>
                 ))}
@@ -261,12 +268,16 @@ export const DashboardTopSection: React.FC<DashboardTopSectionProps> = ({
 
           {/* Right: Controls */}
           <div className={cn(
+            // Base: Stack vertically on mobile
             "flex flex-col gap-[var(--portal-space-sm)]",
-            "sm:flex-row sm:items-center"
+            // Tablet+: Row layout with items centered
+            "sm:flex-row sm:items-center",
+            // Ensure controls don't overflow on tablet
+            "sm:flex-wrap lg:flex-nowrap"
           )}>
-            {/* Additional badges (desktop: inline with controls) */}
+            {/* Additional badges (desktop only: inline with controls) */}
             {badges && badges.length > 0 && (
-              <div className="hidden sm:flex items-center gap-[var(--portal-space-xs)]">
+              <div className="hidden lg:flex items-center gap-[var(--portal-space-xs)]">
                 {badges.map((badge, index) => (
                   <React.Fragment key={index}>{badge}</React.Fragment>
                 ))}

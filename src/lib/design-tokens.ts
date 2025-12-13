@@ -4,10 +4,68 @@
  * TypeScript-friendly design tokens that mirror the CSS custom properties
  * defined in src/styles/portal-theme.css
  *
- * Usage:
+ * ## Quick Start
  * - Import `tokens` for raw values
  * - Import `cssVar()` to get CSS variable references for inline styles
  * - Import `portalClass()` to get portal-prefixed class names
+ *
+ * ## Typography Patterns
+ *
+ * ### Header Sizes (DashboardTopSection, TitleBlock)
+ * | Size | Title                                      | Subtitle        |
+ * |------|--------------------------------------------|--------------------|
+ * | sm   | text-base font-semibold leading-snug       | text-xs            |
+ * | md   | text-xl font-semibold leading-snug         | text-sm            |
+ * | lg   | text-2xl font-bold leading-tight           | text-sm            |
+ *
+ * ### Text Colors
+ * - Primary text: `text-[hsl(var(--portal-text-primary))]`
+ * - Secondary text: `text-[hsl(var(--portal-text-secondary))]`
+ * - Muted text: `text-[hsl(var(--portal-text-muted))]`
+ *
+ * ## Spacing Patterns
+ *
+ * ### Common Component Spacing
+ * | Use Case             | Token                         | Value   |
+ * |----------------------|-------------------------------|---------|
+ * | Fine adjustments     | portal-space-2xs              | 4px     |
+ * | Icon gaps            | portal-space-xs               | 8px     |
+ * | Element gaps         | portal-space-sm               | 12px    |
+ * | Section padding      | portal-space-md               | 16px    |
+ * | Card padding         | portal-space-lg               | 24px    |
+ * | Section gaps         | portal-space-xl               | 32px    |
+ *
+ * ### Responsive Layout Classes
+ * ```tsx
+ * // Mobile-first stacking with tablet/desktop row
+ * className={cn(
+ *   "flex flex-col gap-[var(--portal-space-md)]",
+ *   "sm:flex-row sm:items-start sm:flex-wrap",
+ *   "lg:items-center lg:flex-nowrap"
+ * )}
+ * ```
+ *
+ * ## Border & Shadow Patterns
+ *
+ * ### Elevation Levels (HeaderCard)
+ * | Level     | Shadow Token              | Use Case             |
+ * |-----------|---------------------------|----------------------|
+ * | flat      | portal-shadow-none        | Inline elements      |
+ * | raised    | portal-shadow-card        | Default cards        |
+ * | elevated  | portal-shadow-card-elevated | Important sections |
+ * | floating  | portal-shadow-lg          | Modals, popovers     |
+ *
+ * ### Border Styles
+ * - subtle: `border-[hsl(var(--portal-border))]`
+ * - accent: `border-[hsl(var(--portal-accent-blue))]`
+ * - gradient: Use gradient wrapper component (see HeaderCard)
+ *
+ * ## Cross-Highlighting (KPI ↔ Chart)
+ *
+ * ### KPI_TO_SERIES_MAP Rules
+ * - Only map KPIs to series that directly display the same data
+ * - Calculated metrics (ROI, attribution) should map to empty arrays
+ * - See `dashboardStore.ts` for current mappings
  */
 
 // ============================================================================
