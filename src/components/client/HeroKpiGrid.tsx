@@ -63,6 +63,8 @@ export interface HeroKpiGridProps {
   tabletColumns?: 2 | 3 | 4;
   /** Number of columns on desktop (default: 6) */
   desktopColumns?: 3 | 4 | 5 | 6;
+  /** Expansion mode for cards: "drawer" or "inline" */
+  expansionMode?: "drawer" | "inline";
   /** Additional className */
   className?: string;
 }
@@ -210,8 +212,16 @@ export const HeroKpiGrid: React.FC<HeroKpiGridProps> = ({
   mobileColumns = 2,
   tabletColumns = 3,
   desktopColumns = 6,
+  expansionMode = "drawer",
   className,
 }) => {
+  // Track which card is expanded inline (only used in inline mode)
+  const [expandedKpiKey, setExpandedKpiKey] = React.useState<KpiKey | null>(null);
+
+  // Handle inline expansion change
+  const handleInlineExpandChange = React.useCallback((kpiKey: KpiKey, expanded: boolean) => {
+    setExpandedKpiKey(expanded ? kpiKey : null);
+  }, []);
   // Build responsive grid classes based on column props
   const gridClasses = cn(
     "grid gap-4",
@@ -260,32 +270,43 @@ export const HeroKpiGrid: React.FC<HeroKpiGridProps> = ({
       aria-label="Key performance indicators"
     >
       <AnimatePresence mode="popLayout">
-        {data.map((kpi) => (
-          <motion.div
-            key={kpi.kpiKey}
-            variants={itemVariants}
-            layout
-            exit={{ opacity: 0, scale: 0.95 }}
-          >
-            <HeroKpiCard
-              kpiKey={kpi.kpiKey}
-              label={kpi.label}
-              value={kpi.value}
-              icon={kpi.icon}
-              trend={kpi.trend}
-              previousValue={kpi.previousValue}
-              subtitle={kpi.subtitle}
-              accent={kpi.accent}
-              sparklineData={kpi.sparklineData}
-              description={kpi.description}
-              // Drilldown props
-              trendData={kpi.trendData}
-              trendXAxisKey={kpi.trendXAxisKey ?? "date"}
-              breakdown={kpi.breakdown}
-              expandable={kpi.expandable ?? Boolean(kpi.trendData || kpi.breakdown)}
-            />
-          </motion.div>
-        ))}
+        {data.map((kpi) => {
+          const isExpanded = expansionMode === "inline" && expandedKpiKey === kpi.kpiKey;
+
+          return (
+            <motion.div
+              key={kpi.kpiKey}
+              variants={itemVariants}
+              layout
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={cn(
+                // When expanded inline, span full width of grid
+                isExpanded && "col-span-full"
+              )}
+            >
+              <HeroKpiCard
+                kpiKey={kpi.kpiKey}
+                label={kpi.label}
+                value={kpi.value}
+                icon={kpi.icon}
+                trend={kpi.trend}
+                previousValue={kpi.previousValue}
+                subtitle={kpi.subtitle}
+                accent={kpi.accent}
+                sparklineData={kpi.sparklineData}
+                description={kpi.description}
+                // Drilldown props
+                trendData={kpi.trendData}
+                trendXAxisKey={kpi.trendXAxisKey ?? "date"}
+                breakdown={kpi.breakdown}
+                expandable={kpi.expandable ?? Boolean(kpi.trendData || kpi.breakdown)}
+                // Expansion mode props
+                expansionMode={expansionMode}
+                onInlineExpandChange={(expanded) => handleInlineExpandChange(kpi.kpiKey, expanded)}
+              />
+            </motion.div>
+          );
+        })}
       </AnimatePresence>
     </motion.div>
   );

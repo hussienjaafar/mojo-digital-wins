@@ -1,5 +1,5 @@
 import * as React from "react";
-import { type LucideIcon, TrendingUp, TrendingDown, Minus, ChevronRight } from "lucide-react";
+import { type LucideIcon, TrendingUp, TrendingDown, Minus, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { cssVar, colors, spacing, radius } from "@/lib/design-tokens";
@@ -18,6 +18,7 @@ import {
   type KpiKey,
 } from "@/stores/dashboardStore";
 import { V3KPIDrilldownDrawer, type KPIDrilldownData } from "@/components/v3/V3KPIDrilldownDrawer";
+import { InlineKpiExpansion } from "./InlineKpiExpansion";
 import type { LineSeriesConfig } from "@/components/charts/echarts";
 
 // ============================================================================
@@ -79,6 +80,10 @@ export interface HeroKpiCardProps {
   breakdown?: BreakdownItem[];
   /** Whether card is expandable (auto-detected if trendData or breakdown present) */
   expandable?: boolean;
+  /** Expansion mode: "drawer" opens side drawer, "inline" expands within grid */
+  expansionMode?: "drawer" | "inline";
+  /** Callback when inline expansion state changes */
+  onInlineExpandChange?: (expanded: boolean) => void;
 }
 
 // ============================================================================
@@ -320,8 +325,12 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
   trendXAxisKey = "date",
   breakdown,
   expandable,
+  expansionMode = "drawer",
+  onInlineExpandChange,
 }) => {
   const cardRef = React.useRef<HTMLElement>(null);
+  // Local state for inline expansion mode
+  const [isInlineExpanded, setIsInlineExpanded] = React.useState(false);
   const setSelectedKpi = useDashboardStore((s) => s.setSelectedKpiKey);
   const setHighlightedKpi = useDashboardStore((s) => s.setHighlightedKpiKey);
   const setDrilldownOpen = useDashboardStore((s) => s.setDrilldownOpen);
@@ -372,20 +381,39 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
 
   const handleClick = () => {
     if (isExpandable && hasDrilldownData) {
-      if (isSelected && isDrilldownOpen) {
-        // Close drawer if already selected and open
-        setDrilldownOpen(false);
-        setSelectedKpi(null);
+      if (expansionMode === "inline") {
+        // Inline mode: toggle local expansion state
+        const newExpanded = !isInlineExpanded;
+        setIsInlineExpanded(newExpanded);
+        if (onInlineExpandChange) onInlineExpandChange(newExpanded);
+        // Still update selected state for visual feedback
+        setSelectedKpi(newExpanded ? kpiKey : null);
       } else {
-        // Open drawer and select this KPI
-        setSelectedKpi(kpiKey);
-        setDrilldownOpen(true);
+        // Drawer mode: use global drilldown state
+        if (isSelected && isDrilldownOpen) {
+          // Close drawer if already selected and open
+          setDrilldownOpen(false);
+          setSelectedKpi(null);
+        } else {
+          // Open drawer and select this KPI
+          setSelectedKpi(kpiKey);
+          setDrilldownOpen(true);
+        }
       }
     } else {
       // Toggle selection for non-expandable cards (cross-highlighting)
       setSelectedKpi(isSelected ? null : kpiKey);
     }
     onClick?.();
+  };
+
+  // Close inline expansion handler
+  const handleInlineClose = () => {
+    setIsInlineExpanded(false);
+    if (onInlineExpandChange) onInlineExpandChange(false);
+    setSelectedKpi(null);
+    // Restore focus to card
+    cardRef.current?.focus();
   };
 
   const handleDrawerOpenChange = (open: boolean) => {
@@ -401,6 +429,9 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       handleClick();
+    } else if (e.key === "Escape" && expansionMode === "inline" && isInlineExpanded) {
+      e.preventDefault();
+      handleInlineClose();
     }
   };
 
@@ -453,7 +484,7 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
       tabIndex={0}
       role="button"
       aria-pressed={isSelected}
-      aria-expanded={isExpandable ? (isSelected && isDrilldownOpen) : undefined}
+      aria-expanded={isExpandable ? (expansionMode === "inline" ? isInlineExpanded : (isSelected && isDrilldownOpen)) : undefined}
       aria-label={`${label}: ${value}${trend ? `, ${trend.value > 0 ? "up" : "down"} ${Math.abs(trend.value)}%` : ""}${isExpandable ? ", click to expand details" : ""}`}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
@@ -547,20 +578,43 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
       {/* Expand affordance (chevron) - shows on hover for expandable cards */}
       {isExpandable && (
         <motion.div
-          className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"
-          initial={{ opacity: 0, x: -4 }}
-          whileHover={{ opacity: 1, x: 0 }}
+          className={cn(
+            "absolute top-3 right-3 transition-opacity",
+            // Show chevron when expanded (inline) or on hover when collapsed
+            (expansionMode === "inline" && isInlineExpanded) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          )}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: (expansionMode === "inline" && isInlineExpanded) ? 1 : undefined }}
         >
-          <ChevronRight
+          <ChevronDown
             className={cn(
               "h-4 w-4 text-[hsl(var(--portal-text-muted))]",
               "transition-transform duration-200",
-              isSelected && isDrilldownOpen && "rotate-90"
+              // Rotate when expanded (either inline or drawer mode)
+              ((expansionMode === "inline" && isInlineExpanded) || (expansionMode === "drawer" && isSelected && isDrilldownOpen)) && "rotate-180"
             )}
             aria-hidden="true"
           />
         </motion.div>
       )}
+
+      {/* Inline Expansion Content */}
+      <AnimatePresence>
+        {expansionMode === "inline" && isInlineExpanded && hasDrilldownData && (
+          <InlineKpiExpansion
+            label={label}
+            value={value}
+            icon={Icon}
+            trend={trend}
+            description={description}
+            trendData={trendData}
+            trendXAxisKey={trendXAxisKey}
+            breakdown={breakdown}
+            accent={accent}
+            onClose={handleInlineClose}
+          />
+        )}
+      </AnimatePresence>
     </motion.article>
   );
 
@@ -589,8 +643,8 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
     <>
       {renderContent()}
 
-      {/* Drilldown Drawer - only render for this card if selected */}
-      {isExpandable && drilldownData && (
+      {/* Drilldown Drawer - only render in drawer mode */}
+      {expansionMode === "drawer" && isExpandable && drilldownData && (
         <V3KPIDrilldownDrawer
           open={isSelected && isDrilldownOpen}
           onOpenChange={handleDrawerOpenChange}
