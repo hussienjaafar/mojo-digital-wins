@@ -64,6 +64,8 @@ const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing }) 
             // Size and shape - Mobile: 44px touch target, Tablet+: 36px
             "h-11 w-11 sm:h-9 sm:w-9 p-0",
             "rounded-[var(--portal-radius-sm)]",
+            // Border - override outline variant's border-2 to match 1px date controls
+            "border",
             // Colors
             "bg-[hsl(var(--portal-bg-secondary))]",
             "border-[hsl(var(--portal-border))]",
@@ -73,6 +75,11 @@ const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing }) 
             "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
             "hover:text-[hsl(var(--portal-text-primary))]",
             "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
+            // Focus state - portal-branded ring
+            "focus-visible:ring-2",
+            "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.3)]",
+            "focus-visible:ring-offset-1",
+            "focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
             // Transition
             "transition-all",
             // Disabled state
