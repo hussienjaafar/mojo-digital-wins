@@ -30,6 +30,9 @@
   --portal-accent-blue-hover: 213 90% 38%;   /* Darker on hover */
   --portal-accent-blue-light: 213 90% 95%;   /* Light backgrounds */
   --portal-accent-blue-glow: 213 90% 45% / 0.15; /* Subtle glow */
+/* Purple accent - for gradient effects */
+  --portal-accent-purple: 270 70% 55%;       /* #8B5CF6 - Vibrant purple */
+  --portal-accent-purple-hover: 270 70% 48%; /* Darker on hover */
   
   /* Success/Error/Warning - WCAG compliant for light mode */
   --portal-success: 150 60% 35%;             /* Darker green for contrast */
@@ -123,8 +126,12 @@
   --portal-accent-blue-hover: 213 100% 68%;  /* Brighter on hover */
   --portal-accent-blue-light: 213 100% 15%;  /* Dark blue backgrounds */
   --portal-accent-blue-glow: 213 100% 60% / 0.3; /* Strong glow */
-  
-  /* Success/Error/Warning - brighter for dark mode */
+
+  /* Purple accent - for gradient effects (dark mode) */
+  --portal-accent-purple: 270 80% 65%;       /* Brighter purple for dark mode */
+  --portal-accent-purple-hover: 270 80% 72%; /* Even brighter on hover */
+
+/* Success/Error/Warning - brighter for dark mode */
   --portal-success: 150 70% 50%;
   --portal-error: 0 75% 60%;
   --portal-warning: 45 95% 55%;

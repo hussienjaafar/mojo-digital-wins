@@ -107,11 +107,12 @@ const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing }) 
             "hover:text-[hsl(var(--portal-text-primary))]",
             "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
             // Transitions
-            "transition-all duration-[var(--portal-transition-base)]",
+            "transition-all",
             // Disabled state
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
           aria-label="Refresh data"
+        style={{ transition: "all var(--portal-transition-base)" }}
         >
           <RefreshCw
             className={cn(

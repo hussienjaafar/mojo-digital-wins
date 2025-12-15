@@ -48,7 +48,7 @@ const variantConfig: Record<
     defaultLabel: "Updated",
     showDot: false,
     hasPulse: false,
-    bgToken: "portal-bg-elevated",
+    bgToken: "portal-accent-blue",
     textToken: "portal-text-muted",
     dotToken: null,
   },
@@ -138,12 +138,13 @@ export const StatusChip = React.forwardRef<HTMLSpanElement, StatusChipProps>(
           // Typography
           "text-xs font-medium leading-none",
           // Transition
-          "transition-colors duration-[var(--portal-transition-fast)]",
+          "transition-colors",
           className
         )}
         style={{
           backgroundColor: `hsl(var(--${config.bgToken}) / ${bgOpacity})`,
           color: `hsl(var(--${config.textToken}))`,
+          transition: 'background-color var(--portal-transition-fast), color var(--portal-transition-fast)',
         }}
         {...props}
       >

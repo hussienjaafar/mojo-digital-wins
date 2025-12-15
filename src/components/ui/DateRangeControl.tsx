@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+
 import {
   Popover,
   PopoverContent,
@@ -30,6 +30,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useDashboardStore } from "@/stores/dashboardStore";
+import {
+  DateInputTrigger,
+  DateInputIcon,
+  getDateInputTransitionStyle,
+} from "@/components/ui/DateInputGroup";
 
 // ============================================================================
 // Types
@@ -177,7 +182,7 @@ const QuickRangePill: React.FC<QuickRangePillProps> = ({
         // Shape
         "rounded-full",
         // Transition
-        "transition-all duration-[var(--portal-transition-fast)]",
+        "transition-all",
         // Default state
         !isSelected && [
           "bg-[hsl(var(--portal-bg-elevated))]",
@@ -255,7 +260,7 @@ const PortalCalendar: React.FC<PortalCalendarProps> = ({
           "text-[hsl(var(--portal-text-muted))]",
           "hover:bg-[hsl(var(--portal-bg-hover))]",
           "hover:text-[hsl(var(--portal-text-primary))]",
-          "transition-colors duration-[var(--portal-transition-fast)]",
+          "transition-colors",
           "disabled:opacity-50"
         ),
         nav_button_previous: "absolute left-1",
@@ -283,7 +288,7 @@ const PortalCalendar: React.FC<PortalCalendarProps> = ({
           "rounded-[var(--portal-radius-sm)]",
           "text-[hsl(var(--portal-text-primary))]",
           "hover:bg-[hsl(var(--portal-bg-hover))]",
-          "transition-colors duration-[var(--portal-transition-fast)]",
+          "transition-colors",
           "aria-selected:opacity-100"
         ),
         day_range_end: "day-range-end",
@@ -337,70 +342,36 @@ interface CalendarTriggerProps {
   size?: "sm" | "md";
 }
 
-const CalendarTrigger = React.forwardRef<HTMLButtonElement, CalendarTriggerProps & React.ButtonHTMLAttributes<HTMLButtonElement>>(
-  ({ startDate, endDate, isOpen, size = "md", className, ...props }, ref) => {
-    const heightClass = size === "sm" ? "h-8" : "h-9";
-
-    return (
-      <Button
-        ref={ref}
-        variant="outline"
-        className={cn(
-          // Size
-          heightClass,
-          "justify-start text-left font-normal",
-          "px-[var(--portal-space-sm)]",
-          // Shape
-          "rounded-[var(--portal-radius-sm)]",
-          // Colors
-          "bg-[hsl(var(--portal-bg-secondary))]",
-          "border-[hsl(var(--portal-border))]",
-          "text-[hsl(var(--portal-text-primary))]",
-          // Hover state
-          "hover:bg-[hsl(var(--portal-bg-hover))]",
-          "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
-          "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
-          // Transition
-          "transition-all duration-[var(--portal-transition-base)]",
-          // Open state
-          isOpen && [
-            "border-[hsl(var(--portal-accent-blue))]",
-            "shadow-[0_0_16px_hsl(var(--portal-accent-blue)/0.12)]",
-          ],
-          className
-        )}
-        {...props}
-      >
-        <CalendarIcon
-          className={cn(
-            "mr-2 h-4 w-4",
-            "transition-colors duration-[var(--portal-transition-fast)]",
-            isOpen
-              ? "text-[hsl(var(--portal-accent-blue))]"
-              : "text-[hsl(var(--portal-text-muted))]"
-          )}
-        />
-        {/* Full date on larger screens */}
-        <span className="hidden sm:inline text-sm">
-          {format(startDate, "MMM d, yyyy")} – {format(endDate, "MMM d, yyyy")}
-        </span>
-        {/* Compact date on mobile */}
-        <span className="sm:hidden text-sm">
-          {format(startDate, "MMM d")} – {format(endDate, "MMM d")}
-        </span>
-        <ChevronDown
-          className={cn(
-            "ml-2 h-4 w-4",
-            "transition-all duration-[var(--portal-transition-fast)]",
-            isOpen
-              ? "rotate-180 text-[hsl(var(--portal-accent-blue))]"
-              : "text-[hsl(var(--portal-text-muted))]"
-          )}
-        />
-      </Button>
-    );
-  }
-);
+const CalendarTrigger = React.forwardRef<
+  HTMLButtonElement,
+  CalendarTriggerProps & React.ButtonHTMLAttributes<HTMLButtonElement>
+>(({ startDate, endDate, isOpen, size = "md", className, ...props }, ref) => {
+  return (
+    <DateInputTrigger
+      ref={ref}
+      size={size}
+      accent="blue"
+      isOpen={isOpen}
+      className={className}
+      {...props}
+    >
+      <DateInputIcon isOpen={isOpen} accent="blue">
+        <CalendarIcon className="h-4 w-4" />
+      </DateInputIcon>
+      {/* Full date on larger screens */}
+      <span className="hidden sm:inline text-sm">
+        {format(startDate, "MMM d, yyyy")} – {format(endDate, "MMM d, yyyy")}
+      </span>
+      {/* Compact date on mobile */}
+      <span className="sm:hidden text-sm">
+        {format(startDate, "MMM d")} – {format(endDate, "MMM d")}
+      </span>
+      <DateInputIcon isOpen={isOpen} accent="blue" rotateOnOpen className="ml-auto">
+        <ChevronDown className="h-4 w-4" />
+      </DateInputIcon>
+    </DateInputTrigger>
+  );
+});
 
 CalendarTrigger.displayName = "CalendarTrigger";
 
@@ -501,11 +472,12 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
               "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
               "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
               // Transition
-              "transition-all duration-[var(--portal-transition-base)]",
+              "transition-all",
               // Focus state
               "focus:border-[hsl(var(--portal-accent-blue))]",
               "focus:shadow-[0_0_16px_hsl(var(--portal-accent-blue)/0.12)]"
             )}
+            style={getDateInputTransitionStyle("base")}
           >
             <SelectValue />
           </SelectTrigger>
@@ -584,7 +556,7 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
               "hover:border-[hsl(var(--portal-accent-purple)/0.5)]",
               "hover:shadow-[0_0_12px_hsl(var(--portal-accent-purple)/0.08)]",
               // Transition
-              "transition-all duration-[var(--portal-transition-base)]",
+              "transition-all",
               // Focus state
               "focus:border-[hsl(var(--portal-accent-purple))]",
               "focus:shadow-[0_0_16px_hsl(var(--portal-accent-purple)/0.12)]",
@@ -594,6 +566,7 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
                 "bg-[hsl(var(--portal-accent-purple)/0.05)]",
               ]
             )}
+            style={getDateInputTransitionStyle("base")}
           >
             <SelectValue placeholder="Compare" />
           </SelectTrigger>

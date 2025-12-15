@@ -96,6 +96,8 @@ export const HeaderCard = React.forwardRef<HTMLDivElement, HeaderCardProps>(
       children,
       className,
       style,
+      onMouseEnter: consumerOnMouseEnter,
+      onMouseLeave: consumerOnMouseLeave,
       ...props
     },
     ref
@@ -128,7 +130,7 @@ export const HeaderCard = React.forwardRef<HTMLDivElement, HeaderCardProps>(
           // Background
           "bg-[hsl(var(--portal-bg-secondary))]",
           // Transitions
-          "transition-all duration-[200ms] ease-out",
+          "transition-all",
           // Interactive states
           interactive && [
             "cursor-pointer",
@@ -140,11 +142,18 @@ export const HeaderCard = React.forwardRef<HTMLDivElement, HeaderCardProps>(
         )}
         style={{
           boxShadow: currentShadow,
+          transition: "all var(--portal-transition-base)",
           ...borderStyles,
           ...style,
         }}
-        onMouseEnter={() => interactive && setIsHovered(true)}
-        onMouseLeave={() => interactive && setIsHovered(false)}
+        onMouseEnter={(e) => {
+          if (interactive) setIsHovered(true);
+          consumerOnMouseEnter?.(e);
+        }}
+        onMouseLeave={(e) => {
+          if (interactive) setIsHovered(false);
+          consumerOnMouseLeave?.(e);
+        }}
         {...props}
       >
         {children}

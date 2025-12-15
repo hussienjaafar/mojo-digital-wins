@@ -89,7 +89,7 @@ const IconContainer: React.FC<IconContainerProps> = ({
     // Shape
     "rounded-[var(--portal-radius-md)]",
     // Transition
-    "transition-all duration-[var(--portal-transition-base)]",
+    "transition-all",
     // Variant styles
     variant === "default" && "bg-[hsl(var(--portal-bg-elevated))]",
     variant === "accent" && [
@@ -111,7 +111,7 @@ const IconContainer: React.FC<IconContainerProps> = ({
   );
 
   return (
-    <div className={containerClasses}>
+    <div className={containerClasses} style={{ transition: "all var(--portal-transition-base)" }}>
       <Icon className={iconClasses} aria-hidden="true" />
     </div>
   );
