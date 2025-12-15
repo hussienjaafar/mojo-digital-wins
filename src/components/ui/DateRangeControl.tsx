@@ -425,10 +425,12 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
   // Update compare range when date range changes
   React.useEffect(() => {
     if (compareMode !== "none" && onCompareChange) {
-      const compareRange = compareModes[compareMode].getRange(startDate, endDate);
+      const start = new Date(dateRange.startDate);
+      const end = new Date(dateRange.endDate);
+      const compareRange = compareModes[compareMode].getRange(start, end);
       onCompareChange(compareRange, compareMode);
     }
-  }, [dateRange.startDate, dateRange.endDate, compareMode, onCompareChange, startDate, endDate]);
+  }, [dateRange.startDate, dateRange.endDate, compareMode, onCompareChange]);
 
   return (
     <div

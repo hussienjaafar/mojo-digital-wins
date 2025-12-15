@@ -133,33 +133,6 @@ const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing }) 
 );
 
 // ============================================================================
-// Status Badge Builder
-// ============================================================================
-
-interface StatusBadgeProps {
-  isLive?: boolean;
-  lastUpdated?: Date;
-  badges?: React.ReactNode[];
-}
-
-const StatusBadges: React.FC<StatusBadgeProps> = ({ isLive, lastUpdated, badges }) => {
-  const hasStatus = isLive || lastUpdated || (badges && badges.length > 0);
-  if (!hasStatus) return null;
-
-  return (
-    <div className="flex items-center gap-[var(--portal-space-xs)] flex-wrap">
-      {isLive && <StatusChip variant="live" />}
-      {!isLive && lastUpdated && (
-        <StatusChip variant="updated" timestamp={lastUpdated} />
-      )}
-      {badges?.map((badge, index) => (
-        <React.Fragment key={index}>{badge}</React.Fragment>
-      ))}
-    </div>
-  );
-};
-
-// ============================================================================
 // Controls Section Component
 // ============================================================================
 
