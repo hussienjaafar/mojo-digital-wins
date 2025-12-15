@@ -353,6 +353,7 @@ const CalendarTrigger = React.forwardRef<
       accent="blue"
       isOpen={isOpen}
       className={className}
+      aria-label={`Open date range calendar (${format(startDate, "MMM d, yyyy")} to ${format(endDate, "MMM d, yyyy")})`}
       {...props}
     >
       <DateInputIcon isOpen={isOpen} accent="blue">
@@ -460,10 +461,11 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
           onValueChange={(v) => handlePresetChange(v as PresetKey)}
         >
           <SelectTrigger
+            aria-label="Select date range preset"
             className={cn(
               "md:hidden",
               "w-[110px]",
-              size === "sm" ? "h-8" : "h-9",
+              size === "sm" ? "h-11 sm:h-8" : "h-11 sm:h-9",
               // Shape
               "rounded-[var(--portal-radius-sm)]",
               // Colors
@@ -545,9 +547,10 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
           onValueChange={(v) => handleCompareModeChange(v as CompareMode)}
         >
           <SelectTrigger
+            aria-label="Select comparison range"
             className={cn(
               "w-[140px]",
-              size === "sm" ? "h-8" : "h-9",
+              size === "sm" ? "h-11 sm:h-8" : "h-11 sm:h-9",
               // Shape
               "rounded-[var(--portal-radius-sm)]",
               // Colors

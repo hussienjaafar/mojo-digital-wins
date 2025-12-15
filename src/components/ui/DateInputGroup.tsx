@@ -44,7 +44,8 @@ export interface DateInputSelectTriggerProps extends DateInputStyleConfig {
  * Get height class based on size variant
  */
 export const getDateInputHeight = (size: DateInputSize = "md"): string => {
-  return size === "sm" ? "h-8" : "h-9";
+  // Mobile: 44px (h-11) for touch targets; Tablet+: original sizing
+  return size === "sm" ? "h-11 sm:h-8" : "h-11 sm:h-9";
 };
 
 /**
