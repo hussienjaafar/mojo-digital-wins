@@ -34,6 +34,7 @@ import {
   DateInputTrigger,
   DateInputIcon,
   getDateInputTransitionStyle,
+  getSelectTriggerClasses,
 } from "@/components/ui/DateInputGroup";
 
 // ============================================================================
@@ -201,7 +202,8 @@ const QuickRangePill: React.FC<QuickRangePillProps> = ({
         // Focus state
         "focus:outline-none focus-visible:ring-2",
         "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.5)]",
-        "focus-visible:ring-offset-1"
+        "focus-visible:ring-offset-1",
+        "focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]"
       )}
       aria-pressed={isSelected}
     >
@@ -462,25 +464,12 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
         >
           <SelectTrigger
             aria-label="Select date range preset"
-            className={cn(
-              "md:hidden",
-              "w-[110px]",
-              size === "sm" ? "h-11 sm:h-8" : "h-11 sm:h-9",
-              // Shape
-              "rounded-[var(--portal-radius-sm)]",
-              // Colors
-              "bg-[hsl(var(--portal-bg-secondary))]",
-              "border-[hsl(var(--portal-border))]",
-              "text-[hsl(var(--portal-text-primary))]",
-              // Hover state
-              "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
-              "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
-              // Transition
-              "transition-all",
-              // Focus state
-              "focus:border-[hsl(var(--portal-accent-blue))]",
-              "focus:shadow-[0_0_16px_hsl(var(--portal-accent-blue)/0.12)]"
-            )}
+            className={getSelectTriggerClasses({
+              size,
+              accent: "blue",
+              widthClass: "w-[110px]",
+              className: "md:hidden",
+            })}
             style={getDateInputTransitionStyle("base")}
           >
             <SelectValue />
@@ -548,29 +537,12 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
         >
           <SelectTrigger
             aria-label="Select comparison range"
-            className={cn(
-              "w-[140px]",
-              size === "sm" ? "h-11 sm:h-8" : "h-11 sm:h-9",
-              // Shape
-              "rounded-[var(--portal-radius-sm)]",
-              // Colors
-              "bg-[hsl(var(--portal-bg-secondary))]",
-              "border-[hsl(var(--portal-border))]",
-              "text-[hsl(var(--portal-text-primary))]",
-              // Hover state
-              "hover:border-[hsl(var(--portal-accent-purple)/0.5)]",
-              "hover:shadow-[0_0_12px_hsl(var(--portal-accent-purple)/0.08)]",
-              // Transition
-              "transition-all",
-              // Focus state
-              "focus:border-[hsl(var(--portal-accent-purple))]",
-              "focus:shadow-[0_0_16px_hsl(var(--portal-accent-purple)/0.12)]",
-              // Active state when comparing
-              compareMode !== "none" && [
-                "border-[hsl(var(--portal-accent-purple)/0.5)]",
-                "bg-[hsl(var(--portal-accent-purple)/0.05)]",
-              ]
-            )}
+            className={getSelectTriggerClasses({
+              size,
+              accent: "purple",
+              isActive: compareMode !== "none",
+              widthClass: "w-[140px]",
+            })}
             style={getDateInputTransitionStyle("base")}
           >
             <SelectValue placeholder="Compare" />

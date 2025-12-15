@@ -68,6 +68,7 @@ export const getDateInputAccentClasses = (
     `focus-visible:ring-2`,
     `focus-visible:ring-[hsl(var(--${accentToken})/0.3)]`,
     `focus-visible:ring-offset-1`,
+    `focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]`,
   ];
 
   // Open state
@@ -210,6 +211,7 @@ DateInputTrigger.displayName = "DateInputTrigger";
 /**
  * Get classes to apply to shadcn SelectTrigger for consistent date input styling.
  * Note: Apply transition via inline style separately.
+ * Includes focus:ring-* overrides since SelectTrigger uses focus: (not focus-visible:).
  */
 export const getSelectTriggerClasses = (
   config: DateInputSelectTriggerProps = {}
@@ -223,8 +225,15 @@ export const getSelectTriggerClasses = (
     className,
   } = config;
 
+  const accentToken = accent === "blue" ? "portal-accent-blue" : "portal-accent-purple";
+
   return cn(
     getDateInputTriggerClasses({ size, accent, isOpen, isActive }),
+    // Override shadcn SelectTrigger's default focus:ring-* with portal tokens
+    "focus:ring-2",
+    `focus:ring-[hsl(var(--${accentToken})/0.3)]`,
+    "focus:ring-offset-1",
+    "focus:ring-offset-[hsl(var(--portal-bg-secondary))]",
     widthClass,
     className
   );
