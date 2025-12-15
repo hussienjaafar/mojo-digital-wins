@@ -7,3 +7,4 @@ export { CustomizableDashboard } from "./CustomizableDashboard";
 export { RealtimeDashboard } from "./RealtimeDashboard";
 export { DateRangeSelector } from "./DateRangeSelector";
 export { TitleBlock, type TitleBlockProps, type TitleBlockSize, type TitleBlockIconVariant } from "./TitleBlock";
+export { DashboardHeader, type DashboardHeaderProps } from "./DashboardHeader";

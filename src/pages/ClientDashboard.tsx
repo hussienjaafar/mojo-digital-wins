@@ -210,7 +210,7 @@ const ClientDashboard = () => {
   const triggerRefresh = useDashboardStore((s) => s.triggerRefresh);
 
   // Data fetching with TanStack Query
-  const { data, isLoading, error, refetch, dataUpdatedAt } = useClientDashboardMetricsQuery(organizationId);
+  const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useClientDashboardMetricsQuery(organizationId);
 
   // Build hero KPIs from query data
   const heroKpis = useMemo(() => {
@@ -330,6 +330,7 @@ const ClientDashboard = () => {
                     refetch();
                   }}
                   showRefresh
+                  isRefreshing={isFetching}
                   gridColumns={{ mobile: 2, tablet: 3, desktop: 6 }}
                   expansionMode="inline"
                 />
