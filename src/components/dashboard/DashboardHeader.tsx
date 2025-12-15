@@ -70,11 +70,17 @@ const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing }) 
             "bg-[hsl(var(--portal-bg-secondary))]",
             "border-[hsl(var(--portal-border))]",
             "text-[hsl(var(--portal-text-muted))]",
+            // Dark mode overrides (override outline variant's dark:* classes)
+            "dark:border-[hsl(var(--portal-border))]",
+            "dark:text-[hsl(var(--portal-text-muted))]",
             // Hover state
             "hover:bg-[hsl(var(--portal-bg-hover))]",
             "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
             "hover:text-[hsl(var(--portal-text-primary))]",
             "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
+            // Dark mode hover overrides
+            "dark:hover:bg-[hsl(var(--portal-bg-hover))]",
+            "dark:hover:text-[hsl(var(--portal-text-primary))]",
             // Focus state - portal-branded ring
             "focus-visible:ring-2",
             "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.3)]",
