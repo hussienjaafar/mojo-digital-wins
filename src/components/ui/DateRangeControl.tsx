@@ -476,6 +476,7 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
           </SelectTrigger>
           <SelectContent
             className={cn(
+              "portal-theme",
               "bg-[hsl(var(--portal-bg-secondary))]",
               "border-[hsl(var(--portal-border))]",
               "rounded-[var(--portal-radius-md)]",
@@ -511,6 +512,7 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
         </PopoverTrigger>
         <PopoverContent
           className={cn(
+            "portal-theme",
             "w-auto p-0",
             "bg-[hsl(var(--portal-bg-secondary))]",
             "border-[hsl(var(--portal-border))]",
@@ -549,6 +551,7 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
           </SelectTrigger>
           <SelectContent
             className={cn(
+              "portal-theme",
               "bg-[hsl(var(--portal-bg-secondary))]",
               "border-[hsl(var(--portal-border))]",
               "rounded-[var(--portal-radius-md)]",
