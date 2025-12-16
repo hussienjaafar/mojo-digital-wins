@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, AlertCircle, Clock, RefreshCw, AlertTriangle, Info } from "lucide-react";
 import { formatDistanceToNow, parseISO, format, differenceInHours, differenceInDays } from "date-fns";
-import { logger } from "@/lib/logger";
+import { toast } from "sonner";
 
 type Props = {
   organizationId: string;
@@ -41,6 +41,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
   const [dataFreshness, setDataFreshness] = useState<DataFreshness[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [webhookCount, setWebhookCount] = useState<number>(0);
+  const [hasLoadError, setHasLoadError] = useState(false);
 
   useEffect(() => {
     loadFreshnessData();
@@ -48,6 +49,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
 
   const loadFreshnessData = async () => {
     setIsLoading(true);
+    setHasLoadError(false);
     try {
       // Get sync statuses from credentials
       const { data: credentials } = await supabase
@@ -175,7 +177,8 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
 
       setDataFreshness(freshness);
     } catch (error) {
-      logger.error('Failed to load freshness data', error);
+      setHasLoadError(true);
+      toast.error('Failed to load data freshness', { description: 'Unable to check data status. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -289,6 +292,24 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
     );
     const hasFailed = syncStatuses.some(s => s.status === 'failed');
     
+    if (hasLoadError) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="text-[10px] gap-1 bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))] border-[hsl(var(--portal-error)/0.2)]">
+                <AlertCircle className="h-3 w-3" />
+                Load Error
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent className="bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] shadow-md rounded-lg">
+              <p className="text-xs">Failed to load data freshness status. Please refresh.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
     if (hasFailed || hasCritical) {
       return (
         <TooltipProvider>
@@ -352,6 +373,16 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
   // Full view
   return (
     <div className="space-y-3">
+      {/* Load Error Alert */}
+      {hasLoadError && (
+        <div className="p-3 rounded-md bg-[hsl(var(--portal-error)/0.1)] border border-[hsl(var(--portal-error)/0.2)]">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-[hsl(var(--portal-error))]" />
+            <span className="text-sm text-[hsl(var(--portal-error))]">Failed to load data freshness status</span>
+          </div>
+        </div>
+      )}
+
       {/* Critical Alerts */}
       {showAlerts && alerts.length > 0 && (
         <div className="space-y-2">
