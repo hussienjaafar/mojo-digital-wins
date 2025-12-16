@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   format,
+  parse,
   subDays,
   startOfMonth,
   endOfMonth,
@@ -218,7 +219,7 @@ const QuickRangePill: React.FC<QuickRangePillProps> = ({
 
 interface PortalCalendarProps {
   mode: "range";
-  selected: { from: Date; to: Date };
+  selected: { from?: Date; to?: Date };
   onSelect: (range: { from?: Date; to?: Date } | undefined) => void;
   numberOfMonths?: number;
   defaultMonth?: Date;
@@ -395,8 +396,26 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
   const [compareMode, setCompareMode] = React.useState<CompareMode>("none");
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
 
-  const startDate = new Date(dateRange.startDate);
-  const endDate = new Date(dateRange.endDate);
+  // Parse store dates safely (avoid UTC shifting from new Date(string))
+  const parseStoreDate = (dateStr: string): Date =>
+    parse(dateStr, "yyyy-MM-dd", new Date());
+
+  const startDate = parseStoreDate(dateRange.startDate);
+  const endDate = parseStoreDate(dateRange.endDate);
+
+  // Draft range for 2-click selection (local state while selecting)
+  const [draftRange, setDraftRange] = React.useState<{ from?: Date; to?: Date }>({
+    from: startDate,
+    to: endDate,
+  });
+
+  // Sync draft range when calendar opens or store changes
+  React.useEffect(() => {
+    if (isCalendarOpen) {
+      setDraftRange({ from: startDate, to: endDate });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCalendarOpen, dateRange.startDate, dateRange.endDate]);
 
   // Handle preset selection
   const handlePresetChange = (preset: PresetKey) => {
@@ -407,14 +426,21 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
     }
   };
 
-  // Handle calendar date selection
+  // Handle calendar date selection (2-click: draft until complete)
   const handleDateSelect = (range: { from?: Date; to?: Date } | undefined) => {
-    if (range?.from) {
+    if (!range) {
+      setDraftRange({ from: undefined, to: undefined });
+      return;
+    }
+    setDraftRange(range);
+    // Only commit to store when both from and to are selected
+    if (range.from && range.to) {
       setDateRange(
         format(range.from, "yyyy-MM-dd"),
-        format(range.to || range.from, "yyyy-MM-dd")
+        format(range.to, "yyyy-MM-dd")
       );
       setSelectedPreset("custom");
+      setIsCalendarOpen(false);
     }
   };
 
@@ -428,11 +454,12 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
   // Update compare range when date range changes
   React.useEffect(() => {
     if (compareMode !== "none" && onCompareChange) {
-      const start = new Date(dateRange.startDate);
-      const end = new Date(dateRange.endDate);
+      const start = parseStoreDate(dateRange.startDate);
+      const end = parseStoreDate(dateRange.endDate);
       const compareRange = compareModes[compareMode].getRange(start, end);
       onCompareChange(compareRange, compareMode);
     }
+   
   }, [dateRange.startDate, dateRange.endDate, compareMode, onCompareChange]);
 
   return (
@@ -523,7 +550,7 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
         >
           <PortalCalendar
             mode="range"
-            selected={{ from: startDate, to: endDate }}
+            selected={draftRange}
             onSelect={handleDateSelect}
             numberOfMonths={2}
             defaultMonth={subDays(new Date(), 30)}
