@@ -270,7 +270,7 @@ const ClientDashboard = () => {
 
             if (isWithinInterval(txDate, { start: rangeStart, end: rangeEnd })) {
               refetch();
-              toast.success(`New donation: ${Number(newDonation.amount).toFixed(2)}`, {
+              toast.success(`New donation: $${Number(newDonation.amount).toFixed(2)}`, {
                 description: newDonation.donor_name || 'Anonymous donor',
               });
             }
