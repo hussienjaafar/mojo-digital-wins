@@ -171,7 +171,7 @@ export function MetaDataFreshnessIndicator({ organizationId, compact = false }: 
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80" align="end">
+      <PopoverContent className="portal-theme w-80" align="end">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h4 className="font-semibold text-sm">Meta Ads Data Status</h4>
@@ -184,7 +184,7 @@ export function MetaDataFreshnessIndicator({ organizationId, compact = false }: 
           <div className="space-y-3 text-sm">
             {/* Latest Data Date */}
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground flex items-center gap-1.5">
+              <span className="text-[hsl(var(--portal-text-muted))] flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5" />
                 Latest data
               </span>
@@ -198,7 +198,7 @@ export function MetaDataFreshnessIndicator({ organizationId, compact = false }: 
 
             {/* Last Sync Time */}
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground flex items-center gap-1.5">
+              <span className="text-[hsl(var(--portal-text-muted))] flex items-center gap-1.5">
                 <RefreshCw className="h-3.5 w-3.5" />
                 Last synced
               </span>
@@ -213,7 +213,7 @@ export function MetaDataFreshnessIndicator({ organizationId, compact = false }: 
             {/* Data Lag */}
             {dataLagDays > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground flex items-center gap-1.5">
+                <span className="text-[hsl(var(--portal-text-muted))] flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5" />
                   Data lag
                 </span>
@@ -226,7 +226,7 @@ export function MetaDataFreshnessIndicator({ organizationId, compact = false }: 
             {/* Meta API Latency */}
             {metaApiLatencyHours !== null && (
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground flex items-center gap-1.5">
+                <span className="text-[hsl(var(--portal-text-muted))] flex items-center gap-1.5">
                   <Info className="h-3.5 w-3.5" />
                   Meta API latency
                 </span>
@@ -238,7 +238,7 @@ export function MetaDataFreshnessIndicator({ organizationId, compact = false }: 
           </div>
 
           {/* Explanation */}
-          <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+          <div className="rounded-md bg-[hsl(var(--portal-bg-elevated))] p-3 text-xs text-[hsl(var(--portal-text-muted))]">
             <p className="font-medium mb-1">About Meta data delays:</p>
             <p>{lagReason || 'Meta Ads API typically has a 24-48 hour data processing delay. This is normal and expected.'}</p>
             {freshnessMessage && (
@@ -248,7 +248,7 @@ export function MetaDataFreshnessIndicator({ organizationId, compact = false }: 
 
           {/* Sync Error */}
           {syncError && (
-            <div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive">
+            <div className="rounded-md bg-[hsl(var(--portal-error)/0.12)] p-3 text-xs text-[hsl(var(--portal-error))]">
               <p className="font-medium">Sync Error</p>
               <p>{syncError}</p>
             </div>
@@ -274,7 +274,7 @@ export function MetaDataFreshnessIndicator({ organizationId, compact = false }: 
             )}
           </Button>
 
-          <p className="text-[10px] text-muted-foreground text-center">
+          <p className="text-[10px] text-[hsl(var(--portal-text-muted))] text-center">
             Syncing fetches the latest available data from Meta's API
           </p>
         </div>
