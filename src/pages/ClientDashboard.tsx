@@ -1,5 +1,6 @@
 import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { parseISO, parse, isValid, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { ChevronRight, BarChart3, Brain, LayoutDashboard, Layers, Clock } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
@@ -247,12 +248,32 @@ const ClientDashboard = () => {
           const newDonation = payload.new as any;
 
           // Check if donation falls within current date range
-          const txDate = newDonation.transaction_date;
-          if (txDate >= dateRange.startDate && txDate <= `${dateRange.endDate}T23:59:59`) {
-            refetch();
-            toast.success(`New donation: $${Number(newDonation.amount).toFixed(2)}`, {
-              description: newDonation.donor_name || 'Anonymous donor',
-            });
+          // Robust date parsing: handle ISO, yyyy-MM-dd, and timestamp formats
+          const txDateRaw = newDonation.transaction_date;
+          let txDate: Date | null = null;
+
+          if (typeof txDateRaw === 'number') {
+            txDate = new Date(txDateRaw);
+          } else if (typeof txDateRaw === 'string') {
+            // Try ISO format first
+            txDate = parseISO(txDateRaw);
+            if (!isValid(txDate)) {
+              // Try yyyy-MM-dd format
+              txDate = parse(txDateRaw, 'yyyy-MM-dd', new Date());
+            }
+          }
+
+          // Only trigger refetch if date is valid and within selected range
+          if (txDate && isValid(txDate)) {
+            const rangeStart = startOfDay(parseISO(dateRange.startDate));
+            const rangeEnd = endOfDay(parseISO(dateRange.endDate));
+
+            if (isWithinInterval(txDate, { start: rangeStart, end: rangeEnd })) {
+              refetch();
+              toast.success(`New donation: ${Number(newDonation.amount).toFixed(2)}`, {
+                description: newDonation.donor_name || 'Anonymous donor',
+              });
+            }
           }
         }
       )

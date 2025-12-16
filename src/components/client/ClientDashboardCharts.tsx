@@ -165,14 +165,15 @@ export const ClientDashboardCharts = ({
                 onClick={() => setShowZoom((prev) => !prev)}
                 className={cn(
                   "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[36px]",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
                   showZoom
                     ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
                     : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
                 )}
                 aria-pressed={showZoom}
-                title="Enable zoom & pan"
+                aria-label={showZoom ? "Disable zoom and pan" : "Enable zoom and pan"}
               >
-                <ZoomIn className="h-3.5 w-3.5" />
+                <ZoomIn className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
           }

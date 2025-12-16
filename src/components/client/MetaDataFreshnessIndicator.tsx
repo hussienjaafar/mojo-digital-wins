@@ -126,14 +126,14 @@ export function MetaDataFreshnessIndicator({ organizationId, compact = false }: 
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex items-center gap-1.5 cursor-help">
+            <button type="button" className="flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-1 rounded-md" aria-label={`Meta Ads data status: ${status.label}`}>
               <PortalBadge variant={status.variant} className="gap-1">
                 {status.icon}
                 {status.label}
               </PortalBadge>
-            </div>
+            </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-xs">
+          <TooltipContent side="bottom" className="max-w-xs bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] shadow-md rounded-lg">
             <div className="text-xs space-y-1">
               <p className="font-medium">Meta Ads Data Status</p>
               {latestDataDate && (
@@ -142,8 +142,8 @@ export function MetaDataFreshnessIndicator({ organizationId, compact = false }: 
               {lastSyncAt && (
                 <p>Last sync: {formatDistanceToNow(lastSyncAt, { addSuffix: true })}</p>
               )}
-              <p className="text-muted-foreground">{lagReason}</p>
-              <p className="text-muted-foreground text-[10px] mt-1">
+              <p className="text-[hsl(var(--portal-text-muted))]">{lagReason}</p>
+              <p className="text-[hsl(var(--portal-text-muted))] text-[10px] mt-1">
                 Meta API has a normal 24-48h processing delay
               </p>
             </div>

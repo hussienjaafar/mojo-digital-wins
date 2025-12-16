@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, AlertCircle, Clock, RefreshCw, AlertTriangle, Info } from "lucide-react";
 import { formatDistanceToNow, parseISO, format, differenceInHours, differenceInDays } from "date-fns";
+import { logger } from "@/lib/logger";
 
 type Props = {
   organizationId: string;
@@ -174,7 +175,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
 
       setDataFreshness(freshness);
     } catch (error) {
-      console.error('Failed to load freshness data', error);
+      logger.error('Failed to load freshness data', error);
     } finally {
       setIsLoading(false);
     }
@@ -192,7 +193,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
     
     if (item.hoursStale === null) {
       return (
-        <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground">
+        <Badge variant="outline" className="text-[10px] gap-1 text-[hsl(var(--portal-text-muted))]">
           <Clock className="h-3 w-3" />
           No data
         </Badge>
@@ -205,7 +206,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
     
     if (item.hoursStale <= freshnessThreshold) {
       return (
-        <Badge variant="outline" className="text-[10px] gap-1 bg-green-500/10 text-green-600 border-green-500/20">
+        <Badge variant="outline" className="text-[10px] gap-1 bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]">
           <CheckCircle className="h-3 w-3" />
           Fresh
         </Badge>
@@ -215,7 +216,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
     if (item.hoursStale <= criticalThreshold) {
       const daysStale = Math.round(item.hoursStale / 24);
       return (
-        <Badge variant="outline" className="text-[10px] gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+        <Badge variant="outline" className="text-[10px] gap-1 bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))] border-[hsl(var(--portal-warning)/0.2)]">
           <Clock className="h-3 w-3" />
           {daysStale > 0 ? `${daysStale}d ago` : `${Math.round(item.hoursStale)}h ago`}
         </Badge>
@@ -224,7 +225,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
     
     const daysStale = Math.round(item.hoursStale / 24);
     return (
-      <Badge variant="outline" className="text-[10px] gap-1 bg-red-500/10 text-red-600 border-red-500/20">
+      <Badge variant="outline" className="text-[10px] gap-1 bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))] border-[hsl(var(--portal-error)/0.2)]">
         <AlertCircle className="h-3 w-3" />
         {daysStale}d stale!
       </Badge>
@@ -272,8 +273,8 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
   if (isLoading) {
     return (
       <div className="flex items-center gap-2">
-        <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Loading...</span>
+        <RefreshCw className="h-3 w-3 animate-spin text-[hsl(var(--portal-text-muted))]" />
+        <span className="text-xs text-[hsl(var(--portal-text-muted))]">Loading...</span>
       </div>
     );
   }
@@ -292,13 +293,13 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
       return (
         <TooltipProvider>
           <Tooltip>
-            <TooltipTrigger>
+            <TooltipTrigger asChild>
               <Badge variant="destructive" className="text-[10px] gap-1">
                 <AlertCircle className="h-3 w-3" />
                 {hasFailed ? 'Sync Failed' : 'Data Critical'}
               </Badge>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent className="bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] shadow-md rounded-lg">
               <p className="text-xs">
                 {hasFailed 
                   ? 'One or more data syncs have failed. Check settings.' 
@@ -315,13 +316,13 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
       return (
         <TooltipProvider>
           <Tooltip>
-            <TooltipTrigger>
-              <Badge variant="outline" className="text-[10px] gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="text-[10px] gap-1 bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))] border-[hsl(var(--portal-warning)/0.2)]">
                 <Clock className="h-3 w-3" />
                 Data Delayed
               </Badge>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent className="bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] shadow-md rounded-lg">
               <p className="text-xs">Some data is behind expected freshness levels.</p>
             </TooltipContent>
           </Tooltip>
@@ -332,13 +333,13 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
     return (
       <TooltipProvider>
         <Tooltip>
-          <TooltipTrigger>
-            <Badge variant="outline" className="text-[10px] gap-1 bg-green-500/10 text-green-600 border-green-500/20">
+          <TooltipTrigger asChild>
+            <Badge variant="outline" className="text-[10px] gap-1 bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]">
               <CheckCircle className="h-3 w-3" />
               Data Fresh
             </Badge>
           </TooltipTrigger>
-          <TooltipContent>
+          <TooltipContent className="bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] shadow-md rounded-lg">
             <p className="text-xs">All data sources are within expected freshness.</p>
           </TooltipContent>
         </Tooltip>
@@ -388,7 +389,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
           return (
             <div 
               key={item.source}
-              className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+              className="flex items-center justify-between p-2 rounded-md bg-[hsl(var(--portal-bg-elevated))]"
             >
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
@@ -396,17 +397,17 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
                   {platformInfo && (
                     <TooltipProvider>
                       <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-3 w-3 text-muted-foreground" />
+                        <TooltipTrigger asChild>
+                          <button type="button" aria-label="Explain data freshness" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] rounded-sm"><Info className="h-3 w-3 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" /></button>
                         </TooltipTrigger>
-                        <TooltipContent>
+                        <TooltipContent className="bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] shadow-md rounded-lg">
                           <p className="text-xs max-w-48">{platformInfo.description}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   )}
                 </div>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-[hsl(var(--portal-text-muted))]">
                   {item.recordCount.toLocaleString()} records
                   {item.latestDate && (
                     <>
@@ -427,7 +428,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
         })}
         
         {dataFreshness.length === 0 && (
-          <div className="text-sm text-muted-foreground text-center py-2">
+          <div className="text-sm text-[hsl(var(--portal-text-muted))] text-center py-2">
             No data sources connected yet
           </div>
         )}
@@ -436,28 +437,28 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
       {/* Sync status summary */}
       {syncStatuses.length > 0 && (
         <div className="pt-2 border-t">
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs text-[hsl(var(--portal-text-muted))]">
             Last sync attempts:
           </div>
           <div className="flex flex-wrap gap-2 mt-1">
             {syncStatuses.map((sync) => (
               <TooltipProvider key={sync.platform}>
                 <Tooltip>
-                  <TooltipTrigger>
+                  <TooltipTrigger asChild>
                     <Badge 
                       variant="outline" 
                       className={`text-[10px] ${
                         sync.status === 'success' 
-                          ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                          ? 'bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]'
                           : sync.status === 'failed'
-                          ? 'bg-red-500/10 text-red-600 border-red-500/20'
-                          : 'text-muted-foreground'
+                          ? 'bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))] border-[hsl(var(--portal-error)/0.2)]'
+                          : 'text-[hsl(var(--portal-text-muted))]'
                       }`}
                     >
                       {sync.platform}
                     </Badge>
                   </TooltipTrigger>
-                  <TooltipContent>
+                  <TooltipContent className="bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] shadow-md rounded-lg">
                     <p className="text-xs">
                       {sync.lastSync 
                         ? `Last synced ${formatDistanceToNow(parseISO(sync.lastSync), { addSuffix: true })}`
