@@ -67,6 +67,10 @@ export interface DateRangeControlProps {
   ) => void;
   /** Size variant */
   size?: "sm" | "md";
+  /** Layout variant: default (separate controls) or segmented (joined cluster) */
+  variant?: "default" | "segmented";
+  /** Optional trailing control to render at end of segmented cluster (e.g., refresh button) */
+  trailingControl?: React.ReactNode;
 }
 
 // ============================================================================
@@ -380,6 +384,54 @@ const CalendarTrigger = React.forwardRef<
 CalendarTrigger.displayName = "CalendarTrigger";
 
 // ============================================================================
+// Segmented Trigger Styles (for joined cluster mode)
+// ============================================================================
+
+/**
+ * Get classes for a trigger inside the segmented cluster.
+ * Removes border/radius/shadow since the container owns those.
+ */
+const getSegmentedTriggerClasses = (size: "sm" | "md" = "md"): string => {
+  const height = size === "sm" ? "h-11 sm:h-8" : "h-11 sm:h-9";
+  return cn(
+    height,
+    // Remove individual border/radius/shadow
+    "border-0 rounded-none shadow-none",
+    // Background
+    "bg-transparent",
+    // Text
+    "text-[hsl(var(--portal-text-primary))]",
+    // Hover: simple bg change
+    "hover:bg-[hsl(var(--portal-bg-hover))]",
+    // Focus: subtle indication, container provides main ring
+    "focus:outline-none focus-visible:bg-[hsl(var(--portal-bg-hover))] focus-visible:z-10",
+    // Transition
+    "transition-colors"
+  );
+};
+
+/**
+ * Segmented cluster container classes
+ */
+const segmentedClusterClasses = cn(
+  // Layout
+  "inline-flex items-stretch",
+  // Shape
+  "rounded-[var(--portal-radius-sm)]",
+  // Border
+  "border border-[hsl(var(--portal-border))]",
+  // Background
+  "bg-[hsl(var(--portal-bg-secondary))]",
+  // Internal dividers
+  "divide-x divide-[hsl(var(--portal-border))]",
+  // Clip children to rounded corners
+  "overflow-hidden",
+  // Group focus ring
+  "focus-within:ring-2 focus-within:ring-[hsl(var(--portal-accent-blue)/0.3)]",
+  "focus-within:ring-offset-1 focus-within:ring-offset-[hsl(var(--portal-bg-secondary))]"
+);
+
+// ============================================================================
 // Main DateRangeControl Component
 // ============================================================================
 
@@ -390,6 +442,8 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
   showCompareSelector = false,
   onCompareChange,
   size = "md",
+  variant = "default",
+  trailingControl,
 }) => {
   const { dateRange, setDateRange } = useDashboardStore();
   const [selectedPreset, setSelectedPreset] = React.useState<PresetKey>("30d");
@@ -462,6 +516,181 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
    
   }, [dateRange.startDate, dateRange.endDate, compareMode, onCompareChange]);
 
+  // =========================================================================
+  // Segmented Variant: joined cluster with shared border
+  // =========================================================================
+  if (variant === "segmented") {
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-[var(--portal-space-xs)]",
+          className
+        )}
+      >
+        {/* Quick Range Pills - Desktop Only (outside cluster) */}
+        {showPresets && (
+          <div className="hidden md:flex items-center gap-[var(--portal-space-2xs)]">
+            {pillPresets.map((preset) => (
+              <QuickRangePill
+                key={preset}
+                preset={preset}
+                isSelected={selectedPreset === preset}
+                onClick={() => handlePresetChange(preset)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Segmented Cluster: triggers joined as one unit */}
+        <div className={segmentedClusterClasses}>
+          {/* Mobile Preset Selector (inside cluster) */}
+          {showPresets && (
+            <Select
+              value={selectedPreset}
+              onValueChange={(v) => handlePresetChange(v as PresetKey)}
+            >
+              <SelectTrigger
+                aria-label="Select date range preset"
+                className={cn(
+                  getSegmentedTriggerClasses(size),
+                  "w-[110px] px-[var(--portal-space-sm)]",
+                  "md:hidden"
+                )}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent
+                className={cn(
+                  "portal-theme",
+                  "bg-[hsl(var(--portal-bg-secondary))]",
+                  "border-[hsl(var(--portal-border))]",
+                  "rounded-[var(--portal-radius-md)]",
+                  "shadow-[var(--portal-shadow-lg)]"
+                )}
+              >
+                {Object.entries(presets).map(([key, preset]) => (
+                  <SelectItem
+                    key={key}
+                    value={key}
+                    className={cn(
+                      "text-[hsl(var(--portal-text-primary))]",
+                      "focus:bg-[hsl(var(--portal-bg-hover))]",
+                      "focus:text-[hsl(var(--portal-text-primary))]"
+                    )}
+                  >
+                    {preset.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Calendar Trigger (inside cluster) */}
+          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  getSegmentedTriggerClasses(size),
+                  "inline-flex items-center gap-2 px-[var(--portal-space-sm)]",
+                  "text-sm"
+                )}
+                aria-label={`Open date range calendar (${format(startDate, "MMM d, yyyy")} to ${format(endDate, "MMM d, yyyy")})`}
+              >
+                <DateInputIcon isOpen={isCalendarOpen} accent="blue">
+                  <CalendarIcon className="h-4 w-4" />
+                </DateInputIcon>
+                <span className="hidden sm:inline">
+                  {format(startDate, "MMM d, yyyy")} – {format(endDate, "MMM d, yyyy")}
+                </span>
+                <span className="sm:hidden">
+                  {format(startDate, "MMM d")} – {format(endDate, "MMM d")}
+                </span>
+                <DateInputIcon isOpen={isCalendarOpen} accent="blue" rotateOnOpen className="ml-auto">
+                  <ChevronDown className="h-4 w-4" />
+                </DateInputIcon>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              className={cn(
+                "portal-theme",
+                "w-auto p-0",
+                "bg-[hsl(var(--portal-bg-secondary))]",
+                "border-[hsl(var(--portal-border))]",
+                "rounded-[var(--portal-radius-lg)]",
+                "shadow-[var(--portal-shadow-lg)]"
+              )}
+              align="end"
+            >
+              <PortalCalendar
+                mode="range"
+                selected={draftRange}
+                onSelect={handleDateSelect}
+                numberOfMonths={2}
+                defaultMonth={subDays(new Date(), 30)}
+              />
+            </PopoverContent>
+          </Popover>
+
+          {/* Compare Selector (inside cluster) */}
+          {showCompareSelector && (
+            <Select
+              value={compareMode}
+              onValueChange={(v) => handleCompareModeChange(v as CompareMode)}
+            >
+              <SelectTrigger
+                aria-label="Select comparison range"
+                className={cn(
+                  getSegmentedTriggerClasses(size),
+                  "w-[140px] px-[var(--portal-space-sm)]"
+                )}
+              >
+                <SelectValue placeholder="Compare" />
+              </SelectTrigger>
+              <SelectContent
+                className={cn(
+                  "portal-theme",
+                  "bg-[hsl(var(--portal-bg-secondary))]",
+                  "border-[hsl(var(--portal-border))]",
+                  "rounded-[var(--portal-radius-md)]",
+                  "shadow-[var(--portal-shadow-lg)]"
+                )}
+              >
+                {Object.entries(compareModes).map(([key, mode]) => (
+                  <SelectItem
+                    key={key}
+                    value={key}
+                    className={cn(
+                      "text-[hsl(var(--portal-text-primary))]",
+                      "focus:bg-[hsl(var(--portal-bg-hover))]",
+                      "focus:text-[hsl(var(--portal-text-primary))]"
+                    )}
+                  >
+                    {mode.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Trailing Control (e.g., refresh button) */}
+          {trailingControl && (
+            <div className={cn(
+              getSegmentedTriggerClasses(size),
+              "flex items-center justify-center",
+              "w-11 sm:w-9"
+            )}>
+              {trailingControl}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // Default Variant: separate controls with individual borders
+  // =========================================================================
   return (
     <div
       className={cn(
@@ -601,6 +830,9 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
           </SelectContent>
         </Select>
       )}
+
+      {/* Trailing Control (for default variant, render separately) */}
+      {trailingControl}
     </div>
   );
 };

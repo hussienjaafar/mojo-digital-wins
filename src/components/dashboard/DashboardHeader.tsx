@@ -6,6 +6,7 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { HeaderCard } from "@/components/layout/HeaderCard";
 import { TitleBlock } from "@/components/dashboard/TitleBlock";
 import { DateInputGroup } from "@/components/ui/DateInputGroup";
+import type { DateRangeControlProps } from "@/components/ui/DateRangeControl";
 import {
   Tooltip,
   TooltipContent,
@@ -206,23 +207,42 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </div>
 
         {/* Right: Controls (date controls + refresh) */}
-        {hasControls && (
-          <DateInputGroup
-            className={cn(
-              // Mobile: full width, ensure proper touch targets
-              "w-full sm:w-auto",
-              // Wrap on smaller tablets if needed
-              "flex-wrap lg:flex-nowrap"
-            )}
-          >
-            {/* Date controls: preset(s) -> calendar (already in dateControls order) */}
-            {dateControls}
-            {/* Refresh button last in DOM order for tab sequence */}
-            {showRefresh && onRefresh && (
-              <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
-            )}
-          </DateInputGroup>
-        )}
+        {hasControls && (() => {
+          // Check if dateControls is a DateRangeControl element
+          const isDateRangeControl = React.isValidElement(dateControls) &&
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (dateControls.type as any)?.displayName === "DateRangeControl";
+
+          // If it's DateRangeControl and we have refresh, inject segmented props
+          if (isDateRangeControl && showRefresh && onRefresh) {
+            return React.cloneElement(
+              dateControls as React.ReactElement<DateRangeControlProps>,
+              {
+                variant: "segmented",
+                trailingControl: (
+                  <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
+                ),
+              }
+            );
+          }
+
+          // Fallback: render dateControls + separate refresh button
+          return (
+            <DateInputGroup
+              className={cn(
+                // Mobile: full width, ensure proper touch targets
+                "w-full sm:w-auto",
+                // Wrap on smaller tablets if needed
+                "flex-wrap lg:flex-nowrap"
+              )}
+            >
+              {dateControls}
+              {showRefresh && onRefresh && (
+                <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
+              )}
+            </DateInputGroup>
+          );
+        })()}
       </div>
     </HeaderCard>
   );
