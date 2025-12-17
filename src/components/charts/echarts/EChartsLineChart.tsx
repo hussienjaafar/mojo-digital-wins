@@ -65,6 +65,8 @@ export interface EChartsLineChartProps {
   showRollingAverage?: boolean;
   /** Period for rolling average calculation */
   rollingAveragePeriod?: number;
+  /** Enable chart-to-KPI cross-highlighting on hover (default: false to prevent flicker) */
+  enableChartToKpiHighlight?: boolean;
   onBrushEnd?: (range: { start: string; end: string }) => void;
   onDataPointClick?: (params: { dataIndex: number; seriesName: string; value: any }) => void;
 }
@@ -92,6 +94,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
   anomalyMarkers = [],
   showRollingAverage = false,
   rollingAveragePeriod = 7,
+  enableChartToKpiHighlight = false,
   onBrushEnd,
   onDataPointClick,
 }) => {
@@ -415,13 +418,15 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
           value: params.value,
         });
 
-        // Cross-highlight KPI cards when hovering chart series
-        const seriesKey = seriesNameToKeyMap.get(params.seriesName);
-        if (seriesKey) {
-          const relatedKpis = SERIES_TO_KPI_MAP[seriesKey];
-          if (relatedKpis && relatedKpis.length > 0) {
-            // Highlight the first related KPI (most relevant)
-            setHighlightedKpiKey(relatedKpis[0]);
+        // Cross-highlight KPI cards when hovering chart series (opt-in to prevent flicker)
+        if (enableChartToKpiHighlight) {
+          const seriesKey = seriesNameToKeyMap.get(params.seriesName);
+          if (seriesKey) {
+            const relatedKpis = SERIES_TO_KPI_MAP[seriesKey];
+            if (relatedKpis && relatedKpis.length > 0) {
+              // Highlight the first related KPI (most relevant)
+              setHighlightedKpiKey(relatedKpis[0]);
+            }
           }
         }
       }
@@ -429,7 +434,10 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
 
     events.mouseout = () => {
       setHoveredDataPoint(null);
-      setHighlightedKpiKey(null);
+      // Only clear KPI highlight if this chart was setting it
+      if (enableChartToKpiHighlight) {
+        setHighlightedKpiKey(null);
+      }
     };
 
     if (onDataPointClick) {
@@ -462,7 +470,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     }
 
     return events;
-  }, [data, xAxisKey, showBrush, onBrushEnd, onDataPointClick, setHoveredDataPoint, setSelectedTimeRange, seriesNameToKeyMap, setHighlightedKpiKey]);
+  }, [data, xAxisKey, showBrush, onBrushEnd, onDataPointClick, setHoveredDataPoint, setSelectedTimeRange, seriesNameToKeyMap, setHighlightedKpiKey, enableChartToKpiHighlight]);
 
   return (
     <EChartsBase
