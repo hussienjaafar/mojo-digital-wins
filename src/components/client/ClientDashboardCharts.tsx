@@ -11,7 +11,6 @@ import { PortalBarChart } from "@/components/portal/PortalBarChart";
 import { DollarSign, TrendingUp, Target, MessageSquare, CopyMinus, SlidersHorizontal, ZoomIn } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useHoveredDataPoint } from "@/stores/chartInteractionStore";
 import { useDashboardStore, useComparisonEnabled, type SeriesKey } from "@/stores/dashboardStore";
 import { cssVar, colors } from "@/lib/design-tokens";
 import type { DashboardKPIs, DashboardTimeSeriesPoint, ChannelBreakdown } from "@/queries/useClientDashboardMetricsQuery";
@@ -61,9 +60,6 @@ export const ClientDashboardCharts = ({
 
   const [valueMode, setValueMode] = useState<"both" | "net">("both");
   const [showZoom, setShowZoom] = useState(false);
-
-  // Cross-highlighting state from store
-  const hoveredDataPoint = useHoveredDataPoint();
 
   const formatCurrency = useCallback((value: number) => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
@@ -130,32 +126,39 @@ export const ClientDashboardCharts = ({
                   View:
                 </span>
                 <button
+                  type="button"
                   onClick={() => setValueMode("both")}
                   className={cn(
-                    "rounded-md px-3 py-2 border text-xs min-h-[36px]",
+                    "rounded-md px-3 py-2 border text-xs min-h-[44px] sm:min-h-[36px]",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
                     valueMode === "both"
                       ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
                       : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
                   )}
+                  aria-pressed={valueMode === "both"}
                 >
                   Gross & Net
                 </button>
                 <button
+                  type="button"
                   onClick={() => setValueMode("net")}
                   className={cn(
-                    "rounded-md px-3 py-2 border text-xs min-h-[36px]",
+                    "rounded-md px-3 py-2 border text-xs min-h-[44px] sm:min-h-[36px]",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
                     valueMode === "net"
                       ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
                       : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
                   )}
+                  aria-pressed={valueMode === "net"}
                 >
                   Net focus
                 </button>
               </div>
               <button
+                type="button"
                 onClick={toggleComparison}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[36px] min-w-[44px]",
+                  "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[44px] sm:min-h-[36px] min-w-[44px]",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
                   comparisonEnabled
                     ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
@@ -168,9 +171,10 @@ export const ClientDashboardCharts = ({
                 {comparisonEnabled ? "Hide compare" : "Compare prev period"}
               </button>
               <button
+                type="button"
                 onClick={() => setShowZoom((prev) => !prev)}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[36px]",
+                  "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[44px] sm:min-h-[36px] min-w-[44px]",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
                   showZoom
                     ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
