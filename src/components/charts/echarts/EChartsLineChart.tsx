@@ -325,6 +325,11 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
       animation: true,
       animationDuration: 500,
       animationEasing: "cubicOut",
+      // Top-level axisPointer config - this is where ECharts reads triggerEmphasis
+      // (tooltip.axisPointer does not propagate this setting)
+      axisPointer: {
+        triggerEmphasis: false,
+      },
       tooltip: showTooltip
         ? {
             trigger: "axis",
@@ -333,8 +338,6 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
               crossStyle: {
                 color: "hsl(var(--portal-text-muted))",
               },
-              // Prevent axisPointer from triggering emphasis/blur on series
-              triggerEmphasis: false,
             },
             formatter: (params: any) => {
               if (!Array.isArray(params) || params.length === 0) return "";
