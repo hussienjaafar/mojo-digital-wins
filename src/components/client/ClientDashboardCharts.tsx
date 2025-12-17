@@ -119,9 +119,10 @@ export const ClientDashboardCharts = ({
           accent="green"
           className="lg:col-span-2"
           actions={
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="px-2 py-1 rounded-md border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))] flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              {/* View mode toggle group */}
+              <div className="flex items-center gap-1.5 sm:gap-2 text-xs">
+                <span className="hidden sm:flex px-2 py-1 rounded-md border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))] items-center gap-1">
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                   View:
                 </span>
@@ -129,7 +130,7 @@ export const ClientDashboardCharts = ({
                   type="button"
                   onClick={() => setValueMode("both")}
                   className={cn(
-                    "rounded-md px-3 py-2 border text-xs min-h-[44px] sm:min-h-[36px]",
+                    "rounded-md px-2 sm:px-3 py-2 border text-xs min-h-[44px] sm:min-h-[36px]",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
                     valueMode === "both"
                       ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
@@ -137,13 +138,14 @@ export const ClientDashboardCharts = ({
                   )}
                   aria-pressed={valueMode === "both"}
                 >
-                  Gross & Net
+                  <span className="sm:hidden">Gross</span>
+                  <span className="hidden sm:inline">Gross & Net</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setValueMode("net")}
                   className={cn(
-                    "rounded-md px-3 py-2 border text-xs min-h-[44px] sm:min-h-[36px]",
+                    "rounded-md px-2 sm:px-3 py-2 border text-xs min-h-[44px] sm:min-h-[36px]",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
                     valueMode === "net"
                       ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
@@ -151,14 +153,15 @@ export const ClientDashboardCharts = ({
                   )}
                   aria-pressed={valueMode === "net"}
                 >
-                  Net focus
+                  Net
                 </button>
               </div>
+              {/* Compare toggle */}
               <button
                 type="button"
                 onClick={toggleComparison}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[44px] sm:min-h-[36px] min-w-[44px]",
+                  "flex items-center gap-1.5 sm:gap-2 rounded-md px-2 sm:px-3 py-2 text-xs font-medium border min-h-[44px] sm:min-h-[36px] min-w-[44px]",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
                   comparisonEnabled
                     ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
@@ -168,13 +171,14 @@ export const ClientDashboardCharts = ({
                 aria-label={comparisonEnabled ? "Hide period comparison" : "Compare with previous period"}
               >
                 <CopyMinus className="h-3.5 w-3.5" aria-hidden="true" />
-                {comparisonEnabled ? "Hide compare" : "Compare prev period"}
+                <span className="hidden sm:inline">{comparisonEnabled ? "Hide compare" : "Compare"}</span>
               </button>
+              {/* Zoom toggle */}
               <button
                 type="button"
                 onClick={() => setShowZoom((prev) => !prev)}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[44px] sm:min-h-[36px] min-w-[44px]",
+                  "flex items-center justify-center rounded-md px-2 sm:px-3 py-2 text-xs font-medium border min-h-[44px] sm:min-h-[36px] min-w-[44px]",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
                   showZoom
                     ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
