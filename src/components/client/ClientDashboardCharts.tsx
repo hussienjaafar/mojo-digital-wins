@@ -12,7 +12,7 @@ import { DollarSign, TrendingUp, Target, MessageSquare, CopyMinus, SlidersHorizo
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useHoveredDataPoint } from "@/stores/chartInteractionStore";
-import type { SeriesKey } from "@/stores/dashboardStore";
+import { useDashboardStore, useComparisonEnabled, type SeriesKey } from "@/stores/dashboardStore";
 import { cssVar, colors } from "@/lib/design-tokens";
 import type { DashboardKPIs, DashboardTimeSeriesPoint, ChannelBreakdown } from "@/queries/useClientDashboardMetricsQuery";
 
@@ -55,7 +55,10 @@ export const ClientDashboardCharts = ({
   startDate,
   endDate,
 }: ClientDashboardChartsProps) => {
-  const [showCompare, setShowCompare] = useState(false);
+  // Comparison toggle from persistent dashboard store
+  const comparisonEnabled = useComparisonEnabled();
+  const toggleComparison = useDashboardStore((s) => s.toggleComparison);
+
   const [valueMode, setValueMode] = useState<"both" | "net">("both");
   const [showZoom, setShowZoom] = useState(false);
 
@@ -69,42 +72,43 @@ export const ClientDashboardCharts = ({
   }, []);
 
   // Memoized ECharts series configuration with seriesKey for cross-highlighting
+  // yAxisIndex: 0 = Revenue (left axis), 1 = Spend (right axis)
   const echartsSeriesConfig = useMemo((): LineSeriesConfig[] => {
     const base: LineSeriesConfig[] = valueMode === "net"
       ? [
-          { dataKey: "netDonations", name: "Net donations", color: palette.net, type: "area", areaStyle: { opacity: 0.1 }, seriesKey: "netDonations" as SeriesKey },
-          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" }, seriesKey: "refunds" as SeriesKey },
-          { dataKey: "metaSpend", name: "Meta spend", color: palette.meta, seriesKey: "metaSpend" as SeriesKey },
-          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms, seriesKey: "smsSpend" as SeriesKey },
+          { dataKey: "netDonations", name: "Net donations", color: palette.net, type: "area", areaStyle: { opacity: 0.1 }, seriesKey: "netDonations" as SeriesKey, yAxisIndex: 0 },
+          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" }, seriesKey: "refunds" as SeriesKey, yAxisIndex: 0 },
+          { dataKey: "metaSpend", name: "Meta spend", color: palette.meta, seriesKey: "metaSpend" as SeriesKey, yAxisIndex: 1 },
+          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms, seriesKey: "smsSpend" as SeriesKey, yAxisIndex: 1 },
         ]
       : [
-          { dataKey: "donations", name: "Gross donations", color: palette.gross, type: "area", areaStyle: { opacity: 0.1 }, seriesKey: "donations" as SeriesKey },
-          { dataKey: "netDonations", name: "Net donations", color: palette.net, seriesKey: "netDonations" as SeriesKey },
-          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" }, seriesKey: "refunds" as SeriesKey },
-          { dataKey: "metaSpend", name: "Meta spend", color: palette.meta, seriesKey: "metaSpend" as SeriesKey },
-          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms, seriesKey: "smsSpend" as SeriesKey },
+          { dataKey: "donations", name: "Gross donations", color: palette.gross, type: "area", areaStyle: { opacity: 0.1 }, seriesKey: "donations" as SeriesKey, yAxisIndex: 0 },
+          { dataKey: "netDonations", name: "Net donations", color: palette.net, seriesKey: "netDonations" as SeriesKey, yAxisIndex: 0 },
+          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" }, seriesKey: "refunds" as SeriesKey, yAxisIndex: 0 },
+          { dataKey: "metaSpend", name: "Meta spend", color: palette.meta, seriesKey: "metaSpend" as SeriesKey, yAxisIndex: 1 },
+          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms, seriesKey: "smsSpend" as SeriesKey, yAxisIndex: 1 },
         ];
 
-    if (!showCompare) return base;
+    if (!comparisonEnabled) return base;
 
-    // Comparison series don't need cross-highlighting
+    // Comparison series don't need cross-highlighting (no seriesKey)
     const compare: LineSeriesConfig[] = valueMode === "net"
       ? [
-          { dataKey: "netDonationsPrev", name: "Net (prev)", color: palette.netPrev, lineStyle: { type: "dashed", width: 1 } },
-          { dataKey: "refundsPrev", name: "Refunds (prev)", color: palette.refundsPrev, lineStyle: { type: "dotted", width: 1 } },
-          { dataKey: "metaSpendPrev", name: "Meta (prev)", color: palette.metaPrev, lineStyle: { type: "dashed", width: 1 } },
-          { dataKey: "smsSpendPrev", name: "SMS (prev)", color: palette.smsPrev, lineStyle: { type: "dashed", width: 1 } },
+          { dataKey: "netDonationsPrev", name: "Net (prev)", color: palette.netPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 0 },
+          { dataKey: "refundsPrev", name: "Refunds (prev)", color: palette.refundsPrev, lineStyle: { type: "dotted", width: 1 }, yAxisIndex: 0 },
+          { dataKey: "metaSpendPrev", name: "Meta (prev)", color: palette.metaPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 1 },
+          { dataKey: "smsSpendPrev", name: "SMS (prev)", color: palette.smsPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 1 },
         ]
       : [
-          { dataKey: "donationsPrev", name: "Gross (prev)", color: palette.grossPrev, lineStyle: { type: "dashed", width: 1 } },
-          { dataKey: "netDonationsPrev", name: "Net (prev)", color: palette.netPrev, lineStyle: { type: "dashed", width: 1 } },
-          { dataKey: "refundsPrev", name: "Refunds (prev)", color: palette.refundsPrev, lineStyle: { type: "dotted", width: 1 } },
-          { dataKey: "metaSpendPrev", name: "Meta (prev)", color: palette.metaPrev, lineStyle: { type: "dashed", width: 1 } },
-          { dataKey: "smsSpendPrev", name: "SMS (prev)", color: palette.smsPrev, lineStyle: { type: "dashed", width: 1 } },
+          { dataKey: "donationsPrev", name: "Gross (prev)", color: palette.grossPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 0 },
+          { dataKey: "netDonationsPrev", name: "Net (prev)", color: palette.netPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 0 },
+          { dataKey: "refundsPrev", name: "Refunds (prev)", color: palette.refundsPrev, lineStyle: { type: "dotted", width: 1 }, yAxisIndex: 0 },
+          { dataKey: "metaSpendPrev", name: "Meta (prev)", color: palette.metaPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 1 },
+          { dataKey: "smsSpendPrev", name: "SMS (prev)", color: palette.smsPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 1 },
         ];
 
     return [...base, ...compare];
-  }, [showCompare, valueMode]);
+  }, [comparisonEnabled, valueMode]);
 
   return (
     <div className="space-y-6">
@@ -149,17 +153,19 @@ export const ClientDashboardCharts = ({
                 </button>
               </div>
               <button
-                onClick={() => setShowCompare((prev) => !prev)}
+                onClick={toggleComparison}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[36px]",
-                  showCompare
+                  "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium border min-h-[36px] min-w-[44px]",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
+                  comparisonEnabled
                     ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
                     : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
                 )}
-                aria-pressed={showCompare}
+                aria-pressed={comparisonEnabled}
+                aria-label={comparisonEnabled ? "Hide period comparison" : "Compare with previous period"}
               >
-                <CopyMinus className="h-3.5 w-3.5" />
-                {showCompare ? "Hide compare" : "Compare prev period"}
+                <CopyMinus className="h-3.5 w-3.5" aria-hidden="true" />
+                {comparisonEnabled ? "Hide compare" : "Compare prev period"}
               </button>
               <button
                 onClick={() => setShowZoom((prev) => !prev)}
@@ -202,6 +208,9 @@ export const ClientDashboardCharts = ({
             valueType="currency"
             showZoom={showZoom}
             showLegend={true}
+            dualYAxis={true}
+            yAxisNameLeft="Revenue"
+            yAxisNameRight="Spend"
           />
         </V3ChartWrapper>
 

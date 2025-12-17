@@ -56,6 +56,10 @@ export interface EChartsLineChartProps {
     splitNumber?: number;
   };
   dualYAxis?: boolean;
+  /** Name label for the left y-axis (only used when dualYAxis is true) */
+  yAxisNameLeft?: string;
+  /** Name label for the right y-axis (only used when dualYAxis is true) */
+  yAxisNameRight?: string;
   anomalyMarkers?: AnomalyMarker[];
   /** Show rolling average overlay */
   showRollingAverage?: boolean;
@@ -83,6 +87,8 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
   xAxisType = "category",
   yAxisConfig,
   dualYAxis = false,
+  yAxisNameLeft,
+  yAxisNameRight,
   anomalyMarkers = [],
   showRollingAverage = false,
   rollingAveragePeriod = 7,
@@ -227,6 +233,16 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
           {
             type: "value" as const,
             position: "left" as const,
+            ...(yAxisNameLeft && {
+              name: yAxisNameLeft,
+              nameLocation: "middle" as const,
+              nameGap: 50,
+              nameTextStyle: {
+                color: "hsl(var(--portal-text-secondary))",
+                fontSize: 12,
+                fontWeight: 500,
+              },
+            }),
             axisLabel: {
               formatter: (value: number) => formatValue(value),
               color: "hsl(var(--portal-text-muted))",
@@ -242,6 +258,16 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
           {
             type: "value" as const,
             position: "right" as const,
+            ...(yAxisNameRight && {
+              name: yAxisNameRight,
+              nameLocation: "middle" as const,
+              nameGap: 50,
+              nameTextStyle: {
+                color: "hsl(var(--portal-text-secondary))",
+                fontSize: 12,
+                fontWeight: 500,
+              },
+            }),
             axisLabel: {
               formatter: (value: number) => formatValue(value),
               color: "hsl(var(--portal-text-muted))",
@@ -375,7 +401,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     };
 
     return result;
-  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, formatValue, showRollingAverage, rollingAveragePeriod, calculateRollingAverage, highlightedSeriesKeys]);
+  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, yAxisNameLeft, yAxisNameRight, formatValue, showRollingAverage, rollingAveragePeriod, calculateRollingAverage, highlightedSeriesKeys]);
 
   const handleEvents = React.useMemo(() => {
     const events: Record<string, (params: any) => void> = {};
