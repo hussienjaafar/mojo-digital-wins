@@ -34,27 +34,14 @@ function formatCurrency(value: number): string {
 }
 
 /**
- * Build trend data for drilldown from time series
- */
-function buildTrendData(
-  timeSeries: DashboardTimeSeriesPoint[],
-  dataKey: keyof DashboardTimeSeriesPoint
-): { date: string; value: number }[] | undefined {
-  if (!timeSeries || timeSeries.length === 0) return undefined;
-  return timeSeries.map((d) => ({
-    date: d.name,
-    value: (d[dataKey] as number) ?? 0,
-  }));
-}
-
-/**
  * Build hero KPI data array for HeroKpiGrid
  */
 export function buildHeroKpis({
   kpis,
   prevKpis,
   sparklines,
-  timeSeries,
+  // timeSeries kept in interface for caller compatibility but no longer used for trendData
+  timeSeries: _timeSeries,
   metaSpend = 0,
   smsSpend = 0,
   metaConversions = 0,
@@ -77,7 +64,7 @@ export function buildHeroKpis({
       accent: "green" as HeroKpiAccent,
       sparklineData: sparklines?.netRevenue || [],
       description: "Total donations minus processing fees and refunds",
-      trendData: buildTrendData(timeSeries, "netDonations"),
+      trendData: sparklines?.netRevenue,
       trendXAxisKey: "date",
       breakdown: [
         { label: "Gross Revenue", value: formatCurrency(kpis.totalRaised) },
@@ -101,7 +88,7 @@ export function buildHeroKpis({
       accent: "blue" as HeroKpiAccent,
       sparklineData: sparklines?.roi || [],
       description: "Return on investment: Net Revenue / Total Spend",
-      trendData: buildTrendData(timeSeries, "netDonations"),
+      trendData: sparklines?.roi,
       trendXAxisKey: "date",
       breakdown: [
         { label: "Net Revenue", value: formatCurrency(kpis.totalNetRevenue) },
@@ -126,7 +113,7 @@ export function buildHeroKpis({
       accent: (kpis.refundRate > 5 ? "red" : "default") as HeroKpiAccent,
       sparklineData: sparklines?.refundRate || [],
       description: "Percentage of donations refunded",
-      trendData: buildTrendData(timeSeries, "refunds"),
+      trendData: sparklines?.refundRate,
       trendXAxisKey: "date",
       breakdown: [
         { label: "Total Refunded", value: formatCurrency(kpis.refundAmount) },
@@ -145,11 +132,11 @@ export function buildHeroKpis({
         label: "churn",
       },
       previousValue: prevKpis.recurringRaised ? formatCurrency(prevKpis.recurringRaised) : undefined,
-      subtitle: `${kpis.recurringDonations} recurring tx • Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
+      subtitle: `${kpis.recurringDonations} recurring tx | Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
       accent: "amber" as HeroKpiAccent,
       sparklineData: sparklines?.recurringHealth || [],
       description: "Active recurring donation revenue",
-      trendData: buildTrendData(timeSeries, "donations"),
+      trendData: sparklines?.recurringHealth,
       trendXAxisKey: "date",
       breakdown: [
         { label: "Recurring Revenue", value: formatCurrency(kpis.recurringRaised) },
@@ -168,6 +155,8 @@ export function buildHeroKpis({
       accent: "purple" as HeroKpiAccent,
       sparklineData: sparklines?.attributionQuality || [],
       description: "Percentage of donations with deterministic attribution",
+      trendData: sparklines?.attributionQuality,
+      trendXAxisKey: "date",
       breakdown: [
         { label: "Deterministic Rate", value: `${kpis.deterministicRate.toFixed(1)}%` },
         { label: "Meta Conversions", value: metaConversions.toLocaleString() },
@@ -190,7 +179,7 @@ export function buildHeroKpis({
       accent: "blue" as HeroKpiAccent,
       sparklineData: sparklines?.uniqueDonors || [],
       description: "Number of unique donors in period",
-      trendData: buildTrendData(timeSeries, "donations"),
+      trendData: sparklines?.uniqueDonors,
       trendXAxisKey: "date",
       breakdown: [
         { label: "Unique Donors", value: kpis.uniqueDonors.toLocaleString() },
