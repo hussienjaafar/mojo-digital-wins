@@ -182,7 +182,9 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
         stack: s.stack,
         yAxisIndex: s.yAxisIndex ?? 0,
         emphasis: {
-          focus: "series" as const,
+          // Use "none" to prevent global blur/downplay on axis-trigger tooltips
+          // This keeps all series visible when hovering empty space in the plot area
+          focus: "none" as const,
           itemStyle: {
             // Enhanced shadow for both light and dark mode visibility
             shadowBlur: 12,
@@ -221,10 +223,10 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
           },
           yAxisIndex: s.yAxisIndex ?? 0,
           emphasis: {
-            focus: "series" as const,
+            focus: "none" as const,
           },
         };
-        
+
         return [mainSeries, rollingSeries];
       }
 
