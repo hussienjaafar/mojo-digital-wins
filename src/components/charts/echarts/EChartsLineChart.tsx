@@ -98,9 +98,11 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
   onBrushEnd,
   onDataPointClick,
 }) => {
-  const { setHoveredDataPoint, setSelectedTimeRange } = useChartInteractionStore();
+  // Use selector-based hooks to avoid unnecessary re-renders on hover state changes
+  const setHoveredDataPoint = useChartInteractionStore((s) => s.setHoveredDataPoint);
+  const setSelectedTimeRange = useChartInteractionStore((s) => s.setSelectedTimeRange);
   const highlightedSeriesKeys = useHighlightedSeriesKeys();
-  const { setHighlightedKpiKey } = useDashboardStore();
+  const setHighlightedKpiKey = useDashboardStore((s) => s.setHighlightedKpiKey);
 
   // Build a map of series name to seriesKey for quick lookup
   const seriesNameToKeyMap = React.useMemo(() => {
@@ -197,6 +199,21 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
             width: (s.lineStyle?.width ?? 2) + 1,
           },
         },
+        // Explicit blur state to maintain visibility even if ECharts enters blur mode
+        blur: {
+          itemStyle: {
+            opacity: lineOpacity,
+          },
+          lineStyle: {
+            opacity: lineOpacity,
+            width: s.lineStyle?.width ?? 2,
+          },
+          ...(s.type === "area" && {
+            areaStyle: {
+              opacity: areaOpacity,
+            },
+          }),
+        },
       };
 
       // Add rolling average series if enabled
@@ -224,6 +241,11 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
           yAxisIndex: s.yAxisIndex ?? 0,
           emphasis: {
             focus: "none" as const,
+          },
+          blur: {
+            lineStyle: {
+              opacity: 0.6,
+            },
           },
         };
 
@@ -311,6 +333,8 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
               crossStyle: {
                 color: "hsl(var(--portal-text-muted))",
               },
+              // Prevent axisPointer from triggering emphasis/blur on series
+              triggerEmphasis: false,
             },
             formatter: (params: any) => {
               if (!Array.isArray(params) || params.length === 0) return "";
