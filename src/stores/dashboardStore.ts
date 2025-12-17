@@ -38,16 +38,23 @@ interface DateRange {
  * Used for cross-highlighting: when a KPI is hovered, related series are highlighted.
  *
  * IMPORTANT: Only map KPIs to series that directly display the same data.
- * Calculated metrics (ROI, attribution scores) should have empty arrays
- * to avoid highlighting unrelated series.
+ * Calculated/derived metrics should have empty arrays to avoid misleading highlights.
+ *
+ * Mapping rationale:
+ * - netRevenue → netDonations (direct: same data)
+ * - netRoi → [] (derived from netDonations ÷ spend, not a single series)
+ * - refundRate → refunds, donations (derived from these components)
+ * - recurringHealth → [] (no recurring-only series in chart today)
+ * - attributionQuality → [] (no attribution series in chart today)
+ * - uniqueDonors → [] (no donor count series in chart today)
  */
 export const KPI_TO_SERIES_MAP: Record<KpiKey, SeriesKey[]> = {
   netRevenue: ['netDonations'],
-  netRoi: [], // Calculated metric - no direct series representation
-  refundRate: ['refunds'],
-  recurringHealth: ['donations'],
-  attributionQuality: [], // Calculated metric - no direct series representation
-  uniqueDonors: ['donations'],
+  netRoi: [], // Derived metric - highlighting spend series would be misleading
+  refundRate: ['refunds', 'donations'],
+  recurringHealth: [], // No recurring-specific series in Fundraising chart
+  attributionQuality: [], // No attribution series in Fundraising chart
+  uniqueDonors: [], // No donor count series in Fundraising chart
 };
 
 /**
@@ -55,13 +62,14 @@ export const KPI_TO_SERIES_MAP: Record<KpiKey, SeriesKey[]> = {
  * Used when chart series is hovered to highlight related KPIs
  *
  * Only includes mappings where the series directly represents the KPI data.
+ * Keep in sync with KPI_TO_SERIES_MAP above.
  */
 export const SERIES_TO_KPI_MAP: Record<SeriesKey, KpiKey[]> = {
-  donations: ['recurringHealth', 'uniqueDonors'],
+  donations: ['refundRate'], // Used in refund rate calculation
   netDonations: ['netRevenue'],
   refunds: ['refundRate'],
-  metaSpend: [], // Spend series - no direct KPI (ROI is calculated)
-  smsSpend: [], // Spend series - no direct KPI (ROI is calculated)
+  metaSpend: [], // Spend series - no direct KPI (ROI is derived)
+  smsSpend: [], // Spend series - no direct KPI (ROI is derived)
 };
 
 // ============================================================================

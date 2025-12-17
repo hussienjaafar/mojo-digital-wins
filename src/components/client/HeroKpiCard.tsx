@@ -24,7 +24,7 @@ import type { LineSeriesConfig } from "@/components/charts/echarts";
 // KPI to ValueType mapping for chart formatting
 const KPI_VALUE_TYPE_MAP: Partial<Record<KpiKey, ValueType>> = {
   netRevenue: "currency",
-  netRoi: "number", // ROI multiplier like 2.5x
+  netRoi: "multiplier", // ROI multiplier like 2.5x
   refundRate: "percent",
   recurringHealth: "currency",
   attributionQuality: "percent",
@@ -159,6 +159,7 @@ interface SparklineProps {
   data: SparklineDataPoint[] | number[];
   color: string;
   ariaLabel: string;
+  valueType?: ValueType;
 }
 
 /**
@@ -184,8 +185,26 @@ const LazySparklineInner = React.lazy(() =>
       data,
       color,
       ariaLabel,
+      valueType = "number",
     }: SparklineProps & { data: SparklineDataPoint[] }) {
       const { ResponsiveContainer, LineChart, Line, Tooltip } = mod;
+
+      // Format value based on type
+      const formatValue = (value: number): string => {
+        if (valueType === "currency") {
+          if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+          if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(1)}K`;
+          return `$${value.toFixed(0)}`;
+        }
+        if (valueType === "percent") {
+          return `${value.toFixed(1)}%`;
+        }
+        if (valueType === "multiplier") {
+          return `${value.toFixed(1)}x`;
+        }
+        if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
+        return value.toLocaleString();
+      };
 
       return (
         <div className="h-10 w-full" role="figure" aria-label={ariaLabel}>
@@ -199,7 +218,7 @@ const LazySparklineInner = React.lazy(() =>
                     <div className="rounded-md px-2 py-1 text-xs bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))] shadow-lg">
                       <span className="font-medium text-[hsl(var(--portal-text-primary))]">
                         {typeof point.value === "number"
-                          ? point.value.toLocaleString()
+                          ? formatValue(point.value)
                           : point.value}
                       </span>
                       <span className="text-[hsl(var(--portal-text-muted))] ml-1">
@@ -237,7 +256,7 @@ const LazySparklineInner = React.lazy(() =>
 /**
  * Sparkline wrapper with lazy loading and Suspense
  */
-const Sparkline: React.FC<SparklineProps> = ({ data, color, ariaLabel }) => {
+const Sparkline: React.FC<SparklineProps> = ({ data, color, ariaLabel, valueType }) => {
   const normalizedData = React.useMemo(() => {
     if (!data || data.length === 0) return [];
     if (typeof data[0] === "number") {
@@ -257,6 +276,7 @@ const Sparkline: React.FC<SparklineProps> = ({ data, color, ariaLabel }) => {
         data={normalizedData}
         color={color}
         ariaLabel={ariaLabel}
+        valueType={valueType}
       />
     </React.Suspense>
   );
@@ -575,6 +595,7 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
               "hsl(var(--portal-accent-blue))"
             }
             ariaLabel={`${label} trend over time`}
+            valueType={KPI_VALUE_TYPE_MAP[kpiKey]}
           />
         </div>
       )}

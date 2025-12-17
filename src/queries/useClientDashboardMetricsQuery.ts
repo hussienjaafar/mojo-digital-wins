@@ -223,6 +223,9 @@ async function fetchDashboardMetrics(
   const prevTotalSpend = prevMetaSpend + prevSMSCost;
   const prevRoi = prevTotalSpend > 0 ? prevTotalNetRevenue / prevTotalSpend : 0;
 
+  const prevDeterministicCount = prevDonations.filter((d: any) => d.refcode || d.source_campaign).length;
+  const prevDeterministicRate = prevDonations.length > 0 ? (prevDeterministicCount / prevDonations.length) * 100 : 0;
+
   // Build time series data
   const days = eachDayOfInterval({
     start: parseISO(startDate),
@@ -372,6 +375,7 @@ async function fetchDashboardMetrics(
       recurringPercentage: prevRecurringPercentage,
       roi: prevRoi,
       totalSpend: prevTotalSpend,
+      deterministicRate: prevDeterministicRate,
     },
     timeSeries,
     channelBreakdown,

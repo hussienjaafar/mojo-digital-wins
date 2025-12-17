@@ -10,7 +10,7 @@ import type { BreakdownItem } from "./HeroKpiCard";
 // Types
 // ============================================================================
 
-export type ValueType = "currency" | "percent" | "number";
+export type ValueType = "currency" | "percent" | "number" | "multiplier";
 
 export interface InlineKpiExpansionProps {
   /** KPI label */
@@ -128,6 +128,9 @@ const LazyInlineChart = React.lazy(() =>
         }
         if (valueType === "percent") {
           return `${value.toFixed(1)}%`;
+        }
+        if (valueType === "multiplier") {
+          return `${value.toFixed(1)}x`;
         }
         if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
         return value.toFixed(0);

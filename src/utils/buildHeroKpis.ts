@@ -1,4 +1,4 @@
-import { DollarSign, Users, TrendingUp, Repeat, Target, CopyMinus, Wallet } from "lucide-react";
+import { Users, TrendingUp, Repeat, Target, CopyMinus, Wallet } from "lucide-react";
 import type { HeroKpiData } from "@/components/client/HeroKpiGrid";
 import type { HeroKpiAccent } from "@/components/client/HeroKpiCard";
 import type { KpiKey } from "@/stores/dashboardStore";
@@ -127,9 +127,9 @@ export function buildHeroKpis({
       value: formatCurrency(kpis.recurringRaised),
       icon: Repeat,
       trend: {
-        value: Math.round(calcChange(kpis.recurringChurnRate, prevKpis.recurringChurnRate)),
-        isPositive: kpis.recurringChurnRate <= (prevKpis.recurringChurnRate || 0),
-        label: "churn",
+        value: Math.round(calcChange(kpis.recurringRaised, prevKpis.recurringRaised)),
+        isPositive: kpis.recurringRaised >= (prevKpis.recurringRaised || 0),
+        label: "vs prev",
       },
       previousValue: prevKpis.recurringRaised ? formatCurrency(prevKpis.recurringRaised) : undefined,
       subtitle: `${kpis.recurringDonations} recurring tx | Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
@@ -150,7 +150,14 @@ export function buildHeroKpis({
       label: "Attribution Quality",
       value: `${kpis.deterministicRate.toFixed(0)}%`,
       icon: CopyMinus,
-      trend: { value: 0, isPositive: true },
+      trend: prevKpis.deterministicRate !== undefined
+        ? {
+            value: Math.round(calcChange(kpis.deterministicRate, prevKpis.deterministicRate)),
+            isPositive: kpis.deterministicRate >= (prevKpis.deterministicRate || 0),
+            label: "vs prev",
+          }
+        : undefined,
+      previousValue: prevKpis.deterministicRate !== undefined ? `${prevKpis.deterministicRate.toFixed(0)}%` : undefined,
       subtitle: "Deterministic (refcode/click)",
       accent: "purple" as HeroKpiAccent,
       sparklineData: sparklines?.attributionQuality || [],
