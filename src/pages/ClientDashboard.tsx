@@ -222,7 +222,7 @@ const ClientDashboard = () => {
       sparklines: data.sparklines,
       timeSeries: data.timeSeries || [],
       metaSpend: data.metaSpend,
-      smsSpend: 0, // SMS spend not directly exposed, calculated in kpis.totalSpend
+      smsSpend: data.smsSpend,
       metaConversions: data.metaConversions,
       smsConversions: data.smsConversions,
       directDonations: data.directDonations,

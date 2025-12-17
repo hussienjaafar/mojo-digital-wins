@@ -106,9 +106,14 @@ const ChartSkeleton: React.FC = () => (
   </div>
 );
 
+// Sanitize label to create a valid SVG gradient id (lowercase, alphanumeric + dashes only)
+const sanitizeGradientId = (label: string): string =>
+  `gradient-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+
 const LazyInlineChart = React.lazy(() =>
   import("recharts").then((mod) => ({
     default: function InlineChart({ data, xAxisKey, color, label, valueType = "number" }: InlineChartProps) {
+      const gradientId = sanitizeGradientId(label);
       const {
         ResponsiveContainer,
         AreaChart,
@@ -155,7 +160,7 @@ const LazyInlineChart = React.lazy(() =>
               margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
             >
               <defs>
-                <linearGradient id={`gradient-${label}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={color} stopOpacity={0.3} />
                   <stop offset="95%" stopColor={color} stopOpacity={0.05} />
                 </linearGradient>
@@ -209,7 +214,7 @@ const LazyInlineChart = React.lazy(() =>
                 dataKey="value"
                 stroke={color}
                 strokeWidth={2.5}
-                fill={`url(#gradient-${label})`}
+                fill={`url(#${gradientId})`}
                 dot={false}
                 activeDot={{
                   r: 6,

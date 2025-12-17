@@ -384,6 +384,7 @@ async function fetchDashboardMetrics(
     smsConversions,
     directDonations: directDonationCount,
     metaSpend: totalMetaSpend,
+    smsSpend: totalSMSCost,
     smsMessagesSent: smsMetrics.reduce((sum: number, s: any) => sum + (s.messages_sent || 0), 0),
   };
 }
