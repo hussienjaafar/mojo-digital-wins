@@ -8,6 +8,7 @@ import {
   subMonths,
   subYears,
   differenceInDays,
+  isBefore,
 } from "date-fns";
 import {
   Calendar as CalendarIcon,
@@ -15,7 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { DayPicker } from "react-day-picker";
+import { DayPicker, type DateRange, type SelectRangeEventHandler } from "react-day-picker";
 import { cn } from "@/lib/utils";
 
 import {
@@ -223,8 +224,8 @@ const QuickRangePill: React.FC<QuickRangePillProps> = ({
 
 interface PortalCalendarProps {
   mode: "range";
-  selected: { from?: Date; to?: Date };
-  onSelect: (range: { from?: Date; to?: Date } | undefined) => void;
+  selected: DateRange | undefined;
+  onSelect: SelectRangeEventHandler;
   numberOfMonths?: number;
   defaultMonth?: Date;
 }
@@ -368,11 +369,11 @@ const CalendarTrigger = React.forwardRef<
       </DateInputIcon>
       {/* Full date on larger screens */}
       <span className="hidden sm:inline text-sm">
-        {format(startDate, "MMM d, yyyy")} – {format(endDate, "MMM d, yyyy")}
+        {format(startDate, "MMM d, yyyy")} to {format(endDate, "MMM d, yyyy")}
       </span>
       {/* Compact date on mobile */}
       <span className="sm:hidden text-sm">
-        {format(startDate, "MMM d")} – {format(endDate, "MMM d")}
+        {format(startDate, "MMM d")} - {format(endDate, "MMM d")}
       </span>
       <DateInputIcon isOpen={isOpen} accent="blue" rotateOnOpen className="ml-auto">
         <ChevronDown className="h-4 w-4" />
@@ -457,15 +458,19 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
   const startDate = parseStoreDate(dateRange.startDate);
   const endDate = parseStoreDate(dateRange.endDate);
 
-  // Draft range for 2-click selection (local state while selecting)
-  const [draftRange, setDraftRange] = React.useState<{ from?: Date; to?: Date }>({
+  // Anchor date for 2-click selection (first click sets anchor, second click completes range)
+  const [anchorDate, setAnchorDate] = React.useState<Date | null>(null);
+
+  // Draft range for visual feedback while selecting
+  const [draftRange, setDraftRange] = React.useState<DateRange | undefined>({
     from: startDate,
     to: endDate,
   });
 
-  // Sync draft range when calendar opens or store changes
+  // Reset anchor and sync draft range when calendar opens
   React.useEffect(() => {
     if (isCalendarOpen) {
+      setAnchorDate(null);
       setDraftRange({ from: startDate, to: endDate });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -480,20 +485,33 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
     }
   };
 
-  // Handle calendar date selection (2-click: draft until complete)
-  const handleDateSelect = (range: { from?: Date; to?: Date } | undefined) => {
-    if (!range) {
-      setDraftRange({ from: undefined, to: undefined });
-      return;
-    }
-    setDraftRange(range);
-    // Only commit to store when both from and to are selected
-    if (range.from && range.to) {
+  // Handle calendar date selection with anchor-based 2-click logic
+  // First click sets anchor, second click completes range (order doesn't matter)
+  const handleDateSelect: SelectRangeEventHandler = (
+    _range,
+    selectedDay,
+    _activeModifiers,
+    _e
+  ) => {
+    if (!selectedDay) return;
+
+    if (anchorDate === null) {
+      // First click: set anchor and show single-day selection
+      setAnchorDate(selectedDay);
+      setDraftRange({ from: selectedDay, to: undefined });
+    } else {
+      // Second click: compute range from anchor + selectedDay, commit and close
+      const [rangeStart, rangeEnd] = isBefore(selectedDay, anchorDate)
+        ? [selectedDay, anchorDate]
+        : [anchorDate, selectedDay];
+
+      setDraftRange({ from: rangeStart, to: rangeEnd });
       setDateRange(
-        format(range.from, "yyyy-MM-dd"),
-        format(range.to, "yyyy-MM-dd")
+        format(rangeStart, "yyyy-MM-dd"),
+        format(rangeEnd, "yyyy-MM-dd")
       );
       setSelectedPreset("custom");
+      setAnchorDate(null);
       setIsCalendarOpen(false);
     }
   };
@@ -601,10 +619,10 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
                   <CalendarIcon className="h-4 w-4" />
                 </DateInputIcon>
                 <span className="hidden sm:inline">
-                  {format(startDate, "MMM d, yyyy")} – {format(endDate, "MMM d, yyyy")}
+                  {format(startDate, "MMM d, yyyy")} to {format(endDate, "MMM d, yyyy")}
                 </span>
                 <span className="sm:hidden">
-                  {format(startDate, "MMM d")} – {format(endDate, "MMM d")}
+                  {format(startDate, "MMM d")} - {format(endDate, "MMM d")}
                 </span>
                 <DateInputIcon isOpen={isCalendarOpen} accent="blue" rotateOnOpen className="ml-auto">
                   <ChevronDown className="h-4 w-4" />
