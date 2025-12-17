@@ -183,36 +183,10 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
         }),
         stack: s.stack,
         yAxisIndex: s.yAxisIndex ?? 0,
+        // Disable emphasis entirely to prevent lines from disappearing on axis hover
+        // KPI→chart dimming still works via direct opacity control (highlightedSeriesKeys)
         emphasis: {
-          // Use "none" to prevent global blur/downplay on axis-trigger tooltips
-          // This keeps all series visible when hovering empty space in the plot area
-          focus: "none" as const,
-          itemStyle: {
-            // Enhanced shadow for both light and dark mode visibility
-            shadowBlur: 12,
-            shadowColor: "rgba(0, 0, 0, 0.5)",
-            // Add a bright border ring for dark mode visibility
-            borderColor: baseColor,
-            borderWidth: 2,
-          },
-          lineStyle: {
-            width: (s.lineStyle?.width ?? 2) + 1,
-          },
-        },
-        // Explicit blur state to maintain visibility even if ECharts enters blur mode
-        blur: {
-          itemStyle: {
-            opacity: lineOpacity,
-          },
-          lineStyle: {
-            opacity: lineOpacity,
-            width: s.lineStyle?.width ?? 2,
-          },
-          ...(s.type === "area" && {
-            areaStyle: {
-              opacity: areaOpacity,
-            },
-          }),
+          disabled: true,
         },
       };
 
@@ -240,12 +214,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
           },
           yAxisIndex: s.yAxisIndex ?? 0,
           emphasis: {
-            focus: "none" as const,
-          },
-          blur: {
-            lineStyle: {
-              opacity: 0.6,
-            },
+            disabled: true,
           },
         };
 
