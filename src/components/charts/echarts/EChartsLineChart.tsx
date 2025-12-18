@@ -351,19 +351,59 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
             },
             formatter: (params: any) => {
               if (!Array.isArray(params) || params.length === 0) return "";
+
               // Header: primary text color, semibold
               const header = `<div style="font-weight: 600; margin-bottom: 8px; color: hsl(var(--portal-text-primary)); font-size: 13px;">${params[0].axisValue}</div>`;
-              // Items: muted label, primary value
-              const items = params
-                .map(
-                  (p: any) =>
-                    `<div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
-                      <span style="width: 8px; height: 8px; border-radius: 50%; background: ${p.color}; flex-shrink: 0;"></span>
-                      <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 12px;">${p.seriesName}</span>
-                      <span style="font-weight: 600; color: hsl(var(--portal-text-primary)); font-size: 13px;">${formatTooltipValue(p.value)}</span>
-                    </div>`
-                )
-                .join("");
+
+              // Normalize series name for matching (strip suffixes)
+              const normalizeKey = (name: string) =>
+                name.replace(/\s*\(prev\)$/i, "")
+                    .replace(/\s*donations$/i, "")
+                    .replace(/\s*spend$/i, "")
+                    .replace(/\s*\(negative\)$/i, "")
+                    .trim()
+                    .toLowerCase();
+
+              // Separate current and prev series
+              const currentSeries = params.filter((p: any) => !/\(prev\)$/i.test(p.seriesName));
+              const prevSeries = params.filter((p: any) => /\(prev\)$/i.test(p.seriesName));
+
+              // Build prev lookup map by normalized key
+              const prevMap = new Map<string, any>();
+              prevSeries.forEach((p: any) => {
+                prevMap.set(normalizeKey(p.seriesName), p);
+              });
+
+              // Render items with optional prev pairing
+              const items = currentSeries.map((p: any) => {
+                const key = normalizeKey(p.seriesName);
+                const prev = prevMap.get(key);
+
+                // Primary row: current value
+                let html = `<div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
+                  <span style="width: 8px; height: 8px; border-radius: 50%; background: ${p.color}; flex-shrink: 0;"></span>
+                  <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 12px;">${p.seriesName}</span>
+                  <span style="font-weight: 600; color: hsl(var(--portal-text-primary)); font-size: 13px;">${formatTooltipValue(p.value)}</span>
+                </div>`;
+
+                // If paired prev exists, add secondary row with Prev + Delta
+                if (prev && typeof prev.value === "number" && typeof p.value === "number") {
+                  const delta = p.value - prev.value;
+                  const deltaSign = delta >= 0 ? "+" : "";
+                  const pctChange = prev.value !== 0
+                    ? ` (${deltaSign}${((delta / prev.value) * 100).toFixed(1)}%)`
+                    : "";
+
+                  html += `<div style="display: flex; align-items: center; gap: 8px; margin: 2px 0 6px 16px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: ${prev.color}; flex-shrink: 0; opacity: 0.6;"></span>
+                    <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 11px;">Prev: ${formatTooltipValue(prev.value)}</span>
+                    <span style="font-weight: 500; color: hsl(var(--portal-text-secondary)); font-size: 11px;">Δ ${deltaSign}${formatTooltipValue(Math.abs(delta))}${pctChange}</span>
+                  </div>`;
+                }
+
+                return html;
+              }).join("");
+
               return header + items;
             },
           }
@@ -377,6 +417,25 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
             textStyle: {
               color: "hsl(var(--portal-text-secondary))",
               fontSize: 11,
+            },
+            // Shorten legend labels for readability
+            formatter: (name: string) => {
+              // Prev series: "X (prev)" → "Prev · X"
+              if (/\(prev\)$/i.test(name)) {
+                const base = name.replace(/\s*\(prev\)$/i, "")
+                  .replace(/\s*donations$/i, "")
+                  .replace(/\s*spend$/i, "")
+                  .replace(/\s*\(negative\)$/i, "")
+                  .trim();
+                return `Prev · ${base}`;
+              }
+              // Current series: shorten common names
+              return name
+                .replace(/^Gross donations$/i, "Gross")
+                .replace(/^Net donations$/i, "Net")
+                .replace(/^Refunds \(negative\)$/i, "Refunds")
+                .replace(/^Meta spend$/i, "Meta")
+                .replace(/^SMS spend$/i, "SMS");
             },
             icon: "roundRect",
             itemWidth: 12,
