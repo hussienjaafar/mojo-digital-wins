@@ -87,6 +87,64 @@ function getPreviousPeriod(startDate: string, endDate: string) {
   };
 }
 
+// ============================================================================
+// Performance: Bucket items by yyyy-MM-dd key for O(1) lookups
+// ============================================================================
+
+/**
+ * Extract yyyy-MM-dd from an ISO-ish date string (e.g., "2024-01-15T12:30:00").
+ * Returns null if the string doesn't start with a valid date format.
+ */
+function extractDayKey(dateStr: string | null | undefined): string | null {
+  if (!dateStr || dateStr.length < 10) return null;
+  // Check for yyyy-MM-dd format (positions 4 and 7 are '-')
+  if (dateStr[4] !== '-' || dateStr[7] !== '-') return null;
+  return dateStr.slice(0, 10);
+}
+
+/**
+ * Bucket an array of items by day key for O(1) lookups.
+ * @param items Array of items to bucket
+ * @param getDateStr Function to extract date string from each item
+ * @returns Map from yyyy-MM-dd key to array of items for that day
+ */
+function bucketByDay<T>(
+  items: T[],
+  getDateStr: (item: T) => string | null | undefined
+): Map<string, T[]> {
+  const buckets = new Map<string, T[]>();
+  for (const item of items) {
+    const dayKey = extractDayKey(getDateStr(item));
+    if (dayKey) {
+      const bucket = buckets.get(dayKey);
+      if (bucket) {
+        bucket.push(item);
+      } else {
+        buckets.set(dayKey, [item]);
+      }
+    }
+  }
+  return buckets;
+}
+
+/**
+ * Bucket metaMetrics by date (already yyyy-MM-dd format).
+ */
+function bucketMetaByDay<T extends { date?: string }>(items: T[]): Map<string, T[]> {
+  const buckets = new Map<string, T[]>();
+  for (const item of items) {
+    if (item.date) {
+      const bucket = buckets.get(item.date);
+      if (bucket) {
+        bucket.push(item);
+      } else {
+        buckets.set(item.date, [item]);
+      }
+    }
+  }
+  return buckets;
+}
+
 async function fetchDashboardMetrics(
   organizationId: string,
   startDate: string,
@@ -237,20 +295,29 @@ async function fetchDashboardMetrics(
     end: parseISO(prevPeriod.end),
   });
 
+  // Pre-bucket data by day for O(1) lookups instead of O(days × rows) filtering
+  const donationsByDay = bucketByDay(donations, (d: any) => d.transaction_date);
+  const metaByDay = bucketMetaByDay(metaMetrics);
+  const smsByDay = bucketByDay(smsMetrics, (s: any) => s.send_date);
+  const prevDonationsByDay = bucketByDay(prevDonations, (d: any) => d.transaction_date);
+  const prevMetaByDay = bucketMetaByDay(prevMetaMetrics);
+  const prevSmsByDay = bucketByDay(prevSmsMetrics, (s: any) => s.send_date);
+
   const timeSeries: DashboardTimeSeriesPoint[] = days.map((day, index) => {
     const dayStr = format(day, 'yyyy-MM-dd');
     const dayLabel = format(day, 'MMM d');
     const prevDay = prevDays[index];
     const prevDayStr = prevDay ? format(prevDay, 'yyyy-MM-dd') : null;
 
-    const dayDonations = donations.filter((d: any) => d.transaction_date?.startsWith(dayStr));
-    const dayMeta = metaMetrics.filter((m: any) => m.date === dayStr);
-    const daySms = smsMetrics.filter((s: any) => s.send_date?.startsWith(dayStr));
+    // O(1) lookups instead of O(n) filter calls
+    const dayDonations = donationsByDay.get(dayStr) ?? [];
+    const dayMeta = metaByDay.get(dayStr) ?? [];
+    const daySms = smsByDay.get(dayStr) ?? [];
     const dayRefunds = dayDonations.filter((d: any) => d.transaction_type === 'refund');
 
-    const prevDayDonations = prevDayStr ? prevDonations.filter((d: any) => d.transaction_date?.startsWith(prevDayStr)) : [];
-    const prevDayMeta = prevDayStr ? prevMetaMetrics.filter((m: any) => m.date === prevDayStr) : [];
-    const prevDaySms = prevDayStr ? prevSmsMetrics.filter((s: any) => s.send_date?.startsWith(prevDayStr)) : [];
+    const prevDayDonations = prevDayStr ? (prevDonationsByDay.get(prevDayStr) ?? []) : [];
+    const prevDayMeta = prevDayStr ? (prevMetaByDay.get(prevDayStr) ?? []) : [];
+    const prevDaySms = prevDayStr ? (prevSmsByDay.get(prevDayStr) ?? []) : [];
     const prevDayRefunds = prevDayDonations.filter((d: any) => d.transaction_type === 'refund');
 
     const grossDonations = dayDonations.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
@@ -311,28 +378,27 @@ async function fetchDashboardMetrics(
       };
     }),
     recurringHealth: timeSeries.map((d, i) => {
-      // Use the daily recurring donations portion
-      const dayDonations = donations.filter((don: any) =>
-        don.transaction_date?.startsWith(format(days[i], 'yyyy-MM-dd')) && don.is_recurring
-      );
+      // O(1) bucket lookup + filter for recurring only
+      const dayStr = format(days[i], 'yyyy-MM-dd');
+      const dayDonations = (donationsByDay.get(dayStr) ?? []).filter((don: any) => don.is_recurring);
       return {
         date: format(days[i], 'MMM d'),
         value: dayDonations.reduce((sum: number, don: any) => sum + Number(don.net_amount ?? don.amount ?? 0), 0),
       };
     }),
     uniqueDonors: timeSeries.map((d, i) => {
-      const dayDonations = donations.filter((don: any) =>
-        don.transaction_date?.startsWith(format(days[i], 'yyyy-MM-dd'))
-      );
+      // O(1) bucket lookup
+      const dayStr = format(days[i], 'yyyy-MM-dd');
+      const dayDonations = donationsByDay.get(dayStr) ?? [];
       return {
         date: format(days[i], 'MMM d'),
         value: new Set(dayDonations.map((don: any) => don.donor_id_hash || don.donor_email)).size,
       };
     }),
     attributionQuality: timeSeries.map((d, i) => {
-      const dayDonations = donations.filter((don: any) =>
-        don.transaction_date?.startsWith(format(days[i], 'yyyy-MM-dd'))
-      );
+      // O(1) bucket lookup
+      const dayStr = format(days[i], 'yyyy-MM-dd');
+      const dayDonations = donationsByDay.get(dayStr) ?? [];
       const attributed = dayDonations.filter((don: any) => don.refcode || don.source_campaign).length;
       return {
         date: format(days[i], 'MMM d'),
