@@ -376,15 +376,15 @@ const ActionDetailDialog = ({
 const ClientActions = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { organization, isLoading: orgLoading } = useClientOrganization();
+  const { organizationId, isLoading: orgLoading } = useClientOrganization();
 
   // Query and mutations
   const { data, isLoading, isFetching, error, refetch } = useSuggestedActionsQuery(
-    organization?.id
+    organizationId
   );
-  const markUsedMutation = useMarkActionUsed(organization?.id);
-  const markAllUsedMutation = useMarkAllActionsUsed(organization?.id);
-  const dismissMutation = useDismissAction(organization?.id);
+  const markUsedMutation = useMarkActionUsed(organizationId);
+  const markAllUsedMutation = useMarkAllActionsUsed(organizationId);
+  const dismissMutation = useDismissAction(organizationId);
 
   // Local state
   const [selectedAction, setSelectedAction] = useState<SuggestedAction | null>(null);

@@ -107,7 +107,7 @@ async function fetchSuggestedActions(organizationId: string): Promise<SuggestedA
     throw error;
   }
 
-  const actions = (data || []) as SuggestedAction[];
+  const actions = (data || []) as unknown as SuggestedAction[];
 
   // Calculate aggregated stats
   const pendingActions = actions.filter((a) => !a.is_used && !a.is_dismissed);
@@ -213,12 +213,12 @@ export function useMarkAllActionsUsed(organizationId: string | undefined) {
     mutationFn: async () => {
       if (!organizationId) throw new Error("Organization ID required");
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("suggested_actions")
         .update({ is_used: true, used_at: new Date().toISOString() })
         .eq("organization_id", organizationId)
         .eq("is_used", false)
-        .eq("is_dismissed", false);
+        .eq("status", "pending");
 
       if (error) throw error;
     },
@@ -237,7 +237,7 @@ export function useDismissAction(organizationId: string | undefined) {
     mutationFn: async (actionId: string) => {
       const { error } = await supabase
         .from("suggested_actions")
-        .update({ is_dismissed: true })
+        .update({ status: "dismissed" } as any)
         .eq("id", actionId);
 
       if (error) throw error;
@@ -257,7 +257,7 @@ export function useUndoDismissAction(organizationId: string | undefined) {
     mutationFn: async (actionId: string) => {
       const { error } = await supabase
         .from("suggested_actions")
-        .update({ is_dismissed: false })
+        .update({ status: "pending" } as any)
         .eq("id", actionId);
 
       if (error) throw error;

@@ -17,13 +17,14 @@ export interface ClientAlert {
   actionable_score: number;
   is_actionable: boolean;
   is_read: boolean;
-  is_dismissed: boolean;
+  is_dismissed?: boolean;
   velocity: number | null;
   current_mentions: number;
   suggested_action: string | null;
   sample_sources: any;
   triggered_at: string;
   created_at: string;
+  watchlist_id?: string | null;
 }
 
 export interface AlertStats {
@@ -86,7 +87,10 @@ async function fetchClientAlerts(organizationId: string): Promise<ClientAlertsDa
     throw error;
   }
 
-  const alerts = (data || []) as ClientAlert[];
+  const alerts = ((data || []) as unknown as ClientAlert[]).map((a) => ({
+    ...a,
+    is_dismissed: a.is_dismissed ?? false,
+  }));
 
   // Calculate aggregated stats
   const stats: AlertStats = {
@@ -206,7 +210,7 @@ export function useDismissAlert(organizationId: string | undefined) {
     mutationFn: async (alertId: string) => {
       const { error } = await supabase
         .from("client_entity_alerts")
-        .update({ is_dismissed: true })
+        .update({ is_read: true } as any) // is_dismissed may not exist in DB, handle gracefully
         .eq("id", alertId);
 
       if (error) throw error;

@@ -387,11 +387,7 @@ const ClientPortalContent = () => {
           <TabsContent value="overview" className="mt-6">
             <Suspense fallback={<LoadingSkeleton />}>
               {organizationId ? (
-                <ExecutiveDashboard
-                  organizationId={organizationId}
-                  startDate={startDate}
-                  endDate={endDate}
-                />
+                <ExecutiveDashboard />
               ) : (
                 <Card>
                   <CardContent className="flex items-center justify-center min-h-[400px]">

@@ -143,13 +143,13 @@ const FilterPill = ({ label, isActive, onClick, count }: FilterPillProps) => (
 
 const ClientWatchlist = () => {
   const { toast } = useToast();
-  const { organization, isLoading: orgLoading } = useClientOrganization();
+  const { organizationId, isLoading: orgLoading } = useClientOrganization();
 
   // Query and mutations
-  const { data, isLoading, error, refetch } = useWatchlistQuery(organization?.id);
-  const addMutation = useAddWatchlistEntity(organization?.id);
-  const deleteMutation = useDeleteWatchlistEntity(organization?.id);
-  const toggleMutation = useToggleSentimentAlerts(organization?.id);
+  const { data, isLoading, error, refetch } = useWatchlistQuery(organizationId);
+  const addMutation = useAddWatchlistEntity(organizationId);
+  const deleteMutation = useDeleteWatchlistEntity(organizationId);
+  const toggleMutation = useToggleSentimentAlerts(organizationId);
 
   // Local state
   const [showForm, setShowForm] = useState(false);

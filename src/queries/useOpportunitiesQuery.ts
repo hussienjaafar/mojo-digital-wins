@@ -24,10 +24,11 @@ export interface Opportunity {
   is_active: boolean;
   status: OpportunityStatus;
   opportunity_type: OpportunityType;
-  assigned_to: string | null;
-  notes: string | null;
+  assigned_to?: string | null;
+  notes?: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
+  expires_at?: string | null;
 }
 
 export interface OpportunityStats {
@@ -119,7 +120,7 @@ async function fetchOpportunities(organizationId: string): Promise<Opportunities
   }
 
   // Transform and enrich data
-  const opportunities: Opportunity[] = (data || []).map((opp) => ({
+  const opportunities: Opportunity[] = ((data || []) as unknown as any[]).map((opp) => ({
     ...opp,
     status: inferStatus(opp),
     opportunity_type: inferType(opp),
@@ -127,6 +128,8 @@ async function fetchOpportunities(organizationId: string): Promise<Opportunities
     velocity: opp.velocity || 0,
     current_mentions: opp.current_mentions || 0,
     similar_past_events: opp.similar_past_events || 0,
+    assigned_to: opp.assigned_to ?? null,
+    notes: opp.notes ?? null,
   }));
 
   // Calculate aggregated stats
@@ -280,7 +283,7 @@ export function useAssignOpportunity(organizationId: string | undefined) {
     }) => {
       const { error } = await supabase
         .from("fundraising_opportunities")
-        .update({ assigned_to: assignedTo, status: "live" })
+        .update({ assigned_to: assignedTo, status: "live" } as any)
         .eq("id", opportunityId);
 
       if (error) throw error;
@@ -306,7 +309,7 @@ export function useUpdateOpportunityNotes(organizationId: string | undefined) {
     }) => {
       const { error } = await supabase
         .from("fundraising_opportunities")
-        .update({ notes })
+        .update({ notes } as any)
         .eq("id", opportunityId);
 
       if (error) throw error;

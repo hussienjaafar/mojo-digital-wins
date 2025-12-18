@@ -83,7 +83,7 @@ export interface HeroKpiCardProps {
 
   // ========== Drilldown Props ==========
   /** Time series data for drill-down chart */
-  trendData?: Record<string, unknown>[];
+  trendData?: SparklineDataPoint[] | Record<string, unknown>[];
   /** X-axis key for trend data (default: "date") */
   trendXAxisKey?: string;
   /** Breakdown items for drill-down table */

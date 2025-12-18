@@ -100,9 +100,6 @@ export function SparklineSuspense({ children }: { children: ReactNode }) {
 // Lazy Chart Components
 // ============================================================================
 
-// Lazy load the entire recharts module
-const RechartsModule = lazy(() => import("recharts"));
-
 /**
  * Lazy-loaded LineChart with all common sub-components
  */

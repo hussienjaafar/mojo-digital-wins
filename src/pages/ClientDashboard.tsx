@@ -315,7 +315,7 @@ const ClientDashboard = () => {
 
   // If organization is still loading, let ClientShell handle the loading state
   if (orgLoading || !organizationId) {
-    return <ClientShell />;
+    return <ClientShell><div className="flex items-center justify-center min-h-[200px]" /></ClientShell>;
   }
 
   return (

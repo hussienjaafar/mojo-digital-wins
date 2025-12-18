@@ -297,15 +297,15 @@ const AlertDetailDialog = ({ alert, onClose, onMarkRead, isMarkingRead }: AlertD
 const ClientAlerts = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { organization, isLoading: orgLoading } = useClientOrganization();
+  const { organizationId, isLoading: orgLoading } = useClientOrganization();
 
   // Query and mutations
   const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useClientAlertsQuery(
-    organization?.id
+    organizationId
   );
-  const markReadMutation = useMarkAlertRead(organization?.id);
-  const markAllReadMutation = useMarkAllAlertsRead(organization?.id);
-  const dismissMutation = useDismissAlert(organization?.id);
+  const markReadMutation = useMarkAlertRead(organizationId);
+  const markAllReadMutation = useMarkAllAlertsRead(organizationId);
+  const dismissMutation = useDismissAlert(organizationId);
 
   // Local state
   const [selectedAlert, setSelectedAlert] = useState<ClientAlert | null>(null);
