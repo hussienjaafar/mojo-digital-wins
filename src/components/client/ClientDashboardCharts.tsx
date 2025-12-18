@@ -29,16 +29,17 @@ interface ClientDashboardChartsProps {
 }
 
 // Semantic chart palette using design system tokens
+// Net = blue, Meta = cyan (info), SMS = purple - ensures visual distinction
 const palette = {
   gross: cssVar(colors.status.success),
   net: cssVar(colors.accent.blue),
   refunds: cssVar(colors.status.error),
-  meta: cssVar(colors.accent.blue),
+  meta: cssVar(colors.status.info),      // Cyan - distinct from blue (net)
   sms: cssVar(colors.accent.purple),
   grossPrev: cssVar(colors.status.success, 0.5),
   netPrev: cssVar(colors.accent.blue, 0.5),
   refundsPrev: cssVar(colors.status.error, 0.5),
-  metaPrev: cssVar(colors.accent.blue, 0.5),
+  metaPrev: cssVar(colors.status.info, 0.5),  // Cyan at 50% opacity
   smsPrev: cssVar(colors.accent.purple, 0.5),
 };
 
@@ -201,7 +202,8 @@ export const ClientDashboardCharts = ({
               <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">{formatCurrency(kpis.totalSpend)}</div>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full" style={{ background: palette.meta }} />
-                <span className="text-xs text-[hsl(var(--portal-text-muted))]">Meta Spend</span>
+                <div className="w-2 h-2 rounded-full" style={{ background: palette.sms }} />
+                <span className="text-xs text-[hsl(var(--portal-text-muted))]">Total Spend</span>
               </div>
             </div>
           </div>
