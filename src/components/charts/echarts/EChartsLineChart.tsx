@@ -79,6 +79,27 @@ export interface EChartsLineChartProps {
 // Use design system chart colors
 const colorPalette = getChartColors();
 
+// Shared helper to format series display names (used in legend and tooltip)
+// Shortens common names for readability without changing series identity
+const formatSeriesDisplayName = (name: string): string => {
+  // Prev series: "X (prev)" -> "Prev: X"
+  if (/\(prev\)$/i.test(name)) {
+    const base = name.replace(/\s*\(prev\)$/i, "")
+      .replace(/\s*donations$/i, "")
+      .replace(/\s*spend$/i, "")
+      .replace(/\s*\(negative\)$/i, "")
+      .trim();
+    return `Prev: ${base}`;
+  }
+  // Current series: shorten common names
+  return name
+    .replace(/^Gross donations$/i, "Gross")
+    .replace(/^Net donations$/i, "Net")
+    .replace(/^Refunds \(negative\)$/i, "Refunds")
+    .replace(/^Meta spend$/i, "Meta")
+    .replace(/^SMS spend$/i, "SMS");
+};
+
 export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
   data,
   xAxisKey,
@@ -379,10 +400,10 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
                 const key = normalizeKey(p.seriesName);
                 const prev = prevMap.get(key);
 
-                // Primary row: current value
+                // Primary row: current value (use shortened display name)
                 let html = `<div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
                   <span style="width: 8px; height: 8px; border-radius: 50%; background: ${p.color}; flex-shrink: 0;"></span>
-                  <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 12px;">${p.seriesName}</span>
+                  <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 12px;">${formatSeriesDisplayName(p.seriesName)}</span>
                   <span style="font-weight: 600; color: hsl(var(--portal-text-primary)); font-size: 13px;">${formatTooltipValue(p.value)}</span>
                 </div>`;
 
@@ -418,25 +439,8 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
               color: "hsl(var(--portal-text-secondary))",
               fontSize: 11,
             },
-            // Shorten legend labels for readability
-            formatter: (name: string) => {
-              // Prev series: "X (prev)" → "Prev: X"
-              if (/\(prev\)$/i.test(name)) {
-                const base = name.replace(/\s*\(prev\)$/i, "")
-                  .replace(/\s*donations$/i, "")
-                  .replace(/\s*spend$/i, "")
-                  .replace(/\s*\(negative\)$/i, "")
-                  .trim();
-                return `Prev: ${base}`;
-              }
-              // Current series: shorten common names
-              return name
-                .replace(/^Gross donations$/i, "Gross")
-                .replace(/^Net donations$/i, "Net")
-                .replace(/^Refunds \(negative\)$/i, "Refunds")
-                .replace(/^Meta spend$/i, "Meta")
-                .replace(/^SMS spend$/i, "SMS");
-            },
+            // Use shared helper for shortened legend labels
+            formatter: formatSeriesDisplayName,
             icon: "roundRect",
             itemWidth: 12,
             itemHeight: 3,
