@@ -389,15 +389,15 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
                 // If paired prev exists, add secondary row with Prev + Delta
                 if (prev && typeof prev.value === "number" && typeof p.value === "number") {
                   const delta = p.value - prev.value;
-                  const deltaSign = delta >= 0 ? "+" : "";
-                  const pctChange = prev.value !== 0
-                    ? ` (${deltaSign}${((delta / prev.value) * 100).toFixed(1)}%)`
-                    : "";
+                  const deltaFormatted = formatTooltipValue(delta);
+                  const deltaDisplay = delta > 0 ? `+${deltaFormatted}` : deltaFormatted;
+                  const pct = (delta / prev.value) * 100;
+                  const pctText = prev.value !== 0 ? ` (${pct > 0 ? '+' : ''}${pct.toFixed(1)}%)` : '';
 
                   html += `<div style="display: flex; align-items: center; gap: 8px; margin: 2px 0 6px 16px;">
                     <span style="width: 8px; height: 8px; border-radius: 50%; background: ${prev.color}; flex-shrink: 0; opacity: 0.6;"></span>
                     <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 11px;">Prev: ${formatTooltipValue(prev.value)}</span>
-                    <span style="font-weight: 500; color: hsl(var(--portal-text-secondary)); font-size: 11px;">Δ ${deltaSign}${formatTooltipValue(Math.abs(delta))}${pctChange}</span>
+                    <span style="font-weight: 500; color: hsl(var(--portal-text-secondary)); font-size: 11px;">Change: ${deltaDisplay}${pctText}</span>
                   </div>`;
                 }
 
@@ -420,14 +420,14 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
             },
             // Shorten legend labels for readability
             formatter: (name: string) => {
-              // Prev series: "X (prev)" → "Prev · X"
+              // Prev series: "X (prev)" → "Prev: X"
               if (/\(prev\)$/i.test(name)) {
                 const base = name.replace(/\s*\(prev\)$/i, "")
                   .replace(/\s*donations$/i, "")
                   .replace(/\s*spend$/i, "")
                   .replace(/\s*\(negative\)$/i, "")
                   .trim();
-                return `Prev · ${base}`;
+                return `Prev: ${base}`;
               }
               // Current series: shorten common names
               return name
