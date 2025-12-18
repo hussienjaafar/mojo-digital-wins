@@ -59,7 +59,8 @@ interface ChartActionButtonOptions {
 const chartActionButtonClasses = ({ active = false, iconOnly = false }: ChartActionButtonOptions = {}) =>
   cn(
     // Size and shape - Mobile: 44px touch target, Tablet+: 36px
-    iconOnly ? "h-11 w-11 sm:h-9 sm:w-9 p-0" : "h-11 sm:h-9 px-3",
+    // min-w-[44px] ensures touch target when text is hidden on mobile
+    iconOnly ? "h-11 w-11 sm:h-9 sm:w-9 p-0" : "h-11 sm:h-9 px-3 min-w-[44px] sm:min-w-0",
     "rounded-[var(--portal-radius-sm)]",
     // Layout
     "inline-flex items-center justify-center gap-1.5",
