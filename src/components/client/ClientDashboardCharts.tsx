@@ -107,18 +107,15 @@ export const ClientDashboardCharts = ({
   }, [comparisonEnabled, valueMode]);
 
   return (
-    <div className="space-y-6">
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Fundraising Trend - Main Chart */}
-        <V3ChartWrapper
-          title="Fundraising Performance"
-          icon={TrendingUp}
-          ariaLabel="Fundraising performance chart showing donations and spend over time"
-          description="Line chart displaying daily donations, net revenue, refunds, and channel spend"
-          accent="green"
-          className="lg:col-span-2"
-          actions={
+    <div className="space-y-[var(--portal-space-lg)]">
+      {/* Row 1: Fundraising Performance - Hero Chart (standalone full-width) */}
+      <V3ChartWrapper
+        title="Fundraising Performance"
+        icon={TrendingUp}
+        ariaLabel="Fundraising performance chart showing donations and spend over time"
+        description="Line chart displaying daily donations, net revenue, refunds, and channel spend"
+        accent="green"
+        actions={
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               {/* View mode toggle group */}
               <div className="flex items-center gap-1.5 sm:gap-2 text-xs">
@@ -220,8 +217,10 @@ export const ClientDashboardCharts = ({
             yAxisNameLeft="Revenue"
             yAxisNameRight="Spend"
           />
-        </V3ChartWrapper>
+      </V3ChartWrapper>
 
+      {/* Row 2: Channel Performance + Conversion Sources side-by-side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--portal-space-lg)]">
         {/* Channel Performance Summary */}
         <V3Card id="channel-performance" accent="blue">
           <V3CardHeader>
@@ -292,32 +291,32 @@ export const ClientDashboardCharts = ({
             </div>
           </V3CardContent>
         </V3Card>
+
+        {/* Conversion Sources */}
+        <V3Card id="conversion-sources" accent="blue">
+          <V3CardHeader>
+            <V3CardTitle>Conversion Sources</V3CardTitle>
+            <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-[hsl(var(--portal-text-muted))]">
+              <span>Conversions by source</span>
+              <span className="text-xs">
+                {format(parseISO(startDate), 'MMM d')} - {format(parseISO(endDate), 'MMM d')}
+              </span>
+            </div>
+          </V3CardHeader>
+          <V3CardContent>
+            <PortalBarChart
+              data={channelBreakdown}
+              height={220}
+              valueType="number"
+              showValues
+              ariaLabel="Conversion sources bar chart"
+            />
+          </V3CardContent>
+        </V3Card>
       </div>
 
-      {/* Row 2: Conversion Sources - Standalone card */}
-      <V3Card id="conversion-sources" accent="blue">
-        <V3CardHeader>
-          <V3CardTitle>Conversion Sources</V3CardTitle>
-          <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-[hsl(var(--portal-text-muted))]">
-            <span>Conversions by source</span>
-            <span className="text-xs">
-              {format(parseISO(startDate), 'MMM d')} - {format(parseISO(endDate), 'MMM d')}
-            </span>
-          </div>
-        </V3CardHeader>
-        <V3CardContent>
-          <PortalBarChart
-            data={channelBreakdown}
-            height={220}
-            valueType="number"
-            showValues
-            ariaLabel="Conversion sources bar chart"
-          />
-        </V3CardContent>
-      </V3Card>
-
-      {/* Bottom Row - Campaign Health */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Row 3: Campaign Health + Recurring Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-[var(--portal-space-lg)]">
         <V3Card id="campaign-health" className="lg:col-span-2" accent="purple">
           <V3CardHeader>
             <V3CardTitle>Campaign Health</V3CardTitle>

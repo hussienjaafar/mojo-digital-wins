@@ -359,6 +359,14 @@ const ClientDashboard = () => {
 
               {/* Charts Section - Always render wrapper to prevent CLS */}
               <motion.section variants={sectionVariants}>
+                {(data || (isLoading && !error)) && (
+                  <V3SectionHeader
+                    title="Trends & Drivers"
+                    subtitle="Revenue trends and attribution breakdown"
+                    icon={BarChart3}
+                    className="mb-4"
+                  />
+                )}
                 {data ? (
                   <ClientDashboardCharts
                     kpis={data.kpis}
@@ -374,16 +382,16 @@ const ClientDashboard = () => {
                   />
                 ) : isLoading && !error ? (
                   /* CLS-safe skeleton matching ClientDashboardCharts 3-row layout */
-                  <div className="space-y-6">
-                    {/* Row 1: Fundraising (2/3) + Channel Performance summary (1/3) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      <V3LoadingState variant="chart" height={360} className="lg:col-span-2" />
-                      <V3LoadingState variant="chart" height={260} />
+                  <div className="space-y-[var(--portal-space-lg)]">
+                    {/* Row 1: Fundraising Performance (standalone full-width hero) */}
+                    <V3LoadingState variant="chart" height={360} />
+                    {/* Row 2: Channel Performance + Conversion Sources (side-by-side) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--portal-space-lg)]">
+                      <V3LoadingState variant="chart" height={320} />
+                      <V3LoadingState variant="chart" height={320} />
                     </div>
-                    {/* Row 2: Conversion Sources (standalone full-width) */}
-                    <V3LoadingState variant="chart" height={320} />
                     {/* Row 3: Campaign Health (2/3) + Recurring Summary (1/3) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-[var(--portal-space-lg)]">
                       <V3LoadingState variant="chart" height={280} className="lg:col-span-2" />
                       <V3LoadingState variant="chart" height={240} />
                     </div>
