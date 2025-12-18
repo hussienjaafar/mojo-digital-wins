@@ -38,7 +38,7 @@ export function ResponsiveChartTooltip({
     <div className="portal-chart-tooltip animate-in fade-in-0 zoom-in-95 duration-150">
       {/* Label */}
       {formattedLabel && (
-        <p className="text-xs font-medium text-muted-foreground mb-2 pb-2 border-b border-border/30">
+        <p className="text-xs font-medium portal-text-muted mb-2 pb-2 border-b border-[hsl(var(--portal-border)/0.3)]">
           {formattedLabel}
         </p>
       )}
@@ -59,11 +59,11 @@ export function ResponsiveChartTooltip({
                   className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: entry.color }}
                 />
-                <span className="text-xs text-muted-foreground truncate max-w-[100px]">
+                <span className="text-xs portal-text-muted truncate max-w-[100px]">
                   {entry.name}
                 </span>
               </div>
-              <span className="text-sm font-semibold text-foreground tabular-nums">
+              <span className="text-sm font-semibold portal-text-primary tabular-nums">
                 {formattedValue}
               </span>
             </div>

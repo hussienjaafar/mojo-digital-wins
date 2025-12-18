@@ -546,13 +546,13 @@
 .portal-chart-tooltip {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  background: hsl(var(--card) / 0.95);
-  border: 1px solid hsl(var(--border) / 0.5);
+  background: hsl(var(--portal-bg-secondary) / 0.95);
+  border: 1px solid hsl(var(--portal-border) / 0.5);
   border-radius: 8px;
   padding: 12px;
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.1),
-    0 0 0 1px hsl(var(--border) / 0.1);
+    0 0 0 1px hsl(var(--portal-border) / 0.1);
   min-width: 140px;
   max-width: 280px;
 }
@@ -569,7 +569,7 @@
 /* Chart axis styling */
 .portal-chart-axis {
   font-size: 0.6875rem;
-  fill: hsl(var(--muted-foreground));
+  fill: hsl(var(--portal-text-muted));
 }
 
 @media (min-width: 640px) {

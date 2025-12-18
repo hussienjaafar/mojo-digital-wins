@@ -41,7 +41,11 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 200 : 250);
   const setHoveredDataPoint = useChartInteractionStore((state) => state.setHoveredDataPoint);
-  const hoveredDataPoint = useChartInteractionStore((state) => state.hoveredDataPoint);
+  // Only subscribe to hoveredDataPoint when cross-highlighting is enabled
+  // This prevents re-renders in charts that don't need cross-highlight
+  const hoveredDataPoint = useChartInteractionStore((state) =>
+    enableCrossHighlight ? state.hoveredDataPoint : null
+  );
   
   // Only rotate when there are many items or long labels
   const needsRotation = isMobile && (data.length > 4 || data.some(d => d.name.length > 10));
