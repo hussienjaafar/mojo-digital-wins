@@ -316,6 +316,19 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
         ? {
             trigger: "axis",
             confine: true, // Keep tooltip within chart bounds to prevent overlaying external UI
+            // Portal tooltip surface styling (matches .portal-chart-tooltip)
+            backgroundColor: "hsl(var(--portal-bg-secondary) / 0.95)",
+            borderColor: "hsl(var(--portal-border) / 0.5)",
+            borderWidth: 1,
+            padding: 12,
+            extraCssText: `
+              border-radius: 8px;
+              backdrop-filter: blur(12px);
+              -webkit-backdrop-filter: blur(12px);
+              box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px hsl(var(--portal-border) / 0.1);
+              min-width: 140px;
+              max-width: 280px;
+            `,
             axisPointer: {
               type: "cross",
               crossStyle: {
@@ -324,14 +337,16 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
             },
             formatter: (params: any) => {
               if (!Array.isArray(params) || params.length === 0) return "";
-              const header = `<div style="font-weight: 600; margin-bottom: 8px;">${params[0].axisValue}</div>`;
+              // Header: primary text color, semibold
+              const header = `<div style="font-weight: 600; margin-bottom: 8px; color: hsl(var(--portal-text-primary)); font-size: 13px;">${params[0].axisValue}</div>`;
+              // Items: muted label, primary value
               const items = params
                 .map(
                   (p: any) =>
                     `<div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
-                      <span style="width: 8px; height: 8px; border-radius: 50%; background: ${p.color};"></span>
-                      <span style="flex: 1;">${p.seriesName}</span>
-                      <span style="font-weight: 600;">${formatTooltipValue(p.value)}</span>
+                      <span style="width: 8px; height: 8px; border-radius: 50%; background: ${p.color}; flex-shrink: 0;"></span>
+                      <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 12px;">${p.seriesName}</span>
+                      <span style="font-weight: 600; color: hsl(var(--portal-text-primary)); font-size: 13px;">${formatTooltipValue(p.value)}</span>
                     </div>`
                 )
                 .join("");
