@@ -85,7 +85,8 @@ export const V3ChartWrapper: React.FC<V3ChartWrapperProps> = ({
           aria-describedby={description ? descriptionId : undefined}
           className={cn(
             "focus-visible:outline-none focus-visible:ring-2",
-            "focus-visible:ring-[hsl(var(--portal-accent-blue))] focus-visible:ring-offset-2",
+            "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2",
+            "focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
             "rounded-lg"
           )}
           tabIndex={0}

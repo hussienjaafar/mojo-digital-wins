@@ -194,14 +194,14 @@ export const ClientDashboardCharts = ({
         >
           <div className="flex items-center gap-6 mb-4 flex-wrap">
             <div className="flex items-center gap-2">
-              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{formatCurrency(kpis.totalRaised)}</div>
+              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">{formatCurrency(kpis.totalRaised)}</div>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full" style={{ background: palette.gross }} />
                 <span className="text-xs text-[hsl(var(--portal-text-muted))]">Donations</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{formatCurrency(kpis.totalSpend)}</div>
+              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">{formatCurrency(kpis.totalSpend)}</div>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full" style={{ background: palette.meta }} />
                 <span className="text-xs text-[hsl(var(--portal-text-muted))]">Meta Spend</span>
@@ -247,8 +247,8 @@ export const ClientDashboardCharts = ({
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
-                    {metaConversions}
+                  <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                    {metaConversions.toLocaleString()}
                   </p>
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">conversions</p>
                 </div>
@@ -266,8 +266,8 @@ export const ClientDashboardCharts = ({
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
-                    {smsConversions}
+                  <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                    {smsConversions.toLocaleString()}
                   </p>
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">conversions</p>
                 </div>
@@ -283,8 +283,8 @@ export const ClientDashboardCharts = ({
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">No attribution</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
-                    {directDonations}
+                  <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                    {directDonations.toLocaleString()}
                   </p>
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">donations</p>
                 </div>
@@ -326,27 +326,27 @@ export const ClientDashboardCharts = ({
           <V3CardContent className="space-y-4">
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
               <span className="text-sm text-[hsl(var(--portal-text-muted))]">Average Donation</span>
-              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{formatCurrency(kpis.avgDonation)}</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{formatCurrency(kpis.avgDonation)}</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
               <span className="text-sm text-[hsl(var(--portal-text-muted))]">Total Impressions</span>
-              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{kpis.totalImpressions.toLocaleString()}</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.totalImpressions.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
               <span className="text-sm text-[hsl(var(--portal-text-muted))]">Total Clicks</span>
-              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{kpis.totalClicks.toLocaleString()}</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.totalClicks.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
               <span className="text-sm text-[hsl(var(--portal-text-muted))]">Recurring %</span>
-              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{kpis.recurringPercentage.toFixed(1)}%</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.recurringPercentage.toFixed(1)}%</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
               <span className="text-sm text-[hsl(var(--portal-text-muted))]">Upsell Conversion</span>
-              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{kpis.upsellConversionRate.toFixed(1)}%</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.upsellConversionRate.toFixed(1)}%</span>
             </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-[hsl(var(--portal-text-muted))]">Total Donations</span>
-              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">{kpis.donationCount.toLocaleString()}</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.donationCount.toLocaleString()}</span>
             </div>
           </V3CardContent>
         </V3Card>
@@ -359,21 +359,21 @@ export const ClientDashboardCharts = ({
           </V3CardHeader>
           <V3CardContent className="space-y-4">
             <div className="text-center py-4">
-              <p className="text-3xl font-bold text-[hsl(var(--portal-text-primary))]">
+              <p className="text-3xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
                 {formatCurrency(kpis.recurringRaised)}
               </p>
               <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">Recurring Revenue</p>
             </div>
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[hsl(var(--portal-border))]">
               <div className="text-center">
-                <p className="text-xl font-semibold text-[hsl(var(--portal-text-primary))]">
-                  {kpis.recurringDonations}
+                <p className="text-xl font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                  {kpis.recurringDonations.toLocaleString()}
                 </p>
                 <p className="text-xs text-[hsl(var(--portal-text-muted))]">Transactions</p>
               </div>
               <div className="text-center">
                 <p className={cn(
-                  "text-xl font-semibold",
+                  "text-xl font-semibold tabular-nums",
                   kpis.recurringChurnRate > 5
                     ? "text-[hsl(var(--portal-error))]"
                     : "text-[hsl(var(--portal-text-primary))]"
