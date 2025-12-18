@@ -373,14 +373,16 @@ const ClientDashboard = () => {
                     endDate={dateRange.endDate}
                   />
                 ) : isLoading && !error ? (
-                  /* CLS-safe skeleton matching ClientDashboardCharts grid layout */
+                  /* CLS-safe skeleton matching ClientDashboardCharts 3-row layout */
                   <div className="space-y-6">
-                    {/* Top row: Fundraising (2/3) + Channel Performance (1/3) */}
+                    {/* Row 1: Fundraising (2/3) + Channel Performance summary (1/3) */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                       <V3LoadingState variant="chart" height={360} className="lg:col-span-2" />
-                      <V3LoadingState variant="chart" height={420} />
+                      <V3LoadingState variant="chart" height={260} />
                     </div>
-                    {/* Bottom row: Campaign Health (2/3) + Recurring Summary (1/3) */}
+                    {/* Row 2: Conversion Sources (standalone full-width) */}
+                    <V3LoadingState variant="chart" height={320} />
+                    {/* Row 3: Campaign Health (2/3) + Recurring Summary (1/3) */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                       <V3LoadingState variant="chart" height={280} className="lg:col-span-2" />
                       <V3LoadingState variant="chart" height={240} />

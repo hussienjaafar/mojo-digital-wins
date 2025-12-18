@@ -227,7 +227,7 @@ export const ClientDashboardCharts = ({
           <V3CardHeader>
             <V3CardTitle>Channel Performance</V3CardTitle>
             <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-[hsl(var(--portal-text-muted))]">
-              <span>Conversions by source</span>
+              <span>Attribution summary</span>
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[hsl(var(--portal-bg-elevated))] text-[11px]">
                 Deterministic: {kpis.deterministicRate.toFixed(0)}%
               </span>
@@ -290,25 +290,31 @@ export const ClientDashboardCharts = ({
                 </div>
               </div>
             </div>
-
-            <div className="mt-4 pt-4 border-t border-[hsl(var(--portal-border))]">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Conversion Sources</p>
-                <span className="text-xs text-[hsl(var(--portal-text-muted))]">
-                  {format(parseISO(startDate), 'MMM d')} - {format(parseISO(endDate), 'MMM d')}
-                </span>
-              </div>
-              <PortalBarChart
-                data={channelBreakdown}
-                height={220}
-                valueType="number"
-                showValues
-                ariaLabel="Conversion sources bar chart"
-              />
-            </div>
           </V3CardContent>
         </V3Card>
       </div>
+
+      {/* Row 2: Conversion Sources - Standalone card */}
+      <V3Card id="conversion-sources" accent="blue">
+        <V3CardHeader>
+          <V3CardTitle>Conversion Sources</V3CardTitle>
+          <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-[hsl(var(--portal-text-muted))]">
+            <span>Conversions by source</span>
+            <span className="text-xs">
+              {format(parseISO(startDate), 'MMM d')} - {format(parseISO(endDate), 'MMM d')}
+            </span>
+          </div>
+        </V3CardHeader>
+        <V3CardContent>
+          <PortalBarChart
+            data={channelBreakdown}
+            height={220}
+            valueType="number"
+            showValues
+            ariaLabel="Conversion sources bar chart"
+          />
+        </V3CardContent>
+      </V3Card>
 
       {/* Bottom Row - Campaign Health */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
