@@ -62,9 +62,12 @@ vi.mock('@/hooks/useIsAdmin', () => ({
 vi.mock('@/contexts/ImpersonationContext', () => ({
   useImpersonation: vi.fn(() => ({
     impersonatedOrgId: null,
+    impersonatedUserId: null,
+    impersonatedUserName: null,
+    impersonatedOrgName: null,
     isImpersonating: false,
-    startImpersonation: vi.fn(),
-    stopImpersonation: vi.fn(),
+    setImpersonation: vi.fn(),
+    clearImpersonation: vi.fn(),
   })),
 }));
 
@@ -144,9 +147,12 @@ describe('ClientShell', () => {
       const { useImpersonation } = await import('@/contexts/ImpersonationContext');
       vi.mocked(useImpersonation).mockReturnValue({
         impersonatedOrgId: 'org-123',
+        impersonatedUserId: 'user-123',
+        impersonatedUserName: 'Test User',
+        impersonatedOrgName: 'Test Org',
         isImpersonating: true,
-        startImpersonation: vi.fn(),
-        stopImpersonation: vi.fn(),
+        setImpersonation: vi.fn(),
+        clearImpersonation: vi.fn(),
       });
 
       render(
@@ -168,9 +174,12 @@ describe('ClientShell', () => {
       const { useImpersonation } = await import('@/contexts/ImpersonationContext');
       vi.mocked(useImpersonation).mockReturnValue({
         impersonatedOrgId: 'org-123',
+        impersonatedUserId: 'user-123',
+        impersonatedUserName: 'Test User',
+        impersonatedOrgName: 'Test Org',
         isImpersonating: true,
-        startImpersonation: vi.fn(),
-        stopImpersonation: vi.fn(),
+        setImpersonation: vi.fn(),
+        clearImpersonation: vi.fn(),
       });
 
       render(
@@ -192,9 +201,12 @@ describe('ClientShell', () => {
       const { useImpersonation } = await import('@/contexts/ImpersonationContext');
       vi.mocked(useImpersonation).mockReturnValue({
         impersonatedOrgId: 'org-123',
+        impersonatedUserId: 'user-123',
+        impersonatedUserName: 'Test User',
+        impersonatedOrgName: 'Test Org',
         isImpersonating: true,
-        startImpersonation: vi.fn(),
-        stopImpersonation: vi.fn(),
+        setImpersonation: vi.fn(),
+        clearImpersonation: vi.fn(),
       });
 
       render(
@@ -216,9 +228,12 @@ describe('ClientShell', () => {
       const { useImpersonation } = await import('@/contexts/ImpersonationContext');
       vi.mocked(useImpersonation).mockReturnValue({
         impersonatedOrgId: 'org-123',
+        impersonatedUserId: 'user-123',
+        impersonatedUserName: 'Test User',
+        impersonatedOrgName: 'Test Org',
         isImpersonating: true,
-        startImpersonation: vi.fn(),
-        stopImpersonation: vi.fn(),
+        setImpersonation: vi.fn(),
+        clearImpersonation: vi.fn(),
       });
 
       render(
@@ -238,9 +253,12 @@ describe('ClientShell', () => {
       const { useImpersonation } = await import('@/contexts/ImpersonationContext');
       vi.mocked(useImpersonation).mockReturnValue({
         impersonatedOrgId: 'org-123',
+        impersonatedUserId: 'user-123',
+        impersonatedUserName: 'Test User',
+        impersonatedOrgName: 'Test Org',
         isImpersonating: true,
-        startImpersonation: vi.fn(),
-        stopImpersonation: vi.fn(),
+        setImpersonation: vi.fn(),
+        clearImpersonation: vi.fn(),
       });
 
       render(
@@ -261,9 +279,12 @@ describe('ClientShell', () => {
       const { useImpersonation } = await import('@/contexts/ImpersonationContext');
       vi.mocked(useImpersonation).mockReturnValue({
         impersonatedOrgId: 'org-123',
+        impersonatedUserId: 'user-123',
+        impersonatedUserName: 'Test User',
+        impersonatedOrgName: 'Test Org',
         isImpersonating: true,
-        startImpersonation: vi.fn(),
-        stopImpersonation: vi.fn(),
+        setImpersonation: vi.fn(),
+        clearImpersonation: vi.fn(),
       });
 
       render(
@@ -288,9 +309,12 @@ describe('ClientShell', () => {
       const { useImpersonation } = await import('@/contexts/ImpersonationContext');
       vi.mocked(useImpersonation).mockReturnValue({
         impersonatedOrgId: null,
+        impersonatedUserId: null,
+        impersonatedUserName: null,
+        impersonatedOrgName: null,
         isImpersonating: false,
-        startImpersonation: vi.fn(),
-        stopImpersonation: vi.fn(),
+        setImpersonation: vi.fn(),
+        clearImpersonation: vi.fn(),
       });
 
       render(
@@ -311,9 +335,12 @@ describe('ClientShell', () => {
       const { useImpersonation } = await import('@/contexts/ImpersonationContext');
       vi.mocked(useImpersonation).mockReturnValue({
         impersonatedOrgId: null,
+        impersonatedUserId: null,
+        impersonatedUserName: null,
+        impersonatedOrgName: null,
         isImpersonating: false,
-        startImpersonation: vi.fn(),
-        stopImpersonation: vi.fn(),
+        setImpersonation: vi.fn(),
+        clearImpersonation: vi.fn(),
       });
 
       render(
@@ -334,9 +361,12 @@ describe('ClientShell', () => {
       const { useImpersonation } = await import('@/contexts/ImpersonationContext');
       vi.mocked(useImpersonation).mockReturnValue({
         impersonatedOrgId: null,
+        impersonatedUserId: null,
+        impersonatedUserName: null,
+        impersonatedOrgName: null,
         isImpersonating: false,
-        startImpersonation: vi.fn(),
-        stopImpersonation: vi.fn(),
+        setImpersonation: vi.fn(),
+        clearImpersonation: vi.fn(),
       });
 
       render(
@@ -355,9 +385,12 @@ describe('ClientShell', () => {
       const { useImpersonation } = await import('@/contexts/ImpersonationContext');
       vi.mocked(useImpersonation).mockReturnValue({
         impersonatedOrgId: null,
+        impersonatedUserId: null,
+        impersonatedUserName: null,
+        impersonatedOrgName: null,
         isImpersonating: false,
-        startImpersonation: vi.fn(),
-        stopImpersonation: vi.fn(),
+        setImpersonation: vi.fn(),
+        clearImpersonation: vi.fn(),
       });
 
       render(

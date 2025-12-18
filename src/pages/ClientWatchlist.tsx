@@ -64,13 +64,13 @@ const formVariants = {
     opacity: 1,
     height: "auto",
     marginTop: 16,
-    transition: { duration: 0.3, ease: "easeOut" },
+    transition: { duration: 0.3, ease: [0, 0, 0.2, 1] as const },
   },
   exit: {
     opacity: 0,
     height: 0,
     marginTop: 0,
-    transition: { duration: 0.2, ease: "easeOut" },
+    transition: { duration: 0.2, ease: [0, 0, 0.2, 1] as const },
   },
 };
 

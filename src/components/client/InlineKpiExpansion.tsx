@@ -52,7 +52,7 @@ const expansionVariants = {
     height: 0,
     opacity: 0,
     transition: {
-      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] as const },
       opacity: { duration: 0.2 },
     },
   },
@@ -60,7 +60,7 @@ const expansionVariants = {
     height: "auto",
     opacity: 1,
     transition: {
-      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
+      height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] as const },
       opacity: { duration: 0.3, delay: 0.1 },
     },
   },
