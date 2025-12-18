@@ -64,7 +64,7 @@ export const V3ChartWrapper: React.FC<V3ChartWrapperProps> = ({
 
   return (
     <V3Card accent={accent} className={className}>
-      <V3CardHeader>
+      <V3CardHeader className="relative z-10">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <V3CardTitle className="flex items-center gap-2">
             {Icon && (

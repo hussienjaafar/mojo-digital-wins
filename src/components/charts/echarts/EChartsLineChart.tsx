@@ -315,6 +315,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
       tooltip: showTooltip
         ? {
             trigger: "axis",
+            confine: true, // Keep tooltip within chart bounds to prevent overlaying external UI
             axisPointer: {
               type: "cross",
               crossStyle: {
