@@ -385,9 +385,9 @@ const ClientDashboard = () => {
                   <div className="space-y-[var(--portal-space-lg)]">
                     {/* Row 1: Fundraising Performance (standalone full-width hero) */}
                     <V3LoadingState variant="chart" height={360} />
-                    {/* Row 2: Channel Performance + Conversion Sources (side-by-side) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--portal-space-lg)]">
-                      <V3LoadingState variant="chart" height={320} />
+                    {/* Row 2: Channel Performance (2/3) + Conversion Sources (1/3) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[var(--portal-space-lg)]">
+                      <V3LoadingState variant="chart" height={320} className="lg:col-span-2" />
                       <V3LoadingState variant="chart" height={320} />
                     </div>
                     {/* Row 3: Campaign Health (2/3) + Recurring Summary (1/3) */}

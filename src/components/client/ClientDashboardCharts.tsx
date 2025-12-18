@@ -302,10 +302,10 @@ export const ClientDashboardCharts = ({
           />
       </V3ChartWrapper>
 
-      {/* Row 2: Channel Performance + Conversion Sources side-by-side */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--portal-space-lg)]">
-        {/* Channel Performance Summary */}
-        <V3Card id="channel-performance" accent="blue">
+      {/* Row 2: Channel Performance (2/3) + Conversion Sources (1/3) on desktop */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[var(--portal-space-lg)]">
+        {/* Channel Performance Summary - spans 2 cols at lg for 2/3 width */}
+        <V3Card id="channel-performance" accent="blue" className="lg:col-span-2">
           <V3CardHeader>
             <V3CardTitle>Channel Performance</V3CardTitle>
             <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-[hsl(var(--portal-text-muted))]">
