@@ -10,6 +10,11 @@ import {
 } from "@/stores/dashboardStore";
 import { format } from "date-fns";
 import { getChartColors } from "@/lib/design-tokens";
+import {
+  formatCurrency,
+  formatNumber,
+  formatPercent,
+} from "@/lib/chart-formatters";
 
 export interface LineSeriesConfig {
   dataKey: string;
@@ -128,18 +133,26 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     []
   );
 
-  const formatValue = React.useCallback((value: number) => {
+  // Compact formatter for axis labels (K/M notation to avoid clutter)
+  const formatAxisValue = React.useCallback((value: number) => {
     if (valueType === "currency") {
-      if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-      if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(1)}K`;
-      return `$${value.toFixed(0)}`;
+      return formatCurrency(value, true); // compact=true
     }
     if (valueType === "percent") {
-      return `${value.toFixed(1)}%`;
+      return formatPercent(value, 0);
     }
-    if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-    if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(1)}K`;
-    return value.toFixed(0);
+    return formatNumber(value, true); // compact=true
+  }, [valueType]);
+
+  // Full precision formatter for tooltip (enterprise-grade with separators)
+  const formatTooltipValue = React.useCallback((value: number) => {
+    if (valueType === "currency") {
+      return formatCurrency(value, false); // compact=false → $12,345
+    }
+    if (valueType === "percent") {
+      return formatPercent(value, 1);
+    }
+    return formatNumber(value, false); // compact=false → 12,345
   }, [valueType]);
 
   const option = React.useMemo<EChartsOption>(() => {
@@ -240,7 +253,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
               },
             }),
             axisLabel: {
-              formatter: (value: number) => formatValue(value),
+              formatter: (value: number) => formatAxisValue(value),
               color: "hsl(var(--portal-text-muted))",
             },
             splitLine: {
@@ -265,7 +278,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
               },
             }),
             axisLabel: {
-              formatter: (value: number) => formatValue(value),
+              formatter: (value: number) => formatAxisValue(value),
               color: "hsl(var(--portal-text-muted))",
             },
             splitLine: {
@@ -277,7 +290,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
           {
             type: "value" as const,
             axisLabel: {
-              formatter: (value: number) => formatValue(value),
+              formatter: (value: number) => formatAxisValue(value),
               color: "hsl(var(--portal-text-muted))",
             },
             splitLine: {
@@ -317,7 +330,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
                     `<div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
                       <span style="width: 8px; height: 8px; border-radius: 50%; background: ${p.color};"></span>
                       <span style="flex: 1;">${p.seriesName}</span>
-                      <span style="font-weight: 600;">${formatValue(p.value)}</span>
+                      <span style="font-weight: 600;">${formatTooltipValue(p.value)}</span>
                     </div>`
                 )
                 .join("");
@@ -327,8 +340,10 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
         : undefined,
       legend: showLegend
         ? {
+            type: "scroll" as const,
             data: series.map((s) => s.name),
             bottom: 0,
+            left: "center",
             textStyle: {
               color: "hsl(var(--portal-text-secondary))",
               fontSize: 11,
@@ -336,6 +351,14 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
             icon: "roundRect",
             itemWidth: 12,
             itemHeight: 3,
+            itemGap: 16,
+            pageButtonItemGap: 8,
+            pageIconColor: "hsl(var(--portal-text-secondary))",
+            pageIconInactiveColor: "hsl(var(--portal-text-muted))",
+            pageTextStyle: {
+              color: "hsl(var(--portal-text-muted))",
+              fontSize: 10,
+            },
           }
         : undefined,
       grid: {
@@ -402,7 +425,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     };
 
     return result;
-  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, yAxisNameLeft, yAxisNameRight, formatValue, showRollingAverage, rollingAveragePeriod, calculateRollingAverage, highlightedSeriesKeys]);
+  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, yAxisNameLeft, yAxisNameRight, formatAxisValue, formatTooltipValue, showRollingAverage, rollingAveragePeriod, calculateRollingAverage, highlightedSeriesKeys]);
 
   const handleEvents = React.useMemo(() => {
     const events: Record<string, (params: any) => void> = {};
