@@ -357,9 +357,9 @@ const ClientDashboard = () => {
                 />
               </motion.section>
 
-              {/* Charts Section */}
-              {data && (
-                <motion.section variants={sectionVariants}>
+              {/* Charts Section - Always render wrapper to prevent CLS */}
+              <motion.section variants={sectionVariants}>
+                {data ? (
                   <ClientDashboardCharts
                     kpis={data.kpis}
                     timeSeries={data.timeSeries}
@@ -372,8 +372,22 @@ const ClientDashboard = () => {
                     startDate={dateRange.startDate}
                     endDate={dateRange.endDate}
                   />
-                </motion.section>
-              )}
+                ) : isLoading && !error ? (
+                  /* CLS-safe skeleton matching ClientDashboardCharts grid layout */
+                  <div className="space-y-6">
+                    {/* Top row: Fundraising (2/3) + Channel Performance (1/3) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <V3LoadingState variant="chart" height={360} className="lg:col-span-2" />
+                      <V3LoadingState variant="chart" height={420} />
+                    </div>
+                    {/* Bottom row: Campaign Health (2/3) + Recurring Summary (1/3) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <V3LoadingState variant="chart" height={280} className="lg:col-span-2" />
+                      <V3LoadingState variant="chart" height={240} />
+                    </div>
+                  </div>
+                ) : null}
+              </motion.section>
 
               {/* DEEP DIVE: Channel Details */}
               <motion.section variants={sectionVariants}>
