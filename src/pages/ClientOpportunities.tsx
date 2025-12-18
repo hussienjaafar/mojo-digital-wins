@@ -404,14 +404,14 @@ const OpportunityDetailDialog = ({
 // ============================================================================
 
 export default function ClientOpportunities() {
-  const { organization, isLoading: orgLoading } = useClientOrganization();
+  const { organizationId, isLoading: orgLoading } = useClientOrganization();
 
   // Query and mutations
   const { data, isLoading, isFetching, error, refetch } = useOpportunitiesQuery(
-    organization?.id
+    organizationId
   );
-  const markCompleteMutation = useMarkOpportunityComplete(organization?.id);
-  const dismissMutation = useDismissOpportunity(organization?.id);
+  const markCompleteMutation = useMarkOpportunityComplete(organizationId);
+  const dismissMutation = useDismissOpportunity(organizationId);
 
   // Local state
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);

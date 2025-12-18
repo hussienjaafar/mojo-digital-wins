@@ -193,7 +193,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         trendXAxisKey: "date",
         breakdown: [
           { label: "Gross Revenue", value: formatCurrency(kpis.totalRaised) },
-          { label: "Processing Fees", value: `-${formatCurrency(kpis.processingFees || 0)}`, percentage: kpis.feePercentage },
+          { label: "Processing Fees", value: `-${formatCurrency(kpis.totalFees || 0)}`, percentage: kpis.feePercentage },
           { label: "Refunds", value: `-${formatCurrency(kpis.refundAmount)}`, percentage: kpis.refundRate },
           { label: "Net Revenue", value: formatCurrency(kpis.totalNetRevenue) },
         ],

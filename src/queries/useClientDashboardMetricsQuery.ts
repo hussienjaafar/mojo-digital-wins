@@ -71,6 +71,7 @@ interface DashboardMetricsResult {
   smsConversions: number;
   directDonations: number;
   metaSpend: number;
+  smsSpend: number;
   smsMessagesSent: number;
 }
 

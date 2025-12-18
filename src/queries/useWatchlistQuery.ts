@@ -12,6 +12,7 @@ export interface WatchlistEntity {
   aliases: string[];
   alert_threshold: number;
   sentiment_alerts_enabled: boolean;
+  sentiment_alert?: boolean;
   relevance_score: number;
   created_at: string;
   is_active: boolean;
@@ -83,7 +84,10 @@ async function fetchWatchlist(organizationId: string): Promise<WatchlistData> {
     throw error;
   }
 
-  const entities = (data || []) as WatchlistEntity[];
+  const entities = ((data || []) as unknown as any[]).map((e) => ({
+    ...e,
+    sentiment_alerts_enabled: e.sentiment_alerts_enabled ?? e.sentiment_alert ?? false,
+  })) as WatchlistEntity[];
 
   // Calculate aggregated stats
   const stats: WatchlistStats = {
@@ -215,7 +219,7 @@ export function useToggleSentimentAlerts(organizationId: string | undefined) {
     }) => {
       const { error } = await supabase
         .from("entity_watchlist")
-        .update({ sentiment_alerts_enabled: enabled })
+        .update({ sentiment_alert: enabled } as any)
         .eq("id", entityId);
 
       if (error) throw error;

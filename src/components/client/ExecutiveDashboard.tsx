@@ -31,7 +31,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
-import { useDashboardStore } from "@/stores/dashboardStore";
+import { useDateRange } from "@/stores/dashboardStore";
 import { useRealtimeMetrics } from "@/hooks/useRealtimeMetrics";
 import {
   ComposedChart,
@@ -256,7 +256,7 @@ const AlertItem = ({ alert, onAcknowledge }: AlertItemProps) => {
 const ExecutiveDashboard = () => {
   const { toast } = useToast();
   const { organizationId } = useClientOrganization();
-  const { startDate, endDate } = useDashboardStore();
+  const dateRange = useDateRange();
 
   // Use realtime metrics hook
   const {
@@ -267,7 +267,7 @@ const ExecutiveDashboard = () => {
     isConnected,
     lastUpdate,
     isLoading,
-  } = useRealtimeMetrics(organizationId || "", startDate, endDate);
+  } = useRealtimeMetrics(organizationId || "", dateRange.startDate, dateRange.endDate);
 
   // State
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -293,7 +293,7 @@ const ExecutiveDashboard = () => {
     const smsDeliveryRate = totalSmsSent > 0 ? (totalSmsDelivered / totalSmsSent) * 100 : 0;
 
     // Period comparison
-    const midDate = new Date((new Date(startDate).getTime() + new Date(endDate).getTime()) / 2);
+    const midDate = new Date((new Date(dateRange.startDate).getTime() + new Date(dateRange.endDate).getTime()) / 2);
     const currentPeriodRevenue = transactions
       .filter((t) => new Date(t.transaction_date) >= midDate)
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -317,7 +317,7 @@ const ExecutiveDashboard = () => {
       totalAdSpend,
       totalSmsCost,
     };
-  }, [metaMetrics, smsMetrics, transactions, startDate, endDate]);
+  }, [metaMetrics, smsMetrics, transactions, dateRange.startDate, dateRange.endDate]);
 
   // Attribution analysis
   const attributionData = useMemo(() => {

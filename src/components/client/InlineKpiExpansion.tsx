@@ -28,7 +28,7 @@ export interface InlineKpiExpansionProps {
   /** Description text */
   description?: string;
   /** Time series data for chart */
-  trendData?: Record<string, unknown>[];
+  trendData?: { date: string; value: number }[] | Record<string, unknown>[];
   /** X-axis key for trend data */
   trendXAxisKey?: string;
   /** Breakdown items */
