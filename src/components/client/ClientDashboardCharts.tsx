@@ -393,6 +393,8 @@ export const ClientDashboardCharts = ({
               valueType="number"
               showValues
               ariaLabel="Conversion sources bar chart"
+              barName="Conversions"
+              xAxisTickFormatter={(v) => v.replace(/\s*\([^)]*\)\s*$/, "")}
             />
           </V3CardContent>
         </V3Card>

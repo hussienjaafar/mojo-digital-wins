@@ -24,6 +24,10 @@ interface PortalBarChartProps {
   descriptionId?: string;
   /** Enable cross-highlighting with other charts */
   enableCrossHighlight?: boolean;
+  /** Custom formatter for X-axis tick labels (e.g., to shorten labels) */
+  xAxisTickFormatter?: (value: string) => string;
+  /** Series name displayed in tooltip (defaults to dataKey "value" if not provided) */
+  barName?: string;
 }
 
 export const PortalBarChart: React.FC<PortalBarChartProps> = ({
@@ -37,6 +41,8 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   emptyLabel = "No data available",
   descriptionId,
   enableCrossHighlight = false,
+  xAxisTickFormatter,
+  barName,
 }) => {
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 200 : 250);
@@ -46,9 +52,16 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   const hoveredDataPoint = useChartInteractionStore((state) =>
     enableCrossHighlight ? state.hoveredDataPoint : null
   );
-  
-  // Only rotate when there are many items or long labels
-  const needsRotation = isMobile && (data.length > 4 || data.some(d => d.name.length > 10));
+
+  // Use formatted labels for rotation heuristic when formatter is provided
+  // This prevents unnecessary rotation after labels are shortened
+  const needsRotation = React.useMemo(() => {
+    if (!isMobile) return false;
+    const labels = xAxisTickFormatter
+      ? data.map(d => xAxisTickFormatter(d.name))
+      : data.map(d => d.name);
+    return data.length > 4 || labels.some(label => label.length > 10);
+  }, [isMobile, data, xAxisTickFormatter]);
 
   const handleBarMouseEnter = React.useCallback((entry: DataPoint) => {
     if (enableCrossHighlight) {
@@ -104,6 +117,7 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
             textAnchor={needsRotation ? "end" : "middle"}
             height={needsRotation ? 60 : 30}
             interval={0}
+            tickFormatter={xAxisTickFormatter}
           />
           <YAxis
             tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: isMobile ? 12 : 12 }}
@@ -116,9 +130,10 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
             content={<ResponsiveChartTooltip valueType={valueType} />}
             cursor={{ fill: "hsl(var(--portal-bg-elevated))", opacity: 0.3 }}
           />
-          <Bar 
-            dataKey="value" 
-            fill={barColor} 
+          <Bar
+            dataKey="value"
+            name={barName}
+            fill={barColor}
             radius={[4, 4, 0, 0]}
             maxBarSize={isMobile ? 30 : 50}
             onMouseLeave={handleBarMouseLeave}

@@ -561,6 +561,8 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                 valueType="number"
                 showValues
                 ariaLabel="Conversion sources bar chart"
+                barName="Conversions"
+                xAxisTickFormatter={(v) => v.replace(/\s*\([^)]*\)\s*$/, "")}
               />
             </div>
           </V3CardContent>
