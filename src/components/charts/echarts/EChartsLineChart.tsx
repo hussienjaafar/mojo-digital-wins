@@ -109,6 +109,20 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
   const highlightedSeriesKeys = useHighlightedSeriesKeys();
   const setHighlightedKpiKey = useDashboardStore((s) => s.setHighlightedKpiKey);
 
+  // Track structural changes that require full option replacement (notMerge)
+  // ECharts default merge behavior keeps stale series/dataZoom when toggling features
+  const seriesSignature = series.map((s) => s.name).join("|");
+  const structuralKey = `${showZoom}-${showLegend}-${showBrush}-${seriesSignature}`;
+  const prevStructuralKeyRef = React.useRef(structuralKey);
+
+  // Determine if we need notMerge (structural change detected)
+  const shouldNotMerge = prevStructuralKeyRef.current !== structuralKey;
+
+  // Update ref after render (useEffect runs after render)
+  React.useEffect(() => {
+    prevStructuralKeyRef.current = structuralKey;
+  }, [structuralKey]);
+
   // Build a map of series name to seriesKey for quick lookup
   const seriesNameToKeyMap = React.useMemo(() => {
     const map = new Map<string, SeriesKey>();
@@ -516,6 +530,8 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
       className={className}
       isLoading={isLoading}
       onEvents={handleEvents}
+      notMerge={shouldNotMerge}
+      lazyUpdate={!shouldNotMerge}
     />
   );
 };
