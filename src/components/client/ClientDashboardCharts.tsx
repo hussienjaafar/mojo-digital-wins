@@ -43,6 +43,104 @@ const palette = {
   smsPrev: cssVar(colors.accent.purple, 0.5),
 };
 
+// ============================================================================
+// Chart Action Button Styling (matches DashboardHeader premium controls)
+// ============================================================================
+
+interface ChartActionButtonOptions {
+  active?: boolean;
+  iconOnly?: boolean;
+}
+
+/**
+ * Generate consistent button classes matching DashboardHeader controls.
+ * Provides: radius tokens, hover glow, focus ring, proper touch targets.
+ */
+const chartActionButtonClasses = ({ active = false, iconOnly = false }: ChartActionButtonOptions = {}) =>
+  cn(
+    // Size and shape - Mobile: 44px touch target, Tablet+: 36px
+    iconOnly ? "h-11 w-11 sm:h-9 sm:w-9 p-0" : "h-11 sm:h-9 px-3",
+    "rounded-[var(--portal-radius-sm)]",
+    // Layout
+    "inline-flex items-center justify-center gap-1.5",
+    "text-xs font-medium",
+    // Border
+    "border",
+    // Transition
+    "transition-all",
+    // Focus state - portal-branded ring
+    "focus-visible:outline-none",
+    "focus-visible:ring-2",
+    "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.3)]",
+    "focus-visible:ring-offset-1",
+    "focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
+    // Active vs inactive states
+    active
+      ? [
+          "bg-[hsl(var(--portal-accent-blue)/0.1)]",
+          "border-[hsl(var(--portal-accent-blue))]",
+          "text-[hsl(var(--portal-accent-blue))]",
+          "shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.12)]",
+        ]
+      : [
+          "bg-[hsl(var(--portal-bg-secondary))]",
+          "border-[hsl(var(--portal-border))]",
+          "text-[hsl(var(--portal-text-muted))]",
+          // Hover state (inactive only)
+          "hover:bg-[hsl(var(--portal-bg-hover))]",
+          "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
+          "hover:text-[hsl(var(--portal-text-primary))]",
+          "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
+        ]
+  );
+
+/**
+ * Segmented control wrapper classes - connected buttons with shared border.
+ */
+const segmentedControlClasses = cn(
+  "inline-flex",
+  "rounded-[var(--portal-radius-sm)]",
+  "border border-[hsl(var(--portal-border))]",
+  "bg-[hsl(var(--portal-bg-secondary))]",
+  "overflow-hidden",
+  // Focus-within ring for the group
+  "focus-within:ring-2",
+  "focus-within:ring-[hsl(var(--portal-accent-blue)/0.3)]",
+  "focus-within:ring-offset-1",
+  "focus-within:ring-offset-[hsl(var(--portal-bg-secondary))]"
+);
+
+/**
+ * Segmented control segment (child button) classes.
+ */
+const segmentClasses = (active: boolean, position: "first" | "last" | "middle") =>
+  cn(
+    // Size - 44px mobile, 36px desktop
+    "h-11 sm:h-9 px-3",
+    "inline-flex items-center justify-center",
+    "text-xs font-medium",
+    // No individual border (wrapper handles it)
+    "border-0",
+    // Transition
+    "transition-all",
+    // Remove default focus ring (wrapper handles it)
+    "focus-visible:outline-none",
+    // Divider between segments (except first)
+    position !== "first" && "border-l border-[hsl(var(--portal-border))]",
+    // Active vs inactive
+    active
+      ? [
+          "bg-[hsl(var(--portal-accent-blue)/0.1)]",
+          "text-[hsl(var(--portal-accent-blue))]",
+        ]
+      : [
+          "bg-transparent",
+          "text-[hsl(var(--portal-text-muted))]",
+          "hover:bg-[hsl(var(--portal-bg-hover))]",
+          "hover:text-[hsl(var(--portal-text-primary))]",
+        ]
+  );
+
 export const ClientDashboardCharts = ({
   kpis,
   timeSeries,
@@ -118,74 +216,56 @@ export const ClientDashboardCharts = ({
         accent="green"
         actions={
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              {/* View mode toggle group */}
-              <div className="flex items-center gap-1.5 sm:gap-2 text-xs">
-                <span className="hidden sm:flex px-2 py-1 rounded-md border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))] items-center gap-1">
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
-                  View:
+              {/* View mode segmented control */}
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:flex h-9 px-2 rounded-[var(--portal-radius-sm)] border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] items-center gap-1.5 text-xs text-[hsl(var(--portal-text-muted))]">
+                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                  View
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setValueMode("both")}
-                  className={cn(
-                    "rounded-md px-2 sm:px-3 py-2 border text-xs min-h-[44px] sm:min-h-[36px]",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
-                    valueMode === "both"
-                      ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
-                      : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
-                  )}
-                  aria-pressed={valueMode === "both"}
-                >
-                  <span className="sm:hidden">Gross</span>
-                  <span className="hidden sm:inline">Gross & Net</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setValueMode("net")}
-                  className={cn(
-                    "rounded-md px-2 sm:px-3 py-2 border text-xs min-h-[44px] sm:min-h-[36px]",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
-                    valueMode === "net"
-                      ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
-                      : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
-                  )}
-                  aria-pressed={valueMode === "net"}
-                >
-                  Net
-                </button>
+                <div className={segmentedControlClasses} role="group" aria-label="View mode">
+                  <button
+                    type="button"
+                    onClick={() => setValueMode("both")}
+                    className={segmentClasses(valueMode === "both", "first")}
+                    aria-pressed={valueMode === "both"}
+                    style={{ transition: "all var(--portal-transition-base)" }}
+                  >
+                    <span className="sm:hidden">Gross</span>
+                    <span className="hidden sm:inline">Gross & Net</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setValueMode("net")}
+                    className={segmentClasses(valueMode === "net", "last")}
+                    aria-pressed={valueMode === "net"}
+                    style={{ transition: "all var(--portal-transition-base)" }}
+                  >
+                    Net
+                  </button>
+                </div>
               </div>
               {/* Compare toggle */}
               <button
                 type="button"
                 onClick={toggleComparison}
-                className={cn(
-                  "flex items-center gap-1.5 sm:gap-2 rounded-md px-2 sm:px-3 py-2 text-xs font-medium border min-h-[44px] sm:min-h-[36px] min-w-[44px]",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
-                  comparisonEnabled
-                    ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
-                    : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
-                )}
+                className={chartActionButtonClasses({ active: comparisonEnabled })}
                 aria-pressed={comparisonEnabled}
                 aria-label={comparisonEnabled ? "Hide period comparison" : "Compare with previous period"}
+                style={{ transition: "all var(--portal-transition-base)" }}
               >
-                <CopyMinus className="h-3.5 w-3.5" aria-hidden="true" />
-                <span className="hidden sm:inline">{comparisonEnabled ? "Hide compare" : "Compare"}</span>
+                <CopyMinus className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">{comparisonEnabled ? "Hide" : "Compare"}</span>
               </button>
-              {/* Zoom toggle */}
+              {/* Zoom toggle (icon-only) */}
               <button
                 type="button"
                 onClick={() => setShowZoom((prev) => !prev)}
-                className={cn(
-                  "flex items-center justify-center rounded-md px-2 sm:px-3 py-2 text-xs font-medium border min-h-[44px] sm:min-h-[36px] min-w-[44px]",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
-                  showZoom
-                    ? "border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-bg-elevated))]"
-                    : "border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))] hover:bg-[hsl(var(--portal-bg-elevated))]"
-                )}
+                className={chartActionButtonClasses({ active: showZoom, iconOnly: true })}
                 aria-pressed={showZoom}
                 aria-label={showZoom ? "Disable zoom and pan" : "Enable zoom and pan"}
+                style={{ transition: "all var(--portal-transition-base)" }}
               >
-                <ZoomIn className="h-3.5 w-3.5" aria-hidden="true" />
+                <ZoomIn className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           }
