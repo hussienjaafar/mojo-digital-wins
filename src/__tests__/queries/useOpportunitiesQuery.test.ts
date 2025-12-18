@@ -106,7 +106,7 @@ describe('useOpportunitiesQuery', () => {
 
       const byStatus = result.current.data?.stats.byStatus;
       expect(byStatus).toBeDefined();
-      expect(typeof byStatus?.active).toBe('number');
+      expect(typeof byStatus?.pending).toBe('number');
       expect(typeof byStatus?.completed).toBe('number');
       expect(typeof byStatus?.dismissed).toBe('number');
     });

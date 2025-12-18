@@ -360,6 +360,8 @@ export const mockAlertCardData = {
   is_read: false,
   is_dismissed: false,
   is_actionable: true,
+  sample_sources: [],
+  triggered_at: '2024-01-15T10:00:00Z',
   created_at: '2024-01-15T10:00:00Z',
   updated_at: '2024-01-15T10:00:00Z',
 };
@@ -377,6 +379,12 @@ export const mockActionCardData = {
   estimated_impact: 'High',
   value_proposition: 'Timely reminder expected to boost turnout by 15%',
   status: 'pending' as const,
+  alert_id: 'alert-1',
+  target_audience: 'likely voters',
+  historical_context: null,
+  is_used: false,
+  is_dismissed: false,
+  used_at: null,
   alert: {
     entity_name: 'Early Voting',
     actionable_score: 92,
@@ -415,6 +423,7 @@ export const mockWatchlistEntityCardData = {
   alert_threshold: 70,
   sentiment_alerts_enabled: true,
   relevance_score: 85,
+  is_active: true,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-15T00:00:00Z',
 };
