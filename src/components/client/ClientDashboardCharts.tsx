@@ -187,20 +187,15 @@ export const ClientDashboardCharts = ({
 
     if (!comparisonEnabled) return base;
 
-    // Comparison series don't need cross-highlighting (no seriesKey)
+    // Compare overlays limited to primary revenue series only (reduces clutter)
+    // Refunds/spend prev lines omitted - current values are what matters for spend tracking
     const compare: LineSeriesConfig[] = valueMode === "net"
       ? [
           { dataKey: "netDonationsPrev", name: "Net (prev)", color: palette.netPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 0 },
-          { dataKey: "refundsPrev", name: "Refunds (prev)", color: palette.refundsPrev, lineStyle: { type: "dotted", width: 1 }, yAxisIndex: 0 },
-          { dataKey: "metaSpendPrev", name: "Meta (prev)", color: palette.metaPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 1 },
-          { dataKey: "smsSpendPrev", name: "SMS (prev)", color: palette.smsPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 1 },
         ]
       : [
           { dataKey: "donationsPrev", name: "Gross (prev)", color: palette.grossPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 0 },
           { dataKey: "netDonationsPrev", name: "Net (prev)", color: palette.netPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 0 },
-          { dataKey: "refundsPrev", name: "Refunds (prev)", color: palette.refundsPrev, lineStyle: { type: "dotted", width: 1 }, yAxisIndex: 0 },
-          { dataKey: "metaSpendPrev", name: "Meta (prev)", color: palette.metaPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 1 },
-          { dataKey: "smsSpendPrev", name: "SMS (prev)", color: palette.smsPrev, lineStyle: { type: "dashed", width: 1 }, yAxisIndex: 1 },
         ];
 
     return [...base, ...compare];
