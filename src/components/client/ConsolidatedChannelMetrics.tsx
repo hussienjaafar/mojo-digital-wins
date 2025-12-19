@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, lazy, Suspense } from "react";
 import {
   ChevronRight,
   Target,
@@ -16,10 +16,17 @@ import {
 } from "@/components/v3";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import MetaAdsMetrics from "./MetaAdsMetrics";
+// Lazy load MetaAdsMetrics to defer ECharts bundle until card is expanded
+const MetaAdsMetrics = lazy(() => import("./MetaAdsMetrics"));
 import SMSMetrics from "./SMSMetrics";
 import DonationMetrics from "./DonationMetrics";
-import { useChannelSummariesQuery, type ChannelSummariesData } from "@/queries";
+import {
+  useChannelSummariesQuery,
+  isChannelStale,
+  formatLastDataDate,
+  type ChannelSummariesData,
+  type ChannelType,
+} from "@/queries";
 
 // ============================================================================
 // Types
@@ -250,6 +257,28 @@ const MetricChipSkeleton: React.FC = () => (
   </div>
 );
 
+const getMobileSummaryMetrics = (
+  sectionId: ChannelSection,
+  metrics: SummaryMetric[]
+): SummaryMetric[] => {
+  const preferredLabelsBySection: Record<ChannelSection, string[]> = {
+    meta: ["Spend", "Conv"],
+    sms: ["Raised", "ROI"],
+    donations: ["Net", "Donors"],
+  };
+
+  const preferredLabels = preferredLabelsBySection[sectionId] || [];
+  const preferred = preferredLabels
+    .map(label => metrics.find(metric => metric.label === label))
+    .filter((metric): metric is SummaryMetric => Boolean(metric));
+
+  if (metrics.length <= 2) return metrics;
+  if (preferred.length === 0) return metrics.slice(0, 2);
+
+  const remaining = metrics.filter(metric => !preferred.includes(metric));
+  return [...preferred, ...remaining].slice(0, 2);
+};
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -285,10 +314,9 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
     return `$${value.toFixed(0)}`;
   }, []);
 
-  const formatNumber = useCallback((value: number) => {
-    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
-    return value.toFixed(0);
+  /** Format as integer with thousands separators (no K/M abbreviation) */
+  const formatInteger = useCallback((value: number) => {
+    return Math.round(value).toLocaleString();
   }, []);
 
   const sections: ChannelConfig[] = useMemo(() => [
@@ -298,7 +326,17 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
       icon: Target,
       description: "Facebook & Instagram advertising performance",
       accent: "blue" as V3Accent,
-      component: <MetaAdsMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />,
+      component: (
+        <Suspense fallback={
+          <div className="space-y-6">
+            <V3LoadingState variant="kpi-grid" count={5} />
+            <V3LoadingState variant="chart" height={280} />
+            <V3LoadingState variant="table" />
+          </div>
+        }>
+          <MetaAdsMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />
+        </Suspense>
+      ),
       getSummary: (data) => {
         if (!data) return null;
         const { meta } = data;
@@ -307,7 +345,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
           : "N/A";
         return [
           { label: "Spend", value: formatCurrency(meta.spend) },
-          { label: "Conv", value: formatNumber(meta.conversions) },
+          { label: "Conv", value: formatInteger(meta.conversions) },
           {
             label: "ROAS",
             value: roasDisplay,
@@ -329,7 +367,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
         if (!data) return null;
         const { sms } = data;
         return [
-          { label: "Sent", value: formatNumber(sms.sent) },
+          { label: "Sent", value: formatInteger(sms.sent) },
           { label: "Raised", value: formatCurrency(sms.raised) },
           {
             label: "ROI",
@@ -358,14 +396,14 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
             value: formatCurrency(donations.refundAmount),
             highlight: donations.refundAmount > donations.totalGross * 0.05 ? "error" : false,
           },
-          { label: "Donors", value: formatNumber(donations.donors) },
+          { label: "Donors", value: formatInteger(donations.donors) },
           { label: "Avg", value: formatCurrency(donations.avgNet) },
         ];
       },
       hasData: (data) => data?.donations.hasData ?? false,
       getLastDataDate: (data) => data?.donations.lastDataDate ?? null,
     },
-  ], [organizationId, startDate, endDate, formatCurrency, formatNumber]);
+  ], [organizationId, startDate, endDate, formatCurrency, formatInteger]);
 
   // Show loading skeleton if no data and loading
   if (isLoading && !summaryData) {
@@ -400,9 +438,14 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
           const Icon = section.icon;
           const isExpanded = expandedSections.has(section.id);
           const summaryMetrics = section.getSummary(summaryData);
+          const mobileSummaryMetrics = summaryMetrics
+            ? getMobileSummaryMetrics(section.id, summaryMetrics)
+            : null;
           const channelHasData = section.hasData(summaryData);
           const lastDataDate = section.getLastDataDate(summaryData);
-          const isChannelStale = lastDataDate && lastDataDate < endDate;
+          const channelIsStale = channelHasData && isChannelStale(section.id as ChannelType, lastDataDate, endDate);
+          const formattedLastDataDate = formatLastDataDate(lastDataDate);
+          const showStatusChips = channelIsStale || (!channelHasData && !isLoading);
 
           return (
             <motion.div key={section.id} variants={cardVariants}>
@@ -413,6 +456,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
               >
                 {/* Section Header - Clickable */}
                 <button
+                  type="button"
                   onClick={() => toggleSection(section.id)}
                   className={cn(
                     "w-full px-4 sm:px-6 py-4",
@@ -452,25 +496,29 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                     {/* Title & Description */}
                     <div className="text-left min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-base sm:text-lg font-semibold text-[hsl(var(--portal-text-primary))] transition-colors duration-200 group-hover:text-[hsl(var(--portal-accent-blue))]">
+                        <h3
+                          id={`section-heading-${section.id}`}
+                          className="text-base sm:text-lg font-semibold text-[hsl(var(--portal-text-primary))] transition-colors duration-200 group-hover:text-[hsl(var(--portal-accent-blue))]"
+                        >
                           {section.title}
                         </h3>
-                        {isChannelStale && (
+                        {/* Status chips: inline on desktop only */}
+                        {channelIsStale && formattedLastDataDate && (
                           <span
                             className={cn(
-                              "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]",
+                              "hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] shrink-0",
                               "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]"
                             )}
-                            title={`Last data: ${lastDataDate}`}
+                            title={`Last data: ${formattedLastDataDate}`}
                           >
-                            <Clock className="h-2.5 w-2.5" />
+                            <Clock className="h-2.5 w-2.5" aria-hidden="true" />
                             Stale
                           </span>
                         )}
                         {!channelHasData && !isLoading && (
                           <span
                             className={cn(
-                              "inline-flex items-center px-1.5 py-0.5 rounded text-[10px]",
+                              "hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] shrink-0",
                               "bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-muted))]"
                             )}
                           >
@@ -478,6 +526,33 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                           </span>
                         )}
                       </div>
+                      {/* Status chips: below title on mobile */}
+                      {showStatusChips && (
+                        <div className="flex items-center gap-1.5 mt-0.5 sm:hidden">
+                          {channelIsStale && formattedLastDataDate && (
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]",
+                                "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]"
+                              )}
+                              title={`Last data: ${formattedLastDataDate}`}
+                            >
+                              <Clock className="h-2.5 w-2.5" aria-hidden="true" />
+                              Stale
+                            </span>
+                          )}
+                          {!channelHasData && !isLoading && (
+                            <span
+                              className={cn(
+                                "inline-flex items-center px-1.5 py-0.5 rounded text-[10px]",
+                                "bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-muted))]"
+                              )}
+                            >
+                              No data
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <p className="text-xs sm:text-sm text-[hsl(var(--portal-text-secondary))] mt-0.5 truncate hidden sm:block">
                         {section.description}
                       </p>
@@ -501,12 +576,14 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                           ))}
                         </div>
 
-                        {/* Mobile: Show just key metric (usually 3rd - ROI/ROAS/Avg) */}
-                        <div className="text-right sm:hidden">
-                          {summaryMetrics[2] && (
-                            <MetricChip metric={summaryMetrics[2]} compact />
-                          )}
-                        </div>
+                        {/* Mobile: Show two key metrics per channel */}
+                        {mobileSummaryMetrics && (
+                          <div className="flex gap-3 sm:hidden">
+                            {mobileSummaryMetrics.map((metric, i) => (
+                              <MetricChip key={`${section.id}-mobile-${metric.label}-${i}`} metric={metric} compact />
+                            ))}
+                          </div>
+                        )}
                       </>
                     ) : null}
                   </div>
@@ -539,6 +616,8 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                   {isExpanded && (
                     <motion.div
                       id={`section-content-${section.id}`}
+                      role="region"
+                      aria-labelledby={`section-heading-${section.id}`}
                       variants={contentVariants}
                       initial="collapsed"
                       animate="expanded"

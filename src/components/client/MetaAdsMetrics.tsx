@@ -54,8 +54,8 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [performanceFilter, setPerformanceFilter] = useState<string>("all");
 
-  // Use TanStack Query hook instead of direct Supabase calls
-  const { data, isLoading, error, refetch } = useMetaAdsMetricsQuery(organizationId);
+  // Use TanStack Query hook with dashboard date range
+  const { data, isLoading, error, refetch } = useMetaAdsMetricsQuery(organizationId, startDate, endDate);
 
   // Memoized derived data
   const { campaigns, metrics, dailyMetrics, previousPeriodMetrics } = useMemo(() => ({

@@ -179,14 +179,22 @@ async function fetchMetaAdsMetrics(
   };
 }
 
-export function useMetaAdsMetricsQuery(organizationId: string | undefined) {
-  const dateRange = useDateRange();
+export function useMetaAdsMetricsQuery(
+  organizationId: string | undefined,
+  startDate?: string,
+  endDate?: string
+) {
+  const globalDateRange = useDateRange();
+
+  // Use provided dates if available, otherwise fall back to global date range
+  const effectiveStartDate = startDate ?? globalDateRange.startDate;
+  const effectiveEndDate = endDate ?? globalDateRange.endDate;
 
   return useQuery({
-    queryKey: metaKeys.metrics(organizationId || "", dateRange),
+    queryKey: metaKeys.metrics(organizationId || "", { startDate: effectiveStartDate, endDate: effectiveEndDate }),
     queryFn: () =>
-      fetchMetaAdsMetrics(organizationId!, dateRange.startDate, dateRange.endDate),
-    enabled: !!organizationId,
+      fetchMetaAdsMetrics(organizationId!, effectiveStartDate, effectiveEndDate),
+    enabled: !!organizationId && !!effectiveStartDate && !!effectiveEndDate,
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });

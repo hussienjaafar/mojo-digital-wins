@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { parseISO, isValid, differenceInCalendarDays, format } from "date-fns";
 import { channelKeys } from "./queryKeys";
 
 // ============================================================================
@@ -60,6 +61,63 @@ export interface ChannelSummariesQueryResult {
   dataUpdatedAt: number;
   /** Check if data is stale relative to end date */
   isDataStale: (endDate: string) => boolean;
+}
+
+// ============================================================================
+// Staleness Configuration
+// ============================================================================
+
+export type ChannelType = "meta" | "sms" | "donations";
+
+/** Expected freshness windows in hours per channel */
+const CHANNEL_FRESHNESS_HOURS: Record<ChannelType, number> = {
+  meta: 48,      // Meta Ads: 48h
+  sms: 24,       // SMS: 24h
+  donations: 1,  // Donations: 1h (near real-time)
+};
+
+/**
+ * Check if a channel's data is stale based on its freshness window.
+ * Since lastDataDate is date-only (YYYY-MM-DD), we compare using calendar days.
+ * Converts hours -> days using Math.max(1, Math.ceil(hours/24)) to avoid false stale flags.
+ *
+ * @param channel - The channel type
+ * @param lastDataDate - The last data date (YYYY-MM-DD format) or null
+ * @param endDate - The end date of the selected range (YYYY-MM-DD format)
+ * @returns true if the channel is stale, false otherwise
+ */
+export function isChannelStale(
+  channel: ChannelType,
+  lastDataDate: string | null,
+  endDate: string
+): boolean {
+  if (!lastDataDate) return false; // No data = not stale (handled separately as "No data")
+
+  const lastDate = parseISO(lastDataDate);
+  const rangeEnd = parseISO(endDate);
+
+  if (!isValid(lastDate) || !isValid(rangeEnd)) return false;
+
+  const daysDiff = differenceInCalendarDays(rangeEnd, lastDate);
+
+  // Convert freshness hours to days (minimum 1 day since we're comparing dates)
+  const freshnessHours = CHANNEL_FRESHNESS_HOURS[channel];
+  const freshnessDays = Math.max(1, Math.ceil(freshnessHours / 24));
+
+  return daysDiff > freshnessDays;
+}
+
+/**
+ * Format a date string (YYYY-MM-DD) as "MMM d, yyyy" for display.
+ * Returns null if the date is invalid or null.
+ */
+export function formatLastDataDate(dateString: string | null): string | null {
+  if (!dateString) return null;
+
+  const date = parseISO(dateString);
+  if (!isValid(date)) return null;
+
+  return format(date, "MMM d, yyyy");
 }
 
 // ============================================================================
@@ -236,18 +294,25 @@ export function useChannelSummariesQuery(
   });
 
   /**
-   * Check if data is stale - i.e., if the last data date is older than the selected range end
+   * Check if any channel with data is stale based on per-channel freshness windows.
+   * Returns true if ANY channel with hasData is beyond its expected freshness window.
    */
   const isDataStale = (endDateToCheck: string): boolean => {
     if (!query.data) return false;
 
     const { meta, sms, donations } = query.data;
-    const dates = [meta.lastDataDate, sms.lastDataDate, donations.lastDataDate].filter(Boolean);
 
-    if (dates.length === 0) return true;
+    // Check each channel that has data against its freshness window
+    const channelsToCheck: Array<{ channel: ChannelType; hasData: boolean; lastDataDate: string | null }> = [
+      { channel: "meta", hasData: meta.hasData, lastDataDate: meta.lastDataDate },
+      { channel: "sms", hasData: sms.hasData, lastDataDate: sms.lastDataDate },
+      { channel: "donations", hasData: donations.hasData, lastDataDate: donations.lastDataDate },
+    ];
 
-    const mostRecentDate = dates.sort().reverse()[0]!;
-    return mostRecentDate < endDateToCheck;
+    return channelsToCheck.some(
+      ({ channel, hasData, lastDataDate }) =>
+        hasData && isChannelStale(channel, lastDataDate, endDateToCheck)
+    );
   };
 
   return {

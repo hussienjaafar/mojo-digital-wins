@@ -16,11 +16,14 @@ export { useDashboardKPIsQuery } from "./useDashboardKPIsQuery";
 export {
   useChannelSummariesQuery,
   useChannelSummariesLegacy,
+  isChannelStale,
+  formatLastDataDate,
   type MetaSummary,
   type SmsSummary,
   type DonationsSummary,
   type ChannelSummariesData,
   type ChannelSummariesQueryResult,
+  type ChannelType,
 } from "./useChannelSummariesQuery";
 export {
   useDonationMetricsQuery,
