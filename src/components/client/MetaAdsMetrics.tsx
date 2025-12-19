@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   V3Card,
@@ -22,7 +22,7 @@ import { EChartsBarChart } from "@/components/charts/echarts";
 import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
 import { useMetaAdsMetricsQuery } from "@/queries";
 import { useAnomalyDetection } from "@/hooks/useAnomalyDetection";
-import { useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type Props = {
   organizationId: string;
@@ -53,6 +53,7 @@ const itemVariants = {
 const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [performanceFilter, setPerformanceFilter] = useState<string>("all");
+  const isMobile = useIsMobile();
 
   // Use TanStack Query hook with dashboard date range
   const { data, isLoading, error, refetch } = useMetaAdsMetricsQuery(organizationId, startDate, endDate);
@@ -144,17 +145,21 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
     };
   }), [filteredCampaigns, metrics]);
 
-  // Prepare chart data for campaign breakdown
+  // Prepare chart data for campaign breakdown (keep full names for tooltip)
   const campaignBreakdownData = useMemo(() => tableData
     .filter(c => c.spend > 0)
     .sort((a, b) => b.spend - a.spend)
     .slice(0, 8)
     .map(c => ({
-      name: c.campaign_name.length > 15 ? c.campaign_name.slice(0, 15) + '...' : c.campaign_name,
+      name: c.campaign_name,
       spend: c.spend,
       conversions: c.conversions,
       roas: c.roas,
     })), [tableData]);
+
+  // Truncate campaign names for axis labels only
+  const truncateCampaignName = (name: string) =>
+    name.length > 15 ? name.slice(0, 15) + '...' : name;
 
   // Prepare trend chart data
   const trendChartData = useMemo(() => dailyMetrics.map(d => ({
@@ -176,9 +181,9 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-[var(--portal-space-lg)]">
         <V3LoadingState variant="kpi-grid" count={5} />
-        <V3LoadingState variant="chart" height={280} />
+        <V3LoadingState variant="chart" height={isMobile ? 240 : 280} />
         <V3LoadingState variant="table" />
       </div>
     );
@@ -207,7 +212,7 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[var(--portal-space-lg)]">
       {/* Data Freshness Indicator */}
       <div className="flex justify-end">
         <MetaDataFreshnessIndicator organizationId={organizationId} />
@@ -293,13 +298,15 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
             data={trendChartData}
             xAxisKey="date"
             series={[
-              { dataKey: "spend", name: "Spend", color: CHART_COLORS.spend, type: "area" },
-              { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.conversions, yAxisIndex: 1 },
+              { dataKey: "spend", name: "Spend", color: CHART_COLORS.spend, type: "area", valueType: "currency" },
+              { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.conversions, yAxisIndex: 1, valueType: "number" },
             ]}
-            valueType="currency"
+            valueType="number"
+            yAxisValueTypeLeft="currency"
+            yAxisValueTypeRight="number"
             dualYAxis
-            showZoom
-            height={280}
+            showZoom={!isMobile}
+            height={isMobile ? 240 : 280}
           />
         </V3ChartWrapper>
       )}
@@ -317,11 +324,13 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
             data={campaignBreakdownData}
             xAxisKey="name"
             series={[
-              { dataKey: "spend", name: "Spend", color: CHART_COLORS.spend },
-              { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.conversions },
+              { dataKey: "spend", name: "Spend", color: CHART_COLORS.spend, valueType: "currency" },
+              { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.conversions, valueType: "number" },
             ]}
-            valueType="currency"
-            height={280}
+            valueType="number"
+            axisValueType="number"
+            xAxisLabelFormatter={truncateCampaignName}
+            height={isMobile ? 240 : 280}
           />
         </V3ChartWrapper>
       )}
@@ -331,10 +340,10 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
         <V3CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <V3CardTitle>Campaign Performance</V3CardTitle>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
+            <div className="flex flex-wrap items-center gap-2">
+              <Filter className="hidden sm:block h-4 w-4 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[120px] h-8 text-xs" aria-label="Filter by status">
+                <SelectTrigger className="w-full sm:w-[120px] h-8 text-xs" aria-label="Filter by status">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -344,7 +353,7 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
                 </SelectContent>
               </Select>
               <Select value={performanceFilter} onValueChange={setPerformanceFilter}>
-                <SelectTrigger className="w-[130px] h-8 text-xs" aria-label="Filter by performance">
+                <SelectTrigger className="w-full sm:w-[130px] h-8 text-xs" aria-label="Filter by performance">
                   <SelectValue placeholder="Performance" />
                 </SelectTrigger>
                 <SelectContent>

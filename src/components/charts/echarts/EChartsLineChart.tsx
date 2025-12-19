@@ -16,6 +16,8 @@ import {
   formatPercent,
 } from "@/lib/chart-formatters";
 
+export type ValueFormatType = "number" | "currency" | "percent";
+
 export interface LineSeriesConfig {
   dataKey: string;
   name: string;
@@ -34,6 +36,8 @@ export interface LineSeriesConfig {
   yAxisIndex?: number;
   /** SeriesKey for cross-highlighting with KPI cards */
   seriesKey?: SeriesKey;
+  /** Per-series value type for tooltip formatting */
+  valueType?: ValueFormatType;
 }
 
 export interface AnomalyMarker {
@@ -65,6 +69,10 @@ export interface EChartsLineChartProps {
   yAxisNameLeft?: string;
   /** Name label for the right y-axis (only used when dualYAxis is true) */
   yAxisNameRight?: string;
+  /** Value type for left y-axis labels (defaults to valueType) */
+  yAxisValueTypeLeft?: ValueFormatType;
+  /** Value type for right y-axis labels (defaults to valueType) */
+  yAxisValueTypeRight?: ValueFormatType;
   anomalyMarkers?: AnomalyMarker[];
   /** Show rolling average overlay */
   showRollingAverage?: boolean;
@@ -117,6 +125,8 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
   dualYAxis = false,
   yAxisNameLeft,
   yAxisNameRight,
+  yAxisValueTypeLeft,
+  yAxisValueTypeRight,
   anomalyMarkers = [],
   showRollingAverage = false,
   rollingAveragePeriod = 7,
@@ -168,27 +178,58 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     []
   );
 
+  // Build a map of series name to per-series valueType for tooltip formatting
+  const seriesValueTypeMap = React.useMemo(() => {
+    const map = new Map<string, ValueFormatType>();
+    series.forEach((s) => {
+      if (s.valueType) {
+        map.set(s.name, s.valueType);
+      }
+    });
+    return map;
+  }, [series]);
+
   // Compact formatter for axis labels (K/M notation to avoid clutter)
-  const formatAxisValue = React.useCallback((value: number) => {
-    if (valueType === "currency") {
+  const formatAxisValueByType = React.useCallback((value: number, type: ValueFormatType) => {
+    if (type === "currency") {
       return formatCurrency(value, true); // compact=true
     }
-    if (valueType === "percent") {
+    if (type === "percent") {
       return formatPercent(value, 0);
     }
     return formatNumber(value, true); // compact=true
-  }, [valueType]);
+  }, []);
 
-  // Full precision formatter for tooltip (enterprise-grade with separators)
-  const formatTooltipValue = React.useCallback((value: number) => {
-    if (valueType === "currency") {
-      return formatCurrency(value, false); // compact=false → $12,345
+  // Formatters for left and right axes
+  const formatAxisValueLeft = React.useCallback((value: number) => {
+    return formatAxisValueByType(value, yAxisValueTypeLeft ?? valueType);
+  }, [formatAxisValueByType, yAxisValueTypeLeft, valueType]);
+
+  const formatAxisValueRight = React.useCallback((value: number) => {
+    return formatAxisValueByType(value, yAxisValueTypeRight ?? valueType);
+  }, [formatAxisValueByType, yAxisValueTypeRight, valueType]);
+
+  // Default axis formatter (for single y-axis mode)
+  const formatAxisValue = React.useCallback((value: number) => {
+    return formatAxisValueByType(value, valueType);
+  }, [formatAxisValueByType, valueType]);
+
+  // Full precision formatter for tooltip (uses per-series type if available)
+  const formatTooltipValueByType = React.useCallback((value: number, type: ValueFormatType) => {
+    if (type === "currency") {
+      return formatCurrency(value, false); // compact=false -> $12,345
     }
-    if (valueType === "percent") {
+    if (type === "percent") {
       return formatPercent(value, 1);
     }
-    return formatNumber(value, false); // compact=false → 12,345
-  }, [valueType]);
+    return formatNumber(value, false); // compact=false -> 12,345
+  }, []);
+
+  // Get tooltip value formatted by series name (uses per-series type or fallback)
+  const formatTooltipValue = React.useCallback((value: number, seriesName?: string) => {
+    const seriesType = seriesName ? seriesValueTypeMap.get(seriesName) : undefined;
+    return formatTooltipValueByType(value, seriesType ?? valueType);
+  }, [formatTooltipValueByType, seriesValueTypeMap, valueType]);
 
   const option = React.useMemo<EChartsOption>(() => {
     const xAxisData = data.map((d) => d[xAxisKey]);
@@ -288,7 +329,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
               },
             }),
             axisLabel: {
-              formatter: (value: number) => formatAxisValue(value),
+              formatter: (value: number) => formatAxisValueLeft(value),
               color: "hsl(var(--portal-text-muted))",
             },
             splitLine: {
@@ -313,7 +354,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
               },
             }),
             axisLabel: {
-              formatter: (value: number) => formatAxisValue(value),
+              formatter: (value: number) => formatAxisValueRight(value),
               color: "hsl(var(--portal-text-muted))",
             },
             splitLine: {
@@ -400,24 +441,24 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
                 const key = normalizeKey(p.seriesName);
                 const prev = prevMap.get(key);
 
-                // Primary row: current value (use shortened display name)
+                // Primary row: current value (use shortened display name and per-series valueType)
                 let html = `<div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
                   <span style="width: 8px; height: 8px; border-radius: 50%; background: ${p.color}; flex-shrink: 0;"></span>
                   <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 12px;">${formatSeriesDisplayName(p.seriesName)}</span>
-                  <span style="font-weight: 600; color: hsl(var(--portal-text-primary)); font-size: 13px;">${formatTooltipValue(p.value)}</span>
+                  <span style="font-weight: 600; color: hsl(var(--portal-text-primary)); font-size: 13px;">${formatTooltipValue(p.value, p.seriesName)}</span>
                 </div>`;
 
                 // If paired prev exists, add secondary row with Prev + Delta
                 if (prev && typeof prev.value === "number" && typeof p.value === "number") {
                   const delta = p.value - prev.value;
-                  const deltaFormatted = formatTooltipValue(delta);
+                  const deltaFormatted = formatTooltipValue(delta, p.seriesName);
                   const deltaDisplay = delta > 0 ? `+${deltaFormatted}` : deltaFormatted;
                   const pct = (delta / prev.value) * 100;
                   const pctText = prev.value !== 0 ? ` (${pct > 0 ? '+' : ''}${pct.toFixed(1)}%)` : '';
 
                   html += `<div style="display: flex; align-items: center; gap: 8px; margin: 2px 0 6px 16px;">
                     <span style="width: 8px; height: 8px; border-radius: 50%; background: ${prev.color}; flex-shrink: 0; opacity: 0.6;"></span>
-                    <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 11px;">Prev: ${formatTooltipValue(prev.value)}</span>
+                    <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 11px;">Prev: ${formatTooltipValue(prev.value, p.seriesName)}</span>
                     <span style="font-weight: 500; color: hsl(var(--portal-text-secondary)); font-size: 11px;">Change: ${deltaDisplay}${pctText}</span>
                   </div>`;
                 }
@@ -518,7 +559,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     };
 
     return result;
-  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, yAxisNameLeft, yAxisNameRight, formatAxisValue, formatTooltipValue, showRollingAverage, rollingAveragePeriod, calculateRollingAverage, highlightedSeriesKeys]);
+  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, yAxisNameLeft, yAxisNameRight, formatAxisValue, formatAxisValueLeft, formatAxisValueRight, formatTooltipValue, showRollingAverage, rollingAveragePeriod, calculateRollingAverage, highlightedSeriesKeys]);
 
   const handleEvents = React.useMemo(() => {
     const events: Record<string, (params: any) => void> = {};
