@@ -141,6 +141,10 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
               shadowColor: "rgba(0, 0, 0, 0.3)",
             },
           },
+      // Prevent bars from dimming when other bars are hovered
+      ...(disableHoverEmphasis && {
+        blur: { itemStyle: { opacity: 1 } },
+      }),
     }));
 
     const axisConfig = {
@@ -206,7 +210,9 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
               -webkit-backdrop-filter: blur(12px);
               box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px hsl(var(--portal-border) / 0.1);
             `,
-            axisPointer: { type: "shadow" },
+            axisPointer: disableHoverEmphasis
+              ? { type: "none" }
+              : { type: "shadow" },
             formatter: (params: EChartsBarParams | EChartsBarParams[]) => {
               const items = Array.isArray(params) ? params : [params];
               if (items.length === 0) return "";
