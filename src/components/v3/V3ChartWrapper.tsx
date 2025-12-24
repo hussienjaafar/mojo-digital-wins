@@ -12,6 +12,8 @@ interface V3ChartWrapperProps {
   ariaLabel: string;
   /** Optional longer description for screen readers */
   description?: string;
+  /** Optional concise data summary for screen readers (e.g., "Latest: $5,000 spend, 120 conversions on Dec 15") */
+  dataSummary?: string;
   /** Optional actions to display in header (e.g., filters, toggles) */
   actions?: React.ReactNode;
   /** The chart component to render */
@@ -31,6 +33,7 @@ export const V3ChartWrapper: React.FC<V3ChartWrapperProps> = ({
   icon: Icon,
   ariaLabel,
   description,
+  dataSummary,
   actions,
   children,
   className,
@@ -39,6 +42,7 @@ export const V3ChartWrapper: React.FC<V3ChartWrapperProps> = ({
   loadingHeight = 280,
 }) => {
   const descriptionId = React.useId();
+  const summaryId = React.useId();
 
   if (isLoading) {
     return (
@@ -82,7 +86,11 @@ export const V3ChartWrapper: React.FC<V3ChartWrapperProps> = ({
         <div
           role="figure"
           aria-label={ariaLabel}
-          aria-describedby={description ? descriptionId : undefined}
+          aria-describedby={
+            [description && descriptionId, dataSummary && summaryId]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
           className={cn(
             "focus-visible:outline-none focus-visible:ring-2",
             "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2",
@@ -95,6 +103,11 @@ export const V3ChartWrapper: React.FC<V3ChartWrapperProps> = ({
           {description && (
             <p id={descriptionId} className="sr-only">
               {description}
+            </p>
+          )}
+          {dataSummary && (
+            <p id={summaryId} className="sr-only">
+              {dataSummary}
             </p>
           )}
         </div>

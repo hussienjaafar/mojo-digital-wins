@@ -240,8 +240,10 @@ const MetricChip: React.FC<MetricChipProps> = ({ metric, compact = false }) => {
       </div>
       <div
         className={cn(
-          "text-[hsl(var(--portal-text-muted))] uppercase tracking-wide",
-          compact ? "text-[9px]" : "text-[10px]"
+          "text-[hsl(var(--portal-text-muted))]",
+          compact
+            ? "text-[11px] capitalize tracking-normal"
+            : "text-[10px] uppercase tracking-wide"
         )}
       >
         {metric.label}
@@ -261,8 +263,17 @@ const getMobileSummaryMetrics = (
   sectionId: ChannelSection,
   metrics: SummaryMetric[]
 ): SummaryMetric[] => {
+  // For Meta: show ROAS if available, otherwise fall back to Conv
+  if (sectionId === "meta") {
+    const spend = metrics.find(m => m.label === "Spend");
+    const roas = metrics.find(m => m.label === "ROAS");
+    const conv = metrics.find(m => m.label === "Conv");
+    const secondMetric = roas && roas.value !== "N/A" ? roas : conv;
+    return [spend, secondMetric].filter((m): m is SummaryMetric => Boolean(m));
+  }
+
   const preferredLabelsBySection: Record<ChannelSection, string[]> = {
-    meta: ["Spend", "Conv"],
+    meta: ["Spend", "Conv"], // fallback, not used due to above
     sms: ["Raised", "ROI"],
     donations: ["Net", "Donors"],
   };
@@ -285,6 +296,10 @@ const getMobileSummaryMetrics = (
 
 export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate }: Props) {
   const [expandedSections, setExpandedSections] = useState<Set<ChannelSection>>(new Set());
+
+  // Lifted Meta Ads filter state to persist across collapse/expand
+  const [metaStatusFilter, setMetaStatusFilter] = useState<string>("all");
+  const [metaPerformanceFilter, setMetaPerformanceFilter] = useState<string>("all");
 
   // Use new TanStack Query hook
   const {
@@ -334,7 +349,15 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
             <V3LoadingState variant="table" />
           </div>
         }>
-          <MetaAdsMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />
+          <MetaAdsMetrics
+            organizationId={organizationId}
+            startDate={startDate}
+            endDate={endDate}
+            statusFilter={metaStatusFilter}
+            performanceFilter={metaPerformanceFilter}
+            onStatusFilterChange={setMetaStatusFilter}
+            onPerformanceFilterChange={setMetaPerformanceFilter}
+          />
         </Suspense>
       ),
       getSummary: (data) => {
@@ -403,7 +426,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
       hasData: (data) => data?.donations.hasData ?? false,
       getLastDataDate: (data) => data?.donations.lastDataDate ?? null,
     },
-  ], [organizationId, startDate, endDate, formatCurrency, formatInteger]);
+  ], [organizationId, startDate, endDate, formatCurrency, formatInteger, metaStatusFilter, metaPerformanceFilter]);
 
   // Show loading skeleton if no data and loading
   if (isLoading && !summaryData) {
@@ -445,7 +468,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
           const lastDataDate = section.getLastDataDate(summaryData);
           const channelIsStale = channelHasData && isChannelStale(section.id as ChannelType, lastDataDate, endDate);
           const formattedLastDataDate = formatLastDataDate(lastDataDate);
-          const showStatusChips = channelIsStale || (!channelHasData && !isLoading);
+          const showStatusChips = !isExpanded && (channelIsStale || (!channelHasData && !isLoading));
 
           return (
             <motion.div key={section.id} variants={cardVariants}>
@@ -469,6 +492,8 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                   )}
                   aria-expanded={isExpanded}
                   aria-controls={`section-content-${section.id}`}
+                  aria-labelledby={`section-heading-${section.id}`}
+                  aria-describedby={!isExpanded && channelIsStale && formattedLastDataDate ? `section-status-${section.id} section-status-mobile-${section.id}` : undefined}
                 >
                   <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                     {/* Icon with accent color */}
@@ -502,20 +527,21 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                         >
                           {section.title}
                         </h3>
-                        {/* Status chips: inline on desktop only */}
-                        {channelIsStale && formattedLastDataDate && (
+                        {/* Status chips: inline on desktop only, hidden when expanded */}
+                        {!isExpanded && channelIsStale && formattedLastDataDate && (
                           <span
+                            id={`section-status-${section.id}`}
                             className={cn(
                               "hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] shrink-0",
                               "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]"
                             )}
-                            title={`Last data: ${formattedLastDataDate}`}
                           >
                             <Clock className="h-2.5 w-2.5" aria-hidden="true" />
                             Stale
+                            <span className="sr-only">, last data {formattedLastDataDate}</span>
                           </span>
                         )}
-                        {!channelHasData && !isLoading && (
+                        {!isExpanded && !channelHasData && !isLoading && (
                           <span
                             className={cn(
                               "hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] shrink-0",
@@ -531,14 +557,15 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                         <div className="flex items-center gap-1.5 mt-0.5 sm:hidden">
                           {channelIsStale && formattedLastDataDate && (
                             <span
+                              id={`section-status-mobile-${section.id}`}
                               className={cn(
                                 "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]",
                                 "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]"
                               )}
-                              title={`Last data: ${formattedLastDataDate}`}
                             >
                               <Clock className="h-2.5 w-2.5" aria-hidden="true" />
                               Stale
+                              <span className="sr-only">, last data {formattedLastDataDate}</span>
                             </span>
                           )}
                           {!channelHasData && !isLoading && (
@@ -560,7 +587,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                   </div>
 
                   {/* Summary Metrics */}
-                  <div className="flex items-center gap-3 sm:gap-6 mr-3">
+                  <div className="flex items-center gap-2 sm:gap-6 mr-2 sm:mr-3 shrink-0">
                     {isLoading ? (
                       <div className="hidden sm:flex gap-4">
                         <MetricChipSkeleton />
@@ -611,25 +638,29 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                   </motion.div>
                 </button>
 
-                {/* Section Content - Expandable with Animation */}
-                <AnimatePresence initial={false}>
-                  {isExpanded && (
-                    <motion.div
-                      id={`section-content-${section.id}`}
-                      role="region"
-                      aria-labelledby={`section-heading-${section.id}`}
-                      variants={contentVariants}
-                      initial="collapsed"
-                      animate="expanded"
-                      exit="collapsed"
-                      className="overflow-hidden"
-                    >
-                      <div className="px-4 sm:px-6 pb-6 pt-2 border-t border-[hsl(var(--portal-border))]">
-                        {section.component}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {/* Section Content - Always mounted for a11y, animated visibility */}
+                <div
+                  id={`section-content-${section.id}`}
+                  role="region"
+                  aria-labelledby={`section-heading-${section.id}`}
+                  aria-hidden={!isExpanded}
+                >
+                  <AnimatePresence initial={false}>
+                    {isExpanded && (
+                      <motion.div
+                        variants={contentVariants}
+                        initial="collapsed"
+                        animate="expanded"
+                        exit="collapsed"
+                        className="overflow-hidden"
+                      >
+                        <div className="px-4 sm:px-6 pb-6 pt-2 border-t border-[hsl(var(--portal-border))]">
+                          {section.component}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </V3Card>
             </motion.div>
           );

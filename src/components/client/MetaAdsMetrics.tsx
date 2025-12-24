@@ -16,7 +16,7 @@ import { PortalBadge } from "@/components/portal/PortalBadge";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
 import { Target, MousePointer, Eye, DollarSign, TrendingUp, BarChart3, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { EChartsLineChart } from "@/components/charts/echarts";
 import { EChartsBarChart } from "@/components/charts/echarts";
 import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
@@ -28,6 +28,14 @@ type Props = {
   organizationId: string;
   startDate: string;
   endDate: string;
+  /** Optional controlled filter state for status filter */
+  statusFilter?: string;
+  /** Optional controlled filter state for performance filter */
+  performanceFilter?: string;
+  /** Callback when status filter changes (for controlled mode) */
+  onStatusFilterChange?: (value: string) => void;
+  /** Callback when performance filter changes (for controlled mode) */
+  onPerformanceFilterChange?: (value: string) => void;
 };
 
 const CHART_COLORS = {
@@ -50,9 +58,42 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
 };
 
-const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [performanceFilter, setPerformanceFilter] = useState<string>("all");
+const MetaAdsMetrics = ({
+  organizationId,
+  startDate,
+  endDate,
+  statusFilter: controlledStatusFilter,
+  performanceFilter: controlledPerformanceFilter,
+  onStatusFilterChange,
+  onPerformanceFilterChange,
+}: Props) => {
+  // Internal state for uncontrolled mode (e.g., Admin view)
+  const [internalStatusFilter, setInternalStatusFilter] = useState<string>("all");
+  const [internalPerformanceFilter, setInternalPerformanceFilter] = useState<string>("all");
+
+  // Breakdown chart metric toggle
+  const [breakdownMetric, setBreakdownMetric] = useState<"spend" | "conversions" | "roas">("spend");
+
+  // Use controlled props if provided, otherwise fall back to internal state
+  const statusFilter = controlledStatusFilter ?? internalStatusFilter;
+  const performanceFilter = controlledPerformanceFilter ?? internalPerformanceFilter;
+
+  const handleStatusFilterChange = (value: string) => {
+    if (onStatusFilterChange) {
+      onStatusFilterChange(value);
+    } else {
+      setInternalStatusFilter(value);
+    }
+  };
+
+  const handlePerformanceFilterChange = (value: string) => {
+    if (onPerformanceFilterChange) {
+      onPerformanceFilterChange(value);
+    } else {
+      setInternalPerformanceFilter(value);
+    }
+  };
+
   const isMobile = useIsMobile();
 
   // Use TanStack Query hook with dashboard date range
@@ -145,28 +186,81 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
     };
   }), [filteredCampaigns, metrics]);
 
-  // Prepare chart data for campaign breakdown (keep full names for tooltip)
+  // Prepare chart data for campaign breakdown (sorted by selected metric)
+  // Show fewer campaigns on mobile for better label readability
+  const maxBreakdownCampaigns = isMobile ? 5 : 8;
   const campaignBreakdownData = useMemo(() => tableData
-    .filter(c => c.spend > 0)
-    .sort((a, b) => b.spend - a.spend)
-    .slice(0, 8)
+    .filter(c => Number(c[breakdownMetric]) > 0)
+    .sort((a, b) => b[breakdownMetric] - a[breakdownMetric])
+    .slice(0, maxBreakdownCampaigns)
     .map(c => ({
       name: c.campaign_name,
-      spend: c.spend,
-      conversions: c.conversions,
-      roas: c.roas,
-    })), [tableData]);
+      value: c[breakdownMetric],
+    })), [tableData, breakdownMetric, maxBreakdownCampaigns]);
+
+  // Breakdown chart config based on selected metric
+  const breakdownChartConfig = useMemo(() => {
+    const configs = {
+      spend: {
+        title: "Campaign Breakdown - Spend",
+        description: "Top campaigns ranked by advertising spend",
+        ariaLabel: "Bar chart showing top campaigns by spend",
+        valueType: "currency" as const,
+        color: CHART_COLORS.spend,
+        seriesName: "Spend",
+      },
+      conversions: {
+        title: "Campaign Breakdown - Conversions",
+        description: "Top campaigns ranked by conversion count",
+        ariaLabel: "Bar chart showing top campaigns by conversions",
+        valueType: "number" as const,
+        color: CHART_COLORS.conversions,
+        seriesName: "Conversions",
+      },
+      roas: {
+        title: "Campaign Breakdown - ROAS",
+        description: "Top campaigns ranked by return on ad spend (ratio)",
+        ariaLabel: "Bar chart showing top campaigns by ROAS",
+        valueType: "number" as const,
+        color: "hsl(var(--portal-accent-purple))",
+        seriesName: "ROAS",
+      },
+    };
+    return configs[breakdownMetric];
+  }, [breakdownMetric]);
 
   // Truncate campaign names for axis labels only
   const truncateCampaignName = (name: string) =>
     name.length > 15 ? name.slice(0, 15) + '...' : name;
 
-  // Prepare trend chart data
+  // Prepare trend chart data (keep ISO date strings for time axis)
   const trendChartData = useMemo(() => dailyMetrics.map(d => ({
-    date: format(parseISO(d.date), 'MMM d'),
+    date: d.date,
     spend: d.spend,
     conversions: d.conversions,
   })), [dailyMetrics]);
+
+  // SR-only data summary for Performance Trend chart
+  const trendDataSummary = useMemo(() => {
+    if (trendChartData.length === 0) return undefined;
+    const latest = trendChartData[trendChartData.length - 1];
+    const formattedDate = format(new Date(latest.date), "MMM d, yyyy");
+    const spendFormatted = `$${latest.spend.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    return `Latest data point: ${spendFormatted} spend, ${latest.conversions.toLocaleString()} conversions on ${formattedDate}.`;
+  }, [trendChartData]);
+
+  // SR-only data summary for Campaign Breakdown chart
+  const breakdownDataSummary = useMemo(() => {
+    if (campaignBreakdownData.length === 0) return undefined;
+    const top = campaignBreakdownData[0];
+    const metricLabel = breakdownChartConfig.seriesName;
+    const valueFormatted = breakdownMetric === "spend"
+      ? `$${top.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+      : breakdownMetric === "roas"
+      ? `${top.value.toFixed(2)}x`
+      : top.value.toLocaleString();
+    return `Showing ${metricLabel}. Top campaign: ${top.name} with ${valueFormatted}.`;
+  }, [campaignBreakdownData, breakdownChartConfig.seriesName, breakdownMetric]);
 
   // Sparkline data for KPIs
   const spendSparkline = useMemo(() => dailyMetrics.slice(-14).map(d => d.spend), [dailyMetrics]);
@@ -213,9 +307,12 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
   return (
     <div className="space-y-[var(--portal-space-lg)]">
-      {/* Data Freshness Indicator */}
-      <div className="flex justify-end">
-        <MetaDataFreshnessIndicator organizationId={organizationId} />
+      {/* Panel Header Row */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-[hsl(var(--portal-border)/0.5)]">
+        <h4 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))]">
+          Meta Ads Overview
+        </h4>
+        <MetaDataFreshnessIndicator organizationId={organizationId} compact />
       </div>
 
       {/* V3 KPI Cards with Period Comparison */}
@@ -287,52 +384,141 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
       {/* Performance Trend Chart */}
       {trendChartData.length > 0 && (
-        <V3ChartWrapper
-          title="Performance Trend"
-          icon={TrendingUp}
-          ariaLabel="Meta Ads performance trend chart showing spend and conversions over time"
-          description="Line chart displaying daily spend and conversion trends for Meta advertising campaigns"
-          accent="blue"
-        >
-          <EChartsLineChart
-            data={trendChartData}
-            xAxisKey="date"
-            series={[
-              { dataKey: "spend", name: "Spend", color: CHART_COLORS.spend, type: "area", valueType: "currency" },
-              { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.conversions, yAxisIndex: 1, valueType: "number" },
-            ]}
-            valueType="number"
-            yAxisValueTypeLeft="currency"
-            yAxisValueTypeRight="number"
-            dualYAxis
-            showZoom={!isMobile}
-            height={isMobile ? 240 : 280}
-          />
-        </V3ChartWrapper>
+        <div className="space-y-2">
+          <V3ChartWrapper
+            title="Performance Trend"
+            icon={TrendingUp}
+            ariaLabel="Meta Ads performance trend chart showing spend and conversions over time"
+            description="Line chart displaying daily spend and conversion trends for Meta advertising campaigns"
+            dataSummary={trendDataSummary}
+            accent="blue"
+          >
+            <EChartsLineChart
+              data={trendChartData}
+              xAxisKey="date"
+              xAxisType="time"
+              series={[
+                { dataKey: "spend", name: "Spend", color: CHART_COLORS.spend, type: "area", valueType: "currency" },
+                { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.conversions, yAxisIndex: 1, valueType: "number" },
+              ]}
+              valueType="number"
+              yAxisNameLeft="Spend ($)"
+              yAxisNameRight="Conversions"
+              yAxisValueTypeLeft="currency"
+              yAxisValueTypeRight="number"
+              dualYAxis
+              showZoom={!isMobile}
+              height={isMobile ? 240 : 280}
+            />
+          </V3ChartWrapper>
+          {/* Collapsible data table */}
+          <details className="group">
+            <summary className="cursor-pointer text-xs text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-text-secondary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-1 rounded px-1 py-0.5 w-fit transition-colors">
+              View data table
+            </summary>
+            <div className="mt-2 overflow-x-auto rounded-lg border border-[hsl(var(--portal-border))]">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
+                    <th className="px-3 py-2 text-left font-medium text-[hsl(var(--portal-text-secondary))]">Date</th>
+                    <th className="px-3 py-2 text-right font-medium text-[hsl(var(--portal-text-secondary))]">Spend</th>
+                    <th className="px-3 py-2 text-right font-medium text-[hsl(var(--portal-text-secondary))]">Conversions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trendChartData.map((row, i) => (
+                    <tr key={i} className="border-b border-[hsl(var(--portal-border)/0.5)] last:border-b-0">
+                      <td className="px-3 py-2 text-[hsl(var(--portal-text-primary))] whitespace-nowrap">
+                        {format(new Date(row.date), "MMM d, yyyy")}
+                      </td>
+                      <td className="px-3 py-2 text-right text-[hsl(var(--portal-text-primary))] tabular-nums">
+                        ${row.spend.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </td>
+                      <td className="px-3 py-2 text-right text-[hsl(var(--portal-text-primary))] tabular-nums">
+                        {row.conversions.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
       )}
 
       {/* Campaign Breakdown Chart */}
       {campaignBreakdownData.length > 0 && (
-        <V3ChartWrapper
-          title="Campaign Breakdown"
-          icon={BarChart3}
-          ariaLabel="Campaign breakdown bar chart showing spend and conversions by campaign"
-          description="Bar chart comparing spend and conversions across top performing Meta campaigns"
-          accent="blue"
-        >
-          <EChartsBarChart
-            data={campaignBreakdownData}
-            xAxisKey="name"
-            series={[
-              { dataKey: "spend", name: "Spend", color: CHART_COLORS.spend, valueType: "currency" },
-              { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.conversions, valueType: "number" },
-            ]}
-            valueType="number"
-            axisValueType="number"
-            xAxisLabelFormatter={truncateCampaignName}
-            height={isMobile ? 240 : 280}
-          />
-        </V3ChartWrapper>
+        <div className="space-y-2">
+          <V3ChartWrapper
+            title={breakdownChartConfig.title}
+            icon={BarChart3}
+            ariaLabel={breakdownChartConfig.ariaLabel}
+            description={breakdownChartConfig.description}
+            dataSummary={breakdownDataSummary}
+            accent="blue"
+            actions={
+              <Select value={breakdownMetric} onValueChange={(v) => setBreakdownMetric(v as typeof breakdownMetric)}>
+                <SelectTrigger className="w-[130px] h-8 text-xs" aria-label="Select breakdown metric">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="spend">Spend</SelectItem>
+                  <SelectItem value="conversions">Conversions</SelectItem>
+                  <SelectItem value="roas">ROAS</SelectItem>
+                </SelectContent>
+              </Select>
+            }
+          >
+            <EChartsBarChart
+              data={campaignBreakdownData}
+              xAxisKey="name"
+              series={[
+                {
+                  dataKey: "value",
+                  name: breakdownChartConfig.seriesName,
+                  color: breakdownChartConfig.color,
+                  valueType: breakdownChartConfig.valueType,
+                },
+              ]}
+              valueType={breakdownChartConfig.valueType}
+              axisValueType={breakdownChartConfig.valueType}
+              xAxisLabelFormatter={truncateCampaignName}
+              height={isMobile ? 240 : 280}
+            />
+          </V3ChartWrapper>
+          {/* Collapsible data table */}
+          <details className="group">
+            <summary className="cursor-pointer text-xs text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-text-secondary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-1 rounded px-1 py-0.5 w-fit transition-colors">
+              View data table
+            </summary>
+            <div className="mt-2 overflow-x-auto rounded-lg border border-[hsl(var(--portal-border))]">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
+                    <th className="px-3 py-2 text-left font-medium text-[hsl(var(--portal-text-secondary))]">Campaign</th>
+                    <th className="px-3 py-2 text-right font-medium text-[hsl(var(--portal-text-secondary))]">{breakdownChartConfig.seriesName}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaignBreakdownData.map((row, i) => (
+                    <tr key={i} className="border-b border-[hsl(var(--portal-border)/0.5)] last:border-b-0">
+                      <td className="px-3 py-2 text-[hsl(var(--portal-text-primary))]">
+                        {row.name}
+                      </td>
+                      <td className="px-3 py-2 text-right text-[hsl(var(--portal-text-primary))] tabular-nums">
+                        {breakdownMetric === "spend"
+                          ? `$${row.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                          : breakdownMetric === "roas"
+                          ? `${row.value.toFixed(2)}x`
+                          : row.value.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
       )}
 
       {/* Campaign Table */}
@@ -342,7 +528,7 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
             <V3CardTitle>Campaign Performance</V3CardTitle>
             <div className="flex flex-wrap items-center gap-2">
               <Filter className="hidden sm:block h-4 w-4 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                 <SelectTrigger className="w-full sm:w-[120px] h-8 text-xs" aria-label="Filter by status">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -352,7 +538,7 @@ const MetaAdsMetrics = ({ organizationId, startDate, endDate }: Props) => {
                   <SelectItem value="PAUSED">Paused</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={performanceFilter} onValueChange={setPerformanceFilter}>
+              <Select value={performanceFilter} onValueChange={handlePerformanceFilterChange}>
                 <SelectTrigger className="w-full sm:w-[130px] h-8 text-xs" aria-label="Filter by performance">
                   <SelectValue placeholder="Performance" />
                 </SelectTrigger>

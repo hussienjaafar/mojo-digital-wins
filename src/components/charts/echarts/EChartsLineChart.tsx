@@ -231,12 +231,31 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     return formatTooltipValueByType(value, seriesType ?? valueType);
   }, [formatTooltipValueByType, seriesValueTypeMap, valueType]);
 
+  // Detect if date range crosses years (for time axis formatting)
+  const crossesYears = React.useMemo(() => {
+    if (xAxisType !== "time" || data.length < 2) return false;
+    const firstDate = new Date(data[0][xAxisKey]);
+    const lastDate = new Date(data[data.length - 1][xAxisKey]);
+    return firstDate.getFullYear() !== lastDate.getFullYear();
+  }, [data, xAxisKey, xAxisType]);
+
+  // Format date for time axis display
+  const formatTimeAxisDate = React.useCallback((value: string | number | Date) => {
+    const date = value instanceof Date ? value : new Date(value);
+    return crossesYears
+      ? format(date, "MMM d, yyyy")
+      : format(date, "MMM d");
+  }, [crossesYears]);
+
   const option = React.useMemo<EChartsOption>(() => {
-    const xAxisData = data.map((d) => d[xAxisKey]);
+    const xAxisData = xAxisType === "time" ? undefined : data.map((d) => d[xAxisKey]);
 
     const seriesConfig = series.flatMap((s, index) => {
       const baseColor = s.color || colorPalette[index % colorPalette.length];
-      const seriesData = data.map((d) => d[s.dataKey]);
+      // For time axis, build [x, y] pairs; otherwise just values
+      const seriesData = xAxisType === "time"
+        ? data.map((d) => [d[xAxisKey], d[s.dataKey]])
+        : data.map((d) => d[s.dataKey]);
 
       // Determine if this series should be dimmed based on highlighted KPI
       const seriesKey = s.seriesKey;
@@ -414,8 +433,11 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
             formatter: (params: any) => {
               if (!Array.isArray(params) || params.length === 0) return "";
 
-              // Header: primary text color, semibold
-              const header = `<div style="font-weight: 600; margin-bottom: 8px; color: hsl(var(--portal-text-primary)); font-size: 13px;">${params[0].axisValue}</div>`;
+              // Header: format date for time axis, otherwise use axisValue directly
+              const headerValue = xAxisType === "time"
+                ? formatTimeAxisDate(params[0].axisValue)
+                : params[0].axisValue;
+              const header = `<div style="font-weight: 600; margin-bottom: 8px; color: hsl(var(--portal-text-primary)); font-size: 13px;">${headerValue}</div>`;
 
               // Normalize series name for matching (strip suffixes)
               const normalizeKey = (name: string) =>
@@ -504,7 +526,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
       },
       xAxis: {
         type: xAxisType,
-        data: xAxisData,
+        ...(xAxisData && { data: xAxisData }),
         axisLine: {
           lineStyle: {
             color: "hsl(var(--portal-border))",
@@ -516,6 +538,9 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
         axisLabel: {
           color: "hsl(var(--portal-text-muted))",
           fontSize: 11,
+          ...(xAxisType === "time" && {
+            formatter: (value: number) => formatTimeAxisDate(value),
+          }),
         },
       },
       yAxis: yAxes,
@@ -559,7 +584,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     };
 
     return result;
-  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, yAxisNameLeft, yAxisNameRight, formatAxisValue, formatAxisValueLeft, formatAxisValueRight, formatTooltipValue, showRollingAverage, rollingAveragePeriod, calculateRollingAverage, highlightedSeriesKeys]);
+  }, [data, xAxisKey, series, showLegend, showTooltip, showZoom, showBrush, valueType, xAxisType, yAxisConfig, dualYAxis, yAxisNameLeft, yAxisNameRight, formatAxisValue, formatAxisValueLeft, formatAxisValueRight, formatTooltipValue, formatTimeAxisDate, showRollingAverage, rollingAveragePeriod, calculateRollingAverage, highlightedSeriesKeys]);
 
   const handleEvents = React.useMemo(() => {
     const events: Record<string, (params: any) => void> = {};
