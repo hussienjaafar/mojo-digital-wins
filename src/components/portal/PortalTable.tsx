@@ -175,10 +175,10 @@ export function PortalTable<T extends Record<string, any>>({
                 
                 return (
                   <div key={String(column.key)} className="flex justify-between items-start gap-3">
-                    <span className="text-xs font-medium portal-text-secondary uppercase tracking-wide flex-shrink-0">
+                    <span className="text-xs font-medium portal-text-secondary uppercase tracking-wide shrink-0">
                       {label}
                     </span>
-                    <div className="text-sm portal-text-primary text-right flex-1">
+                    <div className="text-sm portal-text-primary text-right min-w-0 break-words line-clamp-2">
                       {column.render ? column.render(value, row) : value}
                     </div>
                   </div>

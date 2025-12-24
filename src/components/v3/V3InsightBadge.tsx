@@ -63,21 +63,23 @@ export const V3InsightBadge: React.FC<V3InsightBadgeProps> = ({
   const content = (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
+        "inline-flex items-start gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border",
+        "max-w-full min-w-0",
         config.bgColor,
         config.textColor,
         config.borderColor,
         className
       )}
     >
-      <Icon className="h-3 w-3" aria-hidden="true" />
-      {children}
+      <Icon className="h-3 w-3 shrink-0 mt-0.5" aria-hidden="true" />
+      <span className="min-w-0 break-words">{children}</span>
     </span>
   );
 
   if (animate) {
     return (
       <motion.span
+        className="min-w-0 max-w-full"
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.2 }}

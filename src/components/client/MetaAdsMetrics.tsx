@@ -221,7 +221,7 @@ const MetaAdsMetrics = ({
         title: "Campaign Breakdown - ROAS",
         description: "Top campaigns ranked by return on ad spend (ratio)",
         ariaLabel: "Bar chart showing top campaigns by ROAS",
-        valueType: "number" as const,
+        valueType: "ratio" as const,
         color: "hsl(var(--portal-accent-purple))",
         seriesName: "ROAS",
       },
@@ -229,9 +229,16 @@ const MetaAdsMetrics = ({
     return configs[breakdownMetric];
   }, [breakdownMetric]);
 
-  // Truncate campaign names for axis labels only
-  const truncateCampaignName = (name: string) =>
-    name.length > 15 ? name.slice(0, 15) + '...' : name;
+  // Truncate campaign names for axis labels only (desktop)
+  // On mobile horizontal bars, allow longer labels for readability
+  const truncateCampaignName = useMemo(() => {
+    if (isMobile) {
+      // Mobile: longer limit for horizontal bar labels (2 lines ~25 chars each)
+      return (name: string) => name.length > 50 ? name.slice(0, 47) + '...' : name;
+    }
+    // Desktop: shorter truncation for vertical bar x-axis
+    return (name: string) => name.length > 15 ? name.slice(0, 15) + '...' : name;
+  }, [isMobile]);
 
   // Prepare trend chart data (keep ISO date strings for time axis)
   const trendChartData = useMemo(() => dailyMetrics.map(d => ({
@@ -239,6 +246,23 @@ const MetaAdsMetrics = ({
     spend: d.spend,
     conversions: d.conversions,
   })), [dailyMetrics]);
+
+  // Downsampled trend data for mobile chart display (10-12 points)
+  // Keep full data for table and screen reader summaries
+  const trendChartDisplayData = useMemo(() => {
+    if (!isMobile || trendChartData.length <= 12) {
+      return trendChartData;
+    }
+    // Evenly sample ~12 points from the full dataset
+    const targetCount = 12;
+    const step = (trendChartData.length - 1) / (targetCount - 1);
+    const sampled: typeof trendChartData = [];
+    for (let i = 0; i < targetCount; i++) {
+      const idx = Math.round(i * step);
+      sampled.push(trendChartData[idx]);
+    }
+    return sampled;
+  }, [isMobile, trendChartData]);
 
   // SR-only data summary for Performance Trend chart
   const trendDataSummary = useMemo(() => {
@@ -394,7 +418,7 @@ const MetaAdsMetrics = ({
             accent="blue"
           >
             <EChartsLineChart
-              data={trendChartData}
+              data={trendChartDisplayData}
               xAxisKey="date"
               xAxisType="time"
               series={[
@@ -484,6 +508,7 @@ const MetaAdsMetrics = ({
               axisValueType={breakdownChartConfig.valueType}
               xAxisLabelFormatter={truncateCampaignName}
               height={isMobile ? 240 : 280}
+              horizontal={isMobile}
               disableHoverEmphasis
             />
           </V3ChartWrapper>

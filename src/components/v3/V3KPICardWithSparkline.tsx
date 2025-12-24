@@ -146,7 +146,10 @@ export const V3KPICardWithSparkline: React.FC<V3KPICardWithSparklineProps> = ({
       </div>
       
       <div
-        className="text-xl font-bold text-[hsl(var(--portal-text-primary))] leading-tight"
+        className={cn(
+          "text-lg sm:text-xl font-bold text-[hsl(var(--portal-text-primary))] leading-tight",
+          "tabular-nums min-w-0 break-words line-clamp-2 sm:line-clamp-1"
+        )}
         aria-label={`${label}: ${value}`}
       >
         {value}

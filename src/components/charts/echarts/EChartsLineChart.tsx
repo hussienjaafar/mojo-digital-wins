@@ -538,6 +538,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
         axisLabel: {
           color: "hsl(var(--portal-text-muted))",
           fontSize: 11,
+          hideOverlap: true,
           ...(xAxisType === "time" && {
             formatter: (value: number) => formatTimeAxisDate(value),
           }),

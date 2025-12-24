@@ -7,9 +7,10 @@ import {
   formatCurrency,
   formatNumber,
   formatPercent,
+  formatRatio,
 } from "@/lib/chart-formatters";
 
-export type BarValueFormatType = "number" | "currency" | "percent";
+export type BarValueFormatType = "number" | "currency" | "percent" | "ratio";
 
 /** ECharts callback params for bar chart events */
 interface EChartsBarParams {
@@ -93,6 +94,9 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
     if (type === "percent") {
       return formatPercent(value, 0);
     }
+    if (type === "ratio") {
+      return formatRatio(value, 1); // 1 decimal for axis (e.g., 2.4x)
+    }
     return formatNumber(value, true); // compact=true
   }, [axisValueType, valueType]);
 
@@ -105,6 +109,9 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
     }
     if (type === "percent") {
       return formatPercent(value, 1);
+    }
+    if (type === "ratio") {
+      return formatRatio(value, 2); // 2 decimals for tooltip (e.g., 2.42x)
     }
     return formatNumber(value, false); // compact=false -> 12,345
   }, [seriesValueTypeMap, valueType]);
@@ -186,6 +193,12 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
         ...(xAxisLabelFormatter && {
           formatter: xAxisLabelFormatter,
         }),
+        // For horizontal bars (category on y-axis), allow label wrapping
+        ...(horizontal && {
+          width: 100,
+          overflow: "break" as const,
+          lineHeight: 14,
+        }),
       },
     };
 
@@ -245,7 +258,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
           }
         : undefined,
       grid: {
-        left: 12,
+        left: horizontal ? 110 : 12,
         right: 12,
         top: 20,
         bottom: showLegend ? 40 : 12,
