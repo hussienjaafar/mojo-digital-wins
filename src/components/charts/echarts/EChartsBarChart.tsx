@@ -46,6 +46,8 @@ export interface EChartsBarChartProps {
   xAxisLabelFormatter?: (value: string) => string;
   horizontal?: boolean;
   enableCrossHighlight?: boolean;
+  /** Disable hover emphasis to prevent bars from disappearing on hover */
+  disableHoverEmphasis?: boolean;
   onBarClick?: (params: { dataIndex: number; seriesName: string; value: unknown; name: string }) => void;
 }
 
@@ -66,6 +68,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
   xAxisLabelFormatter,
   horizontal = false,
   enableCrossHighlight = false,
+  disableHoverEmphasis = false,
   onBarClick,
 }) => {
   const { setHoveredDataPoint, hoveredDataPoint } = useChartInteractionStore();
@@ -129,13 +132,15 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
       itemStyle: {
         borderRadius: horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0],
       },
-      emphasis: {
-        focus: "series" as const,
-        itemStyle: {
-          shadowBlur: 10,
-          shadowColor: "rgba(0, 0, 0, 0.3)",
-        },
-      },
+      emphasis: disableHoverEmphasis
+        ? { disabled: true }
+        : {
+            focus: "series" as const,
+            itemStyle: {
+              shadowBlur: 10,
+              shadowColor: "rgba(0, 0, 0, 0.3)",
+            },
+          },
     }));
 
     const axisConfig = {
@@ -184,6 +189,9 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
       animation: true,
       animationDuration: 500,
       animationEasing: "cubicOut",
+      ...(disableHoverEmphasis && {
+        axisPointer: { triggerEmphasis: false },
+      }),
       tooltip: showTooltip
         ? {
             trigger: "axis",
@@ -241,7 +249,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
       yAxis: horizontal ? categoryAxisConfig : valueAxisConfig,
       series: seriesConfig,
     };
-  }, [data, xAxisKey, series, showLegend, showTooltip, horizontal, formatAxisValue, formatTooltipValue, xAxisLabelFormatter, enableCrossHighlight, hoveredDataPoint]);
+  }, [data, xAxisKey, series, showLegend, showTooltip, horizontal, formatAxisValue, formatTooltipValue, xAxisLabelFormatter, enableCrossHighlight, disableHoverEmphasis, hoveredDataPoint]);
 
   const handleEvents = React.useMemo(() => {
     const events: Record<string, (params: EChartsBarParams) => void> = {};

@@ -484,6 +484,7 @@ const MetaAdsMetrics = ({
               axisValueType={breakdownChartConfig.valueType}
               xAxisLabelFormatter={truncateCampaignName}
               height={isMobile ? 240 : 280}
+              disableHoverEmphasis
             />
           </V3ChartWrapper>
           {/* Collapsible data table */}
