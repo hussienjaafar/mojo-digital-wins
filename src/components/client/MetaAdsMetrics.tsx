@@ -550,12 +550,12 @@ const MetaAdsMetrics = ({
       {/* Campaign Table */}
       <V3Card accent="blue">
         <V3CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <V3CardTitle>Campaign Performance</V3CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <V3CardTitle className="min-w-0 line-clamp-2 md:line-clamp-1">Campaign Performance</V3CardTitle>
             <div className="flex flex-wrap items-center gap-2">
-              <Filter className="hidden sm:block h-4 w-4 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
+              <Filter className="hidden md:block h-4 w-4 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
               <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-                <SelectTrigger className="w-full sm:w-[120px] h-8 text-xs" aria-label="Filter by status">
+                <SelectTrigger className="w-full md:w-[120px] h-8 text-xs" aria-label="Filter by status">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -565,7 +565,7 @@ const MetaAdsMetrics = ({
                 </SelectContent>
               </Select>
               <Select value={performanceFilter} onValueChange={handlePerformanceFilterChange}>
-                <SelectTrigger className="w-full sm:w-[130px] h-8 text-xs" aria-label="Filter by performance">
+                <SelectTrigger className="w-full md:w-[130px] h-8 text-xs" aria-label="Filter by performance">
                   <SelectValue placeholder="Performance" />
                 </SelectTrigger>
                 <SelectContent>
@@ -586,6 +586,7 @@ const MetaAdsMetrics = ({
                 key: "campaign_name",
                 label: "Campaign",
                 sortable: true,
+                mobileValueClassName: "text-left",
                 render: (value) => <span className="font-medium text-[hsl(var(--portal-text-primary))]">{value}</span>,
               },
               {

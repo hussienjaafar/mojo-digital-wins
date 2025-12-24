@@ -10,6 +10,8 @@ interface Column<T> {
   className?: string;
   mobileLabel?: string; // Custom label for mobile view
   hiddenOnMobile?: boolean; // Hide this column on mobile
+  /** Custom className for mobile value container (e.g., "text-left" for left-aligned text) */
+  mobileValueClassName?: string;
 }
 
 interface PortalTableProps<T> {
@@ -178,7 +180,10 @@ export function PortalTable<T extends Record<string, any>>({
                     <span className="text-xs font-medium portal-text-secondary uppercase tracking-wide shrink-0">
                       {label}
                     </span>
-                    <div className="text-sm portal-text-primary text-right min-w-0 break-words line-clamp-2">
+                    <div className={cn(
+                      "text-sm portal-text-primary text-right min-w-0 break-words line-clamp-2",
+                      column.mobileValueClassName
+                    )}>
                       {column.render ? column.render(value, row) : value}
                     </div>
                   </div>
