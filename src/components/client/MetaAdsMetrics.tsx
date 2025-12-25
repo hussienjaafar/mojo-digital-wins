@@ -188,7 +188,7 @@ const MetaAdsMetrics = ({
 
   // Prepare chart data for campaign breakdown (sorted by selected metric)
   // Show fewer campaigns on mobile for better label readability
-  const maxBreakdownCampaigns = isMobile ? 5 : 8;
+  const maxBreakdownCampaigns = isMobile ? 4 : 8;
   const campaignBreakdownData = useMemo(() => tableData
     .filter(c => Number(c[breakdownMetric]) > 0)
     .sort((a, b) => b[breakdownMetric] - a[breakdownMetric])
@@ -229,12 +229,21 @@ const MetaAdsMetrics = ({
     return configs[breakdownMetric];
   }, [breakdownMetric]);
 
-  // Truncate campaign names for axis labels only (desktop)
-  // On mobile horizontal bars, allow longer labels for readability
+  // Truncate campaign names for axis labels only
+  // Mobile: 2-line wrap with \n, truncate second line if needed
+  // Desktop: single line truncated to 15 chars
   const truncateCampaignName = useMemo(() => {
     if (isMobile) {
-      // Mobile: longer limit for horizontal bar labels (2 lines ~25 chars each)
-      return (name: string) => name.length > 50 ? name.slice(0, 47) + '...' : name;
+      // Mobile: wrap to 2 lines (~20 chars each), add ... on line 2 if needed
+      return (name: string) => {
+        if (name.length <= 20) return name;
+        const line1 = name.slice(0, 20);
+        const remaining = name.slice(20);
+        if (remaining.length <= 20) {
+          return `${line1}\n${remaining}`;
+        }
+        return `${line1}\n${remaining.slice(0, 17)}...`;
+      };
     }
     // Desktop: shorter truncation for vertical bar x-axis
     return (name: string) => name.length > 15 ? name.slice(0, 15) + '...' : name;
@@ -507,7 +516,7 @@ const MetaAdsMetrics = ({
               valueType={breakdownChartConfig.valueType}
               axisValueType={breakdownChartConfig.valueType}
               xAxisLabelFormatter={truncateCampaignName}
-              height={isMobile ? 240 : 280}
+              height={isMobile ? 300 : 280}
               horizontal={isMobile}
               disableHoverEmphasis
             />

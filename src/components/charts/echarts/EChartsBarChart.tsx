@@ -193,10 +193,10 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
         ...(xAxisLabelFormatter && {
           formatter: xAxisLabelFormatter,
         }),
-        // For horizontal bars (category on y-axis), allow label wrapping
+        // For horizontal bars (category on y-axis), support 2-line labels via \n
         ...(horizontal && {
-          width: 100,
-          overflow: "break" as const,
+          width: 140,
+          overflow: "truncate" as const,
           lineHeight: 14,
         }),
       },
@@ -258,7 +258,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
           }
         : undefined,
       grid: {
-        left: horizontal ? 110 : 12,
+        left: horizontal ? 150 : 12,
         right: 12,
         top: 20,
         bottom: showLegend ? 40 : 12,
