@@ -198,6 +198,8 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
           width: 140,
           overflow: "truncate" as const,
           lineHeight: 14,
+          align: "right" as const,
+          interval: 0, // Show all labels, no auto-skipping
         }),
       },
     };

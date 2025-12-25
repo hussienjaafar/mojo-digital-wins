@@ -230,15 +230,17 @@ const MetaAdsMetrics = ({
   }, [breakdownMetric]);
 
   // Truncate campaign names for axis labels only
-  // Mobile: 2-line wrap with \n, truncate second line if needed
+  // Mobile: normalize underscores/dashes, 2-line wrap with \n, truncate line 2 if needed
   // Desktop: single line truncated to 15 chars
   const truncateCampaignName = useMemo(() => {
     if (isMobile) {
-      // Mobile: wrap to 2 lines (~20 chars each), add ... on line 2 if needed
+      // Mobile: normalize and wrap to 2 lines (~20 chars each)
       return (name: string) => {
-        if (name.length <= 20) return name;
-        const line1 = name.slice(0, 20);
-        const remaining = name.slice(20);
+        // Normalize underscores and dashes to spaces for readability
+        const normalized = name.replace(/[_-]/g, ' ');
+        if (normalized.length <= 20) return normalized;
+        const line1 = normalized.slice(0, 20);
+        const remaining = normalized.slice(20);
         if (remaining.length <= 20) {
           return `${line1}\n${remaining}`;
         }
