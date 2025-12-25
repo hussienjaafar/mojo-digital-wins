@@ -230,21 +230,45 @@ const MetaAdsMetrics = ({
   }, [breakdownMetric]);
 
   // Truncate campaign names for axis labels only
-  // Mobile: normalize underscores/dashes, 2-line wrap with \n, truncate line 2 if needed
+  // Mobile: word-wrap to 2 lines (~12 chars each), normalize underscores/dashes
   // Desktop: single line truncated to 15 chars
   const truncateCampaignName = useMemo(() => {
     if (isMobile) {
-      // Mobile: normalize and wrap to 2 lines (~20 chars each)
+      // Mobile: word-wrap to 2 lines with ~12 chars per line
       return (name: string) => {
         // Normalize underscores and dashes to spaces for readability
         const normalized = name.replace(/[_-]/g, ' ');
-        if (normalized.length <= 20) return normalized;
-        const line1 = normalized.slice(0, 20);
-        const remaining = normalized.slice(20);
-        if (remaining.length <= 20) {
-          return `${line1}\n${remaining}`;
+        const words = normalized.split(' ');
+        let line1 = '';
+        let line2 = '';
+        let onLine2 = false;
+
+        for (const word of words) {
+          if (!onLine2) {
+            if ((line1 + ' ' + word).trim().length <= 12) {
+              line1 = (line1 + ' ' + word).trim();
+            } else if (line1 === '') {
+              // First word is too long, slice it
+              line1 = word.slice(0, 12);
+              line2 = word.slice(12);
+              onLine2 = true;
+            } else {
+              onLine2 = true;
+              line2 = word;
+            }
+          } else {
+            if ((line2 + ' ' + word).trim().length <= 12) {
+              line2 = (line2 + ' ' + word).trim();
+            } else {
+              // Overflow on line 2 - truncate with ...
+              const remaining = (line2 + ' ' + word).trim();
+              line2 = remaining.slice(0, 9) + '...';
+              break;
+            }
+          }
         }
-        return `${line1}\n${remaining.slice(0, 17)}...`;
+
+        return line2 ? `${line1}\n${line2}` : line1;
       };
     }
     // Desktop: shorter truncation for vertical bar x-axis
