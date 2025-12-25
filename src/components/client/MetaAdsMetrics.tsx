@@ -518,6 +518,7 @@ const MetaAdsMetrics = ({
               xAxisLabelFormatter={truncateCampaignName}
               height={isMobile ? 300 : 280}
               horizontal={isMobile}
+              showLegend={!isMobile}
               disableHoverEmphasis
             />
           </V3ChartWrapper>

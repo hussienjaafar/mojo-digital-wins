@@ -583,35 +583,31 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                       <p className="text-xs sm:text-sm text-[hsl(var(--portal-text-secondary))] mt-0.5 truncate hidden sm:block">
                         {section.description}
                       </p>
+                      {/* Mobile: Show two key metrics below title to avoid collision */}
+                      {!isLoading && mobileSummaryMetrics && (
+                        <div className="flex gap-3 mt-1.5 sm:hidden">
+                          {mobileSummaryMetrics.map((metric, i) => (
+                            <MetricChip key={`${section.id}-mobile-${metric.label}-${i}`} metric={metric} compact />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Summary Metrics */}
-                  <div className="flex items-center gap-2 sm:gap-6 mr-2 sm:mr-3 shrink-0">
+                  {/* Summary Metrics - Desktop only */}
+                  <div className="hidden sm:flex items-center gap-6 mr-3 shrink-0">
                     {isLoading ? (
-                      <div className="hidden sm:flex gap-4">
+                      <div className="flex gap-4">
                         <MetricChipSkeleton />
                         <MetricChipSkeleton />
                         <MetricChipSkeleton />
                       </div>
                     ) : summaryMetrics ? (
-                      <>
-                        {/* Desktop: Show all metrics */}
-                        <div className="hidden sm:flex gap-4 sm:gap-6">
-                          {summaryMetrics.map((metric, i) => (
-                            <MetricChip key={i} metric={metric} />
-                          ))}
-                        </div>
-
-                        {/* Mobile: Show two key metrics per channel */}
-                        {mobileSummaryMetrics && (
-                          <div className="flex gap-3 sm:hidden">
-                            {mobileSummaryMetrics.map((metric, i) => (
-                              <MetricChip key={`${section.id}-mobile-${metric.label}-${i}`} metric={metric} compact />
-                            ))}
-                          </div>
-                        )}
-                      </>
+                      <div className="flex gap-4 sm:gap-6">
+                        {summaryMetrics.map((metric, i) => (
+                          <MetricChip key={i} metric={metric} />
+                        ))}
+                      </div>
                     ) : null}
                   </div>
 
