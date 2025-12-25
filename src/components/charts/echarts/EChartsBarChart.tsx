@@ -195,8 +195,8 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
         }),
         // For horizontal bars (category on y-axis), support 2-line labels via \n
         ...(horizontal && {
-          width: 140,
-          overflow: "truncate" as const,
+          width: 150,
+          overflow: "break" as const,
           lineHeight: 14,
           align: "right" as const,
           interval: 0, // Show all labels, no auto-skipping
@@ -260,7 +260,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
           }
         : undefined,
       grid: {
-        left: horizontal ? 150 : 12,
+        left: horizontal ? 160 : 12,
         right: 12,
         top: 20,
         bottom: showLegend ? 40 : 12,
