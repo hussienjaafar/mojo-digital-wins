@@ -116,14 +116,14 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
     return formatNumber(value, false); // compact=false -> 12,345
   }, [seriesValueTypeMap, valueType]);
 
-  const option = React.useMemo<EChartsOption>(() => {
-    const xAxisData = data.map((d) => d[xAxisKey]);
+  const option = React.useMemo(() => {
+    const xAxisData = data.map((d) => d[xAxisKey]) as string[];
 
     const seriesConfig = series.map((s, index) => ({
       name: s.name,
       type: "bar" as const,
       data: data.map((d) => {
-        const value = d[s.dataKey];
+        const value = d[s.dataKey] as number;
         const isHighlighted = enableCrossHighlight && hoveredDataPoint?.date === d[xAxisKey];
         return {
           value,
@@ -207,13 +207,13 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
     return {
       animation: true,
       animationDuration: 500,
-      animationEasing: "cubicOut",
+      animationEasing: "cubicOut" as const,
       ...(disableHoverEmphasis && {
         axisPointer: { triggerEmphasis: false },
       }),
       tooltip: showTooltip
         ? {
-            trigger: "axis",
+            trigger: "axis" as const,
             confine: true,
             backgroundColor: "hsl(var(--portal-bg-secondary) / 0.95)",
             borderColor: "hsl(var(--portal-border) / 0.5)",
@@ -226,13 +226,14 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
               box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px hsl(var(--portal-border) / 0.1);
             `,
             axisPointer: disableHoverEmphasis
-              ? { type: "none" }
-              : { type: "shadow" },
-            formatter: (params: EChartsBarParams | EChartsBarParams[]) => {
+              ? { type: "none" as const }
+              : { type: "shadow" as const },
+            formatter: (params: unknown) => {
               const items = Array.isArray(params) ? params : [params];
-              if (items.length === 0) return "";
-              const header = `<div style="font-weight: 600; margin-bottom: 8px; color: hsl(var(--portal-text-primary)); font-size: 13px;">${items[0].axisValue}</div>`;
-              const rows = items
+              const typedItems = items as EChartsBarParams[];
+              if (typedItems.length === 0) return "";
+              const header = `<div style="font-weight: 600; margin-bottom: 8px; color: hsl(var(--portal-text-primary)); font-size: 13px;">${typedItems[0].axisValue}</div>`;
+              const rows = typedItems
                 .map((p) => {
                   const val = typeof p.value === 'object' ? p.value.value : p.value;
                   return `<div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
@@ -281,7 +282,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
         setHoveredDataPoint({
           date: dataPoint[xAxisKey] as string,
           series: params.seriesName,
-          value: params.value,
+          value: typeof params.value === 'object' ? (params.value as { value: number }).value : params.value as number,
         });
       }
     };
