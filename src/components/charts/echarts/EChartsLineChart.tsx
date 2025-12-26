@@ -525,8 +525,8 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
         containLabel: true,
       },
       xAxis: {
-        type: xAxisType,
-        ...(xAxisData && { data: xAxisData }),
+        ...(xAxisType === 'time' ? { type: 'time' as const } : { type: 'category' as const }),
+        ...(xAxisData && { data: xAxisData as string[] }),
         axisLine: {
           lineStyle: {
             color: "hsl(var(--portal-border))",
@@ -540,7 +540,7 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
           fontSize: 11,
           hideOverlap: true,
           ...(xAxisType === "time" && {
-            formatter: (value: number) => formatTimeAxisDate(value),
+            formatter: ((value: number) => formatTimeAxisDate(value)) as unknown as string,
           }),
         },
       },
