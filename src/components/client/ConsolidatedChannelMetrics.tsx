@@ -27,6 +27,7 @@ import {
   type ChannelSummariesData,
   type ChannelType,
 } from "@/queries";
+import { formatRatio } from "@/lib/chart-formatters";
 
 // ============================================================================
 // Types
@@ -165,7 +166,7 @@ const SummaryHeader: React.FC<SummaryHeaderProps> = ({
       >
         <div className="h-4 w-4 border-2 border-[hsl(var(--portal-accent-blue))] border-t-transparent rounded-full animate-spin" />
         <span className="text-sm text-[hsl(var(--portal-text-muted))]">
-          Fetching channel summaries…
+          Fetching channel summaries...
         </span>
       </div>
     );
@@ -185,7 +186,7 @@ const SummaryHeader: React.FC<SummaryHeaderProps> = ({
             <>
               <div className="h-3 w-3 border-2 border-[hsl(var(--portal-accent-blue))] border-t-transparent rounded-full animate-spin" />
               <span className="text-xs text-[hsl(var(--portal-text-muted))]">
-                Refreshing…
+                Refreshing...
               </span>
             </>
           ) : isDataStale ? (
@@ -263,17 +264,15 @@ const getMobileSummaryMetrics = (
   sectionId: ChannelSection,
   metrics: SummaryMetric[]
 ): SummaryMetric[] => {
-  // For Meta: show ROAS if available, otherwise fall back to Conv
+  // For Meta: always show Spend + Conv (never ROAS in collapsed header)
   if (sectionId === "meta") {
     const spend = metrics.find(m => m.label === "Spend");
-    const roas = metrics.find(m => m.label === "ROAS");
     const conv = metrics.find(m => m.label === "Conv");
-    const secondMetric = roas && roas.value !== "N/A" ? roas : conv;
-    return [spend, secondMetric].filter((m): m is SummaryMetric => Boolean(m));
+    return [spend, conv].filter((m): m is SummaryMetric => Boolean(m));
   }
 
   const preferredLabelsBySection: Record<ChannelSection, string[]> = {
-    meta: ["Spend", "Conv"], // fallback, not used due to above
+    meta: ["Spend", "Conv"],
     sms: ["Raised", "ROI"],
     donations: ["Net", "Donors"],
   };
@@ -296,6 +295,8 @@ const getMobileSummaryMetrics = (
 
 export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate }: Props) {
   const [expandedSections, setExpandedSections] = useState<Set<ChannelSection>>(new Set());
+  // Track sections that have been expanded at least once to keep content mounted
+  const [mountedSections, setMountedSections] = useState<Set<ChannelSection>>(new Set());
 
   // Lifted Meta Ads filter state to persist across collapse/expand
   const [metaStatusFilter, setMetaStatusFilter] = useState<string>("all");
@@ -318,6 +319,13 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
         newSet.delete(section);
       } else {
         newSet.add(section);
+        // Mark section as mounted so content stays in DOM after collapse
+        setMountedSections(mounted => {
+          if (mounted.has(section)) return mounted;
+          const newMounted = new Set(mounted);
+          newMounted.add(section);
+          return newMounted;
+        });
       }
       return newSet;
     });
@@ -364,7 +372,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
         if (!data) return null;
         const { meta } = data;
         const roasDisplay = meta.hasConversionValueData
-          ? `${meta.roas.toFixed(1)}x`
+          ? formatRatio(meta.roas, 2)
           : "N/A";
         return [
           { label: "Spend", value: formatCurrency(meta.spend) },
@@ -460,6 +468,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
         {sections.map((section) => {
           const Icon = section.icon;
           const isExpanded = expandedSections.has(section.id);
+          const shouldMount = isExpanded || mountedSections.has(section.id);
           const summaryMetrics = section.getSummary(summaryData);
           const mobileSummaryMetrics = summaryMetrics
             ? getMobileSummaryMetrics(section.id, summaryMetrics)
@@ -483,7 +492,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                   onClick={() => toggleSection(section.id)}
                   className={cn(
                     "w-full px-4 sm:px-6 py-4",
-                    "flex items-center justify-between",
+                    "flex flex-col",
                     "transition-colors duration-200",
                     "hover:bg-[hsl(var(--portal-bg-hover))]",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
@@ -495,83 +504,59 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                   aria-labelledby={`section-heading-${section.id}`}
                   aria-describedby={!isExpanded && channelIsStale && formattedLastDataDate ? `section-status-${section.id} section-status-mobile-${section.id}` : undefined}
                 >
-                  <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                    {/* Icon with accent color */}
-                    <motion.div
-                      className={cn(
-                        "p-2.5 rounded-lg shrink-0 transition-colors duration-200",
-                        section.accent === "blue" && "bg-[hsl(var(--portal-accent-blue)/0.1)]",
-                        section.accent === "purple" && "bg-[hsl(var(--portal-accent-purple)/0.1)]",
-                        section.accent === "green" && "bg-[hsl(var(--portal-success)/0.1)]"
-                      )}
-                      whileHover={{ scale: 1.05 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                    >
-                      <Icon
+                  {/* Row 1: Icon + Title + Status Chips + Chevron */}
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                      {/* Icon with accent color */}
+                      <motion.div
                         className={cn(
-                          "h-5 w-5",
-                          section.accent === "blue" && "text-[hsl(var(--portal-accent-blue))]",
-                          section.accent === "purple" && "text-[hsl(var(--portal-accent-purple))]",
-                          section.accent === "green" && "text-[hsl(var(--portal-success))]"
+                          "p-2.5 rounded-lg shrink-0 transition-colors duration-200",
+                          section.accent === "blue" && "bg-[hsl(var(--portal-accent-blue)/0.1)]",
+                          section.accent === "purple" && "bg-[hsl(var(--portal-accent-purple)/0.1)]",
+                          section.accent === "green" && "bg-[hsl(var(--portal-success)/0.1)]"
                         )}
-                        aria-hidden="true"
-                      />
-                    </motion.div>
+                        whileHover={{ scale: 1.05 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                      >
+                        <Icon
+                          className={cn(
+                            "h-5 w-5",
+                            section.accent === "blue" && "text-[hsl(var(--portal-accent-blue))]",
+                            section.accent === "purple" && "text-[hsl(var(--portal-accent-purple))]",
+                            section.accent === "green" && "text-[hsl(var(--portal-success))]"
+                          )}
+                          aria-hidden="true"
+                        />
+                      </motion.div>
 
-                    {/* Title & Description */}
-                    <div className="text-left min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3
-                          id={`section-heading-${section.id}`}
-                          className="text-base sm:text-lg font-semibold text-[hsl(var(--portal-text-primary))] transition-colors duration-200 group-hover:text-[hsl(var(--portal-accent-blue))]"
-                        >
-                          {section.title}
-                        </h3>
-                        {/* Status chips: inline on desktop only, hidden when expanded */}
-                        {!isExpanded && channelIsStale && formattedLastDataDate && (
-                          <span
-                            id={`section-status-${section.id}`}
-                            className={cn(
-                              "hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] shrink-0",
-                              "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]"
-                            )}
+                      {/* Title + Status Chips */}
+                      <div className="text-left min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3
+                            id={`section-heading-${section.id}`}
+                            className="text-base sm:text-lg font-semibold text-[hsl(var(--portal-text-primary))] transition-colors duration-200 group-hover:text-[hsl(var(--portal-accent-blue))]"
                           >
-                            <Clock className="h-2.5 w-2.5" aria-hidden="true" />
-                            Stale
-                            <span className="sr-only">, last data {formattedLastDataDate}</span>
-                          </span>
-                        )}
-                        {!isExpanded && !channelHasData && !isLoading && (
-                          <span
-                            className={cn(
-                              "hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] shrink-0",
-                              "bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-muted))]"
-                            )}
-                          >
-                            No data
-                          </span>
-                        )}
-                      </div>
-                      {/* Status chips: below title on mobile */}
-                      {showStatusChips && (
-                        <div className="flex items-center gap-1.5 mt-0.5 sm:hidden">
-                          {channelIsStale && formattedLastDataDate && (
+                            {section.title}
+                          </h3>
+                          {/* Status chips: inline with title on desktop, hidden when expanded */}
+                          {!isExpanded && channelIsStale && formattedLastDataDate && (
                             <span
-                              id={`section-status-mobile-${section.id}`}
+                              id={`section-status-${section.id}`}
                               className={cn(
-                                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]",
+                                "hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] shrink-0",
                                 "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]"
                               )}
+                              title={`Last data: ${formattedLastDataDate}`}
                             >
                               <Clock className="h-2.5 w-2.5" aria-hidden="true" />
                               Stale
                               <span className="sr-only">, last data {formattedLastDataDate}</span>
                             </span>
                           )}
-                          {!channelHasData && !isLoading && (
+                          {!isExpanded && !channelHasData && !isLoading && (
                             <span
                               className={cn(
-                                "inline-flex items-center px-1.5 py-0.5 rounded text-[10px]",
+                                "hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] shrink-0",
                                 "bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-muted))]"
                               )}
                             >
@@ -579,62 +564,92 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                             </span>
                           )}
                         </div>
+                        {/* Status chips: below title on mobile */}
+                        {showStatusChips && (
+                          <div className="flex items-center gap-1.5 mt-0.5 sm:hidden">
+                            {channelIsStale && formattedLastDataDate && (
+                              <span
+                                id={`section-status-mobile-${section.id}`}
+                                className={cn(
+                                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]",
+                                  "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]"
+                                )}
+                                title={`Last data: ${formattedLastDataDate}`}
+                              >
+                                <Clock className="h-2.5 w-2.5" aria-hidden="true" />
+                                Stale
+                                <span className="sr-only">, last data {formattedLastDataDate}</span>
+                              </span>
+                            )}
+                            {!channelHasData && !isLoading && (
+                              <span
+                                className={cn(
+                                  "inline-flex items-center px-1.5 py-0.5 rounded text-[10px]",
+                                  "bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-muted))]"
+                                )}
+                              >
+                                No data
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {/* Mobile: Show Spend + Conv metrics below title */}
+                        {!isLoading && mobileSummaryMetrics && (
+                          <div className="flex gap-3 mt-1.5 sm:hidden">
+                            {mobileSummaryMetrics.map((metric, i) => (
+                              <MetricChip key={`${section.id}-mobile-${metric.label}-${i}`} metric={metric} compact />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Expand/Collapse Icon */}
+                    <motion.div
+                      className={cn(
+                        "shrink-0 p-1.5 rounded-md transition-colors duration-200 ml-3",
+                        isExpanded
+                          ? "bg-[hsl(var(--portal-accent-blue))]"
+                          : "bg-[hsl(var(--portal-bg-elevated))] group-hover:bg-[hsl(var(--portal-bg-tertiary))]"
                       )}
-                      <p className="text-xs sm:text-sm text-[hsl(var(--portal-text-secondary))] mt-0.5 truncate hidden sm:block">
-                        {section.description}
-                      </p>
-                      {/* Mobile: Show two key metrics below title to avoid collision */}
-                      {!isLoading && mobileSummaryMetrics && (
-                        <div className="flex gap-3 mt-1.5 sm:hidden">
-                          {mobileSummaryMetrics.map((metric, i) => (
-                            <MetricChip key={`${section.id}-mobile-${metric.label}-${i}`} metric={metric} compact />
-                          ))}
-                        </div>
-                      )}
+                      animate={{ rotate: isExpanded ? 90 : 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ChevronRight
+                        className={cn(
+                          "h-4 w-4",
+                          isExpanded
+                            ? "text-white"
+                            : "text-[hsl(var(--portal-text-secondary))] group-hover:text-[hsl(var(--portal-text-primary))]"
+                        )}
+                        aria-hidden="true"
+                      />
+                    </motion.div>
+                  </div>
+
+                  {/* Row 2: Description + Summary Metrics (Desktop only) */}
+                  <div className="hidden sm:flex items-center justify-between w-full mt-2 pl-[52px]">
+                    <p className="min-w-0 flex-1 text-xs sm:text-sm text-[hsl(var(--portal-text-secondary))] truncate">
+                      {section.description}
+                    </p>
+                    {/* Summary Metrics */}
+                    <div className="flex items-center gap-4 sm:gap-6 shrink-0 ml-4">
+                      {isLoading ? (
+                        <>
+                          <MetricChipSkeleton />
+                          <MetricChipSkeleton />
+                          <MetricChipSkeleton />
+                        </>
+                      ) : summaryMetrics ? (
+                        summaryMetrics.map((metric, i) => (
+                          <MetricChip key={i} metric={metric} />
+                        ))
+                      ) : null}
                     </div>
                   </div>
-
-                  {/* Summary Metrics - Desktop only */}
-                  <div className="hidden sm:flex items-center gap-6 mr-3 shrink-0">
-                    {isLoading ? (
-                      <div className="flex gap-4">
-                        <MetricChipSkeleton />
-                        <MetricChipSkeleton />
-                        <MetricChipSkeleton />
-                      </div>
-                    ) : summaryMetrics ? (
-                      <div className="flex gap-4 sm:gap-6">
-                        {summaryMetrics.map((metric, i) => (
-                          <MetricChip key={i} metric={metric} />
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {/* Expand/Collapse Icon */}
-                  <motion.div
-                    className={cn(
-                      "shrink-0 p-1.5 rounded-md transition-colors duration-200",
-                      isExpanded
-                        ? "bg-[hsl(var(--portal-accent-blue))]"
-                        : "bg-[hsl(var(--portal-bg-elevated))] group-hover:bg-[hsl(var(--portal-bg-tertiary))]"
-                    )}
-                    animate={{ rotate: isExpanded ? 90 : 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <ChevronRight
-                      className={cn(
-                        "h-4 w-4",
-                        isExpanded
-                          ? "text-white"
-                          : "text-[hsl(var(--portal-text-secondary))] group-hover:text-[hsl(var(--portal-text-primary))]"
-                      )}
-                      aria-hidden="true"
-                    />
-                  </motion.div>
                 </button>
 
-                {/* Section Content - Always mounted for a11y, animated visibility */}
+                {/* Section Content - Mounted once expanded, stays in DOM for performance */}
                 <div
                   id={`section-content-${section.id}`}
                   role="region"
@@ -642,11 +657,11 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                   aria-hidden={!isExpanded}
                 >
                   <AnimatePresence initial={false}>
-                    {isExpanded && (
+                    {shouldMount && (
                       <motion.div
                         variants={contentVariants}
                         initial="collapsed"
-                        animate="expanded"
+                        animate={isExpanded ? "expanded" : "collapsed"}
                         exit="collapsed"
                         className="overflow-hidden"
                       >

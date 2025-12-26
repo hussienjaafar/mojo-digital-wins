@@ -97,30 +97,51 @@ export function PortalTable<T extends Record<string, any>>({
           <table className="w-full">
             <thead className="portal-bg-tertiary">
               <tr>
-                {columns.map((column) => (
-                  <th
-                    key={String(column.key)}
-                    className={cn(
-                      "px-4 py-3 text-left text-xs font-semibold portal-text-secondary uppercase tracking-wider",
-                      column.sortable && "cursor-pointer hover:portal-text-primary transition-colors select-none",
-                      column.className
-                    )}
-                    onClick={() => column.sortable && handleSort(String(column.key))}
-                  >
-                    <div className="flex items-center gap-2">
-                      {column.label}
-                      {column.sortable && sortConfig?.key === column.key && (
-                        <span className="text-primary">
-                          {sortConfig.direction === "asc" ? (
-                            <ChevronUp className="h-3 w-3" />
-                          ) : (
-                            <ChevronDown className="h-3 w-3" />
-                          )}
-                        </span>
+                {columns.map((column) => {
+                  const isSorted = sortConfig?.key === String(column.key);
+                  const ariaSort = column.sortable
+                    ? isSorted
+                      ? sortConfig.direction === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : "none"
+                    : undefined;
+
+                  return (
+                    <th
+                      key={String(column.key)}
+                      scope="col"
+                      aria-sort={ariaSort}
+                      className={cn(
+                        "px-4 py-3 text-left text-xs font-semibold portal-text-secondary uppercase tracking-wider",
+                        column.className
                       )}
-                    </div>
-                  </th>
-                ))}
+                    >
+                      {column.sortable ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSort(String(column.key))}
+                          className="w-full flex items-center justify-start gap-2 cursor-pointer hover:portal-text-primary transition-colors select-none"
+                        >
+                          {column.label}
+                          {isSorted && (
+                            <span className="text-primary">
+                              {sortConfig.direction === "asc" ? (
+                                <ChevronUp className="h-3 w-3" />
+                              ) : (
+                                <ChevronDown className="h-3 w-3" />
+                              )}
+                            </span>
+                          )}
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          {column.label}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>

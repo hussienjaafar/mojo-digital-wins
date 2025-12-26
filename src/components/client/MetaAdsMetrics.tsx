@@ -23,6 +23,7 @@ import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
 import { useMetaAdsMetricsQuery } from "@/queries";
 import { useAnomalyDetection } from "@/hooks/useAnomalyDetection";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { formatRatio, formatCurrency } from "@/lib/chart-formatters";
 
 type Props = {
   organizationId: string;
@@ -385,7 +386,7 @@ const MetaAdsMetrics = ({
           <V3KPICardWithSparkline
             icon={DollarSign}
             label="ROAS"
-            value={`${roas.toFixed(2)}x`}
+            value={formatRatio(roas, 2)}
             trend={{ value: calcChange(roas, prevRoas), isPositive: roas >= prevRoas }}
             accent="blue"
           />
@@ -394,7 +395,7 @@ const MetaAdsMetrics = ({
           <V3KPICardWithSparkline
             icon={DollarSign}
             label="Spend"
-            value={`$${totals.spend.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+            value={formatCurrency(totals.spend, true)}
             trend={{ value: calcChange(totals.spend, previousTotals.spend), isPositive: totals.spend <= previousTotals.spend }}
             sparklineData={spendSparkline}
             accent="blue"
