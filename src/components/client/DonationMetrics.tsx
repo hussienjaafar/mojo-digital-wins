@@ -24,6 +24,7 @@ import { PortalPieChart } from "@/components/portal/PortalPieChart";
 import { usePIIAccess } from "@/hooks/usePIIAccess";
 import { maskDonorInfo } from "@/lib/pii-masking";
 import { useDonationMetricsQuery } from "@/queries";
+import { formatCurrency } from "@/lib/chart-formatters";
 
 type Props = {
   organizationId: string;
@@ -160,7 +161,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           <V3KPICard
             icon={DollarSign}
             label="Total Raised"
-            value={`$${metrics.totalRaised.toLocaleString()}`}
+            value={formatCurrency(metrics.totalRaised, true)}
             accent="green"
           />
         </motion.div>
@@ -202,7 +203,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           <V3KPICard
             icon={DollarSign}
             label="Net Revenue"
-            value={`$${metrics.netRaised.toLocaleString()}`}
+            value={formatCurrency(metrics.netRaised, true)}
             accent="green"
           />
         </motion.div>
@@ -218,7 +219,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           <V3KPICard
             icon={Repeat}
             label="Recurring Revenue"
-            value={`$${metrics.recurringRevenue.toLocaleString()}`}
+            value={formatCurrency(metrics.recurringRevenue, true)}
             accent="blue"
           />
         </motion.div>
@@ -226,7 +227,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           <V3KPICard
             icon={TrendingUp}
             label="Refunds"
-            value={`$${metrics.refundAmount.toLocaleString()}`}
+            value={formatCurrency(metrics.refundAmount, true)}
             subtitle={`${metrics.refundCount} refunds`}
             accent={metrics.refundAmount > 0 ? "red" : "default"}
           />

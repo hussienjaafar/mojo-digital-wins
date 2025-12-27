@@ -6,7 +6,7 @@ import { RefreshCw, DollarSign, MessageSquare, TrendingUp, Heart, History, Check
 import { logger } from "@/lib/logger";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
-import { DataFreshnessIndicator } from "./DataFreshnessIndicator";
+import { DataFreshnessIndicator, dataFreshnessKeys } from "./DataFreshnessIndicator";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   V3Card,
@@ -70,7 +70,6 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     loadSyncStatuses();
@@ -96,11 +95,12 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
     return syncStatuses.find(s => s.platform === platform);
   };
 
-  // Invalidate all dashboard-related queries
+  // Invalidate all dashboard-related queries including data freshness
   const invalidateDashboardQueries = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all }),
       queryClient.invalidateQueries({ queryKey: channelKeys.all }),
+      queryClient.invalidateQueries({ queryKey: dataFreshnessKeys.byOrg(organizationId) }),
     ]);
   };
 
@@ -268,7 +268,6 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
     });
 
     await loadSyncStatuses();
-    setRefreshKey(prev => prev + 1);
   };
 
   const renderSyncStatusBadge = (platform: string) => {
@@ -359,6 +358,8 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
             onClick={onClick}
             disabled={disabled}
             variant={variant}
+            aria-busy={isSyncing}
+            aria-label={isSyncing ? `${label} in progress` : label}
             className={cn(
               "h-auto flex-col gap-2 py-4 px-3 relative w-full",
               "transition-all duration-200",
@@ -377,7 +378,7 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
                   exit={{ opacity: 0 }}
                   transition={spinTransition}
                 >
-                  <RefreshCw className={cn("w-5 h-5", accent ? iconColors[accent] : "")} />
+                  <RefreshCw className={cn("w-5 h-5", accent ? iconColors[accent] : "")} aria-hidden="true" />
                 </motion.div>
               ) : (
                 <motion.div
@@ -387,12 +388,16 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
                   exit={{ opacity: 0, scale: 0.8 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <Icon className={cn("w-5 h-5", accent && variant !== "default" ? iconColors[accent] : "")} />
+                  <Icon className={cn("w-5 h-5", accent && variant !== "default" ? iconColors[accent] : "")} aria-hidden="true" />
                 </motion.div>
               )}
             </AnimatePresence>
-            <span className="text-xs font-medium">{label}</span>
+            <span className="text-xs font-medium" aria-hidden="true">{label}</span>
             {platform && !isSyncing && renderSyncStatusBadge(platform)}
+            {/* Screen reader live announcement */}
+            <span className="sr-only" role="status" aria-live="polite">
+              {isSyncing ? `${label} syncing...` : ""}
+            </span>
           </Button>
         </motion.div>
       </motion.div>
@@ -418,7 +423,7 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
               </V3CardDescription>
             </div>
           </div>
-          <DataFreshnessIndicator organizationId={organizationId} compact key={refreshKey} />
+          <DataFreshnessIndicator organizationId={organizationId} compact />
         </div>
       </V3CardHeader>
       <V3CardContent className="space-y-6">
@@ -494,7 +499,7 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
         >
-          <DataFreshnessIndicator organizationId={organizationId} key={`full-${refreshKey}`} />
+          <DataFreshnessIndicator organizationId={organizationId} />
         </motion.div>
       </V3CardContent>
     </V3Card>

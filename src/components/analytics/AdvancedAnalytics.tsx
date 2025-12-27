@@ -224,10 +224,10 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
           {[...Array(4)].map((_, i) => (
             <Card key={i} className="animate-pulse">
               <CardHeader className="space-y-0 pb-2">
-                <div className="h-4 w-24 bg-muted rounded" />
+                <div className="h-4 w-24 bg-[hsl(var(--portal-bg-elevated))] rounded" />
               </CardHeader>
               <CardContent>
-                <div className="h-8 w-32 bg-muted rounded" />
+                <div className="h-8 w-32 bg-[hsl(var(--portal-bg-elevated))] rounded" />
               </CardContent>
             </Card>
           ))}
@@ -249,7 +249,7 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
             <div className="text-2xl font-bold">
               ${keyMetrics.revenue.current.toLocaleString()}
             </div>
-            <p className={`text-xs ${keyMetrics.revenue.changePercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            <p className={`text-xs ${keyMetrics.revenue.changePercent >= 0 ? 'text-[hsl(var(--portal-success))]' : 'text-[hsl(var(--portal-error))]'}`}>
               {keyMetrics.revenue.changePercent >= 0 ? '+' : ''}
               {keyMetrics.revenue.changePercent.toFixed(1)}% from previous period
             </p>
@@ -259,13 +259,13 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">CAC</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
               ${keyMetrics.cac.toFixed(2)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
               Customer Acquisition Cost
             </p>
           </CardContent>
@@ -274,13 +274,13 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">LTV</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
               ${keyMetrics.ltv.toFixed(2)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
               Lifetime Value
             </p>
           </CardContent>
@@ -289,13 +289,13 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">LTV:CAC Ratio</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
               {keyMetrics.ltvCacRatio.toFixed(1)}:1
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
               {keyMetrics.ltvCacRatio >= 3 ? 'Excellent' : keyMetrics.ltvCacRatio >= 1 ? 'Good' : 'Needs improvement'}
             </p>
           </CardContent>
@@ -347,17 +347,17 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
                       <div key={channel.name} className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{channel.name}</span>
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm text-[hsl(var(--portal-text-muted))]">
                             {channel.contribution.toFixed(1)}% contribution
                           </span>
                         </div>
-                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="w-full h-2 bg-[hsl(var(--portal-bg-elevated))] rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-primary transition-all"
+                            className="h-full bg-[hsl(var(--portal-accent-blue))] transition-all"
                             style={{ width: `${channel.contribution}%` }}
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-[hsl(var(--portal-text-muted))]">
                           Efficiency: {channel.efficiency.toFixed(2)} conversions per dollar
                         </p>
                       </div>
@@ -369,7 +369,7 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
           ) : (
             <Card>
               <CardContent className="flex items-center justify-center min-h-[300px]">
-                <p className="text-muted-foreground">No attribution data available for this period</p>
+                <p className="text-[hsl(var(--portal-text-muted))]">No attribution data available for this period</p>
               </CardContent>
             </Card>
           )}

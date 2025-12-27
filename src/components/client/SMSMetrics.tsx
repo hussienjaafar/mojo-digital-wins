@@ -19,6 +19,7 @@ import { format, parseISO } from "date-fns";
 import { PortalLineChart } from "@/components/portal/PortalLineChart";
 import { PortalMultiBarChart } from "@/components/portal/PortalMultiBarChart";
 import { useSMSMetricsQuery } from "@/queries";
+import { formatRatio, formatCurrency } from "@/lib/chart-formatters";
 
 type Props = {
   organizationId: string;
@@ -182,7 +183,7 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
           <V3KPICard
             icon={DollarSign}
             label="ROI"
-            value={`${roi.toFixed(2)}x`}
+            value={formatRatio(roi, 2)}
             trend={{ value: calcChange(roi, prevRoi), isPositive: roi >= prevRoi }}
             accent="green"
           />
@@ -191,7 +192,7 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
           <V3KPICard
             icon={DollarSign}
             label="Amount Raised"
-            value={`$${totals.raised.toLocaleString()}`}
+            value={formatCurrency(totals.raised, true)}
             trend={{ value: calcChange(totals.raised, prevTotals.raised) }}
             accent="blue"
           />

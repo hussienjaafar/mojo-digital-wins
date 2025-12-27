@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, AlertCircle, Clock, RefreshCw, AlertTriangle, Info } from "lucide-react";
 import { formatDistanceToNow, parseISO, format, differenceInHours, differenceInDays } from "date-fns";
-import { toast } from "sonner";
 
 type Props = {
   organizationId: string;
@@ -36,21 +35,16 @@ const EXPECTED_FRESHNESS: Record<string, { hours: number; isWebhook: boolean; de
   'SMS': { hours: 24, isWebhook: false, description: 'Daily sync from Switchboard' },
 };
 
+/** Query key for data freshness - exported for invalidation */
+export const dataFreshnessKeys = {
+  all: ["data-freshness"] as const,
+  byOrg: (orgId: string) => ["data-freshness", orgId] as const,
+};
+
 export const DataFreshnessIndicator = ({ organizationId, compact = false, showAlerts = true }: Props) => {
-  const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
-  const [dataFreshness, setDataFreshness] = useState<DataFreshness[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [webhookCount, setWebhookCount] = useState<number>(0);
-  const [hasLoadError, setHasLoadError] = useState(false);
-
-  useEffect(() => {
-    loadFreshnessData();
-  }, [organizationId]);
-
-  const loadFreshnessData = async () => {
-    setIsLoading(true);
-    setHasLoadError(false);
-    try {
+  const { data, isLoading, isError: hasLoadError } = useQuery({
+    queryKey: dataFreshnessKeys.byOrg(organizationId),
+    queryFn: async () => {
       // Get sync statuses from credentials
       const { data: credentials } = await supabase
         .from('client_api_credentials')
@@ -58,16 +52,14 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
         .eq('organization_id', organizationId)
         .eq('is_active', true);
 
-      if (credentials) {
-        setSyncStatuses(credentials.map(c => ({
-          platform: c.platform,
-          lastSync: c.last_sync_at,
-          status: c.last_sync_status,
-          hoursStale: c.last_sync_at 
-            ? (Date.now() - new Date(c.last_sync_at).getTime()) / (1000 * 60 * 60)
-            : null
-        })));
-      }
+      const syncStatuses: SyncStatus[] = credentials?.map(c => ({
+        platform: c.platform,
+        lastSync: c.last_sync_at,
+        status: c.last_sync_status,
+        hoursStale: c.last_sync_at
+          ? (Date.now() - new Date(c.last_sync_at).getTime()) / (1000 * 60 * 60)
+          : null
+      })) || [];
 
       // Get actual data freshness
       const freshness: DataFreshness[] = [];
@@ -86,14 +78,13 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
           source: 'Meta Ads',
           latestDate,
           recordCount: metaCount || 0,
-          hoursStale: latestDate 
+          hoursStale: latestDate
             ? differenceInHours(new Date(), parseISO(latestDate))
             : null,
           expectedFreshnessHours: EXPECTED_FRESHNESS['Meta Ads'].hours,
           isWebhookBased: false
         });
       } else if (credentials?.some(c => c.platform === 'meta')) {
-        // Meta configured but no data
         freshness.push({
           source: 'Meta Ads',
           latestDate: null,
@@ -118,8 +109,6 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-      
-      setWebhookCount(recentWebhooks || 0);
 
       if (actblueData && actblueData.length > 0) {
         const latestDate = actblueData[0].transaction_date;
@@ -127,7 +116,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
           source: 'ActBlue',
           latestDate,
           recordCount: actblueCount || 0,
-          hoursStale: latestDate 
+          hoursStale: latestDate
             ? differenceInHours(new Date(), parseISO(latestDate))
             : null,
           expectedFreshnessHours: EXPECTED_FRESHNESS['ActBlue'].hours,
@@ -158,7 +147,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
           source: 'SMS',
           latestDate,
           recordCount: smsCount || 0,
-          hoursStale: latestDate 
+          hoursStale: latestDate
             ? differenceInHours(new Date(), parseISO(latestDate))
             : null,
           expectedFreshnessHours: EXPECTED_FRESHNESS['SMS'].hours,
@@ -175,14 +164,16 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
         });
       }
 
-      setDataFreshness(freshness);
-    } catch (error) {
-      setHasLoadError(true);
-      toast.error('Failed to load data freshness', { description: 'Unable to check data status. Please try again.' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return { syncStatuses, dataFreshness: freshness, webhookCount: recentWebhooks || 0 };
+    },
+    enabled: !!organizationId,
+    staleTime: 60 * 1000, // 60 seconds
+    retry: 1,
+  });
+
+  const syncStatuses = data?.syncStatuses ?? [];
+  const dataFreshness = data?.dataFreshness ?? [];
+  const webhookCount = data?.webhookCount ?? 0;
 
   const getStatusBadge = (item: DataFreshness, status?: string | null) => {
     if (status === 'failed') {

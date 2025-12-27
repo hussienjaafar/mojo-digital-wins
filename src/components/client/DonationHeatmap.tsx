@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { parseISO, startOfDay, endOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarHeatmap, type HeatmapDataPoint } from "@/components/charts/CalendarHeatmap";
 import { V3Card, V3CardHeader, V3CardTitle, V3CardContent, V3LoadingState } from "@/components/v3";
@@ -12,6 +13,10 @@ interface DonationHeatmapProps {
 }
 
 export const DonationHeatmap = ({ organizationId, startDate, endDate }: DonationHeatmapProps) => {
+  // Compute full-day range for inclusive date filtering
+  const rangeStart = startOfDay(parseISO(startDate));
+  const rangeEnd = endOfDay(parseISO(endDate));
+
   const { data: donations, isLoading } = useQuery({
     queryKey: ["donations", "heatmap", organizationId, startDate, endDate],
     queryFn: async () => {
@@ -19,8 +24,8 @@ export const DonationHeatmap = ({ organizationId, startDate, endDate }: Donation
         .from("actblue_transactions")
         .select("transaction_date, amount")
         .eq("organization_id", organizationId)
-        .gte("transaction_date", startDate)
-        .lte("transaction_date", endDate);
+        .gte("transaction_date", rangeStart.toISOString())
+        .lte("transaction_date", rangeEnd.toISOString());
 
       if (error) throw error;
       return data || [];
@@ -51,8 +56,9 @@ export const DonationHeatmap = ({ organizationId, startDate, endDate }: Donation
 
     donations.forEach((donation) => {
       const date = new Date(donation.transaction_date);
-      const dayOfWeek = date.getUTCDay();
-      const hour = date.getUTCHours();
+      // Use local time for bucketing
+      const dayOfWeek = date.getDay();
+      const hour = date.getHours();
       const key = `${dayOfWeek}-${hour}`;
       grid[key] = (grid[key] || 0) + Number(donation.amount || 0);
     });

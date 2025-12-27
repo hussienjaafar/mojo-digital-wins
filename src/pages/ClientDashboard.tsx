@@ -102,24 +102,39 @@ const CollapsibleSection = ({
   onToggle,
   children,
 }: CollapsibleSectionProps) => {
+  // Generate stable IDs from title
+  const sectionId = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const headingId = `section-heading-${sectionId}`;
+  const contentId = `section-content-${sectionId}`;
+
   const accentColors = {
     blue: {
       bg: "bg-[hsl(var(--portal-accent-blue)/0.1)]",
       text: "text-[hsl(var(--portal-accent-blue))]",
+      ring: "focus-visible:ring-[hsl(var(--portal-accent-blue))]",
+      chevronBg: "bg-[hsl(var(--portal-accent-blue))]",
+      titleHover: "group-hover:text-[hsl(var(--portal-accent-blue))]",
     },
     green: {
       bg: "bg-[hsl(var(--portal-success)/0.1)]",
       text: "text-[hsl(var(--portal-success))]",
+      ring: "focus-visible:ring-[hsl(var(--portal-success))]",
+      chevronBg: "bg-[hsl(var(--portal-success))]",
+      titleHover: "group-hover:text-[hsl(var(--portal-success))]",
     },
     purple: {
       bg: "bg-[hsl(var(--portal-accent-purple)/0.1)]",
       text: "text-[hsl(var(--portal-accent-purple))]",
+      ring: "focus-visible:ring-[hsl(var(--portal-accent-purple))]",
+      chevronBg: "bg-[hsl(var(--portal-accent-purple))]",
+      titleHover: "group-hover:text-[hsl(var(--portal-accent-purple))]",
     },
   };
 
   return (
     <V3Card accent={accent} interactive className="overflow-hidden">
       <button
+        type="button"
         onClick={onToggle}
         className={cn(
           "w-full px-4 sm:px-6 py-4",
@@ -127,10 +142,11 @@ const CollapsibleSection = ({
           "transition-colors duration-200",
           "hover:bg-[hsl(var(--portal-bg-elevated))]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
-          "focus-visible:ring-[hsl(var(--portal-accent-blue))]",
+          accentColors[accent].ring,
           "group"
         )}
         aria-expanded={isExpanded}
+        aria-controls={contentId}
       >
         <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
           <motion.div
@@ -144,7 +160,13 @@ const CollapsibleSection = ({
             />
           </motion.div>
           <div className="text-left min-w-0 flex-1">
-            <h3 className="text-base sm:text-lg font-semibold text-[hsl(var(--portal-text-primary))] transition-colors duration-200 group-hover:text-[hsl(var(--portal-accent-blue))]">
+            <h3
+              id={headingId}
+              className={cn(
+                "text-base sm:text-lg font-semibold text-[hsl(var(--portal-text-primary))] transition-colors duration-200",
+                accentColors[accent].titleHover
+              )}
+            >
               {title}
             </h3>
             <p className="text-xs sm:text-sm text-[hsl(var(--portal-text-secondary))] mt-0.5 truncate hidden sm:block">
@@ -157,7 +179,7 @@ const CollapsibleSection = ({
           className={cn(
             "shrink-0 p-1.5 rounded-md transition-colors duration-200",
             isExpanded
-              ? "bg-[hsl(var(--portal-accent-blue))]"
+              ? accentColors[accent].chevronBg
               : "bg-[hsl(var(--portal-bg-elevated))] group-hover:bg-[hsl(var(--portal-bg-tertiary))]"
           )}
           animate={{ rotate: isExpanded ? 90 : 0 }}
@@ -175,21 +197,28 @@ const CollapsibleSection = ({
         </motion.div>
       </button>
 
-      <AnimatePresence initial={false}>
-        {isExpanded && (
-          <motion.div
-            variants={contentVariants}
-            initial="collapsed"
-            animate="expanded"
-            exit="collapsed"
-            className="overflow-hidden"
-          >
-            <div className="px-4 sm:px-6 pb-6 pt-2 border-t border-[hsl(var(--portal-border))]">
-              {children}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div
+        id={contentId}
+        role="region"
+        aria-labelledby={headingId}
+        aria-hidden={!isExpanded}
+      >
+        <AnimatePresence initial={false}>
+          {isExpanded && (
+            <motion.div
+              variants={contentVariants}
+              initial="collapsed"
+              animate="expanded"
+              exit="collapsed"
+              className="overflow-hidden"
+            >
+              <div className="px-4 sm:px-6 pb-6 pt-2 border-t border-[hsl(var(--portal-border))]">
+                {children}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </V3Card>
   );
 };

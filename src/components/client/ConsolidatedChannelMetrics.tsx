@@ -273,7 +273,7 @@ const getMobileSummaryMetrics = (
 
   const preferredLabelsBySection: Record<ChannelSection, string[]> = {
     meta: ["Spend", "Conv"],
-    sms: ["Raised", "ROI"],
+    sms: ["Sent", "Raised"],
     donations: ["Net", "Donors"],
   };
 
@@ -402,7 +402,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
           { label: "Raised", value: formatCurrency(sms.raised) },
           {
             label: "ROI",
-            value: `${sms.roi.toFixed(1)}x`,
+            value: formatRatio(sms.roi, 2),
             highlight: sms.roi >= 2 ? "success" : sms.roi > 0 && sms.roi < 1 ? "error" : false,
           },
         ];
