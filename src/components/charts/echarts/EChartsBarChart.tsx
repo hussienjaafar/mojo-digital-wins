@@ -45,6 +45,8 @@ export interface EChartsBarChartProps {
   axisValueType?: BarValueFormatType;
   /** Custom formatter for category axis labels (for truncation) */
   xAxisLabelFormatter?: (value: string) => string;
+  /** Rotation angle for x-axis labels (0 = horizontal, 45 = diagonal) */
+  xAxisLabelRotate?: number;
   horizontal?: boolean;
   enableCrossHighlight?: boolean;
   /** Disable hover emphasis to prevent bars from disappearing on hover */
@@ -69,6 +71,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
   valueType = "number",
   axisValueType,
   xAxisLabelFormatter,
+  xAxisLabelRotate = 0,
   horizontal = false,
   enableCrossHighlight = false,
   disableHoverEmphasis = false,
@@ -193,20 +196,20 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
       axisLabel: {
         color: "hsl(var(--portal-text-muted))",
         fontSize: 11,
+        interval: 0, // Show all labels
         ...(xAxisLabelFormatter && {
           formatter: xAxisLabelFormatter,
         }),
-        // For horizontal bars (category on y-axis), configure labels
+        // Apply rotation for non-horizontal charts
+        ...(!horizontal && xAxisLabelRotate > 0 && {
+          rotate: xAxisLabelRotate,
+          fontSize: 10,
+        }),
+        // For horizontal bars (category on y-axis), simple config
         ...(horizontal && {
           fontSize: 10,
-          lineHeight: 12,
-          interval: 0, // Show all labels, no auto-skipping
-          width: 75, // Fixed width for labels
-          overflow: "truncate" as const,
         }),
       },
-      // Explicitly position y-axis on left for horizontal charts
-      ...(horizontal && { position: "left" as const }),
     };
 
     return {
@@ -266,17 +269,18 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
           }
         : undefined,
       grid: {
-        left: gridLeft ?? (horizontal ? 8 : 12),
-        right: horizontal ? 8 : 12,
+        left: gridLeft ?? 12,
+        right: 12,
         top: 20,
-        bottom: showLegend ? 40 : 12,
+        // Increase bottom padding for rotated labels
+        bottom: showLegend ? 60 : (xAxisLabelRotate > 0 ? 60 : 20),
         containLabel: true,
       },
       xAxis: horizontal ? valueAxisConfig : categoryAxisConfig,
       yAxis: horizontal ? categoryAxisConfig : valueAxisConfig,
       series: seriesConfig,
     };
-  }, [data, xAxisKey, series, showLegend, showTooltip, horizontal, formatAxisValue, formatTooltipValue, xAxisLabelFormatter, enableCrossHighlight, disableHoverEmphasis, gridLeft, hoveredDataPoint]);
+  }, [data, xAxisKey, series, showLegend, showTooltip, horizontal, formatAxisValue, formatTooltipValue, xAxisLabelFormatter, xAxisLabelRotate, enableCrossHighlight, disableHoverEmphasis, gridLeft, hoveredDataPoint]);
 
   const handleEvents = React.useMemo(() => {
     const events: Record<string, (params: EChartsBarParams) => void> = {};

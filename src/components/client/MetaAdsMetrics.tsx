@@ -230,56 +230,18 @@ const MetaAdsMetrics = ({
     return configs[breakdownMetric];
   }, [breakdownMetric]);
 
-  // Truncate campaign names for axis labels only
-  // Mobile: word-wrap to 2 lines (~12 chars each), normalize underscores/dashes
-  // Desktop: single line truncated to 15 chars
+  // Truncate campaign names for axis labels
+  // Mobile: short truncation (10 chars) for rotated labels
+  // Desktop: longer truncation (15 chars) for horizontal labels
   const truncateCampaignName = useMemo(() => {
-    if (isMobile) {
-      // Mobile: word-wrap to 2 lines with ~12 chars per line
-      return (name: string) => {
-        // Normalize underscores and dashes to spaces for readability
-        const normalized = name.replace(/[_-]/g, ' ');
-        const words = normalized.split(' ');
-        let line1 = '';
-        let line2 = '';
-        let onLine2 = false;
-
-        for (const word of words) {
-          if (!onLine2) {
-            if ((line1 + ' ' + word).trim().length <= 12) {
-              line1 = (line1 + ' ' + word).trim();
-            } else if (line1 === '') {
-              // First word is too long, slice it
-              line1 = word.slice(0, 12);
-              const remainder = word.slice(12);
-              line2 = remainder.length > 12 ? remainder.slice(0, 9) + '...' : remainder;
-              onLine2 = true;
-            } else {
-              onLine2 = true;
-              line2 = word;
-            }
-          } else {
-            if ((line2 + ' ' + word).trim().length <= 12) {
-              line2 = (line2 + ' ' + word).trim();
-            } else {
-              // Overflow on line 2 - truncate with ...
-              const remaining = (line2 + ' ' + word).trim();
-              line2 = remaining.slice(0, 9) + '...';
-              break;
-            }
-          }
-        }
-
-        // Final guard: ensure line2 never exceeds 12 chars
-        if (line2 && line2.length > 12) {
-          line2 = line2.slice(0, 9) + '...';
-        }
-
-        return line2 ? `${line1}\n${line2}` : line1;
-      };
-    }
-    // Desktop: shorter truncation for vertical bar x-axis
-    return (name: string) => name.length > 15 ? name.slice(0, 15) + '...' : name;
+    const maxLength = isMobile ? 10 : 15;
+    return (name: string) => {
+      // Normalize underscores and dashes to spaces
+      const normalized = name.replace(/[_-]/g, ' ');
+      return normalized.length > maxLength
+        ? normalized.slice(0, maxLength - 3) + '...'
+        : normalized;
+    };
   }, [isMobile]);
 
   // Prepare trend chart data (keep ISO date strings for time axis)
@@ -549,10 +511,10 @@ const MetaAdsMetrics = ({
               valueType={breakdownChartConfig.valueType}
               axisValueType={breakdownChartConfig.valueType}
               xAxisLabelFormatter={truncateCampaignName}
-              height={isMobile ? 300 : 280}
-              horizontal={isMobile}
+              height={isMobile ? 320 : 280}
               showLegend={!isMobile}
               disableHoverEmphasis
+              xAxisLabelRotate={isMobile ? 45 : 0}
             />
           </V3ChartWrapper>
           {/* Collapsible data table */}
