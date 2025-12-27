@@ -18,6 +18,8 @@ export interface CalendarHeatmapProps {
   valueLabel?: string;
   valueType?: "number" | "currency" | "percent";
   colorScheme?: "blue" | "green" | "purple" | "orange";
+  /** Compact mode for mobile: reduced label density */
+  compact?: boolean;
   onCellClick?: (point: HeatmapDataPoint) => void;
 }
 
@@ -42,6 +44,7 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
   valueLabel = "Value",
   valueType = "number",
   colorScheme = "blue",
+  compact = false,
   onCellClick,
 }) => {
   const formatValue = React.useCallback((value: number) => {
@@ -83,10 +86,10 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
       },
     },
     grid: {
-      left: 50,
-      right: 20,
+      left: compact ? 40 : 50,
+      right: compact ? 12 : 20,
       top: 20,
-      bottom: 60,
+      bottom: compact ? 50 : 60,
     },
     xAxis: {
       type: "category",
@@ -96,8 +99,8 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
       axisTick: { show: false },
       axisLabel: {
         color: "hsl(var(--portal-text-muted))",
-        fontSize: 10,
-        interval: 2,
+        fontSize: compact ? 9 : 10,
+        interval: compact ? 3 : 2,
       },
       splitArea: { show: false },
     },
@@ -108,7 +111,7 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
       axisTick: { show: false },
       axisLabel: {
         color: "hsl(var(--portal-text-muted))",
-        fontSize: 11,
+        fontSize: compact ? 10 : 11,
       },
       splitArea: { show: false },
     },
@@ -147,7 +150,7 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
         },
       },
     ],
-  }), [heatmapData, maxValue, colorScheme, valueLabel, formatValue]);
+  }), [heatmapData, maxValue, colorScheme, valueLabel, formatValue, compact]);
 
   const handleEvents = React.useMemo(() => {
     if (!onCellClick) return undefined;

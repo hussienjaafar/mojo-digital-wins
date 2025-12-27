@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CalendarHeatmap, type HeatmapDataPoint } from "@/components/charts/CalendarHeatmap";
 import { V3Card, V3CardHeader, V3CardTitle, V3CardContent, V3LoadingState, V3EmptyState, V3ErrorState } from "@/components/v3";
 import { Clock } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DonationHeatmapProps {
   organizationId: string;
@@ -12,6 +13,7 @@ interface DonationHeatmapProps {
 }
 
 export const DonationHeatmap = ({ organizationId, startDate, endDate }: DonationHeatmapProps) => {
+  const isMobile = useIsMobile();
   const { data: donations, isLoading, isError, error } = useQuery({
     queryKey: ["donations", "heatmap", organizationId, startDate, endDate],
     queryFn: async () => {
@@ -100,10 +102,11 @@ export const DonationHeatmap = ({ organizationId, startDate, endDate }: Donation
         >
           <CalendarHeatmap
             data={heatmapData}
-            height={280}
+            height={isMobile ? 320 : 280}
             valueLabel="Net Revenue"
             valueType="currency"
             colorScheme="blue"
+            compact={isMobile}
           />
         </div>
       </V3CardContent>
