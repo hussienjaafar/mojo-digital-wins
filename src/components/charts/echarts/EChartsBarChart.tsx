@@ -196,15 +196,17 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
         ...(xAxisLabelFormatter && {
           formatter: xAxisLabelFormatter,
         }),
-        // For horizontal bars (category on y-axis), rely on \n in formatter for line breaks
+        // For horizontal bars (category on y-axis), configure labels
         ...(horizontal && {
           fontSize: 10,
           lineHeight: 12,
-          align: "right" as const,
-          margin: 8,
           interval: 0, // Show all labels, no auto-skipping
+          width: 75, // Fixed width for labels
+          overflow: "truncate" as const,
         }),
       },
+      // Explicitly position y-axis on left for horizontal charts
+      ...(horizontal && { position: "left" as const }),
     };
 
     return {
@@ -264,13 +266,11 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
           }
         : undefined,
       grid: {
-        left: gridLeft ?? (horizontal ? 120 : 12),
-        right: horizontal ? 16 : 12,
+        left: gridLeft ?? (horizontal ? 8 : 12),
+        right: horizontal ? 8 : 12,
         top: 20,
         bottom: showLegend ? 40 : 12,
-        // For horizontal bars, use fixed positioning (containLabel: false)
-        // so gridLeft is the actual margin, not a minimum that gets added to label width
-        containLabel: !horizontal,
+        containLabel: true,
       },
       xAxis: horizontal ? valueAxisConfig : categoryAxisConfig,
       yAxis: horizontal ? categoryAxisConfig : valueAxisConfig,
