@@ -264,11 +264,13 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
           }
         : undefined,
       grid: {
-        left: gridLeft ?? (horizontal ? 135 : 12),
-        right: 12,
+        left: gridLeft ?? (horizontal ? 120 : 12),
+        right: horizontal ? 16 : 12,
         top: 20,
         bottom: showLegend ? 40 : 12,
-        containLabel: true,
+        // For horizontal bars, use fixed positioning (containLabel: false)
+        // so gridLeft is the actual margin, not a minimum that gets added to label width
+        containLabel: !horizontal,
       },
       xAxis: horizontal ? valueAxisConfig : categoryAxisConfig,
       yAxis: horizontal ? categoryAxisConfig : valueAxisConfig,
