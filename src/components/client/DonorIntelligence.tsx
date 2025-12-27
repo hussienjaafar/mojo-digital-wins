@@ -9,7 +9,8 @@ import {
   V3ChartWrapper 
 } from "@/components/v3";
 import { EChartsBarChart } from "@/components/charts/echarts";
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity, GitBranch } from "lucide-react";
 import { useDonorIntelligenceQuery, type AttributionData } from "@/queries";
@@ -237,13 +238,14 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
               Deterministic when refcode/campaign/ad/creative mapping is present
             </span>
           </div>
-          <Badge
-            variant={deterministicOnly ? "default" : "outline"}
-            className="cursor-pointer"
+          <button
+            type="button"
+            className={cn(badgeVariants({ variant: deterministicOnly ? "default" : "outline" }), "cursor-pointer")}
+            aria-pressed={deterministicOnly}
             onClick={() => setDeterministicOnly(!deterministicOnly)}
           >
             {deterministicOnly ? "Showing deterministic only" : "Filter to deterministic"}
-          </Badge>
+          </button>
         </div>
         <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
           <TabsTrigger value="attribution">Attribution</TabsTrigger>
@@ -268,13 +270,20 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
               </V3CardHeader>
               <V3CardContent>
                 {platformRevenue.length > 0 ? (
-                  <EChartsBarChart
-                    data={platformRevenue}
-                    xAxisKey="name"
-                    series={[{ dataKey: "value", name: "Revenue" }]}
-                    height={250}
-                    valueType="currency"
-                  />
+                  <div
+                    role="figure"
+                    aria-label="Bar chart showing revenue by platform"
+                    tabIndex={0}
+                    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))] rounded-lg"
+                  >
+                    <EChartsBarChart
+                      data={platformRevenue}
+                      xAxisKey="name"
+                      series={[{ dataKey: "value", name: "Revenue" }]}
+                      height={250}
+                      valueType="currency"
+                    />
+                  </div>
                 ) : (
                   <div className="h-[250px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
                     No attributed donations yet
@@ -315,7 +324,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                         <div>
                           <div className="font-medium text-[hsl(var(--portal-text-primary))]">{platform.name}</div>
                           <div className="text-sm text-[hsl(var(--portal-text-muted))]">
-                            {platform.donations} donations · {platform.deterministicRate}% deterministic
+                            {platform.donations} donations | {platform.deterministicRate}% deterministic
                           </div>
                         </div>
                       </div>
@@ -362,14 +371,14 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                         <div>
                           <div className="font-medium text-[hsl(var(--portal-text-primary))] capitalize">{topic.topic}</div>
                           <div className="text-sm text-[hsl(var(--portal-text-muted))]">
-                            {topic.donations} donations • {topic.deterministicRate}% deterministic • New {topic.newDonors} / Returning {topic.returningDonors}
+                            {topic.donations} donations | {topic.deterministicRate}% deterministic | New {topic.newDonors} / Returning {topic.returningDonors}
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="font-bold text-[hsl(var(--portal-text-primary))]">{formatCurrency(topic.netRevenue)}</div>
                         <div className="text-sm text-[hsl(var(--portal-text-muted))]">
-                          Net: {formatCurrency(topic.netRevenue)} · Avg: {formatCurrency(topic.avgDonation)}
+                          Net: {formatCurrency(topic.netRevenue)} | Avg: {formatCurrency(topic.avgDonation)}
                         </div>
                       </div>
                     </div>
@@ -397,12 +406,19 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
               </V3CardHeader>
               <V3CardContent>
                 {segmentBreakdown.length > 0 ? (
-                  <EChartsBarChart
-                    data={segmentBreakdown}
-                    xAxisKey="name"
-                    series={[{ dataKey: "value", name: "Donors" }]}
-                    height={250}
-                  />
+                  <div
+                    role="figure"
+                    aria-label="Bar chart showing donor tiers by count"
+                    tabIndex={0}
+                    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))] rounded-lg"
+                  >
+                    <EChartsBarChart
+                      data={segmentBreakdown}
+                      xAxisKey="name"
+                      series={[{ dataKey: "value", name: "Donors" }]}
+                      height={250}
+                    />
+                  </div>
                 ) : (
                   <div className="h-[250px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
                     No segment data available
@@ -423,12 +439,19 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
               </V3CardHeader>
               <V3CardContent>
                 {rfmDistribution.some(d => d.value > 0) ? (
-                  <EChartsBarChart
-                    data={rfmDistribution}
-                    xAxisKey="name"
-                    series={[{ dataKey: "value", name: "Donors", color: "hsl(var(--portal-success))" }]}
-                    height={250}
-                  />
+                  <div
+                    role="figure"
+                    aria-label="Bar chart showing RFM score distribution"
+                    tabIndex={0}
+                    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))] rounded-lg"
+                  >
+                    <EChartsBarChart
+                      data={rfmDistribution}
+                      xAxisKey="name"
+                      series={[{ dataKey: "value", name: "Donors", color: "hsl(var(--portal-success))" }]}
+                      height={250}
+                    />
+                  </div>
                 ) : (
                   <div className="h-[250px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
                     No RFM data available

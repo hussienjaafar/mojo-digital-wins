@@ -433,7 +433,7 @@ export const DataFreshnessIndicator = ({ organizationId, compact = false, showAl
                   {item.recordCount.toLocaleString()} records
                   {item.latestDate && (
                     <>
-                      {' • Latest: '}
+                      {' | Latest: '}
                       {differenceInDays(new Date(), parseISO(item.latestDate)) > 7 
                         ? format(parseISO(item.latestDate), 'MMM d, yyyy')
                         : formatDistanceToNow(parseISO(item.latestDate), { addSuffix: true })

@@ -1,9 +1,8 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { parseISO, startOfDay, endOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarHeatmap, type HeatmapDataPoint } from "@/components/charts/CalendarHeatmap";
-import { V3Card, V3CardHeader, V3CardTitle, V3CardContent, V3LoadingState } from "@/components/v3";
+import { V3Card, V3CardHeader, V3CardTitle, V3CardContent, V3LoadingState, V3EmptyState, V3ErrorState } from "@/components/v3";
 import { Clock } from "lucide-react";
 
 interface DonationHeatmapProps {
@@ -13,19 +12,15 @@ interface DonationHeatmapProps {
 }
 
 export const DonationHeatmap = ({ organizationId, startDate, endDate }: DonationHeatmapProps) => {
-  // Compute full-day range for inclusive date filtering
-  const rangeStart = startOfDay(parseISO(startDate));
-  const rangeEnd = endOfDay(parseISO(endDate));
-
-  const { data: donations, isLoading } = useQuery({
+  const { data: donations, isLoading, isError, error } = useQuery({
     queryKey: ["donations", "heatmap", organizationId, startDate, endDate],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("actblue_transactions")
-        .select("transaction_date, amount")
+        .select("transaction_date, created_at, amount, net_amount, transaction_type")
         .eq("organization_id", organizationId)
-        .gte("transaction_date", rangeStart.toISOString())
-        .lte("transaction_date", rangeEnd.toISOString());
+        .gte("transaction_date", startDate)
+        .lte("transaction_date", endDate);
 
       if (error) throw error;
       return data || [];
@@ -35,17 +30,6 @@ export const DonationHeatmap = ({ organizationId, startDate, endDate }: Donation
   });
 
   const heatmapData = useMemo<HeatmapDataPoint[]>(() => {
-    if (!donations || donations.length === 0) {
-      // Return empty grid
-      const emptyGrid: HeatmapDataPoint[] = [];
-      for (let day = 0; day < 7; day++) {
-        for (let hour = 0; hour < 24; hour++) {
-          emptyGrid.push({ dayOfWeek: day, hour, value: 0 });
-        }
-      }
-      return emptyGrid;
-    }
-
     // Aggregate donations by day of week and hour
     const grid: Record<string, number> = {};
     for (let day = 0; day < 7; day++) {
@@ -54,13 +38,17 @@ export const DonationHeatmap = ({ organizationId, startDate, endDate }: Donation
       }
     }
 
-    donations.forEach((donation) => {
-      const date = new Date(donation.transaction_date);
-      // Use local time for bucketing
+    donations?.forEach((donation) => {
+      // Skip refunds to show net revenue only
+      if (donation.transaction_type === "refund") return;
+      // Use created_at for accurate hour bucketing, fallback to transaction_date
+      const date = new Date(donation.created_at ?? donation.transaction_date);
       const dayOfWeek = date.getDay();
       const hour = date.getHours();
       const key = `${dayOfWeek}-${hour}`;
-      grid[key] = (grid[key] || 0) + Number(donation.amount || 0);
+      // Use net_amount first, fallback to amount
+      const value = Number(donation.net_amount ?? donation.amount ?? 0);
+      grid[key] += value;
     });
 
     return Object.entries(grid).map(([key, value]) => {
@@ -71,6 +59,25 @@ export const DonationHeatmap = ({ organizationId, startDate, endDate }: Donation
 
   if (isLoading) {
     return <V3LoadingState variant="chart" height={280} />;
+  }
+
+  if (isError) {
+    return (
+      <V3ErrorState
+        title="Failed to load donation heatmap"
+        message={error instanceof Error ? error.message : "An error occurred"}
+      />
+    );
+  }
+
+  if (!donations || donations.length === 0) {
+    return (
+      <V3EmptyState
+        icon={Clock}
+        title="No donation activity"
+        description="No donations recorded in this date range."
+      />
+    );
   }
 
   return (
@@ -85,13 +92,20 @@ export const DonationHeatmap = ({ organizationId, startDate, endDate }: Donation
         </p>
       </V3CardHeader>
       <V3CardContent>
-        <CalendarHeatmap
-          data={heatmapData}
-          height={280}
-          valueLabel="Revenue"
-          valueType="currency"
-          colorScheme="blue"
-        />
+        <div
+          role="figure"
+          aria-label="Heatmap showing donation activity by day of week and hour"
+          tabIndex={0}
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))] rounded-lg"
+        >
+          <CalendarHeatmap
+            data={heatmapData}
+            height={280}
+            valueLabel="Net Revenue"
+            valueType="currency"
+            colorScheme="blue"
+          />
+        </div>
       </V3CardContent>
     </V3Card>
   );

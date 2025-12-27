@@ -28,10 +28,10 @@ const hourLabels = Array.from({ length: 24 }, (_, i) =>
 
 // Color schemes using design system tokens
 const colorSchemes = {
-  blue: [cssVar(colors.bg.elevated), cssVar(colors.accent.blue)],
-  green: [cssVar(colors.bg.elevated), cssVar(colors.status.success)],
-  purple: [cssVar(colors.bg.elevated), cssVar(colors.accent.purple)],
-  orange: [cssVar(colors.bg.elevated), cssVar(colors.status.warning)],
+  blue: [cssVar(colors.bg.tertiary), cssVar(colors.accent.blue)],
+  green: [cssVar(colors.bg.tertiary), cssVar(colors.status.success)],
+  purple: [cssVar(colors.bg.tertiary), cssVar(colors.accent.purple)],
+  orange: [cssVar(colors.bg.tertiary), cssVar(colors.status.warning)],
 };
 
 export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
@@ -60,8 +60,12 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
     return data.map(d => [d.hour, d.dayOfWeek, d.value || 0]);
   }, [data]);
 
+  // Use p95 percentile to cap outliers and improve color distribution
   const maxValue = React.useMemo(() => {
-    return Math.max(...data.map(d => d.value), 1);
+    const positiveValues = data.map(d => d.value).filter(v => v > 0).sort((a, b) => a - b);
+    if (positiveValues.length === 0) return 1;
+    const p95Index = Math.floor(positiveValues.length * 0.95);
+    return positiveValues[Math.min(p95Index, positiveValues.length - 1)] || 1;
   }, [data]);
 
   const option = React.useMemo<EChartsOption>(() => ({
@@ -138,8 +142,8 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
         },
         itemStyle: {
           borderRadius: 3,
-          borderWidth: 2,
-          borderColor: "hsl(var(--portal-bg-base))",
+          borderWidth: 1,
+          borderColor: cssVar(colors.border.default),
         },
       },
     ],
