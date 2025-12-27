@@ -251,7 +251,8 @@ const MetaAdsMetrics = ({
             } else if (line1 === '') {
               // First word is too long, slice it
               line1 = word.slice(0, 12);
-              line2 = word.slice(12);
+              const remainder = word.slice(12);
+              line2 = remainder.length > 12 ? remainder.slice(0, 9) + '...' : remainder;
               onLine2 = true;
             } else {
               onLine2 = true;
@@ -267,6 +268,11 @@ const MetaAdsMetrics = ({
               break;
             }
           }
+        }
+
+        // Final guard: ensure line2 never exceeds 12 chars
+        if (line2 && line2.length > 12) {
+          line2 = line2.slice(0, 9) + '...';
         }
 
         return line2 ? `${line1}\n${line2}` : line1;
