@@ -49,6 +49,8 @@ export interface EChartsBarChartProps {
   enableCrossHighlight?: boolean;
   /** Disable hover emphasis to prevent bars from disappearing on hover */
   disableHoverEmphasis?: boolean;
+  /** Override grid left padding (defaults to 135 for horizontal, 12 otherwise) */
+  gridLeft?: number;
   onBarClick?: (params: { dataIndex: number; seriesName: string; value: unknown; name: string }) => void;
 }
 
@@ -70,6 +72,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
   horizontal = false,
   enableCrossHighlight = false,
   disableHoverEmphasis = false,
+  gridLeft,
   onBarClick,
 }) => {
   const { setHoveredDataPoint, hoveredDataPoint } = useChartInteractionStore();
@@ -261,7 +264,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
           }
         : undefined,
       grid: {
-        left: horizontal ? 135 : 12,
+        left: gridLeft ?? (horizontal ? 135 : 12),
         right: 12,
         top: 20,
         bottom: showLegend ? 40 : 12,
@@ -271,7 +274,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
       yAxis: horizontal ? categoryAxisConfig : valueAxisConfig,
       series: seriesConfig,
     };
-  }, [data, xAxisKey, series, showLegend, showTooltip, horizontal, formatAxisValue, formatTooltipValue, xAxisLabelFormatter, enableCrossHighlight, disableHoverEmphasis, hoveredDataPoint]);
+  }, [data, xAxisKey, series, showLegend, showTooltip, horizontal, formatAxisValue, formatTooltipValue, xAxisLabelFormatter, enableCrossHighlight, disableHoverEmphasis, gridLeft, hoveredDataPoint]);
 
   const handleEvents = React.useMemo(() => {
     const events: Record<string, (params: EChartsBarParams) => void> = {};

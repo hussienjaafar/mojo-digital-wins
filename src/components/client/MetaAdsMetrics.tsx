@@ -547,6 +547,7 @@ const MetaAdsMetrics = ({
               horizontal={isMobile}
               showLegend={!isMobile}
               disableHoverEmphasis
+              gridLeft={isMobile ? 90 : undefined}
             />
           </V3ChartWrapper>
           {/* Collapsible data table */}
