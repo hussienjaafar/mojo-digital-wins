@@ -511,7 +511,8 @@ const MetaAdsMetrics = ({
               valueType={breakdownChartConfig.valueType}
               axisValueType={breakdownChartConfig.valueType}
               xAxisLabelFormatter={truncateCampaignName}
-              height={isMobile ? 320 : 280}
+              height={isMobile ? 350 : 280}
+              horizontal={false}
               showLegend={!isMobile}
               disableHoverEmphasis
               xAxisLabelRotate={isMobile ? 45 : 0}
