@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface V3TrendIndicatorProps {
@@ -12,15 +12,23 @@ interface V3TrendIndicatorProps {
   size?: "sm" | "md";
   /** Custom suffix (default: %) */
   suffix?: string;
+  /** Show text prefix for colorblind accessibility (↑ or ↓) */
+  showDirectionText?: boolean;
   className?: string;
 }
 
+/**
+ * Trend indicator with colorblind accessibility.
+ * Uses both color AND icons to convey direction (WCAG 1.4.1 compliance).
+ * Icons are always shown to ensure information is not conveyed by color alone.
+ */
 export const V3TrendIndicator: React.FC<V3TrendIndicatorProps> = ({
   value,
   isPositive,
   neutral = false,
   size = "sm",
   suffix = "%",
+  showDirectionText = false,
   className,
 }) => {
   // Determine direction: positive means good (green), negative means bad (red)
@@ -54,6 +62,10 @@ export const V3TrendIndicator: React.FC<V3TrendIndicatorProps> = ({
     );
   }
 
+  // Use directional arrow icons that are distinguishable regardless of color
+  const DirectionIcon = positive ? TrendingUp : TrendingDown;
+  const directionPrefix = showDirectionText ? (positive ? "↑ " : "↓ ") : "";
+
   return (
     <span
       className={cn(
@@ -66,12 +78,8 @@ export const V3TrendIndicator: React.FC<V3TrendIndicatorProps> = ({
       )}
       aria-label={`${positive ? "Increased" : "Decreased"} by ${Math.abs(value).toFixed(1)}${suffix}`}
     >
-      {positive ? (
-        <TrendingUp className={iconSizes[size]} aria-hidden="true" />
-      ) : (
-        <TrendingDown className={iconSizes[size]} aria-hidden="true" />
-      )}
-      <span>{Math.abs(value).toFixed(1)}{suffix}</span>
+      <DirectionIcon className={iconSizes[size]} aria-hidden="true" />
+      <span>{directionPrefix}{Math.abs(value).toFixed(1)}{suffix}</span>
     </span>
   );
 };
