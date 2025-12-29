@@ -1,14 +1,24 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, MapPin, Briefcase, Users, DollarSign, TrendingUp } from "lucide-react";
+import { Download, MapPin, Briefcase, Users, DollarSign, TrendingUp, Share2 } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { ClientLayout } from "@/components/client/ClientLayout";
-import { getChartColors } from "@/lib/design-tokens";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { ClientShell } from "@/components/client/ClientShell";
+import {
+  V3PageContainer,
+  V3Card,
+  V3CardHeader,
+  V3CardTitle,
+  V3CardDescription,
+  V3CardContent,
+  V3KPICard,
+  V3ChartWrapper,
+  V3LoadingState,
+  V3EmptyState,
+  V3Button,
+} from "@/components/v3";
 
 type Organization = {
   id: string;
@@ -25,8 +35,14 @@ type DonorStats = {
   channelData: Array<{ channel: string; count: number; revenue: number }>;
 };
 
-// Use design system chart colors
-const COLORS = getChartColors();
+const CHART_COLORS = [
+  "hsl(var(--portal-accent-blue))",
+  "hsl(var(--portal-accent-green))",
+  "hsl(var(--portal-accent-yellow))",
+  "hsl(var(--portal-accent-red))",
+  "hsl(var(--portal-accent-purple))",
+  "hsl(var(--portal-accent-cyan))",
+];
 
 const ClientDemographics = () => {
   const navigate = useNavigate();
@@ -35,6 +51,7 @@ const ClientDemographics = () => {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [stats, setStats] = useState<DonorStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -64,7 +81,6 @@ const ClientDemographics = () => {
     try {
       setIsLoading(true);
       
-      // Load organization
       const { data: clientUser } = await (supabase as any)
         .from('client_users')
         .select('organization_id')
@@ -81,7 +97,6 @@ const ClientDemographics = () => {
 
       setOrganization(org);
 
-      // Load donor demographics from secure view (defense-in-depth: masks PII for unauthorized users)
       const { data: transactions, error } = await (supabase as any)
         .from('actblue_transactions_secure')
         .select('*')
@@ -89,12 +104,10 @@ const ClientDemographics = () => {
 
       if (error) throw error;
 
-      // Calculate statistics
       const totalDonors = new Set(transactions?.map((t: any) => t.donor_email).filter(Boolean)).size;
       const totalRevenue = transactions?.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0) || 0;
       const averageDonation = totalDonors > 0 ? totalRevenue / transactions.length : 0;
 
-      // Location breakdown
       const locationMap = new Map<string, { count: number; revenue: number }>();
       transactions?.forEach((t: any) => {
         if (t.state) {
@@ -110,7 +123,6 @@ const ClientDemographics = () => {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 10);
 
-      // Occupation breakdown
       const occupationMap = new Map<string, { count: number; revenue: number }>();
       transactions?.forEach((t: any) => {
         const occupation = t.occupation || 'Not Provided';
@@ -126,7 +138,6 @@ const ClientDemographics = () => {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 10);
 
-      // Channel breakdown (from refcode)
       const channelMap = new Map<string, { count: number; revenue: number }>();
       transactions?.forEach((t: any) => {
         const channel = t.refcode ? 'Campaign' : t.is_express ? 'Express' : 'Direct';
@@ -159,6 +170,7 @@ const ClientDemographics = () => {
   };
 
   const handleExportCSV = async () => {
+    setIsExporting(true);
     try {
       const { data: clientUser } = await (supabase as any)
         .from('client_users')
@@ -171,7 +183,6 @@ const ClientDemographics = () => {
         .select('*')
         .eq('organization_id', clientUser.organization_id);
 
-      // Create CSV
       const headers = ['Date', 'Donor Name', 'Email', 'Amount', 'State', 'City', 'Occupation', 'Employer'];
       const rows = transactions?.map((t: any) => [
         t.transaction_date,
@@ -202,193 +213,221 @@ const ClientDemographics = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsExporting(false);
     }
   };
 
-  if (isLoading || !organization) {
-    return null;
+  if (isLoading) {
+    return (
+      <ClientShell>
+        <div className="p-6">
+          <V3LoadingState variant="kpi-grid" count={3} />
+          <div className="mt-6">
+            <V3LoadingState variant="chart" />
+          </div>
+        </div>
+      </ClientShell>
+    );
+  }
+
+  if (!organization || !stats) {
+    return (
+      <ClientShell>
+        <V3EmptyState
+          title="No Donor Data"
+          description="There is no transaction data available to analyze demographics."
+          accent="blue"
+        />
+      </ClientShell>
+    );
   }
 
   return (
-    <ClientLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Donor Demographics</h2>
-          <Button variant="outline" onClick={handleExportCSV}>
+    <ClientShell>
+      <V3PageContainer
+        title="Donor Demographics"
+        description="Analyze your donor base by location, occupation, and acquisition channel"
+        actions={
+          <V3Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExportCSV}
+            disabled={isExporting}
+          >
             <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-        </div>
-        {/* Summary Stats */}
+            {isExporting ? "Exporting..." : "Export CSV"}
+          </V3Button>
+        }
+      >
+        {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Donors</p>
-                  <p className="text-3xl font-bold">{stats?.totalDonors.toLocaleString()}</p>
-                </div>
-                <Users className="h-8 w-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  <p className="text-3xl font-bold">${stats?.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                </div>
-                <DollarSign className="h-8 w-8 text-success" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Average Donation</p>
-                  <p className="text-3xl font-bold">${stats?.averageDonation.toFixed(2)}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-info" />
-              </div>
-            </CardContent>
-          </Card>
+          <V3KPICard
+            label="Total Donors"
+            value={stats.totalDonors.toLocaleString()}
+            icon={Users}
+            accent="blue"
+          />
+          <V3KPICard
+            label="Total Revenue"
+            value={`$${stats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+            icon={DollarSign}
+            accent="green"
+          />
+          <V3KPICard
+            label="Average Donation"
+            value={`$${stats.averageDonation.toFixed(2)}`}
+            icon={TrendingUp}
+            accent="purple"
+          />
         </div>
 
         {/* Location Breakdown */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Top Donor Locations
-            </CardTitle>
-            <CardDescription>Geographic distribution of donors by state</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={stats?.locationData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="state" />
-                <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-                <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                <Tooltip />
-                <Legend />
-                <Bar yAxisId="left" dataKey="count" fill="#8884d8" name="Donor Count" />
-                <Bar yAxisId="right" dataKey="revenue" fill="#82ca9d" name="Revenue ($)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <V3ChartWrapper
+          title="Top Donor Locations"
+          icon={MapPin}
+          ariaLabel="Bar chart showing donor distribution by state"
+          className="mb-6"
+        >
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={stats.locationData}>
+              <XAxis
+                dataKey="state"
+                stroke="hsl(var(--portal-text-muted))"
+                fontSize={12}
+              />
+              <YAxis
+                stroke="hsl(var(--portal-text-muted))"
+                fontSize={12}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--portal-bg-card))",
+                  border: "1px solid hsl(var(--portal-border))",
+                  borderRadius: "8px",
+                  color: "hsl(var(--portal-text-primary))",
+                }}
+                formatter={(value: number, name: string) => [
+                  name === 'revenue' ? `$${value.toLocaleString()}` : value,
+                  name === 'revenue' ? 'Revenue' : 'Donors'
+                ]}
+              />
+              <Bar dataKey="count" fill="hsl(var(--portal-accent-blue))" radius={[4, 4, 0, 0]} name="Donors" />
+            </BarChart>
+          </ResponsiveContainer>
+        </V3ChartWrapper>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Occupation Breakdown */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5" />
-                Top Occupations
-              </CardTitle>
-              <CardDescription>Donor breakdown by occupation</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={stats?.occupationData.slice(0, 6)}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry) => entry.occupation}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="count"
-                  >
-                    {stats?.occupationData.slice(0, 6).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          <V3ChartWrapper
+            title="Top Occupations"
+            icon={Briefcase}
+            ariaLabel="Pie chart showing donor distribution by occupation"
+          >
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={stats.occupationData.slice(0, 6)}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ occupation, percent }) => `${occupation.slice(0, 15)}${occupation.length > 15 ? '...' : ''} ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  dataKey="count"
+                >
+                  {stats.occupationData.slice(0, 6).map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--portal-bg-card))",
+                    border: "1px solid hsl(var(--portal-border))",
+                    borderRadius: "8px",
+                    color: "hsl(var(--portal-text-primary))",
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </V3ChartWrapper>
 
           {/* Channel Breakdown */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Acquisition Channels
-              </CardTitle>
-              <CardDescription>How donors found you</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={stats?.channelData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry) => `${entry.channel}: ${entry.count}`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="revenue"
-                  >
-                    {stats?.channelData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          <V3ChartWrapper
+            title="Acquisition Channels"
+            icon={Share2}
+            ariaLabel="Pie chart showing donor distribution by acquisition channel"
+          >
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={stats.channelData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ channel, percent }) => `${channel} ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  dataKey="revenue"
+                >
+                  {stats.channelData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--portal-bg-card))",
+                    border: "1px solid hsl(var(--portal-border))",
+                    borderRadius: "8px",
+                    color: "hsl(var(--portal-text-primary))",
+                  }}
+                  formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </V3ChartWrapper>
         </div>
 
         {/* Detailed Tables */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Location Details</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <V3Card>
+            <V3CardHeader>
+              <V3CardTitle>Location Details</V3CardTitle>
+            </V3CardHeader>
+            <V3CardContent>
               <div className="space-y-2">
-                {stats?.locationData.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between py-2 border-b">
-                    <span className="font-medium">{item.state}</span>
+                {stats.locationData.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
+                    <span className="font-medium text-[hsl(var(--portal-text-primary))]">{item.state}</span>
                     <div className="text-right">
-                      <div className="text-sm font-semibold">${item.revenue.toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">{item.count} donors</div>
+                      <div className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">${item.revenue.toLocaleString()}</div>
+                      <div className="text-xs text-[hsl(var(--portal-text-muted))]">{item.count} donors</div>
                     </div>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </V3CardContent>
+          </V3Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Occupation Details</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <V3Card>
+            <V3CardHeader>
+              <V3CardTitle>Occupation Details</V3CardTitle>
+            </V3CardHeader>
+            <V3CardContent>
               <div className="space-y-2">
-                {stats?.occupationData.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between py-2 border-b">
-                    <span className="font-medium truncate max-w-[200px]">{item.occupation}</span>
+                {stats.occupationData.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
+                    <span className="font-medium text-[hsl(var(--portal-text-primary))] truncate max-w-[200px]">{item.occupation}</span>
                     <div className="text-right">
-                      <div className="text-sm font-semibold">${item.revenue.toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">{item.count} donors</div>
+                      <div className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">${item.revenue.toLocaleString()}</div>
+                      <div className="text-xs text-[hsl(var(--portal-text-muted))]">{item.count} donors</div>
                     </div>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </V3CardContent>
+          </V3Card>
         </div>
-      </div>
-    </ClientLayout>
+      </V3PageContainer>
+    </ClientShell>
   );
 };
 
