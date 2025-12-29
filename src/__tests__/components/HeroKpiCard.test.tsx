@@ -88,8 +88,8 @@ export const mockBreakdown = [
 
 describe('HeroKpiCard', () => {
   const defaultProps = {
-    kpiKey: 'totalDonations' as const,
-    label: 'Total Donations',
+    kpiKey: 'netRevenue' as const,
+    label: 'Net Revenue',
     value: '$125,000',
     icon: DollarSign,
   };
@@ -341,12 +341,12 @@ describe('HeroKpiCard', () => {
       );
 
       const button = screen.getByRole('button');
-      expect(button).toHaveAccessibleName(/Total Donations.*\$125,000.*up 15%/i);
+      expect(button).toHaveAccessibleName(/Net Revenue.*\$125,000.*up 15%/i);
     });
 
     it('has aria-pressed when selected', async () => {
       const { useSelectedKpiKey } = await import('@/stores/dashboardStore');
-      vi.mocked(useSelectedKpiKey).mockReturnValue('totalDonations');
+      vi.mocked(useSelectedKpiKey).mockReturnValue('netRevenue');
 
       render(<HeroKpiCard {...defaultProps} />);
 
@@ -443,13 +443,13 @@ describe('HeroKpiCard', () => {
     it('sets aria-expanded to true when drilldown is open and selected', async () => {
       // Mock the store to return this card as selected with drilldown open
       const { useSelectedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
-      vi.mocked(useSelectedKpiKey).mockReturnValue('totalDonations');
+      vi.mocked(useSelectedKpiKey).mockReturnValue('netRevenue');
       vi.mocked(useIsDrilldownOpen).mockReturnValue(true);
 
       render(<HeroKpiCard {...drilldownProps} />);
 
       // Get the card button specifically by its label (drawer close button is also present)
-      const cardButton = screen.getByRole('button', { name: /Total Donations/i });
+      const cardButton = screen.getByRole('button', { name: /Net Revenue/i });
       expect(cardButton).toHaveAttribute('aria-expanded', 'true');
     });
 
@@ -572,14 +572,14 @@ describe('HeroKpiCard', () => {
       it('renders V3KPIDrilldownDrawer when selected and drilldown open', async () => {
         // Mock store state: card is selected and drilldown is open
         const { useSelectedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
-        vi.mocked(useSelectedKpiKey).mockReturnValue('totalDonations');
+        vi.mocked(useSelectedKpiKey).mockReturnValue('netRevenue');
         vi.mocked(useIsDrilldownOpen).mockReturnValue(true);
 
         render(<HeroKpiCard {...drilldownProps} expansionMode="drawer" />);
 
         // V3KPIDrilldownDrawer should be visible
         expect(screen.getByTestId('drilldown-drawer')).toBeInTheDocument();
-        expect(screen.getByTestId('drilldown-drawer')).toHaveAttribute('data-label', 'Total Donations');
+        expect(screen.getByTestId('drilldown-drawer')).toHaveAttribute('data-label', 'Net Revenue');
       });
 
       it('does not render V3KPIDrilldownDrawer when not selected', async () => {
@@ -604,7 +604,7 @@ describe('HeroKpiCard', () => {
 
       it('calls setDrilldownOpen(false) when drawer close button clicked', async () => {
         const { useSelectedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
-        vi.mocked(useSelectedKpiKey).mockReturnValue('totalDonations');
+        vi.mocked(useSelectedKpiKey).mockReturnValue('netRevenue');
         vi.mocked(useIsDrilldownOpen).mockReturnValue(true);
         vi.clearAllMocks();
 
@@ -619,14 +619,14 @@ describe('HeroKpiCard', () => {
 
       it('toggles drawer closed when clicking already-selected card', async () => {
         const { useSelectedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
-        vi.mocked(useSelectedKpiKey).mockReturnValue('totalDonations');
+        vi.mocked(useSelectedKpiKey).mockReturnValue('netRevenue');
         vi.mocked(useIsDrilldownOpen).mockReturnValue(true);
         vi.clearAllMocks();
 
         render(<HeroKpiCard {...drilldownProps} expansionMode="drawer" />);
 
         // Get the card button specifically by its label (drawer close button is also present)
-        const cardButton = screen.getByRole('button', { name: /Total Donations/i });
+        const cardButton = screen.getByRole('button', { name: /Net Revenue/i });
         fireEvent.click(cardButton);
 
         // Should close drawer when clicking already-selected card
@@ -660,13 +660,13 @@ describe('HeroKpiCard', () => {
 
       it('does NOT render V3KPIDrilldownDrawer in inline mode', async () => {
         const { useSelectedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
-        vi.mocked(useSelectedKpiKey).mockReturnValue('totalDonations');
+        vi.mocked(useSelectedKpiKey).mockReturnValue('netRevenue');
         vi.mocked(useIsDrilldownOpen).mockReturnValue(true);
 
         render(<HeroKpiCard {...drilldownProps} expansionMode="inline" />);
 
         // Get the card button specifically by its label (inline expansion close button may be present)
-        const cardButton = screen.getByRole('button', { name: /Total Donations/i });
+        const cardButton = screen.getByRole('button', { name: /Net Revenue/i });
         fireEvent.click(cardButton);
 
         // Drawer should NOT be rendered in inline mode
@@ -807,13 +807,13 @@ describe('HeroKpiCard', () => {
       const card = screen.getByRole('button');
       fireEvent.mouseEnter(card);
 
-      expect(mockSetHighlightedKpiKey).toHaveBeenCalledWith('totalDonations');
+      expect(mockSetHighlightedKpiKey).toHaveBeenCalledWith('netRevenue');
     });
 
     it('clears highlighted key on mouse leave', async () => {
       const { useSelectedKpiKey, useHighlightedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
       vi.mocked(useSelectedKpiKey).mockReturnValue(null);
-      vi.mocked(useHighlightedKpiKey).mockReturnValue('totalDonations');
+      vi.mocked(useHighlightedKpiKey).mockReturnValue('netRevenue');
       vi.mocked(useIsDrilldownOpen).mockReturnValue(false);
       vi.clearAllMocks();
 
@@ -828,7 +828,7 @@ describe('HeroKpiCard', () => {
     it('applies highlighted styling when highlightedKpiKey matches', async () => {
       const { useSelectedKpiKey, useHighlightedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
       vi.mocked(useSelectedKpiKey).mockReturnValue(null);
-      vi.mocked(useHighlightedKpiKey).mockReturnValue('totalDonations');
+      vi.mocked(useHighlightedKpiKey).mockReturnValue('netRevenue');
       vi.mocked(useIsDrilldownOpen).mockReturnValue(false);
 
       render(<HeroKpiCard {...defaultProps} />);
@@ -840,7 +840,7 @@ describe('HeroKpiCard', () => {
 
     it('applies selected styling when selectedKpiKey matches', async () => {
       const { useSelectedKpiKey, useHighlightedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
-      vi.mocked(useSelectedKpiKey).mockReturnValue('totalDonations');
+      vi.mocked(useSelectedKpiKey).mockReturnValue('netRevenue');
       vi.mocked(useHighlightedKpiKey).mockReturnValue(null);
       vi.mocked(useIsDrilldownOpen).mockReturnValue(false);
 
@@ -853,8 +853,8 @@ describe('HeroKpiCard', () => {
 
     it('does not show highlighted styling when card is selected', async () => {
       const { useSelectedKpiKey, useHighlightedKpiKey, useIsDrilldownOpen } = await import('@/stores/dashboardStore');
-      vi.mocked(useSelectedKpiKey).mockReturnValue('totalDonations');
-      vi.mocked(useHighlightedKpiKey).mockReturnValue('totalDonations');
+      vi.mocked(useSelectedKpiKey).mockReturnValue('netRevenue');
+      vi.mocked(useHighlightedKpiKey).mockReturnValue('netRevenue');
       vi.mocked(useIsDrilldownOpen).mockReturnValue(false);
 
       render(<HeroKpiCard {...defaultProps} />);

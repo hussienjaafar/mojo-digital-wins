@@ -1,0 +1,61 @@
+-- Drop and recreate actblue_transactions_secure view with donor_id_hash column
+DROP VIEW IF EXISTS public.actblue_transactions_secure;
+
+CREATE VIEW public.actblue_transactions_secure AS
+SELECT 
+  id,
+  organization_id,
+  transaction_id,
+  transaction_date,
+  transaction_type,
+  amount,
+  net_amount,
+  fee,
+  CASE WHEN has_pii_access(organization_id) THEN donor_email ELSE mask_email(donor_email) END AS donor_email,
+  CASE WHEN has_pii_access(organization_id) THEN donor_name ELSE mask_name(donor_name) END AS donor_name,
+  CASE WHEN has_pii_access(organization_id) THEN first_name ELSE mask_name(first_name) END AS first_name,
+  CASE WHEN has_pii_access(organization_id) THEN last_name ELSE mask_name(last_name) END AS last_name,
+  CASE WHEN has_pii_access(organization_id) THEN addr1 ELSE mask_address(addr1) END AS addr1,
+  city,
+  state,
+  zip,
+  country,
+  CASE WHEN has_pii_access(organization_id) THEN phone ELSE mask_phone(phone) END AS phone,
+  CASE WHEN has_pii_access(organization_id) THEN employer ELSE NULL END AS employer,
+  CASE WHEN has_pii_access(organization_id) THEN occupation ELSE NULL END AS occupation,
+  is_recurring,
+  recurring_period,
+  recurring_duration,
+  recurring_state,
+  next_charge_date,
+  recurring_upsell_shown,
+  recurring_upsell_succeeded,
+  double_down,
+  is_express,
+  is_mobile,
+  payment_method,
+  card_type,
+  committee_name,
+  fec_id,
+  entity_id,
+  contribution_form,
+  refcode,
+  refcode2,
+  refcode_custom,
+  source_campaign,
+  click_id,
+  fbclid,
+  ab_test_name,
+  ab_test_variation,
+  text_message_option,
+  custom_fields,
+  smart_boost_amount,
+  order_number,
+  lineitem_id,
+  created_at,
+  CASE 
+    WHEN donor_email IS NOT NULL THEN encode(digest(lower(donor_email)::bytea, 'sha256'), 'hex') 
+    ELSE NULL 
+  END AS donor_id_hash
+FROM public.actblue_transactions
+WHERE user_belongs_to_organization(organization_id) OR has_role(auth.uid(), 'admin'::app_role);
