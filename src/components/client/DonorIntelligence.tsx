@@ -247,13 +247,13 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
             {deterministicOnly ? "Showing deterministic only" : "Filter to deterministic"}
           </button>
         </div>
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
-          <TabsTrigger value="attribution">Attribution</TabsTrigger>
-          <TabsTrigger value="topics">Creative Topics</TabsTrigger>
-          <TabsTrigger value="segments">Donor Segments</TabsTrigger>
-          <TabsTrigger value="sms">SMS Funnel</TabsTrigger>
-          <TabsTrigger value="journeys">Journeys</TabsTrigger>
-          <TabsTrigger value="ltv">LTV/Forecast</TabsTrigger>
+        <TabsList className="flex w-full overflow-x-auto scrollbar-thin scrollbar-thumb-[hsl(var(--portal-border))] scrollbar-track-transparent">
+          <TabsTrigger value="attribution" className="flex-shrink-0">Attribution</TabsTrigger>
+          <TabsTrigger value="topics" className="flex-shrink-0">Topics</TabsTrigger>
+          <TabsTrigger value="segments" className="flex-shrink-0">Segments</TabsTrigger>
+          <TabsTrigger value="sms" className="flex-shrink-0">SMS</TabsTrigger>
+          <TabsTrigger value="journeys" className="flex-shrink-0">Journeys</TabsTrigger>
+          <TabsTrigger value="ltv" className="flex-shrink-0">LTV</TabsTrigger>
         </TabsList>
 
         <TabsContent value="attribution" className="space-y-6">
