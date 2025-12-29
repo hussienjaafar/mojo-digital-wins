@@ -8,6 +8,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
+const RATE_LIMIT_BACKOFF_MS = 60000;
+
 interface SwitchboardCredentials {
   api_key: string;
   account_id: string;
@@ -66,6 +71,43 @@ interface SwitchboardMessageResponse {
   errors: Array<{ code: string; title: string; description: string }>;
 }
 
+// Utility: sleep for retry backoff
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Utility: fetch with retry and rate limit handling
+async function fetchWithRetry<T>(
+  fn: () => Promise<T>,
+  context: string,
+  maxRetries = MAX_RETRIES
+): Promise<T> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      const isRateLimit = error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit');
+      const isServerError = error.message?.includes('500') || error.message?.includes('502') || error.message?.includes('503');
+      
+      if (isRateLimit) {
+        console.warn(`[SMS SYNC] Rate limited on ${context}, waiting ${RATE_LIMIT_BACKOFF_MS}ms before retry ${attempt}/${maxRetries}`);
+        await sleep(RATE_LIMIT_BACKOFF_MS);
+      } else if (isServerError && attempt < maxRetries) {
+        const delay = RETRY_DELAY_MS * attempt;
+        console.warn(`[SMS SYNC] Server error on ${context}, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        await sleep(delay);
+      } else if (attempt < maxRetries) {
+        const delay = RETRY_DELAY_MS * attempt;
+        console.warn(`[SMS SYNC] Error on ${context}: ${error.message}, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        await sleep(delay);
+      }
+    }
+  }
+  
+  throw lastError || new Error(`Failed after ${maxRetries} retries: ${context}`);
+}
+
 async function fetchSwitchboardBroadcasts(
   accountId: string,
   secretKey: string,
@@ -73,6 +115,8 @@ async function fetchSwitchboardBroadcasts(
 ): Promise<SwitchboardResponse> {
   const url = cursor || 'https://api.oneswitchboard.com/v1/broadcasts';
   const credentials = btoa(`${accountId}:${secretKey}`);
+  
+  console.log(`[SMS SYNC] Fetching broadcasts from: ${cursor ? 'next page' : 'first page'}`);
   
   const response = await fetch(url, {
     method: 'GET',
@@ -84,7 +128,17 @@ async function fetchSwitchboardBroadcasts(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`Switchboard API error: ${response.status} - ${errorText}`);
+    console.error(`[SMS SYNC] Switchboard API error: ${response.status} - ${errorText}`);
+    
+    // Check for specific error types
+    if (response.status === 401) {
+      throw new Error(`Switchboard authentication failed (401): Invalid API credentials`);
+    } else if (response.status === 403) {
+      throw new Error(`Switchboard access denied (403): Check account permissions`);
+    } else if (response.status === 429) {
+      throw new Error(`Switchboard rate limit exceeded (429): ${errorText}`);
+    }
+    
     throw new Error(`Switchboard API error: ${response.status} - ${errorText}`);
   }
 
@@ -110,7 +164,7 @@ async function fetchBroadcastMessages(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`Switchboard API error (messages): ${response.status} - ${errorText}`);
+    console.error(`[SMS SYNC] Messages API error for broadcast ${broadcastId}: ${response.status} - ${errorText}`);
     throw new Error(`Switchboard API error: ${response.status} - ${errorText}`);
   }
 
@@ -139,7 +193,19 @@ const deriveOccurredAt = (msg: SwitchboardMessageEvent): string => {
   );
 };
 
+// Hash phone number for privacy
+const hashPhone = async (phone: string | null): Promise<string | null> => {
+  if (!phone) return null;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(phone);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+};
+
 serve(async (req) => {
+  const startTime = Date.now();
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -149,7 +215,10 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    const { organization_id } = await req.json();
+    const body = await req.json();
+    const { organization_id, force_full_sync = false, since_date = null } = body;
+    
+    console.log(`[SMS SYNC] Starting sync for org: ${organization_id}, force_full: ${force_full_sync}, since: ${since_date}`);
 
     if (!organization_id) {
       throw new Error('organization_id is required');
