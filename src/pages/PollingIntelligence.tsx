@@ -1,16 +1,24 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { TrendingUp, TrendingDown, AlertTriangle, Target, Users, BarChart3 } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { ClientShell } from "@/components/client/ClientShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { TrendingUp, TrendingDown, AlertTriangle, ArrowLeft, Target, Users, BarChart3 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
-import { EmptyState } from "@/components/ui/empty-state";
+import {
+  V3PageContainer,
+  V3Card,
+  V3CardHeader,
+  V3CardTitle,
+  V3CardDescription,
+  V3CardContent,
+  V3LoadingState,
+  V3EmptyState,
+  V3Badge,
+  V3Button,
+  V3FilterPill,
+} from "@/components/v3";
 
 import { Database } from "@/integrations/supabase/types";
 
@@ -123,146 +131,113 @@ export default function PollingIntelligence() {
     return { candidateData, sortedPolls };
   };
 
-  const getPartyColor = (party: string) => {
-    if (party === "Republican") return "hsl(var(--destructive))";
-    if (party === "Democratic") return "hsl(var(--primary))";
-    return "hsl(var(--muted-foreground))";
-  };
-
   const unreadAlertsCount = pollingAlerts.filter(alert => !alert.is_read).length;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading polling data...</p>
+      <ClientShell>
+        <div className="p-6">
+          <V3LoadingState variant="kpi-grid" count={4} />
+          <div className="mt-6">
+            <V3LoadingState variant="chart" />
+          </div>
         </div>
-      </div>
+      </ClientShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/client/dashboard")}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Polling Intelligence</h1>
-                <p className="text-sm text-muted-foreground">Track key races and polling trends</p>
-              </div>
-            </div>
-            <ThemeToggle />
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-8">
+    <ClientShell>
+      <V3PageContainer
+        title="Polling Intelligence"
+        description="Track key races and polling trends"
+      >
         {unreadAlertsCount > 0 && (
-          <Alert className="mb-6 border-destructive/50 bg-destructive/10">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="text-foreground">
+          <Alert className="mb-6 border-[hsl(var(--portal-accent-red))]/50 bg-[hsl(var(--portal-accent-red))]/10">
+            <AlertTriangle className="h-4 w-4 text-[hsl(var(--portal-accent-red))]" />
+            <AlertDescription className="text-[hsl(var(--portal-text-primary))]">
               You have {unreadAlertsCount} unread polling alert{unreadAlertsCount > 1 ? 's' : ''}
             </AlertDescription>
           </Alert>
         )}
 
         <Tabs defaultValue="races" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="races">
+          <TabsList className="bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))]">
+            <TabsTrigger value="races" className="data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white">
               <Target className="h-4 w-4 mr-2" />
               Race Trackers
             </TabsTrigger>
-            <TabsTrigger value="alerts">
+            <TabsTrigger value="alerts" className="data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white">
               <AlertTriangle className="h-4 w-4 mr-2" />
-              Polling Alerts {unreadAlertsCount > 0 && `(${unreadAlertsCount})`}
+              Alerts {unreadAlertsCount > 0 && `(${unreadAlertsCount})`}
             </TabsTrigger>
-            <TabsTrigger value="trends">
+            <TabsTrigger value="trends" className="data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white">
               <TrendingUp className="h-4 w-4 mr-2" />
               Issue Trends
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="races" className="space-y-6">
-            <div className="flex gap-2 mb-4">
-              <Button
-                variant={selectedRaceType === "all" ? "default" : "outline"}
-                size="sm"
+            <div className="flex gap-2 mb-4 flex-wrap">
+              <V3FilterPill
+                label="All Races"
+                isActive={selectedRaceType === "all"}
                 onClick={() => setSelectedRaceType("all")}
-              >
-                All Races
-              </Button>
-              <Button
-                variant={selectedRaceType === "senate" ? "default" : "outline"}
-                size="sm"
+              />
+              <V3FilterPill
+                label="Senate"
+                isActive={selectedRaceType === "senate"}
                 onClick={() => setSelectedRaceType("senate")}
-              >
-                Senate
-              </Button>
-              <Button
-                variant={selectedRaceType === "house" ? "default" : "outline"}
-                size="sm"
+              />
+              <V3FilterPill
+                label="House"
+                isActive={selectedRaceType === "house"}
                 onClick={() => setSelectedRaceType("house")}
-              >
-                House
-              </Button>
-              <Button
-                variant={selectedRaceType === "presidential" ? "default" : "outline"}
-                size="sm"
+              />
+              <V3FilterPill
+                label="Presidential"
+                isActive={selectedRaceType === "presidential"}
                 onClick={() => setSelectedRaceType("presidential")}
-              >
-                Presidential
-              </Button>
+              />
             </div>
 
             {Object.entries(racesByState).map(([raceName, polls]) => {
               const { candidateData, sortedPolls } = getTrendData(raceName);
               const latestPolls = polls.slice(0, 3);
-              const leader = latestPolls.reduce((prev, current) => 
-                (prev.lead_margin || 0) > (current.lead_margin || 0) ? prev : current
-              );
 
               return (
-                <Card key={raceName}>
-                  <CardHeader>
+                <V3Card key={raceName}>
+                  <V3CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <CardTitle className="text-foreground">{raceName}</CardTitle>
-                        <CardDescription>
+                        <V3CardTitle>{raceName}</V3CardTitle>
+                        <V3CardDescription>
                           {polls[0]?.poll_type} • Latest: {new Date(polls[0]?.poll_date).toLocaleDateString()}
-                        </CardDescription>
+                        </V3CardDescription>
                       </div>
-                      <Badge variant="outline" className="border-primary text-primary">
+                      <V3Badge variant="info">
                         <Users className="h-3 w-3 mr-1" />
                         {polls.length} polls
-                      </Badge>
+                      </V3Badge>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+                  </V3CardHeader>
+                  <V3CardContent className="space-y-4">
                     <div className="grid gap-3">
                       {latestPolls.map((poll) => (
-                        <div key={poll.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/50">
+                        <div key={poll.id} className="flex items-center justify-between p-3 rounded-lg border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
                           <div className="flex items-center gap-3">
                             <div>
-                              <p className="font-medium text-foreground">{poll.candidate_name}</p>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="font-medium text-[hsl(var(--portal-text-primary))]">{poll.candidate_name}</p>
+                              <p className="text-xs text-[hsl(var(--portal-text-muted))]">
                                 {poll.pollster}
                               </p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-2xl font-bold text-primary">
+                            <p className="text-2xl font-bold text-[hsl(var(--portal-accent-blue))]">
                               {poll.lead_margin !== null ? `+${poll.lead_margin}` : 'N/A'}%
                             </p>
-                            <p className="text-xs text-muted-foreground">±{poll.margin_of_error}%</p>
+                            <p className="text-xs text-[hsl(var(--portal-text-muted))]">±{poll.margin_of_error}%</p>
                           </div>
                         </div>
                       ))}
@@ -270,21 +245,23 @@ export default function PollingIntelligence() {
 
                     {Object.keys(candidateData).length > 1 && (
                       <div className="mt-6">
-                        <h4 className="text-sm font-medium mb-3 text-foreground">Polling Trend</h4>
+                        <h4 className="text-sm font-medium mb-3 text-[hsl(var(--portal-text-primary))]">Polling Trend</h4>
                         <ResponsiveContainer width="100%" height={200}>
                           <LineChart data={sortedPolls}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--portal-border))" />
                             <XAxis 
                               dataKey="poll_date" 
                               tickFormatter={(date) => new Date(date).toLocaleDateString()}
-                              stroke="hsl(var(--muted-foreground))"
+                              stroke="hsl(var(--portal-text-muted))"
+                              fontSize={12}
                             />
-                            <YAxis stroke="hsl(var(--muted-foreground))" />
+                            <YAxis stroke="hsl(var(--portal-text-muted))" fontSize={12} />
                             <Tooltip 
                               contentStyle={{ 
-                                backgroundColor: "hsl(var(--card))",
-                                border: "1px solid hsl(var(--border))",
-                                color: "hsl(var(--foreground))"
+                                backgroundColor: "hsl(var(--portal-bg-card))",
+                                border: "1px solid hsl(var(--portal-border))",
+                                borderRadius: "8px",
+                                color: "hsl(var(--portal-text-primary))"
                               }}
                             />
                             <Legend />
@@ -295,7 +272,7 @@ export default function PollingIntelligence() {
                                 dataKey="lead_margin"
                                 data={candidateData[candidate]}
                                 name={candidate}
-                                stroke={idx === 0 ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
+                                stroke={idx === 0 ? "hsl(var(--portal-accent-blue))" : "hsl(var(--portal-accent-red))"}
                                 strokeWidth={2}
                               />
                             ))}
@@ -303,48 +280,48 @@ export default function PollingIntelligence() {
                         </ResponsiveContainer>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </V3CardContent>
+                </V3Card>
               );
             })}
 
             {Object.keys(racesByState).length === 0 && (
-              <EmptyState
-                icon={<BarChart3 className="h-12 w-12 text-primary" />}
+              <V3EmptyState
+                icon={BarChart3}
                 title="Polling Data Loading"
                 description="We're aggregating polling data from multiple trusted sources. Check back soon for comprehensive race tracking and trend analysis."
-                variant="card"
+                accent="blue"
               />
             )}
           </TabsContent>
 
           <TabsContent value="alerts" className="space-y-4">
             {pollingAlerts.map((alert) => (
-              <Card key={alert.id} className={!alert.is_read ? "border-primary" : ""}>
-                <CardContent className="pt-6">
+              <V3Card key={alert.id} className={!alert.is_read ? "border-[hsl(var(--portal-accent-blue))]" : ""}>
+                <V3CardContent className="pt-6">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3">
                       {alert.change_amount > 0 ? (
-                        <TrendingUp className="h-5 w-5 text-primary mt-0.5" />
+                        <TrendingUp className="h-5 w-5 text-[hsl(var(--portal-accent-green))] mt-0.5" />
                       ) : (
-                        <TrendingDown className="h-5 w-5 text-destructive mt-0.5" />
+                        <TrendingDown className="h-5 w-5 text-[hsl(var(--portal-accent-red))] mt-0.5" />
                       )}
                       <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-medium text-foreground">{alert.state} {alert.poll_type}</h4>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h4 className="font-medium text-[hsl(var(--portal-text-primary))]">{alert.state} {alert.poll_type}</h4>
                           {!alert.is_read && (
-                            <Badge variant="default" className="text-xs">New</Badge>
+                            <V3Badge variant="info">New</V3Badge>
                           )}
-                          <Badge variant="outline" className={
-                            alert.severity === "high" ? "border-destructive text-destructive" : 
-                            alert.severity === "medium" ? "border-primary text-primary" : 
-                            "border-muted-foreground text-muted-foreground"
+                          <V3Badge variant={
+                            alert.severity === "high" ? "error" : 
+                            alert.severity === "medium" ? "warning" : 
+                            "muted"
                           }>
                             {alert.severity}
-                          </Badge>
+                          </V3Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-2">{alert.description}</p>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <p className="text-sm text-[hsl(var(--portal-text-secondary))] mb-2">{alert.description}</p>
+                        <div className="flex items-center gap-4 text-xs text-[hsl(var(--portal-text-muted))]">
                           <span>Change: {alert.change_amount > 0 ? '+' : ''}{alert.change_amount}%</span>
                           <span>Previous: {alert.previous_value}%</span>
                           <span>Current: {alert.current_value}%</span>
@@ -353,43 +330,43 @@ export default function PollingIntelligence() {
                       </div>
                     </div>
                     {!alert.is_read && (
-                      <Button
-                        variant="outline"
+                      <V3Button
+                        variant="secondary"
                         size="sm"
                         onClick={() => markAlertAsRead(alert.id)}
                       >
                         Mark Read
-                      </Button>
+                      </V3Button>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </V3CardContent>
+              </V3Card>
             ))}
 
             {pollingAlerts.length === 0 && (
-              <EmptyState
-                icon={<AlertTriangle className="h-12 w-12 text-warning" />}
+              <V3EmptyState
+                icon={AlertTriangle}
                 title="No Polling Alerts Yet"
                 description="You'll receive alerts here when significant polling shifts are detected in tracked races. Our system monitors changes every 6 hours."
-                variant="card"
+                accent="amber"
               />
             )}
           </TabsContent>
 
           <TabsContent value="trends" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-foreground">Coming Soon</CardTitle>
-                <CardDescription>Issue polling trends will be available once data is collected</CardDescription>
-              </CardHeader>
-              <CardContent className="py-12 text-center">
-                <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Issue trend analysis in development</p>
-              </CardContent>
-            </Card>
+            <V3Card>
+              <V3CardHeader>
+                <V3CardTitle>Coming Soon</V3CardTitle>
+                <V3CardDescription>Issue polling trends will be available once data is collected</V3CardDescription>
+              </V3CardHeader>
+              <V3CardContent className="py-12 text-center">
+                <TrendingUp className="h-12 w-12 text-[hsl(var(--portal-text-muted))] mx-auto mb-4" />
+                <p className="text-[hsl(var(--portal-text-muted))]">Issue trend analysis in development</p>
+              </V3CardContent>
+            </V3Card>
           </TabsContent>
         </Tabs>
-      </div>
-    </div>
+      </V3PageContainer>
+    </ClientShell>
   );
 }

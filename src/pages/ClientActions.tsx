@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { V3MetricChip, V3FilterPill } from "@/components/v3";
 
 // ============================================================================
 // Types & Constants
