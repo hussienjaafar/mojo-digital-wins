@@ -29,3 +29,5 @@ export { V3KPIDrilldownDrawer, type KPIDrilldownData } from "./V3KPIDrilldownDra
 export { V3DataFreshnessIndicator } from "./V3DataFreshnessIndicator";
 export { V3DataTruncationWarning } from "./V3DataTruncationWarning";
 export { V3ErrorBoundary } from "./V3ErrorBoundary";
+export { V3Badge, type V3BadgeVariant, type V3BadgeProps, getTierBadgeVariant, getSentimentBadgeVariant } from "./V3Badge";
+export { V3Button, type V3ButtonProps } from "./V3Button";
