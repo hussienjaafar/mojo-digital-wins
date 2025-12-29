@@ -247,3 +247,9 @@ verify_jwt = false
 
 [functions.entity-resolver]
 verify_jwt = false
+
+[functions.reprocess-failed-webhooks]
+verify_jwt = false
+
+[functions.test-attribution]
+verify_jwt = false
