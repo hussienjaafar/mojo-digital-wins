@@ -18,20 +18,43 @@ serve(async (req) => {
 
     const { organization_id, limit = 200 } = await req.json();
     if (!organization_id) {
-      return new Response(JSON.stringify({ error: 'organization_id is required' }), { status: 400, headers: corsHeaders });
+      return new Response(
+        JSON.stringify({ error: 'organization_id is required' }), 
+        { status: 400, headers: corsHeaders }
+      );
     }
 
-    // Find donations without refcode but with click_id/fbclid
-    const { data: donations, error: donationErr } = await supabase
-      .from('donation_clickid_candidates')
-      .select('transaction_id, click_id, fbclid')
-      .eq('organization_id', organization_id)
-      .limit(limit);
+    console.log(`[CLICKID RECONCILE] Starting for org ${organization_id}, limit ${limit}`);
 
-    if (donationErr) throw donationErr;
+    // Use the new donation_clickid_candidates view via RLS function
+    const { data: donations, error: donationErr } = await supabase
+      .rpc('get_clickid_candidates', {
+        _organization_id: organization_id,
+        _limit: limit
+      });
+
+    if (donationErr) {
+      console.error('[CLICKID RECONCILE] Error fetching candidates:', donationErr);
+      throw donationErr;
+    }
+
+    console.log(`[CLICKID RECONCILE] Found ${donations?.length || 0} candidates with click_id/fbclid`);
+
+    if (!donations || donations.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          mappings_updated: 0,
+          message: 'No transactions with click_id/fbclid needing reconciliation'
+        }), 
+        { headers: corsHeaders }
+      );
+    }
 
     let upserts = 0;
-    for (const d of donations || []) {
+    let errors = 0;
+
+    for (const d of donations) {
       const clickId = d.click_id || d.fbclid;
       if (!clickId) continue;
 
@@ -39,24 +62,39 @@ serve(async (req) => {
         .from('refcode_mappings')
         .upsert({
           organization_id,
-          refcode: clickId, // use click_id/fbclid as a key when refcode missing
+          refcode: `clickid_${clickId.slice(0, 16)}`, // Create synthetic refcode from click_id
           platform: 'meta',
+          channel_type: 'paid',
           click_id: d.click_id,
           fbclid: d.fbclid,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'organization_id,refcode' });
 
       if (upsertErr) {
-        console.error('[CLICKID RECONCILE] Failed for click_id/fbclid', clickId, upsertErr);
+        console.error(`[CLICKID RECONCILE] Failed for click_id ${clickId}:`, upsertErr);
+        errors++;
       } else {
         upserts++;
       }
     }
 
-    return new Response(JSON.stringify({ success: true, mappings_updated: upserts }), { headers: corsHeaders });
+    console.log(`[CLICKID RECONCILE] Completed: ${upserts} upserts, ${errors} errors`);
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        mappings_updated: upserts,
+        errors,
+        candidates_processed: donations.length
+      }), 
+      { headers: corsHeaders }
+    );
 
   } catch (error: any) {
     console.error('[CLICKID RECONCILE] Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
+    return new Response(
+      JSON.stringify({ error: error.message }), 
+      { status: 500, headers: corsHeaders }
+    );
   }
 });
