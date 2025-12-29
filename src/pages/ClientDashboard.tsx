@@ -15,6 +15,7 @@ import {
   V3Card,
   V3SectionHeader,
   V3LoadingState,
+  V3DataFreshnessPanel,
 } from "@/components/v3";
 import { DateRangeControl } from "@/components/ui/DateRangeControl";
 import { Badge } from "@/components/ui/badge";
@@ -259,6 +260,7 @@ const ClientDashboard = () => {
       metaConversions: data.metaConversions,
       smsConversions: data.smsConversions,
       directDonations: data.directDonations,
+      attributionFallbackMode: data.attributionFallbackMode,
     });
   }, [data]);
 
@@ -375,6 +377,14 @@ const ClientDashboard = () => {
                   isLive={isRealtimeConnected}
                   lastUpdated={dataUpdatedAt ? new Date(dataUpdatedAt) : undefined}
                   badges={[
+                    // Data Freshness Indicator - shows sync status for all sources
+                    organizationId && (
+                      <V3DataFreshnessPanel
+                        key="data-freshness"
+                        organizationId={organizationId}
+                        compact
+                      />
+                    ),
                     <Tooltip key="attribution-model">
                       <TooltipTrigger asChild>
                         <Badge
@@ -395,7 +405,7 @@ const ClientDashboard = () => {
                         </p>
                       </TooltipContent>
                     </Tooltip>
-                  ]}
+                  ].filter(Boolean)}
                   controls={
                     <div className="flex items-center gap-3 flex-wrap">
                       <DateRangeControl pillPresets={["7d", "14d", "30d", "90d"]} />
