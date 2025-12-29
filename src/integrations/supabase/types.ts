@@ -2473,6 +2473,139 @@ export type Database = {
           },
         ]
       }
+      donor_journeys: {
+        Row: {
+          amount: number | null
+          campaign_id: string | null
+          created_at: string | null
+          donor_key: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          net_amount: number | null
+          occurred_at: string
+          organization_id: string
+          refcode: string | null
+          source: string | null
+          transaction_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          campaign_id?: string | null
+          created_at?: string | null
+          donor_key: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          net_amount?: number | null
+          occurred_at: string
+          organization_id: string
+          refcode?: string | null
+          source?: string | null
+          transaction_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          campaign_id?: string | null
+          created_at?: string | null
+          donor_key?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          net_amount?: number | null
+          occurred_at?: string
+          organization_id?: string
+          refcode?: string | null
+          source?: string | null
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donor_journeys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      donor_ltv_predictions: {
+        Row: {
+          calculated_at: string
+          churn_risk: number | null
+          churn_risk_label: string | null
+          confidence_score: number | null
+          created_at: string | null
+          donor_key: string
+          frequency: number | null
+          id: string
+          model_version: string | null
+          monetary_avg: number | null
+          monetary_total: number | null
+          organization_id: string
+          predicted_ltv_180: number | null
+          predicted_ltv_30: number | null
+          predicted_ltv_365: number | null
+          predicted_ltv_90: number | null
+          recency_days: number | null
+          rfm_score: number | null
+          segment: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          calculated_at?: string
+          churn_risk?: number | null
+          churn_risk_label?: string | null
+          confidence_score?: number | null
+          created_at?: string | null
+          donor_key: string
+          frequency?: number | null
+          id?: string
+          model_version?: string | null
+          monetary_avg?: number | null
+          monetary_total?: number | null
+          organization_id: string
+          predicted_ltv_180?: number | null
+          predicted_ltv_30?: number | null
+          predicted_ltv_365?: number | null
+          predicted_ltv_90?: number | null
+          recency_days?: number | null
+          rfm_score?: number | null
+          segment?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          calculated_at?: string
+          churn_risk?: number | null
+          churn_risk_label?: string | null
+          confidence_score?: number | null
+          created_at?: string | null
+          donor_key?: string
+          frequency?: number | null
+          id?: string
+          model_version?: string | null
+          monetary_avg?: number | null
+          monetary_total?: number | null
+          organization_id?: string
+          predicted_ltv_180?: number | null
+          predicted_ltv_30?: number | null
+          predicted_ltv_365?: number | null
+          predicted_ltv_90?: number | null
+          recency_days?: number | null
+          rfm_score?: number | null
+          segment?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donor_ltv_predictions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_queue: {
         Row: {
           attachments: Json | null
@@ -5166,6 +5299,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sms_creative_insights_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_events: {
+        Row: {
+          campaign_id: string | null
+          campaign_name: string | null
+          created_at: string | null
+          error_code: string | null
+          event_type: string
+          id: string
+          link_clicked: string | null
+          message_id: string | null
+          metadata: Json | null
+          occurred_at: string
+          organization_id: string
+          phone_hash: string
+          reply_text: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          campaign_name?: string | null
+          created_at?: string | null
+          error_code?: string | null
+          event_type: string
+          id?: string
+          link_clicked?: string | null
+          message_id?: string | null
+          metadata?: Json | null
+          occurred_at: string
+          organization_id: string
+          phone_hash: string
+          reply_text?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          campaign_name?: string | null
+          created_at?: string | null
+          error_code?: string | null
+          event_type?: string
+          id?: string
+          link_clicked?: string | null
+          message_id?: string | null
+          metadata?: Json | null
+          occurred_at?: string
+          organization_id?: string
+          phone_hash?: string
+          reply_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "client_organizations"
