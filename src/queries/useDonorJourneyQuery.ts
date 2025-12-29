@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
-
+import { QUERY_LIMITS, getDaysAgo, createResultMeta, type QueryResultMeta } from "@/lib/query-utils";
 // ============================================================================
 // Types
 // ============================================================================
@@ -91,6 +91,11 @@ export interface DonorJourneyData {
   touchpointSummary: TouchpointSummary[];
   stats: JourneyStats;
   fetchedAt: string;
+  meta: {
+    transactions: QueryResultMeta;
+    touchpoints: QueryResultMeta;
+    journeyEvents: QueryResultMeta;
+  };
 }
 
 export interface DonorJourneyQueryResult {
@@ -147,9 +152,8 @@ async function fetchDonorJourneyData(
 ): Promise<DonorJourneyData> {
   const sb = supabase as any;
 
-  // Calculate date ranges
-  const ninetyDaysAgo = new Date();
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  // Calculate date ranges using utility
+  const ninetyDaysAgoISO = getDaysAgo(90);
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -161,46 +165,47 @@ async function fetchDonorJourneyData(
     ltvResult,
     journeyEventsResult,
   ] = await Promise.all([
-    // Recent transactions with attribution
+    // Recent transactions with attribution - increased limit
     sb
       .from("actblue_transactions_secure")
       .select("*")
       .eq("organization_id", organizationId)
       .gte("amount", minAmount)
-      .gte("transaction_date", ninetyDaysAgo.toISOString())
+      .gte("transaction_date", ninetyDaysAgoISO)
       .order("transaction_date", { ascending: false })
-      .limit(100),
+      .limit(QUERY_LIMITS.transactions),
 
-    // Donor segments
+    // Donor segments - high limit for aggregated data
     sb
       .from("donor_segments")
       .select("donor_tier, donor_frequency_segment, total_donated, donation_count, days_since_donation, monetary_score, frequency_score, recency_score")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .limit(QUERY_LIMITS.segments),
 
-    // Attribution touchpoints
+    // Attribution touchpoints - increased limit
     sb
       .from("attribution_touchpoints")
       .select("id, touchpoint_type, occurred_at, donor_email, utm_source, utm_medium, utm_campaign, metadata")
       .eq("organization_id", organizationId)
-      .gte("occurred_at", ninetyDaysAgo.toISOString())
+      .gte("occurred_at", ninetyDaysAgoISO)
       .order("occurred_at", { ascending: true })
-      .limit(500),
+      .limit(QUERY_LIMITS.touchpoints),
 
-    // LTV predictions
+    // LTV predictions - increased limit
     sb
       .from("donor_ltv_predictions")
       .select("predicted_ltv_90, predicted_ltv_180, churn_risk, donor_key")
       .eq("organization_id", organizationId)
-      .limit(500),
+      .limit(QUERY_LIMITS.predictions),
 
-    // Donor journey events
+    // Donor journey events - increased limit
     sb
       .from("donor_journeys")
       .select("donor_key, event_type, occurred_at, amount, source")
       .eq("organization_id", organizationId)
-      .gte("occurred_at", ninetyDaysAgo.toISOString())
+      .gte("occurred_at", ninetyDaysAgoISO)
       .order("occurred_at", { ascending: false })
-      .limit(300),
+      .limit(QUERY_LIMITS.journeys),
   ]);
 
   // Log any errors
@@ -431,6 +436,11 @@ async function fetchDonorJourneyData(
     touchpointSummary,
     stats,
     fetchedAt: new Date().toISOString(),
+    meta: {
+      transactions: createResultMeta('transactions', transactions.length, QUERY_LIMITS.transactions),
+      touchpoints: createResultMeta('touchpoints', touchpoints.length, QUERY_LIMITS.touchpoints),
+      journeyEvents: createResultMeta('journey events', journeyEvents.length, QUERY_LIMITS.journeys),
+    },
   };
 }
 

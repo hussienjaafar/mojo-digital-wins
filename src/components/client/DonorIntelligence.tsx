@@ -6,14 +6,16 @@ import {
   V3CardContent, 
   V3KPICard, 
   V3LoadingState, 
-  V3ChartWrapper 
+  V3ChartWrapper,
+  V3ErrorState
 } from "@/components/v3";
 import { EChartsBarChart } from "@/components/charts/echarts";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity, GitBranch } from "lucide-react";
+import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity, GitBranch, AlertTriangle } from "lucide-react";
 import { useDonorIntelligenceQuery, type AttributionData } from "@/queries";
+import { formatCurrency } from "@/lib/chart-formatters";
 
 interface DonorIntelligenceProps {
   organizationId: string;
@@ -24,7 +26,7 @@ interface DonorIntelligenceProps {
 export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorIntelligenceProps) => {
   const [deterministicOnly, setDeterministicOnly] = useState(false);
 
-  const { data, isLoading } = useDonorIntelligenceQuery(organizationId, startDate, endDate);
+  const { data, isLoading, error, isError, refetch } = useDonorIntelligenceQuery(organizationId, startDate, endDate);
 
   const attributionData = data?.attributionData || [];
   const segmentData = data?.segmentData || [];
@@ -34,7 +36,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
   const smsSent = data?.smsSent || 0;
   const ltvSummary = data?.ltvSummary || { avgLtv90: 0, avgLtv180: 0, highRisk: 0, total: 0 };
   const metaSpend = data?.metaSpend || 0;
-
+  const dataMeta = data?.meta;
   const isDeterministic = (d: AttributionData) => {
     if (d.attribution_method === 'refcode' || d.attribution_method === 'click_id') return true;
     return Boolean(
@@ -163,11 +165,8 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
     }));
   }, [segmentData]);
 
-  const formatCurrency = (value: number) => {
-    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
-    return `$${value.toFixed(0)}`;
-  };
+  // Use centralized formatCurrency from chart-formatters (imported at top)
+  const formatCurrencyCompact = (value: number) => formatCurrency(value, true);
 
   const platformEfficiency = useMemo(() => {
     const metaDonations = filteredAttribution.filter(d => d.attributed_platform === 'meta');
@@ -191,6 +190,16 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
         <V3LoadingState variant="kpi-grid" count={4} />
         <V3LoadingState variant="chart" height={280} />
       </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <V3ErrorState
+        title="Failed to load donor intelligence"
+        message={error?.message || "An error occurred while fetching data"}
+        onRetry={refetch}
+      />
     );
   }
 
