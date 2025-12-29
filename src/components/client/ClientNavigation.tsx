@@ -37,38 +37,37 @@ const navigationSections: NavigationSection[] = [
   {
     title: "Overview",
     items: [
-      { label: "Dashboard", path: "/client-dashboard", icon: Home },
+      { label: "Dashboard", path: "/client/dashboard", icon: Home },
     ],
   },
   {
     title: "Intelligence Hub",
     items: [
-      { label: "News Feed", path: "/", icon: TrendingUp },
-      { label: "Entity Watchlist", path: "/client-watchlist", icon: Eye },
-      { label: "Polling Intelligence", path: "/polling-intelligence", icon: BarChart3 },
-      { label: "Polling Alerts", path: "/client-polling-alerts", icon: Bell },
+      { label: "Entity Watchlist", path: "/client/watchlist", icon: Eye },
+      { label: "Polling Intelligence", path: "/client/polling", icon: BarChart3 },
+      { label: "Polling Alerts", path: "/client/polling-alerts", icon: Bell },
     ],
   },
   {
     title: "Alerts & Actions",
     items: [
-      { label: "Critical Alerts", path: "/client-alerts", icon: Bell },
-      { label: "Suggested Actions", path: "/client-actions", icon: Target },
-      { label: "Opportunities", path: "/client-opportunities", icon: DollarSign },
+      { label: "Critical Alerts", path: "/client/alerts", icon: Bell },
+      { label: "Suggested Actions", path: "/client/actions", icon: Target },
+      { label: "Opportunities", path: "/client/opportunities", icon: DollarSign },
     ],
   },
   {
     title: "Performance",
     items: [
       { label: "Creative Intelligence", path: "/client/creative-intelligence", icon: Sparkles },
-      { label: "Demographics", path: "/client-demographics", icon: UserCircle },
-      { label: "Donor Journey", path: "/client-donor-journey", icon: TrendingUp },
+      { label: "Demographics", path: "/client/demographics", icon: UserCircle },
+      { label: "Donor Journey", path: "/client/journey", icon: TrendingUp },
     ],
   },
   {
     title: "Settings",
     items: [
-      { label: "Profile", path: "/client-profile", icon: Settings },
+      { label: "Profile", path: "/client/profile", icon: Settings },
     ],
   },
 ];
@@ -101,11 +100,11 @@ export const ClientNavigation = ({
 
   const getBadgeCount = (path: string) => {
     switch (path) {
-      case "/client-alerts":
+      case "/client/alerts":
         return alertCount;
-      case "/client-actions":
+      case "/client/actions":
         return actionCount;
-      case "/client-opportunities":
+      case "/client/opportunities":
         return opportunityCount;
       default:
         return undefined;

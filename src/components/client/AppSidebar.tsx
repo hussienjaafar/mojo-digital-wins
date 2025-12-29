@@ -90,49 +90,49 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
     {
       label: "Overview",
       items: [
-        { title: "Dashboard", url: "/client-dashboard", icon: LayoutDashboard },
+        { title: "Dashboard", url: "/client/dashboard", icon: LayoutDashboard },
       ],
     },
     {
       label: "Acquisition",
       items: [
-        { title: "Opportunities", url: "/client-opportunities", icon: Target, badge: stats.opportunities },
-        { title: "Suggested Actions", url: "/client-actions", icon: Zap, badge: stats.actions },
+        { title: "Opportunities", url: "/client/opportunities", icon: Target, badge: stats.opportunities },
+        { title: "Suggested Actions", url: "/client/actions", icon: Zap, badge: stats.actions },
       ],
     },
     {
       label: "Donors",
       items: [
-        { title: "Demographics", url: "/client-demographics", icon: Users },
-        { title: "Donor Journey", url: "/client-donor-journey", icon: TrendingUp },
-        { title: "Donor Intelligence", url: "/client-intelligence", icon: Brain },
+        { title: "Demographics", url: "/client/demographics", icon: Users },
+        { title: "Donor Journey", url: "/client/journey", icon: TrendingUp },
+        { title: "Donor Intelligence", url: "/client/intelligence", icon: Brain },
       ],
     },
     {
       label: "Attribution",
       items: [
-        { title: "Attribution", url: "/client-attribution", icon: GitBranch },
+        { title: "Attribution", url: "/client/attribution", icon: GitBranch },
       ],
     },
     {
       label: "Creative Intelligence",
       items: [
-        { title: "Creative Analysis", url: "/client-creative-intelligence", icon: Sparkles },
+        { title: "Creative Analysis", url: "/client/creative-intelligence", icon: Sparkles },
       ],
     },
     {
       label: "Watchlist & Alerts",
       items: [
-        { title: "Entity Watchlist", url: "/client-watchlist", icon: Eye },
-        { title: "Critical Alerts", url: "/client-alerts", icon: Bell, badge: stats.alerts },
-        { title: "Polling Alerts", url: "/client-polling-alerts", icon: BarChart3 },
+        { title: "Entity Watchlist", url: "/client/watchlist", icon: Eye },
+        { title: "Critical Alerts", url: "/client/alerts", icon: Bell, badge: stats.alerts },
+        { title: "Polling Alerts", url: "/client/polling-alerts", icon: BarChart3 },
       ],
     },
     {
       label: "Settings",
       items: [
-        { title: "Profile", url: "/client-profile", icon: User },
-        { title: "Settings", url: "/client-settings", icon: Settings },
+        { title: "Profile", url: "/client/profile", icon: User },
+        { title: "Settings", url: "/client/settings", icon: Settings },
       ],
     },
   ], [stats]);

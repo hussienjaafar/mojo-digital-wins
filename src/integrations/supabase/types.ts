@@ -6815,6 +6815,7 @@ export type Database = {
           attributed_campaign_id: string | null
           attributed_creative_id: string | null
           attributed_platform: string | null
+          attribution_method: string | null
           creative_tone: string | null
           creative_topic: string | null
           creative_type: string | null
