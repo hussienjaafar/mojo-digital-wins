@@ -19,7 +19,18 @@ import {
 } from 'recharts';
 import { deepEqual } from '@/lib/performance';
 
-// Memoized chart components to prevent unnecessary re-renders
+/**
+ * Memoized chart components to prevent unnecessary re-renders
+ * 
+ * @deprecated Use ECharts components from @/components/charts/echarts instead.
+ * - MemoizedLineChart → EChartsLineChart
+ * - MemoizedBarChart → EChartsBarChart
+ * - MemoizedAreaChart → EChartsLineChart (with areaStyle)
+ * - MemoizedComposedChart → Multiple ECharts components
+ * 
+ * These components will be removed in a future release.
+ * Migration guide: See docs/V3_CHART_STANDARDS.md
+ */
 
 export const MemoizedLineChart = memo(
   ({

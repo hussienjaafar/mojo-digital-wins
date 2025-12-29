@@ -30,6 +30,13 @@ interface PortalPieChartProps {
 // Use design system chart colors
 const PORTAL_COLORS = getChartColors();
 
+/**
+ * Portal-styled pie chart component
+ * 
+ * @deprecated Use EChartsPieChart from @/components/charts/echarts instead.
+ * This component will be removed in a future release.
+ * Migration guide: See docs/V3_CHART_STANDARDS.md
+ */
 export const PortalPieChart: React.FC<PortalPieChartProps> = ({
   data,
   height,

@@ -30,6 +30,13 @@ interface PortalBarChartProps {
   barName?: string;
 }
 
+/**
+ * Portal-styled bar chart component
+ * 
+ * @deprecated Use EChartsBarChart from @/components/charts/echarts instead.
+ * This component will be removed in a future release.
+ * Migration guide: See docs/V3_CHART_STANDARDS.md
+ */
 export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   data,
   height,

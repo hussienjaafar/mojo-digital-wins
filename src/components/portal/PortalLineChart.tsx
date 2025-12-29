@@ -28,6 +28,13 @@ interface PortalLineChartProps {
   descriptionId?: string;
 }
 
+/**
+ * Portal-styled line chart component
+ * 
+ * @deprecated Use EChartsLineChart from @/components/charts/echarts instead.
+ * This component will be removed in a future release.
+ * Migration guide: See docs/V3_CHART_STANDARDS.md
+ */
 export const PortalLineChart: React.FC<PortalLineChartProps> = ({
   data,
   lines,

@@ -36,6 +36,10 @@ interface ResponsiveLineChartProps {
 
 /**
  * Mobile-optimized line chart with proper formatting and responsive behavior
+ * 
+ * @deprecated Use EChartsLineChart from @/components/charts/echarts instead.
+ * This component will be removed in a future release.
+ * Migration guide: See docs/V3_CHART_STANDARDS.md
  */
 export function ResponsiveLineChart({
   data,

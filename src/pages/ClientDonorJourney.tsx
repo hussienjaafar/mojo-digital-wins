@@ -4,7 +4,6 @@ import { format, formatDistanceToNow } from "date-fns";
 import {
   Users,
   TrendingUp,
-  TrendingDown,
   DollarSign,
   Target,
   RefreshCw,
@@ -23,7 +22,6 @@ import {
 import { ClientShell } from "@/components/client/ClientShell";
 import { ChartPanel } from "@/components/charts/ChartPanel";
 import { DonorSegmentCard } from "@/components/client/DonorSegmentCard";
-import { NoDataAvailable } from "@/components/client/NoDataAvailable";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,7 +38,8 @@ import {
   type FunnelStage,
 } from "@/queries/useDonorJourneyQuery";
 
-import { V3MetricChip, V3FilterPill } from "@/components/v3";
+import { V3MetricChip, V3FilterPill, V3ChartWrapper } from "@/components/v3";
+import { EChartsFunnelChart } from "@/components/charts/echarts";
 
 // ============================================================================
 // Local Components - Using V3 shared components
@@ -181,57 +180,15 @@ const JourneyCard = ({ journey, onSelect }: JourneyCardProps) => {
 };
 
 // ============================================================================
-// Funnel Stage Component
+// Funnel Stage Colors (for EChartsFunnelChart)
 // ============================================================================
 
-interface FunnelStageBarProps {
-  stage: FunnelStage;
-  maxCount: number;
-}
-
-const FunnelStageBar = ({ stage, maxCount }: FunnelStageBarProps) => {
-  const widthPercent = maxCount > 0 ? (stage.count / maxCount) * 100 : 0;
-
-  const stageColors: Record<string, string> = {
-    awareness: "bg-[hsl(var(--portal-accent-blue))]",
-    engagement: "bg-[hsl(var(--portal-accent-purple))]",
-    conversion: "bg-[hsl(var(--portal-success))]",
-    retention: "bg-[hsl(var(--portal-warning))]",
-    advocacy: "bg-[hsl(var(--portal-error))]",
-  };
-
-  return (
-    <div className="flex items-center gap-4">
-      <div className="w-24 shrink-0">
-        <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
-          {stage.label}
-        </span>
-      </div>
-      <div className="flex-1 h-8 bg-[hsl(var(--portal-bg-tertiary))] rounded-lg overflow-hidden relative">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${widthPercent}%` }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className={cn("h-full rounded-lg", stageColors[stage.stage] || "bg-[hsl(var(--portal-accent-blue))]")}
-        />
-        <div className="absolute inset-0 flex items-center justify-between px-3">
-          <span className="text-xs font-medium text-white drop-shadow-sm">
-            {stage.count.toLocaleString()}
-          </span>
-          {stage.dropoffRate > 0 && (
-            <span className="text-xs text-[hsl(var(--portal-text-muted))]">
-              -{stage.dropoffRate}%
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="w-16 shrink-0 text-right">
-        <span className="text-sm font-semibold text-[hsl(var(--portal-success))] tabular-nums">
-          ${(stage.value / 1000).toFixed(1)}k
-        </span>
-      </div>
-    </div>
-  );
+const FUNNEL_STAGE_COLORS: Record<string, string> = {
+  awareness: "hsl(var(--portal-accent-blue))",
+  engagement: "hsl(var(--portal-accent-purple))",
+  conversion: "hsl(var(--portal-success))",
+  retention: "hsl(var(--portal-warning))",
+  advocacy: "hsl(var(--portal-error))",
 };
 
 // ============================================================================
@@ -416,10 +373,6 @@ const ClientDonorJourney = () => {
   const segments = data?.segments || [];
   const funnel = data?.funnel || [];
 
-  const maxFunnelCount = useMemo(
-    () => Math.max(...funnel.map((f) => f.count), 1),
-    [funnel]
-  );
 
   // Handlers
   const handleRefresh = useCallback(async () => {
@@ -534,28 +487,31 @@ const ClientDonorJourney = () => {
         </div>
 
         {/* Journey Funnel Panel */}
-        <ChartPanel
+        <V3ChartWrapper
           title="Conversion Funnel"
           description="Donor progression through acquisition stages"
           icon={Target}
           isLoading={isLoading}
-          isEmpty={funnel.length === 0}
-          emptyMessage="No funnel data available"
-          minHeight={200}
-          status={
-            funnel.length > 0 && funnel[2]?.percentage >= 30
-              ? { text: "Healthy", variant: "success" }
-              : funnel.length > 0
-              ? { text: "Needs Attention", variant: "warning" }
-              : undefined
-          }
+          ariaLabel="Funnel chart showing donor conversion stages from awareness to advocacy"
+          dataSummary={funnel.length > 0 ? `${funnel.length} stages. Top of funnel: ${funnel[0]?.count.toLocaleString()} donors. Conversion stage: ${funnel.find(f => f.stage === 'conversion')?.count.toLocaleString() || 0} donors.` : undefined}
         >
-          <div className="space-y-3">
-            {funnel.map((stage) => (
-              <FunnelStageBar key={stage.stage} stage={stage} maxCount={maxFunnelCount} />
-            ))}
-          </div>
-        </ChartPanel>
+          {funnel.length === 0 ? (
+            <div className="flex items-center justify-center h-[250px] text-sm text-[hsl(var(--portal-text-muted))]">
+              No funnel data available
+            </div>
+          ) : (
+            <EChartsFunnelChart
+              data={funnel.map(stage => ({
+                name: stage.label,
+                value: stage.count,
+                color: FUNNEL_STAGE_COLORS[stage.stage],
+              }))}
+              height={280}
+              showConversionRates
+              valueType="number"
+            />
+          )}
+        </V3ChartWrapper>
 
         {/* Journeys & Segments Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "journeys" | "segments")}>
