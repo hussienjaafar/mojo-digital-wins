@@ -87,7 +87,7 @@ export function buildHeroKpis({
       subtitle: `Spend: ${formatCurrency(kpis.totalSpend)}`,
       accent: "blue" as HeroKpiAccent,
       sparklineData: sparklines?.roi || [],
-      description: "Return on investment: Net Revenue / Total Spend",
+      description: "Profit per dollar spent: (Net Revenue - Spend) / Spend",
       trendData: sparklines?.roi,
       trendXAxisKey: "date",
       breakdown: [
