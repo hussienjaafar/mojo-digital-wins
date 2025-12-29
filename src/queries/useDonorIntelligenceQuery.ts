@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { intelligenceKeys } from "./queryKeys";
 import { logger } from "@/lib/logger";
-
+import { formatEndDateFull, QUERY_LIMITS, createResultMeta, type QueryResultMeta } from "@/lib/query-utils";
 export interface AttributionData {
   attributed_platform: string | null;
   attributed_campaign_id?: string | null;
@@ -67,6 +67,10 @@ export interface DonorIntelligenceData {
   smsSent: number;
   ltvSummary: LtvSummary;
   metaSpend: number;
+  meta: {
+    journeys: QueryResultMeta;
+    ltv: QueryResultMeta;
+  };
 }
 
 async function fetchDonorIntelligenceData(
@@ -75,8 +79,7 @@ async function fetchDonorIntelligenceData(
   endDate: string
 ): Promise<DonorIntelligenceData> {
   const sb = supabase as any;
-  const endDateFull = `${endDate}T23:59:59`;
-
+  const endDateFull = formatEndDateFull(endDate);
   // Run all queries in parallel
   const [
     attrResult,
@@ -127,7 +130,7 @@ async function fetchDonorIntelligenceData(
       .gte('date', startDate)
       .lte('date', endDate),
 
-    // Donor journeys
+    // Donor journeys - increased limit for better data coverage
     sb
       .from('donor_journeys')
       .select('donor_key, event_type, occurred_at, amount, net_amount, source, transaction_type, refcode')
@@ -135,14 +138,14 @@ async function fetchDonorIntelligenceData(
       .gte('occurred_at', startDate)
       .lte('occurred_at', endDateFull)
       .order('occurred_at', { ascending: false })
-      .limit(200),
+      .limit(QUERY_LIMITS.journeys),
 
-    // LTV predictions
+    // LTV predictions - increased limit
     sb
       .from('donor_ltv_predictions')
       .select('predicted_ltv_90, predicted_ltv_180, churn_risk')
       .eq('organization_id', organizationId)
-      .limit(500),
+      .limit(QUERY_LIMITS.predictions),
   ]);
 
   // Log any errors
@@ -195,6 +198,9 @@ async function fetchDonorIntelligenceData(
   const avgLtv180 = ltvTotal > 0 ? ltvData.reduce((sum: number, d: any) => sum + Number(d.predicted_ltv_180 || 0), 0) / ltvTotal : 0;
   const highRisk = ltvData.filter((d: any) => Number(d.churn_risk || 0) >= 0.7).length;
 
+  const journeyData = journeysResult.data || [];
+  const ltvDataResult = ltvResult.data || [];
+
   return {
     attributionData: attrResult.data || [],
     segmentData: segResult.data || [],
@@ -205,11 +211,15 @@ async function fetchDonorIntelligenceData(
       donated: smsDonations,
       optedOut: eventCounts.opted_out || 0,
     },
-    journeyEvents: journeysResult.data || [],
+    journeyEvents: journeyData,
     smsCost,
     smsSent,
     ltvSummary: { avgLtv90, avgLtv180, highRisk, total: ltvTotal },
     metaSpend,
+    meta: {
+      journeys: createResultMeta('journey events', journeyData.length, QUERY_LIMITS.journeys),
+      ltv: createResultMeta('LTV predictions', ltvDataResult.length, QUERY_LIMITS.predictions),
+    },
   };
 }
 
