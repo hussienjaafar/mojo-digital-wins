@@ -44,6 +44,7 @@ export type Database = {
           last_name: string | null
           lineitem_id: number | null
           net_amount: number | null
+          next_charge_date: string | null
           occupation: string | null
           order_number: string | null
           organization_id: string
@@ -51,6 +52,7 @@ export type Database = {
           phone: string | null
           recurring_duration: number | null
           recurring_period: string | null
+          recurring_state: string | null
           recurring_upsell_shown: boolean | null
           recurring_upsell_succeeded: boolean | null
           refcode: string | null
@@ -94,6 +96,7 @@ export type Database = {
           last_name?: string | null
           lineitem_id?: number | null
           net_amount?: number | null
+          next_charge_date?: string | null
           occupation?: string | null
           order_number?: string | null
           organization_id: string
@@ -101,6 +104,7 @@ export type Database = {
           phone?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
+          recurring_state?: string | null
           recurring_upsell_shown?: boolean | null
           recurring_upsell_succeeded?: boolean | null
           refcode?: string | null
@@ -144,6 +148,7 @@ export type Database = {
           last_name?: string | null
           lineitem_id?: number | null
           net_amount?: number | null
+          next_charge_date?: string | null
           occupation?: string | null
           order_number?: string | null
           organization_id?: string
@@ -151,6 +156,7 @@ export type Database = {
           phone?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
+          recurring_state?: string | null
           recurring_upsell_shown?: boolean | null
           recurring_upsell_succeeded?: boolean | null
           refcode?: string | null
@@ -5736,6 +5742,7 @@ export type Database = {
       transaction_attribution: {
         Row: {
           attribution_calculated_at: string | null
+          attribution_method: string | null
           created_at: string | null
           donor_email: string | null
           first_touch_campaign: string | null
@@ -5753,6 +5760,7 @@ export type Database = {
         }
         Insert: {
           attribution_calculated_at?: string | null
+          attribution_method?: string | null
           created_at?: string | null
           donor_email?: string | null
           first_touch_campaign?: string | null
@@ -5770,6 +5778,7 @@ export type Database = {
         }
         Update: {
           attribution_calculated_at?: string | null
+          attribution_method?: string | null
           created_at?: string | null
           donor_email?: string | null
           first_touch_campaign?: string | null
@@ -6331,6 +6340,8 @@ export type Database = {
           processed_at: string | null
           processing_status: string | null
           received_at: string | null
+          reprocessed_at: string | null
+          success: boolean | null
         }
         Insert: {
           created_at?: string | null
@@ -6344,6 +6355,8 @@ export type Database = {
           processed_at?: string | null
           processing_status?: string | null
           received_at?: string | null
+          reprocessed_at?: string | null
+          success?: boolean | null
         }
         Update: {
           created_at?: string | null
@@ -6357,6 +6370,8 @@ export type Database = {
           processed_at?: string | null
           processing_status?: string | null
           received_at?: string | null
+          reprocessed_at?: string | null
+          success?: boolean | null
         }
         Relationships: [
           {

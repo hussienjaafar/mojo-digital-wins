@@ -3,14 +3,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret, x-scheduled-job',
 };
 
 /**
  * Calculate Attribution
  * 
  * Enhanced multi-touch attribution (40-20-40 model) with:
- * - Refcode-based matching for deterministic attribution
+ * - Refcode-based matching using refcode_mappings table for deterministic attribution
  * - Email-based touchpoint matching for probabilistic attribution
  * - Better batch processing to handle large transaction volumes
  * - Support for both organic and paid channels
@@ -40,6 +40,20 @@ interface AttributionResult {
   attribution_calculated_at: string;
 }
 
+interface RefcodeMapping {
+  id: string;
+  organization_id: string;
+  refcode: string;
+  platform: string;
+  campaign_id: string | null;
+  campaign_name: string | null;
+  ad_id: string | null;
+  ad_name: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -64,6 +78,25 @@ serve(async (req) => {
 
     const cutoffDate = new Date(Date.now() - days_back * 24 * 60 * 60 * 1000).toISOString();
     
+    // Load ALL refcode mappings for quick lookup
+    const { data: allRefcodeMappings, error: mappingsError } = await supabase
+      .from('refcode_mappings')
+      .select('*');
+    
+    if (mappingsError) {
+      console.error('[ATTRIBUTION] Error loading refcode_mappings:', mappingsError);
+    }
+
+    // Create lookup map keyed by org+refcode for O(1) lookups
+    const refcodeLookup = new Map<string, RefcodeMapping>();
+    if (allRefcodeMappings) {
+      for (const mapping of allRefcodeMappings) {
+        const key = `${mapping.organization_id}:${mapping.refcode}`;
+        refcodeLookup.set(key, mapping);
+      }
+      console.log(`[ATTRIBUTION] Loaded ${allRefcodeMappings.length} refcode mappings`);
+    }
+
     // Build transaction query
     let txQuery = supabase
       .from('actblue_transactions')
@@ -76,7 +109,7 @@ serve(async (req) => {
       txQuery = txQuery.eq('organization_id', organization_id);
     }
 
-    const { data: transactions, error: txError } = await txQuery.limit(1000);
+    const { data: transactions, error: txError } = await txQuery.limit(2000);
 
     if (txError) throw txError;
 
@@ -87,6 +120,23 @@ serve(async (req) => {
     let refcodeMatches = 0;
     let touchpointMatches = 0;
     let organicMatches = 0;
+    let sourceCampaignMatches = 0;
+
+    // Get existing attributions if not force recalculating
+    const existingTransactionIds = new Set<string>();
+    if (!force_recalculate && transactions && transactions.length > 0) {
+      const txIds = transactions.map(t => t.transaction_id);
+      const { data: existingAttrs } = await supabase
+        .from('transaction_attribution')
+        .select('transaction_id')
+        .in('transaction_id', txIds);
+      
+      if (existingAttrs) {
+        for (const attr of existingAttrs) {
+          existingTransactionIds.add(attr.transaction_id);
+        }
+      }
+    }
 
     // Process in batches
     for (let i = 0; i < (transactions?.length || 0); i += batch_size) {
@@ -95,46 +145,49 @@ serve(async (req) => {
 
       for (const transaction of batch) {
         // Check if attribution already exists (unless force recalculate)
-        if (!force_recalculate) {
-          const { data: existingAttribution } = await supabase
-            .from('transaction_attribution')
-            .select('id')
-            .eq('transaction_id', transaction.transaction_id)
-            .maybeSingle();
+        if (!force_recalculate && existingTransactionIds.has(transaction.transaction_id)) {
+          attributionsSkipped++;
+          continue;
+        }
 
-          if (existingAttribution) {
-            attributionsSkipped++;
-            continue;
+        // Strategy 1: Try refcode-based attribution using refcode_mappings table (deterministic)
+        const refcodes = [
+          transaction.refcode,
+          transaction.refcode2,
+          transaction.refcode_custom
+        ].filter(Boolean);
+        
+        let attributionMethod = 'organic';
+        let touchpoints: any[] = [];
+        let matchedRefcode: RefcodeMapping | null = null;
+
+        // Check each refcode against mappings
+        for (const refcode of refcodes) {
+          if (refcode) {
+            const key = `${transaction.organization_id}:${refcode}`;
+            const mapping = refcodeLookup.get(key);
+            if (mapping) {
+              matchedRefcode = mapping;
+              break;
+            }
           }
         }
 
-        // Strategy 1: Try refcode-based attribution first (deterministic)
-        const refcode = transaction.refcode || transaction.refcode2 || transaction.refcode_custom;
-        let attributionMethod = 'organic';
-        let touchpoints: any[] = [];
-
-        if (refcode) {
-          // Check if refcode maps to a campaign
-          const { data: refcodeMapping } = await supabase
-            .from('campaign_attribution')
-            .select('*')
-            .eq('organization_id', transaction.organization_id)
-            .eq('refcode', refcode)
-            .maybeSingle();
-
-          if (refcodeMapping) {
-            // Create synthetic touchpoint from refcode mapping
-            touchpoints = [{
-              touchpoint_type: refcodeMapping.utm_source || 'refcode',
-              campaign_id: refcodeMapping.switchboard_campaign_id || refcodeMapping.meta_campaign_id,
-              utm_source: refcodeMapping.utm_source,
-              utm_medium: refcodeMapping.utm_medium,
-              utm_campaign: refcodeMapping.utm_campaign,
-              occurred_at: transaction.transaction_date, // Use transaction date as proxy
-            }];
-            attributionMethod = 'refcode';
-            refcodeMatches++;
-          }
+        if (matchedRefcode) {
+          // Create synthetic touchpoint from refcode mapping
+          touchpoints = [{
+            touchpoint_type: matchedRefcode.platform || 'paid',
+            campaign_id: matchedRefcode.campaign_id,
+            campaign_name: matchedRefcode.campaign_name,
+            ad_id: matchedRefcode.ad_id,
+            ad_name: matchedRefcode.ad_name,
+            utm_source: matchedRefcode.utm_source || matchedRefcode.platform,
+            utm_medium: matchedRefcode.utm_medium || 'cpc',
+            utm_campaign: matchedRefcode.utm_campaign || matchedRefcode.campaign_name,
+            occurred_at: transaction.transaction_date,
+          }];
+          attributionMethod = 'refcode';
+          refcodeMatches++;
         }
 
         // Strategy 2: If no refcode match, try email-based touchpoint matching
@@ -145,7 +198,7 @@ serve(async (req) => {
             .eq('donor_email', transaction.donor_email)
             .eq('organization_id', transaction.organization_id)
             .lte('occurred_at', transaction.transaction_date)
-            .gte('occurred_at', new Date(new Date(transaction.transaction_date).getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()) // Look back 30 days from transaction
+            .gte('occurred_at', new Date(new Date(transaction.transaction_date).getTime() - 30 * 24 * 60 * 60 * 1000).toISOString())
             .order('occurred_at', { ascending: true });
 
           if (!touchpointsError && emailTouchpoints && emailTouchpoints.length > 0) {
@@ -165,6 +218,7 @@ serve(async (req) => {
             occurred_at: transaction.transaction_date,
           }];
           attributionMethod = 'source_campaign';
+          sourceCampaignMatches++;
         }
 
         // Build attribution record
@@ -197,15 +251,15 @@ serve(async (req) => {
             transaction_id: transaction.transaction_id,
             organization_id: transaction.organization_id,
             donor_email: transaction.donor_email,
-            first_touch_channel: firstTouch.touchpoint_type,
-            first_touch_campaign: firstTouch.campaign_id,
+            first_touch_channel: firstTouch.touchpoint_type || firstTouch.platform || 'paid',
+            first_touch_campaign: firstTouch.campaign_id || firstTouch.campaign_name,
             first_touch_weight: 0.4,
-            last_touch_channel: lastTouch.touchpoint_type,
-            last_touch_campaign: lastTouch.campaign_id,
+            last_touch_channel: lastTouch.touchpoint_type || lastTouch.platform || 'paid',
+            last_touch_campaign: lastTouch.campaign_id || lastTouch.campaign_name,
             last_touch_weight: touchpoints.length > 1 ? 0.4 : 0.6,
             middle_touches: middleTouches.map(tp => ({
-              channel: tp.touchpoint_type,
-              campaign: tp.campaign_id,
+              channel: tp.touchpoint_type || tp.platform || 'paid',
+              campaign: tp.campaign_id || tp.campaign_name,
               utm_source: tp.utm_source,
               utm_medium: tp.utm_medium,
               occurred_at: tp.occurred_at,
@@ -235,7 +289,7 @@ serve(async (req) => {
 
     const duration = Date.now() - startTime;
     console.log(`[ATTRIBUTION] Complete. Created ${attributionsCreated}, skipped ${attributionsSkipped} in ${duration}ms`);
-    console.log(`[ATTRIBUTION] Methods: refcode=${refcodeMatches}, touchpoint=${touchpointMatches}, organic=${organicMatches}`);
+    console.log(`[ATTRIBUTION] Methods: refcode=${refcodeMatches}, touchpoint=${touchpointMatches}, source_campaign=${sourceCampaignMatches}, organic=${organicMatches}`);
 
     // Update processing checkpoint
     try {
@@ -246,7 +300,9 @@ serve(async (req) => {
           organization_id,
           refcode_matches: refcodeMatches,
           touchpoint_matches: touchpointMatches,
+          source_campaign_matches: sourceCampaignMatches,
           organic_matches: organicMatches,
+          mappings_loaded: refcodeLookup.size,
         },
       });
     } catch (_) { /* ignore */ }
@@ -257,10 +313,12 @@ serve(async (req) => {
         attributions_created: attributionsCreated,
         attributions_skipped: attributionsSkipped,
         total_transactions: transactions?.length || 0,
+        refcode_mappings_loaded: refcodeLookup.size,
         duration_ms: duration,
         breakdown: {
           refcode: refcodeMatches,
           touchpoint: touchpointMatches,
+          source_campaign: sourceCampaignMatches,
           organic: organicMatches,
         }
       }),
