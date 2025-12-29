@@ -74,6 +74,8 @@ interface DashboardMetricsResult {
   metaSpend: number;
   smsSpend: number;
   smsMessagesSent: number;
+  /** True if attribution data comes from fallback (transaction fields) instead of donation_attribution view */
+  attributionFallbackMode: boolean;
 }
 
 function getPreviousPeriod(startDate: string, endDate: string) {
@@ -334,8 +336,8 @@ async function fetchDashboardMetrics(
   const totalMetaSpend = metaMetrics.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);
   const totalSMSCost = smsMetrics.reduce((sum: number, s: any) => sum + Number(s.cost || 0), 0);
   const totalSpend = totalMetaSpend + totalSMSCost;
-  // ROI = (Revenue - Cost) / Cost, not ROAS which is Revenue / Cost
-  const roi = totalSpend > 0 ? (totalNetRevenue - totalSpend) / totalSpend : 0;
+  // ROI = Net Revenue / Spend (investment multiplier: 1.5x = $1.50 back per $1 spent)
+  const roi = totalSpend > 0 ? totalNetRevenue / totalSpend : 0;
 
   const totalImpressions = metaMetrics.reduce((sum: number, m: any) => sum + (m.impressions || 0), 0);
   const totalClicks = metaMetrics.reduce((sum: number, m: any) => sum + (m.clicks || 0), 0);
@@ -373,6 +375,9 @@ async function fetchDashboardMetrics(
       attributed: deterministicCount,
     });
   }
+  
+  // Track if we're using fallback mode for attribution (helps UI show warning)
+  const attributionFallbackMode = donationAttributions.length === 0 && donations.length > 0;
 
   // Calculate previous period KPIs (using the same methodology as current period)
   const prevGrossDonations = prevDonations.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
@@ -392,8 +397,8 @@ async function fetchDashboardMetrics(
   const prevMetaSpend = prevMetaMetrics.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);
   const prevSMSCost = prevSmsMetrics.reduce((sum: number, s: any) => sum + Number(s.cost || 0), 0);
   const prevTotalSpend = prevMetaSpend + prevSMSCost;
-  // ROI = (Revenue - Cost) / Cost
-  const prevRoi = prevTotalSpend > 0 ? (prevTotalNetRevenue - prevTotalSpend) / prevTotalSpend : 0;
+  // ROI = Net Revenue / Spend (investment multiplier)
+  const prevRoi = prevTotalSpend > 0 ? prevTotalNetRevenue / prevTotalSpend : 0;
 
   // Previous period deterministic rate using same logic as current period
   const prevDonationAttributions = prevAttribution.filter((a: any) => a.transaction_type === 'donation');
@@ -566,10 +571,10 @@ async function fetchDashboardMetrics(
     })),
     roi: timeSeries.map((d, i) => {
       const daySpend = d.metaSpend + d.smsSpend;
-      // ROI = (Revenue - Cost) / Cost
+      // ROI = Net Revenue / Spend (investment multiplier)
       return {
         date: format(days[i], 'MMM d'),
-        value: daySpend > 0 ? (d.netDonations - daySpend) / daySpend : 0,
+        value: daySpend > 0 ? d.netDonations / daySpend : 0,
       };
     }),
     refundRate: timeSeries.map((d, i) => {
@@ -658,6 +663,8 @@ async function fetchDashboardMetrics(
     metaSpend: totalMetaSpend,
     smsSpend: totalSMSCost,
     smsMessagesSent: smsMetrics.reduce((sum: number, s: any) => sum + (s.messages_sent || 0), 0),
+    // Attribution data quality flags
+    attributionFallbackMode,
   };
 }
 

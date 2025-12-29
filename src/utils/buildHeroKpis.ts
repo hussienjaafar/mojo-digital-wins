@@ -14,6 +14,8 @@ interface BuildHeroKpisParams {
   metaConversions?: number;
   smsConversions?: number;
   directDonations?: number;
+  /** When true, attribution is calculated from fallback transaction fields, not full attribution view */
+  attributionFallbackMode?: boolean;
 }
 
 /**
@@ -47,6 +49,7 @@ export function buildHeroKpis({
   metaConversions = 0,
   smsConversions = 0,
   directDonations = 0,
+  attributionFallbackMode = false,
 }: BuildHeroKpisParams): HeroKpiData[] {
   return [
     {
@@ -158,18 +161,28 @@ export function buildHeroKpis({
           }
         : undefined,
       previousValue: prevKpis.deterministicRate !== undefined ? `${prevKpis.deterministicRate.toFixed(0)}%` : undefined,
-      subtitle: "Deterministic (refcode/click)",
-      accent: "purple" as HeroKpiAccent,
+      subtitle: attributionFallbackMode 
+        ? "⚠️ Limited data (fallback mode)" 
+        : "Deterministic (refcode/click)",
+      accent: attributionFallbackMode ? "orange" as HeroKpiAccent : "purple" as HeroKpiAccent,
       sparklineData: sparklines?.attributionQuality || [],
-      description: "Percentage of donations with deterministic attribution",
+      description: attributionFallbackMode 
+        ? "Attribution data unavailable. Using fallback: refcode, click_id, fbclid from transactions. SMS attribution excluded."
+        : "Percentage of donations with deterministic attribution",
       trendData: sparklines?.attributionQuality,
       trendXAxisKey: "date",
-      breakdown: [
-        { label: "Deterministic Rate", value: `${kpis.deterministicRate.toFixed(1)}%` },
-        { label: "Meta Conversions", value: metaConversions.toLocaleString() },
-        { label: "SMS Conversions", value: smsConversions.toLocaleString() },
-        { label: "Direct Donations", value: directDonations.toLocaleString() },
-      ],
+      breakdown: attributionFallbackMode 
+        ? [
+            { label: "⚠️ Fallback Mode", value: "Limited Attribution" },
+            { label: "Deterministic Rate", value: `${kpis.deterministicRate.toFixed(1)}%` },
+            { label: "Why?", value: "Run attribution sync" },
+          ]
+        : [
+            { label: "Deterministic Rate", value: `${kpis.deterministicRate.toFixed(1)}%` },
+            { label: "Meta Conversions", value: metaConversions.toLocaleString() },
+            { label: "SMS Conversions", value: smsConversions.toLocaleString() },
+            { label: "Direct Donations", value: directDonations.toLocaleString() },
+          ],
     },
     {
       kpiKey: "uniqueDonors" as KpiKey,
