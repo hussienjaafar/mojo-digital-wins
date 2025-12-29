@@ -361,9 +361,10 @@ serve(async (req) => {
     // Check for service-level invocation (internal trigger for backfill)
     const authHeader = req.headers.get('Authorization');
     const internalKey = req.headers.get('x-internal-key');
+    const scheduledJob = req.headers.get('x-scheduled-job');
     
-    // Allow internal backfill calls without auth
-    const isInternalBackfill = mode === 'backfill' && organization_id && internalKey;
+    // Allow internal backfill calls or scheduled job calls without auth
+    const isInternalBackfill = (mode === 'backfill' && organization_id && internalKey) || scheduledJob === 'true';
     
     let user: any = null;
     let isServiceCall = false;
@@ -371,7 +372,7 @@ serve(async (req) => {
     if (isInternalBackfill) {
       // Internal service call - bypass user auth for backfill
       isServiceCall = true;
-      console.log(`Internal backfill call detected for organization: ${organization_id}`);
+      console.log(`Internal/scheduled backfill call detected for organization: ${organization_id}`);
     } else if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Authorization header required' }),

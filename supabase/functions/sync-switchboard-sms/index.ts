@@ -225,9 +225,11 @@ serve(async (req) => {
     }
 
     // --- AUTH CHECK ---
-    // Either cron secret or user JWT with org membership
+    // Either cron secret, scheduled job header, or user JWT with org membership
     const cronSecret = Deno.env.get('CRON_SECRET');
     const providedCronSecret = req.headers.get('x-cron-secret');
+    const scheduledJob = req.headers.get('x-scheduled-job');
+    const internalKey = req.headers.get('x-internal-key');
     const authHeader = req.headers.get('Authorization');
     
     let isAuthorized = false;
@@ -236,6 +238,12 @@ serve(async (req) => {
     if (cronSecret && providedCronSecret === cronSecret) {
       isAuthorized = true;
       console.log('[SMS SYNC] Authorized via CRON_SECRET');
+    }
+    
+    // Check scheduled job header (internal calls)
+    if (!isAuthorized && (scheduledJob === 'true' || internalKey)) {
+      isAuthorized = true;
+      console.log('[SMS SYNC] Authorized via scheduled job header');
     }
     
     // Check JWT auth (user must belong to org or be admin)
