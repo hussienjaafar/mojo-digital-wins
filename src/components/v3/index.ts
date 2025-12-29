@@ -32,3 +32,6 @@ export { V3DataTruncationWarning } from "./V3DataTruncationWarning";
 export { V3ErrorBoundary } from "./V3ErrorBoundary";
 export { V3Badge, type V3BadgeVariant, type V3BadgeProps, getTierBadgeVariant, getSentimentBadgeVariant } from "./V3Badge";
 export { V3Button, type V3ButtonProps } from "./V3Button";
+export { V3MetricChip, type V3MetricChipVariant, type V3MetricChipProps } from "./V3MetricChip";
+export { V3FilterPill, type V3FilterPillVariant, type V3FilterPillProps } from "./V3FilterPill";
+export { V3StatsGrid, type V3StatsGridItem, type V3StatsGridProps } from "./V3StatsGrid";
