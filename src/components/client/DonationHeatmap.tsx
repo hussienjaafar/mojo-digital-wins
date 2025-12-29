@@ -10,19 +10,37 @@ interface DonationHeatmapProps {
   organizationId: string;
   startDate: string;
   endDate: string;
+  /** Timezone for hour bucketing (default: browser timezone) */
+  timezone?: string;
 }
 
-export const DonationHeatmap = ({ organizationId, startDate, endDate }: DonationHeatmapProps) => {
+// Get browser timezone
+const getBrowserTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return "UTC";
+  }
+};
+
+export const DonationHeatmap = ({ 
+  organizationId, 
+  startDate, 
+  endDate,
+  timezone = getBrowserTimezone()
+}: DonationHeatmapProps) => {
   const isMobile = useIsMobile();
-  const { data: donations, isLoading, isError, error } = useQuery({
-    queryKey: ["donations", "heatmap", organizationId, startDate, endDate],
+  
+  // Use RPC function for server-side aggregation with timezone support
+  const { data: rpcData, isLoading, isError, error } = useQuery({
+    queryKey: ["donations", "heatmap", organizationId, startDate, endDate, timezone],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("actblue_transactions")
-        .select("transaction_date, created_at, amount, net_amount, transaction_type")
-        .eq("organization_id", organizationId)
-        .gte("transaction_date", startDate)
-        .lte("transaction_date", endDate);
+      const { data, error } = await supabase.rpc("get_donation_heatmap", {
+        _organization_id: organizationId,
+        _start_date: startDate,
+        _end_date: endDate,
+        _timezone: timezone,
+      });
 
       if (error) throw error;
       return data || [];
@@ -31,8 +49,9 @@ export const DonationHeatmap = ({ organizationId, startDate, endDate }: Donation
     staleTime: 5 * 60 * 1000,
   });
 
+  // Transform RPC response to full 7x24 grid for heatmap
   const heatmapData = useMemo<HeatmapDataPoint[]>(() => {
-    // Aggregate donations by day of week and hour
+    // Initialize full grid with zeros
     const grid: Record<string, number> = {};
     for (let day = 0; day < 7; day++) {
       for (let hour = 0; hour < 24; hour++) {
@@ -40,24 +59,17 @@ export const DonationHeatmap = ({ organizationId, startDate, endDate }: Donation
       }
     }
 
-    donations?.forEach((donation) => {
-      // Skip refunds to show net revenue only
-      if (donation.transaction_type === "refund") return;
-      // Use created_at for accurate hour bucketing, fallback to transaction_date
-      const date = new Date(donation.created_at ?? donation.transaction_date);
-      const dayOfWeek = date.getDay();
-      const hour = date.getHours();
-      const key = `${dayOfWeek}-${hour}`;
-      // Use net_amount first, fallback to amount
-      const value = Number(donation.net_amount ?? donation.amount ?? 0);
-      grid[key] += value;
+    // Fill in values from RPC response
+    rpcData?.forEach((row) => {
+      const key = `${row.day_of_week}-${row.hour}`;
+      grid[key] = Number(row.value) || 0;
     });
 
     return Object.entries(grid).map(([key, value]) => {
       const [day, hour] = key.split("-").map(Number);
       return { dayOfWeek: day, hour, value };
     });
-  }, [donations]);
+  }, [rpcData]);
 
   if (isLoading) {
     return <V3LoadingState variant="chart" height={280} />;
@@ -72,7 +84,7 @@ export const DonationHeatmap = ({ organizationId, startDate, endDate }: Donation
     );
   }
 
-  if (!donations || donations.length === 0) {
+  if (!rpcData || rpcData.length === 0) {
     return (
       <V3EmptyState
         icon={Clock}
