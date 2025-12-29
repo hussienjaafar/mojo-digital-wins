@@ -157,13 +157,13 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.sync-meta-ads]
-verify_jwt = true
+verify_jwt = false
 
 [functions.sync-switchboard-sms]
-verify_jwt = true
+verify_jwt = false
 
 [functions.sync-actblue-csv]
-verify_jwt = true
+verify_jwt = false
 
 [functions.auto-match-attribution]
 verify_jwt = true
