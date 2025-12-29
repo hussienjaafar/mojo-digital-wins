@@ -39,7 +39,7 @@ export const DonationHeatmap = ({
         _organization_id: organizationId,
         _start_date: startDate,
         _end_date: endDate,
-        _timezone: timezone,
+        _time_zone: timezone,
       });
 
       if (error) throw error;
