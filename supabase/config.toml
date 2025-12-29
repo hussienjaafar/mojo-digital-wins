@@ -125,6 +125,12 @@ verify_jwt = true
 [functions.monitor-attribution-health]
 verify_jwt = true
 
+[functions.populate-donor-journeys]
+verify_jwt = true
+
+[functions.calculate-donor-ltv]
+verify_jwt = true
+
 # --- CLIENT-AUTHENTICATED FUNCTIONS (require user JWT + org membership) ---
 [functions.calculate-roi]
 verify_jwt = true
