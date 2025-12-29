@@ -120,6 +120,8 @@ export interface QueryResultMeta {
   limit: number;
   actualCount: number;
   warning: string | null;
+  hasData: boolean;
+  isEmpty: boolean;
 }
 
 export function createResultMeta(
@@ -133,5 +135,73 @@ export function createResultMeta(
     limit,
     actualCount: resultCount,
     warning: getTruncationWarning(dataType, resultCount, limit),
+    hasData: resultCount > 0,
+    isEmpty: resultCount === 0,
   };
+}
+
+/**
+ * Safe result extractor - handles null/undefined/error results gracefully
+ */
+export function safeExtractData<T>(
+  result: { data: T[] | null; error: any } | undefined | null,
+  fallback: T[] = []
+): T[] {
+  if (!result || result.error || !result.data) {
+    return fallback;
+  }
+  return result.data;
+}
+
+/**
+ * Check if a query error is a "table not found" or permissions error
+ * These should be handled gracefully with empty data rather than throwing
+ */
+export function isRecoverableError(error: any): boolean {
+  if (!error) return false;
+  
+  const message = error.message?.toLowerCase() || '';
+  const code = error.code || '';
+  
+  // Table doesn't exist or permission denied - return empty data
+  if (message.includes('relation') && message.includes('does not exist')) {
+    return true;
+  }
+  if (code === '42P01') { // PostgreSQL: undefined_table
+    return true;
+  }
+  if (code === '42501') { // PostgreSQL: insufficient_privilege
+    return true;
+  }
+  if (message.includes('permission denied')) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Process multiple query results with graceful error handling
+ * Returns data arrays with empty fallbacks for failed queries
+ */
+export function processQueryResults<T extends Record<string, any>>(
+  results: Array<{ data: any[] | null; error: any }>,
+  keys: (keyof T)[]
+): { data: T; errors: string[] } {
+  const data = {} as T;
+  const errors: string[] = [];
+
+  results.forEach((result, index) => {
+    const key = keys[index];
+    if (result.error) {
+      if (!isRecoverableError(result.error)) {
+        errors.push(`Failed to load ${String(key)}: ${result.error.message}`);
+      }
+      (data as any)[key] = [];
+    } else {
+      (data as any)[key] = result.data || [];
+    }
+  });
+
+  return { data, errors };
 }

@@ -1,7 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
-import { QUERY_LIMITS, getDaysAgo, createResultMeta, type QueryResultMeta } from "@/lib/query-utils";
+import { 
+  QUERY_LIMITS, 
+  getDaysAgo, 
+  createResultMeta, 
+  isRecoverableError,
+  type QueryResultMeta 
+} from "@/lib/query-utils";
 // ============================================================================
 // Types
 // ============================================================================
@@ -208,12 +214,22 @@ async function fetchDonorJourneyData(
       .limit(QUERY_LIMITS.journeys),
   ]);
 
-  // Log any errors
-  if (transactionsResult.error) logger.error("Failed to load transactions", transactionsResult.error);
-  if (segmentsResult.error) logger.error("Failed to load segments", segmentsResult.error);
-  if (touchpointsResult.error) logger.error("Failed to load touchpoints", touchpointsResult.error);
-  if (ltvResult.error) logger.error("Failed to load LTV data", ltvResult.error);
-  if (journeyEventsResult.error) logger.error("Failed to load journey events", journeyEventsResult.error);
+  // Log errors gracefully - don't throw for recoverable errors
+  const logError = (name: string, error: any) => {
+    if (error) {
+      if (isRecoverableError(error)) {
+        logger.warn(`No ${name} data available (table may be empty or not populated yet)`);
+      } else {
+        logger.error(`Failed to load ${name}`, error);
+      }
+    }
+  };
+
+  logError('transactions', transactionsResult.error);
+  logError('segments', segmentsResult.error);
+  logError('touchpoints', touchpointsResult.error);
+  logError('LTV predictions', ltvResult.error);
+  logError('journey events', journeyEventsResult.error);
 
   const transactions = transactionsResult.data || [];
   const segments = segmentsResult.data || [];

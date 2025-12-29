@@ -2,7 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { intelligenceKeys } from "./queryKeys";
 import { logger } from "@/lib/logger";
-import { formatEndDateFull, QUERY_LIMITS, createResultMeta, type QueryResultMeta } from "@/lib/query-utils";
+import { 
+  formatEndDateFull, 
+  QUERY_LIMITS, 
+  createResultMeta, 
+  safeExtractData,
+  isRecoverableError,
+  type QueryResultMeta 
+} from "@/lib/query-utils";
+
 export interface AttributionData {
   attributed_platform: string | null;
   attributed_campaign_id?: string | null;
@@ -148,14 +156,24 @@ async function fetchDonorIntelligenceData(
       .limit(QUERY_LIMITS.predictions),
   ]);
 
-  // Log any errors
-  if (attrResult.error) logger.error('Failed to load attribution data', attrResult.error);
-  if (segResult.error) logger.error('Failed to load segment data', segResult.error);
-  if (smsEventsResult.error) logger.error('Failed to load SMS events', smsEventsResult.error);
-  if (smsCampaignsResult.error) logger.error('Failed to load SMS campaigns', smsCampaignsResult.error);
-  if (metaSpendResult.error) logger.error('Failed to load meta spend', metaSpendResult.error);
-  if (journeysResult.error) logger.error('Failed to load donor journeys', journeysResult.error);
-  if (ltvResult.error) logger.error('Failed to load LTV predictions', ltvResult.error);
+  // Log errors but continue with empty data for recoverable errors
+  const logError = (name: string, error: any) => {
+    if (error) {
+      if (isRecoverableError(error)) {
+        logger.warn(`No ${name} data available (table may be empty or not populated yet)`);
+      } else {
+        logger.error(`Failed to load ${name}`, error);
+      }
+    }
+  };
+
+  logError('attribution', attrResult.error);
+  logError('segment', segResult.error);
+  logError('SMS events', smsEventsResult.error);
+  logError('SMS campaigns', smsCampaignsResult.error);
+  logError('meta spend', metaSpendResult.error);
+  logError('donor journeys', journeysResult.error);
+  logError('LTV predictions', ltvResult.error);
 
   // Process SMS funnel
   const smsEvents = smsEventsResult.data || [];
