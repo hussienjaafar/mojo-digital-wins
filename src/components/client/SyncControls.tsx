@@ -1,12 +1,19 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, DollarSign, MessageSquare, TrendingUp, Heart, History, CheckCircle, AlertCircle, Zap } from "lucide-react";
+import {
+  RefreshCw,
+  DollarSign,
+  MessageSquare,
+  TrendingUp,
+  Heart,
+  History,
+  CheckCircle,
+  AlertCircle,
+  Zap,
+} from "lucide-react";
 import { logger } from "@/lib/logger";
-import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
-import { DataFreshnessIndicator, dataFreshnessKeys } from "./DataFreshnessIndicator";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   V3Card,
@@ -14,10 +21,20 @@ import {
   V3CardHeader,
   V3CardTitle,
   V3CardDescription,
+  V3Badge,
+  V3Button,
+  V3DataFreshnessPanel,
 } from "@/components/v3";
+import { dataFreshnessKeys } from "@/components/v3/V3DataFreshnessPanel";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { dashboardKeys, metaKeys, smsKeys, donationKeys, channelKeys } from "@/queries/queryKeys";
+import {
+  dashboardKeys,
+  metaKeys,
+  smsKeys,
+  donationKeys,
+  channelKeys,
+} from "@/queries/queryKeys";
 
 type Props = {
   organizationId: string;
@@ -58,12 +75,27 @@ const itemVariants = {
   },
 };
 
-// Spinner animation
-const spinTransition = {
-  repeat: Infinity,
-  ease: "linear" as const,
-  duration: 1,
-};
+// Accent color mapping using portal tokens
+const accentColors = {
+  blue: {
+    hover: "hover:border-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue)/0.05)]",
+    icon: "text-[hsl(var(--portal-accent-blue))]",
+  },
+  purple: {
+    hover: "hover:border-[hsl(var(--portal-accent-purple))] hover:bg-[hsl(var(--portal-accent-purple)/0.05)]",
+    icon: "text-[hsl(var(--portal-accent-purple))]",
+  },
+  green: {
+    hover: "hover:border-[hsl(var(--portal-success))] hover:bg-[hsl(var(--portal-success)/0.05)]",
+    icon: "text-[hsl(var(--portal-success))]",
+  },
+  amber: {
+    hover: "hover:border-[hsl(var(--portal-warning))] hover:bg-[hsl(var(--portal-warning)/0.05)]",
+    icon: "text-[hsl(var(--portal-warning))]",
+  },
+} as const;
+
+type AccentColor = keyof typeof accentColors;
 
 const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   const { toast } = useToast();
@@ -77,22 +109,24 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
 
   const loadSyncStatuses = async () => {
     const { data } = await supabase
-      .from('client_api_credentials')
-      .select('platform, last_sync_at, last_sync_status')
-      .eq('organization_id', organizationId)
-      .eq('is_active', true);
+      .from("client_api_credentials")
+      .select("platform, last_sync_at, last_sync_status")
+      .eq("organization_id", organizationId)
+      .eq("is_active", true);
 
     if (data) {
-      setSyncStatuses(data.map(c => ({
-        platform: c.platform,
-        lastSync: c.last_sync_at,
-        status: c.last_sync_status
-      })));
+      setSyncStatuses(
+        data.map((c) => ({
+          platform: c.platform,
+          lastSync: c.last_sync_at,
+          status: c.last_sync_status,
+        }))
+      );
     }
   };
 
   const getSyncStatus = (platform: string) => {
-    return syncStatuses.find(s => s.platform === platform);
+    return syncStatuses.find((s) => s.platform === platform);
   };
 
   // Invalidate all dashboard-related queries including data freshness
@@ -100,22 +134,26 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all }),
       queryClient.invalidateQueries({ queryKey: channelKeys.all }),
-      queryClient.invalidateQueries({ queryKey: dataFreshnessKeys.byOrg(organizationId) }),
+      queryClient.invalidateQueries({
+        queryKey: dataFreshnessKeys.byOrg(organizationId),
+      }),
     ]);
   };
 
   const syncMetaAds = async () => {
     setSyncing({ ...syncing, meta: true });
     try {
-      const syncStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const syncEndDate = endDate || new Date().toISOString().split('T')[0];
+      const syncStartDate =
+        startDate ||
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const syncEndDate = endDate || new Date().toISOString().split("T")[0];
 
-      const { error } = await (supabase as any).functions.invoke('sync-meta-ads', {
+      const { error } = await (supabase as any).functions.invoke("sync-meta-ads", {
         body: {
           organization_id: organizationId,
           start_date: syncStartDate,
-          end_date: syncEndDate
-        }
+          end_date: syncEndDate,
+        },
       });
 
       if (error) throw error;
@@ -125,7 +163,6 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
         description: "Meta Ads sync completed successfully",
       });
 
-      // Invalidate Meta queries
       await queryClient.invalidateQueries({ queryKey: metaKeys.all });
       await invalidateDashboardQueries();
       await calculateROI();
@@ -143,16 +180,20 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   const syncSwitchboard = async () => {
     setSyncing({ ...syncing, sms: true });
     try {
-      const { data, error } = await (supabase as any).functions.invoke('sync-switchboard-sms', {
-        body: { organization_id: organizationId }
-      });
+      const { data, error } = await (supabase as any).functions.invoke(
+        "sync-switchboard-sms",
+        {
+          body: { organization_id: organizationId },
+        }
+      );
 
       if (error) throw error;
 
       if (data && data.error && data.credentials_valid) {
         toast({
           title: "Switchboard API Not Available",
-          description: "OneSwitchboard doesn't provide a public reporting API. Please export CSV reports from your dashboard manually.",
+          description:
+            "OneSwitchboard doesn't provide a public reporting API. Please export CSV reports from your dashboard manually.",
           variant: "default",
         });
       } else {
@@ -160,7 +201,6 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
           title: "Success",
           description: "Switchboard SMS sync completed successfully",
         });
-        // Invalidate SMS queries
         await queryClient.invalidateQueries({ queryKey: smsKeys.all });
         await invalidateDashboardQueries();
         await calculateROI();
@@ -177,31 +217,36 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   };
 
   const syncActBlue = async (backfill = false) => {
-    const syncKey = backfill ? 'actblueBackfill' : 'actblue';
+    const syncKey = backfill ? "actblueBackfill" : "actblue";
     setSyncing({ ...syncing, [syncKey]: true });
     try {
       if (backfill) {
         toast({
           title: "Starting ActBlue Backfill",
-          description: "Fetching 1 year of historical data. This may take a few minutes...",
+          description:
+            "Fetching 1 year of historical data. This may take a few minutes...",
         });
       }
 
       const syncStartDate = backfill
         ? undefined
-        : (startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+        : startDate ||
+          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
       const syncEndDate = backfill
         ? undefined
-        : (endDate || new Date().toISOString().split('T')[0]);
+        : endDate || new Date().toISOString().split("T")[0];
 
-      const { data, error } = await (supabase as any).functions.invoke('sync-actblue-csv', {
-        body: {
-          organization_id: organizationId,
-          mode: backfill ? 'backfill' : 'incremental',
-          start_date: syncStartDate,
-          end_date: syncEndDate
+      const { data, error } = await (supabase as any).functions.invoke(
+        "sync-actblue-csv",
+        {
+          body: {
+            organization_id: organizationId,
+            mode: backfill ? "backfill" : "incremental",
+            start_date: syncStartDate,
+            end_date: syncEndDate,
+          },
         }
-      });
+      );
 
       if (error) throw error;
 
@@ -215,7 +260,6 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
           : `ActBlue sync completed: ${inserted} new transactions`,
       });
 
-      // Invalidate donation queries
       await queryClient.invalidateQueries({ queryKey: donationKeys.all });
       await invalidateDashboardQueries();
       await calculateROI();
@@ -233,8 +277,8 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   const calculateROI = async () => {
     setSyncing({ ...syncing, roi: true });
     try {
-      const { error } = await (supabase as any).functions.invoke('calculate-roi', {
-        body: { organization_id: organizationId }
+      const { error } = await (supabase as any).functions.invoke("calculate-roi", {
+        body: { organization_id: organizationId },
       });
 
       if (error) throw error;
@@ -244,7 +288,7 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
         description: "ROI calculation completed",
       });
     } catch (error: any) {
-      logger.error('ROI calculation failed', error);
+      logger.error("ROI calculation failed", error);
     } finally {
       setSyncing({ ...syncing, roi: false });
     }
@@ -274,35 +318,32 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
     const status = getSyncStatus(platform);
     if (!status) return null;
 
-    if (status.status === 'failed') {
+    if (status.status === "failed") {
       return (
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.2 }}
         >
-          <Badge variant="destructive" className="text-[9px] gap-0.5 px-1.5 py-0.5">
+          <V3Badge variant="error" size="sm">
             <AlertCircle className="h-2.5 w-2.5" />
             Failed
-          </Badge>
+          </V3Badge>
         </motion.div>
       );
     }
 
-    if (status.status === 'success' && status.lastSync) {
+    if (status.status === "success" && status.lastSync) {
       return (
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.2 }}
         >
-          <Badge
-            variant="outline"
-            className="text-[9px] gap-0.5 px-1.5 py-0.5 bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]"
-          >
+          <V3Badge variant="success" size="sm">
             <CheckCircle className="h-2.5 w-2.5" />
             {formatDistanceToNow(new Date(status.lastSync), { addSuffix: false })}
-          </Badge>
+          </V3Badge>
         </motion.div>
       );
     }
@@ -327,23 +368,11 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
     icon: typeof DollarSign;
     label: string;
     platform?: string;
-    variant?: "outline" | "default";
+    variant?: "outline" | "primary";
     dashed?: boolean;
-    accent?: "blue" | "purple" | "green" | "amber";
+    accent?: AccentColor;
   }) => {
-    const accentColors = {
-      blue: "hover:border-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue)/0.05)]",
-      purple: "hover:border-[hsl(var(--portal-accent-purple))] hover:bg-[hsl(var(--portal-accent-purple)/0.05)]",
-      green: "hover:border-[hsl(var(--portal-success))] hover:bg-[hsl(var(--portal-success)/0.05)]",
-      amber: "hover:border-[hsl(var(--portal-warning))] hover:bg-[hsl(var(--portal-warning)/0.05)]",
-    };
-
-    const iconColors = {
-      blue: "text-[hsl(var(--portal-accent-blue))]",
-      purple: "text-[hsl(var(--portal-accent-purple))]",
-      green: "text-[hsl(var(--portal-success))]",
-      amber: "text-[hsl(var(--portal-warning))]",
-    };
+    const isPrimary = variant === "primary";
 
     return (
       <motion.div
@@ -354,19 +383,17 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
         animate="idle"
       >
         <motion.div variants={buttonVariants}>
-          <Button
+          <V3Button
             onClick={onClick}
             disabled={disabled}
-            variant={variant}
+            variant={isPrimary ? "primary" : "outline"}
             aria-busy={isSyncing}
             aria-label={isSyncing ? `${label} in progress` : label}
             className={cn(
-              "h-auto flex-col gap-2 py-4 px-3 relative w-full",
+              "h-auto flex-col gap-[var(--portal-space-xs)] py-[var(--portal-space-md)] px-[var(--portal-space-sm)] relative w-full",
               "transition-all duration-200",
-              "border-[hsl(var(--portal-border))]",
               dashed && "border-dashed",
-              accent && accentColors[accent],
-              variant === "default" && "bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue)/0.9)] text-white border-transparent"
+              !isPrimary && accent && accentColors[accent].hover
             )}
           >
             <AnimatePresence mode="wait">
@@ -376,9 +403,15 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
                   initial={{ opacity: 0, rotate: 0 }}
                   animate={{ opacity: 1, rotate: 360 }}
                   exit={{ opacity: 0 }}
-                  transition={spinTransition}
+                  transition={{ repeat: Infinity, ease: "linear", duration: 1 }}
                 >
-                  <RefreshCw className={cn("w-5 h-5", accent ? iconColors[accent] : "")} aria-hidden="true" />
+                  <RefreshCw
+                    className={cn(
+                      "w-5 h-5",
+                      accent && !isPrimary ? accentColors[accent].icon : ""
+                    )}
+                    aria-hidden="true"
+                  />
                 </motion.div>
               ) : (
                 <motion.div
@@ -388,17 +421,25 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
                   exit={{ opacity: 0, scale: 0.8 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <Icon className={cn("w-5 h-5", accent && variant !== "default" ? iconColors[accent] : "")} aria-hidden="true" />
+                  <Icon
+                    className={cn(
+                      "w-5 h-5",
+                      accent && !isPrimary ? accentColors[accent].icon : ""
+                    )}
+                    aria-hidden="true"
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
-            <span className="text-xs font-medium" aria-hidden="true">{label}</span>
+            <span className="text-xs font-medium" aria-hidden="true">
+              {label}
+            </span>
             {platform && !isSyncing && renderSyncStatusBadge(platform)}
             {/* Screen reader live announcement */}
             <span className="sr-only" role="status" aria-live="polite">
               {isSyncing ? `${label} syncing...` : ""}
             </span>
-          </Button>
+          </V3Button>
         </motion.div>
       </motion.div>
     );
@@ -407,14 +448,17 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   return (
     <V3Card accent="blue">
       <V3CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <div className="flex items-start justify-between gap-[var(--portal-space-md)]">
+          <div className="flex items-center gap-[var(--portal-space-sm)]">
             <motion.div
-              className="p-2.5 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]"
+              className="p-2.5 rounded-[var(--portal-radius-sm)] bg-[hsl(var(--portal-accent-blue)/0.1)]"
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 400, damping: 17 }}
             >
-              <Zap className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" aria-hidden="true" />
+              <Zap
+                className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]"
+                aria-hidden="true"
+              />
             </motion.div>
             <div>
               <V3CardTitle>Data Sync</V3CardTitle>
@@ -423,12 +467,12 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
               </V3CardDescription>
             </div>
           </div>
-          <DataFreshnessIndicator organizationId={organizationId} compact />
+          <V3DataFreshnessPanel organizationId={organizationId} compact />
         </div>
       </V3CardHeader>
-      <V3CardContent className="space-y-6">
+      <V3CardContent className="space-y-[var(--portal-space-lg)]">
         <motion.div
-          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-[var(--portal-space-sm)]"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
@@ -488,18 +532,18 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
             syncing={Object.values(syncing).some(Boolean)}
             icon={RefreshCw}
             label="Sync All"
-            variant="default"
+            variant="primary"
           />
         </motion.div>
 
         {/* Expanded Freshness View */}
         <motion.div
-          className="pt-4 border-t border-[hsl(var(--portal-border))]"
+          className="pt-[var(--portal-space-md)] border-t border-[hsl(var(--portal-border))]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
         >
-          <DataFreshnessIndicator organizationId={organizationId} />
+          <V3DataFreshnessPanel organizationId={organizationId} />
         </motion.div>
       </V3CardContent>
     </V3Card>

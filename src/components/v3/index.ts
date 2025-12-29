@@ -27,6 +27,7 @@ export { V3HighlightableRow } from "./V3HighlightableRow";
 export { V3InsightBadge, type InsightType } from "./V3InsightBadge";
 export { V3KPIDrilldownDrawer, type KPIDrilldownData } from "./V3KPIDrilldownDrawer";
 export { V3DataFreshnessIndicator } from "./V3DataFreshnessIndicator";
+export { V3DataFreshnessPanel, dataFreshnessKeys } from "./V3DataFreshnessPanel";
 export { V3DataTruncationWarning } from "./V3DataTruncationWarning";
 export { V3ErrorBoundary } from "./V3ErrorBoundary";
 export { V3Badge, type V3BadgeVariant, type V3BadgeProps, getTierBadgeVariant, getSentimentBadgeVariant } from "./V3Badge";

@@ -24,6 +24,7 @@ const v3BadgeVariants = cva(
         error: "bg-[hsl(var(--portal-error)/0.15)] text-[hsl(var(--portal-error))] border border-[hsl(var(--portal-error)/0.3)]",
         info: "bg-[hsl(var(--portal-info)/0.15)] text-[hsl(var(--portal-info))] border border-[hsl(var(--portal-info)/0.3)]",
         pending: "bg-[hsl(var(--portal-text-muted)/0.15)] text-[hsl(var(--portal-text-muted))] border border-[hsl(var(--portal-text-muted)/0.3)]",
+        muted: "bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-muted))] border border-[hsl(var(--portal-border))]",
         // Performance tier variants
         top: "bg-[hsl(var(--portal-success)/0.15)] text-[hsl(var(--portal-success))]",
         high: "bg-[hsl(var(--portal-accent-blue)/0.15)] text-[hsl(var(--portal-accent-blue))]",
@@ -52,6 +53,7 @@ const statusIcons: Partial<Record<V3BadgeVariant, React.ElementType>> = {
   error: XCircle,
   info: Info,
   pending: Clock,
+  muted: Clock,
 };
 
 export interface V3BadgeProps
