@@ -390,14 +390,15 @@ serve(async (req) => {
         } while (msgNext && msgPageCount < 100);
 
         if (messageEvents.length > 0) {
-          const eventsToUpsert = messageEvents.map(msg => ({
+          // Hash phone numbers for privacy before inserting
+          const eventsToUpsert = await Promise.all(messageEvents.map(async (msg) => ({
             organization_id,
             campaign_id: broadcast.id,
+            campaign_name: broadcast.title,
             message_id: msg.id,
-            recipient_phone: msg.phone_number,
-            status: msg.status,
+            phone_hash: await hashPhone(msg.phone_number),
             event_type: deriveEventType(msg),
-            click_url: msg.click_url || null,
+            link_clicked: msg.click_url || null,
             occurred_at: deriveOccurredAt(msg),
             metadata: {
               clicks: msg.clicks || 0,
@@ -409,7 +410,7 @@ serve(async (req) => {
               last_click_at: msg.last_click_at,
               raw_status: msg.status,
             },
-          }));
+          })));
 
           const { error: eventError } = await supabase
             .from('sms_events')

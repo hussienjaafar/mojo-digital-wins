@@ -381,10 +381,69 @@ serve(async (req) => {
             break;
 
           case 'attribution':
+          case 'edge_function':
+            // Handle edge_function job types - invoke the function named in the endpoint field
+            if (job.job_type === 'edge_function' && job.endpoint) {
+              console.log(`[SCHEDULER] Invoking edge function: ${job.endpoint}`);
+              const payload = job.payload ? JSON.parse(job.payload) : {};
+              const efResponse = await supabase.functions.invoke(job.endpoint, { body: payload });
+              if (efResponse.error) throw new Error(efResponse.error.message);
+              result = efResponse.data;
+              itemsProcessed = result?.processed || result?.attributions_created || result?.predictions_created || result?.journeys_created || 0;
+              break;
+            }
+            // Fallback for legacy 'attribution' job type
             const attributionResponse = await supabase.functions.invoke('calculate-attribution', { body: {} });
             if (attributionResponse.error) throw new Error(attributionResponse.error.message);
             result = attributionResponse.data;
-            itemsProcessed = result?.touchpoints_analyzed || 0;
+            itemsProcessed = result?.touchpoints_analyzed || result?.attributions_created || 0;
+            break;
+          
+          case 'calculate_attribution':
+            const calcAttrResponse = await supabase.functions.invoke('calculate-attribution', { body: { days_back: 90 } });
+            if (calcAttrResponse.error) throw new Error(calcAttrResponse.error.message);
+            result = calcAttrResponse.data;
+            itemsProcessed = result?.attributions_created || 0;
+            break;
+
+          case 'populate_donor_journeys':
+            // Populate donor journeys for all active organizations
+            const { data: journeyOrgs } = await supabase
+              .from('client_organizations')
+              .select('id')
+              .eq('is_active', true);
+            
+            let journeysCreated = 0;
+            for (const org of journeyOrgs || []) {
+              const journeyResponse = await supabase.functions.invoke('populate-donor-journeys', {
+                body: { organization_id: org.id, days_back: 90 }
+              });
+              if (!journeyResponse.error) {
+                journeysCreated += journeyResponse.data?.journeys_created || 0;
+              }
+            }
+            result = { journeys_created: journeysCreated, organizations: journeyOrgs?.length || 0 };
+            itemsProcessed = journeysCreated;
+            break;
+
+          case 'calculate_donor_ltv':
+            // Calculate LTV for all active organizations
+            const { data: ltvOrgs } = await supabase
+              .from('client_organizations')
+              .select('id')
+              .eq('is_active', true);
+            
+            let predictionsCreated = 0;
+            for (const org of ltvOrgs || []) {
+              const ltvResponse = await supabase.functions.invoke('calculate-donor-ltv', {
+                body: { organization_id: org.id }
+              });
+              if (!ltvResponse.error) {
+                predictionsCreated += ltvResponse.data?.predictions_created || 0;
+              }
+            }
+            result = { predictions_created: predictionsCreated, organizations: ltvOrgs?.length || 0 };
+            itemsProcessed = predictionsCreated;
             break;
 
           case 'polling':

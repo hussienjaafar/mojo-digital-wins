@@ -129,13 +129,16 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.populate-donor-journeys]
-verify_jwt = true
+verify_jwt = false
 
 [functions.calculate-donor-ltv]
-verify_jwt = true
+verify_jwt = false
+
+[functions.calculate-attribution]
+verify_jwt = false
 
 [functions.backfill-attribution]
-verify_jwt = true
+verify_jwt = false
 
 # --- CLIENT-AUTHENTICATED FUNCTIONS (require user JWT + org membership) ---
 [functions.calculate-roi]
@@ -145,9 +148,6 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.calculate-attribution-models]
-verify_jwt = true
-
-[functions.calculate-attribution]
 verify_jwt = true
 
 [functions.generate-report]
