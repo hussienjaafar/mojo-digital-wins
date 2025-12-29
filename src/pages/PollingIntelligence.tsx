@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { TrendingUp, TrendingDown, AlertTriangle, Target, Users, BarChart3 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { ClientShell } from "@/components/client/ClientShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,12 +12,15 @@ import {
   V3CardTitle,
   V3CardDescription,
   V3CardContent,
+  V3ChartWrapper,
   V3LoadingState,
   V3EmptyState,
   V3Badge,
   V3Button,
   V3FilterPill,
 } from "@/components/v3";
+import { EChartsLineChart, type LineSeriesConfig } from "@/components/charts/echarts";
+import { getChartColors } from "@/lib/design-tokens";
 
 import { Database } from "@/integrations/supabase/types";
 
@@ -110,25 +112,45 @@ export default function PollingIntelligence() {
     return acc;
   }, {} as Record<string, PollingData[]>);
 
+  const chartColors = getChartColors();
+
   const getTrendData = (raceName: string) => {
     const racePolls = racesByState[raceName] || [];
     const sortedPolls = [...racePolls].sort((a, b) => 
       new Date(a.poll_date).getTime() - new Date(b.poll_date).getTime()
     );
 
-    const candidateData: Record<string, any[]> = {};
+    // Get unique candidates
+    const candidates = [...new Set(sortedPolls.map(p => p.candidate_name))];
+
+    // Transform data for ECharts - each data point needs all candidate values
+    const dateMap = new Map<string, Record<string, number | null>>();
     sortedPolls.forEach(poll => {
-      if (!candidateData[poll.candidate_name]) {
-        candidateData[poll.candidate_name] = [];
+      const dateKey = poll.poll_date;
+      if (!dateMap.has(dateKey)) {
+        dateMap.set(dateKey, { date: dateKey as any });
       }
-      candidateData[poll.candidate_name].push({
-        date: new Date(poll.poll_date).toLocaleDateString(),
-        lead_margin: poll.lead_margin,
-        pollster: poll.pollster,
-      });
+      const entry = dateMap.get(dateKey)!;
+      entry[poll.candidate_name] = poll.lead_margin;
     });
 
-    return { candidateData, sortedPolls };
+    const chartData = Array.from(dateMap.values()).map(entry => ({
+      date: entry.date as unknown as string,
+      ...Object.fromEntries(
+        candidates.map(c => [c, entry[c] ?? null])
+      )
+    }));
+
+    // Build series config for each candidate
+    const seriesConfig: LineSeriesConfig[] = candidates.map((candidate, idx) => ({
+      dataKey: candidate,
+      name: candidate,
+      color: chartColors[idx % chartColors.length],
+      smooth: true,
+      showSymbol: true,
+    }));
+
+    return { chartData, seriesConfig, sortedPolls, candidates };
   };
 
   const unreadAlertsCount = pollingAlerts.filter(alert => !alert.is_read).length;
@@ -202,7 +224,7 @@ export default function PollingIntelligence() {
             </div>
 
             {Object.entries(racesByState).map(([raceName, polls]) => {
-              const { candidateData, sortedPolls } = getTrendData(raceName);
+              const { chartData, seriesConfig, candidates } = getTrendData(raceName);
               const latestPolls = polls.slice(0, 3);
 
               return (
@@ -243,42 +265,21 @@ export default function PollingIntelligence() {
                       ))}
                     </div>
 
-                    {Object.keys(candidateData).length > 1 && (
-                      <div className="mt-6">
-                        <h4 className="text-sm font-medium mb-3 text-[hsl(var(--portal-text-primary))]">Polling Trend</h4>
-                        <ResponsiveContainer width="100%" height={200}>
-                          <LineChart data={sortedPolls}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--portal-border))" />
-                            <XAxis 
-                              dataKey="poll_date" 
-                              tickFormatter={(date) => new Date(date).toLocaleDateString()}
-                              stroke="hsl(var(--portal-text-muted))"
-                              fontSize={12}
-                            />
-                            <YAxis stroke="hsl(var(--portal-text-muted))" fontSize={12} />
-                            <Tooltip 
-                              contentStyle={{ 
-                                backgroundColor: "hsl(var(--portal-bg-card))",
-                                border: "1px solid hsl(var(--portal-border))",
-                                borderRadius: "8px",
-                                color: "hsl(var(--portal-text-primary))"
-                              }}
-                            />
-                            <Legend />
-                            {Object.keys(candidateData).map((candidate, idx) => (
-                              <Line
-                                key={candidate}
-                                type="monotone"
-                                dataKey="lead_margin"
-                                data={candidateData[candidate]}
-                                name={candidate}
-                                stroke={idx === 0 ? "hsl(var(--portal-accent-blue))" : "hsl(var(--portal-accent-red))"}
-                                strokeWidth={2}
-                              />
-                            ))}
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
+                    {candidates.length > 1 && chartData.length > 1 && (
+                      <V3ChartWrapper
+                        title="Polling Trend"
+                        ariaLabel={`Polling trend chart for ${raceName}`}
+                      >
+                        <EChartsLineChart
+                          data={chartData}
+                          xAxisKey="date"
+                          series={seriesConfig}
+                          height={200}
+                          xAxisType="time"
+                          showLegend={true}
+                          valueType="number"
+                        />
+                      </V3ChartWrapper>
                     )}
                   </V3CardContent>
                 </V3Card>

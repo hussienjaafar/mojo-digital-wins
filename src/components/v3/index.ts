@@ -35,3 +35,4 @@ export { V3Button, type V3ButtonProps } from "./V3Button";
 export { V3MetricChip, type V3MetricChipVariant, type V3MetricChipProps } from "./V3MetricChip";
 export { V3FilterPill, type V3FilterPillVariant, type V3FilterPillProps } from "./V3FilterPill";
 export { V3StatsGrid, type V3StatsGridItem, type V3StatsGridProps } from "./V3StatsGrid";
+export { V3DataTable, type V3Column, type V3DataTableProps } from "./V3DataTable";
