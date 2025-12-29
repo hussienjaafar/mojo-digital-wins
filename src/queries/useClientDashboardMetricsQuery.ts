@@ -252,7 +252,8 @@ async function fetchDashboardMetrics(
   const totalMetaSpend = metaMetrics.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);
   const totalSMSCost = smsMetrics.reduce((sum: number, s: any) => sum + Number(s.cost || 0), 0);
   const totalSpend = totalMetaSpend + totalSMSCost;
-  const roi = totalSpend > 0 ? totalNetRevenue / totalSpend : 0;
+  // ROI = (Revenue - Cost) / Cost, not ROAS which is Revenue / Cost
+  const roi = totalSpend > 0 ? (totalNetRevenue - totalSpend) / totalSpend : 0;
 
   const totalImpressions = metaMetrics.reduce((sum: number, m: any) => sum + (m.impressions || 0), 0);
   const totalClicks = metaMetrics.reduce((sum: number, m: any) => sum + (m.clicks || 0), 0);
@@ -280,7 +281,8 @@ async function fetchDashboardMetrics(
   const prevMetaSpend = prevMetaMetrics.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);
   const prevSMSCost = prevSmsMetrics.reduce((sum: number, s: any) => sum + Number(s.cost || 0), 0);
   const prevTotalSpend = prevMetaSpend + prevSMSCost;
-  const prevRoi = prevTotalSpend > 0 ? prevTotalNetRevenue / prevTotalSpend : 0;
+  // ROI = (Revenue - Cost) / Cost
+  const prevRoi = prevTotalSpend > 0 ? (prevTotalNetRevenue - prevTotalSpend) / prevTotalSpend : 0;
 
   const prevDeterministicCount = prevDonations.filter((d: any) => d.refcode || d.source_campaign).length;
   const prevDeterministicRate = prevDonations.length > 0 ? (prevDeterministicCount / prevDonations.length) * 100 : 0;
@@ -364,9 +366,10 @@ async function fetchDashboardMetrics(
     })),
     roi: timeSeries.map((d, i) => {
       const daySpend = d.metaSpend + d.smsSpend;
+      // ROI = (Revenue - Cost) / Cost
       return {
         date: format(days[i], 'MMM d'),
-        value: daySpend > 0 ? d.netDonations / daySpend : 0,
+        value: daySpend > 0 ? (d.netDonations - daySpend) / daySpend : 0,
       };
     }),
     refundRate: timeSeries.map((d, i) => {
