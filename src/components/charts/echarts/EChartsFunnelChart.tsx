@@ -3,6 +3,7 @@ import type { EChartsOption } from "echarts";
 import { EChartsBase } from "./EChartsBase";
 import { getChartColors } from "@/lib/design-tokens";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
+import { V3EmptyState } from "@/components/v3/V3EmptyState";
 
 export type FunnelValueFormatType = "number" | "currency" | "percent";
 
@@ -32,6 +33,8 @@ export interface EChartsFunnelChartProps {
   showLegend?: boolean;
   /** Click handler for funnel stages */
   onStageClick?: (params: { name: string; value: number; index: number }) => void;
+  /** Empty state message */
+  emptyMessage?: string;
 }
 
 const colorPalette = getChartColors();
@@ -46,7 +49,27 @@ export const EChartsFunnelChart: React.FC<EChartsFunnelChartProps> = ({
   valueType = "number",
   showLegend = false,
   onStageClick,
+  emptyMessage = "No funnel data available",
 }) => {
+  // Handle empty data
+  if (!isLoading && (!data || data.length === 0)) {
+    return (
+      <div className={className} style={{ height: typeof height === 'number' ? height : undefined }}>
+        <V3EmptyState
+          title={emptyMessage}
+          description="There is no funnel data to display."
+          accent="blue"
+        />
+      </div>
+    );
+  }
+
+  // Handle zero-value stages - filter them out to prevent layout issues
+  const validData = React.useMemo(() => 
+    data.filter(item => item.value > 0),
+    [data]
+  );
+
   // Format value based on type
   const formatValue = React.useCallback((value: number) => {
     switch (valueType) {
@@ -61,8 +84,8 @@ export const EChartsFunnelChart: React.FC<EChartsFunnelChartProps> = ({
 
   // Prepare chart data with colors and calculate conversion rates
   const chartData = React.useMemo(() => {
-    return data.map((item, index) => {
-      const prevValue = index > 0 ? data[index - 1].value : item.value;
+    return validData.map((item, index) => {
+      const prevValue = index > 0 ? validData[index - 1].value : item.value;
       const conversionRate = prevValue > 0 ? ((item.value / prevValue) * 100).toFixed(1) : "100";
       
       return {
@@ -74,7 +97,7 @@ export const EChartsFunnelChart: React.FC<EChartsFunnelChartProps> = ({
         },
       };
     });
-  }, [data]);
+  }, [validData]);
 
   const option = React.useMemo<EChartsOption>(() => {
     const isHorizontal = orientation === "horizontal";

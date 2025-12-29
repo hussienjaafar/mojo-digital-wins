@@ -3,6 +3,7 @@ import type { EChartsOption } from "echarts";
 import { EChartsBase } from "./EChartsBase";
 import { getChartColors } from "@/lib/design-tokens";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
+import { V3EmptyState } from "@/components/v3/V3EmptyState";
 
 export type PieValueFormatType = "number" | "currency" | "percent";
 
@@ -37,6 +38,8 @@ export interface EChartsPieChartProps {
   showPercentage?: boolean;
   /** Click handler for pie slices */
   onSliceClick?: (params: { name: string; value: number; percent: number }) => void;
+  /** Empty state message */
+  emptyMessage?: string;
 }
 
 const colorPalette = getChartColors();
@@ -54,7 +57,21 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
   valueType = "number",
   showPercentage = true,
   onSliceClick,
+  emptyMessage = "No data available",
 }) => {
+  // Handle empty data
+  if (!isLoading && (!data || data.length === 0)) {
+    return (
+      <div className={className} style={{ height: typeof height === 'number' ? height : undefined }}>
+        <V3EmptyState
+          title={emptyMessage}
+          description="There is no data to display in this chart."
+          accent="blue"
+        />
+      </div>
+    );
+  }
+
   // Calculate total for percentages
   const total = React.useMemo(() => 
     data.reduce((sum, item) => sum + item.value, 0), 

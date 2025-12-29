@@ -38,6 +38,10 @@ interface ResponsiveBarChartProps {
 
 /**
  * Mobile-optimized bar chart with proper formatting and responsive behavior
+ * 
+ * @deprecated Use EChartsBarChart from @/components/charts/echarts instead.
+ * This component will be removed in a future release.
+ * Migration guide: See docs/V3_CHART_STANDARDS.md
  */
 export function ResponsiveBarChart({
   data,
