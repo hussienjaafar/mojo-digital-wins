@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { V3MetricChip, V3FilterPill } from "@/components/v3";
 
 // ============================================================================
 // Types & Constants
@@ -63,69 +64,7 @@ const TYPE_OPTIONS: { value: OpportunityType | "all"; label: string }[] = [
   { value: "partnership", label: "Partnership" },
 ];
 
-// ============================================================================
-// Sub-components
-// ============================================================================
-
-interface MetricChipProps {
-  label: string;
-  value: string | number;
-  icon: typeof Target;
-  variant?: "default" | "success" | "warning" | "error" | "info";
-}
-
-const MetricChip = ({ label, value, icon: Icon, variant = "default" }: MetricChipProps) => {
-  const variantStyles = {
-    default: "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]",
-    success: "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
-    warning: "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]",
-    error: "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))]",
-    info: "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))]",
-  };
-
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2 px-3 py-2 rounded-lg",
-        variantStyles[variant]
-      )}
-    >
-      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <div className="flex flex-col">
-        <span className="text-xs text-[hsl(var(--portal-text-muted))]">{label}</span>
-        <span className="font-semibold tabular-nums">{value}</span>
-      </div>
-    </div>
-  );
-};
-
-interface FilterPillProps {
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-  count?: number;
-}
-
-const FilterPill = ({ label, isActive, onClick, count }: FilterPillProps) => (
-  <button
-    onClick={onClick}
-    className={cn(
-      "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
-      "border focus:outline-none focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.5)]",
-      isActive
-        ? "bg-[hsl(var(--portal-accent-blue))] text-white border-transparent"
-        : "bg-transparent text-[hsl(var(--portal-text-secondary))] border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"
-    )}
-    aria-pressed={isActive}
-  >
-    {label}
-    {count !== undefined && count > 0 && (
-      <span className={cn("ml-1.5", isActive ? "opacity-80" : "opacity-60")}>
-        ({count})
-      </span>
-    )}
-  </button>
-);
+// Local MetricChip and FilterPill removed - using V3 components from @/components/v3
 
 // ============================================================================
 // Opportunity Detail Dialog
@@ -492,25 +431,25 @@ export default function ClientOpportunities() {
         >
           {/* Hero Metrics */}
           <div className="flex flex-wrap gap-3">
-            <MetricChip
+            <V3MetricChip
               label="Active Opportunities"
               value={stats?.active ?? 0}
               icon={Target}
               variant="info"
             />
-            <MetricChip
+            <V3MetricChip
               label="High Priority"
               value={stats?.highPriority ?? 0}
               icon={Sparkles}
               variant="success"
             />
-            <MetricChip
+            <V3MetricChip
               label="Ready to Launch"
               value={stats?.readyToLaunch ?? 0}
               icon={Zap}
               variant="warning"
             />
-            <MetricChip
+            <V3MetricChip
               label="Avg Est. Value"
               value={stats?.avgEstimatedValue ? `$${stats.avgEstimatedValue.toLocaleString()}` : "$0"}
               icon={DollarSign}
@@ -529,7 +468,7 @@ export default function ClientOpportunities() {
           {/* Status Filters */}
           <div className="flex flex-wrap gap-2">
             {STATUS_OPTIONS.map(({ value, label }) => (
-              <FilterPill
+              <V3FilterPill
                 key={value}
                 label={label}
                 isActive={filterStatus === value}
@@ -550,7 +489,7 @@ export default function ClientOpportunities() {
           {/* Type Filters */}
           <div className="flex flex-wrap gap-2">
             {TYPE_OPTIONS.map(({ value, label }) => (
-              <FilterPill
+              <V3FilterPill
                 key={value}
                 label={label}
                 isActive={filterType === value}

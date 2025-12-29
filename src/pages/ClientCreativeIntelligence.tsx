@@ -1,13 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { ClientLayout } from "@/components/client/ClientLayout";
+import { ClientShell } from "@/components/client/ClientShell";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -18,14 +14,10 @@ import { CreativeScorecard } from "@/components/client/CreativeScorecard";
 import { CreativeDataImport } from "@/components/client/CreativeDataImport";
 import {
   Sparkles,
-  RefreshCw,
   Search,
-  Filter,
   TrendingUp,
   Video,
   Image as ImageIcon,
-  MessageSquare,
-  AlertTriangle,
   Zap,
   BarChart3,
   Lightbulb,
@@ -33,6 +25,16 @@ import {
   Target
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  V3PageContainer,
+  V3Card,
+  V3CardContent,
+  V3KPICard,
+  V3LoadingState,
+  V3EmptyState,
+  V3Button,
+} from "@/components/v3";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Creative = {
   id: string;
@@ -109,7 +111,6 @@ export default function ClientCreativeIntelligence() {
 
       setCreatives(data || []);
 
-      // Calculate stats
       const total = data?.length || 0;
       const analyzed = data?.filter(c => c.analyzed_at).length || 0;
       const pendingTranscription = data?.filter(c => 
@@ -136,7 +137,6 @@ export default function ClientCreativeIntelligence() {
     loadCreatives();
   }, [loadCreatives]);
 
-  // Load AI recommendations when recommendations tab is selected
   useEffect(() => {
     const loadAiRecommendations = async () => {
       if (activeTab === 'scorecard' && organizationId && !aiRecommendations && !isLoadingRecs) {
@@ -220,181 +220,165 @@ export default function ClientCreativeIntelligence() {
 
   if (orgLoading || isLoading) {
     return (
-      <ClientLayout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 w-64 bg-muted rounded" />
-            <div className="grid grid-cols-4 gap-4">
-              {[1,2,3,4].map(i => <Skeleton key={i} className="h-24" />)}
-            </div>
-            <Skeleton className="h-96" />
+      <ClientShell>
+        <div className="p-6">
+          <V3LoadingState variant="kpi-grid" count={7} />
+          <div className="mt-6">
+            <V3LoadingState variant="chart" />
           </div>
         </div>
-      </ClientLayout>
+      </ClientShell>
     );
   }
 
   if (creatives.length === 0 && !showImport) {
     return (
-      <ClientLayout>
-        <div className="container mx-auto px-4 py-8">
-          <Card className="border-dashed max-w-2xl mx-auto">
-            <CardContent className="py-12 text-center">
-              <div className="p-4 rounded-full bg-primary/10 w-fit mx-auto mb-6">
-                <Sparkles className="h-12 w-12 text-primary" />
-              </div>
-              <h2 className="text-2xl font-bold mb-3">Creative Intelligence</h2>
-              <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                Unlock AI-powered insights from your ad creatives. Discover what messaging, 
-                tones, and visuals drive the best performance.
-              </p>
-              <Button onClick={() => setShowImport(true)} size="lg" className="gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Import Campaign Data
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </ClientLayout>
+      <ClientShell>
+        <V3EmptyState
+          icon={Sparkles}
+          title="Creative Intelligence"
+          description="Unlock AI-powered insights from your ad creatives. Discover what messaging, tones, and visuals drive the best performance."
+          accent="purple"
+          action={
+            <V3Button onClick={() => setShowImport(true)}>
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Import Campaign Data
+            </V3Button>
+          }
+        />
+      </ClientShell>
     );
   }
 
   if (showImport) {
     return (
-      <ClientLayout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-2xl mx-auto">
-            <Button 
-              variant="ghost" 
-              onClick={() => setShowImport(false)} 
-              className="mb-4"
-            >
-              ← Back to Creative Intelligence
-            </Button>
-            <CreativeDataImport 
-              organizationId={organizationId!}
-              onImportComplete={() => {
-                setShowImport(false);
-                loadCreatives();
-              }}
-            />
-          </div>
-        </div>
-      </ClientLayout>
+      <ClientShell>
+        <V3PageContainer title="Import Campaign Data" description="Import your Meta Ads creative data">
+          <V3Button 
+            variant="secondary" 
+            onClick={() => setShowImport(false)} 
+            className="mb-4"
+          >
+            ← Back to Creative Intelligence
+          </V3Button>
+          <CreativeDataImport 
+            organizationId={organizationId!}
+            onImportComplete={() => {
+              setShowImport(false);
+              loadCreatives();
+            }}
+          />
+        </V3PageContainer>
+      </ClientShell>
     );
   }
 
   return (
-    <ClientLayout>
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* PHASE 4: Redesigned Header with Portal Theme */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
-              <Sparkles className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Creative Intelligence</h1>
-              <p className="text-sm text-muted-foreground">
-                AI-powered analysis of your ad creatives
-              </p>
-            </div>
-          </div>
+    <ClientShell>
+      <V3PageContainer
+        title="Creative Intelligence"
+        description="AI-powered analysis of your ad creatives"
+        actions={
           <div className="flex flex-wrap gap-2">
             {stats?.pendingTranscription && stats.pendingTranscription > 0 && (
-              <Button 
-                variant="outline" 
+              <V3Button 
+                variant="secondary" 
                 onClick={handleTranscribeVideos}
                 disabled={isTranscribing}
                 size="sm"
-                className="gap-2 border-primary/30 hover:bg-primary/5"
               >
-                <Play className={cn("h-4 w-4", isTranscribing && "animate-pulse")} />
+                <Play className={cn("h-4 w-4 mr-2", isTranscribing && "animate-pulse")} />
                 Transcribe ({stats.pendingTranscription})
-              </Button>
+              </V3Button>
             )}
-            <Button 
-              variant="outline" 
+            <V3Button 
+              variant="secondary" 
               onClick={handleAnalyzeAll}
               disabled={isAnalyzing}
               size="sm"
-              className="gap-2 border-primary/30 hover:bg-primary/5"
             >
-              <Zap className={cn("h-4 w-4", isAnalyzing && "animate-pulse")} />
+              <Zap className={cn("h-4 w-4 mr-2", isAnalyzing && "animate-pulse")} />
               Analyze
-            </Button>
-            <Button 
-              variant="outline" 
+            </V3Button>
+            <V3Button 
+              variant="secondary" 
               onClick={() => setShowImport(true)}
               size="sm"
-              className="gap-2"
             >
-              <TrendingUp className="h-4 w-4" />
+              <TrendingUp className="h-4 w-4 mr-2" />
               Import
-            </Button>
+            </V3Button>
           </div>
-        </div>
-
-        {/* PHASE 4: Stats Overview with Portal Styling */}
+        }
+      >
+        {/* Stats Overview */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-            <Card className="p-4 border-border/50 bg-card/50">
-              <div className="text-2xl font-bold text-foreground">{stats.total}</div>
-              <div className="text-xs text-muted-foreground">Total Creatives</div>
-            </Card>
-            <Card className="p-4 border-border/50 bg-card/50">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.analyzed}</div>
-              <div className="text-xs text-muted-foreground">Analyzed</div>
-            </Card>
-            <Card className="p-4 border-border/50 bg-card/50">
-              <div className="flex items-center gap-1.5">
-                <Video className="h-4 w-4 text-primary" />
-                <span className="text-2xl font-bold text-foreground">{stats.videos}</span>
-              </div>
-              <div className="text-xs text-muted-foreground">Videos</div>
-            </Card>
-            <Card className="p-4 border-border/50 bg-card/50">
-              <div className="flex items-center gap-1.5">
-                <ImageIcon className="h-4 w-4 text-primary" />
-                <span className="text-2xl font-bold text-foreground">{stats.images}</span>
-              </div>
-              <div className="text-xs text-muted-foreground">Images</div>
-            </Card>
-            <Card className="p-4 border-border/50 bg-card/50">
-              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.pendingTranscription}</div>
-              <div className="text-xs text-muted-foreground">Need Transcription</div>
-            </Card>
-            <Card className="p-4 border-border/50 bg-card/50">
-              <div className="text-2xl font-bold text-foreground">{stats.avgRoas.toFixed(2)}x</div>
-              <div className="text-xs text-muted-foreground">Avg ROAS</div>
-            </Card>
-            <Card className="p-4 border-primary/30 bg-primary/5">
-              <div className="text-2xl font-bold text-primary">{stats.topPerformers}</div>
-              <div className="text-xs text-muted-foreground">Top Performers</div>
-            </Card>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+            <V3KPICard
+              label="Total Creatives"
+              value={stats.total}
+              icon={Sparkles}
+              accent="default"
+            />
+            <V3KPICard
+              label="Analyzed"
+              value={stats.analyzed}
+              icon={Zap}
+              accent="green"
+            />
+            <V3KPICard
+              label="Videos"
+              value={stats.videos}
+              icon={Video}
+              accent="blue"
+            />
+            <V3KPICard
+              label="Images"
+              value={stats.images}
+              icon={ImageIcon}
+              accent="purple"
+            />
+            <V3KPICard
+              label="Need Transcription"
+              value={stats.pendingTranscription}
+              icon={Play}
+              accent="amber"
+            />
+            <V3KPICard
+              label="Avg ROAS"
+              value={`${stats.avgRoas.toFixed(2)}x`}
+              icon={TrendingUp}
+              accent="default"
+            />
+            <V3KPICard
+              label="Top Performers"
+              value={stats.topPerformers}
+              icon={Target}
+              accent="green"
+            />
           </div>
         )}
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5 max-w-2xl">
-            <TabsTrigger value="gallery" className="gap-2">
+          <TabsList className="grid w-full grid-cols-5 max-w-2xl bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))]">
+            <TabsTrigger value="gallery" className="gap-2 data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white">
               <ImageIcon className="h-4 w-4" />
               <span className="hidden sm:inline">Gallery</span>
             </TabsTrigger>
-            <TabsTrigger value="insights" className="gap-2">
+            <TabsTrigger value="insights" className="gap-2 data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white">
               <Lightbulb className="h-4 w-4" />
               <span className="hidden sm:inline">Insights</span>
             </TabsTrigger>
-            <TabsTrigger value="matrix" className="gap-2">
+            <TabsTrigger value="matrix" className="gap-2 data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Matrix</span>
             </TabsTrigger>
-            <TabsTrigger value="recommendations" className="gap-2">
+            <TabsTrigger value="recommendations" className="gap-2 data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white">
               <Sparkles className="h-4 w-4" />
               <span className="hidden sm:inline">Recommend</span>
             </TabsTrigger>
-            <TabsTrigger value="scorecard" className="gap-2">
+            <TabsTrigger value="scorecard" className="gap-2 data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white">
               <Target className="h-4 w-4" />
               <span className="hidden sm:inline">Scorecard</span>
             </TabsTrigger>
@@ -405,16 +389,16 @@ export default function ClientCreativeIntelligence() {
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
                 <Input 
                   placeholder="Search by topic, headline, or text..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
                 />
               </div>
               <Select value={channelFilter} onValueChange={setChannelFilter}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-[140px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -424,7 +408,7 @@ export default function ClientCreativeIntelligence() {
                 </SelectContent>
               </Select>
               <Select value={tierFilter} onValueChange={setTierFilter}>
-                <SelectTrigger className="w-[160px]">
+                <SelectTrigger className="w-[160px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
                   <SelectValue placeholder="Performance" />
                 </SelectTrigger>
                 <SelectContent>
@@ -445,10 +429,12 @@ export default function ClientCreativeIntelligence() {
             </div>
 
             {filteredCreatives.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                <Search className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No creatives match your filters</p>
-              </div>
+              <V3EmptyState
+                icon={Search}
+                title="No Matches"
+                description="No creatives match your current filters"
+                accent="blue"
+              />
             )}
           </TabsContent>
 
@@ -491,7 +477,7 @@ export default function ClientCreativeIntelligence() {
             )}
           </TabsContent>
         </Tabs>
-      </div>
-    </ClientLayout>
+      </V3PageContainer>
+    </ClientShell>
   );
 }
