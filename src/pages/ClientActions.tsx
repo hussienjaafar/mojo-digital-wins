@@ -59,68 +59,8 @@ const STATUS_OPTIONS: { value: FilterStatus; label: string }[] = [
 ];
 
 // ============================================================================
-// Sub-components
+// Sub-components - Using V3 shared components
 // ============================================================================
-
-interface MetricChipProps {
-  label: string;
-  value: string | number;
-  icon: typeof Zap;
-  variant?: "default" | "success" | "warning" | "error" | "info";
-}
-
-const MetricChip = ({ label, value, icon: Icon, variant = "default" }: MetricChipProps) => {
-  const variantStyles = {
-    default: "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]",
-    success: "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
-    warning: "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]",
-    error: "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))]",
-    info: "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))]",
-  };
-
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2 px-3 py-2 rounded-lg",
-        variantStyles[variant]
-      )}
-    >
-      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <div className="flex flex-col">
-        <span className="text-xs text-[hsl(var(--portal-text-muted))]">{label}</span>
-        <span className="font-semibold tabular-nums">{value}</span>
-      </div>
-    </div>
-  );
-};
-
-interface FilterPillProps {
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-  count?: number;
-}
-
-const FilterPill = ({ label, isActive, onClick, count }: FilterPillProps) => (
-  <button
-    onClick={onClick}
-    className={cn(
-      "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
-      "border focus:outline-none focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.5)]",
-      isActive
-        ? "bg-[hsl(var(--portal-accent-blue))] text-white border-transparent"
-        : "bg-transparent text-[hsl(var(--portal-text-secondary))] border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"
-    )}
-    aria-pressed={isActive}
-  >
-    {label}
-    {count !== undefined && (
-      <span className={cn("ml-1.5", isActive ? "opacity-80" : "opacity-60")}>
-        ({count})
-      </span>
-    )}
-  </button>
-);
 
 // ============================================================================
 // Action Detail Dialog
@@ -513,25 +453,25 @@ const ClientActions = () => {
         >
           {/* Hero Metrics */}
           <div className="flex flex-wrap gap-3">
-            <MetricChip
+            <V3MetricChip
               label="Pending Actions"
               value={stats?.pending ?? 0}
               icon={Lightbulb}
               variant="warning"
             />
-            <MetricChip
+            <V3MetricChip
               label="Used This Period"
               value={stats?.used ?? 0}
               icon={Check}
               variant="success"
             />
-            <MetricChip
+            <V3MetricChip
               label="High Urgency"
               value={stats?.highUrgencyCount ?? 0}
               icon={Zap}
               variant="error"
             />
-            <MetricChip
+            <V3MetricChip
               label="Avg Relevance"
               value={`${stats?.avgRelevance ?? 0}%`}
               icon={Target}
@@ -550,7 +490,7 @@ const ClientActions = () => {
           {/* Status Filters */}
           <div className="flex flex-wrap gap-2">
             {STATUS_OPTIONS.map(({ value, label }) => (
-              <FilterPill
+              <V3FilterPill
                 key={value}
                 label={label}
                 isActive={filterStatus === value}
@@ -572,13 +512,13 @@ const ClientActions = () => {
 
               {/* Type Filters */}
               <div className="flex flex-wrap gap-2">
-                <FilterPill
+                <V3FilterPill
                   label="All Types"
                   isActive={filterType === "all"}
                   onClick={() => setFilterType("all")}
                 />
                 {actionTypes.map((type) => (
-                  <FilterPill
+                  <V3FilterPill
                     key={type}
                     label={type}
                     isActive={filterType === type}

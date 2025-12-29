@@ -74,68 +74,11 @@ const formVariants = {
   },
 };
 
+import { V3MetricChip, V3FilterPill } from "@/components/v3";
+
 // ============================================================================
-// Sub-components
+// Sub-components - Using V3 shared components
 // ============================================================================
-
-interface MetricChipProps {
-  label: string;
-  value: string | number;
-  icon: typeof Target;
-  variant?: "default" | "success" | "warning" | "info";
-}
-
-const MetricChip = ({ label, value, icon: Icon, variant = "default" }: MetricChipProps) => {
-  const variantStyles = {
-    default: "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]",
-    success: "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
-    warning: "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]",
-    info: "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))]",
-  };
-
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2 px-3 py-2 rounded-lg",
-        variantStyles[variant]
-      )}
-    >
-      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <div className="flex flex-col">
-        <span className="text-xs text-[hsl(var(--portal-text-muted))]">{label}</span>
-        <span className="font-semibold tabular-nums">{value}</span>
-      </div>
-    </div>
-  );
-};
-
-interface FilterPillProps {
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-  count?: number;
-}
-
-const FilterPill = ({ label, isActive, onClick, count }: FilterPillProps) => (
-  <button
-    onClick={onClick}
-    className={cn(
-      "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
-      "border focus:outline-none focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.5)]",
-      isActive
-        ? "bg-[hsl(var(--portal-accent-blue))] text-white border-transparent"
-        : "bg-transparent text-[hsl(var(--portal-text-secondary))] border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"
-    )}
-    aria-pressed={isActive}
-  >
-    {label}
-    {count !== undefined && (
-      <span className={cn("ml-1.5", isActive ? "opacity-80" : "opacity-60")}>
-        ({count})
-      </span>
-    )}
-  </button>
-);
 
 // ============================================================================
 // Main Component
@@ -296,19 +239,19 @@ const ClientWatchlist = () => {
         >
           {/* Hero Metrics */}
           <div className="flex flex-wrap gap-3">
-            <MetricChip
+            <V3MetricChip
               label="Total Entities"
               value={stats?.totalEntities ?? 0}
               icon={Eye}
               variant="info"
             />
-            <MetricChip
+            <V3MetricChip
               label="Sentiment Alerts"
               value={stats?.sentimentAlertsEnabled ?? 0}
               icon={Bell}
               variant="success"
             />
-            <MetricChip
+            <V3MetricChip
               label="Avg Threshold"
               value={`${stats?.averageThreshold ?? 0}%`}
               icon={BarChart2}
@@ -483,7 +426,7 @@ const ClientWatchlist = () => {
           {/* Filter Pills */}
           {data && data.entities.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-4 pb-4 border-b border-[hsl(var(--portal-border)/0.5)]">
-              <FilterPill
+              <V3FilterPill
                 label="All"
                 isActive={filterType === "all"}
                 onClick={() => setFilterType("all")}
@@ -491,7 +434,7 @@ const ClientWatchlist = () => {
               />
               {ENTITY_TYPES.filter((t) => (stats?.byType[t.value] ?? 0) > 0).map(
                 ({ value, label }) => (
-                  <FilterPill
+                  <V3FilterPill
                     key={value}
                     label={label}
                     isActive={filterType === value}

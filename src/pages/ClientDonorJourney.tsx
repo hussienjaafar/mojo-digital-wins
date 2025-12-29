@@ -40,76 +40,11 @@ import {
   type FunnelStage,
 } from "@/queries/useDonorJourneyQuery";
 
+import { V3MetricChip, V3FilterPill } from "@/components/v3";
+
 // ============================================================================
-// Local Components
+// Local Components - Using V3 shared components
 // ============================================================================
-
-interface MetricChipProps {
-  label: string;
-  value: string | number;
-  icon: LucideIcon;
-  variant?: "default" | "success" | "warning" | "error" | "info";
-}
-
-const MetricChip = ({ label, value, icon: Icon, variant = "default" }: MetricChipProps) => {
-  const variantStyles = {
-    default: "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]",
-    success: "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
-    warning: "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]",
-    error: "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))]",
-    info: "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))]",
-  };
-
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2 px-3 py-2 rounded-lg",
-        variantStyles[variant]
-      )}
-    >
-      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <div className="flex flex-col">
-        <span className="text-xs opacity-80">{label}</span>
-        <span className="font-semibold tabular-nums">{value}</span>
-      </div>
-    </div>
-  );
-};
-
-interface FilterPillProps {
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-  count?: number;
-}
-
-const FilterPill = ({ label, isActive, onClick, count }: FilterPillProps) => (
-  <button
-    onClick={onClick}
-    className={cn(
-      "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
-      "border focus:outline-none focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.5)]",
-      isActive
-        ? "bg-[hsl(var(--portal-accent-blue))] text-white border-transparent"
-        : "bg-transparent text-[hsl(var(--portal-text-secondary))] border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"
-    )}
-    aria-pressed={isActive}
-  >
-    {label}
-    {count !== undefined && (
-      <span
-        className={cn(
-          "ml-1.5 px-1.5 py-0.5 rounded-full text-xs",
-          isActive
-            ? "bg-white/20 text-white"
-            : "bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-muted))]"
-        )}
-      >
-        {count}
-      </span>
-    )}
-  </button>
-);
 
 // ============================================================================
 // Touchpoint Icon Helper
@@ -545,18 +480,18 @@ const ClientDonorJourney = () => {
           }
         >
           <div className="flex flex-wrap gap-3">
-            <MetricChip
+            <V3MetricChip
               label="Total Donors"
               value={stats?.totalDonors.toLocaleString() || "0"}
               icon={Users}
             />
-            <MetricChip
+            <V3MetricChip
               label="New vs Returning"
               value={`${stats?.newVsReturningRatio.toFixed(0)}% new`}
               icon={TrendingUp}
               variant="info"
             />
-            <MetricChip
+            <V3MetricChip
               label="Retention Rate"
               value={`${stats?.retentionMetrics.retentionRate.toFixed(0)}%`}
               icon={Heart}
@@ -566,13 +501,13 @@ const ClientDonorJourney = () => {
                   : "warning"
               }
             />
-            <MetricChip
+            <V3MetricChip
               label="Avg Donation"
               value={`$${stats?.avgDonation.toFixed(0) || "0"}`}
               icon={DollarSign}
               variant="success"
             />
-            <MetricChip
+            <V3MetricChip
               label="Avg Touchpoints"
               value={stats?.avgTouchpointsBeforeConversion.toFixed(1) || "0"}
               icon={Layers}
@@ -588,7 +523,7 @@ const ClientDonorJourney = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             {amountFilters.map((filter) => (
-              <FilterPill
+              <V3FilterPill
                 key={filter.value}
                 label={filter.label}
                 isActive={minAmount === filter.value}
