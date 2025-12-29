@@ -6393,6 +6393,7 @@ export type Database = {
           amount: number | null
           card_type: string | null
           city: string | null
+          click_id: string | null
           committee_name: string | null
           contribution_form: string | null
           country: string | null
@@ -6404,6 +6405,7 @@ export type Database = {
           double_down: boolean | null
           employer: string | null
           entity_id: string | null
+          fbclid: string | null
           fec_id: string | null
           fee: number | null
           first_name: string | null
@@ -6414,6 +6416,7 @@ export type Database = {
           last_name: string | null
           lineitem_id: number | null
           net_amount: number | null
+          next_charge_date: string | null
           occupation: string | null
           order_number: string | null
           organization_id: string | null
@@ -6421,6 +6424,7 @@ export type Database = {
           phone: string | null
           recurring_duration: number | null
           recurring_period: string | null
+          recurring_state: string | null
           recurring_upsell_shown: boolean | null
           recurring_upsell_succeeded: boolean | null
           refcode: string | null
@@ -6442,6 +6446,7 @@ export type Database = {
           amount?: number | null
           card_type?: string | null
           city?: string | null
+          click_id?: string | null
           committee_name?: string | null
           contribution_form?: string | null
           country?: string | null
@@ -6451,8 +6456,9 @@ export type Database = {
           donor_id_hash?: never
           donor_name?: never
           double_down?: boolean | null
-          employer?: string | null
+          employer?: never
           entity_id?: string | null
+          fbclid?: string | null
           fec_id?: string | null
           fee?: number | null
           first_name?: never
@@ -6463,13 +6469,15 @@ export type Database = {
           last_name?: never
           lineitem_id?: number | null
           net_amount?: number | null
-          occupation?: string | null
+          next_charge_date?: string | null
+          occupation?: never
           order_number?: string | null
           organization_id?: string | null
           payment_method?: string | null
           phone?: never
           recurring_duration?: number | null
           recurring_period?: string | null
+          recurring_state?: string | null
           recurring_upsell_shown?: boolean | null
           recurring_upsell_succeeded?: boolean | null
           refcode?: string | null
@@ -6482,7 +6490,7 @@ export type Database = {
           transaction_date?: string | null
           transaction_id?: string | null
           transaction_type?: string | null
-          zip?: never
+          zip?: string | null
         }
         Update: {
           ab_test_name?: string | null
@@ -6491,6 +6499,7 @@ export type Database = {
           amount?: number | null
           card_type?: string | null
           city?: string | null
+          click_id?: string | null
           committee_name?: string | null
           contribution_form?: string | null
           country?: string | null
@@ -6500,8 +6509,9 @@ export type Database = {
           donor_id_hash?: never
           donor_name?: never
           double_down?: boolean | null
-          employer?: string | null
+          employer?: never
           entity_id?: string | null
+          fbclid?: string | null
           fec_id?: string | null
           fee?: number | null
           first_name?: never
@@ -6512,13 +6522,15 @@ export type Database = {
           last_name?: never
           lineitem_id?: number | null
           net_amount?: number | null
-          occupation?: string | null
+          next_charge_date?: string | null
+          occupation?: never
           order_number?: string | null
           organization_id?: string | null
           payment_method?: string | null
           phone?: never
           recurring_duration?: number | null
           recurring_period?: string | null
+          recurring_state?: string | null
           recurring_upsell_shown?: boolean | null
           recurring_upsell_succeeded?: boolean | null
           refcode?: string | null
@@ -6531,7 +6543,7 @@ export type Database = {
           transaction_date?: string | null
           transaction_id?: string | null
           transaction_type?: string | null
-          zip?: never
+          zip?: string | null
         }
         Relationships: [
           {
