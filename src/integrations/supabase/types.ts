@@ -22,6 +22,7 @@ export type Database = {
           amount: number
           card_type: string | null
           city: string | null
+          click_id: string | null
           committee_name: string | null
           contribution_form: string | null
           country: string | null
@@ -32,6 +33,7 @@ export type Database = {
           double_down: boolean | null
           employer: string | null
           entity_id: string | null
+          fbclid: string | null
           fec_id: string | null
           fee: number | null
           first_name: string | null
@@ -70,6 +72,7 @@ export type Database = {
           amount: number
           card_type?: string | null
           city?: string | null
+          click_id?: string | null
           committee_name?: string | null
           contribution_form?: string | null
           country?: string | null
@@ -80,6 +83,7 @@ export type Database = {
           double_down?: boolean | null
           employer?: string | null
           entity_id?: string | null
+          fbclid?: string | null
           fec_id?: string | null
           fee?: number | null
           first_name?: string | null
@@ -118,6 +122,7 @@ export type Database = {
           amount?: number
           card_type?: string | null
           city?: string | null
+          click_id?: string | null
           committee_name?: string | null
           contribution_form?: string | null
           country?: string | null
@@ -128,6 +133,7 @@ export type Database = {
           double_down?: boolean | null
           employer?: string | null
           entity_id?: string | null
+          fbclid?: string | null
           fec_id?: string | null
           fee?: number | null
           first_name?: string | null
