@@ -390,7 +390,8 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
             aria-busy={isSyncing}
             aria-label={isSyncing ? `${label} in progress` : label}
             className={cn(
-              "h-auto flex-col gap-[var(--portal-space-xs)] py-[var(--portal-space-md)] px-[var(--portal-space-sm)] relative w-full",
+              // Fixed height for consistency, flex-col layout
+              "min-h-[100px] h-full flex-col justify-center gap-[var(--portal-space-xs)] py-[var(--portal-space-md)] px-[var(--portal-space-sm)] relative w-full",
               "transition-all duration-200",
               dashed && "border-dashed",
               !isPrimary && accent && accentColors[accent].hover
