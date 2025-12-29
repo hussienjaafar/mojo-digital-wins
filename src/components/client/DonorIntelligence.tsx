@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity, GitBranch, AlertTriangle } from "lucide-react";
 import { useDonorIntelligenceQuery, type AttributionData } from "@/queries";
 import { formatCurrency } from "@/lib/chart-formatters";
+import { NoDataAvailable } from "./NoDataAvailable";
 
 interface DonorIntelligenceProps {
   organizationId: string;
@@ -500,27 +501,40 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
               </V3CardTitle>
             </V3CardHeader>
             <V3CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {[
-                  { label: "Sent", value: smsFunnel.sent },
-                  { label: "Delivered", value: smsFunnel.delivered },
-                  { label: "Clicked", value: smsFunnel.clicked },
-                  { label: "Donated (via journeys)", value: smsFunnel.donated },
-                  { label: "Opt-outs", value: smsFunnel.optedOut },
-                ].map(item => (
-                  <div key={item.label} className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
-                    <div className="text-sm text-[hsl(var(--portal-text-muted))]">{item.label}</div>
-                    <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{item.value.toLocaleString()}</div>
+              {smsFunnel.sent === 0 && smsFunnel.delivered === 0 ? (
+                <NoDataAvailable
+                  title="No SMS Data Available"
+                  message="SMS event data will appear here once the SMS sync pipeline populates data."
+                  type="pending"
+                  size="sm"
+                  tips={[
+                    "Ensure Switchboard credentials are configured",
+                    "Run the SMS sync to populate events"
+                  ]}
+                />
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    {[
+                      { label: "Sent", value: smsFunnel.sent },
+                      { label: "Delivered", value: smsFunnel.delivered },
+                      { label: "Clicked", value: smsFunnel.clicked },
+                      { label: "Donated (via journeys)", value: smsFunnel.donated },
+                      { label: "Opt-outs", value: smsFunnel.optedOut },
+                    ].map(item => (
+                      <div key={item.label} className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                        <div className="text-sm text-[hsl(var(--portal-text-muted))]">{item.label}</div>
+                        <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{item.value.toLocaleString()}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
-                  <div className="text-sm text-[hsl(var(--portal-text-muted))]">SMS Spend</div>
-                  <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
-                    {smsCost >= 1000 ? `$${(smsCost / 1000).toFixed(1)}K` : `$${smsCost.toFixed(0)}`}
-                  </div>
-                </div>
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                      <div className="text-sm text-[hsl(var(--portal-text-muted))]">SMS Spend</div>
+                      <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+                        {smsCost >= 1000 ? `$${(smsCost / 1000).toFixed(1)}K` : `$${smsCost.toFixed(0)}`}
+                      </div>
+                    </div>
                 <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
                   <div className="text-sm text-[hsl(var(--portal-text-muted))]">Cost / Send</div>
                   <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
@@ -535,6 +549,8 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                   <div className="text-xs text-[hsl(var(--portal-text-muted))]">Cost per donating recipient</div>
                 </div>
               </div>
+                </>
+              )}
             </V3CardContent>
           </V3Card>
         </TabsContent>

@@ -23,6 +23,7 @@ import {
 import { ClientShell } from "@/components/client/ClientShell";
 import { ChartPanel } from "@/components/charts/ChartPanel";
 import { DonorSegmentCard } from "@/components/client/DonorSegmentCard";
+import { NoDataAvailable } from "@/components/client/NoDataAvailable";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
