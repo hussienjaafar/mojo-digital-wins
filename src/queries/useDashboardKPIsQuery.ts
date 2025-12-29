@@ -122,9 +122,9 @@ async function fetchDashboardKPIs(
   );
   const totalSpend = metaSpend + smsSpend;
 
-  // Calculate ROI = (Net Revenue - Spend) / Spend
-  const roi = totalSpend > 0 ? (totalRaised - totalSpend) / totalSpend : 0;
-  const prevRoi = prevTotalSpend > 0 ? (prevTotalRaised - prevTotalSpend) / prevTotalSpend : 0;
+  // Calculate ROI = Net Revenue / Spend (investment multiplier)
+  const roi = totalSpend > 0 ? totalRaised / totalSpend : 0;
+  const prevRoi = prevTotalSpend > 0 ? prevTotalRaised / prevTotalSpend : 0;
 
   // Calculate trends (percentage change)
   const calcTrend = (current: number, previous: number) => {

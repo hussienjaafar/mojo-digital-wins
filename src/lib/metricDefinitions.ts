@@ -12,8 +12,8 @@ export const metricDefinitions: Record<string, MetricDefinition> = {
   },
   "Net ROI": {
     title: "Net Return on Investment",
-    description: "Profit generated per dollar spent on advertising. A value of 0.15x means 15% profit, 1.0x means you doubled your money.",
-    calculation: "(Net Revenue - Total Ad Spend) / Total Ad Spend",
+    description: "Investment multiplier showing how many times your ad spend was returned. 1.15x means $1.15 back for every $1 spent.",
+    calculation: "Net Revenue / Total Ad Spend",
   },
   "ROAS": {
     title: "Return on Ad Spend",
