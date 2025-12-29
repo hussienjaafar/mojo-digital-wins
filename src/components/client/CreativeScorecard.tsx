@@ -1,13 +1,20 @@
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { CheckCircle2, XCircle, AlertCircle, Target, Sparkles, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { 
+  V3Card, 
+  V3CardHeader, 
+  V3CardTitle, 
+  V3CardDescription, 
+  V3CardContent, 
+  V3Badge, 
+  V3Button 
+} from "@/components/v3";
+import { iconSizes } from "@/lib/design-tokens";
 
 type ScorecardData = {
   topTopics: string[];
@@ -126,11 +133,18 @@ export function CreativeScorecard({ scorecard, optimalFormula }: Props) {
     setFeedback(newFeedback);
   };
 
-  const getScoreColor = (s: number) => {
-    if (s >= 80) return "text-green-500";
-    if (s >= 60) return "text-blue-500";
-    if (s >= 40) return "text-yellow-500";
-    return "text-red-500";
+  const getScoreVariant = (s: number): 'success' | 'blue' | 'amber' | 'error' => {
+    if (s >= 80) return 'success';
+    if (s >= 60) return 'blue';
+    if (s >= 40) return 'amber';
+    return 'error';
+  };
+
+  const getScoreColorClass = (s: number) => {
+    if (s >= 80) return "text-[hsl(var(--portal-success))]";
+    if (s >= 60) return "text-[hsl(var(--portal-accent-blue))]";
+    if (s >= 40) return "text-[hsl(var(--portal-warning))]";
+    return "text-[hsl(var(--portal-error))]";
   };
 
   const getScoreLabel = (s: number) => {
@@ -142,15 +156,15 @@ export function CreativeScorecard({ scorecard, optimalFormula }: Props) {
 
   if (!scorecard) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="py-12 text-center">
-          <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Scorecard Unavailable</h3>
-          <p className="text-muted-foreground">
+      <V3Card className="border-dashed">
+        <V3CardContent className="py-12 text-center">
+          <Target className={cn(iconSizes['2xl'], "text-[hsl(var(--portal-text-muted))] mx-auto mb-4")} />
+          <h3 className="text-lg font-semibold mb-2 text-[hsl(var(--portal-text-primary))]">Scorecard Unavailable</h3>
+          <p className="text-[hsl(var(--portal-text-muted))]">
             Analyze more creatives to enable the pre-launch scorecard.
           </p>
-        </CardContent>
-      </Card>
+        </V3CardContent>
+      </V3Card>
     );
   }
 
@@ -158,70 +172,73 @@ export function CreativeScorecard({ scorecard, optimalFormula }: Props) {
     <div className="space-y-6">
       {/* Optimal Formula Card */}
       {optimalFormula && optimalFormula.topic && (
-        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-          <CardHeader>
+        <V3Card 
+          accent="blue" 
+          className="bg-gradient-to-br from-[hsl(var(--portal-accent-blue)/0.05)] to-[hsl(var(--portal-accent-blue)/0.1)]"
+        >
+          <V3CardHeader>
             <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Optimal Creative Formula</CardTitle>
+              <Sparkles className={cn(iconSizes.md, "text-[hsl(var(--portal-accent-blue))]")} />
+              <V3CardTitle>Optimal Creative Formula</V3CardTitle>
             </div>
-            <CardDescription>
+            <V3CardDescription>
               Based on your top-performing creatives
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </V3CardDescription>
+          </V3CardHeader>
+          <V3CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Topic</p>
-                <Badge variant="secondary" className="font-medium">
+                <p className="text-xs text-[hsl(var(--portal-text-muted))]">Topic</p>
+                <V3Badge variant="secondary" className="font-medium">
                   {optimalFormula.topic}
-                </Badge>
+                </V3Badge>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Tone</p>
-                <Badge variant="secondary" className="font-medium">
+                <p className="text-xs text-[hsl(var(--portal-text-muted))]">Tone</p>
+                <V3Badge variant="secondary" className="font-medium">
                   {optimalFormula.tone || "Any"}
-                </Badge>
+                </V3Badge>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Emotional Appeal</p>
-                <Badge variant="secondary" className="font-medium">
+                <p className="text-xs text-[hsl(var(--portal-text-muted))]">Emotional Appeal</p>
+                <V3Badge variant="secondary" className="font-medium">
                   {optimalFormula.emotionalAppeal || "Any"}
-                </Badge>
+                </V3Badge>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Expected ROAS</p>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))]">Expected ROAS</p>
                 <div className="flex items-center gap-1">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
-                  <span className="font-semibold text-green-600">
+                  <TrendingUp className={cn(iconSizes.sm, "text-[hsl(var(--portal-success))]")} />
+                  <span className="font-semibold text-[hsl(var(--portal-success))]">
                     ${optimalFormula.expectedRoas?.toFixed(2) || "N/A"}
                   </span>
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </V3CardContent>
+        </V3Card>
       )}
 
       {/* Scorecard Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
+      <V3Card>
+        <V3CardHeader>
+          <V3CardTitle className="flex items-center gap-2">
+            <Target className={iconSizes.md} />
             Pre-Launch Scorecard
-          </CardTitle>
-          <CardDescription>
+          </V3CardTitle>
+          <V3CardDescription>
             Evaluate your new creative against historical patterns before launching
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </V3CardDescription>
+        </V3CardHeader>
+        <V3CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Topic/Theme</Label>
+              <Label className="text-[hsl(var(--portal-text-primary))]">Topic/Theme</Label>
               <Select 
                 value={newCreative.topic} 
                 onValueChange={(v) => setNewCreative(prev => ({ ...prev, topic: v }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]">
                   <SelectValue placeholder="Select topic" />
                 </SelectTrigger>
                 <SelectContent>
@@ -234,12 +251,12 @@ export function CreativeScorecard({ scorecard, optimalFormula }: Props) {
             </div>
 
             <div className="space-y-2">
-              <Label>Tone</Label>
+              <Label className="text-[hsl(var(--portal-text-primary))]">Tone</Label>
               <Select 
                 value={newCreative.tone} 
                 onValueChange={(v) => setNewCreative(prev => ({ ...prev, tone: v }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]">
                   <SelectValue placeholder="Select tone" />
                 </SelectTrigger>
                 <SelectContent>
@@ -252,12 +269,12 @@ export function CreativeScorecard({ scorecard, optimalFormula }: Props) {
             </div>
 
             <div className="space-y-2">
-              <Label>Emotional Appeal</Label>
+              <Label className="text-[hsl(var(--portal-text-primary))]">Emotional Appeal</Label>
               <Select 
                 value={newCreative.emotionalAppeal} 
                 onValueChange={(v) => setNewCreative(prev => ({ ...prev, emotionalAppeal: v }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]">
                   <SelectValue placeholder="Select emotional appeal" />
                 </SelectTrigger>
                 <SelectContent>
@@ -270,12 +287,12 @@ export function CreativeScorecard({ scorecard, optimalFormula }: Props) {
             </div>
 
             <div className="space-y-2">
-              <Label>Call to Action</Label>
+              <Label className="text-[hsl(var(--portal-text-primary))]">Call to Action</Label>
               <Select 
                 value={newCreative.cta} 
                 onValueChange={(v) => setNewCreative(prev => ({ ...prev, cta: v }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]">
                   <SelectValue placeholder="Select CTA" />
                 </SelectTrigger>
                 <SelectContent>
@@ -289,57 +306,52 @@ export function CreativeScorecard({ scorecard, optimalFormula }: Props) {
           </div>
 
           <div className="space-y-2">
-            <Label>Headline (optional)</Label>
+            <Label className="text-[hsl(var(--portal-text-primary))]">Headline (optional)</Label>
             <Textarea
               placeholder="Enter your ad headline..."
               value={newCreative.headline}
               onChange={(e) => setNewCreative(prev => ({ ...prev, headline: e.target.value }))}
               rows={2}
+              className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
             />
           </div>
 
-          <Button onClick={evaluateCreative} className="w-full">
-            <Target className="h-4 w-4 mr-2" />
+          <V3Button onClick={evaluateCreative} className="w-full">
+            <Target className={iconSizes.sm} />
             Evaluate Creative
-          </Button>
+          </V3Button>
 
           {/* Score Results */}
           {score !== null && (
-            <div className="mt-6 p-4 rounded-lg bg-muted/50 space-y-4">
+            <div className="mt-6 p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary)/0.5)] space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Creative Score</p>
+                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Creative Score</p>
                   <div className="flex items-center gap-2">
-                    <span className={cn("text-4xl font-bold", getScoreColor(score))}>
+                    <span className={cn("text-4xl font-bold", getScoreColorClass(score))}>
                       {score}
                     </span>
-                    <span className="text-lg text-muted-foreground">/100</span>
+                    <span className="text-lg text-[hsl(var(--portal-text-muted))]">/100</span>
                   </div>
                 </div>
-                <Badge 
-                  variant="outline" 
-                  className={cn(
-                    "text-lg py-1 px-3",
-                    score >= 80 ? "border-green-500 text-green-600" :
-                    score >= 60 ? "border-blue-500 text-blue-600" :
-                    score >= 40 ? "border-yellow-500 text-yellow-600" :
-                    "border-red-500 text-red-600"
-                  )}
+                <V3Badge 
+                  variant={getScoreVariant(score)} 
+                  size="lg"
                 >
                   {getScoreLabel(score)}
-                </Badge>
+                </V3Badge>
               </div>
 
               <div className="space-y-2">
                 {feedback.map((f, i) => (
                   <div key={i} className="flex items-start gap-2 text-sm">
-                    {f.type === 'success' && <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />}
-                    {f.type === 'warning' && <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />}
-                    {f.type === 'error' && <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />}
+                    {f.type === 'success' && <CheckCircle2 className={cn(iconSizes.sm, "text-[hsl(var(--portal-success))] mt-0.5 shrink-0")} />}
+                    {f.type === 'warning' && <AlertCircle className={cn(iconSizes.sm, "text-[hsl(var(--portal-warning))] mt-0.5 shrink-0")} />}
+                    {f.type === 'error' && <XCircle className={cn(iconSizes.sm, "text-[hsl(var(--portal-error))] mt-0.5 shrink-0")} />}
                     <span className={cn(
-                      f.type === 'success' ? 'text-green-700 dark:text-green-400' :
-                      f.type === 'warning' ? 'text-yellow-700 dark:text-yellow-400' :
-                      'text-red-700 dark:text-red-400'
+                      f.type === 'success' ? 'text-[hsl(var(--portal-success))]' :
+                      f.type === 'warning' ? 'text-[hsl(var(--portal-warning))]' :
+                      'text-[hsl(var(--portal-error))]'
                     )}>
                       {f.message}
                     </span>
@@ -348,8 +360,8 @@ export function CreativeScorecard({ scorecard, optimalFormula }: Props) {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </V3CardContent>
+      </V3Card>
     </div>
   );
 }

@@ -331,6 +331,38 @@ export const chartColors = {
 } as const;
 
 /**
+ * Channel-specific color tokens for consistent channel visualization
+ * Use for channel legends, badges, and charts
+ */
+export const channelColors = {
+  meta: colors.accent.blue,
+  sms: colors.accent.purple,
+  actblue: colors.status.success,
+  organic: colors.text.muted,
+  email: colors.status.warning,
+  direct: colors.status.info,
+} as const;
+
+/**
+ * Get channel color as CSS variable value
+ * @example getChannelColor('meta') -> 'hsl(var(--portal-accent-blue))'
+ */
+export const getChannelColor = (channel: keyof typeof channelColors): string =>
+  cssVar(channelColors[channel]);
+
+/**
+ * Get all channel colors as an object with CSS variable values
+ */
+export const getChannelColorMap = (): Record<keyof typeof channelColors, string> => ({
+  meta: cssVar(channelColors.meta),
+  sms: cssVar(channelColors.sms),
+  actblue: cssVar(channelColors.actblue),
+  organic: cssVar(channelColors.organic),
+  email: cssVar(channelColors.email),
+  direct: cssVar(channelColors.direct),
+});
+
+/**
  * Get chart colors as CSS variable values (for inline styles)
  * @example getChartColors() -> ['hsl(var(--portal-accent-blue))', ...]
  */
@@ -342,6 +374,84 @@ export const getChartColors = (): string[] =>
  */
 export const getChartColor = (index: number): string =>
   cssVar(chartColors.series[index % chartColors.series.length]);
+
+// ============================================================================
+// Icon Size Tokens
+// ============================================================================
+
+/**
+ * Standardized icon sizes for consistent UI
+ * Use with className like: iconSizes.sm -> "h-4 w-4"
+ */
+export const iconSizes = {
+  xs: 'h-3 w-3',
+  sm: 'h-4 w-4',
+  md: 'h-5 w-5',
+  lg: 'h-6 w-6',
+  xl: 'h-8 w-8',
+  '2xl': 'h-12 w-12',
+} as const;
+
+/**
+ * Performance tier color mappings using portal tokens
+ * Use for badges, indicators, and highlights
+ */
+export const tierColors = {
+  top: {
+    bg: 'bg-[hsl(var(--portal-success)/0.15)]',
+    text: 'text-[hsl(var(--portal-success))]',
+    border: 'border-[hsl(var(--portal-success)/0.3)]',
+  },
+  high: {
+    bg: 'bg-[hsl(var(--portal-accent-blue)/0.15)]',
+    text: 'text-[hsl(var(--portal-accent-blue))]',
+    border: 'border-[hsl(var(--portal-accent-blue)/0.3)]',
+  },
+  medium: {
+    bg: 'bg-[hsl(var(--portal-warning)/0.15)]',
+    text: 'text-[hsl(var(--portal-warning))]',
+    border: 'border-[hsl(var(--portal-warning)/0.3)]',
+  },
+  low: {
+    bg: 'bg-[hsl(var(--portal-error)/0.15)]',
+    text: 'text-[hsl(var(--portal-error))]',
+    border: 'border-[hsl(var(--portal-error)/0.3)]',
+  },
+} as const;
+
+/**
+ * Get tier color classes as a combined string
+ * @example getTierClasses('top') -> 'bg-[hsl(var(--portal-success)/0.15)] text-[hsl(var(--portal-success))]'
+ */
+export const getTierClasses = (tier: keyof typeof tierColors | string | null): string => {
+  const normalizedTier = tier?.toLowerCase() as keyof typeof tierColors;
+  const tierConfig = tierColors[normalizedTier];
+  if (!tierConfig) return 'bg-[hsl(var(--portal-bg-secondary))] text-[hsl(var(--portal-text-muted))]';
+  return `${tierConfig.bg} ${tierConfig.text}`;
+};
+
+/**
+ * Heatmap color intensity mappings
+ * Use for performance matrices and heatmaps
+ */
+export const heatmapColors = {
+  high: 'bg-[hsl(var(--portal-success)/0.8)] text-white',
+  mediumHigh: 'bg-[hsl(var(--portal-success)/0.4)]',
+  medium: 'bg-[hsl(var(--portal-warning)/0.4)]',
+  low: 'bg-[hsl(var(--portal-error)/0.2)]',
+  none: 'bg-[hsl(var(--portal-bg-secondary))]',
+} as const;
+
+/**
+ * Get heatmap color class based on intensity (0-1)
+ */
+export const getHeatmapColor = (intensity: number): string => {
+  if (intensity >= 0.75) return heatmapColors.high;
+  if (intensity >= 0.5) return heatmapColors.mediumHigh;
+  if (intensity >= 0.25) return heatmapColors.medium;
+  if (intensity > 0) return heatmapColors.low;
+  return heatmapColors.none;
+};
 
 // ============================================================================
 // Sidebar Navigation Types

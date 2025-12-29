@@ -1,13 +1,21 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Upload, MessageSquare, Image, Plus, Trash2, Sparkles, FileSpreadsheet } from "lucide-react";
+import { Upload, MessageSquare, Image, Plus, Trash2, FileSpreadsheet } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { 
+  V3Card, 
+  V3CardHeader, 
+  V3CardTitle, 
+  V3CardDescription, 
+  V3CardContent, 
+  V3Button 
+} from "@/components/v3";
+import { iconSizes } from "@/lib/design-tokens";
 
 type Props = {
   organizationId: string;
@@ -240,38 +248,38 @@ export function CreativeDataImport({ organizationId, onImportComplete }: Props) 
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <V3Card>
+      <V3CardHeader>
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Upload className="h-5 w-5 text-primary" />
+          <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
+            <Upload className={cn(iconSizes.md, "text-[hsl(var(--portal-accent-blue))]")} />
           </div>
           <div>
-            <CardTitle className="text-lg">Import Campaign Data</CardTitle>
-            <CardDescription>
+            <V3CardTitle>Import Campaign Data</V3CardTitle>
+            <V3CardDescription>
               Add your SMS and Meta ad performance data to generate AI insights
-            </CardDescription>
+            </V3CardDescription>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
+      </V3CardHeader>
+      <V3CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="sms" className="gap-2">
-              <MessageSquare className="h-4 w-4" />
+          <TabsList className="grid w-full grid-cols-2 mb-4 bg-[hsl(var(--portal-bg-secondary))]">
+            <TabsTrigger value="sms" className="gap-2 data-[state=active]:bg-[hsl(var(--portal-bg-primary))]">
+              <MessageSquare className={iconSizes.sm} />
               SMS Data
             </TabsTrigger>
-            <TabsTrigger value="meta" className="gap-2">
-              <Image className="h-4 w-4" />
+            <TabsTrigger value="meta" className="gap-2 data-[state=active]:bg-[hsl(var(--portal-bg-primary))]">
+              <Image className={iconSizes.sm} />
               Meta Ads
             </TabsTrigger>
           </TabsList>
 
           {/* CSV Import Section */}
-          <div className="mb-6 p-4 border rounded-lg bg-muted/30">
+          <div className="mb-6 p-4 border border-[hsl(var(--portal-border))] rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
             <div className="flex items-center gap-2 mb-2">
-              <FileSpreadsheet className="h-4 w-4" />
-              <span className="text-sm font-medium">Paste CSV Data</span>
+              <FileSpreadsheet className={iconSizes.sm} />
+              <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Paste CSV Data</span>
             </div>
             <Textarea
               placeholder={
@@ -281,109 +289,116 @@ export function CreativeDataImport({ organizationId, onImportComplete }: Props) 
               }
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
-              className="mb-2 font-mono text-xs h-24"
+              className="mb-2 font-mono text-xs h-24 border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
             />
-            <Button
+            <V3Button
               size="sm"
               variant="outline"
               onClick={() => parseCSV(csvText, activeTab as "sms" | "meta")}
               disabled={!csvText.trim()}
             >
               Parse CSV
-            </Button>
+            </V3Button>
           </div>
 
           <TabsContent value="sms" className="space-y-4">
             {smsEntries.map((entry, index) => (
-              <div key={index} className="p-4 border rounded-lg space-y-3">
+              <div key={index} className="p-4 border border-[hsl(var(--portal-border))] rounded-lg space-y-3 bg-[hsl(var(--portal-bg-card))]">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">SMS #{index + 1}</span>
+                  <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">SMS #{index + 1}</span>
                   {smsEntries.length > 1 && (
-                    <Button variant="ghost" size="icon" onClick={() => removeSmsEntry(index)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <V3Button variant="ghost" size="icon-sm" onClick={() => removeSmsEntry(index)}>
+                      <Trash2 className={cn(iconSizes.sm, "text-[hsl(var(--portal-error))]")} />
+                    </V3Button>
                   )}
                 </div>
 
                 <div className="grid gap-3">
                   <div>
-                    <Label htmlFor={`sms-name-${index}`}>Campaign Name</Label>
+                    <Label htmlFor={`sms-name-${index}`} className="text-[hsl(var(--portal-text-primary))]">Campaign Name</Label>
                     <Input
                       id={`sms-name-${index}`}
                       value={entry.campaign_name}
                       onChange={(e) => updateSmsEntry(index, "campaign_name", e.target.value)}
                       placeholder="Q4 Fundraising Push"
+                      className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor={`sms-text-${index}`}>Message Text *</Label>
+                    <Label htmlFor={`sms-text-${index}`} className="text-[hsl(var(--portal-text-primary))]">Message Text *</Label>
                     <Textarea
                       id={`sms-text-${index}`}
                       value={entry.message_text}
                       onChange={(e) => updateSmsEntry(index, "message_text", e.target.value)}
                       placeholder="URGENT: Your donation TODAY could change everything..."
-                      className="h-20"
+                      className="h-20 border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
-                      <Label htmlFor={`sms-date-${index}`}>Send Date</Label>
+                      <Label htmlFor={`sms-date-${index}`} className="text-[hsl(var(--portal-text-primary))]">Send Date</Label>
                       <Input
                         id={`sms-date-${index}`}
                         type="date"
                         value={entry.send_date}
                         onChange={(e) => updateSmsEntry(index, "send_date", e.target.value)}
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`sms-sent-${index}`}>Sent</Label>
+                      <Label htmlFor={`sms-sent-${index}`} className="text-[hsl(var(--portal-text-primary))]">Sent</Label>
                       <Input
                         id={`sms-sent-${index}`}
                         type="number"
                         value={entry.messages_sent}
                         onChange={(e) => updateSmsEntry(index, "messages_sent", parseInt(e.target.value) || 0)}
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`sms-delivered-${index}`}>Delivered</Label>
+                      <Label htmlFor={`sms-delivered-${index}`} className="text-[hsl(var(--portal-text-primary))]">Delivered</Label>
                       <Input
                         id={`sms-delivered-${index}`}
                         type="number"
                         value={entry.messages_delivered}
                         onChange={(e) => updateSmsEntry(index, "messages_delivered", parseInt(e.target.value) || 0)}
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`sms-clicks-${index}`}>Clicks</Label>
+                      <Label htmlFor={`sms-clicks-${index}`} className="text-[hsl(var(--portal-text-primary))]">Clicks</Label>
                       <Input
                         id={`sms-clicks-${index}`}
                         type="number"
                         value={entry.clicks}
                         onChange={(e) => updateSmsEntry(index, "clicks", parseInt(e.target.value) || 0)}
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label htmlFor={`sms-conv-${index}`}>Conversions</Label>
+                      <Label htmlFor={`sms-conv-${index}`} className="text-[hsl(var(--portal-text-primary))]">Conversions</Label>
                       <Input
                         id={`sms-conv-${index}`}
                         type="number"
                         value={entry.conversions}
                         onChange={(e) => updateSmsEntry(index, "conversions", parseInt(e.target.value) || 0)}
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`sms-amount-${index}`}>Amount Raised ($)</Label>
+                      <Label htmlFor={`sms-amount-${index}`} className="text-[hsl(var(--portal-text-primary))]">Amount Raised ($)</Label>
                       <Input
                         id={`sms-amount-${index}`}
                         type="number"
                         step="0.01"
                         value={entry.amount_raised}
                         onChange={(e) => updateSmsEntry(index, "amount_raised", parseFloat(e.target.value) || 0)}
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                   </div>
@@ -391,42 +406,43 @@ export function CreativeDataImport({ organizationId, onImportComplete }: Props) 
               </div>
             ))}
 
-            <Button variant="outline" onClick={addSmsEntry} className="w-full gap-2">
-              <Plus className="h-4 w-4" />
+            <V3Button variant="outline" onClick={addSmsEntry} className="w-full gap-2">
+              <Plus className={iconSizes.sm} />
               Add Another SMS
-            </Button>
+            </V3Button>
           </TabsContent>
 
           <TabsContent value="meta" className="space-y-4">
             {metaEntries.map((entry, index) => (
-              <div key={index} className="p-4 border rounded-lg space-y-3">
+              <div key={index} className="p-4 border border-[hsl(var(--portal-border))] rounded-lg space-y-3 bg-[hsl(var(--portal-bg-card))]">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Meta Ad #{index + 1}</span>
+                  <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Meta Ad #{index + 1}</span>
                   {metaEntries.length > 1 && (
-                    <Button variant="ghost" size="icon" onClick={() => removeMetaEntry(index)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <V3Button variant="ghost" size="icon-sm" onClick={() => removeMetaEntry(index)}>
+                      <Trash2 className={cn(iconSizes.sm, "text-[hsl(var(--portal-error))]")} />
+                    </V3Button>
                   )}
                 </div>
 
                 <div className="grid gap-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label htmlFor={`meta-name-${index}`}>Campaign Name</Label>
+                      <Label htmlFor={`meta-name-${index}`} className="text-[hsl(var(--portal-text-primary))]">Campaign Name</Label>
                       <Input
                         id={`meta-name-${index}`}
                         value={entry.campaign_name}
                         onChange={(e) => updateMetaEntry(index, "campaign_name", e.target.value)}
                         placeholder="FB Acquisition Q4"
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`meta-type-${index}`}>Creative Type</Label>
+                      <Label htmlFor={`meta-type-${index}`} className="text-[hsl(var(--portal-text-primary))]">Creative Type</Label>
                       <select
                         id={`meta-type-${index}`}
                         value={entry.creative_type}
                         onChange={(e) => updateMetaEntry(index, "creative_type", e.target.value)}
-                        className="w-full h-10 px-3 border rounded-md bg-background"
+                        className="w-full h-10 px-3 border border-[hsl(var(--portal-border))] rounded-md bg-[hsl(var(--portal-bg-primary))] text-[hsl(var(--portal-text-primary))]"
                       >
                         <option value="image">Image</option>
                         <option value="video">Video</option>
@@ -436,72 +452,78 @@ export function CreativeDataImport({ organizationId, onImportComplete }: Props) 
                   </div>
 
                   <div>
-                    <Label htmlFor={`meta-text-${index}`}>Primary Text *</Label>
-                    <Textarea
-                      id={`meta-text-${index}`}
-                      value={entry.primary_text}
-                      onChange={(e) => updateMetaEntry(index, "primary_text", e.target.value)}
-                      placeholder="We're at a critical moment..."
-                      className="h-20"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor={`meta-headline-${index}`}>Headline</Label>
+                    <Label htmlFor={`meta-headline-${index}`} className="text-[hsl(var(--portal-text-primary))]">Headline</Label>
                     <Input
                       id={`meta-headline-${index}`}
                       value={entry.headline}
                       onChange={(e) => updateMetaEntry(index, "headline", e.target.value)}
-                      placeholder="Donate Now - Make a Difference"
+                      placeholder="Double Your Impact Today!"
+                      className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div>
+                    <Label htmlFor={`meta-text-${index}`} className="text-[hsl(var(--portal-text-primary))]">Primary Text *</Label>
+                    <Textarea
+                      id={`meta-text-${index}`}
+                      value={entry.primary_text}
+                      onChange={(e) => updateMetaEntry(index, "primary_text", e.target.value)}
+                      placeholder="Every dollar you give today will be matched..."
+                      className="h-20 border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
                     <div>
-                      <Label htmlFor={`meta-imp-${index}`}>Impressions</Label>
+                      <Label htmlFor={`meta-impressions-${index}`} className="text-[hsl(var(--portal-text-primary))]">Impressions</Label>
                       <Input
-                        id={`meta-imp-${index}`}
+                        id={`meta-impressions-${index}`}
                         type="number"
                         value={entry.impressions}
                         onChange={(e) => updateMetaEntry(index, "impressions", parseInt(e.target.value) || 0)}
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`meta-clicks-${index}`}>Clicks</Label>
+                      <Label htmlFor={`meta-clicks-${index}`} className="text-[hsl(var(--portal-text-primary))]">Clicks</Label>
                       <Input
                         id={`meta-clicks-${index}`}
                         type="number"
                         value={entry.clicks}
                         onChange={(e) => updateMetaEntry(index, "clicks", parseInt(e.target.value) || 0)}
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`meta-spend-${index}`}>Spend ($)</Label>
+                      <Label htmlFor={`meta-spend-${index}`} className="text-[hsl(var(--portal-text-primary))]">Spend ($)</Label>
                       <Input
                         id={`meta-spend-${index}`}
                         type="number"
                         step="0.01"
                         value={entry.spend}
                         onChange={(e) => updateMetaEntry(index, "spend", parseFloat(e.target.value) || 0)}
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`meta-conv-${index}`}>Conversions</Label>
+                      <Label htmlFor={`meta-conv-${index}`} className="text-[hsl(var(--portal-text-primary))]">Conv.</Label>
                       <Input
                         id={`meta-conv-${index}`}
                         type="number"
                         value={entry.conversions}
                         onChange={(e) => updateMetaEntry(index, "conversions", parseInt(e.target.value) || 0)}
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`meta-value-${index}`}>Value ($)</Label>
+                      <Label htmlFor={`meta-value-${index}`} className="text-[hsl(var(--portal-text-primary))]">Value ($)</Label>
                       <Input
                         id={`meta-value-${index}`}
                         type="number"
                         step="0.01"
                         value={entry.conversion_value}
                         onChange={(e) => updateMetaEntry(index, "conversion_value", parseFloat(e.target.value) || 0)}
+                        className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-primary))]"
                       />
                     </div>
                   </div>
@@ -509,26 +531,26 @@ export function CreativeDataImport({ organizationId, onImportComplete }: Props) 
               </div>
             ))}
 
-            <Button variant="outline" onClick={addMetaEntry} className="w-full gap-2">
-              <Plus className="h-4 w-4" />
+            <V3Button variant="outline" onClick={addMetaEntry} className="w-full gap-2">
+              <Plus className={iconSizes.sm} />
               Add Another Meta Ad
-            </Button>
+            </V3Button>
           </TabsContent>
-        </Tabs>
 
-        <div className="mt-6 flex justify-end">
-          <Button onClick={handleImport} disabled={isImporting} className="gap-2">
-            {isImporting ? (
-              <>Importing...</>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" />
-                Import & Analyze
-              </>
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          {/* Import Button */}
+          <div className="mt-6 pt-4 border-t border-[hsl(var(--portal-border))]">
+            <V3Button 
+              onClick={handleImport} 
+              isLoading={isImporting}
+              loadingText="Importing..."
+              className="w-full"
+            >
+              <Upload className={iconSizes.sm} />
+              Import {activeTab === "sms" ? "SMS" : "Meta"} Data
+            </V3Button>
+          </div>
+        </Tabs>
+      </V3CardContent>
+    </V3Card>
   );
 }
