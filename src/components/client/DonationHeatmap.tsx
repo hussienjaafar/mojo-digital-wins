@@ -23,14 +23,14 @@ const getBrowserTimezone = (): string => {
   }
 };
 
-export const DonationHeatmap = ({ 
-  organizationId, 
-  startDate, 
+export const DonationHeatmap = ({
+  organizationId,
+  startDate,
   endDate,
   timezone = getBrowserTimezone()
 }: DonationHeatmapProps) => {
   const isMobile = useIsMobile();
-  
+
   // Use RPC function for server-side aggregation with timezone support
   const { data: rpcData, isLoading, isError, error } = useQuery({
     queryKey: ["donations", "heatmap", organizationId, startDate, endDate, timezone],
