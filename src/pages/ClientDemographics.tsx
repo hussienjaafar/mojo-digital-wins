@@ -4,21 +4,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Download, MapPin, Briefcase, Users, DollarSign, TrendingUp, Share2 } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ClientShell } from "@/components/client/ClientShell";
 import {
   V3PageContainer,
-  V3Card,
-  V3CardHeader,
-  V3CardTitle,
-  V3CardDescription,
-  V3CardContent,
   V3KPICard,
   V3ChartWrapper,
   V3LoadingState,
   V3EmptyState,
   V3Button,
+  V3DataTable,
+  type V3Column,
 } from "@/components/v3";
+import { EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
 
 type Organization = {
   id: string;
@@ -34,15 +31,6 @@ type DonorStats = {
   occupationData: Array<{ occupation: string; count: number; revenue: number }>;
   channelData: Array<{ channel: string; count: number; revenue: number }>;
 };
-
-const CHART_COLORS = [
-  "hsl(var(--portal-accent-blue))",
-  "hsl(var(--portal-accent-green))",
-  "hsl(var(--portal-accent-yellow))",
-  "hsl(var(--portal-accent-red))",
-  "hsl(var(--portal-accent-purple))",
-  "hsl(var(--portal-accent-cyan))",
-];
 
 const ClientDemographics = () => {
   const navigate = useNavigate();
@@ -218,6 +206,79 @@ const ClientDemographics = () => {
     }
   };
 
+  // Table column definitions
+  const locationColumns: V3Column<{ state: string; count: number; revenue: number }>[] = [
+    {
+      key: "state",
+      header: "State",
+      render: (row) => (
+        <span className="font-medium">{row.state}</span>
+      ),
+      sortable: true,
+      sortFn: (a, b) => a.state.localeCompare(b.state),
+    },
+    {
+      key: "revenue",
+      header: "Revenue",
+      render: (row) => (
+        <span className="font-semibold text-[hsl(var(--portal-success))]">
+          ${row.revenue.toLocaleString()}
+        </span>
+      ),
+      align: "right",
+      sortable: true,
+      sortFn: (a, b) => a.revenue - b.revenue,
+    },
+    {
+      key: "count",
+      header: "Donors",
+      render: (row) => (
+        <span className="text-[hsl(var(--portal-text-muted))]">
+          {row.count.toLocaleString()}
+        </span>
+      ),
+      align: "right",
+      sortable: true,
+      sortFn: (a, b) => a.count - b.count,
+    },
+  ];
+
+  const occupationColumns: V3Column<{ occupation: string; count: number; revenue: number }>[] = [
+    {
+      key: "occupation",
+      header: "Occupation",
+      render: (row) => (
+        <span className="font-medium truncate max-w-[200px] block">{row.occupation}</span>
+      ),
+      sortable: true,
+      sortFn: (a, b) => a.occupation.localeCompare(b.occupation),
+    },
+    {
+      key: "revenue",
+      header: "Revenue",
+      render: (row) => (
+        <span className="font-semibold text-[hsl(var(--portal-success))]">
+          ${row.revenue.toLocaleString()}
+        </span>
+      ),
+      align: "right",
+      sortable: true,
+      sortFn: (a, b) => a.revenue - b.revenue,
+    },
+    {
+      key: "count",
+      header: "Donors",
+      render: (row) => (
+        <span className="text-[hsl(var(--portal-text-muted))]">
+          {row.count.toLocaleString()}
+        </span>
+      ),
+      align: "right",
+      sortable: true,
+      sortFn: (a, b) => a.count - b.count,
+    },
+  ];
+
   if (isLoading) {
     return (
       <ClientShell>
@@ -242,6 +303,17 @@ const ClientDemographics = () => {
       </ClientShell>
     );
   }
+
+  // Prepare pie chart data
+  const occupationPieData = stats.occupationData.slice(0, 6).map(item => ({
+    name: item.occupation.length > 20 ? item.occupation.slice(0, 20) + '...' : item.occupation,
+    value: item.count,
+  }));
+
+  const channelPieData = stats.channelData.map(item => ({
+    name: item.channel,
+    value: item.revenue,
+  }));
 
   return (
     <ClientShell>
@@ -282,149 +354,90 @@ const ClientDemographics = () => {
           />
         </div>
 
-        {/* Location Breakdown */}
+        {/* Location Breakdown - Bar Chart */}
         <V3ChartWrapper
           title="Top Donor Locations"
           icon={MapPin}
           ariaLabel="Bar chart showing donor distribution by state"
           className="mb-6"
         >
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={stats.locationData}>
-              <XAxis
-                dataKey="state"
-                stroke="hsl(var(--portal-text-muted))"
-                fontSize={12}
-              />
-              <YAxis
-                stroke="hsl(var(--portal-text-muted))"
-                fontSize={12}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--portal-bg-card))",
-                  border: "1px solid hsl(var(--portal-border))",
-                  borderRadius: "8px",
-                  color: "hsl(var(--portal-text-primary))",
-                }}
-                formatter={(value: number, name: string) => [
-                  name === 'revenue' ? `$${value.toLocaleString()}` : value,
-                  name === 'revenue' ? 'Revenue' : 'Donors'
-                ]}
-              />
-              <Bar dataKey="count" fill="hsl(var(--portal-accent-blue))" radius={[4, 4, 0, 0]} name="Donors" />
-            </BarChart>
-          </ResponsiveContainer>
+          <EChartsBarChart
+            data={stats.locationData}
+            xAxisKey="state"
+            series={[
+              { dataKey: "count", name: "Donors" }
+            ]}
+            height={300}
+            valueType="number"
+          />
         </V3ChartWrapper>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Occupation Breakdown */}
+        {/* Pie Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Occupation Breakdown - Pie Chart */}
           <V3ChartWrapper
             title="Top Occupations"
             icon={Briefcase}
             ariaLabel="Pie chart showing donor distribution by occupation"
           >
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={stats.occupationData.slice(0, 6)}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ occupation, percent }) => `${occupation.slice(0, 15)}${occupation.length > 15 ? '...' : ''} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  dataKey="count"
-                >
-                  {stats.occupationData.slice(0, 6).map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--portal-bg-card))",
-                    border: "1px solid hsl(var(--portal-border))",
-                    borderRadius: "8px",
-                    color: "hsl(var(--portal-text-primary))",
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <EChartsPieChart
+              data={occupationPieData}
+              height={300}
+              variant="donut"
+              valueType="number"
+              showLabels={true}
+              labelThreshold={8}
+              legendPosition="bottom"
+            />
           </V3ChartWrapper>
 
-          {/* Channel Breakdown */}
+          {/* Channel Breakdown - Pie Chart */}
           <V3ChartWrapper
             title="Acquisition Channels"
             icon={Share2}
             ariaLabel="Pie chart showing donor distribution by acquisition channel"
           >
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={stats.channelData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ channel, percent }) => `${channel} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  dataKey="revenue"
-                >
-                  {stats.channelData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--portal-bg-card))",
-                    border: "1px solid hsl(var(--portal-border))",
-                    borderRadius: "8px",
-                    color: "hsl(var(--portal-text-primary))",
-                  }}
-                  formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <EChartsPieChart
+              data={channelPieData}
+              height={300}
+              variant="donut"
+              valueType="currency"
+              showLabels={true}
+              legendPosition="bottom"
+            />
           </V3ChartWrapper>
         </div>
 
         {/* Detailed Tables */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <V3Card>
-            <V3CardHeader>
-              <V3CardTitle>Location Details</V3CardTitle>
-            </V3CardHeader>
-            <V3CardContent>
-              <div className="space-y-2">
-                {stats.locationData.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
-                    <span className="font-medium text-[hsl(var(--portal-text-primary))]">{item.state}</span>
-                    <div className="text-right">
-                      <div className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">${item.revenue.toLocaleString()}</div>
-                      <div className="text-xs text-[hsl(var(--portal-text-muted))]">{item.count} donors</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </V3CardContent>
-          </V3Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <V3ChartWrapper
+            title="Location Details"
+            icon={MapPin}
+            ariaLabel="Table showing detailed donor statistics by location"
+          >
+            <V3DataTable
+              data={stats.locationData}
+              columns={locationColumns}
+              getRowKey={(row) => row.state}
+              compact
+              striped
+            />
+          </V3ChartWrapper>
 
-          <V3Card>
-            <V3CardHeader>
-              <V3CardTitle>Occupation Details</V3CardTitle>
-            </V3CardHeader>
-            <V3CardContent>
-              <div className="space-y-2">
-                {stats.occupationData.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
-                    <span className="font-medium text-[hsl(var(--portal-text-primary))] truncate max-w-[200px]">{item.occupation}</span>
-                    <div className="text-right">
-                      <div className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">${item.revenue.toLocaleString()}</div>
-                      <div className="text-xs text-[hsl(var(--portal-text-muted))]">{item.count} donors</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </V3CardContent>
-          </V3Card>
+          <V3ChartWrapper
+            title="Occupation Details"
+            icon={Briefcase}
+            ariaLabel="Table showing detailed donor statistics by occupation"
+          >
+            <V3DataTable
+              data={stats.occupationData}
+              columns={occupationColumns}
+              getRowKey={(row) => row.occupation}
+              compact
+              striped
+              maxHeight="400px"
+            />
+          </V3ChartWrapper>
         </div>
       </V3PageContainer>
     </ClientShell>
