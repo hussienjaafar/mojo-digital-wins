@@ -4623,9 +4623,11 @@ export type Database = {
           ad_name: string | null
           campaign_id: string | null
           campaign_name: string | null
+          click_id: string | null
           created_at: string | null
           creative_id: string | null
           creative_name: string | null
+          fbclid: string | null
           id: string
           landing_page: string | null
           organization_id: string | null
@@ -4641,9 +4643,11 @@ export type Database = {
           ad_name?: string | null
           campaign_id?: string | null
           campaign_name?: string | null
+          click_id?: string | null
           created_at?: string | null
           creative_id?: string | null
           creative_name?: string | null
+          fbclid?: string | null
           id?: string
           landing_page?: string | null
           organization_id?: string | null
@@ -4659,9 +4663,11 @@ export type Database = {
           ad_name?: string | null
           campaign_id?: string | null
           campaign_name?: string | null
+          click_id?: string | null
           created_at?: string | null
           creative_id?: string | null
           creative_name?: string | null
+          fbclid?: string | null
           id?: string
           landing_page?: string | null
           organization_id?: string | null
@@ -6841,6 +6847,47 @@ export type Database = {
           },
         ]
       }
+      donation_clickid_candidates: {
+        Row: {
+          amount: number | null
+          click_id: string | null
+          donor_email: string | null
+          fbclid: string | null
+          net_amount: number | null
+          organization_id: string | null
+          transaction_date: string | null
+          transaction_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          click_id?: string | null
+          donor_email?: string | null
+          fbclid?: string | null
+          net_amount?: number | null
+          organization_id?: string | null
+          transaction_date?: string | null
+          transaction_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          click_id?: string | null
+          donor_email?: string | null
+          fbclid?: string | null
+          net_amount?: number | null
+          organization_id?: string | null
+          transaction_date?: string | null
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       donor_demographics_secure: {
         Row: {
           address: string | null
@@ -7345,6 +7392,19 @@ export type Database = {
         }[]
       }
       get_briefing_stats: { Args: { target_date?: string }; Returns: Json }
+      get_clickid_candidates: {
+        Args: { _limit?: number; _organization_id: string }
+        Returns: {
+          amount: number
+          click_id: string
+          donor_email: string
+          fbclid: string
+          net_amount: number
+          organization_id: string
+          transaction_date: string
+          transaction_id: string
+        }[]
+      }
       get_daily_metrics_summary: {
         Args: {
           _end_date: string
