@@ -7143,6 +7143,19 @@ export type Database = {
           total_sms_sent: number
         }[]
       }
+      get_donation_heatmap: {
+        Args: {
+          _end_date: string
+          _organization_id: string
+          _start_date: string
+          _timezone?: string
+        }
+        Returns: {
+          day_of_week: number
+          hour: number
+          value: number
+        }[]
+      }
       get_export_data: {
         Args: {
           p_end_date?: string
