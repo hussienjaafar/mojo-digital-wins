@@ -144,7 +144,8 @@ async function fetchRoiDrilldown(
   const metaSpend = (dailyMetrics || []).reduce((sum, d) => sum + Number(d.total_ad_spend || 0), 0);
   const smsSpend = (dailyMetrics || []).reduce((sum, d) => sum + Number(d.total_sms_cost || 0), 0);
   const totalSpend = metaSpend + smsSpend;
-  const roi = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+  // Net ROI = (Net Revenue - Total Spend) / Total Spend
+  const roi = totalSpend > 0 ? (totalRevenue - totalSpend) / totalSpend : 0;
 
   // Daily ROI trend
   const dailyMap = new Map<string, { revenue: number; spend: number }>();
@@ -159,7 +160,8 @@ async function fetchRoiDrilldown(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, { revenue, spend }]) => ({
       date: format(parseISO(date), "MMM d"),
-      value: spend > 0 ? revenue / spend : 0,
+      // Net ROI = (Revenue - Spend) / Spend
+      value: spend > 0 ? (revenue - spend) / spend : 0,
     }));
 
   const breakdown: KpiBreakdownItem[] = [
@@ -172,9 +174,9 @@ async function fetchRoiDrilldown(
   return {
     kpiKey: "netRoi",
     label: "Net ROI",
-    value: `${roi.toFixed(1)}x`,
-    trend: { value: 0, isPositive: roi >= 1 },
-    description: "Return on investment: Net Revenue / Total Spend",
+    value: `${roi.toFixed(2)}x`,
+    trend: { value: 0, isPositive: roi >= 0 },
+    description: "Profit per dollar spent: (Net Revenue - Spend) / Spend",
     trendData,
     breakdown,
   };

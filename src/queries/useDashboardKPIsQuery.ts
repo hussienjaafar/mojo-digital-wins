@@ -92,6 +92,25 @@ async function fetchDashboardKPIs(
   const prevAverageDonation =
     prevDonations.length > 0 ? prevTotalRaised / prevDonations.length : 0;
 
+  // Calculate previous period spend for ROI comparison
+  const [prevMetaMetrics, prevSmsMetrics] = await Promise.all([
+    supabase
+      .from("meta_ad_metrics")
+      .select("spend")
+      .eq("organization_id", organizationId)
+      .gte("date", prevStart.toISOString().split("T")[0])
+      .lte("date", prevEnd.toISOString().split("T")[0]),
+    supabase
+      .from("sms_campaigns")
+      .select("cost")
+      .eq("organization_id", organizationId)
+      .gte("send_date", prevStart.toISOString().split("T")[0])
+      .lte("send_date", prevEnd.toISOString().split("T")[0]),
+  ]);
+  const prevMetaSpend = (prevMetaMetrics.data || []).reduce((sum, m) => sum + (m.spend || 0), 0);
+  const prevSmsSpend = (prevSmsMetrics.data || []).reduce((sum, s) => sum + (s.cost || 0), 0);
+  const prevTotalSpend = prevMetaSpend + prevSmsSpend;
+
   // Calculate spend
   const metaSpend = (metaMetrics.data || []).reduce(
     (sum, m) => sum + (m.spend || 0),
@@ -103,10 +122,9 @@ async function fetchDashboardKPIs(
   );
   const totalSpend = metaSpend + smsSpend;
 
-  // Calculate ROI
-  const roi = totalSpend > 0 ? ((totalRaised - totalSpend) / totalSpend) * 100 : 0;
-  const prevRoi =
-    totalSpend > 0 ? ((prevTotalRaised - totalSpend) / totalSpend) * 100 : 0;
+  // Calculate ROI = (Net Revenue - Spend) / Spend
+  const roi = totalSpend > 0 ? (totalRaised - totalSpend) / totalSpend : 0;
+  const prevRoi = prevTotalSpend > 0 ? (prevTotalRaised - prevTotalSpend) / prevTotalSpend : 0;
 
   // Calculate trends (percentage change)
   const calcTrend = (current: number, previous: number) => {
