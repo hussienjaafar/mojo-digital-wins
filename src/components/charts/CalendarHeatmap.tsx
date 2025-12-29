@@ -164,14 +164,59 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
     };
   }, [onCellClick]);
 
+  // Generate accessible summary for screen readers
+  const totalValue = React.useMemo(() => 
+    data.reduce((sum, d) => sum + d.value, 0), [data]
+  );
+  
+  const peakCell = React.useMemo(() => {
+    if (data.length === 0) return null;
+    const peak = data.reduce((max, d) => d.value > max.value ? d : max, data[0]);
+    return { day: dayLabels[peak.dayOfWeek], hour: hourLabels[peak.hour], value: peak.value };
+  }, [data]);
+
+  const accessibleSummary = React.useMemo(() => {
+    if (!peakCell) return `${valueLabel} heatmap with no data.`;
+    return `${valueLabel} heatmap showing activity by day and hour. Peak activity: ${formatValue(peakCell.value)} on ${peakCell.day} at ${peakCell.hour}. Total: ${formatValue(totalValue)}.`;
+  }, [valueLabel, peakCell, totalValue, formatValue]);
+
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("w-full space-y-2", className)}>
+      {/* Screen reader summary */}
+      <div className="sr-only" role="img" aria-label={accessibleSummary}>
+        {accessibleSummary}
+      </div>
+      
       <EChartsBase
         option={option}
         height={height}
         isLoading={isLoading}
         onEvents={handleEvents}
       />
+      
+      {/* Visual legend explanation */}
+      <div className="flex items-center justify-center gap-2 text-xs text-[hsl(var(--portal-text-muted))]">
+        <span>Less</span>
+        <div className="flex gap-0.5">
+          {[0.1, 0.3, 0.5, 0.7, 1].map((opacity, i) => (
+            <div
+              key={i}
+              className="w-3 h-3 rounded-sm"
+              style={{
+                backgroundColor: `hsl(var(--portal-accent-${colorScheme === 'blue' ? 'blue' : colorScheme === 'green' ? 'green' : colorScheme === 'purple' ? 'purple' : 'amber'}) / ${opacity})`,
+                border: '1px solid hsl(var(--portal-border))',
+              }}
+              aria-hidden="true"
+            />
+          ))}
+        </div>
+        <span>More</span>
+        {peakCell && (
+          <span className="ml-2 text-[hsl(var(--portal-text-secondary))]">
+            Peak: {peakCell.day} {peakCell.hour}
+          </span>
+        )}
+      </div>
     </div>
   );
 };
