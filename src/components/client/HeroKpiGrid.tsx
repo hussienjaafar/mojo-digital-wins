@@ -1,11 +1,12 @@
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { type LucideIcon, AlertCircle, RefreshCw } from "lucide-react";
+import { type LucideIcon, AlertCircle, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HeroKpiCard, type HeroKpiAccent, type SparklineDataPoint, type BreakdownItem } from "./HeroKpiCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import type { KpiKey } from "@/stores/dashboardStore";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // ============================================================================
 // Types
@@ -65,6 +66,8 @@ export interface HeroKpiGridProps {
   desktopColumns?: 3 | 4 | 5 | 6;
   /** Expansion mode for cards: "drawer" or "inline" */
   expansionMode?: "drawer" | "inline";
+  /** Number of KPIs to show on mobile before "Show more" (default: 4) */
+  mobileVisibleCount?: number;
   /** Additional className */
   className?: string;
 }
@@ -213,15 +216,28 @@ export const HeroKpiGrid: React.FC<HeroKpiGridProps> = ({
   tabletColumns = 3,
   desktopColumns = 6,
   expansionMode = "drawer",
+  mobileVisibleCount = 4,
   className,
 }) => {
   // Track which card is expanded inline (only used in inline mode)
   const [expandedKpiKey, setExpandedKpiKey] = React.useState<KpiKey | null>(null);
+  // Track if user has expanded to show all KPIs on mobile
+  const [showAllOnMobile, setShowAllOnMobile] = React.useState(false);
+  const isMobile = useIsMobile();
 
   // Handle inline expansion change
   const handleInlineExpandChange = React.useCallback((kpiKey: KpiKey, expanded: boolean) => {
     setExpandedKpiKey(expanded ? kpiKey : null);
   }, []);
+
+  // Determine visible KPIs based on mobile state
+  const visibleData = React.useMemo(() => {
+    if (!isMobile || showAllOnMobile) return data;
+    return data.slice(0, mobileVisibleCount);
+  }, [data, isMobile, showAllOnMobile, mobileVisibleCount]);
+
+  const hasMoreToShow = isMobile && data.length > mobileVisibleCount;
+
   // Build responsive grid classes based on column props
   const gridClasses = cn(
     "grid gap-4",
@@ -261,54 +277,84 @@ export const HeroKpiGrid: React.FC<HeroKpiGridProps> = ({
 
   // Render grid
   return (
-    <motion.div
-      className={gridClasses}
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      role="region"
-      aria-label="Key performance indicators"
-    >
-      <AnimatePresence mode="popLayout">
-        {data.map((kpi) => {
-          const isExpanded = expansionMode === "inline" && expandedKpiKey === kpi.kpiKey;
+    <div className="space-y-4">
+      <motion.div
+        className={gridClasses}
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        role="region"
+        aria-label="Key performance indicators"
+      >
+        <AnimatePresence mode="popLayout">
+          {visibleData.map((kpi) => {
+            const isExpanded = expansionMode === "inline" && expandedKpiKey === kpi.kpiKey;
 
-          return (
-            <motion.div
-              key={kpi.kpiKey}
-              variants={itemVariants}
-              layout
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={cn(
-                // When expanded inline, span full width of grid
-                isExpanded && "col-span-full"
-              )}
-            >
-              <HeroKpiCard
-                kpiKey={kpi.kpiKey}
-                label={kpi.label}
-                value={kpi.value}
-                icon={kpi.icon}
-                trend={kpi.trend}
-                previousValue={kpi.previousValue}
-                subtitle={kpi.subtitle}
-                accent={kpi.accent}
-                sparklineData={kpi.sparklineData}
-                description={kpi.description}
-                // Drilldown props
-                trendData={kpi.trendData}
-                trendXAxisKey={kpi.trendXAxisKey ?? "date"}
-                breakdown={kpi.breakdown}
-                expandable={kpi.expandable ?? Boolean(kpi.trendData || kpi.breakdown)}
-                // Expansion mode props
-                expansionMode={expansionMode}
-                onInlineExpandChange={(expanded) => handleInlineExpandChange(kpi.kpiKey, expanded)}
-              />
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
-    </motion.div>
+            return (
+              <motion.div
+                key={kpi.kpiKey}
+                variants={itemVariants}
+                layout
+                exit={{ opacity: 0, scale: 0.95 }}
+                className={cn(
+                  // When expanded inline, span full width of grid
+                  isExpanded && "col-span-full"
+                )}
+              >
+                <HeroKpiCard
+                  kpiKey={kpi.kpiKey}
+                  label={kpi.label}
+                  value={kpi.value}
+                  icon={kpi.icon}
+                  trend={kpi.trend}
+                  previousValue={kpi.previousValue}
+                  subtitle={kpi.subtitle}
+                  accent={kpi.accent}
+                  sparklineData={kpi.sparklineData}
+                  description={kpi.description}
+                  // Drilldown props
+                  trendData={kpi.trendData}
+                  trendXAxisKey={kpi.trendXAxisKey ?? "date"}
+                  breakdown={kpi.breakdown}
+                  expandable={kpi.expandable ?? Boolean(kpi.trendData || kpi.breakdown)}
+                  // Expansion mode props
+                  expansionMode={expansionMode}
+                  onInlineExpandChange={(expanded) => handleInlineExpandChange(kpi.kpiKey, expanded)}
+                />
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </motion.div>
+
+      {/* Show More/Less button on mobile */}
+      {hasMoreToShow && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex justify-center md:hidden"
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAllOnMobile(!showAllOnMobile)}
+            className="gap-2 text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-text-primary))]"
+          >
+            {showAllOnMobile ? (
+              <>
+                <ChevronUp className="h-4 w-4" />
+                Show fewer metrics
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-4 w-4" />
+                Show {data.length - mobileVisibleCount} more metrics
+              </>
+            )}
+          </Button>
+        </motion.div>
+      )}
+    </div>
   );
 };
 

@@ -1,5 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { 
+  V3Card, 
+  V3CardContent, 
+  V3CardDescription, 
+  V3CardHeader, 
+  V3CardTitle,
+  V3KPICard,
+  V3LoadingState,
+} from '@/components/v3';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Download, TrendingUp, Users, DollarSign } from 'lucide-react';
@@ -220,18 +228,7 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
   if (isLoading) {
     return (
       <div className="space-y-4 animate-fade-in">
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="space-y-0 pb-2">
-                <div className="h-4 w-24 bg-[hsl(var(--portal-bg-elevated))] rounded" />
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 w-32 bg-[hsl(var(--portal-bg-elevated))] rounded" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <V3LoadingState variant="kpi-grid" count={4} />
       </div>
     );
   }
@@ -239,67 +236,38 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Key Metrics */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover-scale transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium portal-text-primary">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 portal-text-secondary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${keyMetrics.revenue.current.toLocaleString()}
-            </div>
-            <p className={`text-xs ${keyMetrics.revenue.changePercent >= 0 ? 'text-[hsl(var(--portal-success))]' : 'text-[hsl(var(--portal-error))]'}`}>
-              {keyMetrics.revenue.changePercent >= 0 ? '+' : ''}
-              {keyMetrics.revenue.changePercent.toFixed(1)}% from previous period
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">CAC</CardTitle>
-            <Users className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${keyMetrics.cac.toFixed(2)}
-            </div>
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-              Customer Acquisition Cost
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">LTV</CardTitle>
-            <TrendingUp className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${keyMetrics.ltv.toFixed(2)}
-            </div>
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-              Lifetime Value
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">LTV:CAC Ratio</CardTitle>
-            <TrendingUp className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {keyMetrics.ltvCacRatio.toFixed(1)}:1
-            </div>
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-              {keyMetrics.ltvCacRatio >= 3 ? 'Excellent' : keyMetrics.ltvCacRatio >= 1 ? 'Good' : 'Needs improvement'}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <V3KPICard
+          icon={DollarSign}
+          label="Total Revenue"
+          value={`$${keyMetrics.revenue.current.toLocaleString()}`}
+          trend={{ 
+            value: keyMetrics.revenue.changePercent, 
+            isPositive: keyMetrics.revenue.changePercent >= 0 
+          }}
+          accent="blue"
+        />
+        <V3KPICard
+          icon={Users}
+          label="CAC"
+          value={`$${keyMetrics.cac.toFixed(2)}`}
+          subtitle="Customer Acquisition Cost"
+          accent="purple"
+        />
+        <V3KPICard
+          icon={TrendingUp}
+          label="LTV"
+          value={`$${keyMetrics.ltv.toFixed(2)}`}
+          subtitle="Lifetime Value"
+          accent="green"
+        />
+        <V3KPICard
+          icon={TrendingUp}
+          label="LTV:CAC Ratio"
+          value={`${keyMetrics.ltvCacRatio.toFixed(1)}:1`}
+          subtitle={keyMetrics.ltvCacRatio >= 3 ? 'Excellent' : keyMetrics.ltvCacRatio >= 1 ? 'Good' : 'Needs improvement'}
+          accent={keyMetrics.ltvCacRatio >= 3 ? 'green' : keyMetrics.ltvCacRatio >= 1 ? 'blue' : 'amber'}
+        />
       </div>
 
       {/* Export Button */}
@@ -313,7 +281,7 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
       {/* Advanced Analytics Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className={`grid w-full ${isMobile ? 'grid-cols-2' : 'grid-cols-4'}`}>
-          <TabsTrigger value="attribution">Attribution</TabsTrigger>
+          <TabsTrigger value="attribution">Models</TabsTrigger>
           <TabsTrigger value="funnel">Funnel</TabsTrigger>
           <TabsTrigger value="forecast">Forecast</TabsTrigger>
           <TabsTrigger value="comparison">Compare</TabsTrigger>
@@ -336,12 +304,12 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
                 }[]}
               />
               
-              <Card>
-                <CardHeader>
-                  <CardTitle>Channel Contribution</CardTitle>
-                  <CardDescription>Performance efficiency by marketing channel</CardDescription>
-                </CardHeader>
-                <CardContent>
+              <V3Card>
+                <V3CardHeader>
+                  <V3CardTitle>Channel Contribution</V3CardTitle>
+                  <V3CardDescription>Performance efficiency by marketing channel</V3CardDescription>
+                </V3CardHeader>
+                <V3CardContent>
                   <div className="space-y-4">
                     {channelContribution.map(channel => (
                       <div key={channel.name} className="space-y-2">
@@ -363,15 +331,15 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+                </V3CardContent>
+              </V3Card>
             </>
           ) : (
-            <Card>
-              <CardContent className="flex items-center justify-center min-h-[300px]">
+            <V3Card>
+              <V3CardContent className="flex items-center justify-center min-h-[300px]">
                 <p className="text-[hsl(var(--portal-text-muted))]">No attribution data available for this period</p>
-              </CardContent>
-            </Card>
+              </V3CardContent>
+            </V3Card>
           )}
         </TabsContent>
 

@@ -26,3 +26,4 @@ export { V3MetricLabel } from "./V3MetricLabel";
 export { V3HighlightableRow } from "./V3HighlightableRow";
 export { V3InsightBadge, type InsightType } from "./V3InsightBadge";
 export { V3KPIDrilldownDrawer, type KPIDrilldownData } from "./V3KPIDrilldownDrawer";
+export { V3DataFreshnessIndicator } from "./V3DataFreshnessIndicator";
