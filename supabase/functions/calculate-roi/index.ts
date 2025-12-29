@@ -104,38 +104,52 @@ serve(async (req) => {
       const totalImpressions = metaMetrics?.reduce((sum, m) => sum + (m.impressions || 0), 0) || 0;
       const totalClicks = metaMetrics?.reduce((sum, m) => sum + (m.clicks || 0), 0) || 0;
 
-      // Fetch SMS costs for the date
-      const { data: smsMetrics } = await supabase
-        .from('sms_campaign_metrics')
+      // Fetch SMS costs for the date (using sms_campaigns, not sms_campaign_metrics)
+      // Note: sms_campaigns uses send_date as the date field
+      const { data: smsCampaigns } = await supabase
+        .from('sms_campaigns')
         .select('cost, messages_sent, conversions')
         .eq('organization_id', organization_id)
-        .eq('date', date);
+        .gte('send_date', `${date}T00:00:00`)
+        .lt('send_date', `${date}T23:59:59.999`)
+        .neq('status', 'draft');
 
-      const totalSmsCost = smsMetrics?.reduce((sum, m) => sum + parseFloat(m.cost || '0'), 0) || 0;
-      const totalSmsSent = smsMetrics?.reduce((sum, m) => sum + (m.messages_sent || 0), 0) || 0;
-      const totalSmsConversions = smsMetrics?.reduce((sum, m) => sum + (m.conversions || 0), 0) || 0;
+      const totalSmsCost = smsCampaigns?.reduce((sum, m) => sum + parseFloat(m.cost || '0'), 0) || 0;
+      const totalSmsSent = smsCampaigns?.reduce((sum, m) => sum + (m.messages_sent || 0), 0) || 0;
+      const totalSmsConversions = smsCampaigns?.reduce((sum, m) => sum + (m.conversions || 0), 0) || 0;
 
-      // Fetch ActBlue donations for the date
+      // Fetch ActBlue transactions for the date (donations and refunds separately for net revenue)
       const { data: transactions } = await supabase
         .from('actblue_transactions')
-        .select('amount, donor_email')
+        .select('amount, net_amount, donor_email, transaction_type')
         .eq('organization_id', organization_id)
-        .eq('transaction_type', 'donation')
         .gte('transaction_date', `${date}T00:00:00`)
-        .lt('transaction_date', `${date}T23:59:59`);
+        .lt('transaction_date', `${date}T23:59:59.999`);
 
-      const totalFundsRaised = transactions?.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) || 0;
-      const totalDonations = transactions?.length || 0;
+      // Calculate net funds raised: donations - refunds/cancellations
+      // Use net_amount when available (already excludes fees), fall back to amount
+      const donations = (transactions || []).filter(t => t.transaction_type === 'donation');
+      const refunds = (transactions || []).filter(t => t.transaction_type === 'refund' || t.transaction_type === 'cancellation');
 
-      // Calculate unique donors
-      const uniqueEmails = new Set(transactions?.map(t => t.donor_email).filter(Boolean));
+      const grossDonations = donations.reduce((sum, t) => sum + parseFloat(t.net_amount || t.amount || '0'), 0);
+      const refundAmount = refunds.reduce((sum, t) => sum + Math.abs(parseFloat(t.net_amount || t.amount || '0')), 0);
+      const totalFundsRaised = grossDonations - refundAmount; // Net revenue
+      const totalDonations = donations.length;
+
+      // Calculate unique donors (only from donations, not refunds)
+      const uniqueEmails = new Set(donations.map(t => t.donor_email).filter(Boolean));
       const newDonors = uniqueEmails.size;
 
-      // Calculate ROI
+      // Calculate ROI using net revenue
       const totalSpent = totalAdSpend + totalSmsCost;
-      const roiPercentage = totalSpent > 0 
+      const roiPercentage = totalSpent > 0
         ? ((totalFundsRaised - totalSpent) / totalSpent) * 100
         : 0;
+
+      // Log refund impact for observability
+      if (refundAmount > 0) {
+        console.log(`[ROI] ${date}: Refund/cancellation amount: $${refundAmount.toFixed(2)} (${refunds.length} transactions)`);
+      }
 
       // Upsert aggregated metrics using service role
       const { error: upsertError } = await serviceClient

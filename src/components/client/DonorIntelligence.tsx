@@ -1,11 +1,11 @@
 import { useState, useMemo } from "react";
-import { 
-  V3Card, 
-  V3CardHeader, 
-  V3CardTitle, 
-  V3CardContent, 
-  V3KPICard, 
-  V3LoadingState, 
+import {
+  V3Card,
+  V3CardHeader,
+  V3CardTitle,
+  V3CardContent,
+  V3KPICard,
+  V3LoadingState,
   V3ChartWrapper,
   V3ErrorState
 } from "@/components/v3";
@@ -17,6 +17,7 @@ import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity, G
 import { useDonorIntelligenceQuery, type AttributionData } from "@/queries";
 import { formatCurrency } from "@/lib/chart-formatters";
 import { NoDataAvailable } from "./NoDataAvailable";
+import { useSelectedCampaignId, useSelectedCreativeId } from "@/stores/dashboardStore";
 
 interface DonorIntelligenceProps {
   organizationId: string;
@@ -27,7 +28,17 @@ interface DonorIntelligenceProps {
 export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorIntelligenceProps) => {
   const [deterministicOnly, setDeterministicOnly] = useState(false);
 
-  const { data, isLoading, error, isError, refetch } = useDonorIntelligenceQuery(organizationId, startDate, endDate);
+  // Get filter values from dashboard store
+  const selectedCampaignId = useSelectedCampaignId();
+  const selectedCreativeId = useSelectedCreativeId();
+
+  const { data, isLoading, error, isError, refetch } = useDonorIntelligenceQuery(
+    organizationId,
+    startDate,
+    endDate,
+    selectedCampaignId,
+    selectedCreativeId
+  );
 
   const attributionData = data?.attributionData || [];
   const segmentData = data?.segmentData || [];
@@ -38,6 +49,21 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
   const ltvSummary = data?.ltvSummary || { avgLtv90: 0, avgLtv180: 0, highRisk: 0, total: 0 };
   const metaSpend = data?.metaSpend || 0;
   const dataMeta = data?.meta;
+  const donorFirstDonations = data?.donorFirstDonations || [];
+
+  // Build a lookup map for donor first donation dates (for lifetime-based new/returning)
+  const donorFirstDonationMap = useMemo(() => {
+    const map = new Map<string, Date>();
+    donorFirstDonations.forEach(d => {
+      if (d.donor_key && d.first_donation_at) {
+        map.set(d.donor_key, new Date(d.first_donation_at));
+      }
+    });
+    return map;
+  }, [donorFirstDonations]);
+
+  // Parse start date for new/returning comparison
+  const rangeStartDate = useMemo(() => new Date(startDate), [startDate]);
   const isDeterministic = (d: AttributionData) => {
     if (d.attribution_method === 'refcode' || d.attribution_method === 'click_id') return true;
     return Boolean(
@@ -97,28 +123,49 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
 
   const topicPerformance = useMemo(() => {
     const byTopic: Record<string, { revenue: number; netRevenue: number; count: number; deterministicCount: number; newDonors: number; returningDonors: number }> = {};
-    const donorFirstTopic: Record<string, string> = {};
+    // Track unique donors per topic to avoid counting same donor multiple times
+    const topicDonorsSeen = new Map<string, Set<string>>(); // topic -> Set of donor_keys already counted
+
+    // Single pass: calculate metrics per topic with lifetime-based new/returning
     filteredAttribution.forEach(d => {
-      const topic = d.creative_topic || 'unknown';
+      const topic = d.creative_topic || 'Unknown';
       if (!byTopic[topic]) {
         byTopic[topic] = { revenue: 0, netRevenue: 0, count: 0, deterministicCount: 0, newDonors: 0, returningDonors: 0 };
+        topicDonorsSeen.set(topic, new Set());
       }
       byTopic[topic].revenue += Number(d.amount || 0);
       byTopic[topic].netRevenue += Number(d.net_amount ?? d.amount ?? 0);
       byTopic[topic].count++;
       if (isDeterministic(d)) byTopic[topic].deterministicCount++;
 
-      const donorHash = d.attributed_creative_id || d.refcode || d.transaction_click_id || d.transaction_fbclid || '';
-      if (donorHash && !donorFirstTopic[donorHash]) {
-        donorFirstTopic[donorHash] = topic;
-        byTopic[topic].newDonors += 1;
-      } else if (donorHash) {
-        byTopic[topic].returningDonors += 1;
+      // Use donor_key (COALESCE of donor_id_hash and donor_phone_hash) for lifetime-based new/returning
+      const donorKey = d.donor_id_hash || d.donor_phone_hash;
+      if (donorKey) {
+        const seenForTopic = topicDonorsSeen.get(topic)!;
+        if (!seenForTopic.has(donorKey)) {
+          // First time seeing this donor for this topic - check lifetime status
+          seenForTopic.add(donorKey);
+
+          const firstDonationDate = donorFirstDonationMap.get(donorKey);
+          if (firstDonationDate) {
+            // New donor: first-ever donation falls within the selected date range
+            // Returning donor: first donation predates the range
+            if (firstDonationDate >= rangeStartDate) {
+              byTopic[topic].newDonors += 1;
+            } else {
+              byTopic[topic].returningDonors += 1;
+            }
+          } else {
+            // No lifetime data found - treat as new (could be edge case)
+            byTopic[topic].newDonors += 1;
+          }
+        }
+        // If already seen for this topic, don't count again (avoid double-counting)
       }
     });
 
+    // Include Unknown topic (no longer filtered out)
     return Object.entries(byTopic)
-      .filter(([topic]) => topic !== 'unknown')
       .map(([topic, data]) => ({
         topic,
         donations: data.count,
@@ -131,7 +178,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
       }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
-  }, [filteredAttribution]);
+  }, [filteredAttribution, donorFirstDonationMap, rangeStartDate]);
 
   const segmentBreakdown = useMemo(() => {
     const byTier: Record<string, { count: number; totalValue: number }> = {};

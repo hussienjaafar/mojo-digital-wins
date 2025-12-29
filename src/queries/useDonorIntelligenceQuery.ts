@@ -27,6 +27,13 @@ export interface AttributionData {
   amount: number;
   net_amount: number | null;
   transaction_type: string;
+  donor_id_hash?: string | null; // Email-based hash for donor identity
+  donor_phone_hash?: string | null; // Phone-based hash for donor identity (fallback)
+}
+
+export interface DonorFirstDonation {
+  donor_key: string;
+  first_donation_at: string;
 }
 
 export interface DonorSegment {
@@ -79,15 +86,32 @@ export interface DonorIntelligenceData {
     journeys: QueryResultMeta;
     ltv: QueryResultMeta;
   };
+  donorFirstDonations: DonorFirstDonation[]; // Lifetime first donation dates for new/returning classification
 }
 
 async function fetchDonorIntelligenceData(
   organizationId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  campaignId: string | null = null,
+  creativeId: string | null = null
 ): Promise<DonorIntelligenceData> {
   const sb = supabase as any;
   const endDateFull = formatEndDateFull(endDate);
+
+  // Build attribution query with optional campaign/creative filters
+  const buildAttrQuery = () => {
+    let query = sb
+      .from('donation_attribution')
+      .select('attributed_platform, attributed_campaign_id, attributed_ad_id, attributed_creative_id, refcode, creative_topic, creative_tone, amount, net_amount, transaction_type, attribution_method, transaction_click_id, transaction_fbclid, mapped_click_id, mapped_fbclid, donor_id_hash, donor_phone_hash')
+      .eq('organization_id', organizationId)
+      .gte('transaction_date', startDate)
+      .lte('transaction_date', endDateFull)
+      .eq('transaction_type', 'donation');
+    if (campaignId) query = query.eq('attributed_campaign_id', campaignId);
+    if (creativeId) query = query.eq('attributed_creative_id', creativeId);
+    return query;
+  };
   // Run all queries in parallel
   const [
     attrResult,
@@ -97,15 +121,10 @@ async function fetchDonorIntelligenceData(
     metaSpendResult,
     journeysResult,
     ltvResult,
+    donorFirstResult,
   ] = await Promise.all([
-    // Attribution data
-    sb
-      .from('donation_attribution')
-      .select('attributed_platform, attributed_campaign_id, attributed_ad_id, attributed_creative_id, refcode, creative_topic, creative_tone, amount, net_amount, transaction_type, attribution_method, transaction_click_id, transaction_fbclid, mapped_click_id, mapped_fbclid')
-      .eq('organization_id', organizationId)
-      .gte('transaction_date', startDate)
-      .lte('transaction_date', endDateFull)
-      .eq('transaction_type', 'donation'),
+    // Attribution data - include donor_id_hash and donor_phone_hash for new/returning calculation
+    buildAttrQuery(),
 
     // Segment data
     sb
@@ -113,40 +132,52 @@ async function fetchDonorIntelligenceData(
       .select('donor_tier, donor_frequency_segment, total_donated, donation_count, days_since_donation, monetary_score, frequency_score, recency_score')
       .eq('organization_id', organizationId),
 
-    // SMS events
-    sb
-      .from('sms_events')
-      .select('event_type, phone_hash')
-      .eq('organization_id', organizationId)
-      .gte('occurred_at', startDate)
-      .lte('occurred_at', endDateFull),
+    // SMS events (excluded when campaign or creative filter active)
+    // Rationale: SMS campaigns don't map to Meta campaigns or creatives
+    (campaignId || creativeId)
+      ? Promise.resolve({ data: [], error: null })
+      : sb
+          .from('sms_events')
+          .select('event_type, phone_hash')
+          .eq('organization_id', organizationId)
+          .gte('occurred_at', startDate)
+          .lte('occurred_at', endDateFull),
 
-    // SMS campaigns
-    sb
-      .from('sms_campaigns')
-      .select('cost, messages_sent, send_date, status')
-      .eq('organization_id', organizationId)
-      .gte('send_date', startDate)
-      .lte('send_date', endDateFull)
-      .neq('status', 'draft'),
+    // SMS campaigns (excluded when campaign or creative filter active)
+    (campaignId || creativeId)
+      ? Promise.resolve({ data: [], error: null })
+      : sb
+          .from('sms_campaigns')
+          .select('cost, messages_sent, send_date, status')
+          .eq('organization_id', organizationId)
+          .gte('send_date', startDate)
+          .lte('send_date', endDateFull)
+          .neq('status', 'draft'),
 
-    // Meta spend
-    sb
-      .from('meta_ad_metrics')
-      .select('spend')
-      .eq('organization_id', organizationId)
-      .gte('date', startDate)
-      .lte('date', endDate),
+    // Meta spend (filtered by campaign and/or creative if applicable)
+    (() => {
+      let query = sb
+        .from('meta_ad_metrics')
+        .select('spend, campaign_id, ad_creative_id')
+        .eq('organization_id', organizationId)
+        .gte('date', startDate)
+        .lte('date', endDate);
+      if (campaignId) query = query.eq('campaign_id', campaignId);
+      if (creativeId) query = query.eq('ad_creative_id', creativeId);
+      return query;
+    })(),
 
-    // Donor journeys - increased limit for better data coverage
-    sb
-      .from('donor_journeys')
-      .select('donor_key, event_type, occurred_at, amount, net_amount, source, transaction_type, refcode')
-      .eq('organization_id', organizationId)
-      .gte('occurred_at', startDate)
-      .lte('occurred_at', endDateFull)
-      .order('occurred_at', { ascending: false })
-      .limit(QUERY_LIMITS.journeys),
+    // Donor journeys (excluded when campaign or creative filter active - journeys are phone-based)
+    (campaignId || creativeId)
+      ? Promise.resolve({ data: [], error: null })
+      : sb
+          .from('donor_journeys')
+          .select('donor_key, event_type, occurred_at, amount, net_amount, source, transaction_type, refcode')
+          .eq('organization_id', organizationId)
+          .gte('occurred_at', startDate)
+          .lte('occurred_at', endDateFull)
+          .order('occurred_at', { ascending: false })
+          .limit(QUERY_LIMITS.journeys),
 
     // LTV predictions - increased limit
     sb
@@ -154,6 +185,12 @@ async function fetchDonorIntelligenceData(
       .select('predicted_ltv_90, predicted_ltv_180, churn_risk')
       .eq('organization_id', organizationId)
       .limit(QUERY_LIMITS.predictions),
+
+    // Donor first donation dates (for lifetime-based new/returning classification)
+    sb
+      .from('donor_first_donation')
+      .select('donor_key, first_donation_at')
+      .eq('organization_id', organizationId),
   ]);
 
   // Log errors but continue with empty data for recoverable errors
@@ -174,6 +211,7 @@ async function fetchDonorIntelligenceData(
   logError('meta spend', metaSpendResult.error);
   logError('donor journeys', journeysResult.error);
   logError('LTV predictions', ltvResult.error);
+  logError('donor first donations', donorFirstResult.error);
 
   // Process SMS funnel
   const smsEvents = smsEventsResult.data || [];
@@ -238,17 +276,30 @@ async function fetchDonorIntelligenceData(
       journeys: createResultMeta('journey events', journeyData.length, QUERY_LIMITS.journeys),
       ltv: createResultMeta('LTV predictions', ltvDataResult.length, QUERY_LIMITS.predictions),
     },
+    donorFirstDonations: donorFirstResult.data || [],
   };
 }
 
 export function useDonorIntelligenceQuery(
   organizationId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  campaignId: string | null = null,
+  creativeId: string | null = null
 ) {
   return useQuery({
-    queryKey: intelligenceKeys.donors(organizationId, { startDate, endDate }),
-    queryFn: () => fetchDonorIntelligenceData(organizationId, startDate, endDate),
+    queryKey: intelligenceKeys.donors(
+      organizationId,
+      { startDate, endDate },
+      { campaignId, creativeId }
+    ),
+    queryFn: () => fetchDonorIntelligenceData(
+      organizationId,
+      startDate,
+      endDate,
+      campaignId,
+      creativeId
+    ),
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!organizationId && !!startDate && !!endDate,

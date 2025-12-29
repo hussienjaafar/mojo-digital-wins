@@ -10,6 +10,8 @@ import {
   mockMetaAdMetrics,
   mockSmsCampaigns,
   mockDonationTransactions,
+  mockDonationAttributions,
+  mockSmsEvents,
   TEST_ORG_ID,
 } from './fixtures';
 
@@ -226,9 +228,25 @@ export const handlers = [
   http.get(`${SUPABASE_URL}/rest/v1/meta_ad_metrics`, ({ request }) => {
     const url = new URL(request.url);
     const orgId = url.searchParams.get('organization_id');
+    const campaignFilter = url.searchParams.get('campaign_id');
+    const creativeFilter = url.searchParams.get('ad_creative_id');
 
     if (orgId === `eq.${TEST_ORG_ID}`) {
-      return HttpResponse.json(mockMetaAdMetrics);
+      let results = [...mockMetaAdMetrics];
+
+      // Apply campaign filter
+      if (campaignFilter) {
+        const campaignId = campaignFilter.replace('eq.', '');
+        results = results.filter(m => m.campaign_id === campaignId);
+      }
+
+      // Apply creative filter
+      if (creativeFilter) {
+        const creativeId = creativeFilter.replace('eq.', '');
+        results = results.filter(m => m.ad_creative_id === creativeId);
+      }
+
+      return HttpResponse.json(results);
     }
     // Legacy support
     return HttpResponse.json(mockMetaMetrics);
@@ -250,6 +268,48 @@ export const handlers = [
 
     if (orgId === `eq.${TEST_ORG_ID}`) {
       return HttpResponse.json(mockDonationTransactions);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  // -------------------------------------------------------------------------
+  // Donation Attribution (view) - supports campaign/creative filtering
+  // -------------------------------------------------------------------------
+  http.get(`${SUPABASE_URL}/rest/v1/donation_attribution`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+    const campaignFilter = url.searchParams.get('attributed_campaign_id');
+    const creativeFilter = url.searchParams.get('attributed_creative_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      let results = [...mockDonationAttributions];
+
+      // Apply campaign filter
+      if (campaignFilter) {
+        const campaignId = campaignFilter.replace('eq.', '');
+        results = results.filter(d => d.attributed_campaign_id === campaignId);
+      }
+
+      // Apply creative filter
+      if (creativeFilter) {
+        const creativeId = creativeFilter.replace('eq.', '');
+        results = results.filter(d => d.attributed_creative_id === creativeId);
+      }
+
+      return HttpResponse.json(results);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  // -------------------------------------------------------------------------
+  // SMS Events (with phone_hash)
+  // -------------------------------------------------------------------------
+  http.get(`${SUPABASE_URL}/rest/v1/sms_events`, ({ request }) => {
+    const url = new URL(request.url);
+    const orgId = url.searchParams.get('organization_id');
+
+    if (orgId === `eq.${TEST_ORG_ID}`) {
+      return HttpResponse.json(mockSmsEvents);
     }
     return HttpResponse.json([]);
   }),

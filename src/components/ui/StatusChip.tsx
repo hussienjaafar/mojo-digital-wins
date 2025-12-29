@@ -111,7 +111,7 @@ export const StatusChip = React.forwardRef<HTMLSpanElement, StatusChipProps>(
     const displayLabel = React.useMemo(() => {
       if (label) return label;
       if (variant === "updated" && timestamp) {
-        return `Updated ${formatDistanceToNow(timestamp, { addSuffix: false })} ago`;
+        return `Data last updated ${formatDistanceToNow(timestamp, { addSuffix: false })} ago`;
       }
       return config.defaultLabel;
     }, [label, variant, timestamp, config.defaultLabel]);

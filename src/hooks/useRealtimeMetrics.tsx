@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
+import { format, parseISO, addDays } from 'date-fns';
 
 type MetricsUpdate = {
   eventType: 'INSERT' | 'UPDATE' | 'DELETE';
@@ -22,38 +23,41 @@ export function useRealtimeMetrics(organizationId: string, startDate: string, en
     const fetchInitialData = async () => {
       setIsLoading(true);
       try {
+        // Use inclusive date range: [startDate, endDate+1day) to include full end date
+        const endDateInclusive = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
+
         const [metaRes, smsRes, txRes, roiRes] = await Promise.all([
           supabase
             .from('meta_ad_metrics')
             .select('*')
             .eq('organization_id', organizationId)
             .gte('date', startDate)
-            .lte('date', endDate)
+            .lte('date', endDate) // Meta uses date field (already just yyyy-MM-dd)
             .order('date', { ascending: false }),
-          
-          supabase
+
+          (supabase as any)
             .from('sms_campaigns')
             .select('*')
             .eq('organization_id', organizationId)
             .gte('send_date', startDate)
-            .lte('send_date', endDate)
+            .lt('send_date', endDateInclusive) // Inclusive of end date
             .order('send_date', { ascending: false }),
-          
+
           // Using secure view for defense-in-depth PII protection
-          supabase
+          (supabase as any)
             .from('actblue_transactions_secure')
             .select('*')
             .eq('organization_id', organizationId)
             .gte('transaction_date', startDate)
-            .lte('transaction_date', endDate)
+            .lt('transaction_date', endDateInclusive) // Inclusive of end date
             .order('transaction_date', { ascending: false }),
-          
+
           supabase
             .from('roi_analytics')
             .select('*')
             .eq('organization_id', organizationId)
             .gte('date', startDate)
-            .lte('date', endDate)
+            .lte('date', endDate) // ROI uses date field (already just yyyy-MM-dd)
             .order('date', { ascending: false }),
         ]);
 

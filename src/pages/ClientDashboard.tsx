@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { parseISO, parse, isValid, startOfDay, endOfDay, isWithinInterval } from "date-fns";
-import { ChevronRight, BarChart3, Brain, LayoutDashboard, Layers, Clock } from "lucide-react";
+import { ChevronRight, BarChart3, Brain, LayoutDashboard, Layers, Clock, Info } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { OnboardingWizard } from "@/components/client/OnboardingWizard";
@@ -9,7 +9,7 @@ import { ClientDashboardCharts } from "@/components/client/ClientDashboardCharts
 import { ConsolidatedChannelMetrics } from "@/components/client/ConsolidatedChannelMetrics";
 import SyncControls from "@/components/client/SyncControls";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   V3Card,
@@ -17,9 +17,11 @@ import {
   V3LoadingState,
 } from "@/components/v3";
 import { DateRangeControl } from "@/components/ui/DateRangeControl";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useDashboardStore, useDateRange } from "@/stores/dashboardStore";
+import { useDashboardStore, useDateRange, useSelectedCampaignId, useSelectedCreativeId } from "@/stores/dashboardStore";
 import { DashboardTopSection } from "@/components/client/DashboardTopSection";
+import { CampaignCreativeFilters } from "@/components/dashboard/CampaignCreativeFilters";
 import { useClientDashboardMetricsQuery } from "@/queries";
 import { buildHeroKpis } from "@/utils/buildHeroKpis";
 import { logger } from "@/lib/logger";
@@ -235,8 +237,10 @@ const ClientDashboard = () => {
   const [showTimeAnalysis, setShowTimeAnalysis] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
-  // V3: Use Zustand store for global date range
+  // V3: Use Zustand store for global date range and filters
   const dateRange = useDateRange();
+  const selectedCampaignId = useSelectedCampaignId();
+  const selectedCreativeId = useSelectedCreativeId();
   const triggerRefresh = useDashboardStore((s) => s.triggerRefresh);
 
   // Data fetching with TanStack Query
@@ -370,7 +374,36 @@ const ClientDashboard = () => {
                   icon={LayoutDashboard}
                   isLive={isRealtimeConnected}
                   lastUpdated={dataUpdatedAt ? new Date(dataUpdatedAt) : undefined}
-                  controls={<DateRangeControl pillPresets={["7d", "14d", "30d", "90d"]} />}
+                  badges={[
+                    <Tooltip key="attribution-model">
+                      <TooltipTrigger asChild>
+                        <Badge
+                          variant="outline"
+                          className="gap-1 cursor-help bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))]"
+                        >
+                          <Info className="h-3 w-3" />
+                          Last-touch Attribution
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="bottom"
+                        className="max-w-xs bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
+                      >
+                        <p className="font-medium mb-1">Attribution Model: Last-Touch Deterministic</p>
+                        <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+                          Priority: refcode &gt; click_id/fbclid &gt; SMS (7-day window) &gt; unattributed
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ]}
+                  controls={
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <DateRangeControl pillPresets={["7d", "14d", "30d", "90d"]} />
+                      {organizationId && (
+                        <CampaignCreativeFilters organizationId={organizationId} />
+                      )}
+                    </div>
+                  }
                   kpis={heroKpis}
                   isLoading={isLoading}
                   error={error instanceof Error ? error.message : error ? String(error) : null}

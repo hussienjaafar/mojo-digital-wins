@@ -63,6 +63,24 @@ interface SwitchboardMessageEvent {
   metadata?: Record<string, any> | null;
 }
 
+/**
+ * Normalize a phone number to digits only and compute SHA256 hash.
+ * Used for non-PII donor matching between SMS events and donations.
+ * Returns null if phone is invalid (less than 10 digits).
+ */
+async function computePhoneHash(phone: string | null): Promise<string | null> {
+  if (!phone) return null;
+  const normalized = phone.replace(/\D/g, '');
+  if (normalized.length < 10) return null;
+
+  // Use Web Crypto API available in Deno
+  const encoder = new TextEncoder();
+  const data = encoder.encode(normalized);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 interface SwitchboardMessageResponse {
   data: {
     page: SwitchboardMessageEvent[];
@@ -398,13 +416,17 @@ serve(async (req) => {
         } while (msgNext && msgPageCount < 100);
 
         if (messageEvents.length > 0) {
-          // Hash phone numbers for privacy before inserting
-          const eventsToUpsert = await Promise.all(messageEvents.map(async (msg) => ({
+          // Compute phone hashes for all messages in parallel
+          const phoneHashes = await Promise.all(
+            messageEvents.map(msg => computePhoneHash(msg.phone_number))
+          );
+
+          const eventsToUpsert = messageEvents.map((msg, idx) => ({
             organization_id,
             campaign_id: broadcast.id,
             campaign_name: broadcast.title,
             message_id: msg.id,
-            phone_hash: await hashPhone(msg.phone_number),
+            phone_hash: phoneHashes[idx], // Non-PII hash for donor matching
             event_type: deriveEventType(msg),
             link_clicked: msg.click_url || null,
             occurred_at: deriveOccurredAt(msg),
@@ -418,7 +440,13 @@ serve(async (req) => {
               last_click_at: msg.last_click_at,
               raw_status: msg.status,
             },
-          })));
+          }));
+
+          // Log phone_hash population stats for observability
+          const hashCount = phoneHashes.filter(Boolean).length;
+          if (hashCount < messageEvents.length) {
+            console.warn(`[SMS SYNC] ${messageEvents.length - hashCount} events missing phone_hash (invalid/missing phone numbers)`);
+          }
 
           const { error: eventError } = await supabase
             .from('sms_events')

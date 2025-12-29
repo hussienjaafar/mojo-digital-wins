@@ -327,7 +327,7 @@ export const ClientDashboardCharts = ({
                   <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
                     {metaConversions.toLocaleString()}
                   </p>
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">conversions</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">donations</p>
                 </div>
               </div>
 
@@ -346,7 +346,7 @@ export const ClientDashboardCharts = ({
                   <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
                     {smsConversions.toLocaleString()}
                   </p>
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">conversions</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">donations</p>
                 </div>
               </div>
 

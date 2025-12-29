@@ -64,8 +64,12 @@ export const alertKeys = {
 
 export const intelligenceKeys = {
   all: ['intelligence'] as const,
-  donors: (orgId: string, dateRange: { startDate: string; endDate: string }) =>
-    [...intelligenceKeys.all, 'donors', orgId, dateRange] as const,
+  donors: (
+    orgId: string,
+    dateRange: { startDate: string; endDate: string },
+    filters?: { campaignId?: string | null; creativeId?: string | null }
+  ) =>
+    [...intelligenceKeys.all, 'donors', orgId, dateRange, filters ?? {}] as const,
   attribution: (orgId: string, dateRange: { startDate: string; endDate: string }) =>
     [...intelligenceKeys.all, 'attribution', orgId, dateRange] as const,
   segments: (orgId: string) => [...intelligenceKeys.all, 'segments', orgId] as const,

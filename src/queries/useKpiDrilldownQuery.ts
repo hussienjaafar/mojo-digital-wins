@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "./queryKeys";
 import { useDateRange } from "@/stores/dashboardStore";
 import type { KpiKey } from "@/stores/dashboardStore";
-import { format, subDays, parseISO } from "date-fns";
+import { format, parseISO, addDays } from "date-fns";
+import { logger } from "@/lib/logger";
 
 // ============================================================================
 // Types
@@ -70,50 +71,71 @@ async function fetchNetRevenueDrilldown(
   startDate: string,
   endDate: string
 ): Promise<KpiDrilldownData> {
-  // Fetch daily net revenue trend (using correct column names)
-  const { data: dailyData } = await supabase
-    .from("actblue_transactions")
-    .select("transaction_date, amount, fee")
+  // Use inclusive date range
+  const endDateInclusive = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
+
+  // Use secure view with transaction_type for proper filtering
+  const { data: dailyData } = await (supabase as any)
+    .from("actblue_transactions_secure")
+    .select("transaction_date, amount, net_amount, fee, transaction_type")
     .eq("organization_id", organizationId)
     .gte("transaction_date", startDate)
-    .lte("transaction_date", `${endDate}T23:59:59`)
+    .lt("transaction_date", endDateInclusive)
     .order("transaction_date", { ascending: true });
 
-  // Aggregate by day
-  const dailyMap = new Map<string, { gross: number; fees: number }>();
-  (dailyData || []).forEach((tx) => {
+  const allTx = dailyData || [];
+
+  // Separate donations from refunds
+  const donations = allTx.filter((tx: any) => tx.transaction_type === 'donation');
+  const refunds = allTx.filter((tx: any) => tx.transaction_type === 'refund' || tx.transaction_type === 'cancellation');
+
+  // Aggregate donations and refunds by day for refund-adjusted daily net
+  const dailyMap = new Map<string, { gross: number; fees: number; donationNet: number; refundNet: number }>();
+
+  donations.forEach((tx: any) => {
     const date = format(parseISO(tx.transaction_date), "yyyy-MM-dd");
-    const current = dailyMap.get(date) || { gross: 0, fees: 0 };
+    const current = dailyMap.get(date) || { gross: 0, fees: 0, donationNet: 0, refundNet: 0 };
     current.gross += Number(tx.amount) || 0;
     current.fees += Number(tx.fee) || 0;
+    current.donationNet += Number(tx.net_amount ?? tx.amount) || 0;
+    dailyMap.set(date, current);
+  });
+
+  // Subtract refund net amounts per day (same logic as KPI totals)
+  refunds.forEach((tx: any) => {
+    const date = format(parseISO(tx.transaction_date), "yyyy-MM-dd");
+    const current = dailyMap.get(date) || { gross: 0, fees: 0, donationNet: 0, refundNet: 0 };
+    current.refundNet += Math.abs(Number(tx.net_amount ?? tx.amount ?? 0));
     dailyMap.set(date, current);
   });
 
   const trendData: KpiTrendPoint[] = Array.from(dailyMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, { gross, fees }]) => ({
+    .map(([date, { donationNet, refundNet }]) => ({
       date: format(parseISO(date), "MMM d"),
-      value: gross - fees,
+      value: donationNet - refundNet, // Refund-adjusted daily net
     }));
 
-  // Calculate totals
-  const totalGross = Array.from(dailyMap.values()).reduce((sum, d) => sum + d.gross, 0);
-  const totalFees = Array.from(dailyMap.values()).reduce((sum, d) => sum + d.fees, 0);
-  const totalNet = totalGross - totalFees;
+  // Calculate totals (donations only, then subtract refunds)
+  const totalGross = donations.reduce((sum: number, tx: any) => sum + Number(tx.amount || 0), 0);
+  const totalFees = donations.reduce((sum: number, tx: any) => sum + Number(tx.fee || 0), 0);
+  const totalRefunds = refunds.reduce((sum: number, tx: any) => sum + Math.abs(Number(tx.net_amount ?? tx.amount ?? 0)), 0);
+  const totalNet = totalGross - totalFees - totalRefunds;
 
   // Breakdown by revenue type
   const breakdown: KpiBreakdownItem[] = [
-    { label: "Gross Revenue", value: `$${totalGross.toLocaleString()}`, percentage: 100 },
-    { label: "Processing Fees", value: `$${totalFees.toLocaleString()}`, percentage: (totalFees / totalGross) * 100 },
-    { label: "Net Revenue", value: `$${totalNet.toLocaleString()}`, percentage: (totalNet / totalGross) * 100 },
+    { label: "Gross Donations", value: `$${totalGross.toLocaleString()}`, percentage: 100 },
+    { label: "Processing Fees", value: `$${totalFees.toLocaleString()}`, percentage: totalGross > 0 ? (totalFees / totalGross) * 100 : 0 },
+    { label: "Refunds/Cancellations", value: `$${totalRefunds.toLocaleString()}`, percentage: totalGross > 0 ? (totalRefunds / totalGross) * 100 : 0 },
+    { label: "Net Revenue", value: `$${totalNet.toLocaleString()}`, percentage: totalGross > 0 ? (totalNet / totalGross) * 100 : 0 },
   ];
 
   return {
     kpiKey: "netRevenue",
     label: "Net Revenue",
     value: `$${totalNet.toLocaleString()}`,
-    trend: { value: 0, isPositive: true }, // Would need comparison period
-    description: "Total donations minus processing fees and refunds",
+    trend: { value: 0, isPositive: true },
+    description: "Total donations minus processing fees and refunds/cancellations",
     trendData,
     breakdown,
   };
@@ -124,25 +146,43 @@ async function fetchRoiDrilldown(
   startDate: string,
   endDate: string
 ): Promise<KpiDrilldownData> {
-  // Fetch revenue and spend (using correct column names and tables)
-  const [{ data: txData }, { data: dailyMetrics }] = await Promise.all([
-    supabase
-      .from("actblue_transactions")
-      .select("amount, fee")
+  // Use inclusive date range
+  const endDateInclusive = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
+
+  // Fetch revenue and spend
+  const [{ data: txData }, { data: metaData }, { data: smsData }] = await Promise.all([
+    (supabase as any)
+      .from("actblue_transactions_secure")
+      .select("amount, net_amount, fee, transaction_type, transaction_date")
       .eq("organization_id", organizationId)
       .gte("transaction_date", startDate)
-      .lte("transaction_date", `${endDate}T23:59:59`),
+      .lt("transaction_date", endDateInclusive),
     supabase
-      .from("daily_aggregated_metrics")
-      .select("date, total_ad_spend, total_sms_cost")
+      .from("meta_ad_metrics")
+      .select("date, spend")
       .eq("organization_id", organizationId)
       .gte("date", startDate)
       .lte("date", endDate),
+    (supabase as any)
+      .from("sms_campaigns")
+      .select("send_date, cost")
+      .eq("organization_id", organizationId)
+      .gte("send_date", startDate)
+      .lt("send_date", endDateInclusive)
+      .neq("status", "draft"),
   ]);
 
-  const totalRevenue = (txData || []).reduce((sum, tx) => sum + (Number(tx.amount) - Number(tx.fee || 0)), 0);
-  const metaSpend = (dailyMetrics || []).reduce((sum, d) => sum + Number(d.total_ad_spend || 0), 0);
-  const smsSpend = (dailyMetrics || []).reduce((sum, d) => sum + Number(d.total_sms_cost || 0), 0);
+  // Calculate net revenue (donations - fees - refunds)
+  const allTx = txData || [];
+  const donations = allTx.filter((tx: any) => tx.transaction_type === 'donation');
+  const refunds = allTx.filter((tx: any) => tx.transaction_type === 'refund' || tx.transaction_type === 'cancellation');
+
+  const donationNet = donations.reduce((sum: number, tx: any) => sum + Number(tx.net_amount ?? tx.amount ?? 0), 0);
+  const refundAmount = refunds.reduce((sum: number, tx: any) => sum + Math.abs(Number(tx.net_amount ?? tx.amount ?? 0)), 0);
+  const totalRevenue = donationNet - refundAmount;
+
+  const metaSpend = (metaData || []).reduce((sum: number, d: any) => sum + Number(d.spend || 0), 0);
+  const smsSpend = (smsData || []).reduce((sum: number, d: any) => sum + Number(d.cost || 0), 0);
   const totalSpend = metaSpend + smsSpend;
   // ROI = Net Revenue / Total Spend (investment multiplier)
   const roi = totalSpend > 0 ? totalRevenue / totalSpend : 0;
@@ -150,10 +190,37 @@ async function fetchRoiDrilldown(
   // Daily ROI trend
   const dailyMap = new Map<string, { revenue: number; spend: number }>();
 
-  (dailyMetrics || []).forEach((d) => {
+  // Add donations by day
+  donations.forEach((tx: any) => {
+    const date = tx.transaction_date?.split('T')[0];
+    if (!date) return;
+    const current = dailyMap.get(date) || { revenue: 0, spend: 0 };
+    current.revenue += Number(tx.net_amount ?? tx.amount ?? 0);
+    dailyMap.set(date, current);
+  });
+
+  // Subtract refunds
+  refunds.forEach((tx: any) => {
+    const date = tx.transaction_date?.split('T')[0];
+    if (!date) return;
+    const current = dailyMap.get(date) || { revenue: 0, spend: 0 };
+    current.revenue -= Math.abs(Number(tx.net_amount ?? tx.amount ?? 0));
+    dailyMap.set(date, current);
+  });
+
+  // Add spend by day
+  (metaData || []).forEach((d: any) => {
     const current = dailyMap.get(d.date) || { revenue: 0, spend: 0 };
-    current.spend += Number(d.total_ad_spend || 0) + Number(d.total_sms_cost || 0);
+    current.spend += Number(d.spend || 0);
     dailyMap.set(d.date, current);
+  });
+
+  (smsData || []).forEach((d: any) => {
+    const date = d.send_date?.split('T')[0];
+    if (!date) return;
+    const current = dailyMap.get(date) || { revenue: 0, spend: 0 };
+    current.spend += Number(d.cost || 0);
+    dailyMap.set(date, current);
   });
 
   const trendData: KpiTrendPoint[] = Array.from(dailyMap.entries())
@@ -187,44 +254,58 @@ async function fetchRefundDrilldown(
   startDate: string,
   endDate: string
 ): Promise<KpiDrilldownData> {
-  // Note: actblue_transactions doesn't have a status column for refunds
-  // We'll use transaction_type to identify refunds
-  const { data: txData } = await supabase
-    .from("actblue_transactions")
-    .select("transaction_date, amount, transaction_type")
+  // Use inclusive date range
+  const endDateInclusive = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
+
+  const { data: txData } = await (supabase as any)
+    .from("actblue_transactions_secure")
+    .select("transaction_date, amount, net_amount, transaction_type")
     .eq("organization_id", organizationId)
     .gte("transaction_date", startDate)
-    .lte("transaction_date", `${endDate}T23:59:59`);
+    .lt("transaction_date", endDateInclusive);
 
-  const total = (txData || []).reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  const refunded = (txData || [])
-    .filter((tx) => tx.transaction_type === "refund")
-    .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  const refundRate = total > 0 ? (refunded / total) * 100 : 0;
+  const allTx = txData || [];
 
-  // Daily refund rate trend
-  const dailyMap = new Map<string, { total: number; refunded: number }>();
-  (txData || []).forEach((tx) => {
-    const date = format(parseISO(tx.transaction_date), "yyyy-MM-dd");
-    const current = dailyMap.get(date) || { total: 0, refunded: 0 };
-    current.total += Number(tx.amount) || 0;
-    if (tx.transaction_type === "refund") {
-      current.refunded += Number(tx.amount) || 0;
-    }
+  // Separate donations and refunds
+  const donations = allTx.filter((tx: any) => tx.transaction_type === "donation");
+  const refunds = allTx.filter((tx: any) => tx.transaction_type === "refund" || tx.transaction_type === "cancellation");
+
+  // Use gross amount for donation totals, net_amount for refunds (with Math.abs)
+  const totalDonations = donations.reduce((sum: number, tx: any) => sum + Number(tx.amount || 0), 0);
+  const refundedAmount = refunds.reduce((sum: number, tx: any) => sum + Math.abs(Number(tx.net_amount ?? tx.amount ?? 0)), 0);
+  const refundRate = totalDonations > 0 ? (refundedAmount / totalDonations) * 100 : 0;
+
+  // Daily refund rate trend - use net_amount for refunds
+  const dailyMap = new Map<string, { donations: number; refunded: number }>();
+
+  donations.forEach((tx: any) => {
+    const date = tx.transaction_date?.split('T')[0];
+    if (!date) return;
+    const current = dailyMap.get(date) || { donations: 0, refunded: 0 };
+    current.donations += Number(tx.amount) || 0;
+    dailyMap.set(date, current);
+  });
+
+  refunds.forEach((tx: any) => {
+    const date = tx.transaction_date?.split('T')[0];
+    if (!date) return;
+    const current = dailyMap.get(date) || { donations: 0, refunded: 0 };
+    current.refunded += Math.abs(Number(tx.net_amount ?? tx.amount ?? 0));
     dailyMap.set(date, current);
   });
 
   const trendData: KpiTrendPoint[] = Array.from(dailyMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, { total, refunded }]) => ({
+    .map(([date, { donations, refunded }]) => ({
       date: format(parseISO(date), "MMM d"),
-      value: total > 0 ? (refunded / total) * 100 : 0,
+      value: donations > 0 ? (refunded / donations) * 100 : 0,
     }));
 
   const breakdown: KpiBreakdownItem[] = [
-    { label: "Total Donations", value: `$${total.toLocaleString()}`, percentage: 100 },
-    { label: "Refunded", value: `$${refunded.toLocaleString()}`, percentage: refundRate },
-    { label: "Net Retained", value: `$${(total - refunded).toLocaleString()}`, percentage: 100 - refundRate },
+    { label: "Gross Donations", value: `$${totalDonations.toLocaleString()}`, percentage: 100 },
+    { label: "Refunds/Cancellations", value: `$${refundedAmount.toLocaleString()}`, percentage: refundRate },
+    { label: "Net Retained", value: `$${(totalDonations - refundedAmount).toLocaleString()}`, percentage: 100 - refundRate },
+    { label: "Refund Count", value: refunds.length.toString() },
   ];
 
   return {
@@ -232,7 +313,7 @@ async function fetchRefundDrilldown(
     label: "Refund Rate",
     value: `${refundRate.toFixed(1)}%`,
     trend: { value: 0, isPositive: refundRate <= 5 },
-    description: "Percentage of donations refunded",
+    description: "Percentage of donations refunded or cancelled",
     trendData,
     breakdown,
   };
@@ -243,24 +324,34 @@ async function fetchRecurringDrilldown(
   startDate: string,
   endDate: string
 ): Promise<KpiDrilldownData> {
-  // Using is_recurring column from actblue_transactions
-  const { data: txData } = await supabase
-    .from("actblue_transactions")
-    .select("transaction_date, amount, is_recurring")
+  // Use inclusive date range
+  const endDateInclusive = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
+
+  const { data: txData } = await (supabase as any)
+    .from("actblue_transactions_secure")
+    .select("transaction_date, amount, net_amount, is_recurring, transaction_type")
     .eq("organization_id", organizationId)
     .gte("transaction_date", startDate)
-    .lte("transaction_date", `${endDate}T23:59:59`);
+    .lt("transaction_date", endDateInclusive);
 
-  const recurringTx = (txData || []).filter((tx) => tx.is_recurring === true);
-  const recurringTotal = recurringTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  const overallTotal = (txData || []).reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+  const allTx = txData || [];
+
+  // Only count donations (not refunds) for recurring metrics
+  const donations = allTx.filter((tx: any) => tx.transaction_type === 'donation');
+  const recurringDonations = donations.filter((tx: any) => tx.is_recurring === true);
+  const oneTimeDonations = donations.filter((tx: any) => !tx.is_recurring);
+
+  const recurringTotal = recurringDonations.reduce((sum: number, tx: any) => sum + Number(tx.net_amount ?? tx.amount ?? 0), 0);
+  const oneTimeTotal = oneTimeDonations.reduce((sum: number, tx: any) => sum + Number(tx.net_amount ?? tx.amount ?? 0), 0);
+  const overallTotal = recurringTotal + oneTimeTotal;
   const recurringPercentage = overallTotal > 0 ? (recurringTotal / overallTotal) * 100 : 0;
 
-  // Daily trend
+  // Daily recurring revenue trend
   const dailyMap = new Map<string, number>();
-  recurringTx.forEach((tx) => {
-    const date = format(parseISO(tx.transaction_date), "yyyy-MM-dd");
-    dailyMap.set(date, (dailyMap.get(date) || 0) + Number(tx.amount || 0));
+  recurringDonations.forEach((tx: any) => {
+    const date = tx.transaction_date?.split('T')[0];
+    if (!date) return;
+    dailyMap.set(date, (dailyMap.get(date) || 0) + Number(tx.net_amount ?? tx.amount ?? 0));
   });
 
   const trendData: KpiTrendPoint[] = Array.from(dailyMap.entries())
@@ -272,8 +363,9 @@ async function fetchRecurringDrilldown(
 
   const breakdown: KpiBreakdownItem[] = [
     { label: "Recurring Revenue", value: `$${recurringTotal.toLocaleString()}`, percentage: recurringPercentage },
-    { label: "One-time Revenue", value: `$${(overallTotal - recurringTotal).toLocaleString()}`, percentage: 100 - recurringPercentage },
-    { label: "Recurring Donors", value: recurringTx.length.toString() },
+    { label: "One-time Revenue", value: `$${oneTimeTotal.toLocaleString()}`, percentage: 100 - recurringPercentage },
+    { label: "Recurring Donations", value: recurringDonations.length.toString() },
+    { label: "One-time Donations", value: oneTimeDonations.length.toString() },
   ];
 
   return {
@@ -292,26 +384,37 @@ async function fetchDonorsDrilldown(
   startDate: string,
   endDate: string
 ): Promise<KpiDrilldownData> {
-  // Using donor_email as unique identifier (donor_id_hash doesn't exist)
-  const { data: txData } = await supabase
-    .from("actblue_transactions")
-    .select("transaction_date, donor_email")
+  // Use inclusive date range
+  const endDateInclusive = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
+
+  // Use secure view with donor_id_hash for unique identification
+  const { data: txData } = await (supabase as any)
+    .from("actblue_transactions_secure")
+    .select("transaction_date, donor_email, donor_id_hash, transaction_type")
     .eq("organization_id", organizationId)
     .gte("transaction_date", startDate)
-    .lte("transaction_date", `${endDate}T23:59:59`);
+    .lt("transaction_date", endDateInclusive);
 
-  // Unique donors by email
-  const uniqueDonors = new Set((txData || []).map((tx) => tx.donor_email).filter(Boolean)).size;
+  const allTx = txData || [];
+
+  // Only count donors from donations (not refunds)
+  const donations = allTx.filter((tx: any) => tx.transaction_type === 'donation');
+
+  // Use donor_id_hash for unique identification (falls back to email)
+  const getDonorKey = (tx: any) => tx.donor_id_hash || tx.donor_email;
+  const uniqueDonors = new Set(donations.map(getDonorKey).filter(Boolean)).size;
 
   // Daily unique donors trend
   const dailyDonors = new Map<string, Set<string>>();
-  (txData || []).forEach((tx) => {
-    if (!tx.donor_email) return;
-    const date = format(parseISO(tx.transaction_date), "yyyy-MM-dd");
+  donations.forEach((tx: any) => {
+    const donorKey = getDonorKey(tx);
+    if (!donorKey) return;
+    const date = tx.transaction_date?.split('T')[0];
+    if (!date) return;
     if (!dailyDonors.has(date)) {
       dailyDonors.set(date, new Set());
     }
-    dailyDonors.get(date)!.add(tx.donor_email);
+    dailyDonors.get(date)!.add(donorKey);
   });
 
   const trendData: KpiTrendPoint[] = Array.from(dailyDonors.entries())
@@ -321,10 +424,12 @@ async function fetchDonorsDrilldown(
       value: donors.size,
     }));
 
+  const avgDonationsPerDonor = uniqueDonors > 0 ? (donations.length / uniqueDonors).toFixed(1) : "0";
+
   const breakdown: KpiBreakdownItem[] = [
     { label: "Unique Donors", value: uniqueDonors.toString() },
-    { label: "Total Donations", value: (txData || []).length.toString() },
-    { label: "Avg Donations/Donor", value: uniqueDonors > 0 ? ((txData || []).length / uniqueDonors).toFixed(1) : "0" },
+    { label: "Total Donations", value: donations.length.toString() },
+    { label: "Avg Donations/Donor", value: avgDonationsPerDonor },
   ];
 
   return {
@@ -343,33 +448,100 @@ async function fetchAttributionDrilldown(
   startDate: string,
   endDate: string
 ): Promise<KpiDrilldownData> {
-  // Using refcode column (click_id doesn't exist in schema)
-  const { data: txData } = await supabase
-    .from("actblue_transactions")
-    .select("refcode, source_campaign")
-    .eq("organization_id", organizationId)
-    .gte("transaction_date", startDate)
-    .lte("transaction_date", `${endDate}T23:59:59`);
+  // Use inclusive date range
+  const endDateInclusive = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
 
-  const total = (txData || []).length;
-  const withRefcode = (txData || []).filter((tx) => tx.refcode).length;
-  const withCampaign = (txData || []).filter((tx) => tx.source_campaign).length;
-  const deterministic = (txData || []).filter((tx) => tx.refcode || tx.source_campaign).length;
-  const deterministicRate = total > 0 ? (deterministic / total) * 100 : 0;
+  // Try to use donation_attribution view for accurate attribution data
+  const [{ data: attrData }, { data: txData }] = await Promise.all([
+    (supabase as any)
+      .from("donation_attribution")
+      .select("attribution_method, attributed_platform, transaction_type")
+      .eq("organization_id", organizationId)
+      .gte("transaction_date", startDate)
+      .lt("transaction_date", endDateInclusive)
+      .eq("transaction_type", "donation"),
+    (supabase as any)
+      .from("actblue_transactions_secure")
+      .select("refcode, source_campaign, click_id, fbclid, transaction_type")
+      .eq("organization_id", organizationId)
+      .gte("transaction_date", startDate)
+      .lt("transaction_date", endDateInclusive)
+      .eq("transaction_type", "donation"),
+  ]);
 
-  const breakdown: KpiBreakdownItem[] = [
-    { label: "With Refcode", value: withRefcode.toString(), percentage: total > 0 ? (withRefcode / total) * 100 : 0 },
-    { label: "With Campaign", value: withCampaign.toString(), percentage: total > 0 ? (withCampaign / total) * 100 : 0 },
-    { label: "Unattributed", value: (total - deterministic).toString(), percentage: total > 0 ? ((total - deterministic) / total) * 100 : 0 },
-    { label: "Total Transactions", value: total.toString() },
-  ];
+  const attributions = attrData || [];
+  const donations = txData || [];
+
+  let breakdown: KpiBreakdownItem[];
+  let deterministicRate: number;
+
+  if (attributions.length > 0) {
+    // Use donation_attribution view for accurate breakdown
+    const byMethod: Record<string, number> = {};
+    attributions.forEach((a: any) => {
+      const method = a.attribution_method || 'unattributed';
+      byMethod[method] = (byMethod[method] || 0) + 1;
+    });
+
+    const total = attributions.length;
+    const deterministic = total - (byMethod['unattributed'] || 0);
+    deterministicRate = total > 0 ? (deterministic / total) * 100 : 0;
+
+    // Log attribution breakdown for observability
+    logger.debug('Attribution drilldown from donation_attribution', {
+      total,
+      byMethod,
+      deterministicRate: deterministicRate.toFixed(1) + '%',
+    });
+
+    // Warn if SMS attribution is missing when expected
+    if ((byMethod['sms_last_touch'] || 0) === 0) {
+      logger.debug('No SMS last-touch attributions found in drilldown');
+    }
+
+    breakdown = [
+      { label: "Refcode", value: (byMethod['refcode'] || 0).toString(), percentage: total > 0 ? ((byMethod['refcode'] || 0) / total) * 100 : 0 },
+      { label: "Click ID/FBCLID", value: (byMethod['click_id'] || 0).toString(), percentage: total > 0 ? ((byMethod['click_id'] || 0) / total) * 100 : 0 },
+      { label: "SMS Last-Touch", value: (byMethod['sms_last_touch'] || 0).toString(), percentage: total > 0 ? ((byMethod['sms_last_touch'] || 0) / total) * 100 : 0 },
+      { label: "Regex Match", value: (byMethod['regex'] || 0).toString(), percentage: total > 0 ? ((byMethod['regex'] || 0) / total) * 100 : 0 },
+      { label: "Unattributed", value: (byMethod['unattributed'] || 0).toString(), percentage: total > 0 ? ((byMethod['unattributed'] || 0) / total) * 100 : 0 },
+      { label: "Total Donations", value: total.toString() },
+    ];
+  } else {
+    // Fallback to transaction-level fields
+    logger.warn('Attribution drilldown fallback: donation_attribution view returned no data');
+
+    const total = donations.length;
+    const withRefcode = donations.filter((tx: any) => tx.refcode).length;
+    const withClickId = donations.filter((tx: any) => tx.click_id || tx.fbclid).length;
+    const withCampaign = donations.filter((tx: any) => tx.source_campaign && !tx.refcode && !tx.click_id && !tx.fbclid).length;
+    const deterministic = donations.filter((tx: any) => tx.refcode || tx.source_campaign || tx.click_id || tx.fbclid).length;
+    const unattributed = total - deterministic;
+    deterministicRate = total > 0 ? (deterministic / total) * 100 : 0;
+
+    logger.debug('Attribution fallback breakdown', {
+      total,
+      withRefcode,
+      withClickId,
+      withCampaign,
+      unattributed,
+    });
+
+    breakdown = [
+      { label: "With Refcode", value: withRefcode.toString(), percentage: total > 0 ? (withRefcode / total) * 100 : 0 },
+      { label: "With Click ID/FBCLID", value: withClickId.toString(), percentage: total > 0 ? (withClickId / total) * 100 : 0 },
+      { label: "With Campaign", value: withCampaign.toString(), percentage: total > 0 ? (withCampaign / total) * 100 : 0 },
+      { label: "Unattributed", value: unattributed.toString(), percentage: total > 0 ? (unattributed / total) * 100 : 0 },
+      { label: "Total Donations", value: total.toString() },
+    ];
+  }
 
   return {
     kpiKey: "attributionQuality",
     label: "Attribution Quality",
     value: `${deterministicRate.toFixed(0)}%`,
     trend: { value: 0, isPositive: deterministicRate >= 50 },
-    description: "Percentage of donations with deterministic attribution",
+    description: "Percentage of donations with deterministic attribution (refcode, click_id, SMS, etc.)",
     trendData: [], // Attribution doesn't have a meaningful daily trend
     breakdown,
   };
