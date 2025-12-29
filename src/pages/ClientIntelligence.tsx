@@ -97,36 +97,7 @@ const ConnectionStatusBadge = ({ alertsStatus, trendsStatus }: ConnectionStatusP
   );
 };
 
-interface MetricChipProps {
-  label: string;
-  value: string | number;
-  variant?: "default" | "success" | "warning" | "error";
-  icon?: React.ReactNode;
-}
-
-const MetricChip = ({ label, value, variant = "default", icon }: MetricChipProps) => {
-  const variantStyles = {
-    default: "bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-primary))]",
-    success: "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
-    warning: "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]",
-    error: "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))]",
-  };
-
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2 px-3 py-2 rounded-lg border border-[hsl(var(--portal-border)/0.5)]",
-        variantStyles[variant]
-      )}
-    >
-      {icon}
-      <div className="flex flex-col">
-        <span className="text-xs text-[hsl(var(--portal-text-muted))]">{label}</span>
-        <span className="text-sm font-semibold tabular-nums">{value}</span>
-      </div>
-    </div>
-  );
-};
+import { V3MetricChip } from "@/components/v3";
 
 interface SentimentBadgeProps {
   sentiment: string | null;
@@ -600,17 +571,15 @@ export default function ClientIntelligence() {
                 Connection Status
               </h3>
               <div className="grid grid-cols-2 gap-3">
-                <MetricChip
+                <V3MetricChip
                   label="Alerts Feed"
                   value={alertsStatus === "connected" ? "Connected" : "Offline"}
                   variant={alertsStatus === "connected" ? "success" : "error"}
-                  icon={alertsStatus === "connected" ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
                 />
-                <MetricChip
+                <V3MetricChip
                   label="Trends Feed"
                   value={trendsStatus === "connected" ? "Connected" : "Offline"}
                   variant={trendsStatus === "connected" ? "success" : "error"}
-                  icon={trendsStatus === "connected" ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
                 />
               </div>
             </div>

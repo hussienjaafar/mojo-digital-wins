@@ -67,77 +67,8 @@ const SEVERITY_OPTIONS: { value: FilterSeverityOption; label: string }[] = [
 ];
 
 // ============================================================================
-// Sub-components
+// Sub-components - Using V3 shared components
 // ============================================================================
-
-interface MetricChipProps {
-  label: string;
-  value: string | number;
-  icon: typeof Bell;
-  variant?: "default" | "success" | "warning" | "error" | "info";
-}
-
-const MetricChip = ({ label, value, icon: Icon, variant = "default" }: MetricChipProps) => {
-  const variantStyles = {
-    default: "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-primary))]",
-    success: "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
-    warning: "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]",
-    error: "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))]",
-    info: "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))]",
-  };
-
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2 px-3 py-2 rounded-lg",
-        variantStyles[variant]
-      )}
-    >
-      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <div className="flex flex-col">
-        <span className="text-xs text-[hsl(var(--portal-text-muted))]">{label}</span>
-        <span className="font-semibold tabular-nums">{value}</span>
-      </div>
-    </div>
-  );
-};
-
-interface FilterPillProps {
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-  count?: number;
-  variant?: "default" | "error" | "warning";
-}
-
-const FilterPill = ({ label, isActive, onClick, count, variant = "default" }: FilterPillProps) => {
-  const activeStyles = {
-    default: "bg-[hsl(var(--portal-accent-blue))] text-white border-transparent",
-    error: "bg-[hsl(var(--portal-error))] text-white border-transparent",
-    warning: "bg-[hsl(var(--portal-warning))] text-white border-transparent",
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
-        "border focus:outline-none focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.5)]",
-        isActive
-          ? activeStyles[variant]
-          : "bg-transparent text-[hsl(var(--portal-text-secondary))] border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"
-      )}
-      aria-pressed={isActive}
-    >
-      {label}
-      {count !== undefined && (
-        <span className={cn("ml-1.5", isActive ? "opacity-80" : "opacity-60")}>
-          ({count})
-        </span>
-      )}
-    </button>
-  );
-};
 
 // ============================================================================
 // Alert Detail Dialog
@@ -427,25 +358,25 @@ const ClientAlerts = () => {
         >
           {/* Hero Metrics */}
           <div className="flex flex-wrap gap-3">
-            <MetricChip
+            <V3MetricChip
               label="Unread Alerts"
               value={stats?.unread ?? 0}
               icon={Bell}
               variant="info"
             />
-            <MetricChip
+            <V3MetricChip
               label="Critical"
               value={stats?.critical ?? 0}
               icon={AlertTriangle}
               variant="error"
             />
-            <MetricChip
+            <V3MetricChip
               label="Actionable"
               value={`${stats?.actionablePercent ?? 0}%`}
               icon={TrendingUp}
               variant="success"
             />
-            <MetricChip
+            <V3MetricChip
               label="Avg Score"
               value={stats?.avgActionableScore ?? 0}
               icon={Activity}
@@ -464,7 +395,7 @@ const ClientAlerts = () => {
           {/* Type Filters */}
           <div className="flex flex-wrap gap-2">
             {TYPE_OPTIONS.map(({ value, label }) => (
-              <FilterPill
+              <V3FilterPill
                 key={value}
                 label={label}
                 isActive={filterType === value}
@@ -483,7 +414,7 @@ const ClientAlerts = () => {
           {/* Severity Filters */}
           <div className="flex flex-wrap gap-2">
             {SEVERITY_OPTIONS.map(({ value, label }) => (
-              <FilterPill
+              <V3FilterPill
                 key={value}
                 label={label}
                 isActive={filterSeverity === value}
