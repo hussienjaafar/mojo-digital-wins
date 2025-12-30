@@ -40,6 +40,8 @@ export interface EChartsPieChartProps {
   onSliceClick?: (params: { name: string; value: number; percent: number }) => void;
   /** Empty state message */
   emptyMessage?: string;
+  /** Disable hover emphasis to prevent slices from disappearing on hover */
+  disableHoverEmphasis?: boolean;
 }
 
 const colorPalette = getChartColors();
@@ -58,6 +60,7 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
   showPercentage = true,
   onSliceClick,
   emptyMessage = "No data available",
+  disableHoverEmphasis = false,
 }) => {
   // Handle empty data
   if (!isLoading && (!data || data.length === 0)) {
@@ -111,6 +114,10 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
       animation: true,
       animationDuration: 500,
       animationEasing: "cubicOut",
+      // Prevent axis pointer from triggering emphasis on hover
+      ...(disableHoverEmphasis && {
+        axisPointer: { triggerEmphasis: false },
+      }),
       tooltip: {
         trigger: "item",
         confine: true,
@@ -191,14 +198,20 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
                 },
               }
             : { show: false },
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 10,
-              shadowOffsetX: 0,
-              shadowColor: "rgba(0, 0, 0, 0.15)",
-            },
-            scaleSize: 8,
-          },
+          emphasis: disableHoverEmphasis
+            ? { disabled: true }
+            : {
+                itemStyle: {
+                  shadowBlur: 10,
+                  shadowOffsetX: 0,
+                  shadowColor: "rgba(0, 0, 0, 0.15)",
+                },
+                scaleSize: 8,
+              },
+          // Prevent other slices from dimming when one is hovered
+          ...(disableHoverEmphasis && {
+            blur: { itemStyle: { opacity: 1 } },
+          }),
           itemStyle: {
             borderRadius: 4,
             borderColor: "hsl(var(--portal-bg-primary))",
@@ -207,7 +220,7 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
         },
       ],
     };
-  }, [chartData, variant, showLabels, labelThreshold, showLegend, legendPosition, total, formatValue, showPercentage]);
+  }, [chartData, variant, showLabels, labelThreshold, showLegend, legendPosition, total, formatValue, showPercentage, disableHoverEmphasis]);
 
   const handleEvents = React.useMemo(() => {
     if (!onSliceClick) return undefined;
