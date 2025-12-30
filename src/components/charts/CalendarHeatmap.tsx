@@ -52,38 +52,49 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
     return value.toLocaleString();
   }, [valueType]);
 
-  const resolveHslVar = React.useCallback((tokenName: string, alpha?: number) => {
-    // ECharts' color interpolation doesn't reliably handle `var(--...)` or modern space-separated HSL.
-    // Resolve portal CSS variables into comma-based hsl/hsla strings so gradients render correctly.
+  // Resolve CSS variable to concrete RGB color that ECharts can interpolate
+  const resolveToRgb = React.useCallback((tokenName: string, alpha?: number): string => {
     if (typeof window === "undefined") return cssVar(tokenName, alpha);
 
-    const raw = getComputedStyle(document.documentElement)
-      .getPropertyValue(`--${tokenName}`)
-      .trim();
+    // Find the portal theme container or fall back to document element
+    const themeRoot = document.querySelector('.portal-theme') ?? document.documentElement;
+    
+    // Create a temp element inside the theme scope to leverage browser's CSS resolution
+    const temp = document.createElement('div');
+    temp.style.position = 'absolute';
+    temp.style.visibility = 'hidden';
+    temp.style.color = alpha !== undefined 
+      ? `hsl(var(--${tokenName}) / ${alpha})`
+      : `hsl(var(--${tokenName}))`;
+    
+    themeRoot.appendChild(temp);
+    const computed = getComputedStyle(temp).color;
+    themeRoot.removeChild(temp);
 
-    if (!raw) return cssVar(tokenName, alpha);
-
-    // raw is typically like: "213 90% 45%" (H S L). Convert to "hsl(213, 90%, 45%)".
-    const [base] = raw.split("/").map((s) => s.trim());
-    const parts = base.split(/\s+/).filter(Boolean);
-
-    if (parts.length < 3) return cssVar(tokenName, alpha);
-
-    const [h, s, l] = parts;
-    if (alpha !== undefined) return `hsla(${h}, ${s}, ${l}, ${alpha})`;
-    return `hsl(${h}, ${s}, ${l})`;
+    // getComputedStyle returns rgb(r, g, b) or rgba(r, g, b, a)
+    return computed || cssVar(tokenName, alpha);
   }, []);
 
   const colorRange = React.useMemo<string[]>(() => {
-    const schemes: Record<NonNullable<CalendarHeatmapProps["colorScheme"]>, string[]> = {
-      blue: [resolveHslVar(colors.bg.tertiary), resolveHslVar(colors.accent.blue)],
-      green: [resolveHslVar(colors.bg.tertiary), resolveHslVar(colors.status.success)],
-      purple: [resolveHslVar(colors.bg.tertiary), resolveHslVar(colors.accent.purple)],
-      orange: [resolveHslVar(colors.bg.tertiary), resolveHslVar(colors.status.warning)],
+    // Use a lighter base color for better gradient visibility
+    const baseColor = resolveToRgb(colors.bg.elevated);
+    const accentColors: Record<NonNullable<CalendarHeatmapProps["colorScheme"]>, string> = {
+      blue: resolveToRgb(colors.accent.blue),
+      green: resolveToRgb(colors.status.success),
+      purple: resolveToRgb(colors.accent.purple),
+      orange: resolveToRgb(colors.status.warning),
     };
-
-    return schemes[colorScheme] ?? schemes.blue;
-  }, [colorScheme, resolveHslVar]);
+    
+    const accent = accentColors[colorScheme] ?? accentColors.blue;
+    
+    // 3-stop gradient for better visual distinction
+    const midColor = resolveToRgb(colorScheme === 'blue' ? colors.accent.blue : 
+                                   colorScheme === 'green' ? colors.status.success :
+                                   colorScheme === 'purple' ? colors.accent.purple : 
+                                   colors.status.warning, 0.4);
+    
+    return [baseColor, midColor, accent];
+  }, [colorScheme, resolveToRgb]);
 
   // Transform data for ECharts heatmap
   const heatmapData = React.useMemo(() => {
