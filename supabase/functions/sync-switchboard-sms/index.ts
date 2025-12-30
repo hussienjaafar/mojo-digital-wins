@@ -60,6 +60,8 @@ interface SwitchboardMessageEvent {
   opted_out_at?: string | null;
   replied_at?: string | null;
   last_click_at?: string | null;
+  reply_text?: string | null; // Reply content for sentiment analysis
+  reply?: string | null; // Alternative field name for reply content
   metadata?: Record<string, any> | null;
 }
 
@@ -429,6 +431,7 @@ serve(async (req) => {
             phone_hash: phoneHashes[idx], // Non-PII hash for donor matching
             event_type: deriveEventType(msg),
             link_clicked: msg.click_url || null,
+            reply_text: msg.reply_text || msg.reply || null, // Capture reply content for sentiment analysis
             occurred_at: deriveOccurredAt(msg),
             metadata: {
               clicks: msg.clicks || 0,
@@ -439,6 +442,7 @@ serve(async (req) => {
               replied_at: msg.replied_at,
               last_click_at: msg.last_click_at,
               raw_status: msg.status,
+              has_reply: !!(msg.reply_text || msg.reply),
             },
           }));
 
