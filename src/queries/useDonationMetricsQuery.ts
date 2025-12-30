@@ -43,11 +43,26 @@ export interface TopDonor {
   lastDonation: string;
 }
 
+/** Individual donation row for the Recent Donations table */
+export interface DonationRow {
+  id: string;                    // transaction_id for unique key
+  donorName: string;             // donor_name or first_name + last_name
+  email: string;                 // donor_email
+  state: string | null;          // state
+  city: string | null;           // city
+  amount: number;                // gross amount
+  netAmount: number;             // net amount (after fees)
+  date: string;                  // transaction_date
+  isRecurring: boolean;          // is_recurring
+  refcode: string | null;        // refcode for attribution
+}
+
 interface DonationMetricsResult {
   metrics: DonationMetrics;
   timeSeries: DonationTimeSeries[];
   bySource: DonationBySource[];
   topDonors: TopDonor[];
+  recentDonations: DonationRow[];
 }
 
 async function fetchDonationMetrics(
@@ -228,9 +243,28 @@ async function fetchDonationMetrics(
       lastDonation: entry.lastDonation,
     }))
     .sort((a, b) => b.totalAmount - a.totalAmount)
-    .slice(0, 25); // Increased from 10 to 25 for more comprehensive view
+    .slice(0, 25);
 
-  return { metrics, timeSeries, bySource, topDonors };
+  // Recent donations - individual transactions sorted by date (most recent first)
+  const recentDonations: DonationRow[] = donations
+    .map((d: any) => ({
+      id: d.transaction_id || d.id || `${d.donor_email}-${d.transaction_date}-${d.amount}`,
+      donorName: d.donor_name || 
+        (d.first_name && d.last_name ? `${d.first_name} ${d.last_name}` : null) ||
+        d.first_name || 
+        "Anonymous",
+      email: d.donor_email || "",
+      state: d.state || null,
+      city: d.city || null,
+      amount: Number(d.amount || 0),
+      netAmount: Number(d.net_amount || d.amount || 0),
+      date: d.transaction_date,
+      isRecurring: Boolean(d.is_recurring),
+      refcode: d.refcode || null,
+    }))
+    .sort((a: DonationRow, b: DonationRow) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return { metrics, timeSeries, bySource, topDonors, recentDonations };
 }
 
 export function useDonationMetricsQuery(organizationId: string | undefined) {

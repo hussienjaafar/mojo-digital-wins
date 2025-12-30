@@ -32,6 +32,7 @@ export {
   type DonationTimeSeries,
   type DonationBySource,
   type TopDonor,
+  type DonationRow,
 } from "./useDonationMetricsQuery";
 
 // Channel-specific queries
