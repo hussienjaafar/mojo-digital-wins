@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Brain, RefreshCw, Download, Target, Users, AlertTriangle, DollarSign, TrendingUp, GitBranch, BarChart3, Database } from "lucide-react";
+import { Brain, RefreshCw, Download, Target, Users, AlertTriangle, DollarSign, TrendingUp, GitBranch, BarChart3, Database, Play, Zap } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import { DataPipelineStatus } from "@/components/client/DataPipelineStatus";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
@@ -29,6 +29,8 @@ export default function ClientDonorIntelligence() {
   const { startDate, endDate } = useDateRange();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPopulating, setIsPopulating] = useState(false);
+  const [isRunningJourneys, setIsRunningJourneys] = useState(false);
+  const [isRunningLtv, setIsRunningLtv] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, isLoading, error, isError, refetch } = useDonorIntelligenceQuery(
@@ -95,6 +97,61 @@ export default function ClientDonorIntelligence() {
       setIsPopulating(false);
     }
   };
+
+  const handleRunJourneysPipeline = async () => {
+    if (!organizationId) return;
+    
+    setIsRunningJourneys(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('populate-donor-journeys', {
+        body: { 
+          organization_id: organizationId,
+          days_back: 365
+        }
+      });
+      
+      if (error) {
+        console.error('Journeys pipeline error:', error);
+        toast.error('Failed to run journeys pipeline');
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['donor-intelligence'] });
+        toast.success(`Journeys populated: ${result?.journeyEventsCreated || result?.events_created || 0} events for ${result?.uniqueDonors || result?.donors_processed || 0} donors`);
+      }
+    } catch (err) {
+      console.error('Journeys pipeline error:', err);
+      toast.error('Failed to run journeys pipeline');
+    } finally {
+      setIsRunningJourneys(false);
+    }
+  };
+
+  const handleRunLtvPipeline = async () => {
+    if (!organizationId) return;
+    
+    setIsRunningLtv(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('calculate-donor-ltv', {
+        body: { 
+          organization_id: organizationId
+        }
+      });
+      
+      if (error) {
+        console.error('LTV pipeline error:', error);
+        toast.error('Failed to run LTV pipeline');
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['donor-intelligence'] });
+        toast.success(`LTV predictions: ${result?.predictions_created || result?.predictionsCreated || 0} donors analyzed`);
+      }
+    } catch (err) {
+      console.error('LTV pipeline error:', err);
+      toast.error('Failed to run LTV pipeline');
+    } finally {
+      setIsRunningLtv(false);
+    }
+  };
+
+  const isPipelineRunning = isRefreshing || isPopulating || isRunningJourneys || isRunningLtv;
 
   // Process journey events for lifecycle chart
   const lifecycleData = useMemo(() => {
@@ -250,12 +307,32 @@ export default function ClientDonorIntelligence() {
         title="Donor Intelligence"
         description="Analyze donor behavior, lifetime value, and attribution"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <V3Button
+              variant="outline"
+              size="sm"
+              onClick={handleRunJourneysPipeline}
+              disabled={isPipelineRunning}
+              title="Generate donor journey events from transactions"
+            >
+              <Play className={`h-4 w-4 mr-2 ${isRunningJourneys ? 'animate-pulse' : ''}`} />
+              {isRunningJourneys ? 'Running...' : 'Run Journeys'}
+            </V3Button>
+            <V3Button
+              variant="outline"
+              size="sm"
+              onClick={handleRunLtvPipeline}
+              disabled={isPipelineRunning}
+              title="Calculate lifetime value predictions"
+            >
+              <Zap className={`h-4 w-4 mr-2 ${isRunningLtv ? 'animate-pulse' : ''}`} />
+              {isRunningLtv ? 'Running...' : 'Run LTV'}
+            </V3Button>
             <V3Button
               variant="outline"
               size="sm"
               onClick={handlePopulateData}
-              disabled={isPopulating || isRefreshing}
+              disabled={isPipelineRunning}
             >
               <Database className={`h-4 w-4 mr-2 ${isPopulating ? 'animate-pulse' : ''}`} />
               {isPopulating ? 'Syncing...' : 'Sync Attribution'}
@@ -264,7 +341,7 @@ export default function ClientDonorIntelligence() {
               variant="secondary"
               size="sm"
               onClick={handleRefreshData}
-              disabled={isRefreshing || isPopulating}
+              disabled={isPipelineRunning}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
               {isRefreshing ? 'Refreshing...' : 'Refresh'}

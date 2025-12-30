@@ -55,33 +55,17 @@ serve(async (req) => {
 
     console.log(`[POPULATE ATTRIBUTION] Loaded ${refcodeMap.size} refcode mappings`);
 
-    // 2. Fetch meta click mappings for click_id/fbclid matching
-    const { data: clickMappings, error: clickErr } = await supabase
-      .from('meta_click_mappings')
-      .select('click_id, fbclid, campaign_id, ad_id, creative_id')
-      .eq('organization_id', organization_id);
-
-    if (clickErr) {
-      console.error('[POPULATE ATTRIBUTION] Failed to fetch click mappings:', clickErr);
-    }
-
+    // Note: meta_click_mappings table doesn't exist - skip click_id/fbclid mapping
+    // Attribution is done via refcode mappings only
     const clickIdMap = new Map<string, { campaign_id: string; ad_id: string; creative_id: string }>();
     const fbclidMap = new Map<string, { campaign_id: string; ad_id: string; creative_id: string }>();
-    (clickMappings || []).forEach(m => {
-      if (m.click_id) {
-        clickIdMap.set(m.click_id, { campaign_id: m.campaign_id, ad_id: m.ad_id, creative_id: m.creative_id });
-      }
-      if (m.fbclid) {
-        fbclidMap.set(m.fbclid, { campaign_id: m.campaign_id, ad_id: m.ad_id, creative_id: m.creative_id });
-      }
-    });
 
-    console.log(`[POPULATE ATTRIBUTION] Loaded ${clickIdMap.size} click_id and ${fbclidMap.size} fbclid mappings`);
+    console.log(`[POPULATE ATTRIBUTION] Click/fbclid mapping via meta_click_mappings not available`);
 
-    // 3. Fetch actblue transactions
+    // 2. Fetch actblue transactions
     let query = supabase
       .from('actblue_transactions')
-      .select('id, transaction_id, transaction_date, amount, net_amount, refcode, refcode2, click_id, fbclid, donor_email, transaction_type')
+      .select('id, transaction_id, transaction_date, amount, net_amount, fee, refcode, refcode2, click_id, fbclid, donor_email, transaction_type, source_campaign, is_recurring')
       .eq('organization_id', organization_id)
       .eq('transaction_type', 'donation')
       .order('transaction_date', { ascending: false })
@@ -103,7 +87,7 @@ serve(async (req) => {
 
     console.log(`[POPULATE ATTRIBUTION] Processing ${transactions?.length || 0} transactions`);
 
-    // 4. Fetch creative insights for topic/tone
+    // 3. Fetch creative insights for topic/tone
     const { data: creativeInsights, error: insightErr } = await supabase
       .from('meta_creative_insights')
       .select('creative_id, primary_topic, tone')
@@ -116,7 +100,7 @@ serve(async (req) => {
       }
     });
 
-    // 5. Process transactions and create attribution records
+    // 4. Process transactions and create attribution records
     const attributionRecords: any[] = [];
     let matched = 0;
     let unmatched = 0;
@@ -127,8 +111,6 @@ serve(async (req) => {
       let adId: string | null = null;
       let creativeId: string | null = null;
       let attributionMethod: string | null = null;
-      let mappedClickId: string | null = null;
-      let mappedFbclid: string | null = null;
 
       // Try refcode matching first
       const refcode = tx.refcode?.toLowerCase();
@@ -141,7 +123,7 @@ serve(async (req) => {
         attributionMethod = 'refcode';
       }
 
-      // Try click_id matching
+      // Try click_id matching (if mappings exist)
       if (!campaignId && tx.click_id && clickIdMap.has(tx.click_id)) {
         const mapping = clickIdMap.get(tx.click_id)!;
         platform = 'meta';
@@ -149,10 +131,9 @@ serve(async (req) => {
         adId = mapping.ad_id;
         creativeId = mapping.creative_id;
         attributionMethod = 'click_id';
-        mappedClickId = tx.click_id;
       }
 
-      // Try fbclid matching
+      // Try fbclid matching (if mappings exist)
       if (!campaignId && tx.fbclid && fbclidMap.has(tx.fbclid)) {
         const mapping = fbclidMap.get(tx.fbclid)!;
         platform = 'meta';
@@ -160,7 +141,6 @@ serve(async (req) => {
         adId = mapping.ad_id;
         creativeId = mapping.creative_id;
         attributionMethod = 'fbclid';
-        mappedFbclid = tx.fbclid;
       }
 
       // Get creative topic/tone if we have a creative_id
@@ -183,14 +163,20 @@ serve(async (req) => {
         unmatched++;
       }
 
+      // Match the actual donation_attribution table schema
       attributionRecords.push({
         organization_id,
         transaction_id: tx.transaction_id,
         transaction_date: tx.transaction_date,
         amount: tx.amount,
         net_amount: tx.net_amount,
+        fee: tx.fee,
         transaction_type: tx.transaction_type,
         refcode: tx.refcode,
+        source_campaign: tx.source_campaign,
+        is_recurring: tx.is_recurring,
+        donor_id_hash: donorIdHash,
+        donor_email: tx.donor_email,
         attributed_platform: platform,
         attributed_campaign_id: campaignId,
         attributed_ad_id: adId,
@@ -198,17 +184,12 @@ serve(async (req) => {
         creative_topic: creativeTopic,
         creative_tone: creativeTone,
         attribution_method: attributionMethod,
-        transaction_click_id: tx.click_id,
-        transaction_fbclid: tx.fbclid,
-        mapped_click_id: mappedClickId,
-        mapped_fbclid: mappedFbclid,
-        donor_id_hash: donorIdHash,
       });
     }
 
     console.log(`[POPULATE ATTRIBUTION] Matched: ${matched}, Unmatched: ${unmatched}`);
 
-    // 6. Upsert attribution records in batches
+    // 5. Upsert attribution records in batches
     const batchSize = 100;
     let inserted = 0;
     
@@ -229,7 +210,7 @@ serve(async (req) => {
       }
     }
 
-    // 7. Update data freshness
+    // 6. Update data freshness
     await supabase
       .from('data_freshness')
       .upsert({
