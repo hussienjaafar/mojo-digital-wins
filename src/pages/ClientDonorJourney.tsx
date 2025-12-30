@@ -608,6 +608,8 @@ const ClientDonorJourney = () => {
                     <tr className="border-b border-[hsl(var(--portal-border))]">
                       <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Donor</th>
                       <th className="text-right py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Amount</th>
+                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">First Touchpoint</th>
+                      <th className="text-center py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Days to Convert</th>
                       <th className="text-center py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Touchpoints</th>
                       <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Date</th>
                       <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Actions</th>
@@ -626,6 +628,52 @@ const ClientDonorJourney = () => {
                         </td>
                         <td className="py-3 px-4 text-right font-semibold text-[hsl(var(--portal-success))]">
                           ${journey.amount.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4">
+                          {journey.touchpoints.length > 0 ? (
+                            <div className="flex items-center gap-2">
+                              {(() => {
+                                const firstTp = journey.touchpoints[0];
+                                const Icon = getTouchpointIcon(firstTp.touchpoint_type);
+                                return (
+                                  <>
+                                    <div
+                                      className="w-6 h-6 rounded-full bg-[hsl(var(--portal-accent-blue)/0.1)] flex items-center justify-center"
+                                      title={firstTp.touchpoint_type}
+                                    >
+                                      <Icon className="h-3 w-3 text-[hsl(var(--portal-accent-blue))]" />
+                                    </div>
+                                    <span className="text-xs text-[hsl(var(--portal-text-muted))] capitalize">
+                                      {firstTp.touchpoint_type.replace(/_/g, ' ')}
+                                    </span>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-[hsl(var(--portal-text-muted))]">Direct</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {journey.touchpoints.length > 0 ? (
+                            (() => {
+                              const firstTouchDate = new Date(journey.touchpoints[0].occurred_at);
+                              const donationDate = new Date(journey.transaction_date);
+                              const daysDiff = Math.round((donationDate.getTime() - firstTouchDate.getTime()) / (1000 * 60 * 60 * 24));
+                              return (
+                                <span className={cn(
+                                  "text-xs font-medium",
+                                  daysDiff <= 1 ? "text-[hsl(var(--portal-success))]" : 
+                                  daysDiff <= 7 ? "text-[hsl(var(--portal-accent-blue))]" : 
+                                  "text-[hsl(var(--portal-text-muted))]"
+                                )}>
+                                  {daysDiff === 0 ? 'Same day' : `${daysDiff}d`}
+                                </span>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-xs text-[hsl(var(--portal-text-muted))]">—</span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-1">
