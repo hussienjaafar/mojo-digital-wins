@@ -28,10 +28,12 @@ import { buildHeroKpis } from "@/utils/buildHeroKpis";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 
-// Lazy load Advanced Analytics, Donor Intelligence, and Heatmap for performance
+// Lazy load Advanced Analytics and Heatmap for performance
 const AdvancedAnalytics = lazy(() => import("@/components/analytics/AdvancedAnalytics"));
-const DonorIntelligence = lazy(() => import("@/components/client/DonorIntelligence"));
 const DonationHeatmap = lazy(() => import("@/components/client/DonationHeatmap"));
+
+// Import Summary widget (lightweight, no need for lazy load)
+import { DonorIntelligenceSummary } from "@/components/client/DonorIntelligenceSummary";
 
 // Animation variants for page sections
 const containerVariants = {
@@ -234,7 +236,6 @@ const ClientDashboard = () => {
   const { organizationId, isLoading: orgLoading } = useClientOrganization();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
-  const [showDonorIntelligence, setShowDonorIntelligence] = useState(false);
   const [showTimeAnalysis, setShowTimeAnalysis] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
@@ -506,24 +507,13 @@ const ClientDashboard = () => {
                 </CollapsibleSection>
               </motion.section>
 
-              {/* DONOR INTELLIGENCE: Attribution, Segments, Topics */}
+              {/* DONOR INTELLIGENCE SUMMARY: Quick overview with link to full page */}
               <motion.section variants={sectionVariants}>
-                <CollapsibleSection
-                  title="Donor Intelligence"
-                  subtitle="Attribution, creative topics, donor segments & RFM scoring"
-                  icon={Brain}
-                  accent="green"
-                  isExpanded={showDonorIntelligence}
-                  onToggle={() => setShowDonorIntelligence(!showDonorIntelligence)}
-                >
-                  <Suspense fallback={<V3SectionSkeleton />}>
-                    <DonorIntelligence
-                      organizationId={organizationId}
-                      startDate={dateRange.startDate}
-                      endDate={dateRange.endDate}
-                    />
-                  </Suspense>
-                </CollapsibleSection>
+                <DonorIntelligenceSummary
+                  organizationId={organizationId}
+                  startDate={dateRange.startDate}
+                  endDate={dateRange.endDate}
+                />
               </motion.section>
 
               {/* ADVANCED: Attribution, Forecasting, LTV/CAC */}

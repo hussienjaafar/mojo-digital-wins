@@ -121,6 +121,12 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
       ],
     },
     {
+      label: "Media & News",
+      items: [
+        { title: "Media Intelligence", url: "/client/media-intelligence", icon: Eye },
+      ],
+    },
+    {
       label: "Watchlist & Alerts",
       items: [
         { title: "Entity Watchlist", url: "/client/watchlist", icon: Eye },

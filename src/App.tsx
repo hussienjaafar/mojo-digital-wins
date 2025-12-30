@@ -55,7 +55,7 @@ const ClientDonorJourney = lazy(() => import("./pages/ClientDonorJourney"));
 const ClientProfile = lazy(() => import("./pages/ClientProfile"));
 const ClientPollingAlerts = lazy(() => import("./pages/ClientPollingAlerts"));
 const ClientSettings = lazy(() => import("./pages/ClientSettings"));
-const ClientIntelligence = lazy(() => import("./pages/ClientIntelligence"));
+const ClientMediaIntelligence = lazy(() => import("./pages/ClientIntelligence"));
 const ClientDonorIntelligence = lazy(() => import("./pages/ClientDonorIntelligence"));
 const ClientCreativeIntelligence = lazy(() => import("./pages/ClientCreativeIntelligence"));
 const ClientAttribution = lazy(() => import("./pages/ClientAttribution"));
@@ -118,7 +118,8 @@ const AppContent = () => {
             <Route path="/client/profile" element={<ClientProfile />} />
             <Route path="/client/polling-alerts" element={<ClientPollingAlerts />} />
             <Route path="/client/settings" element={<ClientSettings />} />
-            <Route path="/client/intelligence" element={<ClientIntelligence />} />
+            <Route path="/client/intelligence" element={<Navigate to="/client/media-intelligence" replace />} />
+            <Route path="/client/media-intelligence" element={<ClientMediaIntelligence />} />
             <Route path="/client/donor-intelligence" element={<ClientDonorIntelligence />} />
             <Route path="/client/creative-intelligence" element={<ClientCreativeIntelligence />} />
             <Route path="/client/attribution" element={<ClientAttribution />} />
