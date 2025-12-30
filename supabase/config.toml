@@ -253,3 +253,6 @@ verify_jwt = false
 
 [functions.test-attribution]
 verify_jwt = false
+
+[functions.analyze-sms-replies]
+verify_jwt = false

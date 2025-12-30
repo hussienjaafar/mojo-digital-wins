@@ -62,6 +62,8 @@ const navigationSections: NavigationSection[] = [
       { label: "Creative Intelligence", path: "/client/creative-intelligence", icon: Sparkles },
       { label: "Demographics", path: "/client/demographics", icon: UserCircle },
       { label: "Donor Journey", path: "/client/journey", icon: TrendingUp },
+      { label: "A/B Tests", path: "/client/ab-tests", icon: Target },
+      { label: "Recurring Health", path: "/client/recurring-health", icon: DollarSign },
     ],
   },
   {
