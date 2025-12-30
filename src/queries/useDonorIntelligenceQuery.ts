@@ -99,19 +99,35 @@ async function fetchDonorIntelligenceData(
   const sb = supabase as any;
   const endDateFull = formatEndDateFull(endDate);
 
-  // Build attribution query with optional campaign/creative filters
+  // Build attribution query from actblue_transactions directly (donation_attribution is a restricted view)
   const buildAttrQuery = () => {
     let query = sb
-      .from('donation_attribution')
-      .select('attributed_platform, attributed_campaign_id, attributed_ad_id, attributed_creative_id, refcode, creative_topic, creative_tone, amount, net_amount, transaction_type, attribution_method, transaction_click_id, transaction_fbclid, mapped_click_id, mapped_fbclid, donor_id_hash, donor_phone_hash')
+      .from('actblue_transactions')
+      .select(`
+        refcode,
+        amount,
+        net_amount,
+        transaction_type,
+        donor_email,
+        click_id,
+        fbclid,
+        refcode_mappings!left(platform, campaign_id, ad_id, creative_id)
+      `)
       .eq('organization_id', organizationId)
       .gte('transaction_date', startDate)
       .lte('transaction_date', endDateFull)
       .eq('transaction_type', 'donation');
-    if (campaignId) query = query.eq('attributed_campaign_id', campaignId);
-    if (creativeId) query = query.eq('attributed_creative_id', creativeId);
     return query;
   };
+
+  // Build segment query from donor_demographics directly (donor_segments is a restricted view)
+  const buildSegmentQuery = () => {
+    return sb
+      .from('donor_demographics')
+      .select('total_donated, donation_count, last_donation_date, first_donation_date, is_recurring')
+      .eq('organization_id', organizationId);
+  };
+
   // Run all queries in parallel
   const [
     attrResult,
@@ -123,14 +139,11 @@ async function fetchDonorIntelligenceData(
     ltvResult,
     donorFirstResult,
   ] = await Promise.all([
-    // Attribution data - include donor_id_hash and donor_phone_hash for new/returning calculation
+    // Attribution data from actblue_transactions
     buildAttrQuery(),
 
-    // Segment data
-    sb
-      .from('donor_segments')
-      .select('donor_tier, donor_frequency_segment, total_donated, donation_count, days_since_donation, monetary_score, frequency_score, recency_score')
-      .eq('organization_id', organizationId),
+    // Segment data from donor_demographics (we'll compute tiers client-side)
+    buildSegmentQuery(),
 
     // SMS events (excluded when campaign or creative filter active)
     // Rationale: SMS campaigns don't map to Meta campaigns or creatives
@@ -167,22 +180,21 @@ async function fetchDonorIntelligenceData(
       return query;
     })(),
 
-    // Donor journeys (excluded when campaign or creative filter active - journeys are phone-based)
+    // Donor journeys - fetch ALL data regardless of date range for this page
+    // This ensures the intelligence page always shows available lifecycle data
     (campaignId || creativeId)
       ? Promise.resolve({ data: [], error: null })
       : sb
           .from('donor_journeys')
           .select('donor_key, event_type, occurred_at, amount, net_amount, source, transaction_type, refcode')
           .eq('organization_id', organizationId)
-          .gte('occurred_at', startDate)
-          .lte('occurred_at', endDateFull)
           .order('occurred_at', { ascending: false })
           .limit(QUERY_LIMITS.journeys),
 
-    // LTV predictions - increased limit
+    // LTV predictions - include churn_risk_label for proper categorization
     sb
       .from('donor_ltv_predictions')
-      .select('predicted_ltv_90, predicted_ltv_180, churn_risk')
+      .select('predicted_ltv_90, predicted_ltv_180, churn_risk, churn_risk_label')
       .eq('organization_id', organizationId)
       .limit(QUERY_LIMITS.predictions),
 
@@ -257,9 +269,48 @@ async function fetchDonorIntelligenceData(
   const journeyData = journeysResult.data || [];
   const ltvDataResult = ltvResult.data || [];
 
+  // Transform attribution data from actblue_transactions format
+  const rawAttrData = attrResult.data || [];
+  const attributionData: AttributionData[] = rawAttrData.map((tx: any) => {
+    const mapping = tx.refcode_mappings;
+    return {
+      attributed_platform: mapping?.platform || null,
+      attributed_campaign_id: mapping?.campaign_id || null,
+      attributed_ad_id: mapping?.ad_id || null,
+      attributed_creative_id: mapping?.creative_id || null,
+      refcode: tx.refcode,
+      creative_topic: null, // Would need additional join
+      creative_tone: null,
+      amount: tx.amount,
+      net_amount: tx.net_amount,
+      transaction_type: tx.transaction_type,
+      attribution_method: mapping?.platform ? 'refcode' : (tx.click_id ? 'click_id' : (tx.fbclid ? 'fbclid' : null)),
+      transaction_click_id: tx.click_id,
+      transaction_fbclid: tx.fbclid,
+    };
+  });
+
+  // Transform segment data from donor_demographics format
+  const rawSegData = segResult.data || [];
+  const segmentData: DonorSegment[] = rawSegData.map((d: any) => {
+    const daysSince = d.last_donation_date 
+      ? Math.floor((Date.now() - new Date(d.last_donation_date).getTime()) / (1000 * 60 * 60 * 24))
+      : 999;
+    return {
+      donor_tier: d.total_donated >= 1000 ? 'major' : (d.donation_count >= 5 ? 'repeat' : 'grassroots'),
+      donor_frequency_segment: d.donation_count >= 5 ? 'frequent' : (d.donation_count >= 2 ? 'repeat' : 'one-time'),
+      total_donated: d.total_donated || 0,
+      donation_count: d.donation_count || 0,
+      days_since_donation: daysSince,
+      monetary_score: d.total_donated >= 1000 ? 5 : (d.total_donated >= 500 ? 4 : (d.total_donated >= 100 ? 3 : (d.total_donated >= 25 ? 2 : 1))),
+      frequency_score: d.donation_count >= 10 ? 5 : (d.donation_count >= 5 ? 4 : (d.donation_count >= 3 ? 3 : (d.donation_count >= 2 ? 2 : 1))),
+      recency_score: daysSince <= 30 ? 5 : (daysSince <= 60 ? 4 : (daysSince <= 90 ? 3 : (daysSince <= 180 ? 2 : 1))),
+    };
+  });
+
   return {
-    attributionData: attrResult.data || [],
-    segmentData: segResult.data || [],
+    attributionData,
+    segmentData,
     smsFunnel: {
       sent: eventCounts.sent || 0,
       delivered: eventCounts.delivered || 0,
