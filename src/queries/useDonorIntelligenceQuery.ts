@@ -18,17 +18,12 @@ export interface AttributionData {
   attributed_creative_id?: string | null;
   refcode?: string | null;
   attribution_method?: string | null;
-  transaction_click_id?: string | null;
-  transaction_fbclid?: string | null;
-  mapped_click_id?: string | null;
-  mapped_fbclid?: string | null;
   creative_topic: string | null;
   creative_tone: string | null;
   amount: number;
   net_amount: number | null;
   transaction_type: string;
-  donor_id_hash?: string | null; // Email-based hash for donor identity
-  donor_phone_hash?: string | null; // Phone-based hash for donor identity (fallback)
+  donor_id_hash?: string | null;
 }
 
 export interface DonorFirstDonation {
@@ -62,7 +57,6 @@ export interface JourneyEvent {
   amount: number | null;
   net_amount: number | null;
   source: string | null;
-  transaction_type: string | null;
   refcode: string | null;
 }
 
@@ -186,7 +180,7 @@ async function fetchDonorIntelligenceData(
       ? Promise.resolve({ data: [], error: null })
       : sb
           .from('donor_journeys')
-          .select('donor_key, event_type, occurred_at, amount, net_amount, source, transaction_type, refcode')
+          .select('donor_key, event_type, occurred_at, amount, net_amount, source, refcode')
           .eq('organization_id', organizationId)
           .order('occurred_at', { ascending: false })
           .limit(QUERY_LIMITS.journeys),
@@ -279,14 +273,12 @@ async function fetchDonorIntelligenceData(
       attributed_ad_id: mapping?.ad_id || null,
       attributed_creative_id: mapping?.creative_id || null,
       refcode: tx.refcode,
-      creative_topic: null, // Would need additional join
+      creative_topic: null,
       creative_tone: null,
       amount: tx.amount,
       net_amount: tx.net_amount,
       transaction_type: tx.transaction_type,
       attribution_method: mapping?.platform ? 'refcode' : (tx.click_id ? 'click_id' : (tx.fbclid ? 'fbclid' : null)),
-      transaction_click_id: tx.click_id,
-      transaction_fbclid: tx.fbclid,
     };
   });
 

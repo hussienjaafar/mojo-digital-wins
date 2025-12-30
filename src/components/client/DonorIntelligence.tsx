@@ -68,7 +68,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
     if (d.attribution_method === 'refcode' || d.attribution_method === 'click_id') return true;
     return Boolean(
       d.attributed_platform &&
-      (d.attributed_campaign_id || d.attributed_ad_id || d.attributed_creative_id || d.refcode || d.transaction_click_id || d.transaction_fbclid)
+      (d.attributed_campaign_id || d.attributed_ad_id || d.attributed_creative_id || d.refcode)
     );
   };
 
@@ -138,8 +138,8 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
       byTopic[topic].count++;
       if (isDeterministic(d)) byTopic[topic].deterministicCount++;
 
-      // Use donor_key (COALESCE of donor_id_hash and donor_phone_hash) for lifetime-based new/returning
-      const donorKey = d.donor_id_hash || d.donor_phone_hash;
+      // Use donor_id_hash for lifetime-based new/returning
+      const donorKey = d.donor_id_hash;
       if (donorKey) {
         const seenForTopic = topicDonorsSeen.get(topic)!;
         if (!seenForTopic.has(donorKey)) {
