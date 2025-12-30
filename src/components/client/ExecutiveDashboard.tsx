@@ -33,19 +33,10 @@ import { cn } from "@/lib/utils";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { useDateRange } from "@/stores/dashboardStore";
 import { useRealtimeMetrics } from "@/hooks/useRealtimeMetrics";
-import {
-  ComposedChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
-import { ResponsiveBarChart, ResponsivePieChart, ResponsiveChartTooltip } from "@/components/charts";
-import { getYAxisFormatter } from "@/lib/chart-formatters";
+import { EChartsLineChart } from "@/components/charts/echarts/EChartsLineChart";
+import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
+import { EChartsPieChart } from "@/components/charts/echarts/EChartsPieChart";
+import { getChartColors } from "@/lib/design-tokens";
 
 // ============================================================================
 // Types
@@ -574,57 +565,38 @@ const ExecutiveDashboard = () => {
               : undefined
           }
         >
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={performanceTimeline}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="hsl(var(--portal-border))"
-                  opacity={0.4}
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={(value) => format(parseISO(value), "MMM d")}
-                  tick={{ fontSize: 10, fill: "hsl(var(--portal-text-muted))" }}
-                  tickLine={false}
-                  axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: "hsl(var(--portal-text-muted))" }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={getYAxisFormatter("currency")}
-                />
-                <Tooltip
-                  content={<ResponsiveChartTooltip valueType="currency" />}
-                  cursor={{ fill: "hsl(var(--portal-bg-tertiary))", opacity: 0.3 }}
-                />
-                <Legend wrapperStyle={{ fontSize: 11 }} iconSize={10} />
-                <Bar
-                  dataKey="metaSpend"
-                  fill={CHART_COLORS[0]}
-                  name="Meta Ads Spend"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  dataKey="smsSpend"
-                  fill={CHART_COLORS[1]}
-                  name="SMS Spend"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke={CHART_COLORS[2]}
-                  strokeWidth={2.5}
-                  name="Revenue"
-                  dot={false}
-                  activeDot={{ fill: CHART_COLORS[2], r: 5, strokeWidth: 2 }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
+          <EChartsLineChart
+            data={performanceTimeline}
+            xAxisKey="date"
+            xAxisType="time"
+            height={288}
+            valueType="currency"
+            series={[
+              { 
+                dataKey: "metaSpend", 
+                name: "Meta Ads Spend", 
+                color: CHART_COLORS[0],
+                type: "area",
+                areaStyle: { opacity: 0.3 },
+                valueType: "currency"
+              },
+              { 
+                dataKey: "smsSpend", 
+                name: "SMS Spend", 
+                color: CHART_COLORS[1],
+                type: "area",
+                areaStyle: { opacity: 0.3 },
+                valueType: "currency"
+              },
+              { 
+                dataKey: "revenue", 
+                name: "Revenue", 
+                color: CHART_COLORS[2],
+                lineStyle: { width: 2.5 },
+                valueType: "currency"
+              },
+            ]}
+          />
         </ChartPanel>
 
         {/* Attribution Analysis */}
@@ -637,15 +609,17 @@ const ExecutiveDashboard = () => {
               isLoading={isLoading}
               minHeight={280}
             >
-              <ResponsiveBarChart
+              <EChartsBarChart
                 data={attributionData}
-                bars={[
+                xAxisKey="name"
+                series={[
                   { dataKey: "firstTouch", name: "First Touch", color: CHART_COLORS[0], valueType: "currency" },
                   { dataKey: "lastTouch", name: "Last Touch", color: CHART_COLORS[1], valueType: "currency" },
                   { dataKey: "linear", name: "Linear", color: CHART_COLORS[2], valueType: "currency" },
                 ]}
                 valueType="currency"
                 height={240}
+                disableHoverEmphasis
               />
             </ChartPanel>
 
@@ -656,11 +630,12 @@ const ExecutiveDashboard = () => {
               isLoading={isLoading}
               minHeight={280}
             >
-              <ResponsivePieChart
+              <EChartsPieChart
                 data={attributionData.map((d) => ({ name: d.name, value: d.linear }))}
                 valueType="currency"
-                colors={CHART_COLORS}
                 height={240}
+                variant="donut"
+                disableHoverEmphasis
               />
             </ChartPanel>
           </div>

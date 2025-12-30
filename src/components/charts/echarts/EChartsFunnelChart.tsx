@@ -35,6 +35,8 @@ export interface EChartsFunnelChartProps {
   onStageClick?: (params: { name: string; value: number; index: number }) => void;
   /** Empty state message */
   emptyMessage?: string;
+  /** Disable hover emphasis to prevent stages from disappearing on hover */
+  disableHoverEmphasis?: boolean;
 }
 
 const colorPalette = getChartColors();
@@ -50,6 +52,7 @@ export const EChartsFunnelChart: React.FC<EChartsFunnelChartProps> = ({
   showLegend = false,
   onStageClick,
   emptyMessage = "No funnel data available",
+  disableHoverEmphasis = false,
 }) => {
   // Handle empty data
   if (!isLoading && (!data || data.length === 0)) {
@@ -106,6 +109,10 @@ export const EChartsFunnelChart: React.FC<EChartsFunnelChartProps> = ({
       animation: true,
       animationDuration: 600,
       animationEasing: "cubicOut",
+      // Prevent axis pointer from triggering emphasis on hover
+      ...(disableHoverEmphasis && {
+        axisPointer: { triggerEmphasis: false },
+      }),
       tooltip: {
         trigger: "item",
         confine: true,
@@ -193,22 +200,28 @@ export const EChartsFunnelChart: React.FC<EChartsFunnelChartProps> = ({
             borderColor: "hsl(var(--portal-bg-primary))",
             borderWidth: 2,
           },
-          emphasis: {
-            label: {
-              fontSize: 14,
-              fontWeight: 600,
-            },
-            itemStyle: {
-              shadowBlur: 10,
-              shadowOffsetX: 0,
-              shadowColor: "rgba(0, 0, 0, 0.2)",
-            },
-          },
+          emphasis: disableHoverEmphasis
+            ? { disabled: true }
+            : {
+                label: {
+                  fontSize: 14,
+                  fontWeight: 600,
+                },
+                itemStyle: {
+                  shadowBlur: 10,
+                  shadowOffsetX: 0,
+                  shadowColor: "rgba(0, 0, 0, 0.2)",
+                },
+              },
+          // Prevent other stages from dimming when one is hovered
+          ...(disableHoverEmphasis && {
+            blur: { itemStyle: { opacity: 1 } },
+          }),
           data: chartData,
         },
       ],
     };
-  }, [chartData, orientation, showConversionRates, showLegend, formatValue]);
+  }, [chartData, orientation, showConversionRates, showLegend, formatValue, disableHoverEmphasis]);
 
   const handleEvents = React.useMemo(() => {
     if (!onStageClick) return undefined;

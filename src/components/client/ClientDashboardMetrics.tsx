@@ -12,7 +12,7 @@ import {
 import { HeroKpiGrid, type HeroKpiData } from "@/components/client/HeroKpiGrid";
 import type { HeroKpiAccent } from "@/components/client/HeroKpiCard";
 import { EChartsLineChart, type LineSeriesConfig } from "@/components/charts/echarts";
-import { PortalBarChart } from "@/components/portal/PortalBarChart";
+import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
 import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, CopyMinus, SlidersHorizontal, ZoomIn } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { logger } from "@/lib/logger";
@@ -550,14 +550,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                   {format(parseISO(startDate), 'MMM d')} - {format(parseISO(endDate), 'MMM d')}
                 </span>
               </div>
-              <PortalBarChart
-                data={channelBreakdown}
+              <EChartsBarChart
+                data={channelBreakdown as unknown as Record<string, unknown>[]}
+                xAxisKey="name"
+                series={[{ dataKey: "value", name: "Conversions", color: palette.net }]}
                 height={220}
                 valueType="number"
-                showValues
-                ariaLabel="Conversion sources bar chart"
-                barName="Conversions"
-                xAxisTickFormatter={(v) => v.replace(/\s*\([^)]*\)\s*$/, "")}
+                xAxisLabelFormatter={(v) => v.replace(/\s*\([^)]*\)\s*$/, "")}
+                disableHoverEmphasis
               />
             </div>
           </V3CardContent>

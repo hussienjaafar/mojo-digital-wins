@@ -7,7 +7,7 @@ import {
   V3ChartWrapper,
 } from "@/components/v3";
 import { EChartsLineChart, type LineSeriesConfig } from "@/components/charts/echarts";
-import { PortalBarChart } from "@/components/portal/PortalBarChart";
+import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
 import { DollarSign, TrendingUp, Target, MessageSquare, CopyMinus, SlidersHorizontal, ZoomIn } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -382,14 +382,14 @@ export const ClientDashboardCharts = ({
             </div>
           </V3CardHeader>
           <V3CardContent>
-            <PortalBarChart
-              data={channelBreakdown}
+            <EChartsBarChart
+              data={channelBreakdown as unknown as Record<string, unknown>[]}
+              xAxisKey="name"
+              series={[{ dataKey: "value", name: "Conversions", color: palette.net }]}
               height={220}
               valueType="number"
-              showValues
-              ariaLabel="Conversion sources bar chart"
-              barName="Conversions"
-              xAxisTickFormatter={(v) => v.replace(/\s*\([^)]*\)\s*$/, "")}
+              xAxisLabelFormatter={(v) => v.replace(/\s*\([^)]*\)\s*$/, "")}
+              disableHoverEmphasis
             />
           </V3CardContent>
         </V3Card>
