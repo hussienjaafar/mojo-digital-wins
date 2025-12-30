@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Brain, RefreshCw, Download, Target, Users, AlertTriangle, DollarSign, TrendingUp, GitBranch, BarChart3 } from "lucide-react";
+import { Brain, RefreshCw, Download, Target, Users, AlertTriangle, DollarSign, TrendingUp, GitBranch, BarChart3, Database } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import { DataPipelineStatus } from "@/components/client/DataPipelineStatus";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
@@ -28,6 +28,7 @@ export default function ClientDonorIntelligence() {
   const { organizationId, isLoading: orgLoading } = useClientOrganization();
   const { startDate, endDate } = useDateRange();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isPopulating, setIsPopulating] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, isLoading, error, isError, refetch } = useDonorIntelligenceQuery(
@@ -57,6 +58,41 @@ export default function ClientDonorIntelligence() {
       toast.error('Failed to refresh data');
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handlePopulateData = async () => {
+    if (!organizationId) return;
+    
+    setIsPopulating(true);
+    try {
+      // First run refcode reconciliation
+      await supabase.functions.invoke('refcode-reconcile', {
+        body: { organization_id: organizationId, limit: 500 }
+      });
+
+      // Then populate attribution
+      const { data: result, error } = await supabase.functions.invoke('populate-attribution', {
+        body: { 
+          organization_id: organizationId, 
+          start_date: startDate,
+          end_date: endDate,
+          limit: 2000 
+        }
+      });
+      
+      if (error) {
+        console.error('Populate error:', error);
+        toast.error('Failed to populate attribution data');
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['donor-intelligence'] });
+        toast.success(`Attribution populated: ${result?.matched || 0} matched, ${result?.inserted || 0} records created`);
+      }
+    } catch (err) {
+      console.error('Populate error:', err);
+      toast.error('Failed to populate data');
+    } finally {
+      setIsPopulating(false);
     }
   };
 
@@ -216,13 +252,22 @@ export default function ClientDonorIntelligence() {
         actions={
           <div className="flex items-center gap-2">
             <V3Button
+              variant="outline"
+              size="sm"
+              onClick={handlePopulateData}
+              disabled={isPopulating || isRefreshing}
+            >
+              <Database className={`h-4 w-4 mr-2 ${isPopulating ? 'animate-pulse' : ''}`} />
+              {isPopulating ? 'Syncing...' : 'Sync Attribution'}
+            </V3Button>
+            <V3Button
               variant="secondary"
               size="sm"
               onClick={handleRefreshData}
-              disabled={isRefreshing}
+              disabled={isRefreshing || isPopulating}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </V3Button>
           </div>
         }
