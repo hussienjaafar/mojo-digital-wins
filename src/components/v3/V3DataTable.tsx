@@ -48,6 +48,14 @@ export interface V3DataTableProps<T> {
   compact?: boolean;
   /** Maximum height with scroll */
   maxHeight?: string;
+  /** Enable pagination */
+  pagination?: boolean;
+  /** Items per page (default: 25) */
+  pageSize?: number;
+  /** Current page (1-indexed) for controlled pagination */
+  currentPage?: number;
+  /** Page change handler for controlled pagination */
+  onPageChange?: (page: number) => void;
 }
 
 type SortDirection = "asc" | "desc" | null;
@@ -65,9 +73,18 @@ export function V3DataTable<T>({
   striped = false,
   compact = false,
   maxHeight,
+  pagination = false,
+  pageSize = 25,
+  currentPage: controlledPage,
+  onPageChange,
 }: V3DataTableProps<T>) {
   const [sortKey, setSortKey] = React.useState<string | null>(null);
   const [sortDirection, setSortDirection] = React.useState<SortDirection>(null);
+  const [internalPage, setInternalPage] = React.useState(1);
+  
+  // Use controlled or uncontrolled pagination
+  const currentPage = controlledPage ?? internalPage;
+  const setCurrentPage = onPageChange ?? setInternalPage;
 
   // Handle sort click
   const handleSort = React.useCallback((column: V3Column<T>) => {
@@ -97,6 +114,20 @@ export function V3DataTable<T>({
     const sorted = [...data].sort(column.sortFn);
     return sortDirection === "desc" ? sorted.reverse() : sorted;
   }, [data, sortKey, sortDirection, columns]);
+
+  // Pagination calculations
+  const totalItems = sortedData.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedData = pagination ? sortedData.slice(startIndex, endIndex) : sortedData;
+  
+  // Reset to page 1 when data changes significantly
+  React.useEffect(() => {
+    if (pagination && currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage, pagination, setCurrentPage]);
 
   // Render sort icon
   const renderSortIcon = (column: V3Column<T>) => {
@@ -218,9 +249,9 @@ export function V3DataTable<T>({
             </tr>
           </thead>
           <tbody className="divide-y divide-[hsl(var(--portal-border))]">
-            {sortedData.map((row, rowIndex) => (
+            {paginatedData.map((row, rowIndex) => (
               <tr
-                key={getRowKey(row, rowIndex)}
+                key={getRowKey(row, startIndex + rowIndex)}
                 className={cn(
                   "transition-colors",
                   striped && rowIndex % 2 === 1
@@ -228,13 +259,13 @@ export function V3DataTable<T>({
                     : "bg-[hsl(var(--portal-bg-primary))]",
                   onRowClick && "cursor-pointer hover:bg-[hsl(var(--portal-bg-elevated))]"
                 )}
-                onClick={() => onRowClick?.(row, rowIndex)}
+                onClick={() => onRowClick?.(row, startIndex + rowIndex)}
                 role="row"
                 tabIndex={onRowClick ? 0 : undefined}
                 onKeyDown={(e) => {
                   if (onRowClick && (e.key === "Enter" || e.key === " ")) {
                     e.preventDefault();
-                    onRowClick(row, rowIndex);
+                    onRowClick(row, startIndex + rowIndex);
                   }
                 }}
               >
@@ -250,7 +281,7 @@ export function V3DataTable<T>({
                     )}
                     role="cell"
                   >
-                    {column.render(row, rowIndex)}
+                    {column.render(row, startIndex + rowIndex)}
                   </td>
                 ))}
               </tr>
@@ -258,6 +289,44 @@ export function V3DataTable<T>({
           </tbody>
         </table>
       </div>
+      
+      {/* Pagination Controls */}
+      {pagination && totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))]">
+          <div className="text-sm text-[hsl(var(--portal-text-muted))]">
+            Showing {startIndex + 1}-{endIndex} of {totalItems}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                currentPage === 1
+                  ? "text-[hsl(var(--portal-text-muted))] cursor-not-allowed"
+                  : "text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-elevated))]"
+              )}
+            >
+              Previous
+            </button>
+            <span className="text-sm text-[hsl(var(--portal-text-secondary))]">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                currentPage === totalPages
+                  ? "text-[hsl(var(--portal-text-muted))] cursor-not-allowed"
+                  : "text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-elevated))]"
+              )}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

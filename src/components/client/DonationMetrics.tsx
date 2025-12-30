@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   V3Card,
@@ -15,12 +15,12 @@ import {
 import type { V3Column } from "@/components/v3/V3DataTable";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, DollarSign, Users, Repeat, TrendingUp, PieChart, BarChart3, ShieldAlert, Receipt, ArrowUpDown } from "lucide-react";
+import { Search, DollarSign, Users, Repeat, TrendingUp, PieChart, BarChart3, ShieldAlert, Receipt, ArrowUpDown, Filter } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { EChartsLineChart, EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
 import { usePIIAccess } from "@/hooks/usePIIAccess";
 import { maskName, maskEmail } from "@/lib/pii-masking";
-import { useDonationMetricsQuery, TopDonor } from "@/queries";
+import { useDonationMetricsQuery, DonationRow } from "@/queries";
 import { formatCurrency } from "@/lib/chart-formatters";
 
 type Props = {
@@ -54,7 +54,9 @@ const itemVariants = {
 
 const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortBy, setSortBy] = useState<"amount" | "recent" | "count">("amount");
+  const [sortBy, setSortBy] = useState<"amount" | "recent" | "state">("recent");
+  const [filterRecurring, setFilterRecurring] = useState<"all" | "one-time" | "recurring">("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // PII access control - masks donor names/emails for users without PII access
   const { shouldMaskPII, isLoading: piiLoading } = usePIIAccess(organizationId);
@@ -66,7 +68,12 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const metrics = data?.metrics;
   const timeSeries = data?.timeSeries || [];
   const bySource = data?.bySource || [];
-  const topDonors = data?.topDonors || [];
+  const recentDonations = data?.recentDonations || [];
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortBy, filterRecurring]);
 
   // Prepare chart data
   const trendChartData = useMemo(() => timeSeries.map(d => ({
@@ -93,31 +100,39 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     ];
   }, [metrics]);
 
-  // Masked and filtered top donors for display
-  const filteredDonors = useMemo(() => {
-    let result = [...topDonors];
+  // Filtered and sorted donations for the Recent Donations table
+  const filteredDonations = useMemo(() => {
+    let result = [...recentDonations];
     
-    // Apply search filter
+    // Apply search filter (name, email, state, refcode)
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(d => 
-        d.name.toLowerCase().includes(term) || 
+        d.donorName.toLowerCase().includes(term) || 
         d.email.toLowerCase().includes(term) ||
-        (d.state?.toLowerCase().includes(term) ?? false)
+        (d.state?.toLowerCase().includes(term) ?? false) ||
+        (d.refcode?.toLowerCase().includes(term) ?? false)
       );
+    }
+    
+    // Apply recurring filter
+    if (filterRecurring === "one-time") {
+      result = result.filter(d => !d.isRecurring);
+    } else if (filterRecurring === "recurring") {
+      result = result.filter(d => d.isRecurring);
     }
     
     // Apply sorting
     switch (sortBy) {
-      case "recent":
-        result.sort((a, b) => new Date(b.lastDonation).getTime() - new Date(a.lastDonation).getTime());
-        break;
-      case "count":
-        result.sort((a, b) => b.donationCount - a.donationCount);
-        break;
       case "amount":
+        result.sort((a, b) => b.netAmount - a.netAmount);
+        break;
+      case "state":
+        result.sort((a, b) => (a.state || "ZZZ").localeCompare(b.state || "ZZZ"));
+        break;
+      case "recent":
       default:
-        result.sort((a, b) => b.totalAmount - a.totalAmount);
+        result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         break;
     }
     
@@ -125,13 +140,13 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     if (shouldMaskPII) {
       result = result.map(d => ({
         ...d,
-        name: maskName(d.name),
+        donorName: maskName(d.donorName),
         email: maskEmail(d.email),
       }));
     }
     
     return result;
-  }, [topDonors, searchTerm, sortBy, shouldMaskPII]);
+  }, [recentDonations, searchTerm, sortBy, filterRecurring, shouldMaskPII]);
 
   // PII masking indicator component
   const PIIMaskingIndicator = () => shouldMaskPII ? (
@@ -335,57 +350,81 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         )}
       </div>
 
-      {/* Top Donors Table */}
+      {/* Recent Donations Table */}
       <V3Card accent="green">
         <V3CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <V3CardTitle>Top Donors</V3CardTitle>
+            <V3CardTitle>Recent Donations</V3CardTitle>
             <div className="flex items-center gap-2">
               <PIIMaskingIndicator />
             </div>
           </div>
-          {/* Search and Sort Controls */}
+          {/* Search, Sort, and Filter Controls */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4">
             <div className="relative flex-1 max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
               <Input
-                placeholder="Search donors..."
+                placeholder="Search by name, email, state, refcode..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9 bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]"
               />
             </div>
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as "amount" | "recent" | "count")}>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as "amount" | "recent" | "state")}>
               <SelectTrigger className="w-[160px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
                 <ArrowUpDown className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="amount">Highest Amount</SelectItem>
                 <SelectItem value="recent">Most Recent</SelectItem>
-                <SelectItem value="count">Most Donations</SelectItem>
+                <SelectItem value="amount">Highest Amount</SelectItem>
+                <SelectItem value="state">Location</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterRecurring} onValueChange={(v) => setFilterRecurring(v as "all" | "one-time" | "recurring")}>
+              <SelectTrigger className="w-[140px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="one-time">One-time</SelectItem>
+                <SelectItem value="recurring">Recurring</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </V3CardHeader>
         <V3CardContent>
-          <V3DataTable<TopDonor>
-            data={filteredDonors}
+          <V3DataTable<DonationRow>
+            data={filteredDonations}
             getRowKey={(row) => row.id}
             columns={[
               {
-                key: "name",
+                key: "donor",
                 header: "Donor",
-                sortable: true,
-                sortFn: (a, b) => a.name.localeCompare(b.name),
                 render: (row) => (
                   <div className="min-w-0">
                     <div className="font-medium text-[hsl(var(--portal-text-primary))] truncate">
-                      {row.name}
+                      {row.donorName}
                     </div>
                     <div className="text-xs text-[hsl(var(--portal-text-muted))] truncate">
                       {row.email}
                     </div>
+                  </div>
+                ),
+              },
+              {
+                key: "amount",
+                header: "Amount",
+                align: "right",
+                render: (row) => (
+                  <div>
+                    <div className="font-medium text-[hsl(var(--portal-success))]">
+                      {formatCurrency(row.netAmount)}
+                    </div>
+                    {row.isRecurring && (
+                      <span className="text-xs text-[hsl(var(--portal-accent-blue))]">Recurring</span>
+                    )}
                   </div>
                 ),
               },
@@ -400,47 +439,32 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
                 ),
               },
               {
-                key: "totalAmount",
-                header: "Total",
-                align: "right",
-                sortable: true,
-                sortFn: (a, b) => a.totalAmount - b.totalAmount,
-                render: (row) => (
-                  <span className="font-medium text-[hsl(var(--portal-success))]">
-                    {formatCurrency(row.totalAmount)}
-                  </span>
-                ),
-              },
-              {
-                key: "donationCount",
-                header: "Donations",
-                align: "right",
-                hideOnMobile: true,
-                sortable: true,
-                sortFn: (a, b) => a.donationCount - b.donationCount,
-                render: (row) => (
-                  <span className="text-[hsl(var(--portal-text-secondary))]">
-                    {row.donationCount.toLocaleString()}
-                  </span>
-                ),
-              },
-              {
-                key: "lastDonation",
-                header: "Last Donation",
-                hideOnMobile: true,
-                sortable: true,
-                sortFn: (a, b) => new Date(b.lastDonation).getTime() - new Date(a.lastDonation).getTime(),
+                key: "date",
+                header: "Date",
                 render: (row) => (
                   <span className="text-[hsl(var(--portal-text-muted))]">
-                    {row.lastDonation ? format(parseISO(row.lastDonation), 'MMM d, yyyy') : "—"}
+                    {row.date ? format(parseISO(row.date), 'MMM d, yyyy') : "—"}
                   </span>
                 ),
               },
-            ] as V3Column<TopDonor>[]}
-            emptyTitle="No donors found"
-            emptyDescription="No donors match your search criteria"
+              {
+                key: "source",
+                header: "Source",
+                hideOnMobile: true,
+                render: (row) => (
+                  <span className="text-[hsl(var(--portal-text-secondary))] truncate max-w-[120px] block">
+                    {row.refcode || "Direct"}
+                  </span>
+                ),
+              },
+            ] as V3Column<DonationRow>[]}
+            emptyTitle="No donations found"
+            emptyDescription="No donations match your search criteria"
             isLoading={false}
-            maxHeight="400px"
+            pagination
+            pageSize={25}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
           />
         </V3CardContent>
       </V3Card>
