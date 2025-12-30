@@ -46,6 +46,8 @@ type SyncStatus = {
   platform: string;
   lastSync: string | null;
   status: string | null;
+  errorCount: number | null;
+  lastError: string | null;
 };
 
 // Animation variants for buttons
@@ -102,6 +104,7 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
+  const [showSyncHistory, setShowSyncHistory] = useState(false);
 
   useEffect(() => {
     loadSyncStatuses();
@@ -110,7 +113,7 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
   const loadSyncStatuses = async () => {
     const { data } = await supabase
       .from("client_api_credentials")
-      .select("platform, last_sync_at, last_sync_status")
+      .select("platform, last_sync_at, last_sync_status, sync_error_count, last_sync_error")
       .eq("organization_id", organizationId)
       .eq("is_active", true);
 
@@ -120,6 +123,8 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
           platform: c.platform,
           lastSync: c.last_sync_at,
           status: c.last_sync_status,
+          errorCount: c.sync_error_count,
+          lastError: c.last_sync_error,
         }))
       );
     }
@@ -536,6 +541,83 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
             variant="primary"
           />
         </motion.div>
+
+        {/* Sync History Section */}
+        <div className="pt-[var(--portal-space-md)] border-t border-[hsl(var(--portal-border))]">
+          <button
+            type="button"
+            onClick={() => setShowSyncHistory(!showSyncHistory)}
+            className="flex items-center gap-2 text-sm text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-text-primary))] transition-colors mb-3"
+          >
+            <History className="h-4 w-4" />
+            <span>Sync History</span>
+            <motion.span
+              animate={{ rotate: showSyncHistory ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              ▼
+            </motion.span>
+          </button>
+          
+          <AnimatePresence>
+            {showSyncHistory && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-2">
+                  {syncStatuses.length === 0 ? (
+                    <p className="text-sm text-[hsl(var(--portal-text-muted))] py-2">
+                      No connected platforms yet.
+                    </p>
+                  ) : (
+                    syncStatuses.map((status) => (
+                      <div
+                        key={status.platform}
+                        className="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-2 h-2 rounded-full",
+                            status.status === "success" ? "bg-[hsl(var(--portal-success))]" :
+                            status.status === "failed" ? "bg-[hsl(var(--portal-error))]" :
+                            "bg-[hsl(var(--portal-text-muted))]"
+                          )} />
+                          <span className="font-medium text-[hsl(var(--portal-text-primary))] capitalize">
+                            {status.platform}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-[hsl(var(--portal-text-muted))]">
+                          {status.lastSync && (
+                            <span>
+                              {formatDistanceToNow(new Date(status.lastSync), { addSuffix: true })}
+                            </span>
+                          )}
+                          {status.status === "failed" && status.errorCount && status.errorCount > 0 && (
+                            <span className="text-[hsl(var(--portal-error))]">
+                              {status.errorCount} error{status.errorCount > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {syncStatuses.some(s => s.lastError) && (
+                    <div className="mt-2 p-3 rounded-lg bg-[hsl(var(--portal-error)/0.1)] text-sm">
+                      <p className="font-medium text-[hsl(var(--portal-error))] mb-1">Last Error:</p>
+                      <p className="text-[hsl(var(--portal-text-muted))]">
+                        {syncStatuses.find(s => s.lastError)?.lastError}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Expanded Freshness View */}
         <motion.div
