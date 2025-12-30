@@ -2485,6 +2485,47 @@ export type Database = {
           },
         ]
       }
+      donor_first_donation: {
+        Row: {
+          created_at: string
+          donor_key: string
+          first_amount: number | null
+          first_donation_at: string
+          first_refcode: string | null
+          id: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          donor_key: string
+          first_amount?: number | null
+          first_donation_at: string
+          first_refcode?: string | null
+          id?: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          donor_key?: string
+          first_amount?: number | null
+          first_donation_at?: string
+          first_refcode?: string | null
+          id?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donor_first_donation_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       donor_journeys: {
         Row: {
           amount: number | null
