@@ -10,15 +10,17 @@ import {
   V3LoadingState,
   V3ErrorState,
   V3EmptyState,
+  V3DataTable,
 } from "@/components/v3";
+import type { V3Column } from "@/components/v3/V3DataTable";
 import { Input } from "@/components/ui/input";
-import { Search, DollarSign, Users, Repeat, TrendingUp, PieChart, BarChart3, Filter, ShieldAlert, Heart, UserPlus, Receipt } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, DollarSign, Users, Repeat, TrendingUp, PieChart, BarChart3, ShieldAlert, Receipt, ArrowUpDown } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
 import { EChartsLineChart, EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
 import { usePIIAccess } from "@/hooks/usePIIAccess";
-import { maskDonorInfo } from "@/lib/pii-masking";
-import { useDonationMetricsQuery } from "@/queries";
+import { maskName, maskEmail } from "@/lib/pii-masking";
+import { useDonationMetricsQuery, TopDonor } from "@/queries";
 import { formatCurrency } from "@/lib/chart-formatters";
 
 type Props = {
@@ -52,8 +54,7 @@ const itemVariants = {
 
 const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [amountFilter, setAmountFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"amount" | "recent" | "count">("amount");
 
   // PII access control - masks donor names/emails for users without PII access
   const { shouldMaskPII, isLoading: piiLoading } = usePIIAccess(organizationId);
@@ -92,14 +93,45 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     ];
   }, [metrics]);
 
-  // Masked top donors for display
-  const maskedTopDonors = useMemo(() => {
-    if (!shouldMaskPII) return topDonors;
-    return topDonors.map(d => ({
-      ...d,
-      email: '***@***.***',
-    }));
-  }, [topDonors, shouldMaskPII]);
+  // Masked and filtered top donors for display
+  const filteredDonors = useMemo(() => {
+    let result = [...topDonors];
+    
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(d => 
+        d.name.toLowerCase().includes(term) || 
+        d.email.toLowerCase().includes(term) ||
+        (d.state?.toLowerCase().includes(term) ?? false)
+      );
+    }
+    
+    // Apply sorting
+    switch (sortBy) {
+      case "recent":
+        result.sort((a, b) => new Date(b.lastDonation).getTime() - new Date(a.lastDonation).getTime());
+        break;
+      case "count":
+        result.sort((a, b) => b.donationCount - a.donationCount);
+        break;
+      case "amount":
+      default:
+        result.sort((a, b) => b.totalAmount - a.totalAmount);
+        break;
+    }
+    
+    // Apply PII masking after filtering (so search works on real data)
+    if (shouldMaskPII) {
+      result = result.map(d => ({
+        ...d,
+        name: maskName(d.name),
+        email: maskEmail(d.email),
+      }));
+    }
+    
+    return result;
+  }, [topDonors, searchTerm, sortBy, shouldMaskPII]);
 
   // PII masking indicator component
   const PIIMaskingIndicator = () => shouldMaskPII ? (
@@ -308,40 +340,107 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         <V3CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <V3CardTitle>Top Donors</V3CardTitle>
-            <PIIMaskingIndicator />
+            <div className="flex items-center gap-2">
+              <PIIMaskingIndicator />
+            </div>
+          </div>
+          {/* Search and Sort Controls */}
+          <div className="flex flex-col sm:flex-row gap-3 mt-4">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+              <Input
+                placeholder="Search donors..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]"
+              />
+            </div>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as "amount" | "recent" | "count")}>
+              <SelectTrigger className="w-[160px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+                <ArrowUpDown className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="amount">Highest Amount</SelectItem>
+                <SelectItem value="recent">Most Recent</SelectItem>
+                <SelectItem value="count">Most Donations</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </V3CardHeader>
         <V3CardContent>
-          <PortalTable
-            data={maskedTopDonors}
-            keyExtractor={(row) => row.email}
+          <V3DataTable<TopDonor>
+            data={filteredDonors}
+            getRowKey={(row) => row.id}
             columns={[
               {
-                key: "email",
-                label: "Donor",
+                key: "name",
+                header: "Donor",
                 sortable: true,
-                render: (value) => (
-                  <span className="font-medium text-[hsl(var(--portal-text-primary))]">
-                    {value}
+                sortFn: (a, b) => a.name.localeCompare(b.name),
+                render: (row) => (
+                  <div className="min-w-0">
+                    <div className="font-medium text-[hsl(var(--portal-text-primary))] truncate">
+                      {row.name}
+                    </div>
+                    <div className="text-xs text-[hsl(var(--portal-text-muted))] truncate">
+                      {row.email}
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                key: "state",
+                header: "Location",
+                hideOnMobile: true,
+                render: (row) => (
+                  <span className="text-[hsl(var(--portal-text-secondary))]">
+                    {row.state || "—"}
                   </span>
                 ),
               },
               {
                 key: "totalAmount",
-                label: "Total",
+                header: "Total",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.currency,
+                sortFn: (a, b) => a.totalAmount - b.totalAmount,
+                render: (row) => (
+                  <span className="font-medium text-[hsl(var(--portal-success))]">
+                    {formatCurrency(row.totalAmount)}
+                  </span>
+                ),
               },
               {
                 key: "donationCount",
-                label: "Donations",
+                header: "Donations",
+                align: "right",
+                hideOnMobile: true,
                 sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.number,
+                sortFn: (a, b) => a.donationCount - b.donationCount,
+                render: (row) => (
+                  <span className="text-[hsl(var(--portal-text-secondary))]">
+                    {row.donationCount.toLocaleString()}
+                  </span>
+                ),
               },
-            ]}
-            emptyMessage="No donor data available"
+              {
+                key: "lastDonation",
+                header: "Last Donation",
+                hideOnMobile: true,
+                sortable: true,
+                sortFn: (a, b) => new Date(b.lastDonation).getTime() - new Date(a.lastDonation).getTime(),
+                render: (row) => (
+                  <span className="text-[hsl(var(--portal-text-muted))]">
+                    {row.lastDonation ? format(parseISO(row.lastDonation), 'MMM d, yyyy') : "—"}
+                  </span>
+                ),
+              },
+            ] as V3Column<TopDonor>[]}
+            emptyTitle="No donors found"
+            emptyDescription="No donors match your search criteria"
+            isLoading={false}
+            maxHeight="400px"
           />
         </V3CardContent>
       </V3Card>

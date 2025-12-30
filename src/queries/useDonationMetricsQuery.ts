@@ -33,15 +33,21 @@ export interface DonationBySource {
   percentage: number;
 }
 
+export interface TopDonor {
+  id: string;
+  name: string;
+  email: string;
+  state: string | null;
+  totalAmount: number;
+  donationCount: number;
+  lastDonation: string;
+}
+
 interface DonationMetricsResult {
   metrics: DonationMetrics;
   timeSeries: DonationTimeSeries[];
   bySource: DonationBySource[];
-  topDonors: Array<{
-    email: string;
-    totalAmount: number;
-    donationCount: number;
-  }>;
+  topDonors: TopDonor[];
 }
 
 async function fetchDonationMetrics(
@@ -53,9 +59,10 @@ async function fetchDonationMetrics(
   const endDateInclusive = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
 
   // Use actblue_transactions_secure for PII protection
+  // Include donor_name, first_name, last_name, state for complete donor info
   const { data: allTransactions, error } = await (supabase as any)
     .from("actblue_transactions_secure")
-    .select("amount, net_amount, donor_email, donor_id_hash, is_recurring, transaction_type, transaction_date, refcode, source_campaign")
+    .select("amount, net_amount, donor_email, donor_name, first_name, last_name, state, donor_id_hash, is_recurring, transaction_type, transaction_date, refcode, source_campaign")
     .eq("organization_id", organizationId)
     .gte("transaction_date", startDate)
     .lt("transaction_date", endDateInclusive)
@@ -160,26 +167,68 @@ async function fetchDonationMetrics(
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 10);
 
-  // Top donors - donations only, use donor_id_hash for privacy
-  const donorMap = new Map<string, { totalAmount: number; donationCount: number }>();
+  // Top donors - donations only, preserve names and details
+  const donorMap = new Map<string, {
+    name: string;
+    email: string;
+    state: string | null;
+    totalAmount: number;
+    donationCount: number;
+    lastDonation: string;
+  }>();
+
   donations.forEach((d: any) => {
     const donorKey = d.donor_id_hash || d.donor_email;
     if (donorKey) {
-      const entry = donorMap.get(donorKey) || { totalAmount: 0, donationCount: 0 };
-      entry.totalAmount += Number(d.net_amount || d.amount || 0);
-      entry.donationCount += 1;
-      donorMap.set(donorKey, entry);
+      const existing = donorMap.get(donorKey);
+      const txDate = d.transaction_date?.split("T")[0] || "";
+      
+      // Construct full name from available fields
+      const fullName = d.donor_name || 
+        (d.first_name && d.last_name ? `${d.first_name} ${d.last_name}` : null) ||
+        d.first_name || 
+        "Anonymous";
+
+      if (existing) {
+        existing.totalAmount += Number(d.net_amount || d.amount || 0);
+        existing.donationCount += 1;
+        // Keep the most recent donation date
+        if (txDate > existing.lastDonation) {
+          existing.lastDonation = txDate;
+        }
+        // Keep the first non-anonymous name we find
+        if (existing.name === "Anonymous" && fullName !== "Anonymous") {
+          existing.name = fullName;
+        }
+        // Keep first non-null state
+        if (!existing.state && d.state) {
+          existing.state = d.state;
+        }
+      } else {
+        donorMap.set(donorKey, {
+          name: fullName,
+          email: d.donor_email || "",
+          state: d.state || null,
+          totalAmount: Number(d.net_amount || d.amount || 0),
+          donationCount: 1,
+          lastDonation: txDate,
+        });
+      }
     }
   });
 
-  const topDonors = Array.from(donorMap.entries())
-    .map(([email, entry]) => ({
-      email, // This is actually the donor_id_hash or email depending on availability
+  const topDonors: TopDonor[] = Array.from(donorMap.entries())
+    .map(([id, entry]) => ({
+      id,
+      name: entry.name,
+      email: entry.email,
+      state: entry.state,
       totalAmount: entry.totalAmount,
       donationCount: entry.donationCount,
+      lastDonation: entry.lastDonation,
     }))
     .sort((a, b) => b.totalAmount - a.totalAmount)
-    .slice(0, 10);
+    .slice(0, 25); // Increased from 10 to 25 for more comprehensive view
 
   return { metrics, timeSeries, bySource, topDonors };
 }
