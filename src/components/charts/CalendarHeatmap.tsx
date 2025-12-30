@@ -28,13 +28,7 @@ const hourLabels = Array.from({ length: 24 }, (_, i) =>
   i === 0 ? "12a" : i < 12 ? `${i}a` : i === 12 ? "12p" : `${i - 12}p`
 );
 
-// Color schemes using design system tokens
-const colorSchemes = {
-  blue: [cssVar(colors.bg.tertiary), cssVar(colors.accent.blue)],
-  green: [cssVar(colors.bg.tertiary), cssVar(colors.status.success)],
-  purple: [cssVar(colors.bg.tertiary), cssVar(colors.accent.purple)],
-  orange: [cssVar(colors.bg.tertiary), cssVar(colors.status.warning)],
-};
+// Color schemes are resolved at runtime (CSS variables -> concrete colors) to keep ECharts gradients readable.
 
 export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
   data,
@@ -58,9 +52,42 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
     return value.toLocaleString();
   }, [valueType]);
 
+  const resolveHslVar = React.useCallback((tokenName: string, alpha?: number) => {
+    // ECharts' color interpolation doesn't reliably handle `var(--...)` or modern space-separated HSL.
+    // Resolve portal CSS variables into comma-based hsl/hsla strings so gradients render correctly.
+    if (typeof window === "undefined") return cssVar(tokenName, alpha);
+
+    const raw = getComputedStyle(document.documentElement)
+      .getPropertyValue(`--${tokenName}`)
+      .trim();
+
+    if (!raw) return cssVar(tokenName, alpha);
+
+    // raw is typically like: "213 90% 45%" (H S L). Convert to "hsl(213, 90%, 45%)".
+    const [base] = raw.split("/").map((s) => s.trim());
+    const parts = base.split(/\s+/).filter(Boolean);
+
+    if (parts.length < 3) return cssVar(tokenName, alpha);
+
+    const [h, s, l] = parts;
+    if (alpha !== undefined) return `hsla(${h}, ${s}, ${l}, ${alpha})`;
+    return `hsl(${h}, ${s}, ${l})`;
+  }, []);
+
+  const colorRange = React.useMemo<string[]>(() => {
+    const schemes: Record<NonNullable<CalendarHeatmapProps["colorScheme"]>, string[]> = {
+      blue: [resolveHslVar(colors.bg.tertiary), resolveHslVar(colors.accent.blue)],
+      green: [resolveHslVar(colors.bg.tertiary), resolveHslVar(colors.status.success)],
+      purple: [resolveHslVar(colors.bg.tertiary), resolveHslVar(colors.accent.purple)],
+      orange: [resolveHslVar(colors.bg.tertiary), resolveHslVar(colors.status.warning)],
+    };
+
+    return schemes[colorScheme] ?? schemes.blue;
+  }, [colorScheme, resolveHslVar]);
+
   // Transform data for ECharts heatmap
   const heatmapData = React.useMemo(() => {
-    return data.map(d => [d.hour, d.dayOfWeek, d.value || 0]);
+    return data.map((d) => [d.hour, d.dayOfWeek, d.value || 0]);
   }, [data]);
 
   // Use p95 percentile to cap outliers and improve color distribution
@@ -123,7 +150,7 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
       left: "center",
       bottom: 0,
       inRange: {
-        color: colorSchemes[colorScheme],
+        color: colorRange,
       },
       textStyle: {
         color: "hsl(var(--portal-text-muted))",
@@ -150,7 +177,7 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
         },
       },
     ],
-  }), [heatmapData, maxValue, colorScheme, valueLabel, formatValue, compact]);
+  }), [heatmapData, maxValue, colorRange, valueLabel, formatValue, compact]);
 
   const handleEvents = React.useMemo(() => {
     if (!onCellClick) return undefined;
