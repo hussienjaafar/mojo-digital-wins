@@ -218,10 +218,10 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
     const dataByDate: Record<string, any> = {};
     
     smsMetrics.forEach(metric => {
-      // Use send_date from sms_campaigns table, fallback to date for backwards compat
+      // Use send_date from sms_campaigns table
       const dateKey = metric.send_date 
         ? format(new Date(metric.send_date), 'yyyy-MM-dd')
-        : metric.date || '';
+        : '';
       if (!dateKey) return;
       
       if (!dataByDate[dateKey]) {
