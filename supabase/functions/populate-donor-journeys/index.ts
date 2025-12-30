@@ -186,13 +186,35 @@ serve(async (req) => {
         const donorKey = hashDonorKey(tp.donor_email);
         processedDonorKeys.add(donorKey);
 
-        // Map touchpoint types to journey event types
-        let eventType = tp.touchpoint_type || 'unknown_touchpoint';
-        if (eventType === 'ad_click') eventType = 'ad_click';
-        else if (eventType === 'ad_impression' || eventType === 'ad_view') eventType = 'ad_view';
-        else if (eventType === 'email_click') eventType = 'email_click';
-        else if (eventType === 'email_open') eventType = 'email_open';
-        else if (eventType === 'landing_page') eventType = 'landing_page_view';
+        // Map touchpoint types to meaningful journey event types based on utm_medium/source
+        let eventType = tp.touchpoint_type || 'other';
+        
+        // Improve touchpoint categorization based on actual data
+        if (eventType === 'other' || eventType === 'unknown_touchpoint') {
+          // Infer type from utm_medium
+          const medium = (tp.utm_medium || '').toLowerCase();
+          const source = (tp.utm_source || '').toLowerCase();
+          
+          if (medium.includes('cpc') || medium.includes('paid') || source.includes('facebook') || source.includes('meta')) {
+            eventType = 'ad_click';
+          } else if (medium.includes('email') || source.includes('email')) {
+            eventType = 'email_click';
+          } else if (medium.includes('sms') || source.includes('sms')) {
+            eventType = 'sms_click';
+          } else if (medium.includes('social') || source.includes('twitter') || source.includes('instagram')) {
+            eventType = 'social_click';
+          } else if (medium.includes('organic') || source.includes('google')) {
+            eventType = 'organic_search';
+          } else if (source.includes('direct') || (!tp.utm_source && !tp.utm_medium)) {
+            eventType = 'direct_visit';
+          } else {
+            eventType = 'landing_page_view';
+          }
+        } else {
+          // Map existing types
+          if (eventType === 'ad_impression' || eventType === 'ad_view') eventType = 'ad_view';
+          else if (eventType === 'landing_page') eventType = 'landing_page_view';
+        }
 
         journeyEvents.push({
           organization_id,

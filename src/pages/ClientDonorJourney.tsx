@@ -13,37 +13,44 @@ import {
   Mail,
   MousePointerClick,
   Clock,
-  Activity,
-  ChevronRight,
   Layers,
   Heart,
+  Play,
+  Database,
+  GitBranch,
   type LucideIcon,
 } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
-import { ChartPanel } from "@/components/charts/ChartPanel";
-import { DonorSegmentCard } from "@/components/client/DonorSegmentCard";
+import { DataPipelineStatus } from "@/components/client/DataPipelineStatus";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   useDonorJourneyQuery,
   useRefreshJourneyData,
   type DonorJourneyRecord,
-  type DonorSegmentSummary,
   type FunnelStage,
 } from "@/queries/useDonorJourneyQuery";
 
-import { V3MetricChip, V3FilterPill, V3ChartWrapper } from "@/components/v3";
-import { EChartsFunnelChart } from "@/components/charts/echarts";
-
-// ============================================================================
-// Local Components - Using V3 shared components
-// ============================================================================
+import {
+  V3PageContainer,
+  V3KPICard,
+  V3ChartWrapper,
+  V3LoadingState,
+  V3EmptyState,
+  V3Button,
+  V3Card,
+  V3CardHeader,
+  V3CardTitle,
+  V3CardContent,
+  V3FilterPill,
+} from "@/components/v3";
+import { EChartsFunnelChart, EChartsBarChart } from "@/components/charts/echarts";
 
 // ============================================================================
 // Touchpoint Icon Helper
@@ -52,8 +59,10 @@ import { EChartsFunnelChart } from "@/components/charts/echarts";
 const getTouchpointIcon = (type: string): LucideIcon => {
   switch (type) {
     case "meta_ad_click":
+    case "ad_click":
       return MousePointerClick;
     case "sms_send":
+    case "sms_click":
       return MessageSquare;
     case "email_open":
     case "email_click":
@@ -66,8 +75,10 @@ const getTouchpointIcon = (type: string): LucideIcon => {
 const getTouchpointColor = (type: string): string => {
   switch (type) {
     case "meta_ad_click":
+    case "ad_click":
       return "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] border-[hsl(var(--portal-accent-blue)/0.2)]";
     case "sms_send":
+    case "sms_click":
       return "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]";
     case "email_open":
     case "email_click":
@@ -78,109 +89,7 @@ const getTouchpointColor = (type: string): string => {
 };
 
 // ============================================================================
-// Journey Card Component
-// ============================================================================
-
-interface JourneyCardProps {
-  journey: DonorJourneyRecord;
-  onSelect: (journey: DonorJourneyRecord) => void;
-}
-
-const JourneyCard = ({ journey, onSelect }: JourneyCardProps) => {
-  const timeAgo = formatDistanceToNow(new Date(journey.transaction_date), { addSuffix: true });
-
-  return (
-    <motion.article
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.2 }}
-      className={cn(
-        "group relative rounded-xl border bg-[hsl(var(--portal-bg-elevated))]",
-        "border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]",
-        "transition-all duration-200 hover:shadow-md cursor-pointer"
-      )}
-      onClick={() => onSelect(journey)}
-      role="article"
-      aria-label={`Donor journey: ${journey.donor_email}`}
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect(journey);
-        }
-      }}
-    >
-      {/* Accent border top */}
-      <div className="absolute top-0 left-4 right-4 h-0.5 rounded-full bg-[hsl(var(--portal-success)/0.5)]" />
-
-      <div className="p-4">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-[hsl(var(--portal-text-primary))] truncate">
-              {journey.donor_email}
-            </h3>
-            <p className="text-xs text-[hsl(var(--portal-text-muted))] flex items-center gap-1 mt-0.5">
-              <Clock className="h-3 w-3" aria-hidden="true" />
-              {timeAgo}
-            </p>
-          </div>
-
-          <div className="text-right shrink-0">
-            <div className="flex items-center gap-1 text-xl font-bold text-[hsl(var(--portal-success))]">
-              <DollarSign className="h-5 w-5" aria-hidden="true" />
-              {journey.amount.toFixed(2)}
-            </div>
-            <Badge
-              variant="outline"
-              className="text-xs border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-secondary))]"
-            >
-              {journey.touchpoints.length} touchpoints
-            </Badge>
-          </div>
-        </div>
-
-        {/* Touchpoint Preview */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {journey.touchpoints.slice(0, 4).map((tp, idx) => {
-            const Icon = getTouchpointIcon(tp.touchpoint_type);
-            return (
-              <Badge
-                key={tp.id}
-                variant="outline"
-                className={cn("text-xs shrink-0", getTouchpointColor(tp.touchpoint_type))}
-              >
-                <Icon className="h-3 w-3 mr-1" aria-hidden="true" />
-                {tp.touchpoint_type.replace("_", " ")}
-              </Badge>
-            );
-          })}
-          {journey.touchpoints.length > 4 && (
-            <Badge
-              variant="outline"
-              className="text-xs border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))]"
-            >
-              +{journey.touchpoints.length - 4} more
-            </Badge>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end pt-3 mt-3 border-t border-[hsl(var(--portal-border)/0.5)]">
-          <div className="flex items-center gap-1 text-sm text-[hsl(var(--portal-text-muted))] group-hover:text-[hsl(var(--portal-accent-blue))] transition-colors">
-            <span className="hidden sm:inline">View journey</span>
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </div>
-        </div>
-      </div>
-    </motion.article>
-  );
-};
-
-// ============================================================================
-// Funnel Stage Colors (for EChartsFunnelChart)
+// Funnel Stage Colors
 // ============================================================================
 
 const FUNNEL_STAGE_COLORS: Record<string, string> = {
@@ -284,7 +193,7 @@ const JourneyDetailDialog = ({ journey, open, onOpenChange }: JourneyDetailDialo
                   <div className="flex-1 pt-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className={getTouchpointColor(touchpoint.touchpoint_type)}>
-                        {touchpoint.touchpoint_type.replace("_", " ")}
+                        {touchpoint.touchpoint_type.replace(/_/g, " ")}
                       </Badge>
                       {isFirst && (
                         <Badge className="bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] border border-[hsl(var(--portal-accent-blue)/0.2)]">
@@ -346,20 +255,19 @@ const JourneyDetailDialog = ({ journey, open, onOpenChange }: JourneyDetailDialo
 // ============================================================================
 
 const ClientDonorJourney = () => {
-  const { toast } = useToast();
-  const { organizationId } = useClientOrganization();
+  const { organizationId, isLoading: orgLoading } = useClientOrganization();
+  const queryClient = useQueryClient();
 
   // State
   const [minAmount, setMinAmount] = useState(0);
-  const [activeTab, setActiveTab] = useState<"journeys" | "segments">("journeys");
   const [selectedJourney, setSelectedJourney] = useState<DonorJourneyRecord | null>(null);
-  const [selectedSegment, setSelectedSegment] = useState<DonorSegmentSummary | null>(null);
+  const [isRunningJourneys, setIsRunningJourneys] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Query
   const {
     data,
     isLoading,
-    isFetching,
     error,
     refetch,
     dataUpdatedAt,
@@ -372,31 +280,88 @@ const ClientDonorJourney = () => {
   const journeys = data?.journeys || [];
   const segments = data?.segments || [];
   const funnel = data?.funnel || [];
+  const touchpointSummary = data?.touchpointSummary || [];
 
+  // Pipeline status data
+  const pipelineData = useMemo(() => [
+    {
+      name: 'Journeys',
+      table: 'donor_journeys',
+      count: (data?.meta?.journeyEvents as any)?.returnedCount || 0,
+      description: 'Journey events',
+    },
+    {
+      name: 'Touchpoints',
+      table: 'attribution_touchpoints',
+      count: (data?.meta?.touchpoints as any)?.returnedCount || 0,
+      description: 'Attribution data',
+    },
+    {
+      name: 'Transactions',
+      table: 'actblue_transactions',
+      count: (data?.meta?.transactions as any)?.returnedCount || 0,
+      description: 'Donation records',
+    },
+    {
+      name: 'Segments',
+      table: 'donor_demographics',
+      count: segments.reduce((sum, s) => sum + s.count, 0),
+      description: 'Donor tiers',
+    },
+  ], [data, segments]);
+
+  // Touchpoint distribution for chart
+  const touchpointChartData = useMemo(() => {
+    return touchpointSummary
+      .map(tp => ({
+        name: tp.touchpoint_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        value: tp.count,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+  }, [touchpointSummary]);
 
   // Handlers
+  const handleRunJourneysPipeline = async () => {
+    if (!organizationId) return;
+    
+    setIsRunningJourneys(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('populate-donor-journeys', {
+        body: { 
+          organization_id: organizationId,
+          days_back: 365
+        }
+      });
+      
+      if (error) {
+        console.error('Journeys pipeline error:', error);
+        toast.error('Failed to run journeys pipeline');
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['donorJourney'] });
+        toast.success(`Journeys populated: ${result?.events_created || 0} events for ${result?.unique_donors || 0} donors`);
+      }
+    } catch (err) {
+      console.error('Journeys pipeline error:', err);
+      toast.error('Failed to run journeys pipeline');
+    } finally {
+      setIsRunningJourneys(false);
+    }
+  };
+
   const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
     try {
       await refreshMutation.mutateAsync();
-      toast({
-        title: "Journey data refreshed",
-        description: "The donor journey analytics have been updated.",
-      });
+      toast.success('Journey data refreshed');
     } catch {
-      toast({
-        title: "Refresh failed",
-        description: "Unable to refresh journey data. Please try again.",
-        variant: "destructive",
-      });
+      toast.error('Unable to refresh journey data');
+    } finally {
+      setIsRefreshing(false);
     }
-  }, [refreshMutation, toast]);
+  }, [refreshMutation]);
 
-  const handleInviteToCampaign = useCallback((segment: DonorSegmentSummary) => {
-    toast({
-      title: "Campaign invitation",
-      description: `Preparing to invite ${segment.count} donors from "${segment.name}" segment.`,
-    });
-  }, [toast]);
+  const isPipelineRunning = isRunningJourneys || isRefreshing;
 
   // Amount filter options
   const amountFilters = [
@@ -407,69 +372,115 @@ const ClientDonorJourney = () => {
     { label: "$250+", value: 250 },
   ];
 
+  if (orgLoading || !organizationId) {
+    return (
+      <ClientShell pageTitle="Donor Journey">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-pulse text-muted-foreground">Loading...</div>
+        </div>
+      </ClientShell>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <ClientShell pageTitle="Donor Journey">
+        <V3PageContainer
+          icon={GitBranch}
+          title="Donor Journey"
+          description="Multi-touch attribution and conversion funnel analytics"
+        >
+          <V3LoadingState variant="kpi-grid" count={4} />
+          <div className="mt-6">
+            <V3LoadingState variant="chart" height={300} />
+          </div>
+        </V3PageContainer>
+      </ClientShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <ClientShell pageTitle="Donor Journey">
+        <V3PageContainer
+          icon={GitBranch}
+          title="Donor Journey"
+          description="Multi-touch attribution and conversion funnel analytics"
+        >
+          <V3EmptyState
+            title="Failed to Load Data"
+            description={error?.message || "An error occurred while loading journey data"}
+            accent="red"
+          />
+        </V3PageContainer>
+      </ClientShell>
+    );
+  }
+
   return (
-    <ClientShell pageTitle="Donor Journey" showDateControls={false}>
-      <div className="space-y-6">
-        {/* Hero Panel */}
-        <ChartPanel
-          title="Donor Journey & Attribution"
-          description="Multi-touch attribution insights and donor lifecycle analytics"
-          icon={Activity}
-          isLoading={isLoading}
-          error={error}
-          onRetry={refetch}
-          minHeight={120}
-          actions={
-            <Button
+    <ClientShell pageTitle="Donor Journey">
+      <V3PageContainer
+        icon={GitBranch}
+        title="Donor Journey"
+        description="Multi-touch attribution and conversion funnel analytics"
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            <V3Button
               variant="outline"
               size="sm"
-              onClick={handleRefresh}
-              disabled={isFetching}
-              className="gap-2"
+              onClick={handleRunJourneysPipeline}
+              disabled={isPipelineRunning}
+              title="Generate donor journey events from transactions"
             >
-              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
-              Refresh
-            </Button>
-          }
-        >
-          <div className="flex flex-wrap gap-3">
-            <V3MetricChip
-              label="Total Donors"
-              value={stats?.totalDonors.toLocaleString() || "0"}
-              icon={Users}
-            />
-            <V3MetricChip
-              label="New vs Returning"
-              value={`${stats?.newVsReturningRatio.toFixed(0)}% new`}
-              icon={TrendingUp}
-              variant="info"
-            />
-            <V3MetricChip
-              label="Retention Rate"
-              value={`${stats?.retentionMetrics.retentionRate.toFixed(0)}%`}
-              icon={Heart}
-              variant={
-                (stats?.retentionMetrics.retentionRate || 0) >= 50
-                  ? "success"
-                  : "warning"
-              }
-            />
-            <V3MetricChip
-              label="Avg Donation"
-              value={`$${stats?.avgDonation.toFixed(0) || "0"}`}
-              icon={DollarSign}
-              variant="success"
-            />
-            <V3MetricChip
-              label="Avg Touchpoints"
-              value={stats?.avgTouchpointsBeforeConversion.toFixed(1) || "0"}
-              icon={Layers}
-            />
+              <Play className={`h-4 w-4 mr-2 ${isRunningJourneys ? 'animate-pulse' : ''}`} />
+              {isRunningJourneys ? 'Running...' : 'Run Pipeline'}
+            </V3Button>
+            <V3Button
+              variant="secondary"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isPipelineRunning}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </V3Button>
           </div>
-        </ChartPanel>
+        }
+      >
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <V3KPICard
+            icon={Users}
+            label="Total Donors"
+            value={(stats?.totalDonors || 0).toLocaleString()}
+            subtitle="Unique donors analyzed"
+            accent="blue"
+          />
+          <V3KPICard
+            icon={TrendingUp}
+            label="Avg Touchpoints"
+            value={(stats?.avgTouchpointsBeforeConversion || 0).toFixed(1)}
+            subtitle="Before conversion"
+            accent="purple"
+          />
+          <V3KPICard
+            icon={Heart}
+            label="Retention Rate"
+            value={`${(stats?.retentionMetrics.retentionRate || 0).toFixed(0)}%`}
+            subtitle="Repeat donors"
+            accent={(stats?.retentionMetrics.retentionRate || 0) >= 50 ? "green" : "amber"}
+          />
+          <V3KPICard
+            icon={DollarSign}
+            label="Avg Donation"
+            value={`$${(stats?.avgDonation || 0).toFixed(0)}`}
+            subtitle="Per transaction"
+            accent="green"
+          />
+        </div>
 
         {/* Filter Bar */}
-        <div className="flex flex-wrap items-center gap-3 px-1">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-sm text-[hsl(var(--portal-text-muted))]">
             <Filter className="h-4 w-4" />
             <span>Min Amount:</span>
@@ -486,139 +497,189 @@ const ClientDonorJourney = () => {
           </div>
         </div>
 
-        {/* Journey Funnel Panel */}
-        <V3ChartWrapper
-          title="Conversion Funnel"
-          description="Donor progression through acquisition stages"
-          icon={Target}
-          isLoading={isLoading}
-          ariaLabel="Funnel chart showing donor conversion stages from awareness to advocacy"
-          dataSummary={funnel.length > 0 ? `${funnel.length} stages. Top of funnel: ${funnel[0]?.count.toLocaleString()} donors. Conversion stage: ${funnel.find(f => f.stage === 'conversion')?.count.toLocaleString() || 0} donors.` : undefined}
-        >
-          {funnel.length === 0 ? (
-            <div className="flex items-center justify-center h-[250px] text-sm text-[hsl(var(--portal-text-muted))]">
-              No funnel data available
+        {/* Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Conversion Funnel */}
+          <V3ChartWrapper
+            title="Conversion Funnel"
+            description="Donor progression through acquisition stages"
+            icon={Target}
+            isLoading={isLoading}
+            ariaLabel="Funnel chart showing donor conversion stages"
+          >
+            {funnel.length === 0 || funnel.every(f => f.count === 0) ? (
+              <div className="h-[280px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
+                <div className="text-center">
+                  <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No funnel data available</p>
+                  <p className="text-sm">Run the pipeline to generate journey events</p>
+                </div>
+              </div>
+            ) : (
+              <EChartsFunnelChart
+                data={funnel.map(stage => ({
+                  name: stage.label,
+                  value: stage.count,
+                  color: FUNNEL_STAGE_COLORS[stage.stage],
+                }))}
+                height={280}
+                showConversionRates
+                valueType="number"
+              />
+            )}
+          </V3ChartWrapper>
+
+          {/* Touchpoint Distribution */}
+          <V3ChartWrapper
+            title="Touchpoint Distribution"
+            description="Types of interactions before conversion"
+            icon={Layers}
+            isLoading={isLoading}
+            ariaLabel="Bar chart showing touchpoint types"
+          >
+            {touchpointChartData.length === 0 ? (
+              <div className="h-[280px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
+                <div className="text-center">
+                  <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No touchpoint data available</p>
+                  <p className="text-sm">Run the pipeline to generate touchpoint data</p>
+                </div>
+              </div>
+            ) : (
+              <EChartsBarChart
+                data={touchpointChartData}
+                xAxisKey="name"
+                series={[{ dataKey: "value", name: "Touchpoints" }]}
+                height={280}
+                valueType="number"
+              />
+            )}
+          </V3ChartWrapper>
+        </div>
+
+        {/* Attribution Model */}
+        <V3Card>
+          <V3CardHeader>
+            <V3CardTitle className="flex items-center gap-2">
+              <Layers className="h-4 w-4" />
+              Multi-Touch Attribution Model
+            </V3CardTitle>
+            <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
+              40% First Touch • 20% Middle Touches • 40% Last Touch
+            </p>
+          </V3CardHeader>
+          <V3CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
+                <div className="text-3xl font-bold text-[hsl(var(--portal-accent-blue))]">40%</div>
+                <div className="text-sm text-[hsl(var(--portal-text-muted))]">First Touch</div>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Initial awareness</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-success)/0.1)]">
+                <div className="text-3xl font-bold text-[hsl(var(--portal-success))]">20%</div>
+                <div className="text-sm text-[hsl(var(--portal-text-muted))]">Middle Touches</div>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Nurturing phase</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]">
+                <div className="text-3xl font-bold text-[hsl(var(--portal-accent-purple))]">40%</div>
+                <div className="text-sm text-[hsl(var(--portal-text-muted))]">Last Touch</div>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Final conversion</p>
+              </div>
             </div>
-          ) : (
-            <EChartsFunnelChart
-              data={funnel.map(stage => ({
-                name: stage.label,
-                value: stage.count,
-                color: FUNNEL_STAGE_COLORS[stage.stage],
-              }))}
-              height={280}
-              showConversionRates
-              valueType="number"
-            />
-          )}
-        </V3ChartWrapper>
+          </V3CardContent>
+        </V3Card>
 
-        {/* Journeys & Segments Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "journeys" | "segments")}>
-          <TabsList className="bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
-            <TabsTrigger
-              value="journeys"
-              className="data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white"
-            >
-              Recent Journeys
-              {journeys.length > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {journeys.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger
-              value="segments"
-              className="data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white"
-            >
-              Donor Segments
-              {segments.length > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {segments.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="journeys" className="mt-4">
-            <ChartPanel
-              title="Recent Donor Journeys"
-              description="Multi-touch attribution paths leading to conversions"
-              icon={ArrowRight}
-              isLoading={isLoading}
-              isEmpty={journeys.length === 0}
-              emptyMessage="No donor journeys found for the selected filters"
-              minHeight={300}
-            >
-              <ScrollArea className="h-[400px] pr-4">
-                <AnimatePresence mode="popLayout">
-                  <div className="space-y-4">
-                    {journeys.map((journey) => (
-                      <JourneyCard
-                        key={journey.id}
-                        journey={journey}
-                        onSelect={setSelectedJourney}
-                      />
+        {/* Recent Journeys Table */}
+        <V3Card>
+          <V3CardHeader>
+            <V3CardTitle className="flex items-center gap-2">
+              <ArrowRight className="h-4 w-4" />
+              Recent Donor Journeys
+            </V3CardTitle>
+            <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
+              {journeys.length} journeys with attribution paths
+            </p>
+          </V3CardHeader>
+          <V3CardContent>
+            {journeys.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[hsl(var(--portal-border))]">
+                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Donor</th>
+                      <th className="text-right py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Amount</th>
+                      <th className="text-center py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Touchpoints</th>
+                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Date</th>
+                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {journeys.slice(0, 10).map((journey, idx) => (
+                      <tr 
+                        key={journey.id || idx}
+                        className="border-b border-[hsl(var(--portal-border)/0.5)] hover:bg-[hsl(var(--portal-bg-elevated))]"
+                      >
+                        <td className="py-3 px-4">
+                          <span className="font-mono text-xs text-[hsl(var(--portal-text-primary))]">
+                            {journey.donor_email?.slice(0, 20)}...
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-semibold text-[hsl(var(--portal-success))]">
+                          ${journey.amount.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {journey.touchpoints.slice(0, 3).map((tp, tpIdx) => {
+                              const Icon = getTouchpointIcon(tp.touchpoint_type);
+                              return (
+                                <div
+                                  key={tpIdx}
+                                  className="w-6 h-6 rounded-full bg-[hsl(var(--portal-bg-elevated))] flex items-center justify-center"
+                                  title={tp.touchpoint_type}
+                                >
+                                  <Icon className="h-3 w-3 text-[hsl(var(--portal-text-muted))]" />
+                                </div>
+                              );
+                            })}
+                            {journey.touchpoints.length > 3 && (
+                              <span className="text-xs text-[hsl(var(--portal-text-muted))]">
+                                +{journey.touchpoints.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-[hsl(var(--portal-text-muted))]">
+                          {formatDistanceToNow(new Date(journey.transaction_date), { addSuffix: true })}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedJourney(journey)}
+                            className="text-[hsl(var(--portal-accent-blue))]"
+                          >
+                            View
+                          </Button>
+                        </td>
+                      </tr>
                     ))}
-                  </div>
-                </AnimatePresence>
-              </ScrollArea>
-            </ChartPanel>
-          </TabsContent>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
+                <div className="text-center">
+                  <ArrowRight className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No journey data available</p>
+                  <p className="text-sm">Run the pipeline to generate donor journeys</p>
+                </div>
+              </div>
+            )}
+          </V3CardContent>
+        </V3Card>
 
-          <TabsContent value="segments" className="mt-4">
-            <ChartPanel
-              title="Donor Segments"
-              description="Behavioral cohorts and retention insights"
-              icon={Users}
-              isLoading={isLoading}
-              isEmpty={segments.length === 0}
-              emptyMessage="No donor segments available"
-              minHeight={300}
-            >
-              <ScrollArea className="h-[400px] pr-4">
-                <AnimatePresence mode="popLayout">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {segments.map((segment) => (
-                      <DonorSegmentCard
-                        key={segment.id}
-                        segment={segment}
-                        onSelect={setSelectedSegment}
-                        onInviteToCampaign={handleInviteToCampaign}
-                      />
-                    ))}
-                  </div>
-                </AnimatePresence>
-              </ScrollArea>
-            </ChartPanel>
-          </TabsContent>
-        </Tabs>
-
-        {/* Attribution Model Info */}
-        <ChartPanel
-          title="Multi-Touch Attribution Model"
-          description="40% First Touch • 20% Middle Touches • 40% Last Touch"
-          icon={Layers}
-          minHeight={100}
-        >
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
-              <div className="text-3xl font-bold text-[hsl(var(--portal-accent-blue))]">40%</div>
-              <div className="text-sm text-[hsl(var(--portal-text-muted))]">First Touch</div>
-              <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Initial awareness</p>
-            </div>
-            <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-success)/0.1)]">
-              <div className="text-3xl font-bold text-[hsl(var(--portal-success))]">20%</div>
-              <div className="text-sm text-[hsl(var(--portal-text-muted))]">Middle Touches</div>
-              <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Nurturing phase</p>
-            </div>
-            <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]">
-              <div className="text-3xl font-bold text-[hsl(var(--portal-accent-purple))]">40%</div>
-              <div className="text-sm text-[hsl(var(--portal-text-muted))]">Last Touch</div>
-              <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Final conversion</p>
-            </div>
-          </div>
-        </ChartPanel>
+        {/* Data Pipeline Status */}
+        <DataPipelineStatus pipelines={pipelineData} isLoading={isLoading} />
 
         {/* Data Freshness */}
         {dataUpdatedAt > 0 && (
@@ -626,7 +687,7 @@ const ClientDonorJourney = () => {
             Data updated {formatDistanceToNow(dataUpdatedAt, { addSuffix: true })}
           </p>
         )}
-      </div>
+      </V3PageContainer>
 
       {/* Journey Detail Dialog */}
       <JourneyDetailDialog
