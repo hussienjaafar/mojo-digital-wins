@@ -189,30 +189,45 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
     });
   }, [dailyData, startDate, endDate]);
 
-  // Key metrics with trends
+  // Key metrics with trends - calculate LTV/CAC from actual data
   const keyMetrics = useMemo(() => {
     const currentTotal = dailyData.reduce((sum, d) => sum + d.revenue, 0);
     const currentSpend = dailyData.reduce((sum, d) => sum + d.totalSpend, 0);
     const currentDonors = transactions.length;
 
-    // Calculate previous period
+    // Calculate previous period for trend
     const midpoint = Math.floor(dailyData.length / 2);
     const previousRevenue = dailyData.slice(0, midpoint).reduce((sum, d) => sum + d.revenue, 0);
-    const previousSpend = dailyData.slice(0, midpoint).reduce((sum, d) => sum + d.totalSpend, 0);
 
     const revenueTrend = calculateTrend(currentTotal, previousRevenue);
     const cacValue = calculateCAC(currentSpend, currentDonors);
-    const ltvValue = calculateLTV(
-      currentDonors > 0 ? currentTotal / currentDonors : 0,
-      2.5, // avg donations per year
-      3    // retention years
-    );
+
+    // Calculate average donation and estimate annual frequency from data
+    const avgDonation = currentDonors > 0 ? currentTotal / currentDonors : 0;
+    
+    // Calculate days in selected period to estimate annual donation frequency
+    const periodDays = dailyData.length || 1;
+    const donationsPerYear = periodDays > 0 ? (currentDonors / periodDays) * 365 : 0;
+    
+    // Use conservative retention estimate based on recurring donor ratio
+    const recurringCount = transactions.filter(t => t.is_recurring).length;
+    const recurringRate = currentDonors > 0 ? recurringCount / currentDonors : 0;
+    // Higher recurring rate = longer retention (1.5 to 4 years based on recurring percentage)
+    const estimatedRetentionYears = 1.5 + (recurringRate * 2.5);
+    
+    const ltvValue = calculateLTV(avgDonation, Math.min(donationsPerYear / currentDonors || 1, 12), estimatedRetentionYears);
+
+    // Confidence indicator based on sample size
+    const hasEnoughData = currentDonors >= 30 && periodDays >= 14;
 
     return {
       revenue: revenueTrend,
       cac: cacValue,
       ltv: ltvValue,
       ltvCacRatio: cacValue > 0 ? ltvValue / cacValue : 0,
+      confidence: hasEnoughData ? 'high' : currentDonors >= 10 ? 'medium' : 'low',
+      sampleSize: currentDonors,
+      periodDays,
     };
   }, [dailyData, transactions]);
 
@@ -243,6 +258,23 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Confidence Indicator */}
+      {keyMetrics.confidence !== 'high' && (
+        <div className={`flex items-center gap-2 p-3 rounded-lg text-sm ${
+          keyMetrics.confidence === 'low' 
+            ? 'bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]' 
+            : 'bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))]'
+        }`}>
+          <TrendingUp className="h-4 w-4" />
+          <span>
+            {keyMetrics.confidence === 'low' 
+              ? `Limited data: ${keyMetrics.sampleSize} donors over ${keyMetrics.periodDays} days. LTV/CAC estimates may be less reliable.`
+              : `Moderate confidence: ${keyMetrics.sampleSize} donors. Consider extending date range for more accurate LTV estimates.`
+            }
+          </span>
+        </div>
+      )}
+
       {/* Key Metrics */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <V3KPICard
@@ -266,7 +298,7 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
           icon={TrendingUp}
           label="LTV"
           value={`$${keyMetrics.ltv.toFixed(2)}`}
-          subtitle="Lifetime Value"
+          subtitle={`Est. ${keyMetrics.confidence} confidence`}
           accent="green"
         />
         <V3KPICard
