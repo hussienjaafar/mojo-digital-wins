@@ -105,7 +105,7 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
       items: [
         { title: "Demographics", url: "/client/demographics", icon: Users },
         { title: "Donor Journey", url: "/client/journey", icon: TrendingUp },
-        { title: "Donor Intelligence", url: "/client/intelligence", icon: Brain },
+        { title: "Donor Intelligence", url: "/client/donor-intelligence", icon: Brain },
       ],
     },
     {
