@@ -182,10 +182,10 @@ async function fetchDonorJourneyData(
       .order("transaction_date", { ascending: false })
       .limit(QUERY_LIMITS.transactions),
 
-    // Donor demographics - direct table query (bypasses RLS views)
+    // Donor demographics - direct table query with correct column names
     sb
       .from("donor_demographics")
-      .select("donor_id_hash, total_amount, donation_count, is_new_donor, recency_days, avg_donation, largest_donation")
+      .select("id, donor_email, total_donated, donation_count, first_donation_date, last_donation_date, is_recurring, organization_id")
       .eq("organization_id", organizationId)
       .limit(QUERY_LIMITS.segments),
 
@@ -273,12 +273,15 @@ async function fetchDonorJourneyData(
   }
 
   // Calculate segment summaries from donor_demographics
-  // Create tiers based on total_amount
+  // Derive values from actual columns: total_donated, donation_count, first_donation_date, last_donation_date
+  const now = Date.now();
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  
   const segmentGroups = segments.reduce((acc: any, donor: any) => {
-    const amount = Number(donor.total_amount || 0);
+    const amount = Number(donor.total_donated || 0);
     const donationCount = Number(donor.donation_count || 1);
     
-    // Determine tier based on amount
+    // Determine tier based on total_donated
     let tier = 'minnow';
     if (amount >= 1000) tier = 'whale';
     else if (amount >= 250) tier = 'dolphin';
@@ -300,8 +303,13 @@ async function fetchDonorJourneyData(
   const segmentSummaries: DonorSegmentSummary[] = Object.entries(segmentGroups).map(
     ([key, group]: [string, any], idx) => {
       const donors = group.donors;
-      const totalValue = donors.reduce((sum: number, d: any) => sum + Number(d.total_amount || 0), 0);
-      const avgRecency = donors.reduce((sum: number, d: any) => sum + Number(d.recency_days || 30), 0) / donors.length;
+      const totalValue = donors.reduce((sum: number, d: any) => sum + Number(d.total_donated || 0), 0);
+      // Calculate recency from last_donation_date
+      const avgRecency = donors.reduce((sum: number, d: any) => {
+        if (!d.last_donation_date) return sum + 30;
+        const recencyDays = Math.floor((now - new Date(d.last_donation_date).getTime()) / (1000 * 60 * 60 * 24));
+        return sum + recencyDays;
+      }, 0) / donors.length;
       const returningDonors = donors.filter((d: any) => Number(d.donation_count || 1) > 1).length;
       const retentionRate = donors.length > 0 ? (returningDonors / donors.length) * 100 : 0;
       const trend = 0; // Would be calculated from historical data
