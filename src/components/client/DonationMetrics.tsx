@@ -11,16 +11,11 @@ import {
   V3ErrorState,
   V3EmptyState,
 } from "@/components/v3";
-import { PortalBadge } from "@/components/portal/PortalBadge";
 import { Input } from "@/components/ui/input";
 import { Search, DollarSign, Users, Repeat, TrendingUp, PieChart, BarChart3, Filter, ShieldAlert, Heart, UserPlus, Receipt } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
-import { NoResultsEmptyState } from "@/components/portal/PortalEmptyState";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PortalLineChart } from "@/components/portal/PortalLineChart";
-import { PortalMultiBarChart } from "@/components/portal/PortalMultiBarChart";
-import { PortalPieChart } from "@/components/portal/PortalPieChart";
+import { EChartsLineChart, EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
 import { usePIIAccess } from "@/hooks/usePIIAccess";
 import { maskDonorInfo } from "@/lib/pii-masking";
 import { useDonationMetricsQuery } from "@/queries";
@@ -243,14 +238,18 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Line chart displaying daily donation amounts and transaction counts"
           accent="green"
         >
-          <PortalLineChart
+          <EChartsLineChart
             data={trendChartData}
-            lines={[
-              { dataKey: "Amount", name: "Amount", stroke: "hsl(var(--portal-success))", valueType: "currency" },
-              { dataKey: "Donations", name: "Donations", stroke: "hsl(var(--portal-accent-blue))", valueType: "number" },
+            xAxisKey="name"
+            series={[
+              { dataKey: "Amount", name: "Amount", color: "hsl(var(--portal-success))" },
+              { dataKey: "Donations", name: "Donations", color: "hsl(var(--portal-accent-blue))" },
             ]}
             valueType="currency"
-            ariaLabel="Donation trend showing daily amounts and transaction counts over time"
+            dualYAxis
+            yAxisValueTypeLeft="currency"
+            yAxisValueTypeRight="number"
+            height={280}
           />
         </V3ChartWrapper>
       )}
@@ -266,11 +265,17 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
             description="Distribution of donations by refcode and source campaign"
             accent="blue"
           >
-            <PortalPieChart
-              data={attributionData}
-              colors={CHART_COLORS}
+            <EChartsPieChart
+              data={attributionData.map((d, i) => ({ 
+                name: d.name, 
+                value: d.value,
+                color: CHART_COLORS[i % CHART_COLORS.length]
+              }))}
               valueType="currency"
-              ariaLabel="Attribution breakdown by source showing donation amounts"
+              variant="donut"
+              showLabels
+              labelThreshold={5}
+              height={280}
             />
           </V3ChartWrapper>
         )}
@@ -284,14 +289,15 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
             description="Comparison of one-time vs recurring donations"
             accent="purple"
           >
-            <PortalMultiBarChart
+            <EChartsBarChart
               data={giftSizeData}
-              bars={[
-                { dataKey: "amount", name: "Amount", fill: "hsl(var(--portal-success))", valueType: "currency" },
-                { dataKey: "count", name: "Count", fill: "hsl(var(--portal-accent-blue))", valueType: "number" },
+              xAxisKey="name"
+              series={[
+                { dataKey: "amount", name: "Amount" },
+                { dataKey: "count", name: "Count" },
               ]}
               valueType="currency"
-              ariaLabel="Donation type breakdown showing one-time vs recurring"
+              height={280}
             />
           </V3ChartWrapper>
         )}

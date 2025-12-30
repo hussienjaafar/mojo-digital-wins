@@ -45,26 +45,34 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
+  // Normalize data to have a common 'date' field for grouping
+  const normalizedData = useMemo(() => {
+    const metaNorm = metaMetrics.map(m => ({ ...m, _date: m.date, _type: 'meta' as const }));
+    const smsNorm = smsMetrics.map(m => ({ ...m, _date: m.send_date || '', _type: 'sms' as const }));
+    const txNorm = transactions.map(t => ({ ...t, _date: t.transaction_date?.split('T')[0] || '', _type: 'transaction' as const }));
+    return [...metaNorm, ...smsNorm, ...txNorm].filter(item => item._date);
+  }, [metaMetrics, smsMetrics, transactions]);
+
   // Calculate daily aggregated data
   const dailyData = useMemo(() => {
     return groupByPeriod(
-      [...metaMetrics, ...smsMetrics, ...transactions],
-      'date',
+      normalizedData,
+      '_date',
       'day',
       (items) => {
         const metaSpend = items
-          .filter((i: any) => 'spend' in i)
+          .filter((i: any) => i._type === 'meta')
           .reduce((sum, i: any) => sum + Number(i.spend || 0), 0);
         
         const smsSpend = items
-          .filter((i: any) => 'cost' in i)
+          .filter((i: any) => i._type === 'sms')
           .reduce((sum, i: any) => sum + Number(i.cost || 0), 0);
         
         const revenue = items
-          .filter((i: any) => 'amount' in i)
+          .filter((i: any) => i._type === 'transaction')
           .reduce((sum, i: any) => sum + Number(i.amount || 0), 0);
         
-        const conversions = items.filter((i: any) => 'amount' in i).length;
+        const conversions = items.filter((i: any) => i._type === 'transaction').length;
 
         return {
           totalSpend: metaSpend + smsSpend,
@@ -76,7 +84,7 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
         };
       }
     ).sort((a, b) => a.period.localeCompare(b.period));
-  }, [metaMetrics, smsMetrics, transactions]);
+  }, [normalizedData]);
 
   // Revenue forecast
   const revenueForecast = useMemo(() => {

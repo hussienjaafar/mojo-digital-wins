@@ -12,12 +12,10 @@ import {
   V3EmptyState,
 } from "@/components/v3";
 import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
-import { PortalBadge } from "@/components/portal/PortalBadge";
 import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, parseISO } from "date-fns";
-import { PortalLineChart } from "@/components/portal/PortalLineChart";
-import { PortalMultiBarChart } from "@/components/portal/PortalMultiBarChart";
+import { EChartsLineChart, EChartsBarChart } from "@/components/charts/echarts";
 import { useSMSMetricsQuery } from "@/queries";
 import { formatRatio, formatCurrency } from "@/lib/chart-formatters";
 
@@ -25,12 +23,6 @@ type Props = {
   organizationId: string;
   startDate: string;
   endDate: string;
-};
-
-const CHART_COLORS = {
-  sent: "hsl(var(--portal-accent-purple))",
-  conversions: "hsl(var(--portal-success))",
-  raised: "hsl(var(--portal-accent-blue))",
 };
 
 // Animation variants for staggered KPI cards
@@ -235,14 +227,15 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Line chart displaying daily SMS send volume and conversion trends"
           accent="purple"
         >
-          <PortalLineChart
+          <EChartsLineChart
             data={trendChartData}
-            lines={[
-              { dataKey: "Sent", name: "Messages Sent", stroke: CHART_COLORS.sent, valueType: "number" },
-              { dataKey: "Conversions", name: "Conversions", stroke: CHART_COLORS.conversions, valueType: "number" },
+            xAxisKey="name"
+            series={[
+              { dataKey: "Sent", name: "Messages Sent", color: "hsl(var(--portal-accent-purple))" },
+              { dataKey: "Conversions", name: "Conversions", color: "hsl(var(--portal-success))" },
             ]}
             valueType="number"
-            ariaLabel="SMS campaign performance trend showing messages sent and conversions over time"
+            height={280}
           />
         </V3ChartWrapper>
       )}
@@ -256,13 +249,14 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Bar chart comparing ROI performance across top SMS campaigns"
           accent="purple"
         >
-          <PortalMultiBarChart
+          <EChartsBarChart
             data={roiComparisonData}
-            bars={[
-              { dataKey: "roi", name: "ROI", fill: CHART_COLORS.conversions, valueType: "ratio" },
+            xAxisKey="name"
+            series={[
+              { dataKey: "roi", name: "ROI" },
             ]}
             valueType="ratio"
-            ariaLabel="Campaign ROI comparison showing return on investment by campaign"
+            height={280}
           />
         </V3ChartWrapper>
       )}

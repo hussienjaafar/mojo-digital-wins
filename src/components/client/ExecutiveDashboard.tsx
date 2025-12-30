@@ -347,11 +347,12 @@ const ExecutiveDashboard = () => {
     });
 
     smsMetrics.forEach((m) => {
-      const date = m.date;
+      const date = m.send_date || '';
+      if (!date) return;
       if (!dateMap.has(date)) {
         dateMap.set(date, { date, metaSpend: 0, smsSpend: 0, revenue: 0 });
       }
-      dateMap.get(date).smsSpend += Number(m.cost || 0);
+      dateMap.get(date)!.smsSpend += Number(m.cost || 0);
     });
 
     transactions.forEach((t) => {
