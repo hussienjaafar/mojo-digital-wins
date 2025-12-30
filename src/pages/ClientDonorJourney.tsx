@@ -287,19 +287,19 @@ const ClientDonorJourney = () => {
     {
       name: 'Journeys',
       table: 'donor_journeys',
-      count: (data?.meta?.journeyEvents as any)?.returnedCount || 0,
+      count: (data?.meta?.journeyEvents as any)?.actualCount || 0,
       description: 'Journey events',
     },
     {
       name: 'Touchpoints',
       table: 'attribution_touchpoints',
-      count: (data?.meta?.touchpoints as any)?.returnedCount || 0,
+      count: (data?.meta?.touchpoints as any)?.actualCount || 0,
       description: 'Attribution data',
     },
     {
       name: 'Transactions',
       table: 'actblue_transactions',
-      count: (data?.meta?.transactions as any)?.returnedCount || 0,
+      count: (data?.meta?.transactions as any)?.actualCount || 0,
       description: 'Donation records',
     },
     {
