@@ -3828,6 +3828,8 @@ export type Database = {
           campaign_id: string
           clicks: number | null
           color_palette: string[] | null
+          comments: number | null
+          conversion_rate_ranking: string | null
           conversion_value: number | null
           conversions: number | null
           created_at: string | null
@@ -3840,8 +3842,10 @@ export type Database = {
           detected_text: string | null
           effectiveness_score: number | null
           emotional_appeal: string | null
+          engagement_rate_ranking: string | null
           extracted_refcode: string | null
           first_seen_at: string | null
+          frequency: number | null
           has_faces: boolean | null
           headline: string | null
           id: string
@@ -3856,11 +3860,18 @@ export type Database = {
           meta_video_id: string | null
           organization_id: string
           performance_tier: string | null
+          post_engagement: number | null
           primary_text: string | null
+          quality_ranking: string | null
+          reactions_like: number | null
+          reactions_love: number | null
+          reactions_other: number | null
+          reactions_total: number | null
           refcode_source: string | null
           roas: number | null
           sentiment_label: string | null
           sentiment_score: number | null
+          shares: number | null
           spend: number | null
           thumbnail_url: string | null
           tone: string | null
@@ -3874,7 +3885,14 @@ export type Database = {
           updated_at: string | null
           urgency_level: string | null
           verbal_themes: string[] | null
+          video_avg_watch_time_seconds: number | null
           video_duration_seconds: number | null
+          video_p100: number | null
+          video_p25: number | null
+          video_p50: number | null
+          video_p75: number | null
+          video_plays: number | null
+          video_thruplay: number | null
           video_url: string | null
           visual_analysis: Json | null
         }
@@ -3888,6 +3906,8 @@ export type Database = {
           campaign_id: string
           clicks?: number | null
           color_palette?: string[] | null
+          comments?: number | null
+          conversion_rate_ranking?: string | null
           conversion_value?: number | null
           conversions?: number | null
           created_at?: string | null
@@ -3900,8 +3920,10 @@ export type Database = {
           detected_text?: string | null
           effectiveness_score?: number | null
           emotional_appeal?: string | null
+          engagement_rate_ranking?: string | null
           extracted_refcode?: string | null
           first_seen_at?: string | null
+          frequency?: number | null
           has_faces?: boolean | null
           headline?: string | null
           id?: string
@@ -3916,11 +3938,18 @@ export type Database = {
           meta_video_id?: string | null
           organization_id: string
           performance_tier?: string | null
+          post_engagement?: number | null
           primary_text?: string | null
+          quality_ranking?: string | null
+          reactions_like?: number | null
+          reactions_love?: number | null
+          reactions_other?: number | null
+          reactions_total?: number | null
           refcode_source?: string | null
           roas?: number | null
           sentiment_label?: string | null
           sentiment_score?: number | null
+          shares?: number | null
           spend?: number | null
           thumbnail_url?: string | null
           tone?: string | null
@@ -3934,7 +3963,14 @@ export type Database = {
           updated_at?: string | null
           urgency_level?: string | null
           verbal_themes?: string[] | null
+          video_avg_watch_time_seconds?: number | null
           video_duration_seconds?: number | null
+          video_p100?: number | null
+          video_p25?: number | null
+          video_p50?: number | null
+          video_p75?: number | null
+          video_plays?: number | null
+          video_thruplay?: number | null
           video_url?: string | null
           visual_analysis?: Json | null
         }
@@ -3948,6 +3984,8 @@ export type Database = {
           campaign_id?: string
           clicks?: number | null
           color_palette?: string[] | null
+          comments?: number | null
+          conversion_rate_ranking?: string | null
           conversion_value?: number | null
           conversions?: number | null
           created_at?: string | null
@@ -3960,8 +3998,10 @@ export type Database = {
           detected_text?: string | null
           effectiveness_score?: number | null
           emotional_appeal?: string | null
+          engagement_rate_ranking?: string | null
           extracted_refcode?: string | null
           first_seen_at?: string | null
+          frequency?: number | null
           has_faces?: boolean | null
           headline?: string | null
           id?: string
@@ -3976,11 +4016,18 @@ export type Database = {
           meta_video_id?: string | null
           organization_id?: string
           performance_tier?: string | null
+          post_engagement?: number | null
           primary_text?: string | null
+          quality_ranking?: string | null
+          reactions_like?: number | null
+          reactions_love?: number | null
+          reactions_other?: number | null
+          reactions_total?: number | null
           refcode_source?: string | null
           roas?: number | null
           sentiment_label?: string | null
           sentiment_score?: number | null
+          shares?: number | null
           spend?: number | null
           thumbnail_url?: string | null
           tone?: string | null
@@ -3994,7 +4041,14 @@ export type Database = {
           updated_at?: string | null
           urgency_level?: string | null
           verbal_themes?: string[] | null
+          video_avg_watch_time_seconds?: number | null
           video_duration_seconds?: number | null
+          video_p100?: number | null
+          video_p25?: number | null
+          video_p50?: number | null
+          video_p75?: number | null
+          video_plays?: number | null
+          video_thruplay?: number | null
           video_url?: string | null
           visual_analysis?: Json | null
         }
@@ -5338,7 +5392,10 @@ export type Database = {
           occurred_at: string
           organization_id: string
           phone_hash: string
+          reply_intent: string | null
+          reply_sentiment: string | null
           reply_text: string | null
+          sentiment_analyzed: boolean | null
         }
         Insert: {
           campaign_id?: string | null
@@ -5353,7 +5410,10 @@ export type Database = {
           occurred_at: string
           organization_id: string
           phone_hash: string
+          reply_intent?: string | null
+          reply_sentiment?: string | null
           reply_text?: string | null
+          sentiment_analyzed?: boolean | null
         }
         Update: {
           campaign_id?: string | null
@@ -5368,7 +5428,10 @@ export type Database = {
           occurred_at?: string
           organization_id?: string
           phone_hash?: string
+          reply_intent?: string | null
+          reply_sentiment?: string | null
           reply_text?: string | null
+          sentiment_analyzed?: boolean | null
         }
         Relationships: [
           {
@@ -6391,6 +6454,30 @@ export type Database = {
       }
     }
     Views: {
+      ab_test_performance: {
+        Row: {
+          ab_test_name: string | null
+          ab_test_variation: string | null
+          avg_donation: number | null
+          donations: number | null
+          first_donation: string | null
+          last_donation: string | null
+          net_raised: number | null
+          organization_id: string | null
+          recurring_donations: number | null
+          total_raised: number | null
+          unique_donors: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       actblue_transactions_secure: {
         Row: {
           ab_test_name: string | null
@@ -7459,6 +7546,26 @@ export type Database = {
           organization_id: string
           organization_name: string
           sync_priority: string
+        }[]
+      }
+      get_recurring_health: {
+        Args: {
+          _end_date: string
+          _organization_id: string
+          _start_date: string
+        }
+        Returns: {
+          active_recurring: number
+          avg_recurring_amount: number
+          cancelled_recurring: number
+          failed_recurring: number
+          mrr: number
+          paused_recurring: number
+          recurring_donor_count: number
+          total_recurring_revenue: number
+          upsell_rate: number
+          upsell_shown: number
+          upsell_succeeded: number
         }[]
       }
       get_submissions_with_details: {

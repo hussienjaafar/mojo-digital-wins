@@ -663,11 +663,19 @@ serve(async (req) => {
                 }
               }
 
-              // Fetch ad-level insights for performance metrics - include purchase_roas for accurate ROAS
-              const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad.id}/insights?fields=impressions,clicks,spend,actions,action_values,ctr,frequency,quality_ranking,engagement_rate_ranking,conversion_rate_ranking,purchase_roas,website_purchase_roas&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&action_attribution_windows=["7d_click","1d_view"]&access_token=${access_token}`;
+              // Fetch ad-level insights for performance metrics - include video and social engagement metrics
+              const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad.id}/insights?fields=impressions,clicks,spend,actions,action_values,ctr,frequency,quality_ranking,engagement_rate_ranking,conversion_rate_ranking,purchase_roas,website_purchase_roas,video_play_actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_avg_time_watched_actions,post_engagement,post_reactions_like_total,post_reactions_love_total,post_reactions_haha_total,post_reactions_wow_total,post_reactions_sorry_total,post_reactions_anger_total,comment,share&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&action_attribution_windows=["7d_click","1d_view"]&access_token=${access_token}`;
               
               let impressions = 0, clicks = 0, spend = 0, conversions = 0, conversionValue = 0, ctr = 0;
               let frequency = 0, qualityRanking = '', engagementRanking = '', conversionRanking = '';
+              
+              // Video engagement metrics
+              let videoPlays = 0, videoThruplay = 0, videoP25 = 0, videoP50 = 0, videoP75 = 0, videoP100 = 0;
+              let videoAvgWatchTime = 0;
+              
+              // Social engagement metrics
+              let reactionsTotal = 0, reactionsLike = 0, reactionsLove = 0, reactionsOther = 0;
+              let commentsCount = 0, sharesCount = 0, postEngagement = 0;
               
               try {
                 const adInsightsResponse = await fetch(adInsightsUrl);
@@ -684,6 +692,49 @@ serve(async (req) => {
                   qualityRanking = insight.quality_ranking || '';
                   engagementRanking = insight.engagement_rate_ranking || '';
                   conversionRanking = insight.conversion_rate_ranking || '';
+                  
+                  // Extract video engagement metrics
+                  if (insight.video_play_actions) {
+                    const playAction = insight.video_play_actions.find((a: any) => a.action_type === 'video_view');
+                    videoPlays = parseInt(playAction?.value) || 0;
+                  }
+                  if (insight.video_thruplay_watched_actions) {
+                    const thruplayAction = insight.video_thruplay_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    videoThruplay = parseInt(thruplayAction?.value) || 0;
+                  }
+                  if (insight.video_p25_watched_actions) {
+                    const p25Action = insight.video_p25_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    videoP25 = parseInt(p25Action?.value) || 0;
+                  }
+                  if (insight.video_p50_watched_actions) {
+                    const p50Action = insight.video_p50_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    videoP50 = parseInt(p50Action?.value) || 0;
+                  }
+                  if (insight.video_p75_watched_actions) {
+                    const p75Action = insight.video_p75_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    videoP75 = parseInt(p75Action?.value) || 0;
+                  }
+                  if (insight.video_p100_watched_actions) {
+                    const p100Action = insight.video_p100_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    videoP100 = parseInt(p100Action?.value) || 0;
+                  }
+                  if (insight.video_avg_time_watched_actions) {
+                    const avgTimeAction = insight.video_avg_time_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    videoAvgWatchTime = parseFloat(avgTimeAction?.value) || 0;
+                  }
+                  
+                  // Extract social engagement metrics
+                  postEngagement = parseInt(insight.post_engagement) || 0;
+                  reactionsLike = parseInt(insight.post_reactions_like_total) || 0;
+                  reactionsLove = parseInt(insight.post_reactions_love_total) || 0;
+                  const hahaReactions = parseInt(insight.post_reactions_haha_total) || 0;
+                  const wowReactions = parseInt(insight.post_reactions_wow_total) || 0;
+                  const sorryReactions = parseInt(insight.post_reactions_sorry_total) || 0;
+                  const angerReactions = parseInt(insight.post_reactions_anger_total) || 0;
+                  reactionsOther = hahaReactions + wowReactions + sorryReactions + angerReactions;
+                  reactionsTotal = reactionsLike + reactionsLove + reactionsOther;
+                  commentsCount = parseInt(insight.comment) || 0;
+                  sharesCount = parseInt(insight.share) || 0;
                   
                   if (insight.actions) {
                     const convAction = insight.actions.find((a: any) => 
@@ -731,7 +782,7 @@ serve(async (req) => {
               // PHASE 2 FIX: Calculate ROAS from Meta's purchase_roas when available
               const creativeRoas = spend > 0 ? conversionValue / spend : 0;
               
-              // Store creative insight with enhanced fields including high-res assets and destination URL
+              // Store creative insight with enhanced fields including video/social engagement metrics
               const { error: creativeError } = await supabase
                 .from('meta_creative_insights')
                 .upsert({
@@ -764,6 +815,27 @@ serve(async (req) => {
                   conversion_value: conversionValue,
                   ctr, // Stored as decimal (0.025 = 2.5%)
                   roas: creativeRoas, // Uses conversion_value which may come from purchase_roas
+                  // Video engagement metrics
+                  video_plays: videoPlays,
+                  video_thruplay: videoThruplay,
+                  video_p25: videoP25,
+                  video_p50: videoP50,
+                  video_p75: videoP75,
+                  video_p100: videoP100,
+                  video_avg_watch_time_seconds: videoAvgWatchTime,
+                  // Social engagement metrics
+                  reactions_total: reactionsTotal,
+                  reactions_like: reactionsLike,
+                  reactions_love: reactionsLove,
+                  reactions_other: reactionsOther,
+                  comments: commentsCount,
+                  shares: sharesCount,
+                  post_engagement: postEngagement,
+                  // Quality rankings
+                  frequency,
+                  quality_ranking: qualityRanking,
+                  engagement_rate_ranking: engagementRanking,
+                  conversion_rate_ranking: conversionRanking,
                   // PHASE 3: Track first seen for time-aware model
                   first_seen_at: new Date().toISOString(),
                 }, {
