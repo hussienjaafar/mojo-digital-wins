@@ -330,9 +330,23 @@ async function fetchDonorJourneyData(
   );
 
   // Calculate funnel stages from REAL journey events data
-  // Use actual event_types from donor_journeys table
+  // PHASE 4 FIX: Include ALL awareness/engagement event types for complete funnel
+  const awarenessEventTypes = [
+    'ad_view', 'ad_click', 'meta_ad_click', 'meta_ad_impression',
+    'email_open', 'landing_page_view', 'sms_sent', 'sms_delivered',
+    'organic_search', 'social_click', 'direct_visit'
+  ];
+  
+  const engagementEventTypes = [
+    'ad_click', 'meta_ad_click', 'sms_click', 'email_click',
+    'landing_page_view', 'sms_reply'
+  ];
+  
   const awarenessEvents = journeyEvents.filter((e: any) => 
-    ['ad_view', 'ad_click', 'email_open', 'landing_page_view', 'sms_click'].includes(e.event_type)
+    awarenessEventTypes.includes(e.event_type)
+  );
+  const engagementEvents = journeyEvents.filter((e: any) => 
+    engagementEventTypes.includes(e.event_type)
   );
   const conversionEvents = journeyEvents.filter((e: any) => 
     e.event_type === 'first_donation'
@@ -346,17 +360,19 @@ async function fetchDonorJourneyData(
 
   // Get unique donors at each stage
   const awarenessCount = new Set(awarenessEvents.map((e: any) => e.donor_key)).size || touchpoints.length;
+  const engagementCount = new Set(engagementEvents.map((e: any) => e.donor_key)).size || 
+    new Set(touchpoints.map((t: any) => t.donor_email)).size;
   const conversionCount = new Set(conversionEvents.map((e: any) => e.donor_key)).size;
   const retentionCount = new Set(retentionEvents.map((e: any) => e.donor_key)).size;
   const advocacyCount = new Set(advocacyEvents.map((e: any) => e.donor_key)).size;
-
-  // Engagement = touchpoints with known donors
-  const engagementCount = new Set(touchpoints.map((t: any) => t.donor_email)).size;
 
   // Calculate revenue at each stage
   const conversionValue = conversionEvents.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
   const retentionValue = retentionEvents.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
   const advocacyValue = advocacyEvents.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+
+  // Calculate baseline for funnel - use awareness count as the top
+  const funnelBaseline = awarenessCount || segments.length || 100;
 
   const funnel: FunnelStage[] = [
     {
@@ -370,10 +386,10 @@ async function fetchDonorJourneyData(
     {
       stage: "engagement",
       label: "Engagement",
-      count: engagementCount || Math.round((awarenessCount || segments.length) * 0.7),
-      percentage: awarenessCount > 0 ? Math.round((engagementCount / awarenessCount) * 100) : 70,
+      count: engagementCount || Math.round(funnelBaseline * 0.7),
+      percentage: funnelBaseline > 0 ? Math.round((engagementCount / funnelBaseline) * 100) : 70,
       value: 0,
-      dropoffRate: awarenessCount > 0 ? Math.round(((awarenessCount - engagementCount) / awarenessCount) * 100) : 30,
+      dropoffRate: funnelBaseline > 0 ? Math.round(((funnelBaseline - engagementCount) / funnelBaseline) * 100) : 30,
     },
     {
       stage: "conversion",

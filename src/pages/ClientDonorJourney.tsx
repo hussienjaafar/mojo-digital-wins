@@ -36,7 +36,7 @@ import {
   type DonorJourneyRecord,
   type FunnelStage,
 } from "@/queries/useDonorJourneyQuery";
-
+import { AttributionHealthCard } from "@/components/donor/AttributionHealthCard";
 import {
   V3PageContainer,
   V3KPICard,
@@ -677,6 +677,9 @@ const ClientDonorJourney = () => {
             )}
           </V3CardContent>
         </V3Card>
+
+        {/* Attribution Health Card */}
+        <AttributionHealthCard organizationId={organizationId} />
 
         {/* Data Pipeline Status */}
         <DataPipelineStatus pipelines={pipelineData} isLoading={isLoading} />

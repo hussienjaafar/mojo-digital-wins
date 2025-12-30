@@ -2526,6 +2526,50 @@ export type Database = {
           },
         ]
       }
+      donor_identity_links: {
+        Row: {
+          confidence_score: number | null
+          created_at: string | null
+          donor_email: string | null
+          email_hash: string | null
+          id: string
+          organization_id: string
+          phone_hash: string | null
+          source: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string | null
+          donor_email?: string | null
+          email_hash?: string | null
+          id?: string
+          organization_id: string
+          phone_hash?: string | null
+          source?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string | null
+          donor_email?: string | null
+          email_hash?: string | null
+          id?: string
+          organization_id?: string
+          phone_hash?: string | null
+          source?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donor_identity_links_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       donor_journeys: {
         Row: {
           amount: number | null

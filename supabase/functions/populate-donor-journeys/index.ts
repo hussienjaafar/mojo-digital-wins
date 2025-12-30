@@ -69,6 +69,37 @@ serve(async (req) => {
     const cutoffDate = new Date(Date.now() - days_back * 24 * 60 * 60 * 1000).toISOString();
     const journeyEvents: DonorJourneyEvent[] = [];
     const processedDonorKeys = new Set<string>();
+    
+    // PHASE 2 FIX: Load phone-to-email identity links for SMS matching
+    const { data: identityLinks } = await supabase
+      .from('donor_identity_links')
+      .select('phone_hash, donor_email')
+      .eq('organization_id', organization_id);
+    
+    const phoneToEmailMap = new Map<string, string>();
+    for (const link of (identityLinks || [])) {
+      if (link.phone_hash && link.donor_email) {
+        phoneToEmailMap.set(link.phone_hash, link.donor_email);
+      }
+    }
+    console.log(`[DONOR JOURNEYS] Loaded ${phoneToEmailMap.size} phone-to-email identity links`);
+    
+    // Load refcode-to-donor mapping from transactions for touchpoint matching
+    const { data: refcodeDonors } = await supabase
+      .from('actblue_transactions')
+      .select('refcode, donor_email')
+      .eq('organization_id', organization_id)
+      .not('refcode', 'is', null)
+      .not('donor_email', 'is', null)
+      .order('transaction_date', { ascending: false });
+    
+    const refcodeToEmailMap = new Map<string, string>();
+    for (const tx of (refcodeDonors || [])) {
+      if (tx.refcode && tx.donor_email && !refcodeToEmailMap.has(tx.refcode)) {
+        refcodeToEmailMap.set(tx.refcode, tx.donor_email);
+      }
+    }
+    console.log(`[DONOR JOURNEYS] Loaded ${refcodeToEmailMap.size} refcode-to-donor mappings`);
 
     // 1. Process ActBlue transactions (donation events)
     console.log('[DONOR JOURNEYS] Processing ActBlue transactions...');
@@ -181,9 +212,18 @@ serve(async (req) => {
       }
 
       for (const tp of touchpoints) {
-        if (!tp.donor_email) continue;
+        // PHASE 3 FIX: Try to resolve donor email from multiple sources
+        let donorEmail = tp.donor_email;
         
-        const donorKey = hashDonorKey(tp.donor_email);
+        // If no donor_email, try to match via refcode
+        if (!donorEmail && tp.refcode && refcodeToEmailMap.has(tp.refcode)) {
+          donorEmail = refcodeToEmailMap.get(tp.refcode)!;
+        }
+        
+        // Skip if still no donor email
+        if (!donorEmail) continue;
+        
+        const donorKey = hashDonorKey(donorEmail);
         processedDonorKeys.add(donorKey);
 
         // Map touchpoint types to meaningful journey event types based on utm_medium/source
@@ -211,8 +251,10 @@ serve(async (req) => {
             eventType = 'landing_page_view';
           }
         } else {
-          // Map existing types
-          if (eventType === 'ad_impression' || eventType === 'ad_view') eventType = 'ad_view';
+          // Map existing types - keep meta_ad_click and meta_ad_impression as-is for visibility
+          if (eventType === 'meta_ad_click') eventType = 'ad_click';
+          else if (eventType === 'meta_ad_impression') eventType = 'ad_view';
+          else if (eventType === 'ad_impression') eventType = 'ad_view';
           else if (eventType === 'landing_page') eventType = 'landing_page_view';
         }
 
@@ -267,14 +309,25 @@ serve(async (req) => {
       for (const sms of smsEvents) {
         if (!sms.phone_hash) continue;
         
-        // Use phone_hash as donor key for SMS events
-        const donorKey = `sms_${sms.phone_hash}`;
+        // PHASE 2 FIX: Try to resolve donor via phone-to-email identity link
+        let donorKey: string;
+        const linkedEmail = phoneToEmailMap.get(sms.phone_hash);
+        
+        if (linkedEmail) {
+          // Use email-based donor key for unified tracking
+          donorKey = hashDonorKey(linkedEmail);
+        } else {
+          // Fallback to phone-based key
+          donorKey = `sms_${sms.phone_hash}`;
+        }
         processedDonorKeys.add(donorKey);
 
         let eventType = 'sms_' + (sms.event_type || 'unknown');
         if (sms.event_type === 'clicked') eventType = 'sms_click';
         else if (sms.event_type === 'opted_out') eventType = 'sms_opt_out';
         else if (sms.event_type === 'replied') eventType = 'sms_reply';
+        else if (sms.event_type === 'delivered') eventType = 'sms_sent';
+        else if (sms.event_type === 'sent') eventType = 'sms_sent';
 
         journeyEvents.push({
           organization_id,
@@ -286,6 +339,7 @@ serve(async (req) => {
           metadata: {
             campaign_name: sms.campaign_name,
             link_clicked: sms.link_clicked,
+            phone_linked: !!linkedEmail,
           },
         });
         smsCount++;
