@@ -825,6 +825,50 @@ export type Database = {
         }
         Relationships: []
       }
+      attribution_model_log: {
+        Row: {
+          attribution_method: string | null
+          attribution_model_version: string | null
+          calculated_at: string | null
+          channels: Json | null
+          created_at: string | null
+          id: string
+          is_deterministic: boolean | null
+          organization_id: string
+          transaction_id: string
+        }
+        Insert: {
+          attribution_method?: string | null
+          attribution_model_version?: string | null
+          calculated_at?: string | null
+          channels?: Json | null
+          created_at?: string | null
+          id?: string
+          is_deterministic?: boolean | null
+          organization_id: string
+          transaction_id: string
+        }
+        Update: {
+          attribution_method?: string | null
+          attribution_model_version?: string | null
+          calculated_at?: string | null
+          channels?: Json | null
+          created_at?: string | null
+          id?: string
+          is_deterministic?: boolean | null
+          organization_id?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attribution_model_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attribution_touchpoints: {
         Row: {
           campaign_id: string | null
@@ -3774,6 +3818,7 @@ export type Database = {
           frequency: number | null
           id: string
           impressions: number | null
+          ingestion_run_id: string | null
           organization_id: string
           placement: string | null
           reach: number | null
@@ -3804,6 +3849,7 @@ export type Database = {
           frequency?: number | null
           id?: string
           impressions?: number | null
+          ingestion_run_id?: string | null
           organization_id: string
           placement?: string | null
           reach?: number | null
@@ -3834,6 +3880,7 @@ export type Database = {
           frequency?: number | null
           id?: string
           impressions?: number | null
+          ingestion_run_id?: string | null
           organization_id?: string
           placement?: string | null
           reach?: number | null
@@ -5471,6 +5518,7 @@ export type Database = {
           error_code: string | null
           event_type: string
           id: string
+          ingestion_run_id: string | null
           link_clicked: string | null
           message_id: string | null
           metadata: Json | null
@@ -5489,6 +5537,7 @@ export type Database = {
           error_code?: string | null
           event_type: string
           id?: string
+          ingestion_run_id?: string | null
           link_clicked?: string | null
           message_id?: string | null
           metadata?: Json | null
@@ -5507,6 +5556,7 @@ export type Database = {
           error_code?: string | null
           event_type?: string
           id?: string
+          ingestion_run_id?: string | null
           link_clicked?: string | null
           message_id?: string | null
           metadata?: Json | null
@@ -5903,6 +5953,7 @@ export type Database = {
           first_touch_channel: string | null
           first_touch_weight: number | null
           id: string
+          is_deterministic: boolean | null
           last_touch_campaign: string | null
           last_touch_channel: string | null
           last_touch_weight: number | null
@@ -5921,6 +5972,7 @@ export type Database = {
           first_touch_channel?: string | null
           first_touch_weight?: number | null
           id?: string
+          is_deterministic?: boolean | null
           last_touch_campaign?: string | null
           last_touch_channel?: string | null
           last_touch_weight?: number | null
@@ -5939,6 +5991,7 @@ export type Database = {
           first_touch_channel?: string | null
           first_touch_weight?: number | null
           id?: string
+          is_deterministic?: boolean | null
           last_touch_campaign?: string | null
           last_touch_channel?: string | null
           last_touch_weight?: number | null

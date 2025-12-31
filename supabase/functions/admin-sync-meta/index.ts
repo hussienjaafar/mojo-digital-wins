@@ -55,17 +55,23 @@ serve(async (req) => {
     
     let isAuthorized = false;
     
-    // Internal sync trigger (from tiered-meta-sync) - uses secret instead of hardcoded value
-    const internalTriggerSecret = Deno.env.get('INTERNAL_TRIGGER_SECRET');
-    if ((internalTriggerSecret && adminKey === internalTriggerSecret) || isScheduledJob) {
-      isAuthorized = true;
-      console.log('[META SYNC] Authorized via internal trigger');
-    }
-    
-    // Cron secret
-    if (!isAuthorized && cronSecret && providedCronSecret === cronSecret) {
+    // SECURITY: Cron secret validation REQUIRED for scheduled jobs
+    if (cronSecret && providedCronSecret === cronSecret) {
       isAuthorized = true;
       console.log('[META SYNC] Authorized via CRON_SECRET');
+    }
+    
+    // SECURITY: Internal sync trigger (from tiered-meta-sync) - must use valid secret
+    const internalTriggerSecret = Deno.env.get('INTERNAL_TRIGGER_SECRET');
+    if (!isAuthorized && internalTriggerSecret && adminKey === internalTriggerSecret) {
+      isAuthorized = true;
+      console.log('[META SYNC] Authorized via INTERNAL_TRIGGER_SECRET');
+    }
+    
+    // SECURITY: Reject x-scheduled-job header without valid cron secret
+    if (!isAuthorized && isScheduledJob) {
+      console.warn('[META SYNC] Rejected: x-scheduled-job header provided without valid x-cron-secret');
+      // Fall through to JWT check - do NOT auto-authorize
     }
     
     // Admin JWT

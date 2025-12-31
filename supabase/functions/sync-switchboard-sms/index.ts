@@ -254,16 +254,24 @@ serve(async (req) => {
     
     let isAuthorized = false;
     
-    // Check cron secret (scheduled jobs)
+    // SECURITY: Check cron secret (scheduled jobs) - REQUIRED for scheduled calls
     if (cronSecret && providedCronSecret === cronSecret) {
       isAuthorized = true;
       console.log('[SMS SYNC] Authorized via CRON_SECRET');
     }
     
-    // Check scheduled job header (internal calls)
-    if (!isAuthorized && (scheduledJob === 'true' || internalKey)) {
+    // SECURITY: Scheduled job headers MUST also provide cron secret
+    // The x-scheduled-job header alone is NOT sufficient for authorization
+    if (!isAuthorized && scheduledJob === 'true') {
+      console.warn('[SMS SYNC] Rejected: x-scheduled-job header provided without valid x-cron-secret');
+      // Do NOT authorize - fall through to JWT check or reject
+    }
+    
+    // SECURITY: Internal key must match a configured secret, not just be present
+    const internalKeySecret = Deno.env.get('INTERNAL_TRIGGER_SECRET');
+    if (!isAuthorized && internalKey && internalKeySecret && internalKey === internalKeySecret) {
       isAuthorized = true;
-      console.log('[SMS SYNC] Authorized via scheduled job header');
+      console.log('[SMS SYNC] Authorized via INTERNAL_TRIGGER_SECRET');
     }
     
     // Check JWT auth (user must belong to org or be admin)
