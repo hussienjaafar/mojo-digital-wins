@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { server } from './mocks/server';
 
-// Mock ResizeObserver for recharts components
+// Mock ResizeObserver for chart components (ECharts, etc.)
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),

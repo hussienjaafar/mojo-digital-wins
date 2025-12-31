@@ -18,7 +18,7 @@ const {
   mockOnInlineExpandChange: vi.fn(),
 }));
 
-// Mock recharts (used in sparkline component) to avoid ResponsiveContainer issues
+// Mock recharts (still used by sparkline) to avoid ResponsiveContainer issues in tests
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   LineChart: ({ children }: { children: React.ReactNode }) => <svg data-testid="sparkline-chart">{children}</svg>,
