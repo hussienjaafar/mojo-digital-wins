@@ -14,12 +14,7 @@ import {
   useIsDrilldownOpen,
   type KpiKey,
 } from "@/stores/dashboardStore";
-import {
-  LineChart,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
+import { EChartsSparkline } from "@/components/charts/echarts";
 
 // ============================================================================
 // Types
@@ -150,24 +145,8 @@ export const ExpandableKpiCard: React.FC<ExpandableKpiCardProps> = ({
   const isHighlighted = highlightedKpiKey === kpiKey;
   const showDrawer = isDrilldownOpen && isSelected;
 
-  // Transform sparkline data for Recharts
-  const chartData = React.useMemo(() => {
-    if (!sparklineData || sparklineData.length === 0) return [];
-
-    // Handle both number[] and SparklineDataPoint[] formats
-    if (typeof sparklineData[0] === 'number') {
-      return (sparklineData as number[]).map((val, index) => ({
-        index,
-        value: val
-      }));
-    }
-
-    return (sparklineData as SparklineDataPoint[]).map((point, index) => ({
-      index,
-      value: point.value,
-      date: point.date,
-    }));
-  }, [sparklineData]);
+  // Check if we have sparkline data
+  const hasSparklineData = sparklineData && sparklineData.length > 1;
 
   // Build drilldown data
   const drilldownData: KPIDrilldownData | null = React.useMemo(() => {
@@ -322,46 +301,19 @@ export const ExpandableKpiCard: React.FC<ExpandableKpiCardProps> = ({
         </div>
 
         {/* Sparkline */}
-        {chartData.length > 0 && (
+        {hasSparklineData && (
           <motion.div
             className="h-10 mt-2 -mx-1"
             initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.3 }}
           >
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
-                <defs>
-                  <linearGradient id={`sparklineGradient-${kpiKey}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={chartColor} stopOpacity={0.3} />
-                    <stop offset="100%" stopColor={chartColor} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="px-2 py-1 text-xs bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))] rounded shadow-lg">
-                          {typeof payload[0].value === 'number'
-                            ? payload[0].value.toLocaleString(undefined, { maximumFractionDigits: 1 })
-                            : payload[0].value}
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke={chartColor}
-                  strokeWidth={1.5}
-                  dot={false}
-                  activeDot={{ r: 3, fill: chartColor }}
-                  fill={`url(#sparklineGradient-${kpiKey})`}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <EChartsSparkline
+              data={sparklineData}
+              color={chartColor}
+              height={40}
+              ariaLabel={`${label} sparkline`}
+            />
           </motion.div>
         )}
 

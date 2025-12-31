@@ -6,12 +6,7 @@ import { V3MetricLabel } from "./V3MetricLabel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
-import {
-  LineChart,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
+import { EChartsSparkline } from "@/components/charts/echarts";
 
 export type V3KPIAccent = "blue" | "green" | "purple" | "amber" | "red" | "default";
 
@@ -79,13 +74,7 @@ export const V3KPICardWithSparkline: React.FC<V3KPICardWithSparklineProps> = ({
   const isInteractive = !!onClick;
   const chartColor = sparklineColor || accentSparklineColor[accent];
   const prefersReducedMotion = useReducedMotion();
-
-  // Transform sparkline data for Recharts
-  const chartData = React.useMemo(() => {
-    if (!sparklineData || sparklineData.length === 0) return [];
-    return sparklineData.map((value, index) => ({ index, value }));
-  }, [sparklineData]);
-
+  
   // Reduced motion variants
   const motionProps = prefersReducedMotion
     ? {}
@@ -93,14 +82,9 @@ export const V3KPICardWithSparkline: React.FC<V3KPICardWithSparklineProps> = ({
         whileHover: { scale: 1.01 },
         whileTap: { scale: 0.99 },
       };
-  
-  const sparklineMotion = prefersReducedMotion
-    ? { opacity: 1 }
-    : { opacity: 0, transition: { delay: 0.1, duration: 0.3 } };
-  
-  const sparklineAnimateTo = prefersReducedMotion
-    ? { opacity: 1 }
-    : { opacity: 1, transition: { delay: 0.1, duration: 0.3 } };
+
+  // Check if we have sparkline data
+  const hasSparklineData = sparklineData && sparklineData.length > 1;
 
   if (isLoading) {
     return (
@@ -156,45 +140,19 @@ export const V3KPICardWithSparkline: React.FC<V3KPICardWithSparklineProps> = ({
       </div>
 
       {/* Sparkline */}
-      {chartData.length > 0 && (
+      {hasSparklineData && (
         <motion.div
           className="h-10 mt-2 -mx-1"
-          initial={sparklineMotion}
-          animate={sparklineAnimateTo}
+          initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
-              <defs>
-                <linearGradient id={`sparklineGradient-${label.replace(/\s/g, '')}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={chartColor} stopOpacity={0.3} />
-                  <stop offset="100%" stopColor={chartColor} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div className="px-2 py-1 text-xs bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))] rounded shadow-lg">
-                        {typeof payload[0].value === 'number' 
-                          ? payload[0].value.toLocaleString(undefined, { maximumFractionDigits: 1 })
-                          : payload[0].value}
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke={chartColor}
-                strokeWidth={1.5}
-                dot={false}
-                activeDot={{ r: 3, fill: chartColor }}
-                fill={`url(#sparklineGradient-${label.replace(/\s/g, '')})`}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <EChartsSparkline
+            data={sparklineData}
+            color={chartColor}
+            height={40}
+            ariaLabel={`${label} sparkline`}
+          />
         </motion.div>
       )}
 
