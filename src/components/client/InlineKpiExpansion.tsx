@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BreakdownItem } from "./HeroKpiCard";
+import { EChartsLineChart, type LineSeriesConfig } from "@/components/charts/echarts";
 
 // ============================================================================
 // Types
@@ -89,7 +90,7 @@ const accentColors: Record<string, string> = {
 };
 
 // ============================================================================
-// Inline Chart Component (Lazy Loaded)
+// Inline Chart Component (ECharts-based)
 // ============================================================================
 
 interface InlineChartProps {
@@ -106,134 +107,35 @@ const ChartSkeleton: React.FC = () => (
   </div>
 );
 
-// Sanitize label to create a valid SVG gradient id (lowercase, alphanumeric + dashes only)
-const sanitizeGradientId = (label: string): string =>
-  `gradient-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+const InlineChart: React.FC<InlineChartProps> = ({ data, xAxisKey, color, label, valueType = "number" }) => {
+  // Map valueType to ECharts format type
+  const chartValueType = valueType === "multiplier" ? "number" : valueType;
 
-const LazyInlineChart = React.lazy(() =>
-  import("recharts").then((mod) => ({
-    default: function InlineChart({ data, xAxisKey, color, label, valueType = "number" }: InlineChartProps) {
-      const gradientId = sanitizeGradientId(label);
-      const {
-        ResponsiveContainer,
-        AreaChart,
-        Area,
-        XAxis,
-        YAxis,
-        CartesianGrid,
-        Tooltip,
-      } = mod;
+  const series: LineSeriesConfig[] = React.useMemo(() => [{
+    dataKey: "value",
+    name: label,
+    color,
+    type: "area",
+    areaStyle: { opacity: 0.15 },
+    valueType: chartValueType as "number" | "currency" | "percent",
+  }], [label, color, chartValueType]);
 
-      // Format value based on type
-      const formatValue = (value: number): string => {
-        if (valueType === "currency") {
-          if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-          if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(1)}K`;
-          return `$${value.toFixed(0)}`;
-        }
-        if (valueType === "percent") {
-          return `${value.toFixed(1)}%`;
-        }
-        if (valueType === "multiplier") {
-          return `${value.toFixed(1)}x`;
-        }
-        if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
-        return value.toFixed(0);
-      };
-
-      // Format data for chart
-      const chartData = data.map((d) => ({
-        ...d,
-        [xAxisKey]: d[xAxisKey],
-        value: d.value as number,
-      }));
-
-      return (
-        <div
-          className="h-48 w-full"
-          role="figure"
-          aria-label={`${label} trend chart`}
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={chartData}
-              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-            >
-              <defs>
-                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={color} stopOpacity={0.05} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="hsl(var(--portal-border))"
-                strokeOpacity={0.5}
-                vertical={false}
-              />
-              <XAxis
-                dataKey={xAxisKey}
-                tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 11 }}
-                tickLine={false}
-                axisLine={{ stroke: "hsl(var(--portal-border))" }}
-                dy={8}
-              />
-              <YAxis
-                tick={{ fill: "hsl(var(--portal-text-muted))", fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                width={60}
-                tickFormatter={(value) =>
-                  typeof value === "number" ? formatValue(value) : value
-                }
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--portal-bg-tertiary))",
-                  border: "1px solid hsl(var(--portal-border))",
-                  borderRadius: "8px",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                }}
-                labelStyle={{
-                  color: "hsl(var(--portal-text-primary))",
-                  fontWeight: 600,
-                  marginBottom: 4,
-                }}
-                itemStyle={{
-                  color: "hsl(var(--portal-text-secondary))",
-                }}
-                formatter={(value: number) => [formatValue(value), label]}
-                cursor={{
-                  stroke: color,
-                  strokeWidth: 1,
-                  strokeDasharray: "4 4",
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke={color}
-                strokeWidth={2.5}
-                fill={`url(#${gradientId})`}
-                dot={false}
-                activeDot={{
-                  r: 6,
-                  fill: color,
-                  stroke: "hsl(var(--portal-bg-secondary))",
-                  strokeWidth: 2,
-                  // Enhanced glow for dark mode visibility
-                  style: {
-                    filter: "drop-shadow(0 0 6px currentColor)",
-                  },
-                }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      );
-    },
-  }))
-);
+  return (
+    <div
+      className="h-48 w-full"
+      role="figure"
+      aria-label={`${label} trend chart`}
+    >
+      <EChartsLineChart
+        data={data}
+        xAxisKey={xAxisKey}
+        series={series}
+        height={192}
+        valueType={chartValueType as "number" | "currency" | "percent"}
+      />
+    </div>
+  );
+};
 
 // ============================================================================
 // Trend Badge Component
@@ -445,15 +347,13 @@ export const InlineKpiExpansion: React.FC<InlineKpiExpansionProps> = ({
               Trend Over Time
             </h5>
             <div className="rounded-lg border border-[hsl(var(--portal-border))] p-3 bg-[hsl(var(--portal-bg-elevated))]">
-              <React.Suspense fallback={<ChartSkeleton />}>
-                <LazyInlineChart
-                  data={trendData}
-                  xAxisKey={trendXAxisKey}
-                  color={chartColor}
+              <InlineChart
+                data={trendData}
+                xAxisKey={trendXAxisKey}
+                color={chartColor}
                   label={label}
-                  valueType={valueType}
-                />
-              </React.Suspense>
+                valueType={valueType}
+              />
             </div>
           </div>
         )}

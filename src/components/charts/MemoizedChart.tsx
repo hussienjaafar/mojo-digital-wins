@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import React, { memo } from 'react';
 import {
   LineChart,
   Line,
@@ -12,9 +12,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
   ComposedChart,
 } from 'recharts';
 import { deepEqual } from '@/lib/performance';
@@ -32,6 +29,9 @@ import { deepEqual } from '@/lib/performance';
  * Migration guide: See docs/V3_CHART_STANDARDS.md
  */
 
+/**
+ * @deprecated Use EChartsLineChart from @/components/charts/echarts instead
+ */
 export const MemoizedLineChart = memo(
   ({
     data,
@@ -83,6 +83,9 @@ export const MemoizedLineChart = memo(
 
 MemoizedLineChart.displayName = 'MemoizedLineChart';
 
+/**
+ * @deprecated Use EChartsBarChart from @/components/charts/echarts instead
+ */
 export const MemoizedBarChart = memo(
   ({
     data,
@@ -126,6 +129,9 @@ export const MemoizedBarChart = memo(
 
 MemoizedBarChart.displayName = 'MemoizedBarChart';
 
+/**
+ * @deprecated Use EChartsLineChart with areaStyle from @/components/charts/echarts instead
+ */
 export const MemoizedAreaChart = memo(
   ({
     data,
@@ -176,6 +182,9 @@ export const MemoizedAreaChart = memo(
 
 MemoizedAreaChart.displayName = 'MemoizedAreaChart';
 
+/**
+ * @deprecated Use multiple ECharts components from @/components/charts/echarts instead
+ */
 export const MemoizedComposedChart = memo(
   ({
     data,
