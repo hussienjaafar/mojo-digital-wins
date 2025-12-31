@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
 serve(async (req) => {
@@ -14,6 +14,46 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    // SECURITY: Authentication required
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    const providedCronSecret = req.headers.get('x-cron-secret');
+    const authHeader = req.headers.get('authorization');
+    
+    let isAuthorized = false;
+    
+    // Check cron secret for scheduled jobs
+    if (cronSecret && providedCronSecret === cronSecret) {
+      isAuthorized = true;
+      console.log('[CLICKID RECONCILE] Authorized via CRON_SECRET');
+    }
+    
+    // Check admin JWT
+    if (!isAuthorized && authHeader) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (user) {
+        const { data: isAdmin } = await userClient.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
+        if (isAdmin) {
+          isAuthorized = true;
+          console.log('[CLICKID RECONCILE] Authorized via admin JWT');
+        }
+      }
+    }
+    
+    if (!isAuthorized) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - requires CRON_SECRET or admin access' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { organization_id, limit = 200 } = await req.json();

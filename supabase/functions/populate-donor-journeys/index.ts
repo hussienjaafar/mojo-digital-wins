@@ -31,18 +31,31 @@ interface DonorJourneyEvent {
   metadata?: Record<string, any>;
 }
 
-// Hash email for privacy-preserving donor key
-function hashDonorKey(email: string): string {
-  // Simple hash - in production you'd use a proper hash function
-  // This creates a consistent key without storing raw email
+// Hash email for privacy-preserving donor key using SHA-256
+// This matches the compute_donor_key() database function for consistency
+async function hashDonorKey(email: string): Promise<string> {
   const normalized = email.toLowerCase().trim();
-  let hash = 0;
-  for (let i = 0; i < normalized.length; i++) {
-    const char = normalized.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return `donor_${Math.abs(hash).toString(36)}`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(normalized);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  // Return format matches database function: donor_<16-char-hash-prefix>
+  return `donor_${hashHex.substring(0, 16)}`;
+}
+
+// Hash phone number for SMS identity resolution
+// Matches the compute_phone_hash() database function
+async function hashPhone(phone: string): Promise<string | null> {
+  if (!phone) return null;
+  const normalized = phone.replace(/\D/g, '');
+  if (normalized.length < 10) return null;
+  
+  const encoder = new TextEncoder();
+  const data = encoder.encode(normalized);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 serve(async (req) => {
@@ -55,6 +68,46 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    // SECURITY: Authentication required
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    const providedCronSecret = req.headers.get('x-cron-secret');
+    const authHeader = req.headers.get('authorization');
+    
+    let isAuthorized = false;
+    
+    // Check cron secret for scheduled jobs
+    if (cronSecret && providedCronSecret === cronSecret) {
+      isAuthorized = true;
+      console.log('[DONOR JOURNEYS] Authorized via CRON_SECRET');
+    }
+    
+    // Check admin JWT
+    if (!isAuthorized && authHeader) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (user) {
+        const { data: isAdmin } = await userClient.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
+        if (isAdmin) {
+          isAuthorized = true;
+          console.log('[DONOR JOURNEYS] Authorized via admin JWT');
+        }
+      }
+    }
+    
+    if (!isAuthorized) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - requires CRON_SECRET or admin access' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const body = await req.json().catch(() => ({}));
@@ -128,7 +181,7 @@ serve(async (req) => {
       for (const tx of transactions) {
         if (!tx.donor_email) continue;
         
-        const donorKey = hashDonorKey(tx.donor_email);
+        const donorKey = await hashDonorKey(tx.donor_email);
         processedDonorKeys.add(donorKey);
 
         // Determine event type based on transaction characteristics
@@ -223,7 +276,7 @@ serve(async (req) => {
         // Skip if still no donor email
         if (!donorEmail) continue;
         
-        const donorKey = hashDonorKey(donorEmail);
+        const donorKey = await hashDonorKey(donorEmail);
         processedDonorKeys.add(donorKey);
 
         // Map touchpoint types to meaningful journey event types based on utm_medium/source
@@ -315,10 +368,10 @@ serve(async (req) => {
         
         if (linkedEmail) {
           // Use email-based donor key for unified tracking
-          donorKey = hashDonorKey(linkedEmail);
+          donorKey = await hashDonorKey(linkedEmail);
         } else {
-          // Fallback to phone-based key
-          donorKey = `sms_${sms.phone_hash}`;
+          // Fallback to phone-based key (less ideal but maintains data)
+          donorKey = `sms_${sms.phone_hash.substring(0, 16)}`;
         }
         processedDonorKeys.add(donorKey);
 
