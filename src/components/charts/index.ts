@@ -32,6 +32,3 @@ export {
   getTooltipFormatter,
   type ValueType 
 } from "@/lib/chart-formatters";
-
-// Tremor components (external library - use for specific Tremor patterns only)
-export * from "./tremor";

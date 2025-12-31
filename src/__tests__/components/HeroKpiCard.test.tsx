@@ -18,20 +18,25 @@ const {
   mockOnInlineExpandChange: vi.fn(),
 }));
 
-// Mock recharts to avoid ResponsiveContainer issues
-// This mock handles both static and dynamic imports
+// Mock recharts (used in sparkline component) to avoid ResponsiveContainer issues
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   LineChart: ({ children }: { children: React.ReactNode }) => <svg data-testid="sparkline-chart">{children}</svg>,
   Line: () => null,
   Tooltip: () => null,
-  // Export default for dynamic import
-  default: {
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    LineChart: ({ children }: { children: React.ReactNode }) => <svg data-testid="sparkline-chart">{children}</svg>,
-    Line: () => null,
-    Tooltip: () => null,
-  },
+  AreaChart: ({ children }: { children: React.ReactNode }) => <svg data-testid="area-chart">{children}</svg>,
+  Area: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  CartesianGrid: () => null,
+}));
+
+// Mock ECharts components to avoid canvas rendering in tests
+vi.mock('@/components/charts/echarts', () => ({
+  EChartsLineChart: () => <div data-testid="echarts-line-chart">ECharts Line Chart</div>,
+  EChartsBarChart: () => <div data-testid="echarts-bar-chart">ECharts Bar Chart</div>,
+  EChartsPieChart: () => <div data-testid="echarts-pie-chart">ECharts Pie Chart</div>,
+  EChartsFunnelChart: () => <div data-testid="echarts-funnel-chart">ECharts Funnel Chart</div>,
 }));
 
 // Mock V3KPIDrilldownDrawer to avoid loading full ECharts

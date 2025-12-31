@@ -1,19 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3CardDescription } from "@/components/v3/V3Card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 import { V3EmptyState } from "@/components/v3/V3EmptyState";
+import { EChartsPieChart } from "@/components/charts/echarts";
 import { 
   RefreshCw, 
   TrendingUp, 
-  TrendingDown, 
-  AlertTriangle, 
-  CheckCircle2,
-  PauseCircle,
-  XCircle,
   DollarSign,
   Users,
   ArrowUpCircle
@@ -70,11 +66,11 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
 
   if (error) {
     return (
-      <Card className="border-destructive">
-        <CardContent className="pt-6">
+      <V3Card accent="red">
+        <V3CardContent className="pt-6">
           <p className="text-destructive">Error loading recurring health data: {error.message}</p>
-        </CardContent>
-      </Card>
+        </V3CardContent>
+      </V3Card>
     );
   }
 
@@ -96,18 +92,25 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
 
   const activeRate = totalRecurring > 0 ? healthData.active_recurring / totalRecurring : 0;
   const churnRate = totalRecurring > 0 ? (healthData.cancelled_recurring + healthData.failed_recurring) / totalRecurring : 0;
-  const pausedRate = totalRecurring > 0 ? healthData.paused_recurring / totalRecurring : 0;
 
   // Health score based on active rate and churn
   const healthScore = Math.round((activeRate * 0.7 + (1 - churnRate) * 0.3) * 100);
   const healthStatus = healthScore >= 80 ? 'excellent' : healthScore >= 60 ? 'good' : healthScore >= 40 ? 'fair' : 'poor';
 
+  // Pie chart data for status breakdown with colors embedded
+  const statusBreakdownData = [
+    { name: 'Active', value: healthData.active_recurring, color: 'hsl(var(--portal-success))' },
+    { name: 'Paused', value: healthData.paused_recurring, color: 'hsl(var(--portal-warning))' },
+    { name: 'Cancelled', value: healthData.cancelled_recurring, color: 'hsl(var(--portal-error))' },
+    { name: 'Failed', value: healthData.failed_recurring, color: 'hsl(var(--portal-accent-amber))' },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <RefreshCw className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-bold">Recurring Donor Health</h2>
+          <RefreshCw className="h-6 w-6 text-[hsl(var(--portal-accent-blue))]" />
+          <h2 className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">Recurring Donor Health</h2>
         </div>
         <Badge 
           variant={healthStatus === 'excellent' ? 'default' : healthStatus === 'good' ? 'secondary' : 'destructive'}
@@ -119,132 +122,135 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
+        <V3Card accent="green">
+          <V3CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Monthly Recurring Revenue</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-sm text-[hsl(var(--portal-text-muted))]">Monthly Recurring Revenue</p>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-success))]">
                   {formatCurrency(healthData.mrr || 0)}
                 </p>
               </div>
-              <DollarSign className="h-10 w-10 text-green-600/20" />
+              <DollarSign className="h-10 w-10 text-[hsl(var(--portal-success)/0.2)]" />
             </div>
-          </CardContent>
-        </Card>
+          </V3CardContent>
+        </V3Card>
 
-        <Card>
-          <CardContent className="pt-6">
+        <V3Card accent="blue">
+          <V3CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Recurring Donors</p>
-                <p className="text-2xl font-bold">
+                <p className="text-sm text-[hsl(var(--portal-text-muted))]">Recurring Donors</p>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
                   {formatNumber(healthData.recurring_donor_count || 0)}
                 </p>
               </div>
-              <Users className="h-10 w-10 text-primary/20" />
+              <Users className="h-10 w-10 text-[hsl(var(--portal-accent-blue)/0.2)]" />
             </div>
-          </CardContent>
-        </Card>
+          </V3CardContent>
+        </V3Card>
 
-        <Card>
-          <CardContent className="pt-6">
+        <V3Card accent="purple">
+          <V3CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Avg Recurring Amount</p>
-                <p className="text-2xl font-bold">
+                <p className="text-sm text-[hsl(var(--portal-text-muted))]">Avg Recurring Amount</p>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
                   {formatCurrency(healthData.avg_recurring_amount || 0)}
                 </p>
               </div>
-              <TrendingUp className="h-10 w-10 text-blue-600/20" />
+              <TrendingUp className="h-10 w-10 text-[hsl(var(--portal-accent-purple)/0.2)]" />
             </div>
-          </CardContent>
-        </Card>
+          </V3CardContent>
+        </V3Card>
 
-        <Card>
-          <CardContent className="pt-6">
+        <V3Card accent="amber">
+          <V3CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Recurring Revenue</p>
-                <p className="text-2xl font-bold">
+                <p className="text-sm text-[hsl(var(--portal-text-muted))]">Total Recurring Revenue</p>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
                   {formatCurrency(healthData.total_recurring_revenue || 0)}
                 </p>
               </div>
-              <DollarSign className="h-10 w-10 text-purple-600/20" />
+              <DollarSign className="h-10 w-10 text-[hsl(var(--portal-accent-amber)/0.2)]" />
             </div>
-          </CardContent>
-        </Card>
+          </V3CardContent>
+        </V3Card>
       </div>
 
-      {/* Status Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Recurring Status Breakdown</CardTitle>
-          <CardDescription>Distribution of recurring donations by status</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900">
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <span className="font-medium text-green-700 dark:text-green-400">Active</span>
-              </div>
-              <p className="text-3xl font-bold text-green-700 dark:text-green-400">
-                {formatNumber(healthData.active_recurring)}
-              </p>
-              <p className="text-sm text-green-600 dark:text-green-500 mt-1">
-                {formatPercent(activeRate)} of total
-              </p>
+      {/* Status Breakdown with ECharts Pie */}
+      <V3Card>
+        <V3CardHeader>
+          <V3CardTitle>Recurring Status Breakdown</V3CardTitle>
+          <V3CardDescription>Distribution of recurring donations by status</V3CardDescription>
+        </V3CardHeader>
+        <V3CardContent>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Pie Chart */}
+            <div className="h-[280px]">
+              <EChartsPieChart
+                data={statusBreakdownData}
+                height={280}
+                showLegend={true}
+                legendPosition="bottom"
+                variant="donut"
+                showLabels={false}
+              />
             </div>
 
-            <div className="p-4 rounded-lg bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900">
-              <div className="flex items-center gap-2 mb-2">
-                <PauseCircle className="h-5 w-5 text-yellow-600" />
-                <span className="font-medium text-yellow-700 dark:text-yellow-400">Paused</span>
+            {/* Status Cards */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 rounded-lg bg-[hsl(var(--portal-success)/0.1)] border border-[hsl(var(--portal-success)/0.3)]">
+                <span className="font-medium text-[hsl(var(--portal-success))]">Active</span>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-success))] mt-1">
+                  {formatNumber(healthData.active_recurring)}
+                </p>
+                <p className="text-sm text-[hsl(var(--portal-success)/0.8)] mt-1">
+                  {formatPercent(activeRate)} of total
+                </p>
               </div>
-              <p className="text-3xl font-bold text-yellow-700 dark:text-yellow-400">
-                {formatNumber(healthData.paused_recurring)}
-              </p>
-              <p className="text-sm text-yellow-600 dark:text-yellow-500 mt-1">
-                {formatPercent(pausedRate)} of total
-              </p>
-            </div>
 
-            <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900">
-              <div className="flex items-center gap-2 mb-2">
-                <XCircle className="h-5 w-5 text-red-600" />
-                <span className="font-medium text-red-700 dark:text-red-400">Cancelled</span>
+              <div className="p-4 rounded-lg bg-[hsl(var(--portal-warning)/0.1)] border border-[hsl(var(--portal-warning)/0.3)]">
+                <span className="font-medium text-[hsl(var(--portal-warning))]">Paused</span>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-warning))] mt-1">
+                  {formatNumber(healthData.paused_recurring)}
+                </p>
+                <p className="text-sm text-[hsl(var(--portal-warning)/0.8)] mt-1">
+                  {formatPercent(healthData.paused_recurring / totalRecurring)} of total
+                </p>
               </div>
-              <p className="text-3xl font-bold text-red-700 dark:text-red-400">
-                {formatNumber(healthData.cancelled_recurring)}
-              </p>
-              <p className="text-sm text-red-600 dark:text-red-500 mt-1">
-                {formatPercent(healthData.cancelled_recurring / totalRecurring)} of total
-              </p>
-            </div>
 
-            <div className="p-4 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-5 w-5 text-orange-600" />
-                <span className="font-medium text-orange-700 dark:text-orange-400">Failed</span>
+              <div className="p-4 rounded-lg bg-[hsl(var(--portal-error)/0.1)] border border-[hsl(var(--portal-error)/0.3)]">
+                <span className="font-medium text-[hsl(var(--portal-error))]">Cancelled</span>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-error))] mt-1">
+                  {formatNumber(healthData.cancelled_recurring)}
+                </p>
+                <p className="text-sm text-[hsl(var(--portal-error)/0.8)] mt-1">
+                  {formatPercent(healthData.cancelled_recurring / totalRecurring)} of total
+                </p>
               </div>
-              <p className="text-3xl font-bold text-orange-700 dark:text-orange-400">
-                {formatNumber(healthData.failed_recurring)}
-              </p>
-              <p className="text-sm text-orange-600 dark:text-orange-500 mt-1">
-                {formatPercent(healthData.failed_recurring / totalRecurring)} of total
-              </p>
+
+              <div className="p-4 rounded-lg bg-[hsl(var(--portal-accent-amber)/0.1)] border border-[hsl(var(--portal-accent-amber)/0.3)]">
+                <span className="font-medium text-[hsl(var(--portal-accent-amber))]">Failed</span>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-accent-amber))] mt-1">
+                  {formatNumber(healthData.failed_recurring)}
+                </p>
+                <p className="text-sm text-[hsl(var(--portal-accent-amber)/0.8)] mt-1">
+                  {formatPercent(healthData.failed_recurring / totalRecurring)} of total
+                </p>
+              </div>
             </div>
           </div>
 
           {/* Health Progress Bar */}
           <div className="mt-6 space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Overall Health</span>
+              <span className="text-[hsl(var(--portal-text-muted))]">Overall Health</span>
               <span className={`font-medium ${
-                healthStatus === 'excellent' ? 'text-green-600' :
-                healthStatus === 'good' ? 'text-blue-600' :
-                healthStatus === 'fair' ? 'text-yellow-600' : 'text-red-600'
+                healthStatus === 'excellent' ? 'text-[hsl(var(--portal-success))]' :
+                healthStatus === 'good' ? 'text-[hsl(var(--portal-accent-blue))]' :
+                healthStatus === 'fair' ? 'text-[hsl(var(--portal-warning))]' : 'text-[hsl(var(--portal-error))]'
               }`}>
                 {healthStatus.charAt(0).toUpperCase() + healthStatus.slice(1)}
               </span>
@@ -252,39 +258,39 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
             <Progress 
               value={healthScore} 
               className={`h-3 ${
-                healthStatus === 'excellent' ? '[&>div]:bg-green-600' :
-                healthStatus === 'good' ? '[&>div]:bg-blue-600' :
-                healthStatus === 'fair' ? '[&>div]:bg-yellow-600' : '[&>div]:bg-red-600'
+                healthStatus === 'excellent' ? '[&>div]:bg-[hsl(var(--portal-success))]' :
+                healthStatus === 'good' ? '[&>div]:bg-[hsl(var(--portal-accent-blue))]' :
+                healthStatus === 'fair' ? '[&>div]:bg-[hsl(var(--portal-warning))]' : '[&>div]:bg-[hsl(var(--portal-error))]'
               }`}
             />
           </div>
-        </CardContent>
-      </Card>
+        </V3CardContent>
+      </V3Card>
 
       {/* Upsell Performance */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <ArrowUpCircle className="h-5 w-5 text-primary" />
+      <V3Card>
+        <V3CardHeader>
+          <V3CardTitle className="flex items-center gap-2">
+            <ArrowUpCircle className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
             Recurring Upsell Performance
-          </CardTitle>
-          <CardDescription>
+          </V3CardTitle>
+          <V3CardDescription>
             Conversion rate for recurring donation upsell prompts
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </V3CardDescription>
+        </V3CardHeader>
+        <V3CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center p-4 rounded-lg bg-muted/50">
-              <p className="text-sm text-muted-foreground mb-1">Upsells Shown</p>
-              <p className="text-3xl font-bold">{formatNumber(healthData.upsell_shown)}</p>
+            <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary))]">
+              <p className="text-sm text-[hsl(var(--portal-text-muted))] mb-1">Upsells Shown</p>
+              <p className="text-3xl font-bold text-[hsl(var(--portal-text-primary))]">{formatNumber(healthData.upsell_shown)}</p>
             </div>
-            <div className="text-center p-4 rounded-lg bg-muted/50">
-              <p className="text-sm text-muted-foreground mb-1">Upsells Accepted</p>
-              <p className="text-3xl font-bold text-green-600">{formatNumber(healthData.upsell_succeeded)}</p>
+            <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary))]">
+              <p className="text-sm text-[hsl(var(--portal-text-muted))] mb-1">Upsells Accepted</p>
+              <p className="text-3xl font-bold text-[hsl(var(--portal-success))]">{formatNumber(healthData.upsell_succeeded)}</p>
             </div>
-            <div className="text-center p-4 rounded-lg bg-primary/10">
-              <p className="text-sm text-muted-foreground mb-1">Conversion Rate</p>
-              <p className="text-3xl font-bold text-primary">
+            <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
+              <p className="text-sm text-[hsl(var(--portal-text-muted))] mb-1">Conversion Rate</p>
+              <p className="text-3xl font-bold text-[hsl(var(--portal-accent-blue))]">
                 {formatPercent(healthData.upsell_rate)}
               </p>
             </div>
@@ -297,13 +303,13 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
                 value={healthData.upsell_rate * 100} 
                 className="h-2"
               />
-              <p className="text-xs text-muted-foreground mt-1 text-center">
+              <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1 text-center">
                 {formatNumber(healthData.upsell_succeeded)} of {formatNumber(healthData.upsell_shown)} donors accepted the upsell
               </p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </V3CardContent>
+      </V3Card>
     </div>
   );
 }

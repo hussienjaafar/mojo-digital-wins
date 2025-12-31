@@ -410,14 +410,17 @@ Returns an array of CSS variable values for all series colors.
 ```typescript
 import { getChartColors } from "@/lib/design-tokens";
 
-// Recharts example
-<PieChart>
-  <Pie data={data}>
-    {data.map((entry, index) => (
-      <Cell key={index} fill={getChartColors()[index % 6]} />
-    ))}
-  </Pie>
-</PieChart>
+// ECharts pie chart example
+const pieColors = getChartColors();
+const option = {
+  series: [{
+    type: 'pie',
+    data: data.map((item, index) => ({
+      ...item,
+      itemStyle: { color: pieColors[index % 6] }
+    }))
+  }]
+};
 ```
 
 ### `getChartColor(index)`
@@ -427,15 +430,14 @@ Returns a single chart color by index. Automatically wraps around if index excee
 ```typescript
 import { getChartColor } from "@/lib/design-tokens";
 
-// Single line chart
-<Line
-  dataKey="donations"
-  stroke={getChartColor(0)}  // Blue
-/>
-<Line
-  dataKey="sms"
-  stroke={getChartColor(1)}  // Purple
-/>
+// ECharts line series colors
+const option = {
+  series: [
+    { name: 'Donations', type: 'line', color: getChartColor(0) }, // Blue
+    { name: 'SMS', type: 'line', color: getChartColor(1) },       // Purple
+    { name: 'Meta', type: 'line', color: getChartColor(2) },      // Green
+  ]
+};
 
 // Safe for any index (wraps around)
 getChartColor(7)  // Returns index 1 (purple) because 7 % 6 = 1
@@ -451,30 +453,29 @@ import {
   cssVar
 } from "@/lib/design-tokens";
 
-// Full Recharts configuration
-<ResponsiveContainer>
-  <LineChart data={data}>
-    <CartesianGrid
-      stroke={cssVar(chartColors.grid)}
-      strokeDasharray="3 3"
-    />
-    <XAxis
-      tick={{ fill: cssVar(chartColors.axis) }}
-    />
-    <YAxis
-      tick={{ fill: cssVar(chartColors.axis) }}
-    />
-    <Tooltip
-      contentStyle={{
-        background: cssVar(chartColors.tooltipBg),
-        border: `1px solid ${cssVar(chartColors.tooltipBorder)}`,
-      }}
-    />
-    <Line dataKey="donations" stroke={getChartColor(0)} />
-    <Line dataKey="sms" stroke={getChartColor(1)} />
-    <Line dataKey="meta" stroke={getChartColor(2)} />
-  </LineChart>
-</ResponsiveContainer>
+// ECharts configuration with design tokens
+const option = {
+  grid: {
+    borderColor: cssVar(chartColors.grid),
+  },
+  xAxis: {
+    axisLabel: { color: cssVar(chartColors.axis) },
+    axisLine: { lineStyle: { color: cssVar(chartColors.grid) } },
+  },
+  yAxis: {
+    axisLabel: { color: cssVar(chartColors.axis) },
+    splitLine: { lineStyle: { color: cssVar(chartColors.grid) } },
+  },
+  tooltip: {
+    backgroundColor: cssVar(chartColors.tooltipBg),
+    borderColor: cssVar(chartColors.tooltipBorder),
+  },
+  series: [
+    { name: 'Donations', type: 'line', color: getChartColor(0) },
+    { name: 'SMS', type: 'line', color: getChartColor(1) },
+    { name: 'Meta', type: 'line', color: getChartColor(2) },
+  ]
+};
 ```
 
 ---
