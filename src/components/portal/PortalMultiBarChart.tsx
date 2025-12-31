@@ -48,6 +48,16 @@ export const PortalMultiBarChart: React.FC<PortalMultiBarChartProps> = ({
   maxMobilePoints = 6,
   layout = "horizontal",
 }) => {
+  // Log deprecation warning in development
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[DEPRECATED] PortalMultiBarChart is deprecated. ' +
+        'Please migrate to EChartsBarChart from @/components/charts/echarts. ' +
+        'See docs/V3_CHART_STANDARDS.md for migration guide.'
+      );
+    }
+  }, []);
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 220 : 280);
   const [hiddenKeys, setHiddenKeys] = React.useState<Set<string>>(new Set());

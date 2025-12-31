@@ -52,6 +52,16 @@ export function ResponsiveLineChart({
   showLegend = true,
   maxMobilePoints = 8,
 }: ResponsiveLineChartProps) {
+  // Log deprecation warning in development
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[DEPRECATED] ResponsiveLineChart is deprecated. ' +
+        'Please migrate to EChartsLineChart from @/components/charts/echarts. ' +
+        'See docs/V3_CHART_STANDARDS.md for migration guide.'
+      );
+    }
+  }, []);
   const isMobile = useIsMobile();
 
   // Reduce data points on mobile for readability

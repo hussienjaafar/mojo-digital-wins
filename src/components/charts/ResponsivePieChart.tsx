@@ -51,6 +51,16 @@ export function ResponsivePieChart({
   innerRadius = 0,
   labelThreshold = 5,
 }: ResponsivePieChartProps) {
+  // Log deprecation warning in development
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[DEPRECATED] ResponsivePieChart is deprecated. ' +
+        'Please migrate to EChartsPieChart from @/components/charts/echarts. ' +
+        'See docs/V3_CHART_STANDARDS.md for migration guide.'
+      );
+    }
+  }, []);
   const isMobile = useIsMobile();
 
   // Calculate total for percentage calculations

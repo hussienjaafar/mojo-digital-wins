@@ -45,6 +45,16 @@ export const PortalLineChart: React.FC<PortalLineChartProps> = ({
   emptyLabel = "No data available",
   descriptionId,
 }) => {
+  // Log deprecation warning in development
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[DEPRECATED] PortalLineChart is deprecated. ' +
+        'Please migrate to EChartsLineChart from @/components/charts/echarts. ' +
+        'See docs/V3_CHART_STANDARDS.md for migration guide.'
+      );
+    }
+  }, []);
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 200 : 280);
   const [hiddenKeys, setHiddenKeys] = React.useState<Set<string>>(new Set());

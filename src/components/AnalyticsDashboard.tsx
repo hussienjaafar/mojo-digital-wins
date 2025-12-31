@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from "recharts";
+import { EChartsLineChart, EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
 import { useToast } from "@/hooks/use-toast";
 import { format, subDays, startOfDay } from "date-fns";
 import { logger } from "@/lib/logger";
@@ -33,14 +32,17 @@ type StatusData = {
   value: number;
 };
 
-const COLORS = {
-  urgent: "hsl(var(--destructive))",
-  high: "hsl(var(--warning))",
-  medium: "hsl(var(--primary))",
-  low: "hsl(var(--muted-foreground))",
-  new: "hsl(var(--chart-1))",
-  "in-progress": "hsl(var(--chart-2))",
-  resolved: "hsl(var(--chart-3))",
+const PRIORITY_COLORS: Record<string, string> = {
+  Urgent: "hsl(var(--destructive))",
+  High: "hsl(var(--warning))",
+  Medium: "hsl(var(--primary))",
+  Low: "hsl(var(--muted-foreground))",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  New: "hsl(var(--chart-1))",
+  "In Progress": "hsl(var(--chart-2))",
+  Resolved: "hsl(var(--chart-3))",
 };
 
 export const AnalyticsDashboard = () => {
@@ -151,12 +153,18 @@ export const AnalyticsDashboard = () => {
     );
   }
 
-  const chartConfig = {
-    submissions: {
-      label: "Submissions",
-      color: "hsl(var(--primary))",
-    },
-  };
+  // Prepare pie chart data with colors
+  const priorityPieData = priorityData.map(item => ({
+    name: item.name,
+    value: item.value,
+    color: PRIORITY_COLORS[item.name] || "hsl(var(--primary))",
+  }));
+
+  const statusPieData = statusData.map(item => ({
+    name: item.name,
+    value: item.value,
+    color: STATUS_COLORS[item.name] || "hsl(var(--primary))",
+  }));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -203,27 +211,21 @@ export const AnalyticsDashboard = () => {
             <CardDescription className="portal-text-secondary">Daily submission volume over time</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={timeSeriesData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                  />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line 
-                    type="monotone" 
-                    dataKey="submissions" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(var(--primary))" }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            <EChartsLineChart
+              data={timeSeriesData}
+              xAxisKey="date"
+              series={[
+                {
+                  dataKey: "submissions",
+                  name: "Submissions",
+                  color: "hsl(var(--primary))",
+                  type: "area",
+                  areaStyle: { opacity: 0.1 },
+                },
+              ]}
+              height={300}
+              showLegend={false}
+            />
           </CardContent>
         </Card>
 
@@ -234,24 +236,20 @@ export const AnalyticsDashboard = () => {
             <CardDescription className="portal-text-secondary">Top 10 campaigns by submission count</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={campaignData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="name" 
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                    angle={-45}
-                    textAnchor="end"
-                    height={80}
-                  />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            <EChartsBarChart
+              data={campaignData as Record<string, unknown>[]}
+              xAxisKey="name"
+              series={[
+                {
+                  dataKey: "count",
+                  name: "Submissions",
+                  color: "hsl(var(--primary))",
+                },
+              ]}
+              height={300}
+              showLegend={false}
+              xAxisLabelRotate={45}
+            />
           </CardContent>
         </Card>
 
@@ -262,31 +260,13 @@ export const AnalyticsDashboard = () => {
             <CardDescription className="portal-text-secondary">Breakdown by priority level</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={priorityData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="hsl(var(--primary))"
-                    dataKey="value"
-                  >
-                    {priorityData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={COLORS[entry.name.toLowerCase() as keyof typeof COLORS] || "hsl(var(--primary))"} 
-                      />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            <EChartsPieChart
+              data={priorityPieData}
+              height={300}
+              valueType="number"
+              showLabels={true}
+              legendPosition="bottom"
+            />
           </CardContent>
         </Card>
 
@@ -297,31 +277,13 @@ export const AnalyticsDashboard = () => {
             <CardDescription className="portal-text-secondary">Current status distribution</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="hsl(var(--primary))"
-                    dataKey="value"
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={COLORS[entry.name.toLowerCase().replace(' ', '-') as keyof typeof COLORS] || "hsl(var(--primary))"} 
-                      />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            <EChartsPieChart
+              data={statusPieData}
+              height={300}
+              valueType="number"
+              showLabels={true}
+              legendPosition="bottom"
+            />
           </CardContent>
         </Card>
       </div>

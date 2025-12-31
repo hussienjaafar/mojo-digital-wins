@@ -2,10 +2,9 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, DollarSign, Users, Target } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { logger } from "@/lib/logger";
-import { CurrencyChartTooltip, PercentageChartTooltip } from "@/components/charts/CustomChartTooltip";
 import { PortalSkeleton } from "@/components/portal/PortalSkeleton";
+import { EChartsLineChart, EChartsPieChart } from "@/components/charts/echarts";
 import { NoDataEmptyState } from "@/components/portal/PortalEmptyState";
 
 type Props = {
@@ -23,7 +22,7 @@ type AggregatedMetrics = {
   roi_percentage: number;
 };
 
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))'];
+
 
 const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) => {
   const [metrics, setMetrics] = useState<AggregatedMetrics[]>([]);
@@ -150,21 +149,22 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
             <CardTitle className="text-base sm:text-lg">Funds Raised Over Time</CardTitle>
           </CardHeader>
           <CardContent className="pb-4">
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={metrics}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-                <YAxis stroke="hsl(var(--muted-foreground))" />
-                <Tooltip content={<CurrencyChartTooltip />} />
-                <Line
-                  type="monotone"
-                  dataKey="total_funds_raised"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  name="Funds Raised"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <EChartsLineChart
+              data={metrics}
+              xAxisKey="date"
+              series={[
+                {
+                  dataKey: "total_funds_raised",
+                  name: "Funds Raised",
+                  color: "hsl(var(--primary))",
+                  type: "area",
+                  areaStyle: { opacity: 0.1 },
+                },
+              ]}
+              height={250}
+              valueType="currency"
+              showLegend={false}
+            />
           </CardContent>
         </Card>
 
@@ -173,25 +173,14 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
             <CardTitle className="text-base sm:text-lg">Spend by Channel</CardTitle>
           </CardHeader>
           <CardContent className="pb-4">
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={spendByChannel}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value }) => `${name}: $${value.toLocaleString()}`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {spendByChannel.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CurrencyChartTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
+            <EChartsPieChart
+              data={spendByChannel}
+              height={250}
+              variant="donut"
+              valueType="currency"
+              showLabels={true}
+              legendPosition="right"
+            />
           </CardContent>
         </Card>
       </div>
@@ -202,21 +191,20 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
           <CardTitle className="text-base sm:text-lg">ROI Trend</CardTitle>
         </CardHeader>
         <CardContent className="pb-4">
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={metrics}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-              <YAxis stroke="hsl(var(--muted-foreground))" />
-              <Tooltip content={<PercentageChartTooltip />} />
-              <Line
-                type="monotone"
-                dataKey="roi_percentage"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                name="ROI %"
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <EChartsLineChart
+            data={metrics}
+            xAxisKey="date"
+            series={[
+              {
+                dataKey: "roi_percentage",
+                name: "ROI %",
+                color: "hsl(var(--primary))",
+              },
+            ]}
+            height={250}
+            valueType="percent"
+            showLegend={false}
+          />
         </CardContent>
       </Card>
     </div>

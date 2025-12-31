@@ -51,6 +51,16 @@ export const PortalBarChart: React.FC<PortalBarChartProps> = ({
   xAxisTickFormatter,
   barName,
 }) => {
+  // Log deprecation warning in development
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[DEPRECATED] PortalBarChart is deprecated. ' +
+        'Please migrate to EChartsBarChart from @/components/charts/echarts. ' +
+        'See docs/V3_CHART_STANDARDS.md for migration guide.'
+      );
+    }
+  }, []);
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 200 : 250);
   const setHoveredDataPoint = useChartInteractionStore((state) => state.setHoveredDataPoint);

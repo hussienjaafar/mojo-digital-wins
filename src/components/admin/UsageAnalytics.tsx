@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Activity, TrendingUp, Users, AlertCircle, Database, BarChart3 } from "lucide-react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { EChartsLineChart, EChartsBarChart } from "@/components/charts/echarts";
 
 interface UsageStats {
   totalClients: number;
@@ -28,7 +28,7 @@ interface WatchlistTrend {
   count: number;
 }
 
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--destructive))', 'hsl(var(--warning))', 'hsl(var(--success))'];
+
 
 export default function UsageAnalytics() {
   const [stats, setStats] = useState<UsageStats>({
@@ -240,27 +240,21 @@ export default function UsageAnalytics() {
             <CardDescription>Daily watchlist entity additions</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={watchlistTrends}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-                <YAxis stroke="hsl(var(--muted-foreground))" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    color: "hsl(var(--foreground))"
-                  }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="count" 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={2}
-                  name="New Entries"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <EChartsLineChart
+              data={watchlistTrends}
+              xAxisKey="date"
+              series={[
+                {
+                  dataKey: "count",
+                  name: "New Entries",
+                  color: "hsl(var(--primary))",
+                  type: "area",
+                  areaStyle: { opacity: 0.1 },
+                },
+              ]}
+              height={250}
+              showLegend={false}
+            />
           </CardContent>
         </Card>
 
@@ -270,27 +264,20 @@ export default function UsageAnalytics() {
             <CardDescription>Organizations with most entities tracked</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={clientUsage.slice(0, 5)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis 
-                  dataKey="organization_name" 
-                  stroke="hsl(var(--muted-foreground))"
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis stroke="hsl(var(--muted-foreground))" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    color: "hsl(var(--foreground))"
-                  }}
-                />
-                <Bar dataKey="watchlist_count" fill="hsl(var(--primary))" name="Watchlist Entries" />
-              </BarChart>
-            </ResponsiveContainer>
+            <EChartsBarChart
+              data={clientUsage.slice(0, 5).map(c => ({ ...c })) as Record<string, unknown>[]}
+              xAxisKey="organization_name"
+              series={[
+                {
+                  dataKey: "watchlist_count",
+                  name: "Watchlist Entries",
+                  color: "hsl(var(--primary))",
+                },
+              ]}
+              height={250}
+              showLegend={false}
+              xAxisLabelRotate={45}
+            />
           </CardContent>
         </Card>
       </div>

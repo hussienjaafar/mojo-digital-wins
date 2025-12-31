@@ -2,10 +2,9 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { format, subDays } from "date-fns";
 import { LoadingCard } from "@/components/ui/loading-spinner";
-import { cssVar, colors } from "@/lib/design-tokens";
+import { EChartsLineChart } from "@/components/charts/echarts";
 
 export function SentimentTrendChart() {
   const [data, setData] = useState<any[]>([]);
@@ -137,53 +136,30 @@ export function SentimentTrendChart() {
             No sentiment data available for the selected period
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="date" 
-                className="text-xs"
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <YAxis 
-                label={{ value: 'Percentage', angle: -90, position: 'insideLeft' }}
-                className="text-xs"
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: cssVar(colors.bg.elevated),
-                  border: `1px solid ${cssVar(colors.border.default)}`,
-                  borderRadius: '8px'
-                }}
-              />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="positive"
-                stroke={cssVar(colors.status.success)}
-                strokeWidth={2}
-                name="Positive (%)"
-                dot={{ fill: cssVar(colors.status.success) }}
-              />
-              <Line
-                type="monotone"
-                dataKey="neutral"
-                stroke={cssVar(colors.text.muted)}
-                strokeWidth={2}
-                name="Neutral (%)"
-                dot={{ fill: cssVar(colors.text.muted) }}
-              />
-              <Line
-                type="monotone"
-                dataKey="negative"
-                stroke={cssVar(colors.status.error)}
-                strokeWidth={2}
-                name="Negative (%)"
-                dot={{ fill: cssVar(colors.status.error) }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <EChartsLineChart
+            data={data}
+            xAxisKey="date"
+            series={[
+              {
+                dataKey: "positive",
+                name: "Positive (%)",
+                color: "hsl(var(--portal-success))",
+              },
+              {
+                dataKey: "neutral",
+                name: "Neutral (%)",
+                color: "hsl(var(--portal-text-muted))",
+              },
+              {
+                dataKey: "negative",
+                name: "Negative (%)",
+                color: "hsl(var(--portal-error))",
+              },
+            ]}
+            height={400}
+            valueType="percent"
+            showLegend={true}
+          />
         )}
       </CardContent>
     </Card>
