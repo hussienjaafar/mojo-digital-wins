@@ -152,75 +152,96 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Parse request body first
     const body = await req.json();
     const { organization_id, start_date, end_date, mode, check_freshness_only } = body;
     
-    // Check for internal backfill call (bypasses auth)
+    // --- SECURITY: Authentication checks ---
     const internalKey = req.headers.get('x-internal-key');
     const isInternalCall = mode === 'backfill' && organization_id && internalKey === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.slice(0, 20);
-    const isScheduledCall = req.headers.get('x-scheduled-job') === 'true';
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    const providedCronSecret = req.headers.get('x-cron-secret');
+    const internalTriggerSecret = Deno.env.get('INTERNAL_TRIGGER_SECRET');
+    const authHeader = req.headers.get('Authorization');
+    const isScheduledHeader = req.headers.get('x-scheduled-job') === 'true';
+    
+    let isAuthorized = false;
+    let authMethod = '';
 
-    let isAdmin = false;
+    // SECURITY: Cron secret validation REQUIRED for scheduled jobs
+    if (cronSecret && providedCronSecret === cronSecret) {
+      isAuthorized = true;
+      authMethod = 'CRON_SECRET';
+      console.log('[SYNC-META-ADS] Authorized via CRON_SECRET');
+    }
+    
+    // SECURITY: Internal trigger (from tiered-meta-sync or other internal functions)
+    if (!isAuthorized && internalTriggerSecret && internalKey === internalTriggerSecret) {
+      isAuthorized = true;
+      authMethod = 'INTERNAL_TRIGGER_SECRET';
+      console.log('[SYNC-META-ADS] Authorized via INTERNAL_TRIGGER_SECRET');
+    }
+    
+    // SECURITY: Legacy internal backfill call (service role key prefix)
+    if (!isAuthorized && isInternalCall) {
+      isAuthorized = true;
+      authMethod = 'INTERNAL_BACKFILL';
+      console.log('[SYNC-META-ADS] Authorized via internal backfill key');
+    }
+    
+    // SECURITY: Reject x-scheduled-job header without valid cron secret
+    if (!isAuthorized && isScheduledHeader) {
+      console.warn('[SYNC-META-ADS] Rejected: x-scheduled-job header provided without valid x-cron-secret');
+      // Fall through to JWT check - do NOT auto-authorize
+    }
+    
+    // Admin JWT check
+    if (!isAuthorized && authHeader) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      
+      if (!authError && user) {
+        // Check if user is admin
+        const { data: isAdmin } = await userClient.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
+        
+        if (isAdmin) {
+          isAuthorized = true;
+          authMethod = 'ADMIN_JWT';
+          console.log('[SYNC-META-ADS] Authorized via admin JWT');
+        } else {
+          // Non-admin users must belong to the organization
+          const { data: clientUser, error: accessError } = await supabase
+            .from('client_users')
+            .select('organization_id')
+            .eq('id', user.id)
+            .single();
 
-    if (!isInternalCall && !isScheduledCall) {
-      // Verify user authentication
-      const authHeader = req.headers.get('Authorization');
-      if (!authHeader) {
-        return new Response(
-          JSON.stringify({ error: 'Authorization header required' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Get user from JWT token
-      const { data: { user }, error: authError } = await supabase.auth.getUser(
-        authHeader.replace('Bearer ', '')
-      );
-
-      if (authError || !user) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid or expired token' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (!organization_id) {
-        throw new Error('organization_id is required');
-      }
-
-      // Check if user is admin
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-
-      isAdmin = userRoles?.some(r => r.role === 'admin') || false;
-
-      // Admins can sync any organization, regular users must belong to the organization
-      if (!isAdmin) {
-        const { data: clientUser, error: accessError } = await supabase
-          .from('client_users')
-          .select('organization_id')
-          .eq('id', user.id)
-          .single();
-
-        if (accessError || !clientUser || clientUser.organization_id !== organization_id) {
-          return new Response(
-            JSON.stringify({ error: 'You do not have access to this organization' }),
-            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          if (!accessError && clientUser && clientUser.organization_id === organization_id) {
+            isAuthorized = true;
+            authMethod = 'USER_JWT';
+            console.log('[SYNC-META-ADS] Authorized via user JWT for their organization');
+          }
         }
       }
-
-      console.log(`Starting Meta Ads sync for organization: ${organization_id} by ${isAdmin ? 'admin' : 'user'}`);
-    } else if (isScheduledCall) {
-      console.log(`Starting SCHEDULED Meta Ads sync for organization: ${organization_id}`);
-    } else {
-      console.log(`Starting INTERNAL Meta Ads backfill for organization: ${organization_id}`);
     }
+    
+    if (!isAuthorized) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - requires CRON_SECRET, admin access, or org membership' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[SYNC-META-ADS] Starting sync for org ${organization_id} (auth: ${authMethod})`);
 
     if (!organization_id) {
       throw new Error('organization_id is required');
