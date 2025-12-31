@@ -51,16 +51,16 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
   height = 300,
   className,
   isLoading = false,
-  variant = "pie",
+  variant = "donut",
   showLabels = true,
-  labelThreshold = 5,
+  labelThreshold = 8,
   showLegend = true,
   legendPosition = "bottom",
   valueType = "number",
   showPercentage = true,
   onSliceClick,
   emptyMessage = "No data available",
-  disableHoverEmphasis = false,
+  disableHoverEmphasis = true,
 }) => {
   // Handle empty data
   if (!isLoading && (!data || data.length === 0)) {

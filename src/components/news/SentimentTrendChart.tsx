@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { V3Card, V3CardContent, V3CardDescription, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays } from "date-fns";
@@ -35,7 +35,7 @@ export function SentimentTrendChart() {
 
       if (error) throw error;
 
-      // Transform data for recharts
+      // Transform data for ECharts
       const chartData = transformDataForChart(trendsData || []);
       setData(chartData);
     } catch (error) {
@@ -94,14 +94,14 @@ export function SentimentTrendChart() {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <V3Card>
+      <V3CardHeader>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <CardTitle>Sentiment Trends Over Time</CardTitle>
-            <CardDescription>
+            <V3CardTitle>Sentiment Trends Over Time</V3CardTitle>
+            <V3CardDescription>
               Historical sentiment analysis showing positive, neutral, and negative percentages
-            </CardDescription>
+            </V3CardDescription>
           </div>
           <div className="flex gap-2">
             <Select value={category} onValueChange={setCategory}>
@@ -129,8 +129,8 @@ export function SentimentTrendChart() {
             </Select>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
+      </V3CardHeader>
+      <V3CardContent>
         {data.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             No sentiment data available for the selected period
@@ -161,7 +161,7 @@ export function SentimentTrendChart() {
             showLegend={true}
           />
         )}
-      </CardContent>
-    </Card>
+      </V3CardContent>
+    </V3Card>
   );
 }

@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { V3Card, V3CardContent, V3CardDescription, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
+import { V3KPICard } from "@/components/v3/V3KPICard";
+import { V3ChartWrapper } from "@/components/v3/V3ChartWrapper";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
-import { V3ChartWrapper } from "@/components/v3/V3ChartWrapper";
 import { V3EmptyState } from "@/components/v3/V3EmptyState";
 import { FlaskConical, TrendingUp, Users, DollarSign } from "lucide-react";
 
@@ -56,11 +57,11 @@ export function ABTestAnalytics({ organizationId }: ABTestAnalyticsProps) {
 
   if (error) {
     return (
-      <Card className="border-destructive">
-        <CardContent className="pt-6">
+      <V3Card className="border-destructive">
+        <V3CardContent className="pt-6">
           <p className="text-destructive">Error loading A/B test data: {error.message}</p>
-        </CardContent>
-      </Card>
+        </V3CardContent>
+      </V3Card>
     );
   }
 
@@ -106,21 +107,21 @@ export function ABTestAnalytics({ organizationId }: ABTestAnalyticsProps) {
         , variations[0]);
 
         return (
-          <Card key={testName} className="overflow-hidden">
-            <CardHeader className="bg-muted/30">
+          <V3Card key={testName} className="overflow-hidden">
+            <V3CardHeader className="bg-muted/30">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg">{testName}</CardTitle>
-                  <CardDescription>
+                  <V3CardTitle className="text-lg">{testName}</V3CardTitle>
+                  <V3CardDescription>
                     {variations.length} variations • {formatNumber(totalDonations)} total donations
-                  </CardDescription>
+                  </V3CardDescription>
                 </div>
                 <Badge variant="default" className="text-sm">
                   Winner: {bestVariation.ab_test_variation || 'Control'}
                 </Badge>
               </div>
-            </CardHeader>
-            <CardContent className="pt-6">
+            </V3CardHeader>
+            <V3CardContent className="pt-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Summary Stats */}
                 <div className="space-y-4">
@@ -196,8 +197,8 @@ export function ABTestAnalytics({ organizationId }: ABTestAnalyticsProps) {
                   ))}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </V3CardContent>
+          </V3Card>
         );
       })}
     </div>

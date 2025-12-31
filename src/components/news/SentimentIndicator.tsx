@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { V3Card, V3CardContent, V3CardDescription, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
@@ -74,15 +74,15 @@ export function SentimentTrendCard({ category, data }: SentimentTrendCardProps) 
     data.avg_sentiment_score < 0.4 ? 'negative' : 'neutral';
 
   return (
-    <Card>
-      <CardHeader>
+    <V3Card>
+      <V3CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg capitalize">{category}</CardTitle>
+          <V3CardTitle className="text-lg capitalize">{category}</V3CardTitle>
           <SentimentBadge sentiment={overallSentiment} showConfidence={false} />
         </div>
-        <CardDescription>{total} articles analyzed today</CardDescription>
-      </CardHeader>
-      <CardContent>
+        <V3CardDescription>{total} articles analyzed today</V3CardDescription>
+      </V3CardHeader>
+      <V3CardContent>
         <div className="space-y-3">
           {/* Sentiment Distribution Bar */}
           <div className="w-full h-4 rounded-full overflow-hidden flex">
@@ -103,20 +103,20 @@ export function SentimentTrendCard({ category, data }: SentimentTrendCardProps) 
           {/* Sentiment Counts */}
           <div className="grid grid-cols-3 gap-2 text-sm">
             <div className="text-center">
-              <div className="text-green-600 font-bold">{data.positive_count}</div>
+              <div className="text-success font-bold">{data.positive_count}</div>
               <div className="text-muted-foreground">Positive</div>
             </div>
             <div className="text-center">
-              <div className="text-gray-600 font-bold">{data.neutral_count}</div>
+              <div className="text-muted-foreground font-bold">{data.neutral_count}</div>
               <div className="text-muted-foreground">Neutral</div>
             </div>
             <div className="text-center">
-              <div className="text-red-600 font-bold">{data.negative_count}</div>
+              <div className="text-destructive font-bold">{data.negative_count}</div>
               <div className="text-muted-foreground">Negative</div>
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </V3CardContent>
+    </V3Card>
   );
 }
