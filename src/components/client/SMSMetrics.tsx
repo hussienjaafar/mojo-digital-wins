@@ -10,14 +10,15 @@ import {
   V3LoadingState,
   V3ErrorState,
   V3EmptyState,
+  V3DataTable,
+  type V3Column,
 } from "@/components/v3";
-import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
 import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, parseISO } from "date-fns";
 import { EChartsLineChart, EChartsBarChart } from "@/components/charts/echarts";
 import { useSMSMetricsQuery } from "@/queries";
-import { formatRatio, formatCurrency } from "@/lib/chart-formatters";
+import { formatRatio, formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 
 type Props = {
   organizationId: string;
@@ -282,75 +283,85 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
           </div>
         </V3CardHeader>
         <V3CardContent>
-          <PortalTable
+          <V3DataTable
             data={filteredCampaigns}
-            keyExtractor={(row) => row.campaign_id}
+            getRowKey={(row) => row.campaign_id}
+            pagination
+            pageSize={10}
+            emptyTitle="No campaigns match the selected filters"
+            emptyDescription="Try adjusting your filter criteria"
             columns={[
               {
                 key: "campaign_name",
-                label: "Campaign",
+                header: "Campaign",
                 sortable: true,
-                render: (value) => <span className="font-medium text-[hsl(var(--portal-text-primary))]">{value}</span>,
+                sortFn: (a, b) => a.campaign_name.localeCompare(b.campaign_name),
+                render: (row) => <span className="font-medium text-[hsl(var(--portal-text-primary))]">{row.campaign_name}</span>,
               },
               {
                 key: "messages_sent",
-                label: "Sent",
+                header: "Sent",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.number,
+                sortFn: (a, b) => a.messages_sent - b.messages_sent,
+                render: (row) => formatNumber(row.messages_sent),
               },
               {
                 key: "delivery_rate",
-                label: "Delivery",
+                header: "Delivery",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: (value) => (
-                  <span className={value < 90 ? 'text-[hsl(var(--portal-warning))]' : ''}>
-                    {value.toFixed(1)}%
+                sortFn: (a, b) => a.delivery_rate - b.delivery_rate,
+                hideOnMobile: true,
+                render: (row) => (
+                  <span className={row.delivery_rate < 90 ? 'text-[hsl(var(--portal-warning))]' : ''}>
+                    {row.delivery_rate.toFixed(1)}%
                   </span>
                 ),
-                hiddenOnMobile: true,
               },
               {
                 key: "roi",
-                label: "ROI",
+                header: "ROI",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: (value) => (
-                  <span className={value >= 2 ? 'text-[hsl(var(--portal-success))] font-semibold' : ''}>
-                    {value.toFixed(2)}x
+                sortFn: (a, b) => a.roi - b.roi,
+                render: (row) => (
+                  <span className={row.roi >= 2 ? 'text-[hsl(var(--portal-success))] font-semibold' : ''}>
+                    {row.roi.toFixed(2)}x
                   </span>
                 ),
               },
               {
                 key: "amount_raised",
-                label: "Raised",
+                header: "Raised",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.currency,
+                sortFn: (a, b) => a.amount_raised - b.amount_raised,
+                render: (row) => formatCurrency(row.amount_raised),
               },
               {
                 key: "cost",
-                label: "Cost",
+                header: "Cost",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.currency,
-                hiddenOnMobile: true,
+                sortFn: (a, b) => a.cost - b.cost,
+                hideOnMobile: true,
+                render: (row) => formatCurrency(row.cost),
               },
               {
                 key: "opt_out_rate",
-                label: "Opt-out",
+                header: "Opt-out",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: (value) => (
-                  <span className={value >= 2 ? 'text-[hsl(var(--portal-warning))]' : ''}>
-                    {value.toFixed(2)}%
+                sortFn: (a, b) => a.opt_out_rate - b.opt_out_rate,
+                hideOnMobile: true,
+                render: (row) => (
+                  <span className={row.opt_out_rate >= 2 ? 'text-[hsl(var(--portal-warning))]' : ''}>
+                    {row.opt_out_rate.toFixed(2)}%
                   </span>
                 ),
-                hiddenOnMobile: true,
               },
-            ]}
-            emptyMessage="No campaigns match the selected filters"
+            ] as V3Column<typeof filteredCampaigns[0]>[]}
           />
         </V3CardContent>
       </V3Card>
