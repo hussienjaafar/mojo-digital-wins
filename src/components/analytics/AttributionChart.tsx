@@ -1,18 +1,9 @@
 import { memo } from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts';
 import { GitBranch } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartPanel } from '@/components/charts/ChartPanel';
-import { getYAxisFormatter, formatNumber } from '@/lib/chart-formatters';
+import { EChartsBarChart } from '@/components/charts/echarts';
+import { formatNumber } from '@/lib/chart-formatters';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 type AttributionModel = 'firstTouch' | 'lastTouch' | 'linear' | 'positionBased' | 'timeDecay';
@@ -33,14 +24,6 @@ type Props = {
   error?: Error | string | null;
   onRetry?: () => void;
 };
-
-const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-];
 
 const MODEL_DESCRIPTIONS: Record<AttributionModel, string> = {
   firstTouch: 'All credit to first interaction',
@@ -75,52 +58,13 @@ export const AttributionChart = memo(({
         <p className="text-xs sm:text-sm text-[hsl(var(--portal-text-muted))]">
           {MODEL_DESCRIPTIONS[model]}
         </p>
-        <div style={{ height: chartHeight }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              layout="horizontal"
-              margin={{ top: 8, right: isMobile ? 8 : 16, bottom: 4, left: isMobile ? -12 : 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--portal-border))" opacity={0.4} vertical={false} />
-              <XAxis
-                type="number"
-                tick={{ fontSize: isMobile ? 10 : 11, fill: "hsl(var(--portal-text-muted))" }}
-                tickLine={false}
-                axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
-                tickFormatter={getYAxisFormatter('number')}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tick={{ fontSize: isMobile ? 10 : 11, fill: "hsl(var(--portal-text-muted))" }}
-                tickLine={false}
-                axisLine={false}
-                width={isMobile ? 70 : 100}
-              />
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (!active || !payload?.[0]) return null;
-                  const entry = payload[0].payload;
-                  return (
-                    <div className="rounded-lg px-3 py-2 text-xs bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))] shadow-lg">
-                      <p className="font-medium text-sm text-[hsl(var(--portal-text-primary))]">{entry.name}</p>
-                      <p className="text-[hsl(var(--portal-text-muted))]">{entry.platform}</p>
-                      <p className="text-sm font-semibold mt-1 tabular-nums text-[hsl(var(--portal-text-primary))]">
-                        {formatNumber(entry.value)} conversions
-                      </p>
-                    </div>
-                  );
-                }}
-              />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={isMobile ? 20 : 30}>
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <EChartsBarChart
+          data={chartData}
+          series={[{ dataKey: 'value', name: 'Conversions', color: 'hsl(var(--chart-1))' }]}
+          xAxisKey="name"
+          valueType="number"
+          height={chartHeight}
+        />
 
         {/* Platform summary */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 border-t border-[hsl(var(--portal-border)/0.5)]">

@@ -1,20 +1,18 @@
 /**
  * Lazy-loaded Recharts components
  *
+ * @deprecated This module is deprecated. Use ECharts components from @/components/charts/echarts instead.
+ * - LazyLineChart → EChartsLineChart
+ * - LazyBarChart → EChartsBarChart
+ * - LazyPieChart → EChartsPieChart
+ * - LazyAreaChart → EChartsLineChart (with areaStyle)
+ * - LazySparkline → EChartsLineChart (with minimal config)
+ *
  * This module provides lazy-loaded versions of Recharts components to reduce
  * the initial bundle size. Recharts adds ~377 kB to the bundle, so lazy loading
  * ensures it's only fetched when charts are actually rendered.
  *
- * Usage:
- * ```tsx
- * import { LazyLineChart, ChartSuspense } from "@/components/charts/LazyCharts";
- *
- * <ChartSuspense>
- *   <LazyLineChart data={data}>
- *     <Line dataKey="value" />
- *   </LazyLineChart>
- * </ChartSuspense>
- * ```
+ * Migration guide: See docs/V3_CHART_STANDARDS.md
  */
 
 import React, { Suspense, lazy, ComponentType, ReactNode } from "react";
