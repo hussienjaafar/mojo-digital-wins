@@ -50,6 +50,7 @@ import {
   V3CardContent,
   V3FilterPill,
 } from "@/components/v3";
+import { PortalTable, type PortalTableColumn } from "@/components/v3/PortalTable";
 import { EChartsFunnelChart, EChartsBarChart } from "@/components/charts/echarts";
 
 // ============================================================================
@@ -601,128 +602,142 @@ const ClientDonorJourney = () => {
             </p>
           </V3CardHeader>
           <V3CardContent>
-            {journeys.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[hsl(var(--portal-border))]">
-                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Donor</th>
-                      <th className="text-right py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Amount</th>
-                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">First Touchpoint</th>
-                      <th className="text-center py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Days to Convert</th>
-                      <th className="text-center py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Touchpoints</th>
-                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Date</th>
-                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {journeys.slice(0, 10).map((journey, idx) => (
-                      <tr 
-                        key={journey.id || idx}
-                        className="border-b border-[hsl(var(--portal-border)/0.5)] hover:bg-[hsl(var(--portal-bg-elevated))]"
+            <PortalTable
+              columns={[
+                {
+                  key: "donor",
+                  header: "Donor",
+                  render: (journey) => (
+                    <span className="font-mono text-xs text-[hsl(var(--portal-text-primary))]">
+                      {journey.donor_email?.slice(0, 20)}...
+                    </span>
+                  ),
+                },
+                {
+                  key: "amount",
+                  header: "Amount",
+                  align: "right",
+                  render: (journey) => (
+                    <span className="font-semibold text-[hsl(var(--portal-success))]">
+                      ${journey.amount.toFixed(2)}
+                    </span>
+                  ),
+                },
+                {
+                  key: "firstTouchpoint",
+                  header: "First Touchpoint",
+                  render: (journey) => {
+                    if (journey.touchpoints.length === 0) {
+                      return <span className="text-xs text-[hsl(var(--portal-text-muted))]">Direct</span>;
+                    }
+                    const firstTp = journey.touchpoints[0];
+                    const Icon = getTouchpointIcon(firstTp.touchpoint_type);
+                    return (
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-6 h-6 rounded-full bg-[hsl(var(--portal-accent-blue)/0.1)] flex items-center justify-center"
+                          title={firstTp.touchpoint_type}
+                        >
+                          <Icon className="h-3 w-3 text-[hsl(var(--portal-accent-blue))]" />
+                        </div>
+                        <span className="text-xs text-[hsl(var(--portal-text-muted))] capitalize">
+                          {firstTp.touchpoint_type.replace(/_/g, " ")}
+                        </span>
+                      </div>
+                    );
+                  },
+                },
+                {
+                  key: "daysToConvert",
+                  header: "Days to Convert",
+                  align: "center",
+                  render: (journey) => {
+                    if (journey.touchpoints.length === 0) {
+                      return <span className="text-xs text-[hsl(var(--portal-text-muted))]">—</span>;
+                    }
+                    const firstTouchDate = new Date(journey.touchpoints[0].occurred_at);
+                    const donationDate = new Date(journey.transaction_date);
+                    const daysDiff = Math.round(
+                      (donationDate.getTime() - firstTouchDate.getTime()) / (1000 * 60 * 60 * 24)
+                    );
+                    return (
+                      <span
+                        className={cn(
+                          "text-xs font-medium",
+                          daysDiff <= 1
+                            ? "text-[hsl(var(--portal-success))]"
+                            : daysDiff <= 7
+                            ? "text-[hsl(var(--portal-accent-blue))]"
+                            : "text-[hsl(var(--portal-text-muted))]"
+                        )}
                       >
-                        <td className="py-3 px-4">
-                          <span className="font-mono text-xs text-[hsl(var(--portal-text-primary))]">
-                            {journey.donor_email?.slice(0, 20)}...
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right font-semibold text-[hsl(var(--portal-success))]">
-                          ${journey.amount.toFixed(2)}
-                        </td>
-                        <td className="py-3 px-4">
-                          {journey.touchpoints.length > 0 ? (
-                            <div className="flex items-center gap-2">
-                              {(() => {
-                                const firstTp = journey.touchpoints[0];
-                                const Icon = getTouchpointIcon(firstTp.touchpoint_type);
-                                return (
-                                  <>
-                                    <div
-                                      className="w-6 h-6 rounded-full bg-[hsl(var(--portal-accent-blue)/0.1)] flex items-center justify-center"
-                                      title={firstTp.touchpoint_type}
-                                    >
-                                      <Icon className="h-3 w-3 text-[hsl(var(--portal-accent-blue))]" />
-                                    </div>
-                                    <span className="text-xs text-[hsl(var(--portal-text-muted))] capitalize">
-                                      {firstTp.touchpoint_type.replace(/_/g, ' ')}
-                                    </span>
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-[hsl(var(--portal-text-muted))]">Direct</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {journey.touchpoints.length > 0 ? (
-                            (() => {
-                              const firstTouchDate = new Date(journey.touchpoints[0].occurred_at);
-                              const donationDate = new Date(journey.transaction_date);
-                              const daysDiff = Math.round((donationDate.getTime() - firstTouchDate.getTime()) / (1000 * 60 * 60 * 24));
-                              return (
-                                <span className={cn(
-                                  "text-xs font-medium",
-                                  daysDiff <= 1 ? "text-[hsl(var(--portal-success))]" : 
-                                  daysDiff <= 7 ? "text-[hsl(var(--portal-accent-blue))]" : 
-                                  "text-[hsl(var(--portal-text-muted))]"
-                                )}>
-                                  {daysDiff === 0 ? 'Same day' : `${daysDiff}d`}
-                                </span>
-                              );
-                            })()
-                          ) : (
-                            <span className="text-xs text-[hsl(var(--portal-text-muted))]">—</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {journey.touchpoints.slice(0, 3).map((tp, tpIdx) => {
-                              const Icon = getTouchpointIcon(tp.touchpoint_type);
-                              return (
-                                <div
-                                  key={tpIdx}
-                                  className="w-6 h-6 rounded-full bg-[hsl(var(--portal-bg-elevated))] flex items-center justify-center"
-                                  title={tp.touchpoint_type}
-                                >
-                                  <Icon className="h-3 w-3 text-[hsl(var(--portal-text-muted))]" />
-                                </div>
-                              );
-                            })}
-                            {journey.touchpoints.length > 3 && (
-                              <span className="text-xs text-[hsl(var(--portal-text-muted))]">
-                                +{journey.touchpoints.length - 3}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-[hsl(var(--portal-text-muted))]">
-                          {formatDistanceToNow(new Date(journey.transaction_date), { addSuffix: true })}
-                        </td>
-                        <td className="py-3 px-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedJourney(journey)}
-                            className="text-[hsl(var(--portal-accent-blue))]"
+                        {daysDiff === 0 ? "Same day" : `${daysDiff}d`}
+                      </span>
+                    );
+                  },
+                },
+                {
+                  key: "touchpoints",
+                  header: "Touchpoints",
+                  align: "center",
+                  render: (journey) => (
+                    <div className="flex items-center justify-center gap-1">
+                      {journey.touchpoints.slice(0, 3).map((tp, tpIdx) => {
+                        const Icon = getTouchpointIcon(tp.touchpoint_type);
+                        return (
+                          <div
+                            key={tpIdx}
+                            className="w-6 h-6 rounded-full bg-[hsl(var(--portal-bg-elevated))] flex items-center justify-center"
+                            title={tp.touchpoint_type}
                           >
-                            View
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
-                <div className="text-center">
-                  <ArrowRight className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No journey data available</p>
-                  <p className="text-sm">Run the pipeline to generate donor journeys</p>
+                            <Icon className="h-3 w-3 text-[hsl(var(--portal-text-muted))]" />
+                          </div>
+                        );
+                      })}
+                      {journey.touchpoints.length > 3 && (
+                        <span className="text-xs text-[hsl(var(--portal-text-muted))]">
+                          +{journey.touchpoints.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  key: "date",
+                  header: "Date",
+                  render: (journey) => (
+                    <span className="text-[hsl(var(--portal-text-muted))]">
+                      {formatDistanceToNow(new Date(journey.transaction_date), { addSuffix: true })}
+                    </span>
+                  ),
+                },
+                {
+                  key: "actions",
+                  header: "Actions",
+                  render: (journey) => (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedJourney(journey)}
+                      className="text-[hsl(var(--portal-accent-blue))]"
+                    >
+                      View
+                    </Button>
+                  ),
+                },
+              ] as PortalTableColumn<DonorJourneyRecord>[]}
+              data={journeys.slice(0, 10)}
+              getRowKey={(journey, idx) => journey.id || idx}
+              emptyContent={
+                <div className="h-[200px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
+                  <div className="text-center">
+                    <ArrowRight className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No journey data available</p>
+                    <p className="text-sm">Run the pipeline to generate donor journeys</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              }
+            />
           </V3CardContent>
         </V3Card>
 

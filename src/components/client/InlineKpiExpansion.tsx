@@ -278,53 +278,23 @@ const TrendBadge: React.FC<TrendBadgeProps> = ({
 };
 
 // ============================================================================
-// Breakdown Table Component
+// Breakdown Table Component (uses shared PortalBreakdownTable)
 // ============================================================================
+
+import { PortalBreakdownTable } from "@/components/v3/PortalTable";
 
 interface BreakdownTableProps {
   items: BreakdownItem[];
 }
 
 const BreakdownTable: React.FC<BreakdownTableProps> = ({ items }) => (
-  <div className="rounded-lg border border-[hsl(var(--portal-border))] overflow-hidden">
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="bg-[hsl(var(--portal-bg-elevated))]">
-          <th className="px-4 py-2.5 text-left font-medium text-[hsl(var(--portal-text-muted))]">
-            Metric
-          </th>
-          <th className="px-4 py-2.5 text-right font-medium text-[hsl(var(--portal-text-muted))]">
-            Value
-          </th>
-          {items.some((i) => i.percentage !== undefined) && (
-            <th className="px-4 py-2.5 text-right font-medium text-[hsl(var(--portal-text-muted))] w-20">
-              %
-            </th>
-          )}
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-[hsl(var(--portal-border))]">
-        {items.map((item, index) => (
-          <tr
-            key={index}
-            className="hover:bg-[hsl(var(--portal-bg-hover))] transition-colors"
-          >
-            <td className="px-4 py-2.5 text-[hsl(var(--portal-text-primary))]">
-              {item.label}
-            </td>
-            <td className="px-4 py-2.5 text-right font-medium text-[hsl(var(--portal-text-primary))] tabular-nums">
-              {item.value}
-            </td>
-            {item.percentage !== undefined && (
-              <td className="px-4 py-2.5 text-right text-[hsl(var(--portal-text-muted))] tabular-nums">
-                {item.percentage.toFixed(1)}%
-              </td>
-            )}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
+  <PortalBreakdownTable
+    items={items.map((item) => ({
+      label: item.label,
+      value: item.value,
+      percentage: item.percentage,
+    }))}
+  />
 );
 
 // ============================================================================

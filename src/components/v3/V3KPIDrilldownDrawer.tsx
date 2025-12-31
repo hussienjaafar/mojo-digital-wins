@@ -7,8 +7,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { V3TrendIndicator } from "./V3TrendIndicator";
+import { PortalBreakdownTable } from "./PortalTable";
 import { type LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { EChartsLineChart, type LineSeriesConfig } from "@/components/charts/echarts";
 
 export interface KPIDrilldownData {
@@ -110,45 +110,13 @@ export const V3KPIDrilldownDrawer: React.FC<V3KPIDrilldownDrawerProps> = ({
               <h4 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))]">
                 Breakdown
               </h4>
-              <div className="rounded-lg border border-[hsl(var(--portal-border))] overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-[hsl(var(--portal-bg-elevated))]">
-                      <th className="px-4 py-2 text-left font-medium text-[hsl(var(--portal-text-muted))]">
-                        Category
-                      </th>
-                      <th className="px-4 py-2 text-right font-medium text-[hsl(var(--portal-text-muted))]">
-                        Value
-                      </th>
-                      {data.breakdown[0]?.percentage !== undefined && (
-                        <th className="px-4 py-2 text-right font-medium text-[hsl(var(--portal-text-muted))]">
-                          %
-                        </th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[hsl(var(--portal-border))]">
-                    {data.breakdown.map((item, index) => (
-                      <tr
-                        key={index}
-                        className="hover:bg-[hsl(var(--portal-bg-elevated))]/50 transition-colors"
-                      >
-                        <td className="px-4 py-2 text-[hsl(var(--portal-text-primary))]">
-                          {item.label}
-                        </td>
-                        <td className="px-4 py-2 text-right font-medium text-[hsl(var(--portal-text-primary))]">
-                          {item.value}
-                        </td>
-                        {item.percentage !== undefined && (
-                          <td className="px-4 py-2 text-right text-[hsl(var(--portal-text-muted))]">
-                            {item.percentage.toFixed(1)}%
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <PortalBreakdownTable
+                items={data.breakdown.map((item) => ({
+                  label: item.label,
+                  value: item.value,
+                  percentage: item.percentage,
+                }))}
+              />
             </div>
           )}
         </div>

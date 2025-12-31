@@ -21,6 +21,7 @@ import {
   V3CardTitle,
   V3CardContent,
 } from "@/components/v3";
+import { PortalTable, type PortalTableColumn } from "@/components/v3/PortalTable";
 import { EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
 import { useState } from "react";
 
@@ -489,55 +490,67 @@ export default function ClientDonorIntelligence() {
             </p>
           </V3CardHeader>
           <V3CardContent>
-            {recentJourneys.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[hsl(var(--portal-border))]">
-                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Donor</th>
-                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Event</th>
-                      <th className="text-right py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Amount</th>
-                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Source</th>
-                      <th className="text-left py-3 px-4 font-medium text-[hsl(var(--portal-text-muted))]">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentJourneys.map((journey, idx) => (
-                      <tr 
-                        key={`${journey.donor_key}-${idx}`}
-                        className="border-b border-[hsl(var(--portal-border)/0.5)] hover:bg-[hsl(var(--portal-bg-elevated))]"
-                      >
-                        <td className="py-3 px-4 font-mono text-xs text-[hsl(var(--portal-text-primary))]">
-                          {journey.donor_key?.slice(0, 8)}...
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-1 rounded-full text-xs bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-primary))]">
-                            {journey.event_type?.replace(/_/g, ' ')}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right font-semibold text-[hsl(var(--portal-success))]">
-                          {journey.amount ? formatCurrency(journey.amount) : '-'}
-                        </td>
-                        <td className="py-3 px-4 text-[hsl(var(--portal-text-muted))]">
-                          {journey.source || journey.refcode || '-'}
-                        </td>
-                        <td className="py-3 px-4 text-[hsl(var(--portal-text-muted))]">
-                          {new Date(journey.occurred_at).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
-                <div className="text-center">
-                  <GitBranch className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No journey data available</p>
-                  <p className="text-sm">Sync transactions to populate donor journeys</p>
+            <PortalTable
+              columns={[
+                {
+                  key: "donor",
+                  header: "Donor",
+                  render: (journey) => (
+                    <span className="font-mono text-xs text-[hsl(var(--portal-text-primary))]">
+                      {journey.donor_key?.slice(0, 8)}...
+                    </span>
+                  ),
+                },
+                {
+                  key: "event",
+                  header: "Event",
+                  render: (journey) => (
+                    <span className="px-2 py-1 rounded-full text-xs bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-primary))]">
+                      {journey.event_type?.replace(/_/g, " ")}
+                    </span>
+                  ),
+                },
+                {
+                  key: "amount",
+                  header: "Amount",
+                  align: "right",
+                  render: (journey) => (
+                    <span className="font-semibold text-[hsl(var(--portal-success))]">
+                      {journey.amount ? formatCurrency(journey.amount) : "-"}
+                    </span>
+                  ),
+                },
+                {
+                  key: "source",
+                  header: "Source",
+                  render: (journey) => (
+                    <span className="text-[hsl(var(--portal-text-muted))]">
+                      {journey.source || journey.refcode || "-"}
+                    </span>
+                  ),
+                },
+                {
+                  key: "date",
+                  header: "Date",
+                  render: (journey) => (
+                    <span className="text-[hsl(var(--portal-text-muted))]">
+                      {new Date(journey.occurred_at).toLocaleDateString()}
+                    </span>
+                  ),
+                },
+              ]}
+              data={recentJourneys}
+              getRowKey={(journey, idx) => `${journey.donor_key}-${idx}`}
+              emptyContent={
+                <div className="h-[200px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
+                  <div className="text-center">
+                    <GitBranch className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No journey data available</p>
+                    <p className="text-sm">Sync transactions to populate donor journeys</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              }
+            />
           </V3CardContent>
         </V3Card>
 
