@@ -134,15 +134,43 @@ const JourneyDetailDialog = ({ journey, open, onOpenChange }: JourneyDetailDialo
               ${journey.amount.toFixed(2)}
             </p>
           </div>
-          <Badge className="bg-[hsl(var(--portal-success))] text-white">
-            {journey.touchpoints.length} Touchpoints
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge className="bg-[hsl(var(--portal-success))] text-white">
+              {journey.touchpoints.length} Touchpoints
+            </Badge>
+          </div>
+        </div>
+
+        {/* Attribution Method Indicator */}
+        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-[hsl(var(--portal-text-muted))]">Attribution Method:</span>
+              {journey.touchpoints.some(tp => tp.utm_campaign || tp.utm_source) ? (
+                <Badge variant="outline" className="bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] border-[hsl(var(--portal-accent-blue)/0.3)]">
+                  <Target className="h-3 w-3 mr-1" />
+                  Deterministic (UTM/Refcode)
+                </Badge>
+              ) : journey.touchpoints.length > 0 ? (
+                <Badge variant="outline" className="bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))] border-[hsl(var(--portal-warning)/0.3)]">
+                  <Layers className="h-3 w-3 mr-1" />
+                  Touchpoint-Based
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-[hsl(var(--portal-text-muted)/0.1)] text-[hsl(var(--portal-text-muted))] border-[hsl(var(--portal-border))]">
+                  <Heart className="h-3 w-3 mr-1" />
+                  Organic / Unattributed
+                </Badge>
+              )}
+            </div>
+            <span className="text-xs text-[hsl(var(--portal-text-muted))]">Model v1.0 (40/20/40)</span>
+          </div>
         </div>
 
         {/* Attribution Model */}
         <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
           <h4 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-3">
-            Attribution Model (40/20/40)
+            Attribution Breakdown
           </h4>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
