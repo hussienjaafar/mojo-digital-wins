@@ -56,6 +56,16 @@ export function ResponsiveBarChart({
   maxMobilePoints = 6,
   barColors,
 }: ResponsiveBarChartProps) {
+  // Log deprecation warning in development
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[DEPRECATED] ResponsiveBarChart is deprecated. ' +
+        'Please migrate to EChartsBarChart from @/components/charts/echarts. ' +
+        'See docs/V3_CHART_STANDARDS.md for migration guide.'
+      );
+    }
+  }, []);
   const isMobile = useIsMobile();
 
   // Reduce data points on mobile for readability

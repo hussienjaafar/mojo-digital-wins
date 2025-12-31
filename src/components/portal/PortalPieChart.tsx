@@ -51,6 +51,16 @@ export const PortalPieChart: React.FC<PortalPieChartProps> = ({
   colors = PORTAL_COLORS,
   labelThreshold = 5,
 }) => {
+  // Log deprecation warning in development
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[DEPRECATED] PortalPieChart is deprecated. ' +
+        'Please migrate to EChartsPieChart from @/components/charts/echarts. ' +
+        'See docs/V3_CHART_STANDARDS.md for migration guide.'
+      );
+    }
+  }, []);
   const isMobile = useIsMobile();
   const chartHeight = height || (isMobile ? 220 : 280);
   const [hiddenKeys, setHiddenKeys] = React.useState<Set<string>>(new Set());
