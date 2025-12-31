@@ -1,5 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { V3Card, V3CardContent, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
+import { V3KPICard } from "@/components/v3/V3KPICard";
+import { V3ChartWrapper } from "@/components/v3/V3ChartWrapper";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -330,15 +332,7 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="pb-2">
-                <div className="h-4 bg-muted rounded w-24" />
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 bg-muted rounded w-32 mb-2" />
-                <div className="h-3 bg-muted rounded w-20" />
-              </CardContent>
-            </Card>
+            <V3KPICard key={i} icon={DollarSign} label="Loading..." value="--" isLoading />
           ))}
         </div>
       </div>
@@ -351,16 +345,16 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
         {/* Header with connection status */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold">Meta Ads Analytics</h2>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <h2 className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">Meta Ads Analytics</h2>
+            <div className="flex items-center gap-1 text-sm text-[hsl(var(--portal-text-muted))]">
               {isConnected ? (
                 <>
-                  <Wifi className="h-4 w-4 text-success" />
+                  <Wifi className="h-4 w-4 text-[hsl(var(--portal-success))]" />
                   <span className="hidden sm:inline">Live</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className="h-4 w-4 text-muted-foreground" />
+                  <WifiOff className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
                   <span className="hidden sm:inline">Offline</span>
                 </>
               )}
@@ -407,92 +401,54 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
 
         {/* KPI Cards - Responsive Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Total Spend
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${kpis.totalSpend.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Avg CPM: ${kpis.averageCPM.toFixed(2)}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Eye className="h-4 w-4" />
-                Impressions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{kpis.totalImpressions.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                CTR: {kpis.averageCTR.toFixed(2)}%
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                Conversions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{kpis.totalConversions}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Avg CPC: ${kpis.averageCPC.toFixed(2)}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Average ROAS
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold flex items-center gap-2">
-                {kpis.averageROAS.toFixed(2)}x
-                {kpis.averageROAS >= 3 ? (
-                  <TrendingUp className="h-5 w-5 text-success" />
-                ) : (
-                  <TrendingDown className="h-5 w-5 text-danger" />
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {kpis.averageROAS >= 3 ? "Strong performance" : "Needs optimization"}
-              </p>
-            </CardContent>
-          </Card>
+          <V3KPICard
+            icon={DollarSign}
+            label="Total Spend"
+            value={`$${kpis.totalSpend.toFixed(2)}`}
+            subtitle={`Avg CPM: $${kpis.averageCPM.toFixed(2)}`}
+            accent="blue"
+          />
+          <V3KPICard
+            icon={Eye}
+            label="Impressions"
+            value={kpis.totalImpressions.toLocaleString()}
+            subtitle={`CTR: ${kpis.averageCTR.toFixed(2)}%`}
+            accent="purple"
+          />
+          <V3KPICard
+            icon={Target}
+            label="Conversions"
+            value={kpis.totalConversions.toString()}
+            subtitle={`Avg CPC: $${kpis.averageCPC.toFixed(2)}`}
+            accent="green"
+          />
+          <V3KPICard
+            icon={TrendingUp}
+            label="Average ROAS"
+            value={`${kpis.averageROAS.toFixed(2)}x`}
+            subtitle={kpis.averageROAS >= 3 ? "Strong performance" : "Needs optimization"}
+            accent={kpis.averageROAS >= 3 ? "green" : "amber"}
+          />
         </div>
 
         {/* Charts Section - Collapsible on Mobile */}
         <Collapsible open={chartsPanelOpen} onOpenChange={setChartsPanelOpen}>
-          <Card>
-            <CardHeader>
+          <V3Card>
+            <V3CardHeader>
               <CollapsibleTrigger className="flex items-center justify-between w-full">
-                <CardTitle>Performance Analytics</CardTitle>
+                <V3CardTitle>Performance Analytics</V3CardTitle>
                 {chartsPanelOpen ? (
                   <ChevronUp className="h-5 w-5" />
                 ) : (
                   <ChevronDown className="h-5 w-5" />
                 )}
               </CollapsibleTrigger>
-            </CardHeader>
+            </V3CardHeader>
             <CollapsibleContent>
-              <CardContent className="space-y-6">
+              <V3CardContent className="space-y-6">
                 {/* Performance Trends */}
                 <div>
-                  <h3 className="text-sm font-semibold mb-4">Performance Over Time</h3>
+                  <h3 className="text-sm font-semibold mb-4 text-[hsl(var(--portal-text-primary))]">Performance Over Time</h3>
                   <EChartsLineChart
                     data={performanceTrends as Record<string, any>[]}
                     xAxisKey="date"
@@ -533,7 +489,7 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Creative Performance */}
                   <div>
-                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-[hsl(var(--portal-text-primary))]">
                       <Image className="h-4 w-4" />
                       Creative Type Performance
                     </h3>
@@ -545,14 +501,12 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
                       }))}
                       height={200}
                       valueType="currency"
-                      variant="pie"
-                      disableHoverEmphasis
                     />
                   </div>
 
                   {/* Device Performance */}
                   <div>
-                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-[hsl(var(--portal-text-primary))]">
                       <Smartphone className="h-4 w-4" />
                       Device Platform Performance
                     </h3>
@@ -568,149 +522,141 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
                     />
                   </div>
                 </div>
-              </CardContent>
+              </V3CardContent>
             </CollapsibleContent>
-          </Card>
+          </V3Card>
         </Collapsible>
 
         {/* Campaign Performance Table - Desktop */}
-        <Card className="hidden md:block">
-          <CardHeader>
-            <CardTitle>Campaign Performance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("campaign_name")}>
-                      Campaign {sortField === "campaign_name" && (sortDirection === "asc" ? "↑" : "↓")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("spend")}>
-                      Spend {sortField === "spend" && (sortDirection === "asc" ? "↑" : "↓")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("impressions")}>
-                      Impressions {sortField === "impressions" && (sortDirection === "asc" ? "↑" : "↓")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("clicks")}>
-                      Clicks {sortField === "clicks" && (sortDirection === "asc" ? "↑" : "↓")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("conversions")}>
-                      Conversions {sortField === "conversions" && (sortDirection === "asc" ? "↑" : "↓")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("roas")}>
-                      ROAS {sortField === "roas" && (sortDirection === "asc" ? "↑" : "↓")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("ctr")}>
-                      CTR {sortField === "ctr" && (sortDirection === "asc" ? "↑" : "↓")}
-                    </TableHead>
-                    <TableHead className="text-right">Creative</TableHead>
+        <V3Card className="hidden md:block" title="Campaign Performance">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort("campaign_name")}>
+                    Campaign {sortField === "campaign_name" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </TableHead>
+                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("spend")}>
+                    Spend {sortField === "spend" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </TableHead>
+                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("impressions")}>
+                    Impressions {sortField === "impressions" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </TableHead>
+                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("clicks")}>
+                    Clicks {sortField === "clicks" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </TableHead>
+                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("conversions")}>
+                    Conversions {sortField === "conversions" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </TableHead>
+                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("roas")}>
+                    ROAS {sortField === "roas" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </TableHead>
+                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("ctr")}>
+                    CTR {sortField === "ctr" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </TableHead>
+                  <TableHead className="text-right">Creative</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedCampaigns.map((campaign) => (
+                  <TableRow
+                    key={campaign.campaign_id}
+                    className="cursor-pointer hover:bg-[hsl(var(--portal-bg-hover))]"
+                    onClick={() => handleCampaignToggle(campaign.campaign_id)}
+                  >
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {compareMode && (
+                          <input
+                            type="checkbox"
+                            checked={selectedCampaigns.includes(campaign.campaign_id)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleCampaignToggle(campaign.campaign_id);
+                            }}
+                            className="h-4 w-4"
+                          />
+                        )}
+                        {campaign.campaign_name}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">${campaign.spend.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{campaign.impressions.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{campaign.clicks.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{campaign.conversions}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant={campaign.roas >= 3 ? "default" : "secondary"}>
+                        {campaign.roas.toFixed(2)}x
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{campaign.ctr.toFixed(2)}%</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {campaign.top_creative_type === "video" && <Video className="h-4 w-4" />}
+                        {campaign.top_creative_type === "image" && <Image className="h-4 w-4" />}
+                        {campaign.top_creative_type === "carousel" && <Grid3x3 className="h-4 w-4" />}
+                        <span className="text-xs text-[hsl(var(--portal-text-muted))]">{campaign.creative_count}</span>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedCampaigns.map((campaign) => (
-                    <TableRow
-                      key={campaign.campaign_id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => handleCampaignToggle(campaign.campaign_id)}
-                    >
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {compareMode && (
-                            <input
-                              type="checkbox"
-                              checked={selectedCampaigns.includes(campaign.campaign_id)}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleCampaignToggle(campaign.campaign_id);
-                              }}
-                              className="h-4 w-4"
-                            />
-                          )}
-                          {campaign.campaign_name}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">${campaign.spend.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{campaign.impressions.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{campaign.clicks.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{campaign.conversions}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={campaign.roas >= 3 ? "default" : "secondary"}>
-                          {campaign.roas.toFixed(2)}x
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{campaign.ctr.toFixed(2)}%</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {campaign.top_creative_type === "video" && <Video className="h-4 w-4" />}
-                          {campaign.top_creative_type === "image" && <Image className="h-4 w-4" />}
-                          {campaign.top_creative_type === "carousel" && <Grid3x3 className="h-4 w-4" />}
-                          <span className="text-xs text-muted-foreground">{campaign.creative_count}</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </V3Card>
 
         {/* Campaign Performance Cards - Mobile */}
         <div className="md:hidden space-y-4">
           {sortedCampaigns.map((campaign) => (
-            <Card
+            <V3Card
               key={campaign.campaign_id}
-              className="cursor-pointer hover:shadow-lg transition-shadow"
+              interactive
+              className="cursor-pointer"
               onClick={() => handleMobileDetails(campaign)}
             >
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">{campaign.campaign_name}</CardTitle>
-                  <Badge variant={campaign.roas >= 3 ? "default" : "secondary"}>
-                    {campaign.roas.toFixed(2)}x
-                  </Badge>
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-semibold text-[hsl(var(--portal-text-primary))]">{campaign.campaign_name}</span>
+                <Badge variant={campaign.roas >= 3 ? "default" : "secondary"}>
+                  {campaign.roas.toFixed(2)}x
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-[hsl(var(--portal-text-muted))] text-xs">Spend</p>
+                  <p className="font-semibold text-[hsl(var(--portal-text-primary))]">${campaign.spend.toFixed(2)}</p>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground text-xs">Spend</p>
-                    <p className="font-semibold">${campaign.spend.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">Conversions</p>
-                    <p className="font-semibold">{campaign.conversions}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">Impressions</p>
-                    <p className="font-semibold">{campaign.impressions.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">CTR</p>
-                    <p className="font-semibold">{campaign.ctr.toFixed(2)}%</p>
-                  </div>
+                <div>
+                  <p className="text-[hsl(var(--portal-text-muted))] text-xs">Conversions</p>
+                  <p className="font-semibold text-[hsl(var(--portal-text-primary))]">{campaign.conversions}</p>
                 </div>
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <div className="flex items-center gap-2">
-                    {campaign.top_creative_type === "video" && <Video className="h-4 w-4" />}
-                    {campaign.top_creative_type === "image" && <Image className="h-4 w-4" />}
-                    {campaign.top_creative_type === "carousel" && <Grid3x3 className="h-4 w-4" />}
-                    <span className="text-xs text-muted-foreground">
-                      {campaign.creative_count} creatives
-                    </span>
-                  </div>
-                  {campaign.top_device && (
-                    <div className="flex items-center gap-1">
-                      {campaign.top_device === "mobile" && <Smartphone className="h-4 w-4" />}
-                      {campaign.top_device === "desktop" && <Monitor className="h-4 w-4" />}
-                      {campaign.top_device === "tablet" && <TabletSmartphone className="h-4 w-4" />}
-                      <span className="text-xs text-muted-foreground capitalize">{campaign.top_device}</span>
-                    </div>
-                  )}
+                <div>
+                  <p className="text-[hsl(var(--portal-text-muted))] text-xs">Impressions</p>
+                  <p className="font-semibold text-[hsl(var(--portal-text-primary))]">{campaign.impressions.toLocaleString()}</p>
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <p className="text-[hsl(var(--portal-text-muted))] text-xs">CTR</p>
+                  <p className="font-semibold text-[hsl(var(--portal-text-primary))]">{campaign.ctr.toFixed(2)}%</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-3 mt-3 border-t border-[hsl(var(--portal-border))]">
+                <div className="flex items-center gap-2">
+                  {campaign.top_creative_type === "video" && <Video className="h-4 w-4" />}
+                  {campaign.top_creative_type === "image" && <Image className="h-4 w-4" />}
+                  {campaign.top_creative_type === "carousel" && <Grid3x3 className="h-4 w-4" />}
+                  <span className="text-xs text-[hsl(var(--portal-text-muted))]">
+                    {campaign.creative_count} creatives
+                  </span>
+                </div>
+                {campaign.top_device && (
+                  <div className="flex items-center gap-1">
+                    {campaign.top_device === "mobile" && <Smartphone className="h-4 w-4" />}
+                    {campaign.top_device === "desktop" && <Monitor className="h-4 w-4" />}
+                    {campaign.top_device === "tablet" && <TabletSmartphone className="h-4 w-4" />}
+                    <span className="text-xs text-[hsl(var(--portal-text-muted))] capitalize">{campaign.top_device}</span>
+                  </div>
+                )}
+              </div>
+            </V3Card>
           ))}
         </div>
 

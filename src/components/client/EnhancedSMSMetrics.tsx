@@ -1,5 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { V3Card, V3CardContent, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
+import { V3KPICard } from "@/components/v3/V3KPICard";
+import { V3ChartWrapper } from "@/components/v3/V3ChartWrapper";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -345,357 +347,285 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
 
       {/* KPI Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-primary">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Messages Sent
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totals.messages_sent.toLocaleString()}</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {avgDeliveryRate.toFixed(1)}% delivered
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-secondary">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Conversions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totals.conversions.toLocaleString()}</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {avgConversionRate.toFixed(1)}% conversion rate
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-accent">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Cost per Conversion
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${avgCostPerConversion.toFixed(2)}</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              ${totals.cost.toLocaleString()} total cost
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className={`border-l-4 ${avgOptOutRate > 5 ? 'border-l-destructive' : 'border-l-muted'}`}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              Opt-out Rate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{avgOptOutRate.toFixed(2)}%</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {totals.opt_outs.toLocaleString()} opt-outs
-            </div>
-          </CardContent>
-        </Card>
+        <V3KPICard
+          icon={MessageSquare}
+          label="Messages Sent"
+          value={totals.messages_sent.toLocaleString()}
+          subtitle={`${avgDeliveryRate.toFixed(1)}% delivered`}
+          accent="blue"
+        />
+        <V3KPICard
+          icon={Target}
+          label="Conversions"
+          value={totals.conversions.toLocaleString()}
+          subtitle={`${avgConversionRate.toFixed(1)}% conversion rate`}
+          accent="purple"
+        />
+        <V3KPICard
+          icon={DollarSign}
+          label="Cost per Conversion"
+          value={`$${avgCostPerConversion.toFixed(2)}`}
+          subtitle={`$${totals.cost.toLocaleString()} total cost`}
+          accent="green"
+        />
+        <V3KPICard
+          icon={AlertCircle}
+          label="Opt-out Rate"
+          value={`${avgOptOutRate.toFixed(2)}%`}
+          subtitle={`${totals.opt_outs.toLocaleString()} opt-outs`}
+          accent={avgOptOutRate > 5 ? "red" : "default"}
+        />
       </div>
 
       {/* Optimization Recommendations */}
       {recommendations.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              Optimization Recommendations
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <V3Card accent="amber" title="Optimization Recommendations">
+          <div className="space-y-2">
             {recommendations.map((rec, idx) => (
               <div 
                 key={idx}
                 className={`p-3 rounded-md border-l-4 ${
                   rec.severity === 'high' 
-                    ? 'bg-destructive/10 border-l-destructive' 
+                    ? 'bg-[hsl(var(--portal-error)/0.1)] border-l-[hsl(var(--portal-error))]' 
                     : rec.severity === 'medium'
-                    ? 'bg-accent/10 border-l-accent'
-                    : 'bg-secondary/10 border-l-secondary'
+                    ? 'bg-[hsl(var(--portal-warning)/0.1)] border-l-[hsl(var(--portal-warning))]'
+                    : 'bg-[hsl(var(--portal-bg-hover))] border-l-[hsl(var(--portal-border))]'
                 }`}
               >
                 <div className="flex items-start gap-2">
                   <Badge variant={rec.severity === 'high' ? 'destructive' : 'secondary'}>
                     {rec.severity.toUpperCase()}
                   </Badge>
-                  <p className="text-sm flex-1">{rec.message}</p>
+                  <p className="text-sm flex-1 text-[hsl(var(--portal-text-primary))]">{rec.message}</p>
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </V3Card>
       )}
 
       {/* Conversion Funnel */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Conversion Funnel</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <EChartsBarChart
-            data={funnelData as unknown as Record<string, unknown>[]}
-            xAxisKey="stage"
-            series={[{ dataKey: "value", name: "Count", color: CHART_COLORS.primary }]}
-            height={300}
-            horizontal
-            disableHoverEmphasis
-          />
-        </CardContent>
-      </Card>
+      <V3ChartWrapper title="Conversion Funnel" ariaLabel="SMS conversion funnel chart">
+        <EChartsBarChart
+          data={funnelData as unknown as Record<string, unknown>[]}
+          xAxisKey="stage"
+          series={[{ dataKey: "value", name: "Count", color: CHART_COLORS.primary }]}
+          height={300}
+          horizontal
+          disableHoverEmphasis
+        />
+      </V3ChartWrapper>
 
       {/* Performance Trends */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Performance Trends Over Time</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <EChartsLineChart
-            data={timeSeriesData as Record<string, any>[]}
-            xAxisKey="date"
-            height={300}
-            valueType="percent"
-            series={[
-              {
-                dataKey: "delivery_rate",
-                name: "Delivery Rate %",
-                color: CHART_COLORS.primary,
-                valueType: "percent",
-              },
-              {
-                dataKey: "conversion_rate",
-                name: "Conversion Rate %",
-                color: CHART_COLORS.secondary,
-                valueType: "percent",
-              },
-              {
-                dataKey: "opt_out_rate",
-                name: "Opt-out Rate %",
-                color: CHART_COLORS.destructive,
-                type: "area",
-                areaStyle: { opacity: 0.2 },
-                valueType: "percent",
-              },
-            ]}
-          />
-        </CardContent>
-      </Card>
+      <V3ChartWrapper title="Performance Trends Over Time" ariaLabel="SMS performance trends chart">
+        <EChartsLineChart
+          data={timeSeriesData as Record<string, any>[]}
+          xAxisKey="date"
+          height={300}
+          valueType="percent"
+          series={[
+            {
+              dataKey: "delivery_rate",
+              name: "Delivery Rate %",
+              color: CHART_COLORS.primary,
+              valueType: "percent",
+            },
+            {
+              dataKey: "conversion_rate",
+              name: "Conversion Rate %",
+              color: CHART_COLORS.secondary,
+              valueType: "percent",
+            },
+            {
+              dataKey: "opt_out_rate",
+              name: "Opt-out Rate %",
+              color: CHART_COLORS.destructive,
+              type: "area",
+              areaStyle: { opacity: 0.2 },
+              valueType: "percent",
+            },
+          ]}
+        />
+      </V3ChartWrapper>
 
       {/* Audience Segment Performance */}
       {segmentPerformance.length > 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Audience Segment Performance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <EChartsPieChart
-                data={segmentPerformance.map((seg, index) => ({
-                  name: seg.segment,
-                  value: seg.conversions,
-                  color: Object.values(CHART_COLORS)[index % Object.values(CHART_COLORS).length],
-                }))}
-                height={250}
-                valueType="number"
-                variant="pie"
-                disableHoverEmphasis
-              />
+        <V3Card title="Audience Segment Performance">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <EChartsPieChart
+              data={segmentPerformance.map((seg, index) => ({
+                name: seg.segment,
+                value: seg.conversions,
+                color: Object.values(CHART_COLORS)[index % Object.values(CHART_COLORS).length],
+              }))}
+              height={250}
+              valueType="number"
+            />
 
-              <div className="space-y-3">
-                {segmentPerformance.map((seg, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-md bg-muted/50">
-                    <div>
-                      <div className="font-medium">{seg.segment}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {seg.conversions} conversions
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className={`font-bold ${seg.roi > 0 ? 'text-secondary' : 'text-destructive'}`}>
-                        {seg.roi > 0 ? '+' : ''}{seg.roi.toFixed(0)}% ROI
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        ${seg.amount_raised.toLocaleString()}
-                      </div>
+            <div className="space-y-3">
+              {segmentPerformance.map((seg, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 rounded-md bg-[hsl(var(--portal-bg-hover))]">
+                  <div>
+                    <div className="font-medium text-[hsl(var(--portal-text-primary))]">{seg.segment}</div>
+                    <div className="text-sm text-[hsl(var(--portal-text-muted))]">
+                      {seg.conversions} conversions
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className="text-right">
+                    <div className={`font-bold ${seg.roi > 0 ? 'text-[hsl(var(--portal-success))]' : 'text-[hsl(var(--portal-error))]'}`}>
+                      {seg.roi > 0 ? '+' : ''}{seg.roi.toFixed(0)}% ROI
+                    </div>
+                    <div className="text-sm text-[hsl(var(--portal-text-muted))]">
+                      ${seg.amount_raised.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </V3Card>
       )}
 
       {/* Campaign Details Table */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg">Campaign Details</CardTitle>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort("campaign_name")}>
-                    Campaign {sortField === "campaign_name" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("messages_sent")}>
-                    Sent {sortField === "messages_sent" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("delivery_rate")}>
-                    Delivery % {sortField === "delivery_rate" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("conversions")}>
-                    Conversions {sortField === "conversions" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("conversion_rate")}>
-                    Conv. Rate {sortField === "conversion_rate" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("cost_per_conversion")}>
-                    Cost/Conv. {sortField === "cost_per_conversion" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("opt_out_rate")}>
-                    Opt-out % {sortField === "opt_out_rate" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {aggregatedMetrics.map((metric) => (
-                  <Collapsible
-                    key={metric.campaign_id}
-                    open={expandedCampaign === metric.campaign_id}
-                    onOpenChange={() => setExpandedCampaign(
-                      expandedCampaign === metric.campaign_id ? null : metric.campaign_id
-                    )}
-                    asChild
-                  >
-                    <>
-                      <TableRow className="cursor-pointer hover:bg-muted/50">
-                        <TableCell className="font-medium">
-                          <div>
-                            {metric.campaign_name}
-                            {metric.a_b_test_variant && (
-                              <Badge variant="outline" className="ml-2 text-xs">
-                                {metric.a_b_test_variant}
-                              </Badge>
-                            )}
-                          </div>
-                          {metric.audience_segment !== "General" && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {metric.audience_segment}
-                            </div>
+      <V3Card title="Campaign Details">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="cursor-pointer" onClick={() => handleSort("campaign_name")}>
+                  Campaign {sortField === "campaign_name" && (sortDirection === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead className="cursor-pointer text-right" onClick={() => handleSort("messages_sent")}>
+                  Sent {sortField === "messages_sent" && (sortDirection === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead className="cursor-pointer text-right" onClick={() => handleSort("delivery_rate")}>
+                  Delivery % {sortField === "delivery_rate" && (sortDirection === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead className="cursor-pointer text-right" onClick={() => handleSort("conversions")}>
+                  Conversions {sortField === "conversions" && (sortDirection === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead className="cursor-pointer text-right" onClick={() => handleSort("conversion_rate")}>
+                  Conv. Rate {sortField === "conversion_rate" && (sortDirection === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead className="cursor-pointer text-right" onClick={() => handleSort("cost_per_conversion")}>
+                  Cost/Conv. {sortField === "cost_per_conversion" && (sortDirection === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead className="cursor-pointer text-right" onClick={() => handleSort("opt_out_rate")}>
+                  Opt-out % {sortField === "opt_out_rate" && (sortDirection === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead className="w-12"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {aggregatedMetrics.map((metric) => (
+                <Collapsible
+                  key={metric.campaign_id}
+                  open={expandedCampaign === metric.campaign_id}
+                  onOpenChange={() => setExpandedCampaign(
+                    expandedCampaign === metric.campaign_id ? null : metric.campaign_id
+                  )}
+                  asChild
+                >
+                  <>
+                    <TableRow className="cursor-pointer hover:bg-[hsl(var(--portal-bg-hover))]">
+                      <TableCell className="font-medium">
+                        <div>
+                          {metric.campaign_name}
+                          {metric.a_b_test_variant && (
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              {metric.a_b_test_variant}
+                            </Badge>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {metric.messages_sent.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className={metric.delivery_rate < 90 ? 'text-destructive font-medium' : ''}>
-                            {metric.delivery_rate.toFixed(1)}%
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {metric.conversions.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {metric.conversion_rate.toFixed(1)}%
-                        </TableCell>
-                        <TableCell className="text-right">
-                          ${metric.cost_per_conversion.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className={metric.opt_out_rate > 5 ? 'text-destructive font-medium' : ''}>
-                            {metric.opt_out_rate.toFixed(2)}%
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <CollapsibleTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              {expandedCampaign === metric.campaign_id ? (
-                                <ChevronUp className="h-4 w-4" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </CollapsibleTrigger>
-                        </TableCell>
-                      </TableRow>
-                      <CollapsibleContent asChild>
-                        <TableRow>
-                          <TableCell colSpan={8} className="bg-muted/20">
-                            <div className="p-4 space-y-3">
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                  <div className="text-muted-foreground">Delivered</div>
-                                  <div className="font-medium">{metric.messages_delivered.toLocaleString()}</div>
-                                </div>
-                                <div>
-                                  <div className="text-muted-foreground">Failed</div>
-                                  <div className="font-medium">{metric.messages_failed.toLocaleString()}</div>
-                                </div>
-                                <div>
-                                  <div className="text-muted-foreground">Clicks</div>
-                                  <div className="font-medium">{metric.clicks.toLocaleString()}</div>
-                                </div>
-                                <div>
-                                  <div className="text-muted-foreground">Click Rate</div>
-                                  <div className="font-medium">{metric.click_through_rate.toFixed(2)}%</div>
-                                </div>
-                                <div>
-                                  <div className="text-muted-foreground">Amount Raised</div>
-                                  <div className="font-medium text-secondary">${metric.amount_raised.toLocaleString()}</div>
-                                </div>
-                                <div>
-                                  <div className="text-muted-foreground">Total Cost</div>
-                                  <div className="font-medium">${metric.cost.toLocaleString()}</div>
-                                </div>
-                                <div>
-                                  <div className="text-muted-foreground">Bounce Rate</div>
-                                  <div className="font-medium">{metric.bounce_rate.toFixed(2)}%</div>
-                                </div>
-                                <div>
-                                  <div className="text-muted-foreground">Opt-outs</div>
-                                  <div className="font-medium">{metric.opt_outs.toLocaleString()}</div>
-                                </div>
+                        </div>
+                        {metric.audience_segment !== "General" && (
+                          <div className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">
+                            {metric.audience_segment}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {metric.messages_sent.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className={metric.delivery_rate < 90 ? 'text-[hsl(var(--portal-error))] font-medium' : ''}>
+                          {metric.delivery_rate.toFixed(1)}%
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {metric.conversions.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {metric.conversion_rate.toFixed(1)}%
+                      </TableCell>
+                      <TableCell className="text-right">
+                        ${metric.cost_per_conversion.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className={metric.opt_out_rate > 5 ? 'text-[hsl(var(--portal-error))] font-medium' : ''}>
+                          {metric.opt_out_rate.toFixed(2)}%
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            {expandedCampaign === metric.campaign_id ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </CollapsibleTrigger>
+                      </TableCell>
+                    </TableRow>
+                    <CollapsibleContent asChild>
+                      <TableRow>
+                        <TableCell colSpan={8} className="bg-[hsl(var(--portal-bg-hover))]">
+                          <div className="p-4 space-y-3">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <div className="text-[hsl(var(--portal-text-muted))]">Delivered</div>
+                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.messages_delivered.toLocaleString()}</div>
+                              </div>
+                              <div>
+                                <div className="text-[hsl(var(--portal-text-muted))]">Failed</div>
+                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.messages_failed.toLocaleString()}</div>
+                              </div>
+                              <div>
+                                <div className="text-[hsl(var(--portal-text-muted))]">Clicks</div>
+                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.clicks.toLocaleString()}</div>
+                              </div>
+                              <div>
+                                <div className="text-[hsl(var(--portal-text-muted))]">Click Rate</div>
+                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.click_through_rate.toFixed(2)}%</div>
+                              </div>
+                              <div>
+                                <div className="text-[hsl(var(--portal-text-muted))]">Amount Raised</div>
+                                <div className="font-medium text-[hsl(var(--portal-success))]">${metric.amount_raised.toLocaleString()}</div>
+                              </div>
+                              <div>
+                                <div className="text-[hsl(var(--portal-text-muted))]">Total Cost</div>
+                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">${metric.cost.toLocaleString()}</div>
+                              </div>
+                              <div>
+                                <div className="text-[hsl(var(--portal-text-muted))]">Bounce Rate</div>
+                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.bounce_rate.toFixed(2)}%</div>
+                              </div>
+                              <div>
+                                <div className="text-[hsl(var(--portal-text-muted))]">Opt-outs</div>
+                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.opt_outs.toLocaleString()}</div>
                               </div>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      </CollapsibleContent>
-                    </>
-                  </Collapsible>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    </CollapsibleContent>
+                  </>
+                </Collapsible>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </V3Card>
     </div>
   );
 }

@@ -6,7 +6,8 @@
 import { lazy, Suspense, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { V3Card, V3CardContent, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
+import { V3KPICard } from "@/components/v3/V3KPICard";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,15 +48,7 @@ const LoadingSkeleton = () => (
   <div className="space-y-4">
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {[...Array(4)].map((_, i) => (
-        <Card key={i}>
-          <CardHeader className="space-y-0 pb-2">
-            <Skeleton className="h-4 w-24" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-3 w-20" />
-          </CardContent>
-        </Card>
+        <V3KPICard key={i} icon={DollarSign} label="Loading..." value="--" isLoading />
       ))}
     </div>
     <Skeleton className="h-96 w-full" />
@@ -82,14 +75,7 @@ const SummaryCards = () => {
     return (
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="space-y-0 pb-2">
-              <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-32" />
-            </CardContent>
-          </Card>
+          <V3KPICard key={i} icon={DollarSign} label="Loading..." value="--" isLoading />
         ))}
       </div>
     );
@@ -97,51 +83,34 @@ const SummaryCards = () => {
 
   return (
     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-      <Card className="hover:shadow-lg transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Spend</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">${totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-          <p className="text-xs text-muted-foreground">Combined Meta + SMS</p>
-        </CardContent>
-      </Card>
-
-      <Card className="hover:shadow-lg transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-          <p className="text-xs text-muted-foreground">From donations</p>
-        </CardContent>
-      </Card>
-
-      <Card className="hover:shadow-lg transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total ROI</CardTitle>
-          <Target className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{roi.toFixed(1)}%</div>
-          <p className="text-xs text-muted-foreground">
-            {roi > 0 ? 'Profitable' : roi < 0 ? 'Loss' : 'Break-even'}
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card className="hover:shadow-lg transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Conversions</CardTitle>
-          <Activity className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{totalConversions.toLocaleString()}</div>
-          <p className="text-xs text-muted-foreground">Total donations</p>
-        </CardContent>
-      </Card>
+      <V3KPICard
+        icon={DollarSign}
+        label="Total Spend"
+        value={`$${totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+        subtitle="Combined Meta + SMS"
+        accent="blue"
+      />
+      <V3KPICard
+        icon={TrendingUp}
+        label="Total Revenue"
+        value={`$${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+        subtitle="From donations"
+        accent="green"
+      />
+      <V3KPICard
+        icon={Target}
+        label="Total ROI"
+        value={`${roi.toFixed(1)}%`}
+        subtitle={roi > 0 ? 'Profitable' : roi < 0 ? 'Loss' : 'Break-even'}
+        accent={roi > 0 ? "green" : roi < 0 ? "red" : "default"}
+      />
+      <V3KPICard
+        icon={Activity}
+        label="Conversions"
+        value={totalConversions.toLocaleString()}
+        subtitle="Total donations"
+        accent="purple"
+      />
     </div>
   );
 };
@@ -389,13 +358,13 @@ const ClientPortalContent = () => {
               {organizationId ? (
                 <ExecutiveDashboard />
               ) : (
-                <Card>
-                  <CardContent className="flex items-center justify-center min-h-[400px]">
+                <V3Card>
+                  <V3CardContent className="flex items-center justify-center min-h-[400px]">
                     <div className="text-center">
-                      <p className="text-muted-foreground">Please select an organization to view analytics</p>
+                      <p className="text-[hsl(var(--portal-text-muted))]">Please select an organization to view analytics</p>
                     </div>
-                  </CardContent>
-                </Card>
+                  </V3CardContent>
+                </V3Card>
               )}
             </Suspense>
           </TabsContent>
@@ -409,13 +378,13 @@ const ClientPortalContent = () => {
                   endDate={endDate}
                 />
               ) : (
-                <Card>
-                  <CardContent className="flex items-center justify-center min-h-[400px]">
+                <V3Card>
+                  <V3CardContent className="flex items-center justify-center min-h-[400px]">
                     <div className="text-center">
-                      <p className="text-muted-foreground">Please select an organization to view Meta Ads analytics</p>
+                      <p className="text-[hsl(var(--portal-text-muted))]">Please select an organization to view Meta Ads analytics</p>
                     </div>
-                  </CardContent>
-                </Card>
+                  </V3CardContent>
+                </V3Card>
               )}
             </Suspense>
           </TabsContent>
@@ -429,13 +398,13 @@ const ClientPortalContent = () => {
                   endDate={endDate}
                 />
               ) : (
-                <Card>
-                  <CardContent className="flex items-center justify-center min-h-[400px]">
+                <V3Card>
+                  <V3CardContent className="flex items-center justify-center min-h-[400px]">
                     <div className="text-center">
-                      <p className="text-muted-foreground">Please select an organization to view SMS analytics</p>
+                      <p className="text-[hsl(var(--portal-text-muted))]">Please select an organization to view SMS analytics</p>
                     </div>
-                  </CardContent>
-                </Card>
+                  </V3CardContent>
+                </V3Card>
               )}
             </Suspense>
           </TabsContent>
@@ -449,13 +418,13 @@ const ClientPortalContent = () => {
                   endDate={endDate}
                 />
               ) : (
-                <Card>
-                  <CardContent className="flex items-center justify-center min-h-[400px]">
+                <V3Card>
+                  <V3CardContent className="flex items-center justify-center min-h-[400px]">
                     <div className="text-center">
-                      <p className="text-muted-foreground">Please select an organization to view advanced analytics</p>
+                      <p className="text-[hsl(var(--portal-text-muted))]">Please select an organization to view advanced analytics</p>
                     </div>
-                  </CardContent>
-                </Card>
+                  </V3CardContent>
+                </V3Card>
               )}
             </Suspense>
           </TabsContent>
