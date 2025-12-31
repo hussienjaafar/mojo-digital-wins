@@ -1,18 +1,8 @@
 import { memo, useMemo } from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
 import { BarChart3 } from 'lucide-react';
 import { ChartPanel } from '@/components/charts/ChartPanel';
-import { ResponsiveChartTooltip } from '@/components/charts/ResponsiveChartTooltip';
-import { getYAxisFormatter, formatValue, ValueType, reduceDataPoints } from '@/lib/chart-formatters';
+import { EChartsBarChart } from '@/components/charts/echarts';
+import { formatValue, ValueType, reduceDataPoints } from '@/lib/chart-formatters';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 type Props = {
@@ -63,15 +53,6 @@ export const ComparisonChart = memo(({
     return { currentTotal: current, previousTotal: previous, overallChange: change };
   }, [data, currentKey, previousKey]);
 
-  const formatXAxis = (value: string) => {
-    try {
-      const date = new Date(value);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    } catch {
-      return value;
-    }
-  };
-
   const isEmpty = !data || data.length === 0;
 
   return (
@@ -88,48 +69,20 @@ export const ComparisonChart = memo(({
       onRetry={onRetry}
       isEmpty={isEmpty}
       emptyMessage="No comparison data available for this period"
-      minHeight={chartHeight + 80} // Extra for summary
+      minHeight={chartHeight + 80}
     >
       <div className="space-y-4">
-        <div style={{ height: chartHeight }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 8, right: isMobile ? 8 : 16, bottom: 4, left: isMobile ? -12 : 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--portal-border))" opacity={0.4} vertical={false} />
-              <XAxis
-                dataKey={xAxisKey}
-                tick={{ fontSize: isMobile ? 10 : 11, fill: "hsl(var(--portal-text-muted))" }}
-                tickLine={false}
-                axisLine={{ stroke: "hsl(var(--portal-border))", opacity: 0.5 }}
-                tickFormatter={formatXAxis}
-                interval={isMobile ? "preserveStartEnd" : "equidistantPreserveStart"}
-              />
-              <YAxis
-                tick={{ fontSize: isMobile ? 10 : 11, fill: "hsl(var(--portal-text-muted))" }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={getYAxisFormatter(valueType)}
-                width={isMobile ? 45 : 55}
-              />
-              <Tooltip content={<ResponsiveChartTooltip valueType={valueType} />} />
-              <Legend wrapperStyle={{ fontSize: isMobile ? 10 : 12 }} iconSize={isMobile ? 8 : 10} />
-              <Bar
-                dataKey={currentKey}
-                fill="hsl(var(--portal-accent-blue))"
-                name={currentLabel}
-                radius={[4, 4, 0, 0]}
-                maxBarSize={isMobile ? 25 : 40}
-              />
-              <Bar
-                dataKey={previousKey}
-                fill="hsl(var(--portal-text-muted))"
-                name={previousLabel}
-                opacity={0.6}
-                radius={[4, 4, 0, 0]}
-                maxBarSize={isMobile ? 25 : 40}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <EChartsBarChart
+          data={chartData}
+          series={[
+            { dataKey: currentKey, name: currentLabel, color: 'hsl(var(--portal-accent-blue))' },
+            { dataKey: previousKey, name: previousLabel, color: 'hsl(var(--portal-text-muted))' },
+          ]}
+          xAxisKey={xAxisKey}
+          valueType={valueType as "number" | "currency" | "percent"}
+          height={chartHeight}
+          showLegend
+        />
 
         {/* Summary */}
         <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[hsl(var(--portal-border)/0.5)]">

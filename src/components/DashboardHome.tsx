@@ -21,25 +21,7 @@ import {
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
-import { CurrencyChartTooltip, PercentageChartTooltip, NumberChartTooltip } from "@/components/charts/CustomChartTooltip";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Area,
-  AreaChart
-} from "recharts";
-import { getChartColors } from "@/lib/design-tokens";
+import { EChartsLineChart, EChartsBarChart } from "@/components/charts/echarts";
 
 interface DashboardStats {
   totalClients: number;
@@ -67,8 +49,6 @@ interface CampaignPerformance {
   roi: number;
 }
 
-// Use design system chart colors
-const COLORS = getChartColors();
 
 export function DashboardHome() {
   const navigate = useNavigate();
@@ -489,49 +469,17 @@ export function DashboardHome() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-4">
-            <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#667eea" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#667eea" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f093fb" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#f093fb" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis
-                  dataKey="date"
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                />
-                <YAxis
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                />
-                <Tooltip content={<CurrencyChartTooltip />} />
-                <Legend />
-                <Area 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stroke="#667eea" 
-                  fillOpacity={1} 
-                  fill="url(#colorRevenue)"
-                  name="Revenue"
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="spend" 
-                  stroke="#f093fb" 
-                  fillOpacity={1} 
-                  fill="url(#colorSpend)"
-                  name="Spend"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <EChartsLineChart
+              data={chartData}
+              series={[
+                { dataKey: 'revenue', name: 'Revenue', color: '#667eea', areaStyle: { opacity: 0.3 } },
+                { dataKey: 'spend', name: 'Spend', color: '#f093fb', areaStyle: { opacity: 0.3 } },
+              ]}
+              xAxisKey="date"
+              valueType="currency"
+              height={isMobile ? 250 : 300}
+              showLegend
+            />
           </CardContent>
         </Card>
 
@@ -549,31 +497,16 @@ export function DashboardHome() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-4">
-            <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis
-                  dataKey="date"
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                />
-                <YAxis
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                  tickFormatter={(value) => `${value}%`}
-                />
-                <Tooltip content={<PercentageChartTooltip />} />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="roi" 
-                  stroke="#43e97b" 
-                  strokeWidth={3}
-                  dot={{ fill: '#43e97b', r: 4 }}
-                  name="ROI %"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <EChartsLineChart
+              data={chartData}
+              series={[
+                { dataKey: 'roi', name: 'ROI %', color: '#43e97b' },
+              ]}
+              xAxisKey="date"
+              valueType="percent"
+              height={isMobile ? 250 : 300}
+              showLegend
+            />
           </CardContent>
         </Card>
 
@@ -591,28 +524,18 @@ export function DashboardHome() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-4">
-            <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
-              <BarChart data={campaignData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis 
-                  dataKey="name" 
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis 
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                />
-                <Tooltip content={<CurrencyChartTooltip />} />
-                <Legend />
-                <Bar dataKey="revenue" fill="#667eea" name="Revenue" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="spend" fill="#764ba2" name="Spend" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <EChartsBarChart
+              data={campaignData as unknown as Record<string, unknown>[]}
+              series={[
+                { dataKey: 'revenue', name: 'Revenue', color: '#667eea' },
+                { dataKey: 'spend', name: 'Spend', color: '#764ba2' },
+              ]}
+              xAxisKey="name"
+              valueType="currency"
+              height={isMobile ? 250 : 300}
+              showLegend
+              xAxisLabelRotate={45}
+            />
           </CardContent>
         </Card>
 
@@ -630,36 +553,16 @@ export function DashboardHome() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-4">
-            <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorDonations" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4facfe" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#4facfe" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis 
-                  dataKey="date" 
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                />
-                <YAxis 
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                />
-                <Tooltip content={<NumberChartTooltip />} />
-                <Legend />
-                <Area 
-                  type="monotone" 
-                  dataKey="donations" 
-                  stroke="#4facfe" 
-                  fillOpacity={1} 
-                  fill="url(#colorDonations)"
-                  name="Donations"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <EChartsLineChart
+              data={chartData}
+              series={[
+                { dataKey: 'donations', name: 'Donations', color: '#4facfe', areaStyle: { opacity: 0.3 } },
+              ]}
+              xAxisKey="date"
+              valueType="number"
+              height={isMobile ? 250 : 300}
+              showLegend
+            />
           </CardContent>
         </Card>
       </div>
