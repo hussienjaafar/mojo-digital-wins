@@ -45,12 +45,12 @@ The Mojo Digital Wins client dashboard is a **production-ready, near world-class
 
 | Recommendation | Status | Implementation Details |
 |----------------|--------|------------------------|
-| Apache ECharts | ✅ Complete | ECharts 6.0 via `EChartsLineChart.tsx`, `EChartsBarChart.tsx` |
-| Tremor | ✅ Complete | Tremor 3.18 wrappers: `TremorAreaChart`, `TremorBarChart`, `TremorDonutChart` |
-| Recharts | ✅ Complete | Responsive chart components with custom tooltips |
-| Vega-Lite | ❌ Not implemented | Not needed given ECharts coverage |
+| Apache ECharts | ✅ Complete | ECharts 6.0 - **sole charting library** as of Dec 2024 |
+| Tremor | ✅ Complete | Tremor 3.18 wrappers for specific patterns |
+| Recharts | ✅ Migrated | All Recharts wrappers removed; ECharts used exclusively |
+| Vega-Lite | ❌ Not needed | ECharts covers all use cases |
 
-**Score: 9/10** (Vega-Lite optional)
+**Score: 10/10** (Unified on ECharts)
 
 ---
 

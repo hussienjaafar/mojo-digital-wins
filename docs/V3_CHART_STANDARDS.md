@@ -267,12 +267,14 @@ import { EChartsBarChart } from "@/components/charts/echarts";
 </V3ChartWrapper>
 ```
 
-## 11. Deprecated Components
+## 11. Migration Complete ✅
 
-The following components are **deprecated** and should not be used in new code:
+As of December 2024, all deprecated Recharts wrapper components have been **removed** from the codebase. The dashboard now uses ECharts exclusively for all chart rendering.
 
-| Deprecated | Replacement |
-|------------|-------------|
+### Migration Summary
+
+| Original Component | Replaced By |
+|-------------------|-------------|
 | `ResponsiveLineChart` | `EChartsLineChart` |
 | `ResponsiveBarChart` | `EChartsBarChart` |
 | `ResponsivePieChart` | `EChartsPieChart` |
@@ -280,9 +282,11 @@ The following components are **deprecated** and should not be used in new code:
 | `PortalBarChart` | `EChartsBarChart` |
 | `PortalPieChart` | `EChartsPieChart` |
 | `PortalMultiBarChart` | `EChartsBarChart` |
-| `MemoizedLineChart` | `EChartsLineChart` |
-| `MemoizedBarChart` | `EChartsBarChart` |
-| `MemoizedAreaChart` | `EChartsLineChart` (with `areaStyle`) |
+| `MemoizedChart` components | ECharts equivalents |
+| `LazyCharts` | ECharts (no lazy loading needed) |
+| `CustomChartTooltip` | `ResponsiveChartTooltip` |
+
+> **Note:** `src/components/ui/chart.tsx` (shadcn/ui) remains in the codebase as scaffolding but is not actively used.
 
 ## 12. Quick Reference
 
