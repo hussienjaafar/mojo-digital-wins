@@ -1,8 +1,8 @@
-import { memo } from 'react';
-import { Filter, ChevronDown } from 'lucide-react';
+import { memo, useMemo } from 'react';
+import { Filter } from 'lucide-react';
 import { ChartPanel } from '@/components/charts/ChartPanel';
+import { EChartsFunnelChart } from '@/components/charts/echarts';
 import { formatNumber } from '@/lib/chart-formatters';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 type FunnelStage = {
   name: string;
@@ -27,13 +27,27 @@ export const FunnelChart = memo(({
   error,
   onRetry,
 }: Props) => {
-  const maxValue = stages[0]?.value || 1;
-  const isMobile = useIsMobile();
-
   const isEmpty = !stages || stages.length === 0;
-  const overallConversion = stages.length >= 2
-    ? ((stages[stages.length - 1]?.value / stages[0]?.value) * 100) || 0
-    : 0;
+  
+  const overallConversion = useMemo(() => {
+    if (stages.length < 2) return 0;
+    return ((stages[stages.length - 1]?.value / stages[0]?.value) * 100) || 0;
+  }, [stages]);
+
+  // Transform stages to ECharts funnel data format
+  const funnelData = useMemo(() => {
+    return stages.map((stage) => ({
+      name: stage.name,
+      value: stage.value,
+      itemStyle: { color: stage.color },
+    }));
+  }, [stages]);
+
+  // Calculate summary metrics
+  const totalDropOff = useMemo(() => {
+    if (stages.length < 2) return 0;
+    return (stages[0]?.value || 0) - (stages[stages.length - 1]?.value || 0);
+  }, [stages]);
 
   return (
     <ChartPanel
@@ -53,61 +67,18 @@ export const FunnelChart = memo(({
       onRetry={onRetry}
       isEmpty={isEmpty}
       emptyMessage="No funnel data available"
-      minHeight={300}
+      minHeight={380}
     >
       <div className="space-y-4">
-        {/* Funnel stages */}
-        <div className="space-y-2">
-          {stages.map((stage, index) => {
-            const percentage = (stage.value / maxValue) * 100;
-            const conversionRate = index > 0
-              ? ((stage.value / stages[index - 1].value) * 100).toFixed(1)
-              : '100.0';
-
-            return (
-              <div key={stage.name} className="space-y-1">
-                <div className="relative">
-                  {/* Funnel segment */}
-                  <div
-                    className="rounded-lg transition-all duration-300 hover:opacity-90 cursor-pointer"
-                    style={{
-                      width: `${Math.max(percentage, 50)}%`,
-                      margin: '0 auto',
-                      backgroundColor: stage.color,
-                    }}
-                    role="listitem"
-                    aria-label={`${stage.name}: ${formatNumber(stage.value)} (${percentage.toFixed(1)}% of total)`}
-                  >
-                    <div className={`${isMobile ? 'p-3' : 'p-4'} flex items-center justify-between text-primary-foreground`}>
-                      <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>{stage.name}</span>
-                      <span className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold tabular-nums`}>
-                        {formatNumber(stage.value)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Conversion rate indicator */}
-                {index < stages.length - 1 && (
-                  <div className="flex items-center justify-center gap-1.5 text-xs text-[hsl(var(--portal-text-muted))] py-1">
-                    <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>{conversionRate}% conversion</span>
-                  </div>
-                )}
-
-                {/* Summary stats */}
-                <div className="flex items-center justify-center gap-3 text-xs text-[hsl(var(--portal-text-muted))]">
-                  <span>{percentage.toFixed(1)}% of total</span>
-                  {index > 0 && (
-                    <span>
-                      {((stages[0].value - stage.value) / stages[0].value * 100).toFixed(1)}% drop-off
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {/* ECharts Funnel */}
+        <EChartsFunnelChart
+          data={funnelData}
+          height={280}
+          valueType="number"
+          showConversionRates={true}
+          orientation="vertical"
+          showLegend={false}
+        />
 
         {/* Summary metrics */}
         <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[hsl(var(--portal-border)/0.5)]">
@@ -119,7 +90,7 @@ export const FunnelChart = memo(({
           </div>
           <div className="text-center">
             <div className="text-xl sm:text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
-              {formatNumber((stages[0]?.value || 0) - (stages[stages.length - 1]?.value || 0))}
+              {formatNumber(totalDropOff)}
             </div>
             <div className="text-xs sm:text-sm text-[hsl(var(--portal-text-muted))]">Total Drop-off</div>
           </div>
