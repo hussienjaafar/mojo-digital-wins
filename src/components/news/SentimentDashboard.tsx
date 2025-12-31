@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { V3Card, V3CardContent, V3CardDescription, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
 import { SentimentTrendCard } from "./SentimentIndicator";
 import { SentimentTrendChart } from "./SentimentTrendChart";
 import { LoadingCard } from "@/components/ui/loading-spinner";
@@ -77,34 +77,34 @@ export function SentimentDashboard() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
+      <V3Card>
+        <V3CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Sentiment Analysis Dashboard</CardTitle>
-              <CardDescription>
+              <V3CardTitle>Sentiment Analysis Dashboard</V3CardTitle>
+              <V3CardDescription>
                 AI-powered sentiment tracking across news sources
-              </CardDescription>
+              </V3CardDescription>
             </div>
             <Button onClick={runAnalysis} disabled={analyzing}>
               <RefreshCw className={`w-4 h-4 mr-2 ${analyzing ? 'animate-spin' : ''}`} />
               Analyze Articles
             </Button>
           </div>
-        </CardHeader>
-      </Card>
+        </V3CardHeader>
+      </V3Card>
 
       {trends.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
+        <V3Card>
+          <V3CardContent className="p-12 text-center">
             <p className="text-muted-foreground mb-4">
               No sentiment data available yet
             </p>
             <Button onClick={runAnalysis} disabled={analyzing}>
               Run Analysis
             </Button>
-          </CardContent>
-        </Card>
+          </V3CardContent>
+        </V3Card>
       ) : (
         <div className="space-y-6">
           {/* Historical Trend Chart */}

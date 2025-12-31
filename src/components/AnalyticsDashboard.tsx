@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { V3Card, V3CardContent, V3CardDescription, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
+import { V3KPICard } from "@/components/v3/V3KPICard";
+import { V3ChartWrapper } from "@/components/v3/V3ChartWrapper";
 import { EChartsLineChart, EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
 import { useToast } from "@/hooks/use-toast";
 import { format, subDays, startOfDay } from "date-fns";
 import { logger } from "@/lib/logger";
+import { FileText, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 
 type ContactSubmission = {
   id: string;
@@ -139,14 +142,13 @@ export const AnalyticsDashboard = () => {
       <div className="space-y-4 animate-fade-in">
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="space-y-0 pb-2">
-                <div className="h-4 w-24 bg-muted rounded" />
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 w-32 bg-muted rounded" />
-              </CardContent>
-            </Card>
+            <V3KPICard
+              key={i}
+              icon={FileText}
+              label="Loading..."
+              value=""
+              isLoading={true}
+            />
           ))}
         </div>
       </div>
@@ -170,122 +172,116 @@ export const AnalyticsDashboard = () => {
     <div className="space-y-6 animate-fade-in">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="hover-scale transition-all duration-300">
-          <CardHeader className="pb-2">
-            <CardDescription className="portal-text-secondary">Total Submissions</CardDescription>
-            <CardTitle className="text-3xl portal-text-primary">{submissions.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="hover-scale transition-all duration-300">
-          <CardHeader className="pb-2">
-            <CardDescription className="portal-text-secondary">Resolved</CardDescription>
-            <CardTitle className="text-3xl portal-text-primary">
-              {statusData.find(s => s.name === 'Resolved')?.value || 0}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="hover-scale transition-all duration-300">
-          <CardHeader className="pb-2">
-            <CardDescription className="portal-text-secondary">In Progress</CardDescription>
-            <CardTitle className="text-3xl portal-text-primary">
-              {statusData.find(s => s.name === 'In Progress')?.value || 0}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="hover-scale transition-all duration-300">
-          <CardHeader className="pb-2">
-            <CardDescription className="portal-text-secondary">Urgent Priority</CardDescription>
-            <CardTitle className="text-3xl portal-text-primary">
-              {priorityData.find(p => p.name === 'Urgent')?.value || 0}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+        <V3KPICard
+          icon={FileText}
+          label="Total Submissions"
+          value={submissions.length.toString()}
+          accent="blue"
+        />
+        <V3KPICard
+          icon={CheckCircle}
+          label="Resolved"
+          value={(statusData.find(s => s.name === 'Resolved')?.value || 0).toString()}
+          accent="green"
+        />
+        <V3KPICard
+          icon={Clock}
+          label="In Progress"
+          value={(statusData.find(s => s.name === 'In Progress')?.value || 0).toString()}
+          accent="purple"
+        />
+        <V3KPICard
+          icon={AlertTriangle}
+          label="Urgent Priority"
+          value={(priorityData.find(p => p.name === 'Urgent')?.value || 0).toString()}
+          accent="amber"
+        />
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Submission Trends */}
-        <Card className="hover-scale transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="portal-text-primary">Submission Trends (Last 30 Days)</CardTitle>
-            <CardDescription className="portal-text-secondary">Daily submission volume over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <EChartsLineChart
-              data={timeSeriesData}
-              xAxisKey="date"
-              series={[
-                {
-                  dataKey: "submissions",
-                  name: "Submissions",
-                  color: "hsl(var(--primary))",
-                  type: "area",
-                  areaStyle: { opacity: 0.1 },
-                },
-              ]}
-              height={300}
-              showLegend={false}
-            />
-          </CardContent>
-        </Card>
+        <V3ChartWrapper
+          title="Submission Trends (Last 30 Days)"
+          ariaLabel="Line chart showing daily submission volume over the past 30 days"
+          description="Daily submission volume over time"
+          accent="blue"
+        >
+          <EChartsLineChart
+            data={timeSeriesData}
+            xAxisKey="date"
+            series={[
+              {
+                dataKey: "submissions",
+                name: "Submissions",
+                color: "hsl(var(--primary))",
+                type: "area",
+                areaStyle: { opacity: 0.1 },
+              },
+            ]}
+            height={300}
+            showLegend={false}
+          />
+        </V3ChartWrapper>
 
         {/* Campaign Performance */}
-        <Card className="hover-scale transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="portal-text-primary">Campaign Performance</CardTitle>
-            <CardDescription className="portal-text-secondary">Top 10 campaigns by submission count</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <EChartsBarChart
-              data={campaignData as Record<string, unknown>[]}
-              xAxisKey="name"
-              series={[
-                {
-                  dataKey: "count",
-                  name: "Submissions",
-                  color: "hsl(var(--primary))",
-                },
-              ]}
-              height={300}
-              showLegend={false}
-              xAxisLabelRotate={45}
-            />
-          </CardContent>
-        </Card>
+        <V3ChartWrapper
+          title="Campaign Performance"
+          ariaLabel="Bar chart showing top 10 campaigns by submission count"
+          description="Top 10 campaigns by submission count"
+          accent="purple"
+        >
+          <EChartsBarChart
+            data={campaignData as Record<string, unknown>[]}
+            xAxisKey="name"
+            series={[
+              {
+                dataKey: "count",
+                name: "Submissions",
+                color: "hsl(var(--primary))",
+              },
+            ]}
+            height={300}
+            showLegend={false}
+            xAxisLabelRotate={45}
+          />
+        </V3ChartWrapper>
 
         {/* Priority Distribution */}
-        <Card className="hover-scale transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="portal-text-primary">Priority Distribution</CardTitle>
-            <CardDescription className="portal-text-secondary">Breakdown by priority level</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <EChartsPieChart
-              data={priorityPieData}
-              height={300}
-              valueType="number"
-              showLabels={true}
-              legendPosition="bottom"
-            />
-          </CardContent>
-        </Card>
+        <V3ChartWrapper
+          title="Priority Distribution"
+          ariaLabel="Donut chart showing breakdown by priority level"
+          description="Breakdown by priority level"
+          accent="amber"
+        >
+          <EChartsPieChart
+            data={priorityPieData}
+            height={300}
+            valueType="number"
+            showLabels={true}
+            legendPosition="bottom"
+            variant="donut"
+            disableHoverEmphasis
+          />
+        </V3ChartWrapper>
 
         {/* Status Completion Rates */}
-        <Card className="hover-scale transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="portal-text-primary">Status Breakdown</CardTitle>
-            <CardDescription className="portal-text-secondary">Current status distribution</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <EChartsPieChart
-              data={statusPieData}
-              height={300}
-              valueType="number"
-              showLabels={true}
-              legendPosition="bottom"
-            />
-          </CardContent>
-        </Card>
+        <V3ChartWrapper
+          title="Status Breakdown"
+          ariaLabel="Donut chart showing current status distribution"
+          description="Current status distribution"
+          accent="green"
+        >
+          <EChartsPieChart
+            data={statusPieData}
+            height={300}
+            valueType="number"
+            showLabels={true}
+            legendPosition="bottom"
+            variant="donut"
+            disableHoverEmphasis
+          />
+        </V3ChartWrapper>
       </div>
     </div>
   );
