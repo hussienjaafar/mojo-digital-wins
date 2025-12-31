@@ -362,18 +362,34 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     const internalKey = req.headers.get('x-internal-key');
     const scheduledJob = req.headers.get('x-scheduled-job');
+    const providedCronSecret = req.headers.get('x-cron-secret');
+    const cronSecret = Deno.env.get('CRON_SECRET');
+    const internalTriggerSecret = Deno.env.get('INTERNAL_TRIGGER_SECRET');
     
-    // Allow internal backfill calls or scheduled job calls without auth
-    const isInternalBackfill = (mode === 'backfill' && organization_id && internalKey) || scheduledJob === 'true';
-    
-    let user: any = null;
+    // SECURITY: Validate service-level invocations with proper secrets
     let isServiceCall = false;
+    let user: any = null;
     
-    if (isInternalBackfill) {
-      // Internal service call - bypass user auth for backfill
+    // Option 1: Valid cron secret for scheduled jobs
+    if (scheduledJob === 'true' && cronSecret && providedCronSecret === cronSecret) {
       isServiceCall = true;
-      console.log(`Internal/scheduled backfill call detected for organization: ${organization_id}`);
-    } else if (!authHeader) {
+      console.log('[ACTBLUE CSV] Authorized via CRON_SECRET for scheduled job');
+    }
+    // Option 2: Valid internal trigger secret for backfill
+    else if (mode === 'backfill' && organization_id && internalKey && internalTriggerSecret && internalKey === internalTriggerSecret) {
+      isServiceCall = true;
+      console.log(`[ACTBLUE CSV] Authorized via INTERNAL_TRIGGER_SECRET for backfill: ${organization_id}`);
+    }
+    // SECURITY: Reject scheduled jobs without proper secret
+    else if (scheduledJob === 'true' || internalKey) {
+      console.warn('[ACTBLUE CSV] Rejected: scheduled-job or internal-key header without valid secret');
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication: x-cron-secret or valid internal key required for service calls' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    // Option 3: User JWT authentication
+    else if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Authorization header required' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

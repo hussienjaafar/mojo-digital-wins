@@ -13,11 +13,17 @@ import { EChartsBarChart } from "@/components/charts/echarts";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity, GitBranch, AlertTriangle } from "lucide-react";
+import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity, GitBranch, AlertTriangle, HelpCircle, Clock } from "lucide-react";
 import { useDonorIntelligenceQuery, type AttributionData } from "@/queries";
 import { formatCurrency } from "@/lib/chart-formatters";
 import { NoDataAvailable } from "./NoDataAvailable";
 import { useSelectedCampaignId, useSelectedCreativeId } from "@/stores/dashboardStore";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface DonorIntelligenceProps {
   organizationId: string;
@@ -251,22 +257,54 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
     );
   }
 
+  // Calculate unattributed metrics
+  const unattributedCount = attributionData.filter(d => !d.attributed_platform).length;
+  const unattributedRevenue = attributionData
+    .filter(d => !d.attributed_platform)
+    .reduce((sum, d) => sum + Number(d.amount || 0), 0);
+  const attributedCount = attributionData.filter(d => d.attributed_platform).length;
+
   return (
     <div className="space-y-6">
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Data Freshness Indicator */}
+      {dataMeta && (
+        <div className="flex items-center gap-2 text-sm text-[hsl(var(--portal-text-muted))]">
+          <Clock className="h-4 w-4" />
+          <span>Data last updated: {new Date().toLocaleDateString()}</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <HelpCircle className="h-3.5 w-3.5" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Attribution data may have a 24-48 hour delay from source platforms. Deterministic attribution (refcode/click ID) is more reliable than heuristic matching.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
+
+      {/* Summary Stats - Now includes Unattributed */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <V3KPICard
           icon={Target}
           label="Attributed"
-          value={attributionData.filter(d => d.attributed_platform).length}
-          subtitle={`of ${attributionData.length} donations`}
+          value={attributedCount}
+          subtitle={`${attributionData.length > 0 ? Math.round((attributedCount / attributionData.length) * 100) : 0}% of donations`}
           accent="blue"
+        />
+        <V3KPICard
+          icon={AlertTriangle}
+          label="Unattributed"
+          value={unattributedCount}
+          subtitle={`${formatCurrency(unattributedRevenue, true)} revenue`}
+          accent="amber"
         />
         <V3KPICard
           icon={Sparkles}
           label="Topics Linked"
           value={attributionData.filter(d => d.creative_topic).length}
-          subtitle="donations with creative topic"
+          subtitle="with creative topic"
           accent="purple"
         />
         <V3KPICard
@@ -281,7 +319,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
           label="Major Donors"
           value={segmentData.filter(d => d.donor_tier === 'major').length}
           subtitle="$1,000+ lifetime"
-          accent="amber"
+          accent="default"
         />
       </div>
 
