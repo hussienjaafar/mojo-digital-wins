@@ -5,11 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  ComposedChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter
-} from "recharts";
+import { EChartsLineChart } from "@/components/charts/echarts/EChartsLineChart";
+import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
+import { EChartsPieChart } from "@/components/charts/echarts/EChartsPieChart";
 import {
   TrendingUp, TrendingDown, DollarSign, Eye, MousePointer,
   Target, AlertCircle, ChevronDown, ChevronUp, Download,
@@ -21,7 +19,7 @@ import { useRealtimeMetrics } from "@/hooks/useRealtimeMetrics";
 import PullToRefresh from "@/components/PullToRefresh";
 import { toast } from "sonner";
 import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
-import { cssVar, colors } from "@/lib/design-tokens";
+import { cssVar, colors, getChartColors } from "@/lib/design-tokens";
 
 type Props = {
   organizationId: string;
@@ -495,52 +493,40 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
                 {/* Performance Trends */}
                 <div>
                   <h3 className="text-sm font-semibold mb-4">Performance Over Time</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <ComposedChart data={performanceTrends}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis
-                        dataKey="date"
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                        tickFormatter={(value) => format(parseISO(value), "MMM d")}
-                      />
-                      <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                      <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--background))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "var(--radius)",
-                        }}
-                      />
-                      <Legend />
-                      <Area
-                        yAxisId="left"
-                        type="monotone"
-                        dataKey="spend"
-                        fill={CHART_COLORS.primary}
-                        fillOpacity={0.3}
-                        stroke={CHART_COLORS.primary}
-                        name="Spend ($)"
-                      />
-                      <Line
-                        yAxisId="right"
-                        type="monotone"
-                        dataKey="roas"
-                        stroke={CHART_COLORS.success}
-                        strokeWidth={2}
-                        name="ROAS"
-                      />
-                      <Line
-                        yAxisId="right"
-                        type="monotone"
-                        dataKey="ctr"
-                        stroke={CHART_COLORS.accent}
-                        strokeWidth={2}
-                        name="CTR (%)"
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
+                  <EChartsLineChart
+                    data={performanceTrends as Record<string, any>[]}
+                    xAxisKey="date"
+                    xAxisType="time"
+                    height={250}
+                    dualYAxis
+                    yAxisValueTypeLeft="currency"
+                    yAxisValueTypeRight="number"
+                    series={[
+                      {
+                        dataKey: "spend",
+                        name: "Spend ($)",
+                        color: CHART_COLORS.primary,
+                        type: "area",
+                        areaStyle: { opacity: 0.3 },
+                        yAxisIndex: 0,
+                        valueType: "currency",
+                      },
+                      {
+                        dataKey: "roas",
+                        name: "ROAS",
+                        color: CHART_COLORS.success,
+                        yAxisIndex: 1,
+                        valueType: "number",
+                      },
+                      {
+                        dataKey: "ctr",
+                        name: "CTR (%)",
+                        color: CHART_COLORS.accent,
+                        yAxisIndex: 1,
+                        valueType: "percent",
+                      },
+                    ]}
+                  />
                 </div>
 
                 {/* Creative Performance & Device Performance - Responsive Grid */}
@@ -551,27 +537,17 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
                       <Image className="h-4 w-4" />
                       Creative Type Performance
                     </h3>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
-                        <Pie
-                          data={creativePerformance}
-                          dataKey="spend"
-                          nameKey="type"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={70}
-                          label={(entry) => `${entry.type}: $${entry.spend.toFixed(0)}`}
-                        >
-                          {creativePerformance.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={CREATIVE_TYPE_COLORS[entry.type as keyof typeof CREATIVE_TYPE_COLORS] || CHART_COLORS.muted}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <EChartsPieChart
+                      data={creativePerformance.map((entry) => ({
+                        name: entry.type,
+                        value: entry.spend,
+                        color: CREATIVE_TYPE_COLORS[entry.type as keyof typeof CREATIVE_TYPE_COLORS] || CHART_COLORS.muted,
+                      }))}
+                      height={200}
+                      valueType="currency"
+                      variant="pie"
+                      disableHoverEmphasis
+                    />
                   </div>
 
                   {/* Device Performance */}
@@ -580,22 +556,16 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
                       <Smartphone className="h-4 w-4" />
                       Device Platform Performance
                     </h3>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={devicePerformance}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="device" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--background))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "var(--radius)",
-                          }}
-                        />
-                        <Bar dataKey="conversions" fill={CHART_COLORS.primary} name="Conversions" />
-                        <Bar dataKey="clicks" fill={CHART_COLORS.accent} name="Clicks" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <EChartsBarChart
+                      data={devicePerformance as unknown as Record<string, unknown>[]}
+                      xAxisKey="device"
+                      series={[
+                        { dataKey: "conversions", name: "Conversions", color: CHART_COLORS.primary },
+                        { dataKey: "clicks", name: "Clicks", color: CHART_COLORS.accent },
+                      ]}
+                      height={200}
+                      disableHoverEmphasis
+                    />
                   </div>
                 </div>
               </CardContent>

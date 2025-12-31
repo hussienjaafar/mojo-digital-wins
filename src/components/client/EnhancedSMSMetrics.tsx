@@ -5,11 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { 
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
-  ComposedChart, Area, XAxis, YAxis, CartesianGrid, 
-  Tooltip, Legend, ResponsiveContainer 
-} from "recharts";
+import { EChartsLineChart } from "@/components/charts/echarts/EChartsLineChart";
+import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
+import { EChartsPieChart } from "@/components/charts/echarts/EChartsPieChart";
 import { 
   TrendingUp, TrendingDown, MessageSquare, Users, 
   DollarSign, AlertCircle, Clock, Target, ChevronDown,
@@ -19,6 +17,7 @@ import { format, parseISO } from "date-fns";
 import { useRealtimeMetrics } from "@/hooks/useRealtimeMetrics";
 import PullToRefresh from "@/components/PullToRefresh";
 import { toast } from "sonner";
+import { getChartColors } from "@/lib/design-tokens";
 
 type Props = {
   organizationId: string;
@@ -446,28 +445,14 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
           <CardTitle className="text-lg">Conversion Funnel</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={funnelData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis type="number" stroke="hsl(var(--muted-foreground))" />
-              <YAxis dataKey="stage" type="category" stroke="hsl(var(--muted-foreground))" />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: "hsl(var(--card))", 
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "var(--radius)"
-                }}
-                formatter={(value: number, name: string) => {
-                  const item = funnelData.find(d => d.value === value);
-                  return [
-                    `${value.toLocaleString()} (${item?.percentage.toFixed(1)}%)`,
-                    name === "value" ? "Count" : name
-                  ];
-                }}
-              />
-              <Bar dataKey="value" fill={CHART_COLORS.primary} radius={[0, 8, 8, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <EChartsBarChart
+            data={funnelData as unknown as Record<string, unknown>[]}
+            xAxisKey="stage"
+            series={[{ dataKey: "value", name: "Count", color: CHART_COLORS.primary }]}
+            height={300}
+            horizontal
+            disableHoverEmphasis
+          />
         </CardContent>
       </Card>
 
@@ -477,47 +462,34 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
           <CardTitle className="text-lg">Performance Trends Over Time</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={timeSeriesData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis 
-                dataKey="date" 
-                stroke="hsl(var(--muted-foreground))"
-                tick={{ fontSize: 12 }}
-              />
-              <YAxis stroke="hsl(var(--muted-foreground))" />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: "hsl(var(--card))", 
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "var(--radius)"
-                }}
-              />
-              <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="delivery_rate" 
-                stroke={CHART_COLORS.primary} 
-                name="Delivery Rate %" 
-                strokeWidth={2}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="conversion_rate" 
-                stroke={CHART_COLORS.secondary} 
-                name="Conversion Rate %" 
-                strokeWidth={2}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="opt_out_rate" 
-                fill={CHART_COLORS.destructive} 
-                stroke={CHART_COLORS.destructive}
-                fillOpacity={0.2}
-                name="Opt-out Rate %"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <EChartsLineChart
+            data={timeSeriesData as Record<string, any>[]}
+            xAxisKey="date"
+            height={300}
+            valueType="percent"
+            series={[
+              {
+                dataKey: "delivery_rate",
+                name: "Delivery Rate %",
+                color: CHART_COLORS.primary,
+                valueType: "percent",
+              },
+              {
+                dataKey: "conversion_rate",
+                name: "Conversion Rate %",
+                color: CHART_COLORS.secondary,
+                valueType: "percent",
+              },
+              {
+                dataKey: "opt_out_rate",
+                name: "Opt-out Rate %",
+                color: CHART_COLORS.destructive,
+                type: "area",
+                areaStyle: { opacity: 0.2 },
+                valueType: "percent",
+              },
+            ]}
+          />
         </CardContent>
       </Card>
 
@@ -532,33 +504,17 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={segmentPerformance}
-                    dataKey="conversions"
-                    nameKey="segment"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label={(entry) => `${entry.segment}: ${entry.conversions}`}
-                  >
-                    {segmentPerformance.map((_, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={Object.values(CHART_COLORS)[index % Object.values(CHART_COLORS).length]} 
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--card))", 
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "var(--radius)"
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <EChartsPieChart
+                data={segmentPerformance.map((seg, index) => ({
+                  name: seg.segment,
+                  value: seg.conversions,
+                  color: Object.values(CHART_COLORS)[index % Object.values(CHART_COLORS).length],
+                }))}
+                height={250}
+                valueType="number"
+                variant="pie"
+                disableHoverEmphasis
+              />
 
               <div className="space-y-3">
                 {segmentPerformance.map((seg, idx) => (

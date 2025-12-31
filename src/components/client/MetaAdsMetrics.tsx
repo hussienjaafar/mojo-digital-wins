@@ -11,9 +11,10 @@ import {
   V3ErrorState,
   V3EmptyState,
   V3InsightBadge,
+  V3DataTable,
+  type V3Column,
 } from "@/components/v3";
 import { PortalBadge } from "@/components/portal/PortalBadge";
-import { PortalTable, PortalTableRenderers } from "@/components/portal/PortalTable";
 import { Target, MousePointer, Eye, DollarSign, TrendingUp, BarChart3, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -23,7 +24,7 @@ import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
 import { useMetaAdsMetricsQuery } from "@/queries";
 import { useAnomalyDetection } from "@/hooks/useAnomalyDetection";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { formatRatio, formatCurrency } from "@/lib/chart-formatters";
+import { formatRatio, formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 
 type Props = {
   organizationId: string;
@@ -584,78 +585,86 @@ const MetaAdsMetrics = ({
           </div>
         </V3CardHeader>
         <V3CardContent>
-          <PortalTable
+          <V3DataTable
             data={tableData}
-            keyExtractor={(row) => row.campaign_id}
+            getRowKey={(row) => row.campaign_id}
+            pagination
+            pageSize={10}
+            emptyTitle="No campaigns match the selected filters"
+            emptyDescription="Try adjusting your filter criteria"
             columns={[
               {
                 key: "campaign_name",
-                label: "Campaign",
+                header: "Campaign",
                 sortable: true,
-                mobileValueClassName: "text-left",
-                render: (value) => <span className="font-medium text-[hsl(var(--portal-text-primary))]">{value}</span>,
+                sortFn: (a, b) => a.campaign_name.localeCompare(b.campaign_name),
+                render: (row) => <span className="font-medium text-[hsl(var(--portal-text-primary))]">{row.campaign_name}</span>,
               },
               {
                 key: "status",
-                label: "Status",
-                mobileLabel: "Status",
-                render: (value) => (
-                  <PortalBadge variant={value === 'ACTIVE' ? 'success' : 'neutral'}>
-                    {value}
+                header: "Status",
+                render: (row) => (
+                  <PortalBadge variant={row.status === 'ACTIVE' ? 'success' : 'neutral'}>
+                    {row.status}
                   </PortalBadge>
                 ),
               },
               {
                 key: "spend",
-                label: "Spend",
+                header: "Spend",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.currency,
+                sortFn: (a, b) => a.spend - b.spend,
+                render: (row) => formatCurrency(row.spend),
               },
               {
                 key: "impressions",
-                label: "Impr.",
+                header: "Impr.",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.number,
-                hiddenOnMobile: true,
+                sortFn: (a, b) => a.impressions - b.impressions,
+                hideOnMobile: true,
+                render: (row) => formatNumber(row.impressions),
               },
               {
                 key: "clicks",
-                label: "Clicks",
+                header: "Clicks",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.number,
-                hiddenOnMobile: true,
+                sortFn: (a, b) => a.clicks - b.clicks,
+                hideOnMobile: true,
+                render: (row) => formatNumber(row.clicks),
               },
               {
                 key: "ctr",
-                label: "CTR",
+                header: "CTR",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: (value) => `${value.toFixed(2)}%`,
-                hiddenOnMobile: true,
+                sortFn: (a, b) => a.ctr - b.ctr,
+                hideOnMobile: true,
+                render: (row) => `${row.ctr.toFixed(2)}%`,
               },
               {
                 key: "conversions",
-                label: "Conv",
+                header: "Conv",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: PortalTableRenderers.number,
+                sortFn: (a, b) => a.conversions - b.conversions,
+                render: (row) => formatNumber(row.conversions),
               },
               {
                 key: "roas",
-                label: "ROAS",
+                header: "ROAS",
+                align: "right",
                 sortable: true,
-                className: "text-right",
-                render: (value) => (
-                  <span className={value >= 2 ? 'text-[hsl(var(--portal-success))] font-semibold' : ''}>
-                    {value.toFixed(2)}x
+                sortFn: (a, b) => a.roas - b.roas,
+                render: (row) => (
+                  <span className={row.roas >= 2 ? 'text-[hsl(var(--portal-success))] font-semibold' : ''}>
+                    {row.roas.toFixed(2)}x
                   </span>
                 ),
               },
-            ]}
-            emptyMessage="No campaigns match the selected filters"
+            ] as V3Column<typeof tableData[0]>[]}
           />
         </V3CardContent>
       </V3Card>
