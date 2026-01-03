@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Mail, Plus, Trash2, Send, Clock, CheckCircle, XCircle, Settings } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import ReportCustomizationDialog from "./ReportCustomizationDialog";
+import { AdminPageHeader, AdminLoadingState } from "./v3";
 
 type Organization = {
   id: string;
@@ -233,24 +234,13 @@ const EmailReportManager = () => {
   if (isLoading) {
     return (
       <div className="space-y-6 portal-animate-fade-in">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
-            <Mail className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Email Reports</h2>
-            <p className="text-sm portal-text-secondary">Loading report configuration...</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
-              <div className="portal-skeleton h-6 w-48" />
-              <div className="portal-skeleton h-4 w-full" />
-              <div className="portal-skeleton h-4 w-2/3" />
-            </div>
-          ))}
-        </div>
+        <AdminPageHeader
+          title="Email Reports"
+          description="Loading report configuration..."
+          icon={Mail}
+          iconColor="blue"
+        />
+        <AdminLoadingState variant="card" count={3} />
       </div>
     );
   }

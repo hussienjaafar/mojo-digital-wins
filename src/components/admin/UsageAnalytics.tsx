@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Activity, TrendingUp, Users, AlertCircle, Database, BarChart3 } from "lucide-react";
 import { EChartsLineChart, EChartsBarChart } from "@/components/charts/echarts";
+import { AdminPageHeader, AdminLoadingState, AdminStatsGrid, type AdminStatItem } from "./v3";
 
 interface UsageStats {
   totalClients: number;
@@ -147,91 +148,58 @@ export default function UsageAnalytics() {
   if (loading) {
     return (
       <div className="space-y-6 portal-animate-fade-in">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
-            <BarChart3 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Usage Analytics</h2>
-            <p className="text-sm portal-text-secondary">Loading usage data...</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
-              <div className="portal-skeleton h-6 w-32" />
-              <div className="portal-skeleton h-32 w-full rounded" />
-            </div>
-          ))}
-        </div>
+        <AdminPageHeader
+          title="Usage Analytics"
+          description="Loading analytics data..."
+          icon={BarChart3}
+          iconColor="blue"
+        />
+        <AdminLoadingState variant="card" count={4} />
       </div>
     );
   }
 
+  const statItems: AdminStatItem[] = [
+    {
+      id: "total-clients",
+      label: "Total Clients",
+      value: stats.totalClients,
+      subtitle: `${stats.activeClients} active`,
+      icon: Users,
+    },
+    {
+      id: "watchlist-entries",
+      label: "Watchlist Entries",
+      value: stats.totalWatchlistEntries,
+      subtitle: `Avg ${stats.avgWatchlistPerClient} per client`,
+      icon: Database,
+    },
+    {
+      id: "alerts-generated",
+      label: "Alerts Generated",
+      value: stats.totalAlerts,
+      subtitle: `Avg ${stats.avgAlertsPerClient} per client`,
+      icon: AlertCircle,
+    },
+    {
+      id: "activity-rate",
+      label: "Activity Rate",
+      value: `${stats.totalClients > 0 ? Math.round((stats.activeClients / stats.totalClients) * 100) : 0}%`,
+      subtitle: "Client engagement",
+      icon: Activity,
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Usage Analytics</h2>
-        <p className="text-sm text-muted-foreground">
-          Monitor client engagement and system utilization
-        </p>
-      </div>
+      <AdminPageHeader
+        title="Usage Analytics"
+        description="Monitor client engagement and system utilization"
+        icon={BarChart3}
+        iconColor="blue"
+      />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.totalClients}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.activeClients} active
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Watchlist Entries</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.totalWatchlistEntries}</div>
-            <p className="text-xs text-muted-foreground">
-              Avg {stats.avgWatchlistPerClient} per client
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alerts Generated</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.totalAlerts}</div>
-            <p className="text-xs text-muted-foreground">
-              Avg {stats.avgAlertsPerClient} per client
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Activity Rate</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
-              {stats.totalClients > 0 ? Math.round((stats.activeClients / stats.totalClients) * 100) : 0}%
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Client engagement
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <AdminStatsGrid items={statItems} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
