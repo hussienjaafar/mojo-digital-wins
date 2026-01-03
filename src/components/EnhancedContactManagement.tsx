@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -556,10 +556,10 @@ export const EnhancedContactManagement = () => {
                 <SelectItem value="low">Low</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={exportToCSV} variant="outline">
+            <V3Button onClick={exportToCSV} variant="secondary">
               <Download className="h-4 w-4 mr-2" />
               Export CSV
-            </Button>
+            </V3Button>
           </div>
 
           {/* Bulk Actions */}
@@ -568,35 +568,35 @@ export const EnhancedContactManagement = () => {
               <span className="text-sm font-medium self-center">
                 {selectedSubmissions.size} selected
               </span>
-              <Button 
+              <V3Button 
                 size="sm" 
-                variant="outline"
+                variant="secondary"
                 onClick={() => bulkUpdateStatus('in_progress')}
               >
                 Mark In Progress
-              </Button>
-              <Button 
+              </V3Button>
+              <V3Button 
                 size="sm" 
-                variant="outline"
+                variant="secondary"
                 onClick={() => bulkUpdateStatus('resolved')}
               >
                 Mark Resolved
-              </Button>
-              <Button 
+              </V3Button>
+              <V3Button 
                 size="sm" 
-                variant="outline"
+                variant="secondary"
                 onClick={() => bulkUpdateStatus('archived')}
               >
                 Archive
-              </Button>
-              <Button 
+              </V3Button>
+              <V3Button 
                 size="sm" 
                 variant="destructive"
                 onClick={() => setShowBulkDeleteDialog(true)}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
-              </Button>
+              </V3Button>
             </div>
           )}
         </CardHeader>
@@ -706,8 +706,8 @@ export const EnhancedContactManagement = () => {
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
+                      <V3Button
+                        variant="secondary"
                         size="sm"
                         onClick={() => {
                           setSelectedSubmission(submission);
@@ -717,7 +717,7 @@ export const EnhancedContactManagement = () => {
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         {submission.notes_count}
-                      </Button>
+                      </V3Button>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {format(new Date(submission.created_at), 'MMM dd, yyyy')}
@@ -725,9 +725,9 @@ export const EnhancedContactManagement = () => {
                     <TableCell>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm">
+                          <V3Button variant="ghost" size="sm">
                             <Trash2 className="h-4 w-4" />
-                          </Button>
+                          </V3Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -804,13 +804,13 @@ export const EnhancedContactManagement = () => {
                           {format(new Date(note.created_at), 'PPpp')}
                         </p>
                       </div>
-                      <Button
+                      <V3Button
                         variant="ghost"
                         size="sm"
                         onClick={() => deleteNote(note.id)}
                       >
                         <Trash2 className="h-4 w-4" />
-                      </Button>
+                      </V3Button>
                     </div>
                     <p className="text-sm">{note.note}</p>
                   </div>
@@ -833,12 +833,12 @@ export const EnhancedContactManagement = () => {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNotesDialog(false)}>
+            <V3Button variant="secondary" onClick={() => setShowNotesDialog(false)}>
               Close
-            </Button>
-            <Button onClick={addNote} disabled={!newNote.trim()}>
+            </V3Button>
+            <V3Button onClick={addNote} disabled={!newNote.trim()}>
               Add Note
-            </Button>
+            </V3Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

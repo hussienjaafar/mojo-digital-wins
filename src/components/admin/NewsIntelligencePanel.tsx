@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { TrendingUp, Newspaper, ChevronDown, ChevronUp, ExternalLink, Flame, AlertTriangle, GripVertical } from "lucide-react";
@@ -189,14 +189,14 @@ export function NewsIntelligencePanel({ showDragHandle = false }: NewsIntelligen
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               {getThreatBadge(item.threat_level)}
-                              <Button
+                              <V3Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-6 w-6"
                                 onClick={() => window.open(item.source_url, '_blank')}
                               >
                                 <ExternalLink className="h-3 w-3" />
-                              </Button>
+                              </V3Button>
                             </div>
                           </div>
                         </div>

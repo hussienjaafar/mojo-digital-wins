@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -377,12 +377,12 @@ export const UserManagement = () => {
                           <div className="flex gap-2">
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button 
-                                  variant={isAdmin ? "destructive" : "default"} 
+                                <V3Button 
+                                  variant={isAdmin ? "destructive" : "primary"} 
                                   size="sm"
                                 >
                                   {isAdmin ? <ShieldOff className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
-                                </Button>
+                                </V3Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
@@ -409,12 +409,12 @@ export const UserManagement = () => {
 
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button 
-                                  variant={user.is_active ? "outline" : "default"}
+                                <V3Button 
+                                  variant={user.is_active ? "secondary" : "primary"}
                                   size="sm"
                                 >
                                   {user.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                                </Button>
+                                </V3Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>

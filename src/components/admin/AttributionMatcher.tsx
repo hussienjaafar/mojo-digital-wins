@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -271,23 +271,19 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
+            <V3Button 
+              variant="secondary" 
               size="sm"
               onClick={() => setShowDebug(!showDebug)}
               className="mr-2"
             >
               <Bug className="w-4 h-4 mr-1" />
               {showDebug ? 'Hide Debug' : 'Debug'}
-            </Button>
-            <Button onClick={runAutoMatch} disabled={isLoading}>
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4 mr-2" />
-              )}
+            </V3Button>
+            <V3Button onClick={runAutoMatch} isLoading={isLoading}>
+              <RefreshCw className="w-4 h-4 mr-2" />
               Run Auto-Match
-            </Button>
+            </V3Button>
           </div>
         </div>
       </CardHeader>
@@ -381,18 +377,15 @@ const AttributionMatcher = ({ organizationId }: AttributionMatcherProps) => {
                 <span className="text-sm text-muted-foreground">
                   {selectedMatches.size} selected
                 </span>
-                <Button 
+                <V3Button 
                   onClick={applySelectedMatches} 
-                  disabled={selectedMatches.size === 0 || isApplying}
+                  disabled={selectedMatches.size === 0}
+                  isLoading={isApplying}
                   size="sm"
                 >
-                  {isApplying ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Check className="w-4 h-4 mr-2" />
-                  )}
+                  <Check className="w-4 h-4 mr-2" />
                   Apply Selected ({selectedMatches.size})
-                </Button>
+                </V3Button>
               </div>
             </div>
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle, XCircle, AlertCircle, RefreshCw, Eye, Calendar, Activity, Database, Clock, HeartPulse } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -268,14 +268,14 @@ export default function ClientHealthOverview() {
                       </CardDescription>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
+                  <V3Button
+                    variant="secondary"
                     size="sm"
                     onClick={() => navigate(`/admin/client-view/${client.id}`)}
                   >
                     <Eye className="h-4 w-4 mr-1" />
                     View
-                  </Button>
+                  </V3Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -317,7 +317,7 @@ export default function ClientHealthOverview() {
                                   {formatDistanceToNow(new Date(cred.last_sync_at), { addSuffix: true })}
                                 </span>
                               )}
-                              <Button
+                              <V3Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-5 w-5 p-0"
@@ -325,7 +325,7 @@ export default function ClientHealthOverview() {
                                 onClick={() => triggerSync(client.id, cred.platform)}
                               >
                                 <RefreshCw className={`h-3 w-3 ${isSyncing ? 'animate-spin' : ''}`} />
-                              </Button>
+                              </V3Button>
                             </div>
                           );
                         })}

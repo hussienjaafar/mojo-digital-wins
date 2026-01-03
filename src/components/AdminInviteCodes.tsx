@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -322,16 +322,16 @@ export const AdminInviteCodes = () => {
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button onClick={generateInviteCode} size="sm">
+            <V3Button onClick={generateInviteCode} size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Generate Code
-            </Button>
+            </V3Button>
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
+                <V3Button variant="secondary" size="sm">
                   <Mail className="h-4 w-4 mr-2" />
                   Send Invite
-                </Button>
+                </V3Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -353,9 +353,9 @@ export const AdminInviteCodes = () => {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button onClick={sendInviteEmail} disabled={!inviteEmail || isSending}>
+                  <V3Button onClick={sendInviteEmail} disabled={!inviteEmail} isLoading={isSending}>
                     {isSending ? "Sending..." : "Send Invitation"}
-                  </Button>
+                  </V3Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -425,7 +425,7 @@ export const AdminInviteCodes = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
+                          <V3Button
                             variant="ghost"
                             size="sm"
                             onClick={() => copyToClipboard(code.code)}
@@ -435,14 +435,14 @@ export const AdminInviteCodes = () => {
                             ) : (
                               <Copy className="h-4 w-4" />
                             )}
-                          </Button>
-                          <Button
+                          </V3Button>
+                          <V3Button
                             variant="ghost"
                             size="sm"
                             onClick={() => deleteInviteCode(code.id)}
                           >
                             <Trash2 className="h-4 w-4" />
-                          </Button>
+                          </V3Button>
                         </div>
                       </TableCell>
                     </TableRow>
