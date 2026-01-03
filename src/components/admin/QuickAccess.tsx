@@ -67,7 +67,7 @@ export function QuickAccess({
                         "text-[hsl(var(--portal-accent-blue))]",
                         "font-medium",
                         "hover:bg-[hsl(var(--portal-accent-blue)/0.15)]",
-                        "border-l-2 border-[hsl(var(--portal-accent-blue))]",
+                        !collapsed && "border-l-2 border-[hsl(var(--portal-accent-blue))]",
                       ],
                       (!activeTab || activeTab !== item.value) && "portal-text-secondary"
                     )}
