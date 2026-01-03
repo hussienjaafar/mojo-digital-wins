@@ -406,6 +406,39 @@ const ClientDonorJourney = () => {
     }
   };
 
+  // Confirm a suggested match manually
+  const confirmSuggestion = async (suggestion: SuggestedMatch) => {
+    if (!organizationId) return;
+    
+    try {
+      const { error } = await supabase
+        .from("campaign_attribution")
+        .insert({
+          organization_id: organizationId,
+          refcode: suggestion.refcode,
+          utm_source: suggestion.suggested_campaign.toLowerCase().includes('meta') ? 'facebook' : 
+                      suggestion.suggested_campaign.toLowerCase().includes('sms') ? 'sms' : 'manual',
+          match_confidence: 1.0,
+          is_auto_matched: false,
+          match_reason: `Manually confirmed: ${suggestion.reason}`,
+          attributed_revenue: suggestion.revenue,
+          attributed_transactions: suggestion.transactions,
+          is_deterministic: false, // Manual confirmations are not URL-based
+          attribution_type: 'manual_confirmed'
+        });
+
+      if (error) throw error;
+      
+      toast.success(`Confirmed mapping for ${suggestion.refcode}`);
+      // Remove from suggestions and reload
+      setSuggestedMatches(prev => prev.filter(s => s.refcode !== suggestion.refcode));
+      await loadAttributions();
+    } catch (error) {
+      console.error("Error confirming suggestion:", error);
+      toast.error("Failed to confirm mapping");
+    }
+  };
+
   // Derived stats
   const stats = useMemo(() => {
     if (!data) return null;
@@ -751,7 +784,7 @@ const ClientDonorJourney = () => {
                             <TableHead>Suggested Campaign</TableHead>
                             <TableHead>Match Type</TableHead>
                             <TableHead className="text-right">Revenue</TableHead>
-                            <TableHead className="text-right">Transactions</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -776,7 +809,24 @@ const ClientDonorJourney = () => {
                                 {formatCurrency(match.revenue)}
                               </TableCell>
                               <TableCell className="text-right">
-                                {match.transactions}
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <V3Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => confirmSuggestion(match)}
+                                        className="h-7 px-2"
+                                      >
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                        Confirm
+                                      </V3Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Verify in Meta creative URL, then confirm to add to mappings</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               </TableCell>
                             </TableRow>
                           ))}

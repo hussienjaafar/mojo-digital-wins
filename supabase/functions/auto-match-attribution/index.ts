@@ -249,6 +249,9 @@ serve(async (req) => {
 
     const { organizationId, dryRun = true, minConfidence = 0.5 } = await req.json();
 
+    // Track timing for audit log
+    const startedAt = new Date().toISOString();
+
     console.log(`[AUTO-MATCH] Starting for org: ${organizationId || 'all'}, dryRun: ${dryRun}`);
 
     // Get unmatched refcodes with revenue
@@ -494,6 +497,37 @@ serve(async (req) => {
     console.log(`[AUTO-MATCH] Skipped (deterministic protected): ${skippedDeterministic}`);
     console.log(`[AUTO-MATCH] Unmatched: ${unmatched.length}`);
     console.log(`[AUTO-MATCH] ===================================`);
+
+    // Write to audit log table (Gate C requirement)
+    const finishedAt = new Date().toISOString();
+    const auditLogData = {
+      organization_id: organizationId || null,
+      started_at: startedAt,
+      finished_at: finishedAt,
+      dry_run: dryRun,
+      matches_deterministic: deterministicCount,
+      matches_heuristic_partial: heuristicPartialCount,
+      matches_heuristic_pattern: heuristicPatternCount,
+      matches_heuristic_fuzzy: heuristicFuzzyCount,
+      total_matches: matches.length,
+      skipped_existing: existingSet.size,
+      skipped_deterministic_protected: skippedDeterministic,
+      unmatched_count: unmatched.length,
+      matched_revenue: matches.reduce((sum, m) => sum + m.revenue, 0),
+      unmatched_revenue: unmatched.reduce((sum, u) => sum + u.revenue, 0),
+      errors: []
+    };
+
+    const { error: auditError } = await supabase
+      .from('attribution_matcher_runs')
+      .insert(auditLogData);
+
+    if (auditError) {
+      console.error('[AUTO-MATCH] Failed to write audit log:', auditError);
+      // Don't fail the whole operation for audit log errors
+    } else {
+      console.log('[AUTO-MATCH] Audit log written successfully');
+    }
 
     return new Response(
       JSON.stringify({
