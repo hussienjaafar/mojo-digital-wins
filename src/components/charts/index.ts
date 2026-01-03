@@ -18,8 +18,8 @@ export {
 export { CalendarHeatmap, type CalendarHeatmapProps, type HeatmapDataPoint } from "./CalendarHeatmap";
 
 // US Choropleth Map (react-simple-maps based - recommended)
-export { USChoroplethMap, type USChoroplethMapProps, type ChoroplethDataItem } from "./USChoroplethMap";
-export { USMapLegend, type USMapLegendProps } from "./USMapLegend";
+export { USChoroplethMap, type USChoroplethMapProps, type ChoroplethDataItem, type MapMetricMode } from "./USChoroplethMap";
+export { USMapLegend, type USMapLegendProps, type LegendBucket } from "./USMapLegend";
 
 // Tooltip utilities
 export { ResponsiveChartTooltip, CurrencyTooltip, PercentTooltip, NumberTooltip } from "./ResponsiveChartTooltip";

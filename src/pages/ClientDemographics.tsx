@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -16,8 +16,10 @@ import {
   type V3Column,
 } from "@/components/v3";
 import { EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
-import { USChoroplethMap, type ChoroplethDataItem } from "@/components/charts";
-import { getStateName, getStateAbbreviation, isValidStateAbbreviation } from "@/lib/us-states";
+import { USChoroplethMap, type ChoroplethDataItem, type MapMetricMode } from "@/components/charts";
+import { getStateName } from "@/lib/us-states";
+import { formatCurrency, formatNumber } from "@/lib/chart-formatters";
+import { escapeCSVValue, downloadCSV } from "@/lib/csv-utils";
 
 type Organization = {
   id: string;
@@ -25,17 +27,45 @@ type Organization = {
   logo_url: string | null;
 };
 
-type LocationData = { state: string; count: number; revenue: number };
-type CityData = { city: string; state: string; count: number; revenue: number };
+// Types for RPC response
+type StateStats = {
+  state_abbr: string;
+  unique_donors: number;
+  transaction_count: number;
+  revenue: number;
+};
 
-type DonorStats = {
-  totalDonors: number;
-  totalRevenue: number;
-  averageDonation: number;
-  locationData: LocationData[];
-  cityData: CityData[];
-  occupationData: Array<{ occupation: string; count: number; revenue: number }>;
-  channelData: Array<{ channel: string; count: number; revenue: number }>;
+type OccupationStats = {
+  occupation: string;
+  unique_donors: number;
+  count: number;
+  revenue: number;
+};
+
+type ChannelStats = {
+  channel: string;
+  count: number;
+  revenue: number;
+};
+
+type CityStats = {
+  city: string;
+  unique_donors: number;
+  transaction_count: number;
+  revenue: number;
+};
+
+type DemographicsTotals = {
+  unique_donor_count: number;
+  transaction_count: number;
+  total_revenue: number;
+};
+
+type DemographicsSummary = {
+  totals: DemographicsTotals;
+  state_stats: StateStats[];
+  occupation_stats: OccupationStats[];
+  channel_stats: ChannelStats[];
 };
 
 const ClientDemographics = () => {
@@ -43,10 +73,15 @@ const ClientDemographics = () => {
   const { toast } = useToast();
   const [session, setSession] = useState<Session | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
-  const [stats, setStats] = useState<DonorStats | null>(null);
+  const [summary, setSummary] = useState<DemographicsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedState, setSelectedState] = useState<string | null>(null);
+  const [mapMetricMode, setMapMetricMode] = useState<MapMetricMode>("donations");
+  
+  // City data caching for drilldown
+  const [cityCache, setCityCache] = useState<Map<string, CityStats[]>>(new Map());
+  const [isCityLoading, setIsCityLoading] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -72,6 +107,13 @@ const ClientDemographics = () => {
     }
   }, [session]);
 
+  // Load city data on-demand when state is selected
+  useEffect(() => {
+    if (selectedState && organization && !cityCache.has(selectedState)) {
+      loadCityData(selectedState);
+    }
+  }, [selectedState, organization]);
+
   const loadData = async () => {
     try {
       setIsLoading(true);
@@ -92,113 +134,15 @@ const ClientDemographics = () => {
 
       setOrganization(org);
 
-      const { data: transactions, error } = await (supabase as any)
-        .from('actblue_transactions_secure')
-        .select('*')
-        .eq('organization_id', clientUser.organization_id);
+      // Use server-side aggregation RPC
+      const { data: summaryData, error } = await supabase.rpc(
+        'get_donor_demographics_summary',
+        { _organization_id: clientUser.organization_id }
+      );
 
       if (error) throw error;
 
-      const totalDonors = new Set(transactions?.map((t: any) => t.donor_email).filter(Boolean)).size;
-      const totalRevenue = transactions?.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0) || 0;
-      const averageDonation = totalDonors > 0 ? totalRevenue / transactions.length : 0;
-
-      // Helper to normalize state to 2-letter abbreviation
-      const normalizeState = (rawState: string): string => {
-        if (!rawState) return "";
-        const trimmed = rawState.trim().toUpperCase();
-        // Already a valid abbreviation
-        if (trimmed.length === 2 && isValidStateAbbreviation(trimmed)) {
-          return trimmed;
-        }
-        // Try to get abbreviation from full name
-        const abbr = getStateAbbreviation(rawState);
-        if (abbr !== rawState && isValidStateAbbreviation(abbr)) {
-          return abbr.toUpperCase();
-        }
-        // Return original if we can't normalize
-        return trimmed;
-      };
-
-      // State-level aggregation (keep ALL states for map, not just top 10)
-      const locationMap = new Map<string, { count: number; revenue: number }>();
-      transactions?.forEach((t: any) => {
-        if (t.state) {
-          const normalizedState = normalizeState(t.state);
-          if (normalizedState) {
-            const existing = locationMap.get(normalizedState) || { count: 0, revenue: 0 };
-            locationMap.set(normalizedState, {
-              count: existing.count + 1,
-              revenue: existing.revenue + Number(t.amount || 0),
-            });
-          }
-        }
-      });
-      const locationData = Array.from(locationMap.entries())
-        .map(([state, data]) => ({ state, ...data }))
-        .sort((a, b) => b.revenue - a.revenue);
-
-      // City-level aggregation for drill-down (using normalized state)
-      const cityMap = new Map<string, { count: number; revenue: number; state: string }>();
-      transactions?.forEach((t: any) => {
-        if (t.city && t.state) {
-          const normalizedState = normalizeState(t.state);
-          if (normalizedState) {
-            const key = `${t.city}|${normalizedState}`;
-            const existing = cityMap.get(key) || { count: 0, revenue: 0, state: normalizedState };
-            cityMap.set(key, {
-              count: existing.count + 1,
-              revenue: existing.revenue + Number(t.amount || 0),
-              state: normalizedState,
-            });
-          }
-        }
-      });
-      const cityData = Array.from(cityMap.entries())
-        .map(([key, data]) => ({ 
-          city: key.split('|')[0], 
-          state: data.state,
-          count: data.count,
-          revenue: data.revenue 
-        }))
-        .sort((a, b) => b.revenue - a.revenue);
-
-      const occupationMap = new Map<string, { count: number; revenue: number }>();
-      transactions?.forEach((t: any) => {
-        const occupation = t.occupation || 'Not Provided';
-        const existing = occupationMap.get(occupation) || { count: 0, revenue: 0 };
-        occupationMap.set(occupation, {
-          count: existing.count + 1,
-          revenue: existing.revenue + Number(t.amount || 0),
-        });
-      });
-      const occupationData = Array.from(occupationMap.entries())
-        .map(([occupation, data]) => ({ occupation, ...data }))
-        .filter(item => item.occupation !== 'Not Provided')
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 10);
-
-      const channelMap = new Map<string, { count: number; revenue: number }>();
-      transactions?.forEach((t: any) => {
-        const channel = t.refcode ? 'Campaign' : t.is_express ? 'Express' : 'Direct';
-        const existing = channelMap.get(channel) || { count: 0, revenue: 0 };
-        channelMap.set(channel, {
-          count: existing.count + 1,
-          revenue: existing.revenue + Number(t.amount || 0),
-        });
-      });
-      const channelData = Array.from(channelMap.entries())
-        .map(([channel, data]) => ({ channel, ...data }));
-
-      setStats({
-        totalDonors,
-        totalRevenue,
-        averageDonation,
-        locationData,
-        cityData,
-        occupationData,
-        channelData,
-      });
+      setSummary(summaryData as DemographicsSummary);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -210,43 +154,55 @@ const ClientDemographics = () => {
     }
   };
 
+  const loadCityData = async (stateAbbr: string) => {
+    if (!organization) return;
+    
+    try {
+      setIsCityLoading(true);
+      
+      const { data, error } = await supabase.rpc(
+        'get_state_city_breakdown',
+        { 
+          _organization_id: organization.id,
+          _state_abbr: stateAbbr 
+        }
+      );
+
+      if (error) throw error;
+
+      const cities = (data as { state: string; cities: CityStats[] })?.cities || [];
+      setCityCache(prev => new Map(prev).set(stateAbbr, cities));
+    } catch (error: any) {
+      toast({
+        title: "Error loading city data",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsCityLoading(false);
+    }
+  };
+
   const handleExportCSV = async () => {
+    if (!summary) return;
+    
     setIsExporting(true);
     try {
-      const { data: clientUser } = await (supabase as any)
-        .from('client_users')
-        .select('organization_id')
-        .eq('id', session?.user?.id)
-        .maybeSingle();
+      // Export aggregated summary (safe, no PII)
+      const headers = ['State', 'Unique Donors', 'Donations', 'Revenue'];
+      const rows = summary.state_stats.map(s => [
+        escapeCSVValue(s.state_abbr),
+        escapeCSVValue(s.unique_donors),
+        escapeCSVValue(s.transaction_count),
+        escapeCSVValue(s.revenue),
+      ]);
 
-      const { data: transactions } = await (supabase as any)
-        .from('actblue_transactions_secure')
-        .select('*')
-        .eq('organization_id', clientUser.organization_id);
-
-      const headers = ['Date', 'Donor Name', 'Email', 'Amount', 'State', 'City', 'Occupation', 'Employer'];
-      const rows = transactions?.map((t: any) => [
-        t.transaction_date,
-        t.donor_name || '',
-        t.donor_email || '',
-        t.amount,
-        t.state || '',
-        t.city || '',
-        t.occupation || '',
-        t.employer || '',
-      ]) || [];
-
-      const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `donor-demographics-${new Date().toISOString().split('T')[0]}.csv`;
-      a.click();
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      downloadCSV(csv, `donor-demographics-summary-${new Date().toISOString().split('T')[0]}.csv`);
 
       toast({
         title: "Success",
-        description: "Donor demographics exported to CSV",
+        description: "Demographics summary exported to CSV",
       });
     } catch (error: any) {
       toast({
@@ -259,23 +215,54 @@ const ClientDemographics = () => {
     }
   };
 
+  // Calculate derived values
+  const totals = useMemo(() => {
+    if (!summary?.totals) return null;
+    const { unique_donor_count, transaction_count, total_revenue } = summary.totals;
+    // Average donation per transaction (correct formula with guard)
+    const avgDonation = transaction_count > 0 ? total_revenue / transaction_count : 0;
+    return {
+      uniqueDonors: unique_donor_count,
+      transactionCount: transaction_count,
+      totalRevenue: total_revenue,
+      avgDonation,
+    };
+  }, [summary]);
+
+  // Prepare map data with all metrics
+  const mapData: ChoroplethDataItem[] = useMemo(() => {
+    if (!summary?.state_stats) return [];
+    return summary.state_stats.map((s) => ({
+      name: s.state_abbr,
+      value: s.transaction_count,
+      donors: s.unique_donors,
+      revenue: s.revenue,
+    }));
+  }, [summary]);
+
+  // Get cities for selected state (from cache)
+  const selectedStateCities = useMemo(() => {
+    if (!selectedState) return [];
+    return cityCache.get(selectedState) || [];
+  }, [selectedState, cityCache]);
+
   // Table column definitions
-  const locationColumns: V3Column<{ state: string; count: number; revenue: number }>[] = [
+  const locationColumns: V3Column<StateStats>[] = [
     {
-      key: "state",
+      key: "state_abbr",
       header: "State",
       render: (row) => (
-        <span className="font-medium">{row.state}</span>
+        <span className="font-medium">{row.state_abbr}</span>
       ),
       sortable: true,
-      sortFn: (a, b) => a.state.localeCompare(b.state),
+      sortFn: (a, b) => a.state_abbr.localeCompare(b.state_abbr),
     },
     {
       key: "revenue",
       header: "Revenue",
       render: (row) => (
         <span className="font-semibold text-[hsl(var(--portal-success))]">
-          ${row.revenue.toLocaleString()}
+          {formatCurrency(row.revenue)}
         </span>
       ),
       align: "right",
@@ -283,20 +270,20 @@ const ClientDemographics = () => {
       sortFn: (a, b) => a.revenue - b.revenue,
     },
     {
-      key: "count",
+      key: "unique_donors",
       header: "Donors",
       render: (row) => (
         <span className="text-[hsl(var(--portal-text-muted))]">
-          {row.count.toLocaleString()}
+          {formatNumber(row.unique_donors)}
         </span>
       ),
       align: "right",
       sortable: true,
-      sortFn: (a, b) => a.count - b.count,
+      sortFn: (a, b) => a.unique_donors - b.unique_donors,
     },
   ];
 
-  const occupationColumns: V3Column<{ occupation: string; count: number; revenue: number }>[] = [
+  const occupationColumns: V3Column<OccupationStats>[] = [
     {
       key: "occupation",
       header: "Occupation",
@@ -311,7 +298,7 @@ const ClientDemographics = () => {
       header: "Revenue",
       render: (row) => (
         <span className="font-semibold text-[hsl(var(--portal-success))]">
-          ${row.revenue.toLocaleString()}
+          {formatCurrency(row.revenue)}
         </span>
       ),
       align: "right",
@@ -319,71 +306,21 @@ const ClientDemographics = () => {
       sortFn: (a, b) => a.revenue - b.revenue,
     },
     {
-      key: "count",
+      key: "unique_donors",
       header: "Donors",
       render: (row) => (
         <span className="text-[hsl(var(--portal-text-muted))]">
-          {row.count.toLocaleString()}
+          {formatNumber(row.unique_donors)}
         </span>
       ),
       align: "right",
       sortable: true,
-      sortFn: (a, b) => a.count - b.count,
+      sortFn: (a, b) => a.unique_donors - b.unique_donors,
     },
   ];
 
-  // Prepare map data for US heat map (must be before conditional returns)
-  const mapData: ChoroplethDataItem[] = useMemo(() => {
-    if (!stats) return [];
-    return stats.locationData.map((item) => ({
-      name: item.state,
-      value: item.count,
-      revenue: item.revenue,
-    }));
-  }, [stats]);
-
-  // Get cities for selected state
-  const selectedStateCities = useMemo(() => {
-    if (!stats || !selectedState) return [];
-    return stats.cityData
-      .filter((city) => city.state === selectedState)
-      .slice(0, 15);
-  }, [selectedState, stats]);
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <ClientShell>
-        <div className="p-6">
-          <V3LoadingState variant="kpi-grid" count={3} />
-          <div className="mt-6">
-            <V3LoadingState variant="chart" />
-          </div>
-        </div>
-      </ClientShell>
-    );
-  }
-
-  // Empty state
-  if (!organization || !stats) {
-    return (
-      <ClientShell>
-        <V3EmptyState
-          title="No Donor Data"
-          description="There is no transaction data available to analyze demographics."
-          accent="blue"
-        />
-      </ClientShell>
-    );
-  }
-
-  // Handle state click on map
-  const handleStateClick = (stateAbbr: string, stateName: string) => {
-    setSelectedState(stateAbbr);
-  };
-
   // City table columns
-  const cityColumns: V3Column<CityData>[] = [
+  const cityColumns: V3Column<CityStats>[] = [
     {
       key: "city",
       header: "City",
@@ -401,7 +338,7 @@ const ClientDemographics = () => {
       header: "Revenue",
       render: (row) => (
         <span className="font-semibold text-[hsl(var(--portal-success))]">
-          ${row.revenue.toLocaleString()}
+          {formatCurrency(row.revenue)}
         </span>
       ),
       align: "right",
@@ -409,26 +346,58 @@ const ClientDemographics = () => {
       sortFn: (a, b) => a.revenue - b.revenue,
     },
     {
-      key: "count",
+      key: "unique_donors",
       header: "Donors",
       render: (row) => (
         <span className="text-[hsl(var(--portal-text-muted))]">
-          {row.count.toLocaleString()}
+          {formatNumber(row.unique_donors)}
         </span>
       ),
       align: "right",
       sortable: true,
-      sortFn: (a, b) => a.count - b.count,
+      sortFn: (a, b) => a.unique_donors - b.unique_donors,
     },
   ];
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <ClientShell>
+        <div className="p-6">
+          <V3LoadingState variant="kpi-grid" count={3} />
+          <div className="mt-6">
+            <V3LoadingState variant="chart" />
+          </div>
+        </div>
+      </ClientShell>
+    );
+  }
+
+  // Empty state
+  if (!organization || !summary || !totals) {
+    return (
+      <ClientShell>
+        <V3EmptyState
+          title="No Donor Data"
+          description="There is no transaction data available to analyze demographics."
+          accent="blue"
+        />
+      </ClientShell>
+    );
+  }
+
+  // Handle state click on map
+  const handleStateClick = (stateAbbr: string, stateName: string) => {
+    setSelectedState(stateAbbr);
+  };
+
   // Prepare pie chart data
-  const occupationPieData = stats.occupationData.slice(0, 6).map(item => ({
+  const occupationPieData = summary.occupation_stats.slice(0, 6).map(item => ({
     name: item.occupation.length > 20 ? item.occupation.slice(0, 20) + '...' : item.occupation,
     value: item.count,
   }));
 
-  const channelPieData = stats.channelData.map(item => ({
+  const channelPieData = summary.channel_stats.map(item => ({
     name: item.channel,
     value: item.revenue,
   }));
@@ -446,27 +415,27 @@ const ClientDemographics = () => {
             disabled={isExporting}
           >
             <Download className="h-4 w-4 mr-2" />
-            {isExporting ? "Exporting..." : "Export CSV"}
+            {isExporting ? "Exporting..." : "Export Summary"}
           </V3Button>
         }
       >
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <V3KPICard
-            label="Total Donors"
-            value={stats.totalDonors.toLocaleString()}
+            label="Unique Donors"
+            value={formatNumber(totals.uniqueDonors)}
             icon={Users}
             accent="blue"
           />
           <V3KPICard
             label="Total Revenue"
-            value={`$${stats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+            value={formatCurrency(totals.totalRevenue)}
             icon={DollarSign}
             accent="green"
           />
           <V3KPICard
-            label="Average Donation"
-            value={`$${stats.averageDonation.toFixed(2)}`}
+            label="Avg. Donation"
+            value={formatCurrency(totals.avgDonation)}
             icon={TrendingUp}
             accent="purple"
           />
@@ -502,9 +471,11 @@ const ClientDemographics = () => {
               <USChoroplethMap
                 data={mapData}
                 height={420}
-                valueLabel="Donors"
-                showRevenue
+                metricMode={mapMetricMode}
+                onMetricModeChange={setMapMetricMode}
+                showMetricToggle
                 onStateClick={handleStateClick}
+                selectedState={selectedState}
               />
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -513,9 +484,14 @@ const ClientDemographics = () => {
                   <h4 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-3">
                     Top Cities in {getStateName(selectedState)}
                   </h4>
-                  {selectedStateCities.length > 0 ? (
+                  {isCityLoading ? (
+                    <V3LoadingState variant="chart" className="h-[300px]" />
+                  ) : selectedStateCities.length > 0 ? (
                     <EChartsBarChart
-                      data={selectedStateCities.slice(0, 10)}
+                      data={selectedStateCities.slice(0, 10).map(c => ({
+                        city: c.city,
+                        count: c.unique_donors,
+                      }))}
                       xAxisKey="city"
                       series={[
                         { dataKey: "count", name: "Donors" }
@@ -524,9 +500,11 @@ const ClientDemographics = () => {
                       valueType="number"
                     />
                   ) : (
-                    <div className="h-[300px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
-                      No city data available for this state
-                    </div>
+                    <V3EmptyState
+                      title="No City Data"
+                      description={`No city-level data available for ${getStateName(selectedState)}`}
+                      className="h-[300px]"
+                    />
                   )}
                 </div>
                 
@@ -535,19 +513,23 @@ const ClientDemographics = () => {
                   <h4 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-3">
                     City Details
                   </h4>
-                  {selectedStateCities.length > 0 ? (
+                  {isCityLoading ? (
+                    <V3LoadingState variant="table" className="h-[300px]" />
+                  ) : selectedStateCities.length > 0 ? (
                     <V3DataTable
                       data={selectedStateCities}
                       columns={cityColumns}
-                      getRowKey={(row) => `${row.city}-${row.state}`}
+                      getRowKey={(row) => row.city}
                       compact
                       striped
                       maxHeight="300px"
                     />
                   ) : (
-                    <div className="h-[300px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
-                      No city data available
-                    </div>
+                    <V3EmptyState
+                      title="No Data"
+                      description="No city data available"
+                      className="h-[300px]"
+                    />
                   )}
                 </div>
               </div>
@@ -599,9 +581,9 @@ const ClientDemographics = () => {
             ariaLabel="Table showing top donor statistics by state"
           >
             <V3DataTable
-              data={stats.locationData.slice(0, 10)}
+              data={summary.state_stats.slice(0, 10)}
               columns={locationColumns}
-              getRowKey={(row) => row.state}
+              getRowKey={(row) => row.state_abbr}
               compact
               striped
               maxHeight="400px"
@@ -614,7 +596,7 @@ const ClientDemographics = () => {
             ariaLabel="Table showing detailed donor statistics by occupation"
           >
             <V3DataTable
-              data={stats.occupationData}
+              data={summary.occupation_stats}
               columns={occupationColumns}
               getRowKey={(row) => row.occupation}
               compact

@@ -7664,6 +7664,10 @@ export type Database = {
           value: number
         }[]
       }
+      get_donor_demographics_summary: {
+        Args: { _organization_id: string }
+        Returns: Json
+      }
       get_export_data: {
         Args: {
           p_end_date?: string
@@ -7705,6 +7709,10 @@ export type Database = {
           upsell_shown: number
           upsell_succeeded: number
         }[]
+      }
+      get_state_city_breakdown: {
+        Args: { _organization_id: string; _state_abbr: string }
+        Returns: Json
       }
       get_submissions_with_details: {
         Args: never
