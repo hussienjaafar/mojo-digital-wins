@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Responsive, WidthProvider, Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSidebar } from "@/components/ui/sidebar";
 
 import "./dashboard-grid.css";
 
@@ -60,6 +61,26 @@ export function CustomizableDashboard({
   const [isEditMode, setIsEditMode] = useState(false);
   const isMobile = useIsMobile();
   const isInitialized = useRef(false);
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Get sidebar state for triggering grid recalculation
+  let sidebarState: "expanded" | "collapsed" = "expanded";
+  try {
+    const sidebar = useSidebar();
+    sidebarState = sidebar.state;
+  } catch {
+    // useSidebar throws if not in SidebarProvider - default to expanded
+  }
+  
+  // Trigger grid recalculation when sidebar state changes
+  useEffect(() => {
+    // Wait for CSS transition to complete (200ms) then trigger resize
+    const timeout = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 250);
+    
+    return () => clearTimeout(timeout);
+  }, [sidebarState]);
 
   // Load saved layout from localStorage - only on mount
   useEffect(() => {
