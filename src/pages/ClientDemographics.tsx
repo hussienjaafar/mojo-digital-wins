@@ -17,8 +17,8 @@ import {
   V3PrimaryCell,
   type V3Column,
 } from "@/components/v3";
-import { EChartsBarChart, V3DonutChart } from "@/components/charts/echarts";
-import { USChoroplethMap, type ChoroplethDataItem, type MapMetricMode } from "@/components/charts";
+import { V3DonutChart } from "@/components/charts/echarts";
+import { V3BarChart, USChoroplethMap, type ChoroplethDataItem, type MapMetricMode } from "@/components/charts";
 import { getStateName } from "@/lib/us-states";
 import { formatCurrency, formatNumber } from "@/lib/chart-formatters";
 import { escapeCSVValue, downloadCSV } from "@/lib/csv-utils";
@@ -544,21 +544,22 @@ const ClientDemographics = () => {
                   {isCityLoading ? (
                     <V3LoadingState variant="chart" className="h-[300px]" />
                   ) : selectedStateCities.length > 0 ? (
-                    <EChartsBarChart
+                    <V3BarChart
                       data={[...selectedStateCities]
                         .sort((a, b) => b.unique_donors - a.unique_donors)
                         .slice(0, 10)
                         .map(c => ({
-                          city: c.city,
-                          count: c.unique_donors,
+                          name: c.city,
+                          value: c.unique_donors,
                         }))}
-                      xAxisKey="city"
-                      series={[
-                        { dataKey: "count", name: "Donors" }
-                      ]}
+                      nameKey="name"
+                      valueKey="value"
+                      valueName="Donors"
                       height={300}
                       valueType="number"
-                      xAxisLabelRotate={45}
+                      horizontal
+                      topN={10}
+                      showRankBadges={false}
                     />
                   ) : (
                     <V3EmptyState

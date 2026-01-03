@@ -51,7 +51,7 @@ import {
   V3FilterPill,
 } from "@/components/v3";
 import { PortalTable, type PortalTableColumn } from "@/components/v3/PortalTable";
-import { V3FunnelChart, V3BarChart } from "@/components/charts";
+import { V3StageChart, V3BarChart } from "@/components/charts";
 
 // ============================================================================
 // Touchpoint Icon Helper
@@ -545,7 +545,7 @@ const ClientDonorJourney = () => {
                 </div>
               </div>
             ) : (
-              <V3FunnelChart
+              <V3StageChart
                 stages={funnel.map(stage => ({
                   name: stage.label,
                   value: stage.count,
