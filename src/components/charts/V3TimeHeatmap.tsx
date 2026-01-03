@@ -2,7 +2,7 @@
  * V3TimeHeatmap - Premium Time-of-Day × Day-of-Week Heatmap
  * 
  * A world-class ECharts heatmap for visualizing temporal patterns.
- * Supports revenue, count, and unique donor metrics with interactive
+ * Supports revenue, count, and average donation metrics with interactive
  * cell selection, accessible tooltips, and export functionality.
  */
 
@@ -14,22 +14,28 @@ import { cssVar, colors } from "@/lib/design-tokens";
 import { formatCurrency, formatNumber, formatPercent, type ValueType } from "@/lib/chart-formatters";
 import {
   type HeatmapDataPoint,
+  type HeatmapMetric,
   type RankedCell,
+  type HeatmapStats,
   DAY_LABELS_SHORT,
   HOUR_LABELS_SHORT,
   formatTimeSlot,
   formatTimeSlotShort,
   toEChartsData,
   isSameCell,
-  getRankedCells,
-  calculateP95,
+  calculateHeatmapStats,
+  getCellRank,
+  getMetricLabel,
+  TOTAL_TIME_SLOTS,
 } from "@/lib/heatmap-utils";
+import { TrendingUp, TrendingDown, Minus, Trophy, Medal, Award, X, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface V3TimeHeatmapProps {
   /** Normalized 7×24 grid data */
   data: HeatmapDataPoint[];
   /** Metric being displayed */
-  metric?: 'revenue' | 'count';
+  metric?: HeatmapMetric;
   /** Value type for formatting */
   valueType?: ValueType;
   /** Label for the metric */
@@ -88,14 +94,8 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
   compact = false,
 }) => {
   // Calculate totals and stats
-  const stats = React.useMemo(() => {
-    const values = data.map(d => d.value);
-    const totalValue = values.reduce((sum, v) => sum + v, 0);
-    const maxValue = Math.max(...values, 0);
-    const p95Value = calculateP95(values);
-    const peakCells = getRankedCells(data, 5);
-    
-    return { totalValue, maxValue, p95Value, peakCells };
+  const stats = React.useMemo<HeatmapStats>(() => {
+    return calculateHeatmapStats(data, 5);
   }, [data]);
 
   // Format value based on type
@@ -178,37 +178,62 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
         formatter: (params: any) => {
           const [hour, day, value] = params.data;
           const cell = data.find(d => d.dayOfWeek === day && d.hour === hour);
-          const rank = stats.peakCells.find(p => p.dayOfWeek === day && p.hour === hour);
+          const rank = getCellRank(data, day, hour);
           const percentOfTotal = stats.totalValue > 0 ? (value / stats.totalValue) * 100 : 0;
+          const isAboveAvg = value > stats.avgValue;
+          const isBelowAvg = value < stats.avgValue && value > 0;
+          const hasNoData = !cell?.hasData;
+          
+          // Above/below average indicator
+          const avgIndicator = hasNoData 
+            ? '' 
+            : isAboveAvg 
+              ? `<span style="color: hsl(var(--portal-success)); font-size: 11px;">↑ Above average</span>`
+              : isBelowAvg 
+                ? `<span style="color: hsl(var(--portal-warning)); font-size: 11px;">↓ Below average</span>`
+                : `<span style="color: hsl(var(--portal-text-muted)); font-size: 11px;">— Average</span>`;
           
           return `
-            <div style="min-width: 180px;">
+            <div style="min-width: 200px;">
               <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px; color: hsl(var(--portal-text-primary));">
                 ${formatTimeSlot(day, hour)}
               </div>
-              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
-                <span style="color: hsl(var(--portal-text-muted)); font-size: 12px;">${valueLabel}</span>
-                <span style="font-weight: 600; font-size: 15px; color: hsl(var(--portal-text-primary));">
-                  ${formatValue(value)}
-                </span>
-              </div>
-              <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: hsl(var(--portal-text-muted));">
-                <span>% of Total</span>
-                <span>${percentOfTotal.toFixed(1)}%</span>
-              </div>
-              ${rank ? `
-                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid hsl(var(--portal-border)); display: flex; align-items: center; gap: 6px;">
-                  <span style="background: hsl(var(--portal-accent-${colorScheme}) / 0.15); color: hsl(var(--portal-accent-${colorScheme})); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
-                    #${rank.rank} Peak
+              ${hasNoData ? `
+                <div style="color: hsl(var(--portal-text-muted)); font-size: 12px; font-style: italic;">
+                  No donations in this time slot
+                </div>
+              ` : `
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                  <span style="color: hsl(var(--portal-text-muted)); font-size: 12px;">${valueLabel}</span>
+                  <span style="font-weight: 600; font-size: 15px; color: hsl(var(--portal-text-primary));">
+                    ${formatValue(value)}
                   </span>
                 </div>
-              ` : ''}
-              ${cell?.count !== undefined ? `
-                <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: hsl(var(--portal-text-muted)); margin-top: 4px;">
-                  <span>Transactions</span>
-                  <span>${cell.count.toLocaleString()}</span>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: hsl(var(--portal-text-muted)); margin-bottom: 4px;">
+                  <span>% of Weekly Total</span>
+                  <span>${percentOfTotal.toFixed(1)}%</span>
                 </div>
-              ` : ''}
+                <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid hsl(var(--portal-border));">
+                  ${avgIndicator}
+                </div>
+                ${rank && rank <= 5 ? `
+                  <div style="margin-top: 8px; display: flex; align-items: center; gap: 6px;">
+                    <span style="background: hsl(var(--portal-accent-${colorScheme}) / 0.15); color: hsl(var(--portal-accent-${colorScheme})); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+                      #${rank} of ${TOTAL_TIME_SLOTS} slots
+                    </span>
+                  </div>
+                ` : rank ? `
+                  <div style="font-size: 11px; color: hsl(var(--portal-text-muted)); margin-top: 4px;">
+                    Rank: #${rank} of ${TOTAL_TIME_SLOTS} slots
+                  </div>
+                ` : ''}
+                ${cell?.count !== undefined ? `
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: hsl(var(--portal-text-muted)); margin-top: 4px;">
+                    <span>Transactions</span>
+                    <span>${cell.count.toLocaleString()}</span>
+                  </div>
+                ` : ''}
+              `}
             </div>
           `;
         },
@@ -250,25 +275,13 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
         min: 0,
         max: scaleMax,
         calculable: false,
-        orient: 'horizontal',
-        left: 'center',
-        bottom: 4,
-        itemWidth: compact ? 12 : 14,
-        itemHeight: compact ? 80 : 120,
+        show: false, // Hide built-in legend, we use custom
         inRange: {
           color: colorRange,
         },
         outOfRange: {
           color: resolveToRgb(colors.bg.tertiary),
         },
-        text: [formatValue(stats.p95Value, true), '0'],
-        textGap: 8,
-        textStyle: {
-          color: 'hsl(var(--portal-text-muted))',
-          fontSize: 10,
-          fontFamily: 'inherit',
-        },
-        formatter: (value: number) => formatValue(value, true),
       },
       series: [
         {
@@ -350,26 +363,37 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
 V3TimeHeatmap.displayName = "V3TimeHeatmap";
 
 // ============================================================================
-// Subcomponents
+// Explicit Legend Component
 // ============================================================================
 
 export interface V3TimeHeatmapLegendProps {
-  valueLabel?: string;
+  /** Metric label */
+  metricLabel: string;
+  /** Minimum value */
+  minValue: number;
+  /** Maximum value */
+  maxValue: number;
+  /** Average value */
+  avgValue?: number;
+  /** Format function */
+  formatValue: (value: number) => string;
+  /** Color scheme */
   colorScheme?: 'blue' | 'green' | 'purple' | 'amber';
-  minValue?: number;
-  maxValue?: number;
-  formatValue?: (value: number) => string;
+  /** Show help tooltip */
+  showHelp?: boolean;
+  /** Scale mode label */
+  scaleMode?: 'linear' | 'log' | 'quantized';
 }
 
-/**
- * Visual legend component for the heatmap
- */
 export const V3TimeHeatmapLegend: React.FC<V3TimeHeatmapLegendProps> = ({
-  valueLabel = 'Intensity',
+  metricLabel,
+  minValue,
+  maxValue,
+  avgValue,
+  formatValue,
   colorScheme = 'blue',
-  minValue = 0,
-  maxValue = 100,
-  formatValue = (v) => v.toString(),
+  showHelp = true,
+  scaleMode = 'linear',
 }) => {
   const accentVar = colorScheme === 'blue' ? 'portal-accent-blue' 
     : colorScheme === 'green' ? 'portal-success' 
@@ -377,28 +401,140 @@ export const V3TimeHeatmapLegend: React.FC<V3TimeHeatmapLegendProps> = ({
     : 'portal-warning';
 
   return (
-    <div className="flex items-center justify-center gap-3 text-xs text-[hsl(var(--portal-text-muted))]">
-      <span className="font-medium">{valueLabel}:</span>
-      <span>{formatValue(minValue)}</span>
-      <div className="flex gap-0.5">
-        {[0.1, 0.25, 0.45, 0.65, 0.85].map((opacity, i) => (
-          <div
-            key={i}
-            className="w-4 h-4 rounded"
-            style={{
-              backgroundColor: `hsl(var(--${accentVar}) / ${opacity})`,
-              border: '1px solid hsl(var(--portal-border))',
-            }}
-            aria-hidden="true"
-          />
-        ))}
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))]">
+      {/* Legend Label */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold text-[hsl(var(--portal-text-primary))]">
+          {metricLabel}
+        </span>
+        {showHelp && (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button className="text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-text-secondary))] transition-colors">
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[240px]">
+                <p className="text-xs">
+                  Color intensity shows {metricLabel.toLowerCase()} per hour.
+                  {scaleMode === 'linear' && ' Using linear scale.'}
+                  {scaleMode === 'quantized' && ' Using quantized bins.'}
+                  Click any cell to see details.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
-      <span>{formatValue(maxValue)}</span>
+
+      {/* Color Scale */}
+      <div className="flex items-center gap-2">
+        {/* No Data indicator */}
+        <div className="flex items-center gap-1.5">
+          <div 
+            className="w-4 h-4 rounded border border-[hsl(var(--portal-border))]"
+            style={{ backgroundColor: 'hsl(var(--portal-bg-tertiary))' }}
+          />
+          <span className="text-[10px] text-[hsl(var(--portal-text-muted))]">No data</span>
+        </div>
+
+        <div className="w-px h-4 bg-[hsl(var(--portal-border))]" />
+
+        {/* Value range */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-medium text-[hsl(var(--portal-text-muted))]">
+            {formatValue(minValue)}
+          </span>
+          <div className="flex">
+            {[0.15, 0.3, 0.45, 0.65, 0.85].map((opacity, i) => (
+              <div
+                key={i}
+                className="w-5 h-4 first:rounded-l last:rounded-r"
+                style={{
+                  backgroundColor: `hsl(var(--${accentVar}) / ${opacity})`,
+                }}
+              />
+            ))}
+          </div>
+          <span className="text-[10px] font-medium text-[hsl(var(--portal-text-muted))]">
+            {formatValue(maxValue)}
+          </span>
+        </div>
+
+        {/* Average marker */}
+        {avgValue !== undefined && avgValue > 0 && (
+          <>
+            <div className="w-px h-4 bg-[hsl(var(--portal-border))]" />
+            <div className="flex items-center gap-1 text-[10px] text-[hsl(var(--portal-text-muted))]">
+              <Minus className="h-3 w-3" />
+              <span>Avg: {formatValue(avgValue)}</span>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
 
 V3TimeHeatmapLegend.displayName = "V3TimeHeatmapLegend";
+
+// ============================================================================
+// Metric Toggle Component
+// ============================================================================
+
+export interface V3TimeHeatmapMetricToggleProps {
+  /** Currently selected metric */
+  metric: HeatmapMetric;
+  /** Callback when metric changes */
+  onMetricChange: (metric: HeatmapMetric) => void;
+  /** Available metrics */
+  availableMetrics?: HeatmapMetric[];
+  /** Compact mode */
+  compact?: boolean;
+}
+
+export const V3TimeHeatmapMetricToggle: React.FC<V3TimeHeatmapMetricToggleProps> = ({
+  metric,
+  onMetricChange,
+  availableMetrics = ['revenue', 'count', 'avg_donation'],
+  compact = false,
+}) => {
+  const metricOptions: { value: HeatmapMetric; label: string; shortLabel: string }[] = [
+    { value: 'revenue', label: 'Net Revenue', shortLabel: 'Revenue' },
+    { value: 'count', label: 'Donation Count', shortLabel: 'Count' },
+    { value: 'avg_donation', label: 'Average Donation', shortLabel: 'Avg' },
+  ];
+
+  const visibleOptions = metricOptions.filter(opt => availableMetrics.includes(opt.value));
+
+  return (
+    <div className="inline-flex rounded-lg border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))] p-0.5">
+      {visibleOptions.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onMetricChange(opt.value)}
+          className={cn(
+            "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.5)]",
+            metric === opt.value
+              ? "bg-[hsl(var(--portal-accent-blue))] text-white shadow-sm"
+              : "text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-hover))]"
+          )}
+          aria-pressed={metric === opt.value}
+        >
+          {compact ? opt.shortLabel : opt.label}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+V3TimeHeatmapMetricToggle.displayName = "V3TimeHeatmapMetricToggle";
+
+// ============================================================================
+// Peak Chips Component
+// ============================================================================
 
 export interface V3TimeHeatmapPeakChipsProps {
   peakCells: RankedCell[];
@@ -406,17 +542,23 @@ export interface V3TimeHeatmapPeakChipsProps {
   onSelect?: (cell: RankedCell) => void;
   formatValue?: (value: number) => string;
   colorScheme?: 'blue' | 'green' | 'purple' | 'amber';
+  metricLabel?: string;
 }
 
-/**
- * Interactive peak time chips
- */
+const RankIcon: React.FC<{ rank: number; className?: string }> = ({ rank, className }) => {
+  if (rank === 1) return <Trophy className={cn("h-3.5 w-3.5", className)} />;
+  if (rank === 2) return <Medal className={cn("h-3.5 w-3.5", className)} />;
+  if (rank === 3) return <Award className={cn("h-3.5 w-3.5", className)} />;
+  return null;
+};
+
 export const V3TimeHeatmapPeakChips: React.FC<V3TimeHeatmapPeakChipsProps> = ({
   peakCells,
   selectedCell = null,
   onSelect,
   formatValue = (v) => `$${v.toLocaleString()}`,
   colorScheme = 'blue',
+  metricLabel,
 }) => {
   if (!peakCells.length) return null;
 
@@ -435,20 +577,24 @@ export const V3TimeHeatmapPeakChips: React.FC<V3TimeHeatmapPeakChipsProps> = ({
             key={`${peak.dayOfWeek}-${peak.hour}`}
             onClick={() => onSelect?.(peak)}
             className={cn(
-              "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium",
+              "group inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium",
               "transition-all duration-200 cursor-pointer",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
               `focus-visible:ring-[hsl(var(--${accentVar})/0.5)]`,
               isSelected
                 ? `bg-[hsl(var(--${accentVar})/0.2)] text-[hsl(var(--${accentVar}))] ring-2 ring-[hsl(var(--${accentVar})/0.4)]`
-                : `bg-[hsl(var(--${accentVar})/0.1)] text-[hsl(var(--${accentVar}))] hover:bg-[hsl(var(--${accentVar})/0.15)]`
+                : `bg-[hsl(var(--${accentVar})/0.08)] text-[hsl(var(--${accentVar}))] hover:bg-[hsl(var(--${accentVar})/0.15)]`
             )}
             aria-pressed={isSelected}
             aria-label={`Peak #${peak.rank}: ${formatTimeSlotShort(peak.dayOfWeek, peak.hour)}, ${formatValue(peak.value)}`}
           >
-            <span className="font-bold opacity-60">#{peak.rank}</span>
+            <span className="flex items-center gap-1.5">
+              <RankIcon rank={peak.rank} className="opacity-70" />
+              <span className="font-bold">#{peak.rank}</span>
+            </span>
+            <span className="opacity-80">·</span>
             <span>{formatTimeSlotShort(peak.dayOfWeek, peak.hour)}</span>
-            <span className="opacity-80">—</span>
+            <span className="opacity-60">→</span>
             <span className="font-semibold">{formatValue(peak.value)}</span>
           </button>
         );
@@ -459,47 +605,69 @@ export const V3TimeHeatmapPeakChips: React.FC<V3TimeHeatmapPeakChipsProps> = ({
 
 V3TimeHeatmapPeakChips.displayName = "V3TimeHeatmapPeakChips";
 
+// ============================================================================
+// Details Panel Component
+// ============================================================================
+
 export interface V3TimeHeatmapDetailsPanelProps {
   selectedCell: HeatmapDataPoint | null;
   totalValue: number;
-  peakCells: RankedCell[];
+  totalCount?: number;
+  allCells: HeatmapDataPoint[];
   onClear?: () => void;
   formatValue?: (value: number) => string;
   valueLabel?: string;
+  metric?: HeatmapMetric;
 }
 
-/**
- * Details panel for selected cell
- */
 export const V3TimeHeatmapDetailsPanel: React.FC<V3TimeHeatmapDetailsPanelProps> = ({
   selectedCell,
   totalValue,
-  peakCells,
+  totalCount = 0,
+  allCells,
   onClear,
   formatValue = (v) => `$${v.toLocaleString()}`,
   valueLabel = 'Revenue',
+  metric = 'revenue',
 }) => {
   if (!selectedCell) return null;
 
   const percentOfTotal = totalValue > 0 ? (selectedCell.value / totalValue) * 100 : 0;
-  const rank = peakCells.find(p => isSameCell(p, selectedCell));
+  const rank = getCellRank(allCells, selectedCell.dayOfWeek, selectedCell.hour);
+  const avgDonation = selectedCell.count && selectedCell.count > 0 
+    ? (selectedCell.revenue || selectedCell.value) / selectedCell.count 
+    : 0;
+  const isAboveAvg = selectedCell.value > (totalValue / allCells.filter(c => c.value > 0).length);
 
   return (
     <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))]">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
+          {/* Header */}
+          <div className="flex items-center gap-2 mb-3">
             <h4 className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">
               {formatTimeSlot(selectedCell.dayOfWeek, selectedCell.hour)}
             </h4>
             {rank && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[hsl(var(--portal-accent-blue)/0.15)] text-[hsl(var(--portal-accent-blue))]">
-                #{rank.rank} Peak
+              <span className={cn(
+                "px-2 py-0.5 rounded text-[10px] font-bold",
+                rank <= 3 
+                  ? "bg-[hsl(var(--portal-accent-blue)/0.15)] text-[hsl(var(--portal-accent-blue))]"
+                  : "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-muted))]"
+              )}>
+                #{rank} of {TOTAL_TIME_SLOTS}
+              </span>
+            )}
+            {isAboveAvg && selectedCell.value > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] font-medium text-[hsl(var(--portal-success))]">
+                <TrendingUp className="h-3 w-3" />
+                Above avg
               </span>
             )}
           </div>
           
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <p className="text-xs text-[hsl(var(--portal-text-muted))] mb-0.5">{valueLabel}</p>
               <p className="text-lg font-semibold text-[hsl(var(--portal-text-primary))]">
@@ -520,18 +688,25 @@ export const V3TimeHeatmapDetailsPanel: React.FC<V3TimeHeatmapDetailsPanelProps>
                 </p>
               </div>
             )}
+            {metric === 'revenue' && avgDonation > 0 && (
+              <div>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))] mb-0.5">Avg Donation</p>
+                <p className="text-lg font-semibold text-[hsl(var(--portal-text-primary))]">
+                  {formatCurrency(avgDonation)}
+                </p>
+              </div>
+            )}
           </div>
         </div>
         
+        {/* Clear button */}
         {onClear && (
           <button
             onClick={onClear}
             className="p-1.5 rounded-md text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-hover))] transition-colors"
             aria-label="Clear selection"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 4l8 8M12 4l-8 8" />
-            </svg>
+            <X className="h-4 w-4" />
           </button>
         )}
       </div>
