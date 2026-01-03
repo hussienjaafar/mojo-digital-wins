@@ -110,8 +110,8 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
     }
   }, [valueType]);
 
-  // Generate color range for visualMap
-  const colorRange = React.useMemo<string[]>(() => {
+  // Generate color stops for visualMap - use piecewise for clearer buckets
+  const colorConfig = React.useMemo(() => {
     const noDataColor = resolveToRgb(colors.bg.tertiary);
     
     const accentMap: Record<string, string> = {
@@ -123,14 +123,19 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
     
     const accentToken = accentMap[colorScheme] || accentMap.blue;
     
-    // 5-stop gradient for smooth transitions
-    return [
+    // Create distinct color stops with clear visual separation
+    return {
       noDataColor,
-      resolveToRgb(accentToken, 0.15),
-      resolveToRgb(accentToken, 0.35),
-      resolveToRgb(accentToken, 0.6),
-      resolveToRgb(accentToken, 0.85),
-    ];
+      // 6-stop gradient with more separation at low end
+      colors: [
+        noDataColor,                          // 0 - no data
+        resolveToRgb(accentToken, 0.2),       // very low
+        resolveToRgb(accentToken, 0.4),       // low  
+        resolveToRgb(accentToken, 0.6),       // medium
+        resolveToRgb(accentToken, 0.8),       // high
+        resolveToRgb(accentToken, 1.0),       // very high
+      ],
+    };
   }, [colorScheme]);
 
   // Transform data to ECharts format
@@ -143,6 +148,20 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
     }
     return stats.p95Value || 1;
   }, [stats.p95Value, stats.maxValue, scaleMode]);
+
+  // Calculate piecewise thresholds for clearer bucket separation
+  const visualMapPieces = React.useMemo(() => {
+    const max = scaleMax;
+    // Create 5 buckets with clear boundaries
+    return [
+      { min: 0, max: 0, color: colorConfig.noDataColor, label: 'None' },
+      { min: 0.01, max: max * 0.1, color: colorConfig.colors[1], label: 'Very Low' },
+      { min: max * 0.1, max: max * 0.3, color: colorConfig.colors[2], label: 'Low' },
+      { min: max * 0.3, max: max * 0.6, color: colorConfig.colors[3], label: 'Medium' },
+      { min: max * 0.6, max: max * 0.85, color: colorConfig.colors[4], label: 'High' },
+      { min: max * 0.85, max: max * 2, color: colorConfig.colors[5], label: 'Very High' },
+    ];
+  }, [scaleMax, colorConfig]);
 
   // Build ECharts option
   const option = React.useMemo<EChartsOption>(() => {
@@ -276,15 +295,12 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
         splitArea: { show: false },
       },
       visualMap: {
-        min: 0,
-        max: scaleMax,
+        type: 'piecewise',
+        pieces: visualMapPieces,
         calculable: false,
         show: false, // Hide built-in legend, we use custom
-        inRange: {
-          color: colorRange,
-        },
         outOfRange: {
-          color: resolveToRgb(colors.bg.tertiary),
+          color: colorConfig.noDataColor,
         },
       },
       series: [
@@ -318,7 +334,7 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
         },
       ],
     };
-  }, [data, echartsData, stats, scaleMax, colorRange, valueLabel, formatValue, colorScheme, selectedCell, compact]);
+  }, [data, echartsData, stats, scaleMax, visualMapPieces, colorConfig, valueLabel, formatValue, colorScheme, selectedCell, compact]);
 
   // Handle cell click events
   const handleEvents = React.useMemo(() => {
