@@ -1149,80 +1149,24 @@ serve(async (req) => {
         const clicks = parseInt(insight.clicks) || 0;
         const impressions = parseInt(insight.impressions) || 0;
         
-        if (clicks > 0) {
-          console.log(`Creating attribution touchpoint for campaign ${campaign.id} on ${insight.date_start} (${clicks} clicks)`);
-          
-          // Extract refcode from campaign name if present (e.g., "Donate Now - refcode123")
-          let campaignRefcode: string | null = null;
-          if (campaign.name) {
-            // Look for patterns like "refcode=xyz" or "refcode:xyz" in campaign name
-            const refcodeMatch = campaign.name.match(/refcode[=:\-_]?(\w+)/i);
-            if (refcodeMatch) {
-              campaignRefcode = refcodeMatch[1];
-            }
-            // Also check for common refcode patterns at end of name
-            const endMatch = campaign.name.match(/[-_](\w{4,20})$/);
-            if (!campaignRefcode && endMatch) {
-              campaignRefcode = endMatch[1];
-            }
-          }
-          
-          // Use mapping refcode if available, otherwise use extracted refcode
-          const refcode = mapping?.refcode || campaignRefcode;
-          
-          const { error: touchpointError } = await supabase
-            .from('attribution_touchpoints')
-            .insert({
-              organization_id,
-              touchpoint_type: 'meta_ad_click',
-              occurred_at: `${insight.date_start}T12:00:00Z`,
-              utm_source: 'meta',
-              utm_medium: 'cpc',
-              utm_campaign: campaign.name || campaign.id,
-              campaign_id: campaign.id,
-              refcode: refcode,
-              metadata: {
-                campaign_id: campaign.id,
-                campaign_name: campaign.name,
-                date: insight.date_start,
-                clicks: clicks,
-                impressions: impressions,
-                spend: parseFloat(insight.spend) || 0,
-                has_mapping: !!mapping,
-              }
-            });
-
-          if (touchpointError) {
-            console.error(`Error creating click touchpoint for ${campaign.id}:`, touchpointError);
-          }
-        }
+        // DEPRECATED: We no longer create per-donor touchpoints from aggregated Meta data.
+        // The Meta Marketing API only provides aggregated campaign metrics (total clicks, impressions).
+        // Creating "touchpoints" without donor_email leads to fake attribution that cannot be traced
+        // to actual individuals. This was misleading users with false precision.
+        //
+        // Instead, Meta data is stored ONLY as:
+        // 1. meta_campaign_insights (campaign-level aggregated metrics)
+        // 2. meta_ad_metrics (ad-level aggregated metrics)  
+        // 3. meta_creative_insights (creative-level aggregated metrics)
+        //
+        // Real per-donor touchpoints can only be created when we have actual donor identity:
+        // - ActBlue webhooks with refcode/click_id/fbclid → deterministic attribution
+        // - SMS events with phone_hash → identity resolution to donor
+        //
+        // See: Attribution System Audit (2026-01-03) for full rationale.
         
-        // Also create impression-level touchpoints for awareness tracking
-        if (impressions >= 100 && !clicks) {
-          // Only track impressions if there are many and no clicks (awareness without action)
-          const { error: impressionTouchpointError } = await supabase
-            .from('attribution_touchpoints')
-            .insert({
-              organization_id,
-              touchpoint_type: 'meta_ad_impression',
-              occurred_at: `${insight.date_start}T12:00:00Z`,
-              utm_source: 'meta',
-              utm_medium: 'cpm',
-              utm_campaign: campaign.name || campaign.id,
-              campaign_id: campaign.id,
-              refcode: mapping?.refcode || null,
-              metadata: {
-                campaign_id: campaign.id,
-                campaign_name: campaign.name,
-                date: insight.date_start,
-                impressions: impressions,
-                spend: parseFloat(insight.spend) || 0,
-              }
-            });
-
-          if (impressionTouchpointError) {
-            console.error(`Error creating impression touchpoint for ${campaign.id}:`, impressionTouchpointError);
-          }
+        if (clicks > 0) {
+          console.log(`[DEPRECATED] Skipping fake touchpoint creation for campaign ${campaign.id} on ${insight.date_start} (${clicks} clicks). Meta data is aggregated, not per-donor.`);
         }
       }
     }

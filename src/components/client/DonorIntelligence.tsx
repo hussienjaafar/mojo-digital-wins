@@ -277,7 +277,13 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
                 <HelpCircle className="h-3.5 w-3.5" />
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
-                <p>Attribution data may have a 24-48 hour delay from source platforms. Deterministic attribution (refcode/click ID) is more reliable than heuristic matching.</p>
+                <p className="font-medium mb-1">Attribution Data Sources:</p>
+                <ul className="text-xs space-y-1">
+                  <li>• <strong>ActBlue:</strong> Refcodes, click IDs → per-donor attribution</li>
+                  <li>• <strong>Meta:</strong> Aggregated metrics only (no per-donor data)</li>
+                  <li>• <strong>SMS:</strong> Phone-hash matching for identity resolution</li>
+                </ul>
+                <p className="mt-2 text-xs opacity-80">Platform revenue is only shown when we can match a refcode to a campaign.</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -327,11 +333,22 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="bg-[hsl(var(--portal-bg-elevated))]">
-              Deterministic: {deterministicRate.toFixed(0)}%
+              Refcode Match: {deterministicRate.toFixed(0)}%
             </Badge>
-            <span className="text-sm portal-text-muted">
-              Deterministic when refcode/campaign/ad/creative mapping is present
-            </span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger className="flex items-center gap-1">
+                  <span className="text-sm portal-text-muted">
+                    Based on ActBlue refcodes/click IDs
+                  </span>
+                  <HelpCircle className="h-3.5 w-3.5 text-[hsl(var(--portal-text-muted))]" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p><strong>Deterministic attribution</strong> means we can trace the donation back to a specific campaign via a refcode, click_id, or fbclid embedded in the ActBlue link.</p>
+                  <p className="mt-2 text-xs opacity-80">Meta impressions and clicks cannot be attributed to individual donors — Meta only provides aggregated campaign metrics.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <button
             type="button"
@@ -339,7 +356,7 @@ export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorI
             aria-pressed={deterministicOnly}
             onClick={() => setDeterministicOnly(!deterministicOnly)}
           >
-            {deterministicOnly ? "Showing deterministic only" : "Filter to deterministic"}
+            {deterministicOnly ? "Showing matched only" : "Filter to matched"}
           </button>
         </div>
         <TabsList className="flex w-full overflow-x-auto scrollbar-thin scrollbar-thumb-[hsl(var(--portal-border))] scrollbar-track-transparent">

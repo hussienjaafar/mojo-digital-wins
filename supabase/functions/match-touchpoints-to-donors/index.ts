@@ -9,34 +9,39 @@ const corsHeaders = {
 /**
  * Match Touchpoints to Donors
  * 
- * This function matches attribution touchpoints to donors by:
- * 1. Finding touchpoints with refcodes that match ActBlue transactions
- * 2. Updating touchpoints with donor_email from matched transactions
- * 3. Building the donor_identity_links table for phone-to-email matching
+ * This function performs identity resolution and attribution matching:
+ * 1. Matches touchpoints with refcodes to donors via ActBlue transactions
+ * 2. Builds the donor_identity_links table for phone-to-email cross-referencing
+ * 3. Enables SMS event → donor attribution via phone hash matching
+ * 
+ * IMPORTANT: This only handles DETERMINISTIC matching. We do not create
+ * fake per-donor touchpoints from aggregated data (e.g., Meta impressions).
  */
 
-// Simple hash function for phone normalization
-function hashPhone(phone: string): string {
+// SHA-256 hash for phone normalization (cryptographically secure)
+async function hashPhone(phone: string): Promise<string> {
   const normalized = phone.replace(/\D/g, '').slice(-10);
-  let hash = 0;
-  for (let i = 0; i < normalized.length; i++) {
-    const char = normalized.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return `ph_${Math.abs(hash).toString(36)}`;
+  if (normalized.length < 10) return ''; // Invalid phone
+  
+  const encoder = new TextEncoder();
+  const data = encoder.encode(normalized);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return `ph_${hashHex.substring(0, 16)}`; // Truncate for storage efficiency
 }
 
-// Simple hash for email
-function hashEmail(email: string): string {
+// SHA-256 hash for email
+async function hashEmail(email: string): Promise<string> {
   const normalized = email.toLowerCase().trim();
-  let hash = 0;
-  for (let i = 0; i < normalized.length; i++) {
-    const char = normalized.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return `em_${Math.abs(hash).toString(36)}`;
+  if (!normalized || !normalized.includes('@')) return '';
+  
+  const encoder = new TextEncoder();
+  const data = encoder.encode(normalized);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return `em_${hashHex.substring(0, 16)}`;
 }
 
 serve(async (req) => {
@@ -52,7 +57,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const body = await req.json().catch(() => ({}));
-    const { organization_id, batch_size = 500 } = body;
+    const { organization_id, batch_size = 500, populate_identity_links = true } = body;
 
     if (!organization_id) {
       throw new Error('organization_id is required');
@@ -62,6 +67,7 @@ serve(async (req) => {
 
     let matchedByRefcode = 0;
     let identityLinksCreated = 0;
+    let skippedInvalidPhone = 0;
 
     // Step 1: Get all unique refcodes from ActBlue transactions with their donor emails
     const { data: refcodeDonors, error: refcodeError } = await supabase
@@ -100,7 +106,7 @@ serve(async (req) => {
       console.error('[MATCH TOUCHPOINTS] Error fetching unmatched touchpoints:', tpError);
     }
 
-    // Step 3: Match touchpoints to donors via refcode
+    // Step 3: Match touchpoints to donors via refcode (DETERMINISTIC)
     const updates: { id: string; donor_email: string }[] = [];
     for (const tp of (unmatchedTouchpoints || [])) {
       if (tp.refcode && refcodeToDonor.has(tp.refcode)) {
@@ -128,65 +134,75 @@ serve(async (req) => {
     console.log(`[MATCH TOUCHPOINTS] Matched ${matchedByRefcode} touchpoints via refcode`);
 
     // Step 4: Build donor identity links for phone-to-email cross-reference
-    // Get transactions with both phone and email
-    const { data: transactionsWithPhone, error: phoneError } = await supabase
-      .from('actblue_transactions')
-      .select('donor_email, phone')
-      .eq('organization_id', organization_id)
-      .not('phone', 'is', null)
-      .not('donor_email', 'is', null)
-      .limit(batch_size);
+    // This enables SMS event attribution via phone hash matching
+    if (populate_identity_links) {
+      const { data: transactionsWithPhone, error: phoneError } = await supabase
+        .from('actblue_transactions')
+        .select('donor_email, phone')
+        .eq('organization_id', organization_id)
+        .not('phone', 'is', null)
+        .not('donor_email', 'is', null)
+        .limit(batch_size);
 
-    if (phoneError) {
-      console.error('[MATCH TOUCHPOINTS] Error fetching transactions with phone:', phoneError);
-    }
+      if (phoneError) {
+        console.error('[MATCH TOUCHPOINTS] Error fetching transactions with phone:', phoneError);
+      }
 
-    // Create identity links
-    const identityLinks: Array<{
-      organization_id: string;
-      email_hash: string;
-      phone_hash: string;
-      donor_email: string;
-      source: string;
-    }> = [];
+      // Create identity links with proper SHA-256 hashing
+      const identityLinks: Array<{
+        organization_id: string;
+        email_hash: string;
+        phone_hash: string;
+        donor_email: string;
+        source: string;
+        confidence: number;
+      }> = [];
 
-    const seenLinks = new Set<string>();
-    for (const tx of (transactionsWithPhone || [])) {
-      if (tx.phone && tx.donor_email) {
-        const emailHash = hashEmail(tx.donor_email);
-        const phoneHash = hashPhone(tx.phone);
-        const linkKey = `${emailHash}:${phoneHash}`;
-        
-        if (!seenLinks.has(linkKey)) {
-          seenLinks.add(linkKey);
-          identityLinks.push({
-            organization_id,
-            email_hash: emailHash,
-            phone_hash: phoneHash,
-            donor_email: tx.donor_email,
-            source: 'actblue',
-          });
+      const seenLinks = new Set<string>();
+      for (const tx of (transactionsWithPhone || [])) {
+        if (tx.phone && tx.donor_email) {
+          const emailHash = await hashEmail(tx.donor_email);
+          const phoneHash = await hashPhone(tx.phone);
+          
+          if (!emailHash || !phoneHash) {
+            skippedInvalidPhone++;
+            continue;
+          }
+          
+          const linkKey = `${emailHash}:${phoneHash}`;
+          
+          if (!seenLinks.has(linkKey)) {
+            seenLinks.add(linkKey);
+            identityLinks.push({
+              organization_id,
+              email_hash: emailHash,
+              phone_hash: phoneHash,
+              donor_email: tx.donor_email,
+              source: 'actblue',
+              confidence: 1.0, // ActBlue provides both - high confidence
+            });
+          }
         }
       }
-    }
 
-    // Upsert identity links
-    if (identityLinks.length > 0) {
-      const { error: linkError, count } = await supabase
-        .from('donor_identity_links')
-        .upsert(identityLinks, { 
-          onConflict: 'organization_id,email_hash,phone_hash',
-          ignoreDuplicates: true 
-        });
+      // Upsert identity links
+      if (identityLinks.length > 0) {
+        const { error: linkError } = await supabase
+          .from('donor_identity_links')
+          .upsert(identityLinks, { 
+            onConflict: 'organization_id,email_hash,phone_hash',
+            ignoreDuplicates: true 
+          });
 
-      if (linkError) {
-        console.error('[MATCH TOUCHPOINTS] Error creating identity links:', linkError);
-      } else {
-        identityLinksCreated = identityLinks.length;
+        if (linkError) {
+          console.error('[MATCH TOUCHPOINTS] Error creating identity links:', linkError);
+        } else {
+          identityLinksCreated = identityLinks.length;
+        }
       }
-    }
 
-    console.log(`[MATCH TOUCHPOINTS] Created ${identityLinksCreated} identity links`);
+      console.log(`[MATCH TOUCHPOINTS] Created ${identityLinksCreated} identity links (skipped ${skippedInvalidPhone} invalid phones)`);
+    }
 
     const duration = Date.now() - startTime;
     console.log(`[MATCH TOUCHPOINTS] Complete in ${duration}ms`);
@@ -196,6 +212,7 @@ serve(async (req) => {
         success: true,
         matched_by_refcode: matchedByRefcode,
         identity_links_created: identityLinksCreated,
+        skipped_invalid_phone: skippedInvalidPhone,
         duration_ms: duration,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -590,32 +590,38 @@ const ClientDonorJourney = () => {
           </V3ChartWrapper>
         </div>
 
-        {/* Attribution Model */}
+        {/* Attribution Model - Renamed and clarified */}
         <V3Card>
           <V3CardHeader>
             <V3CardTitle className="flex items-center gap-2">
               <Layers className="h-4 w-4" />
-              Multi-Touch Attribution Model
+              Refcode Attribution Model
             </V3CardTitle>
             <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
-              40% First Touch • 20% Middle Touches • 40% Last Touch
+              When multiple refcodes exist for a donor, revenue is weighted: 40% First • 20% Middle • 40% Last
             </p>
           </V3CardHeader>
           <V3CardContent>
+            <div className="p-3 mb-4 rounded-lg bg-[hsl(var(--portal-warning)/0.1)] border border-[hsl(var(--portal-warning)/0.3)]">
+              <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                <strong>Note:</strong> Multi-touch weighting only applies to donors with multiple refcode interactions. 
+                Meta impressions/clicks cannot be attributed to individual donors — we can only track aggregated campaign performance.
+              </p>
+            </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
                 <div className="text-3xl font-bold text-[hsl(var(--portal-accent-blue))]">40%</div>
-                <div className="text-sm text-[hsl(var(--portal-text-muted))]">First Touch</div>
-                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Initial awareness</p>
+                <div className="text-sm text-[hsl(var(--portal-text-muted))]">First Refcode</div>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Initial campaign</p>
               </div>
               <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-success)/0.1)]">
                 <div className="text-3xl font-bold text-[hsl(var(--portal-success))]">20%</div>
-                <div className="text-sm text-[hsl(var(--portal-text-muted))]">Middle Touches</div>
-                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Nurturing phase</p>
+                <div className="text-sm text-[hsl(var(--portal-text-muted))]">Middle Refcodes</div>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Intermediate touches</p>
               </div>
               <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]">
                 <div className="text-3xl font-bold text-[hsl(var(--portal-accent-purple))]">40%</div>
-                <div className="text-sm text-[hsl(var(--portal-text-muted))]">Last Touch</div>
+                <div className="text-sm text-[hsl(var(--portal-text-muted))]">Last Refcode</div>
                 <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Final conversion</p>
               </div>
             </div>
