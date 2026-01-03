@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as echarts from "echarts";
 import ReactECharts from "echarts-for-react";
-import type { EChartsOption, ECharts } from "echarts";
+import type { EChartsOption } from "echarts";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getStateName, getStateAbbreviation } from "@/lib/us-states";
@@ -41,8 +41,25 @@ export interface EChartsUSMapProps {
   maxValue?: number;
 }
 
-// GeoJSON URL for USA map
+// TopoJSON URL for USA map (us-atlas)
 const USA_GEOJSON_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
+
+// FIPS codes to state names mapping
+const FIPS_TO_STATE: Record<string, string> = {
+  "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas",
+  "06": "California", "08": "Colorado", "09": "Connecticut", "10": "Delaware",
+  "11": "District of Columbia", "12": "Florida", "13": "Georgia", "15": "Hawaii",
+  "16": "Idaho", "17": "Illinois", "18": "Indiana", "19": "Iowa",
+  "20": "Kansas", "21": "Kentucky", "22": "Louisiana", "23": "Maine",
+  "24": "Maryland", "25": "Massachusetts", "26": "Michigan", "27": "Minnesota",
+  "28": "Mississippi", "29": "Missouri", "30": "Montana", "31": "Nebraska",
+  "32": "Nevada", "33": "New Hampshire", "34": "New Jersey", "35": "New Mexico",
+  "36": "New York", "37": "North Carolina", "38": "North Dakota", "39": "Ohio",
+  "40": "Oklahoma", "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island",
+  "45": "South Carolina", "46": "South Dakota", "47": "Tennessee", "48": "Texas",
+  "49": "Utah", "50": "Vermont", "51": "Virginia", "53": "Washington",
+  "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming", "72": "Puerto Rico",
+};
 
 export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
   data,
@@ -57,6 +74,7 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
   maxValue,
 }) => {
   const chartRef = React.useRef<ReactECharts>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const [mapRegistered, setMapRegistered] = React.useState(false);
   const [mapError, setMapError] = React.useState<string | null>(null);
 
@@ -79,34 +97,22 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
         const { feature } = await import("topojson-client");
         const geoJson = feature(topoJson, topoJson.objects.states) as any;
         
-        // Map FIPS codes to state names
-        const statesByFips: Record<string, string> = {
-          "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas",
-          "06": "California", "08": "Colorado", "09": "Connecticut", "10": "Delaware",
-          "11": "District of Columbia", "12": "Florida", "13": "Georgia", "15": "Hawaii",
-          "16": "Idaho", "17": "Illinois", "18": "Indiana", "19": "Iowa",
-          "20": "Kansas", "21": "Kentucky", "22": "Louisiana", "23": "Maine",
-          "24": "Maryland", "25": "Massachusetts", "26": "Michigan", "27": "Minnesota",
-          "28": "Mississippi", "29": "Missouri", "30": "Montana", "31": "Nebraska",
-          "32": "Nevada", "33": "New Hampshire", "34": "New Jersey", "35": "New Mexico",
-          "36": "New York", "37": "North Carolina", "38": "North Dakota", "39": "Ohio",
-          "40": "Oklahoma", "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island",
-          "45": "South Carolina", "46": "South Dakota", "47": "Tennessee", "48": "Texas",
-          "49": "Utah", "50": "Vermont", "51": "Virginia", "53": "Washington",
-          "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming", "72": "Puerto Rico",
-        };
-        
-        // Add state names to features
-        geoJson.features = geoJson.features.map((f: any) => ({
-          ...f,
-          properties: {
-            ...f.properties,
-            name: statesByFips[f.id] || f.properties?.name || "Unknown",
-          },
-        }));
+        // Add state names to features using normalized FIPS codes
+        geoJson.features = geoJson.features.map((f: any) => {
+          // Normalize FIPS ID - can be number or string, pad to 2 digits
+          const fips = String(f.id).padStart(2, "0");
+          const stateName = FIPS_TO_STATE[fips] || f.properties?.name || "Unknown";
+          
+          return {
+            ...f,
+            properties: {
+              ...f.properties,
+              name: stateName,
+            },
+          };
+        });
 
         echarts.registerMap("USA", geoJson);
-        
         setMapRegistered(true);
       } catch (err) {
         console.error("Failed to register USA map:", err);
@@ -116,6 +122,33 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
 
     registerMap();
   }, []);
+
+  // Resize chart when map is registered or container changes
+  React.useEffect(() => {
+    if (!mapRegistered || !chartRef.current) return;
+    
+    const chart = chartRef.current.getEchartsInstance();
+    if (chart) {
+      // Delay resize to ensure container has settled
+      const timer = setTimeout(() => chart.resize(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [mapRegistered]);
+
+  // ResizeObserver for container size changes
+  React.useEffect(() => {
+    if (!containerRef.current || !chartRef.current) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      const chart = chartRef.current?.getEchartsInstance();
+      if (chart) {
+        chart.resize();
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, [mapRegistered]);
 
   // Transform data to use full state names for GeoJSON matching
   const transformedData = React.useMemo(() => {
@@ -148,7 +181,7 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
     }
   }, [valueType]);
 
-  // ECharts option
+  // ECharts option - using layoutCenter/layoutSize for reliable sizing
   const option = React.useMemo<EChartsOption>(() => ({
     tooltip: {
       trigger: "item",
@@ -199,8 +232,8 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
         color: "hsl(var(--portal-text-secondary))",
         fontSize: 11,
       },
-      calculable: true,
-      itemWidth: 180,
+      calculable: false, // Disable draggable handles for cleaner UI
+      itemWidth: 200,
       itemHeight: 12,
       inRange: {
         color: [
@@ -220,13 +253,14 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
         type: "map",
         map: "USA",
         roam: false,
-        left: "5%",
-        right: "5%",
-        top: "5%",
-        bottom: 50,
-        aspectScale: 0.85,
+        // Use layoutCenter/layoutSize for reliable positioning
+        layoutCenter: ["50%", "45%"],
+        layoutSize: "95%",
         data: transformedData,
         selectedMode: onStateClick ? "single" : false,
+        label: {
+          show: false,
+        },
         itemStyle: {
           areaColor: "hsl(var(--portal-bg-tertiary))",
           borderColor: "hsl(var(--portal-border))",
@@ -270,11 +304,13 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
     };
   }, [onStateClick]);
 
+  const heightStyle = typeof height === "number" ? `${height}px` : height;
+
   if (isLoading || !mapRegistered) {
     return (
       <div
         className={cn("w-full", className)}
-        style={{ height: typeof height === "number" ? `${height}px` : height }}
+        style={{ height: heightStyle }}
       >
         <Skeleton className="w-full h-full rounded-lg" />
       </div>
@@ -288,7 +324,7 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
           "w-full flex items-center justify-center text-[hsl(var(--portal-text-muted))]",
           className
         )}
-        style={{ height: typeof height === "number" ? `${height}px` : height }}
+        style={{ height: heightStyle }}
       >
         {mapError}
       </div>
@@ -296,13 +332,18 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
   }
 
   return (
-    <div className={cn("w-full", className)}>
+    <div 
+      ref={containerRef}
+      className={cn("w-full", className)}
+      style={{ height: heightStyle }}
+    >
       <ReactECharts
         ref={chartRef}
         option={option}
-        style={{ height: typeof height === "number" ? `${height}px` : height }}
-        opts={{ renderer: "svg" }}
+        style={{ width: "100%", height: "100%" }}
+        opts={{ renderer: "canvas" }} // Canvas renderer for reliable sizing
         onEvents={handleEvents}
+        notMerge
       />
     </div>
   );
