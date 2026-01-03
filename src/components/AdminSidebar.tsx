@@ -300,37 +300,8 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     threshold: 50,
   });
 
-  // Attach swipe listeners for mobile
-  useEffect(() => {
-    if (!isMobile) return;
-
-    const mainContent = document.querySelector('main');
-    if (!mainContent) return;
-
-    mainContent.addEventListener('touchstart', handleTouchStart as any);
-    mainContent.addEventListener('touchmove', handleTouchMove as any);
-    mainContent.addEventListener('touchend', handleTouchEnd as any);
-
-    return () => {
-      mainContent.removeEventListener('touchstart', handleTouchStart as any);
-      mainContent.removeEventListener('touchmove', handleTouchMove as any);
-      mainContent.removeEventListener('touchend', handleTouchEnd as any);
-    };
-  }, [isMobile, handleTouchStart, handleTouchMove, handleTouchEnd]);
-
-  // Keyboard shortcuts
+  // Keyboard shortcuts (sidebar toggle is handled by base sidebar.tsx)
   useKeyboardShortcut([
-    {
-      key: 'b',
-      ctrlKey: true,
-      metaKey: true,
-      callback: () => {
-        if (isMobile) {
-          setOpenMobile?.(!open);
-        }
-      },
-      description: 'Toggle sidebar',
-    },
     {
       key: '?',
       shiftKey: true,
@@ -568,7 +539,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                                         "text-[hsl(var(--portal-accent-blue))]",
                                         "font-medium",
                                         "hover:bg-[hsl(var(--portal-accent-blue)/0.15)]",
-                                        "border-l-2 border-[hsl(var(--portal-accent-blue))]",
+                                        !collapsed && "border-l-2 border-[hsl(var(--portal-accent-blue))]",
                                       ],
                                       !activeTab || activeTab !== item.value && "portal-text-secondary"
                                     )}
