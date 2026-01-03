@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Download, MapPin, Briefcase, Users, DollarSign, TrendingUp, Share2, ArrowLeft, Building2 } from "lucide-react";
+import { Download, MapPin, Briefcase, Users, DollarSign, TrendingUp, Share2, ArrowLeft } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
 import { ClientShell } from "@/components/client/ClientShell";
 import {
@@ -13,6 +13,8 @@ import {
   V3EmptyState,
   V3Button,
   V3DataTable,
+  V3InlineBarCell,
+  V3PrimaryCell,
   type V3Column,
 } from "@/components/v3";
 import { EChartsBarChart, V3DonutChart } from "@/components/charts/echarts";
@@ -246,13 +248,28 @@ const ClientDemographics = () => {
     return cityCache.get(selectedState) || [];
   }, [selectedState, cityCache]);
 
+  // Calculate max values for inline bars
+  const maxStateRevenue = useMemo(() => 
+    Math.max(...(summary?.state_stats || []).map(s => s.revenue), 1),
+    [summary]
+  );
+  const totalStateRevenue = useMemo(() => 
+    (summary?.state_stats || []).reduce((sum, s) => sum + s.revenue, 0),
+    [summary]
+  );
+
   // Table column definitions
   const locationColumns: V3Column<StateStats>[] = [
     {
       key: "state_abbr",
       header: "State",
-      render: (row) => (
-        <span className="font-medium">{row.state_abbr}</span>
+      primary: true,
+      render: (row, index) => (
+        <V3PrimaryCell
+          label={row.state_abbr}
+          sublabel={getStateName(row.state_abbr)}
+          isTopRank={index < 3}
+        />
       ),
       sortable: true,
       sortFn: (a, b) => a.state_abbr.localeCompare(b.state_abbr),
@@ -261,9 +278,13 @@ const ClientDemographics = () => {
       key: "revenue",
       header: "Revenue",
       render: (row) => (
-        <span className="font-semibold text-[hsl(var(--portal-success))]">
-          {formatCurrency(row.revenue)}
-        </span>
+        <V3InlineBarCell
+          value={row.revenue}
+          maxValue={maxStateRevenue}
+          valueType="currency"
+          variant="success"
+          percentOfTotal={(row.revenue / totalStateRevenue) * 100}
+        />
       ),
       align: "right",
       sortable: true,
@@ -273,22 +294,37 @@ const ClientDemographics = () => {
       key: "unique_donors",
       header: "Donors",
       render: (row) => (
-        <span className="text-[hsl(var(--portal-text-muted))]">
+        <span className="text-[hsl(var(--portal-text-secondary))] tabular-nums">
           {formatNumber(row.unique_donors)}
         </span>
       ),
       align: "right",
       sortable: true,
       sortFn: (a, b) => a.unique_donors - b.unique_donors,
+      hideOnMobile: true,
     },
   ];
+
+  // Calculate max values for occupation inline bars
+  const maxOccupationRevenue = useMemo(() => 
+    Math.max(...(summary?.occupation_stats || []).map(s => s.revenue), 1),
+    [summary]
+  );
+  const totalOccupationRevenue = useMemo(() => 
+    (summary?.occupation_stats || []).reduce((sum, s) => sum + s.revenue, 0),
+    [summary]
+  );
 
   const occupationColumns: V3Column<OccupationStats>[] = [
     {
       key: "occupation",
       header: "Occupation",
-      render: (row) => (
-        <span className="font-medium truncate max-w-[200px] block">{row.occupation}</span>
+      primary: true,
+      render: (row, index) => (
+        <V3PrimaryCell
+          label={row.occupation}
+          isTopRank={index < 3}
+        />
       ),
       sortable: true,
       sortFn: (a, b) => a.occupation.localeCompare(b.occupation),
@@ -297,9 +333,13 @@ const ClientDemographics = () => {
       key: "revenue",
       header: "Revenue",
       render: (row) => (
-        <span className="font-semibold text-[hsl(var(--portal-success))]">
-          {formatCurrency(row.revenue)}
-        </span>
+        <V3InlineBarCell
+          value={row.revenue}
+          maxValue={maxOccupationRevenue}
+          valueType="currency"
+          variant="success"
+          percentOfTotal={(row.revenue / totalOccupationRevenue) * 100}
+        />
       ),
       align: "right",
       sortable: true,
@@ -309,26 +349,38 @@ const ClientDemographics = () => {
       key: "unique_donors",
       header: "Donors",
       render: (row) => (
-        <span className="text-[hsl(var(--portal-text-muted))]">
+        <span className="text-[hsl(var(--portal-text-secondary))] tabular-nums">
           {formatNumber(row.unique_donors)}
         </span>
       ),
       align: "right",
       sortable: true,
       sortFn: (a, b) => a.unique_donors - b.unique_donors,
+      hideOnMobile: true,
     },
   ];
+
+  // Calculate max values for city inline bars
+  const maxCityRevenue = useMemo(() => 
+    Math.max(...selectedStateCities.map(s => s.revenue), 1),
+    [selectedStateCities]
+  );
+  const totalCityRevenue = useMemo(() => 
+    selectedStateCities.reduce((sum, s) => sum + s.revenue, 0),
+    [selectedStateCities]
+  );
 
   // City table columns
   const cityColumns: V3Column<CityStats>[] = [
     {
       key: "city",
       header: "City",
-      render: (row) => (
-        <div className="flex items-center gap-2">
-          <Building2 className="h-3.5 w-3.5 text-[hsl(var(--portal-text-muted))]" />
-          <span className="font-medium">{row.city}</span>
-        </div>
+      primary: true,
+      render: (row, index) => (
+        <V3PrimaryCell
+          label={row.city}
+          isTopRank={index < 3}
+        />
       ),
       sortable: true,
       sortFn: (a, b) => a.city.localeCompare(b.city),
@@ -337,9 +389,13 @@ const ClientDemographics = () => {
       key: "revenue",
       header: "Revenue",
       render: (row) => (
-        <span className="font-semibold text-[hsl(var(--portal-success))]">
-          {formatCurrency(row.revenue)}
-        </span>
+        <V3InlineBarCell
+          value={row.revenue}
+          maxValue={maxCityRevenue}
+          valueType="currency"
+          variant="success"
+          percentOfTotal={totalCityRevenue > 0 ? (row.revenue / totalCityRevenue) * 100 : 0}
+        />
       ),
       align: "right",
       sortable: true,
@@ -349,13 +405,14 @@ const ClientDemographics = () => {
       key: "unique_donors",
       header: "Donors",
       render: (row) => (
-        <span className="text-[hsl(var(--portal-text-muted))]">
+        <span className="text-[hsl(var(--portal-text-secondary))] tabular-nums">
           {formatNumber(row.unique_donors)}
         </span>
       ),
       align: "right",
       sortable: true,
       sortFn: (a, b) => a.unique_donors - b.unique_donors,
+      hideOnMobile: true,
     },
   ];
 
@@ -525,8 +582,11 @@ const ClientDemographics = () => {
                       columns={cityColumns}
                       getRowKey={(row) => row.city}
                       compact
-                      striped
                       maxHeight="300px"
+                      showRowNumbers
+                      highlightTopN={3}
+                      defaultSortKey="revenue"
+                      defaultSortDirection="desc"
                     />
                   ) : (
                     <V3EmptyState
@@ -588,8 +648,11 @@ const ClientDemographics = () => {
               columns={locationColumns}
               getRowKey={(row) => row.state_abbr}
               compact
-              striped
               maxHeight="400px"
+              showRowNumbers
+              highlightTopN={3}
+              defaultSortKey="revenue"
+              defaultSortDirection="desc"
             />
           </V3ChartWrapper>
 
@@ -599,12 +662,15 @@ const ClientDemographics = () => {
             ariaLabel="Table showing detailed donor statistics by occupation"
           >
             <V3DataTable
-              data={summary.occupation_stats}
+              data={summary.occupation_stats.slice(0, 15)}
               columns={occupationColumns}
               getRowKey={(row) => row.occupation}
               compact
-              striped
               maxHeight="400px"
+              showRowNumbers
+              highlightTopN={3}
+              defaultSortKey="revenue"
+              defaultSortDirection="desc"
             />
           </V3ChartWrapper>
         </div>
