@@ -15,7 +15,8 @@ import {
   V3DataTable,
   type V3Column,
 } from "@/components/v3";
-import { EChartsBarChart, EChartsPieChart, EChartsUSMap, type USMapDataItem } from "@/components/charts/echarts";
+import { EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
+import { USChoroplethMap, type ChoroplethDataItem } from "@/components/charts";
 import { getStateName, getStateAbbreviation, isValidStateAbbreviation } from "@/lib/us-states";
 
 type Organization = {
@@ -332,7 +333,7 @@ const ClientDemographics = () => {
   ];
 
   // Prepare map data for US heat map (must be before conditional returns)
-  const mapData: USMapDataItem[] = useMemo(() => {
+  const mapData: ChoroplethDataItem[] = useMemo(() => {
     if (!stats) return [];
     return stats.locationData.map((item) => ({
       name: item.state,
@@ -498,7 +499,7 @@ const ClientDemographics = () => {
             )}
             
             {!selectedState ? (
-              <EChartsUSMap
+              <USChoroplethMap
                 data={mapData}
                 height={420}
                 valueLabel="Donors"
