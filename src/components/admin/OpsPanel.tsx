@@ -213,6 +213,14 @@ export default function OpsPanel() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <AdminPageHeader
+        title="Operations Panel"
+        description="Monitor system health and run diagnostics"
+        icon={Activity}
+        iconColor="green"
+        onRefresh={loadData}
+      />
+
       <div className="flex flex-wrap gap-4 items-stretch">
         <Card className="min-w-[280px] flex-1 hover-scale transition-all duration-300">
           <CardHeader className="pb-2">

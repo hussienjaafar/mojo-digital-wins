@@ -15,6 +15,7 @@ import { Link2, Plus, Trash2, Target, Wand2, DollarSign, Building2, TrendingUp, 
 import { logger } from "@/lib/logger";
 import AttributionMatcher from "./AttributionMatcher";
 import { cn } from "@/lib/utils";
+import { AdminPageHeader, AdminLoadingState } from "./v3";
 
 type Organization = {
   id: string;
@@ -294,27 +295,13 @@ const CampaignAttributionManager = () => {
   if (isLoading) {
     return (
       <div className="space-y-6 portal-animate-fade-in">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
-            <Target className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Campaign Attribution</h2>
-            <p className="text-sm portal-text-secondary">Loading attribution mappings...</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
-              <div className="flex justify-between items-start">
-                <div className="flex-1 space-y-2">
-                  <div className="portal-skeleton h-5 w-40" />
-                  <div className="portal-skeleton h-4 w-full" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <AdminPageHeader
+          title="Campaign Attribution"
+          description="Loading attribution mappings..."
+          icon={Target}
+          iconColor="purple"
+        />
+        <AdminLoadingState variant="card" count={5} />
       </div>
     );
   }
@@ -322,47 +309,40 @@ const CampaignAttributionManager = () => {
   return (
     <div className="space-y-6">
       {/* Header with Client Selector */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950">
-            <Target className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Campaign Attribution</h2>
-            <p className="text-sm portal-text-secondary">
-              {selectedOrgId === "all" 
-                ? "Manage attribution across all clients" 
-                : `Managing ${selectedOrg?.name || 'client'}`}
-            </p>
-          </div>
-        </div>
-
-        {/* Client Selector */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground hidden sm:inline">Client:</span>
-          </div>
-          <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
-            <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Select client" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">
-                <span className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  All Clients
-                </span>
-              </SelectItem>
-              {organizations.map((org) => (
-                <SelectItem key={org.id} value={org.id}>
-                  {org.name}
+      <AdminPageHeader
+        title="Campaign Attribution"
+        description={selectedOrgId === "all" 
+          ? "Manage attribution across all clients" 
+          : `Managing ${selectedOrg?.name || 'client'}`}
+        icon={Target}
+        iconColor="purple"
+        actions={
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground hidden sm:inline">Client:</span>
+            </div>
+            <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Select client" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  <span className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    All Clients
+                  </span>
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+                {organizations.map((org) => (
+                  <SelectItem key={org.id} value={org.id}>
+                    {org.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        }
+      />
 
       {/* Client Stats - Only show when a specific client is selected */}
       {selectedOrgId !== "all" && clientStats && (

@@ -8,11 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { LoadingCard } from "@/components/ui/loading-spinner";
 import { Building2, RefreshCw, Search, ExternalLink, Plus, MapPin, Download } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { ExportDialog } from "@/components/reports/ExportDialog";
+import { AdminPageHeader, AdminLoadingState } from "@/components/admin/v3";
 
 import type { Database } from "@/integrations/supabase/types";
 
@@ -195,170 +195,161 @@ export function StateActions() {
 
   if (loading) {
     return (
-      <div className="space-y-4 animate-fade-in">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader>
-              <div className="h-6 w-3/4 bg-muted rounded" />
-              <div className="h-4 w-1/2 bg-muted rounded mt-2" />
-            </CardHeader>
-            <CardContent>
-              <div className="h-4 w-full bg-muted rounded" />
-              <div className="h-4 w-5/6 bg-muted rounded mt-2" />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-6 portal-animate-fade-in">
+        <AdminPageHeader
+          title="State Actions"
+          description="Loading state-level actions..."
+          icon={Building2}
+          iconColor="purple"
+        />
+        <AdminLoadingState variant="card" count={3} />
       </div>
     );
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold flex items-center gap-2 portal-text-primary">
-            <Building2 className="h-7 w-7" />
-            State Actions
-          </h2>
-          <p className="portal-text-secondary mt-1">
-            Tracking {filteredActions.length} state-level actions
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <ExportDialog
-            reportType="state_actions"
-            title="State Actions"
-            trigger={
-              <Button variant="smooth">
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-            }
-          />
-          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-            <DialogTrigger asChild>
-              <Button variant="smooth">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Manual
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add State Action</DialogTitle>
-                <DialogDescription>
-                  Manually add a state-level action for tracking
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="state_code">State Code</Label>
-                    <Input
-                      id="state_code"
-                      placeholder="TX"
-                      value={newAction.state_code}
-                      onChange={(e) => setNewAction({ ...newAction, state_code: e.target.value.toUpperCase() })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="state_name">State Name</Label>
-                    <Input
-                      id="state_name"
-                      placeholder="Texas"
-                      value={newAction.state_name}
-                      onChange={(e) => setNewAction({ ...newAction, state_name: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="action_type">Action Type</Label>
-                  <Select
-                    value={newAction.action_type}
-                    onValueChange={(value) => setNewAction({ ...newAction, action_type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="executive_order">Executive Order</SelectItem>
-                      <SelectItem value="designation">Designation</SelectItem>
-                      <SelectItem value="legislation">Legislation</SelectItem>
-                      <SelectItem value="lawsuit">Lawsuit</SelectItem>
-                      <SelectItem value="announcement">Announcement</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
-                  <Input
-                    id="title"
-                    placeholder="Governor designates CAIR as terrorist organization"
-                    value={newAction.title}
-                    onChange={(e) => setNewAction({ ...newAction, title: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Details about the action..."
-                    value={newAction.description}
-                    onChange={(e) => setNewAction({ ...newAction, description: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="official_name">Official Name</Label>
-                    <Input
-                      id="official_name"
-                      placeholder="Greg Abbott"
-                      value={newAction.official_name}
-                      onChange={(e) => setNewAction({ ...newAction, official_name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="official_title">Title</Label>
-                    <Input
-                      id="official_title"
-                      placeholder="Governor"
-                      value={newAction.official_title}
-                      onChange={(e) => setNewAction({ ...newAction, official_title: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="source_url">Source URL</Label>
-                  <Input
-                    id="source_url"
-                    type="url"
-                    placeholder="https://..."
-                    value={newAction.source_url}
-                    onChange={(e) => setNewAction({ ...newAction, source_url: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="action_date">Action Date</Label>
-                  <Input
-                    id="action_date"
-                    type="date"
-                    value={newAction.action_date}
-                    onChange={(e) => setNewAction({ ...newAction, action_date: e.target.value })}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={addManualAction} disabled={!newAction.title || !newAction.state_code}>
-                  Add Action
+      <AdminPageHeader
+        title="State Actions"
+        description={`Tracking ${filteredActions.length} state-level actions`}
+        icon={Building2}
+        iconColor="purple"
+        actions={
+          <div className="flex gap-2">
+            <ExportDialog
+              reportType="state_actions"
+              title="State Actions"
+              trigger={
+                <Button variant="smooth">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Button onClick={syncActions} disabled={syncing} variant="smooth">
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-            Sync
-          </Button>
-        </div>
-      </div>
+              }
+            />
+            <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+              <DialogTrigger asChild>
+                <Button variant="smooth">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Manual
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+          </div>
+        }
+      />
+
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add State Action</DialogTitle>
+            <DialogDescription>
+              Manually add a state-level action for tracking
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="state_code">State Code</Label>
+                <Input
+                  id="state_code"
+                  placeholder="TX"
+                  value={newAction.state_code}
+                  onChange={(e) => setNewAction({ ...newAction, state_code: e.target.value.toUpperCase() })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state_name">State Name</Label>
+                <Input
+                  id="state_name"
+                  placeholder="Texas"
+                  value={newAction.state_name}
+                  onChange={(e) => setNewAction({ ...newAction, state_name: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="action_type">Action Type</Label>
+              <Select
+                value={newAction.action_type}
+                onValueChange={(value) => setNewAction({ ...newAction, action_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="executive_order">Executive Order</SelectItem>
+                  <SelectItem value="designation">Designation</SelectItem>
+                  <SelectItem value="legislation">Legislation</SelectItem>
+                  <SelectItem value="lawsuit">Lawsuit</SelectItem>
+                  <SelectItem value="announcement">Announcement</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                placeholder="Governor designates CAIR as terrorist organization"
+                value={newAction.title}
+                onChange={(e) => setNewAction({ ...newAction, title: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Details about the action..."
+                value={newAction.description}
+                onChange={(e) => setNewAction({ ...newAction, description: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="official_name">Official Name</Label>
+                <Input
+                  id="official_name"
+                  placeholder="Greg Abbott"
+                  value={newAction.official_name}
+                  onChange={(e) => setNewAction({ ...newAction, official_name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="official_title">Title</Label>
+                <Input
+                  id="official_title"
+                  placeholder="Governor"
+                  value={newAction.official_title}
+                  onChange={(e) => setNewAction({ ...newAction, official_title: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="source_url">Source URL</Label>
+              <Input
+                id="source_url"
+                type="url"
+                placeholder="https://..."
+                value={newAction.source_url}
+                onChange={(e) => setNewAction({ ...newAction, source_url: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="action_date">Action Date</Label>
+              <Input
+                id="action_date"
+                type="date"
+                value={newAction.action_date}
+                onChange={(e) => setNewAction({ ...newAction, action_date: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={addManualAction} disabled={!newAction.title || !newAction.state_code}>
+              Add Action
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

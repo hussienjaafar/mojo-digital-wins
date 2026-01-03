@@ -5,11 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LoadingCard } from "@/components/ui/loading-spinner";
 import { Shield, RefreshCw, Search, ExternalLink, FileText, Calendar, Download } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { ExportDialog } from "@/components/reports/ExportDialog";
+import { AdminPageHeader, AdminLoadingState } from "@/components/admin/v3";
 
 import type { Database } from "@/integrations/supabase/types";
 
@@ -126,52 +126,44 @@ export function ExecutiveOrders() {
 
   if (loading) {
     return (
-      <div className="space-y-4 animate-fade-in">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader>
-              <div className="h-6 w-3/4 bg-muted rounded" />
-              <div className="h-4 w-1/2 bg-muted rounded mt-2" />
-            </CardHeader>
-            <CardContent>
-              <div className="h-4 w-full bg-muted rounded" />
-              <div className="h-4 w-5/6 bg-muted rounded mt-2" />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-6 portal-animate-fade-in">
+        <AdminPageHeader
+          title="Executive Orders"
+          description="Loading presidential actions..."
+          icon={Shield}
+          iconColor="red"
+        />
+        <AdminLoadingState variant="card" count={3} />
       </div>
     );
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold flex items-center gap-2 portal-text-primary">
-            <Shield className="h-7 w-7" />
-            Executive Orders
-          </h2>
-          <p className="portal-text-secondary mt-1">
-            Tracking {filteredOrders.length} relevant presidential actions
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <ExportDialog
-            reportType="executive_orders"
-            title="Executive Orders"
-            trigger={
-              <Button variant="smooth">
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-            }
-          />
-          <Button onClick={syncOrders} disabled={syncing} variant="smooth">
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-            Sync Orders
-          </Button>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Executive Orders"
+        description={`Tracking ${filteredOrders.length} relevant presidential actions`}
+        icon={Shield}
+        iconColor="red"
+        actions={
+          <div className="flex gap-2">
+            <ExportDialog
+              reportType="executive_orders"
+              title="Executive Orders"
+              trigger={
+                <Button variant="smooth">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              }
+            />
+            <Button onClick={syncOrders} disabled={syncing} variant="smooth">
+              <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+              Sync Orders
+            </Button>
+          </div>
+        }
+      />
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

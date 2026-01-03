@@ -242,49 +242,26 @@ const SyncScheduler = () => {
   if (isLoading) {
     return (
       <div className="space-y-6 portal-animate-fade-in">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
-            <RefreshCw className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Sync Scheduler</h2>
-            <p className="text-sm portal-text-secondary">Loading sync configuration...</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
-              <div className="portal-skeleton h-6 w-32" />
-              <div className="portal-skeleton h-4 w-full" />
-              <div className="flex gap-2 mt-4">
-                <div className="portal-skeleton h-8 w-24" />
-                <div className="portal-skeleton h-8 w-20 rounded-full" />
-              </div>
-            </div>
-          ))}
-        </div>
+        <AdminPageHeader
+          title="Sync Scheduler"
+          description="Loading sync configuration..."
+          icon={RefreshCw}
+          iconColor="blue"
+        />
+        <AdminLoadingState variant="card" count={4} />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold flex items-center gap-2">
-            <Clock className="h-7 w-7" />
-            Job Scheduler
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            Manage automated data fetching and processing jobs
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={loadData}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+      <AdminPageHeader
+        title="Job Scheduler"
+        description="Manage automated data fetching and processing jobs"
+        icon={Clock}
+        iconColor="blue"
+        onRefresh={loadData}
+        actions={
           <Button onClick={runAllJobs} disabled={isRunningAll}>
             {isRunningAll ? (
               <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -293,8 +270,8 @@ const SyncScheduler = () => {
             )}
             {isRunningAll ? "Running..." : "Run All Now"}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <Tabs defaultValue="jobs" className="space-y-4">
         <TabsList>
