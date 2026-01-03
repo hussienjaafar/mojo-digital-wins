@@ -431,6 +431,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
             onKeyDown={handleSearchKeyDown}
             collapsed={!isEffectivelyExpanded}
             isEffectivelyExpanded={isEffectivelyExpanded}
+            onExpandSidebar={() => setOpen(true)}
           />
         </div>
 
