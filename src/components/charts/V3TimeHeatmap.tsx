@@ -165,6 +165,9 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
         },
       },
       tooltip: {
+        show: true,
+        trigger: 'item',
+        confine: true,
         position: 'top',
         backgroundColor: 'hsl(var(--portal-bg-secondary) / 0.98)',
         borderColor: 'hsl(var(--portal-border))',
