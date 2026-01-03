@@ -121,9 +121,9 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
   if (!hasFilters && !isLoading) return null;
 
   return (
-    <div className={cn("flex items-center gap-2 flex-wrap", className)}>
+    <div className={cn("flex items-center gap-2", className)}>
       {/* Filter icon label */}
-      <div className="hidden sm:flex h-9 px-2 rounded-[var(--portal-radius-sm)] border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] items-center gap-1.5 text-xs text-[hsl(var(--portal-text-muted))]">
+      <div className="hidden sm:flex h-11 sm:h-9 px-2.5 rounded-[var(--portal-radius-sm)] border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] items-center gap-1.5 text-xs text-[hsl(var(--portal-text-muted))]">
         <Filter className="h-3.5 w-3.5" aria-hidden="true" />
         <span>Filters</span>
       </div>
@@ -136,13 +136,15 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
         >
           <SelectTrigger
             className={cn(
-              "h-9 w-[140px] sm:w-[160px]",
+              "h-11 sm:h-9 w-[130px] sm:w-[150px]",
               "rounded-[var(--portal-radius-sm)]",
               "border border-[hsl(var(--portal-border))]",
               "bg-[hsl(var(--portal-bg-secondary))]",
               "text-xs",
               "text-[hsl(var(--portal-text-primary))]",
+              "hover:bg-[hsl(var(--portal-bg-hover))]",
               "focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.3)]",
+              "transition-colors",
               selectedCampaignId && "border-[hsl(var(--portal-accent-blue))]"
             )}
             aria-label="Filter by campaign"
@@ -151,9 +153,11 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
           </SelectTrigger>
           <SelectContent
             className={cn(
+              "z-50",
               "bg-[hsl(var(--portal-bg-elevated))]",
               "border-[hsl(var(--portal-border))]",
-              "rounded-[var(--portal-radius-sm)]"
+              "rounded-[var(--portal-radius-sm)]",
+              "shadow-lg"
             )}
           >
             <SelectItem value="all" className="text-xs">
@@ -165,8 +169,8 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
                 value={campaign.id}
                 className="text-xs truncate"
               >
-                {campaign.label.length > 20
-                  ? `${campaign.label.slice(0, 20)}...`
+                {campaign.label.length > 18
+                  ? `${campaign.label.slice(0, 18)}...`
                   : campaign.label}
               </SelectItem>
             ))}
@@ -182,13 +186,15 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
         >
           <SelectTrigger
             className={cn(
-              "h-9 w-[140px] sm:w-[160px]",
+              "h-11 sm:h-9 w-[130px] sm:w-[150px]",
               "rounded-[var(--portal-radius-sm)]",
               "border border-[hsl(var(--portal-border))]",
               "bg-[hsl(var(--portal-bg-secondary))]",
               "text-xs",
               "text-[hsl(var(--portal-text-primary))]",
+              "hover:bg-[hsl(var(--portal-bg-hover))]",
               "focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.3)]",
+              "transition-colors",
               selectedCreativeId && "border-[hsl(var(--portal-accent-blue))]"
             )}
             aria-label="Filter by creative"
@@ -197,9 +203,11 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
           </SelectTrigger>
           <SelectContent
             className={cn(
+              "z-50",
               "bg-[hsl(var(--portal-bg-elevated))]",
               "border-[hsl(var(--portal-border))]",
-              "rounded-[var(--portal-radius-sm)]"
+              "rounded-[var(--portal-radius-sm)]",
+              "shadow-lg"
             )}
           >
             <SelectItem value="all" className="text-xs">
@@ -211,8 +219,8 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
                 value={creative.id}
                 className="text-xs truncate"
               >
-                {creative.label.length > 20
-                  ? `${creative.label.slice(0, 20)}...`
+                {creative.label.length > 18
+                  ? `${creative.label.slice(0, 18)}...`
                   : creative.label}
               </SelectItem>
             ))}
