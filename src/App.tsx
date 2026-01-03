@@ -58,7 +58,6 @@ const ClientSettings = lazy(() => import("./pages/ClientSettings"));
 const ClientMediaIntelligence = lazy(() => import("./pages/ClientIntelligence"));
 const ClientDonorIntelligence = lazy(() => import("./pages/ClientDonorIntelligence"));
 const ClientCreativeIntelligence = lazy(() => import("./pages/ClientCreativeIntelligence"));
-const ClientAttribution = lazy(() => import("./pages/ClientAttribution"));
 const ClientABTests = lazy(() => import("./pages/ClientABTests"));
 const ClientRecurringHealth = lazy(() => import("./pages/ClientRecurringHealth"));
 
@@ -122,7 +121,7 @@ const AppContent = () => {
             <Route path="/client/media-intelligence" element={<ClientMediaIntelligence />} />
             <Route path="/client/donor-intelligence" element={<ClientDonorIntelligence />} />
             <Route path="/client/creative-intelligence" element={<ClientCreativeIntelligence />} />
-            <Route path="/client/attribution" element={<ClientAttribution />} />
+            <Route path="/client/attribution" element={<Navigate to="/client/journey" replace />} />
             <Route path="/client/ab-tests" element={<ClientABTests />} />
             <Route path="/client/recurring-health" element={<ClientRecurringHealth />} />
             <Route path="/access-denied" element={<AccessDenied />} />
