@@ -270,6 +270,16 @@ const ClientDonorJourney = () => {
     deterministicCount: 0,
     heuristicCount: 0,
   });
+  const [lastMatcherRun, setLastMatcherRun] = useState<{
+    started_at: string | null;
+    finished_at: string | null;
+    matches_deterministic: number;
+    matches_heuristic_partial: number;
+    matches_heuristic_pattern: number;
+    matches_heuristic_fuzzy: number;
+    total_matches: number;
+    unmatched_count: number;
+  } | null>(null);
 
   // Load attribution data when organization is available
   useEffect(() => {
@@ -305,19 +315,54 @@ const ClientDonorJourney = () => {
 
       if (txData) {
         const totalRevenue = txData.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-        const matchedRefcodes = new Set((attrData || []).map(a => a.refcode?.toLowerCase()).filter(Boolean));
         
+        // GATE D: Separate deterministic vs heuristic refcodes for proper attribution
+        const deterministicRefcodes = new Set(
+          (attrData || [])
+            .filter(a => a.is_deterministic === true)
+            .map(a => a.refcode?.toLowerCase())
+            .filter(Boolean)
+        );
+        const allMatchedRefcodes = new Set(
+          (attrData || []).map(a => a.refcode?.toLowerCase()).filter(Boolean)
+        );
+        
+        // Calculate revenue only from deterministic matches for "matched" totals
         const matchedRevenue = txData
-          .filter(tx => tx.refcode && matchedRefcodes.has(tx.refcode.toLowerCase()))
+          .filter(tx => tx.refcode && deterministicRefcodes.has(tx.refcode.toLowerCase()))
+          .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+        
+        // Calculate heuristic-only revenue separately
+        const heuristicRefcodes = new Set(
+          (attrData || [])
+            .filter(a => a.is_deterministic === false)
+            .map(a => a.refcode?.toLowerCase())
+            .filter(Boolean)
+        );
+        const heuristicRevenue = txData
+          .filter(tx => tx.refcode && heuristicRefcodes.has(tx.refcode.toLowerCase()))
           .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
         setAttributionStats({
-          matchedRevenue,
-          unmatchedRevenue: totalRevenue - matchedRevenue,
+          matchedRevenue, // Now only deterministic
+          unmatchedRevenue: totalRevenue - matchedRevenue - heuristicRevenue, // True unattributed
           matchRate: totalRevenue > 0 ? (matchedRevenue / totalRevenue) * 100 : 0,
           deterministicCount,
           heuristicCount,
         });
+      }
+
+      // Load last matcher run from audit log (Gate C)
+      const { data: lastRun } = await supabase
+        .from("attribution_matcher_runs")
+        .select("started_at, finished_at, matches_deterministic, matches_heuristic_partial, matches_heuristic_pattern, matches_heuristic_fuzzy, total_matches, unmatched_count")
+        .eq("organization_id", organizationId)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (lastRun) {
+        setLastMatcherRun(lastRun);
       }
 
       // Find unmatched refcodes for suggestions
@@ -677,6 +722,32 @@ const ClientDonorJourney = () => {
                     <p className="text-sm text-[hsl(var(--portal-text-muted))]">Inferred Matches</p>
                   </div>
                 </div>
+
+                {/* Last Matcher Run Info (Gate C requirement) */}
+                {lastMatcherRun && (
+                  <div className="mt-4 pt-4 border-t border-border/50">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[hsl(var(--portal-text-muted))]">
+                        Last run: {lastMatcherRun.finished_at 
+                          ? formatDistanceToNow(new Date(lastMatcherRun.finished_at), { addSuffix: true })
+                          : 'In progress...'}
+                      </span>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-green-400">
+                          {lastMatcherRun.matches_deterministic} deterministic
+                        </span>
+                        <span className="text-orange-400">
+                          {(lastMatcherRun.matches_heuristic_partial || 0) + 
+                           (lastMatcherRun.matches_heuristic_pattern || 0) + 
+                           (lastMatcherRun.matches_heuristic_fuzzy || 0)} heuristic
+                        </span>
+                        <span className="text-gray-400">
+                          {lastMatcherRun.unmatched_count} unmatched
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </V3CardContent>
             </V3Card>
 
