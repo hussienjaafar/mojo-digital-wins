@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -20,6 +19,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { ExportDialog } from "@/components/reports/ExportDialog";
 import { AdminPageHeader, AdminLoadingState } from "@/components/admin/v3";
+import { V3Button } from "@/components/v3/V3Button";
 
 interface CriticalAlert {
   source_type: string;
@@ -199,27 +199,32 @@ export function CriticalAlerts() {
                 reportType="critical_alerts"
                 title="Critical Alerts"
                 trigger={
-                  <Button variant="smooth" size="sm">
-                    <Download className="h-4 w-4 mr-2" />
+                  <V3Button variant="outline" size="sm" leftIcon={<Download className="h-4 w-4" />}>
                     Export
-                  </Button>
+                  </V3Button>
                 }
               />
-              <Button onClick={syncAllSources} disabled={syncing} size="sm" variant="smooth">
-                <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+              <V3Button 
+                variant="primary" 
+                size="sm" 
+                onClick={syncAllSources} 
+                isLoading={syncing}
+                loadingText="Syncing..."
+                leftIcon={<RefreshCw className="h-4 w-4" />}
+              >
                 Sync All
-              </Button>
+              </V3Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {alerts.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 portal-text-muted">
               <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No critical or high priority alerts at this time</p>
-              <Button onClick={syncAllSources} className="mt-4" variant="smooth" size="sm">
+              <V3Button onClick={syncAllSources} className="mt-4" variant="primary" size="sm">
                 Sync Sources
-              </Button>
+              </V3Button>
             </div>
           ) : (
             <ScrollArea className="h-[400px] pr-4">

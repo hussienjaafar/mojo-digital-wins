@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { AlertTriangle, TrendingUp, TrendingDown, Activity, Check, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { V3Button } from '@/components/v3/V3Button';
 import { 
   useAnomalyAlerts, 
   TrendAnomaly, 
@@ -56,56 +54,54 @@ export function AnomalyAlertsWidget({ showDragHandle = false }: AnomalyAlertsWid
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader className="pb-2">
-          <Skeleton className="h-5 w-40" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="portal-card h-full">
+        <div className="p-4 pb-2">
+          <div className="portal-skeleton h-5 w-40" />
+        </div>
+        <div className="p-4 pt-0 space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="portal-skeleton h-16 w-full" />
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+    <div className="portal-card h-full flex flex-col">
+      <div className="p-4 pb-2 flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
           {showDragHandle && (
             <div className="cursor-grab active:cursor-grabbing p-1">
               <div className="w-4 h-4 grid grid-cols-2 gap-0.5">
                 {[...Array(4)].map((_, i) => (
-                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--portal-text-muted))]/30" />
                 ))}
               </div>
             </div>
           )}
-          <CardTitle className="text-base font-medium flex items-center gap-2">
+          <h3 className="text-base font-medium flex items-center gap-2 portal-text-primary">
             <AlertTriangle className="h-4 w-4 text-orange-500" />
             Anomaly Alerts
-          </CardTitle>
+          </h3>
           {stats.critical + stats.high > 0 && (
             <Badge variant="destructive" className="text-xs">
               {stats.critical + stats.high} urgent
             </Badge>
           )}
         </div>
-        <Button
+        <V3Button
           variant="ghost"
-          size="sm"
+          size="icon-sm"
           onClick={handleRefresh}
-          disabled={isRefreshing}
+          isLoading={isRefreshing}
         >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </Button>
-      </CardHeader>
-      <CardContent className="pt-0">
+          <RefreshCw className="h-4 w-4" />
+        </V3Button>
+      </div>
+      <div className="p-4 pt-0 flex-1">
         {anomalies.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 portal-text-muted">
             <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No anomalies detected</p>
             <p className="text-xs">System is operating normally</p>
@@ -152,15 +148,15 @@ export function AnomalyAlertsWidget({ showDragHandle = false }: AnomalyAlertsWid
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Button
+                          <V3Button
                             variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
+                            size="icon-sm"
+                            className="h-6 w-6"
                             onClick={(e) => handleAcknowledge(anomaly.id, e)}
                             title="Acknowledge"
                           >
                             <Check className="h-3 w-3" />
-                          </Button>
+                          </V3Button>
                           {expandedId === anomaly.id ? (
                             <ChevronUp className="h-4 w-4 text-muted-foreground" />
                           ) : (
@@ -171,19 +167,19 @@ export function AnomalyAlertsWidget({ showDragHandle = false }: AnomalyAlertsWid
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="px-3 pb-3 pt-1 text-xs space-y-2 bg-muted/30 rounded-b-lg -mt-1 border-x border-b">
+                    <div className="px-3 pb-3 pt-1 text-xs space-y-2 bg-[hsl(var(--portal-bg-tertiary))] rounded-b-lg -mt-1 border-x border-b border-[hsl(var(--portal-border))]">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <span className="text-muted-foreground">Current:</span>
-                          <span className="ml-1 font-medium">{anomaly.current_value.toFixed(2)}</span>
+                          <span className="portal-text-muted">Current:</span>
+                          <span className="ml-1 font-medium portal-text-primary">{anomaly.current_value.toFixed(2)}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Expected:</span>
-                          <span className="ml-1 font-medium">{anomaly.expected_value.toFixed(2)}</span>
+                          <span className="portal-text-muted">Expected:</span>
+                          <span className="ml-1 font-medium portal-text-primary">{anomaly.expected_value.toFixed(2)}</span>
                         </div>
                         {anomaly.deviation_percentage && (
                           <div>
-                            <span className="text-muted-foreground">Deviation:</span>
+                            <span className="portal-text-muted">Deviation:</span>
                             <span className={`ml-1 font-medium ${anomaly.deviation_percentage > 0 ? 'text-green-500' : 'text-red-500'}`}>
                               {anomaly.deviation_percentage > 0 ? '+' : ''}{anomaly.deviation_percentage.toFixed(1)}%
                             </span>
@@ -191,15 +187,15 @@ export function AnomalyAlertsWidget({ showDragHandle = false }: AnomalyAlertsWid
                         )}
                         {anomaly.source_type && (
                           <div>
-                            <span className="text-muted-foreground">Source:</span>
-                            <span className="ml-1 capitalize">{anomaly.source_type}</span>
+                            <span className="portal-text-muted">Source:</span>
+                            <span className="ml-1 capitalize portal-text-primary">{anomaly.source_type}</span>
                           </div>
                         )}
                       </div>
                       {anomaly.context && Object.keys(anomaly.context).length > 0 && (
-                        <div className="pt-1 border-t border-border/50">
-                          <span className="text-muted-foreground">Context:</span>
-                          <pre className="mt-1 text-[10px] bg-background/50 p-1.5 rounded overflow-auto max-h-20">
+                        <div className="pt-1 border-t border-[hsl(var(--portal-border))]/50">
+                          <span className="portal-text-muted">Context:</span>
+                          <pre className="mt-1 text-[10px] bg-[hsl(var(--portal-bg-primary))]/50 p-1.5 rounded overflow-auto max-h-20 portal-text-primary">
                             {JSON.stringify(anomaly.context, null, 2)}
                           </pre>
                         </div>
@@ -213,7 +209,7 @@ export function AnomalyAlertsWidget({ showDragHandle = false }: AnomalyAlertsWid
         )}
         
         {/* Stats footer */}
-        <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
+        <div className="mt-3 pt-3 border-t border-[hsl(var(--portal-border))] flex items-center justify-between text-xs portal-text-muted">
           <div className="flex gap-3">
             <span>Spikes: {stats.byType.velocity_spike}</span>
             <span>Shifts: {stats.byType.sentiment_shift}</span>
@@ -221,8 +217,8 @@ export function AnomalyAlertsWidget({ showDragHandle = false }: AnomalyAlertsWid
           </div>
           <span>{stats.total} total</span>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
