@@ -331,8 +331,8 @@ export default function AdvancedAnalytics({ organizationId, startDate, endDate }
           {attributionData.length > 0 ? (
             <>
               <AttributionChart
-                title="Multi-Touch Attribution Analysis"
-                description="Compare how different attribution models credit your marketing touchpoints"
+                title="Refcode Attribution Analysis"
+                description="Compare how different models weight refcode-based touchpoints (Meta ads are aggregated only)"
                 data={attributionData as {
                   touchpoint: string;
                   platform: string;

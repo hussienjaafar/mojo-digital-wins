@@ -249,11 +249,13 @@ const ClientAttribution = () => {
     }).format(value);
   };
 
-  const getConfidenceBadge = (confidence: number | null) => {
-    if (!confidence) return <Badge variant="outline">Unknown</Badge>;
-    if (confidence >= 80) return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">High ({confidence}%)</Badge>;
-    if (confidence >= 60) return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Medium ({confidence}%)</Badge>;
-    return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Low ({confidence}%)</Badge>;
+  // Match type badge - reframed from "confidence %" to match type labels
+  const getMatchTypeBadge = (confidence: number | null, isAutoMatched: boolean | null) => {
+    if (!confidence) return <Badge variant="outline">Unmatched</Badge>;
+    if (confidence >= 80) return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Refcode Match</Badge>;
+    if (confidence >= 60) return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Pattern Match</Badge>;
+    if (isAutoMatched) return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Timing Correlation</Badge>;
+    return <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">Directional</Badge>;
   };
 
   return (
@@ -359,7 +361,7 @@ const ClientAttribution = () => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>{getConfidenceBadge(attr.match_confidence)}</TableCell>
+                        <TableCell>{getMatchTypeBadge(attr.match_confidence, attr.is_auto_matched)}</TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(attr.attributed_revenue || 0)}
                         </TableCell>
@@ -414,7 +416,7 @@ const ClientAttribution = () => {
                             {match.reason}
                           </p>
                         </TableCell>
-                        <TableCell>{getConfidenceBadge(match.confidence)}</TableCell>
+                        <TableCell>{getMatchTypeBadge(match.confidence, true)}</TableCell>
                         <TableCell className="text-right font-medium text-green-500">
                           {formatCurrency(match.revenue)}
                         </TableCell>
