@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -259,10 +259,10 @@ const EmailReportManager = () => {
             </div>
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
-                <Button>
+                <V3Button>
                   <Plus className="h-4 w-4 mr-2" />
                   Create Schedule
-                </Button>
+                </V3Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
@@ -366,9 +366,9 @@ const EmailReportManager = () => {
                     />
                   </div>
 
-                  <Button type="submit" className="w-full">
+                  <V3Button type="submit" className="w-full">
                     Create Schedule
-                  </Button>
+                  </V3Button>
                 </form>
               </DialogContent>
             </Dialog>
@@ -438,34 +438,34 @@ const EmailReportManager = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
-                          <Button
+                          <V3Button
                             size="sm"
-                            variant="outline"
+                            variant="secondary"
                             onClick={() => setCustomizeScheduleId(schedule.id)}
                           >
                             <Settings className="h-4 w-4 mr-2" />
                             Customize
-                          </Button>
-                          <Button
+                          </V3Button>
+                          <V3Button
                             size="sm"
-                            variant="outline"
+                            variant="secondary"
                             onClick={() => sendTestReport(schedule)}
-                            disabled={isSending}
+                            isLoading={isSending}
                           >
                             <Send className="h-4 w-4 mr-2" />
                             Test
-                          </Button>
+                          </V3Button>
                           <Switch
                             checked={schedule.is_active}
                             onCheckedChange={() => toggleActive(schedule.id, schedule.is_active)}
                           />
-                          <Button
+                          <V3Button
                             size="sm"
                             variant="destructive"
                             onClick={() => deleteSchedule(schedule.id)}
                           >
                             <Trash2 className="h-4 w-4" />
-                          </Button>
+                          </V3Button>
                         </div>
                       </TableCell>
                     </TableRow>

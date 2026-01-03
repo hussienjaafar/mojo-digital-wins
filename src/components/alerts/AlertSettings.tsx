@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -194,14 +194,10 @@ export function AlertSettings() {
             Configure how and when you receive alerts
           </p>
         </div>
-        <Button onClick={savePreferences} disabled={saving} variant="smooth">
-          {saving ? (
-            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4 mr-2" />
-          )}
+        <V3Button onClick={savePreferences} isLoading={saving}>
+          <Save className="w-4 h-4 mr-2" />
           {saving ? 'Saving...' : 'Save Settings'}
-        </Button>
+        </V3Button>
       </div>
 
       {/* Alert Threshold */}

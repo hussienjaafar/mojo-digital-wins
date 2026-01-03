@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -452,10 +452,10 @@ const CampaignAttributionManager = () => {
                 </div>
                 <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
                   <DialogTrigger asChild>
-                    <Button>
+                    <V3Button>
                       <Plus className="w-4 h-4 mr-2" />
                       Add Manual
-                    </Button>
+                    </V3Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-2xl">
                     <DialogHeader>
@@ -558,10 +558,10 @@ const CampaignAttributionManager = () => {
                       </div>
 
                       <div className="flex gap-2 justify-end pt-4">
-                        <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                        <V3Button type="button" variant="secondary" onClick={() => setShowCreateDialog(false)}>
                           Cancel
-                        </Button>
-                        <Button type="submit">Create Attribution</Button>
+                        </V3Button>
+                        <V3Button type="submit">Create Attribution</V3Button>
                       </div>
                     </form>
                   </DialogContent>
@@ -628,13 +628,13 @@ const CampaignAttributionManager = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
+                          <V3Button
                             size="sm"
                             variant="ghost"
                             onClick={() => handleDeleteClick(attr.id)}
                           >
                             <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
+                          </V3Button>
                         </TableCell>
                       </TableRow>
                     ))
