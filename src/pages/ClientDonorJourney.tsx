@@ -532,10 +532,10 @@ const ClientDonorJourney = () => {
           {/* Conversion Funnel */}
           <V3ChartWrapper
             title="Conversion Funnel"
-            description="Donor progression through acquisition stages"
+            description="Donor journey stages based on verified events only"
             icon={Target}
             isLoading={isLoading}
-            ariaLabel="Funnel chart showing donor conversion stages"
+            ariaLabel="Funnel chart showing donor journey stages"
           >
             {funnel.length === 0 || funnel.every(f => f.count === 0) ? (
               <div className="h-[280px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
@@ -546,24 +546,32 @@ const ClientDonorJourney = () => {
                 </div>
               </div>
             ) : (
-              <V3StageChart
-                stages={funnel.map(stage => ({
-                  name: stage.label,
-                  value: stage.count,
-                  color: FUNNEL_STAGE_COLORS[stage.stage],
-                }))}
-                height={280}
-                showConversionRates
-                valueType="number"
-                showDropOffAnnotation
-              />
+              <>
+                <div className="mb-2 p-2 rounded bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))]">
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                    <strong>Note:</strong> Funnel stages are based on events linked to individual donors (SMS, email, refcode visits). 
+                    Meta ad impressions/clicks are excluded as they cannot be attributed to specific donors.
+                  </p>
+                </div>
+                <V3StageChart
+                  stages={funnel.map(stage => ({
+                    name: stage.label,
+                    value: stage.count,
+                    color: FUNNEL_STAGE_COLORS[stage.stage],
+                  }))}
+                  height={260}
+                  showConversionRates
+                  valueType="number"
+                  showDropOffAnnotation
+                />
+              </>
             )}
           </V3ChartWrapper>
 
           {/* Touchpoint Distribution */}
           <V3ChartWrapper
             title="Touchpoint Distribution"
-            description="Types of interactions before conversion"
+            description="Verified interactions linked to individual donors"
             icon={Layers}
             isLoading={isLoading}
             ariaLabel="Bar chart showing touchpoint types"
@@ -573,20 +581,28 @@ const ClientDonorJourney = () => {
                 <div className="text-center">
                   <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p>No touchpoint data available</p>
-                  <p className="text-sm">Run the pipeline to generate touchpoint data</p>
+                  <p className="text-sm">Touchpoints are created from ActBlue refcodes and SMS events</p>
                 </div>
               </div>
             ) : (
-              <V3BarChart
-                data={touchpointChartData}
-                nameKey="name"
-                valueKey="value"
-                valueName="Touchpoints"
-                height={280}
-                valueType="number"
-                horizontal
-                topN={8}
-              />
+              <>
+                <div className="mb-2 p-2 rounded bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))]">
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                    <strong>Note:</strong> Only shows touchpoints with donor identity. 
+                    Sourced from ActBlue refcodes and SMS events — not Meta ad data.
+                  </p>
+                </div>
+                <V3BarChart
+                  data={touchpointChartData}
+                  nameKey="name"
+                  valueKey="value"
+                  valueName="Touchpoints"
+                  height={260}
+                  valueType="number"
+                  horizontal
+                  topN={8}
+                />
+              </>
             )}
           </V3ChartWrapper>
         </div>

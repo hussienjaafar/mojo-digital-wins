@@ -330,16 +330,18 @@ async function fetchDonorJourneyData(
   );
 
   // Calculate funnel stages from REAL journey events data
-  // PHASE 4 FIX: Include ALL awareness/engagement event types for complete funnel
+  // IMPORTANT: Only include event types that can be deterministically linked to individual donors
+  // Meta ad events (meta_ad_click, meta_ad_impression) are EXCLUDED because:
+  // - Meta Marketing API only provides aggregated campaign metrics
+  // - We cannot attribute impressions/clicks to specific donors without pixel/CAPI integration
+  // - Including them would imply per-donor tracking that doesn't exist
   const awarenessEventTypes = [
-    'ad_view', 'ad_click', 'meta_ad_click', 'meta_ad_impression',
     'email_open', 'landing_page_view', 'sms_sent', 'sms_delivered',
-    'organic_search', 'social_click', 'direct_visit'
+    'organic_search', 'social_click', 'direct_visit', 'refcode_visit'
   ];
   
   const engagementEventTypes = [
-    'ad_click', 'meta_ad_click', 'sms_click', 'email_click',
-    'landing_page_view', 'sms_reply'
+    'sms_click', 'email_click', 'landing_page_view', 'sms_reply', 'refcode_click'
   ];
   
   const awarenessEvents = journeyEvents.filter((e: any) => 
