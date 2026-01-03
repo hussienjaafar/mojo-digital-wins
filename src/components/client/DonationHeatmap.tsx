@@ -1,12 +1,41 @@
-import { useMemo, useCallback } from "react";
+/**
+ * DonationHeatmap - Premium V3 Donation Activity Heatmap
+ * 
+ * Visualizes donation patterns by day-of-week × hour-of-day
+ * with interactive cell selection, peak time chips, and export.
+ */
+
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { CalendarHeatmap, type HeatmapDataPoint } from "@/components/charts/CalendarHeatmap";
-import { V3Card, V3CardHeader, V3CardTitle, V3CardContent, V3LoadingState, V3EmptyState, V3ErrorState } from "@/components/v3";
+import { 
+  V3TimeHeatmap, 
+  V3TimeHeatmapPeakChips, 
+  V3TimeHeatmapDetailsPanel 
+} from "@/components/charts/V3TimeHeatmap";
+import { 
+  V3Card, 
+  V3CardHeader, 
+  V3CardTitle, 
+  V3CardContent, 
+  V3LoadingState, 
+  V3EmptyState, 
+  V3ErrorState 
+} from "@/components/v3";
 import { Button } from "@/components/ui/button";
-import { Clock, Download } from "lucide-react";
+import { Clock, Download, X, Image } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/chart-formatters";
+import {
+  type HeatmapDataPoint,
+  type RankedCell,
+  normalizeHeatmapData,
+  getRankedCells,
+  exportHeatmapToCSV,
+  DAY_LABELS_FULL,
+  HOUR_LABELS_FULL,
+} from "@/lib/heatmap-utils";
 
 interface DonationHeatmapProps {
   organizationId: string;
@@ -25,11 +54,6 @@ const getBrowserTimezone = (): string => {
   }
 };
 
-const dayLabels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const hourLabels = Array.from({ length: 24 }, (_, i) =>
-  i === 0 ? "12:00 AM" : i < 12 ? `${i}:00 AM` : i === 12 ? "12:00 PM" : `${i - 12}:00 PM`
-);
-
 export const DonationHeatmap = ({
   organizationId,
   startDate,
@@ -38,8 +62,11 @@ export const DonationHeatmap = ({
 }: DonationHeatmapProps) => {
   const isMobile = useIsMobile();
   const { toast } = useToast();
+  
+  // Selected cell state
+  const [selectedCell, setSelectedCell] = useState<HeatmapDataPoint | null>(null);
 
-  // Use RPC function for server-side aggregation with timezone support
+  // Fetch heatmap data from RPC
   const { data: rpcData, isLoading, isError, error } = useQuery({
     queryKey: ["donations", "heatmap", organizationId, startDate, endDate, timezone],
     queryFn: async () => {
@@ -57,51 +84,50 @@ export const DonationHeatmap = ({
     staleTime: 5 * 60 * 1000,
   });
 
-  // Transform RPC response to full 7x24 grid for heatmap
+  // Process data into normalized grid
   const heatmapData = useMemo<HeatmapDataPoint[]>(() => {
-    // Initialize full grid with zeros
-    const grid: Record<string, number> = {};
-    for (let day = 0; day < 7; day++) {
-      for (let hour = 0; hour < 24; hour++) {
-        grid[`${day}-${hour}`] = 0;
-      }
-    }
-
-    // Fill in values from RPC response
-    rpcData?.forEach((row) => {
-      const key = `${row.day_of_week}-${row.hour}`;
-      grid[key] = Number(row.value) || 0;
-    });
-
-    return Object.entries(grid).map(([key, value]) => {
-      const [day, hour] = key.split("-").map(Number);
-      return { dayOfWeek: day, hour, value };
-    });
+    return normalizeHeatmapData(rpcData);
   }, [rpcData]);
 
-  // Export heatmap data to CSV
+  // Calculate stats
+  const stats = useMemo(() => {
+    const totalValue = heatmapData.reduce((sum, p) => sum + p.value, 0);
+    const peakCells = getRankedCells(heatmapData, 5);
+    return { totalValue, peakCells };
+  }, [heatmapData]);
+
+  // Handle cell selection
+  const handleCellSelect = useCallback((cell: HeatmapDataPoint | null) => {
+    setSelectedCell(cell);
+  }, []);
+
+  // Handle peak chip click
+  const handlePeakSelect = useCallback((peak: RankedCell) => {
+    const cell = heatmapData.find(
+      d => d.dayOfWeek === peak.dayOfWeek && d.hour === peak.hour
+    );
+    if (cell) {
+      // Toggle if same cell
+      if (selectedCell && selectedCell.dayOfWeek === peak.dayOfWeek && selectedCell.hour === peak.hour) {
+        setSelectedCell(null);
+      } else {
+        setSelectedCell(cell);
+      }
+    }
+  }, [heatmapData, selectedCell]);
+
+  // Clear selection
+  const handleClearSelection = useCallback(() => {
+    setSelectedCell(null);
+  }, []);
+
+  // Export to CSV
   const handleExportCSV = useCallback(() => {
-    // Build CSV content
-    const headers = ["Day", "Hour", "Net Revenue"];
-    const rows = heatmapData
-      .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.hour - b.hour)
-      .map((point) => [
-        dayLabels[point.dayOfWeek],
-        hourLabels[point.hour],
-        `$${point.value.toFixed(2)}`,
-      ]);
-
-    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `donation-heatmap-${startDate}-to-${endDate}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    exportHeatmapToCSV(heatmapData, {
+      metricLabel: 'Net Revenue',
+      filename: `donation-heatmap-${startDate}-to-${endDate}.csv`,
+      formatValue: (v) => `$${v.toFixed(2)}`,
+    });
 
     toast({
       title: "Export successful",
@@ -109,26 +135,12 @@ export const DonationHeatmap = ({
     });
   }, [heatmapData, startDate, endDate, toast]);
 
-  // Calculate peak times for summary
-  const peakTimes = useMemo(() => {
-    if (heatmapData.length === 0) return null;
-    
-    const sorted = [...heatmapData].sort((a, b) => b.value - a.value);
-    const top3 = sorted.slice(0, 3).filter((p) => p.value > 0);
-    
-    if (top3.length === 0) return null;
-    
-    return top3.map((p) => ({
-      day: dayLabels[p.dayOfWeek],
-      hour: hourLabels[p.hour],
-      value: p.value,
-    }));
-  }, [heatmapData]);
-
+  // Loading state
   if (isLoading) {
-    return <V3LoadingState variant="chart" height={280} />;
+    return <V3LoadingState variant="chart" height={340} />;
   }
 
+  // Error state
   if (isError) {
     return (
       <V3ErrorState
@@ -138,12 +150,13 @@ export const DonationHeatmap = ({
     );
   }
 
-  if (!rpcData || rpcData.length === 0) {
+  // Empty state
+  if (!rpcData || rpcData.length === 0 || stats.totalValue === 0) {
     return (
       <V3EmptyState
         icon={Clock}
         title="No donation activity"
-        description="No donations recorded in this date range."
+        description="Not enough donations to determine peak times. Check back when you have more data."
       />
     );
   }
@@ -154,58 +167,84 @@ export const DonationHeatmap = ({
         <div className="flex items-start justify-between gap-3">
           <div>
             <V3CardTitle className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
+              <Clock className="h-4 w-4" aria-hidden="true" />
               Donation Activity by Time
             </V3CardTitle>
             <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
               Discover peak donation times to optimize send schedules
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportCSV}
-            className="shrink-0"
-          >
-            <Download className="h-4 w-4 mr-1.5" />
-            Export
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+              className="shrink-0"
+            >
+              <Download className="h-4 w-4 mr-1.5" aria-hidden="true" />
+              Export
+            </Button>
+          </div>
         </div>
       </V3CardHeader>
-      <V3CardContent>
+      
+      <V3CardContent className="space-y-4">
+        {/* Main Heatmap */}
         <div
           role="figure"
           aria-label="Heatmap showing donation activity by day of week and hour"
           tabIndex={0}
           className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--portal-accent-blue)/0.35)] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))] rounded-lg"
         >
-          <CalendarHeatmap
+          <V3TimeHeatmap
             data={heatmapData}
-            height={isMobile ? 320 : 280}
-            valueLabel="Net Revenue"
+            metric="revenue"
             valueType="currency"
+            valueLabel="Net Revenue"
+            height={isMobile ? 340 : 300}
             colorScheme="blue"
             compact={isMobile}
+            selectedCell={selectedCell}
+            onCellSelect={handleCellSelect}
           />
         </div>
 
-        {/* Peak Times Summary */}
-        {peakTimes && peakTimes.length > 0 && (
-          <div className="mt-4 p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
-            <p className="text-xs font-medium text-[hsl(var(--portal-text-muted))] mb-2">
-              Top Performing Times
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {peakTimes.map((peak, idx) => (
-                <span
-                  key={`${peak.day}-${peak.hour}`}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] text-xs font-medium"
+        {/* Selection Details Panel */}
+        {selectedCell && (
+          <V3TimeHeatmapDetailsPanel
+            selectedCell={selectedCell}
+            totalValue={stats.totalValue}
+            peakCells={stats.peakCells}
+            onClear={handleClearSelection}
+            formatValue={(v) => formatCurrency(v)}
+            valueLabel="Net Revenue"
+          />
+        )}
+
+        {/* Peak Times Section */}
+        {stats.peakCells.length > 0 && (
+          <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-[hsl(var(--portal-text-muted))]">
+                Top Performing Times
+              </p>
+              {selectedCell && (
+                <button
+                  onClick={handleClearSelection}
+                  className="inline-flex items-center gap-1 text-xs text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-text-primary))] transition-colors"
                 >
-                  <span className="font-bold">#{idx + 1}</span>
-                  {peak.day} {peak.hour} — ${peak.value.toLocaleString()}
-                </span>
-              ))}
+                  <X className="h-3 w-3" aria-hidden="true" />
+                  Clear selection
+                </button>
+              )}
             </div>
+            <V3TimeHeatmapPeakChips
+              peakCells={stats.peakCells}
+              selectedCell={selectedCell}
+              onSelect={handlePeakSelect}
+              formatValue={(v) => formatCurrency(v)}
+              colorScheme="blue"
+            />
           </div>
         )}
       </V3CardContent>
