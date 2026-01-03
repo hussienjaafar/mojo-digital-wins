@@ -389,11 +389,14 @@ export function USChoroplethMap({
       {/* Tooltip */}
       {tooltipContent && (
         <div
-          className="fixed z-50 pointer-events-none bg-[hsl(var(--portal-card-bg))] border border-[hsl(var(--portal-border))] rounded-lg px-3 py-2 shadow-lg"
+          className="fixed z-50 pointer-events-none rounded-lg px-3.5 py-2.5 shadow-xl backdrop-blur-sm"
           style={{
             left: tooltipPos.x + 12,
             top: tooltipPos.y - 12,
             transform: "translateY(-100%)",
+            backgroundColor: "hsl(var(--portal-bg-secondary) / 0.98)",
+            border: "1px solid hsl(var(--portal-border) / 0.6)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05)",
           }}
         >
           {tooltipContent}
