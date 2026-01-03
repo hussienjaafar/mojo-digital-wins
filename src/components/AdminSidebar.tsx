@@ -602,15 +602,20 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         })}
 
         {/* Theme Toggle - Fixed at bottom */}
-        <div className="mt-auto pt-4 border-t border-[hsl(var(--portal-border))]">
+        <div className={cn(
+          "mt-auto border-t border-[hsl(var(--portal-border))]",
+          collapsed ? "pt-2 pb-2" : "pt-4"
+        )}>
           <div className={cn(
-            "py-3 flex items-center",
-            collapsed ? "justify-center px-1" : "justify-between px-4"
+            "flex items-center",
+            collapsed ? "justify-center py-1" : "justify-between px-4 py-3"
           )}>
             {isEffectivelyExpanded && (
               <span className="text-sm font-medium portal-text-secondary">Theme</span>
             )}
-            <ThemeToggle />
+            <div className={collapsed ? "scale-90" : ""}>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </SidebarContent>
