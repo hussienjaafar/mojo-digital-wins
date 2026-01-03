@@ -308,6 +308,25 @@ const ClientDemographics = () => {
     },
   ];
 
+  // Prepare map data for US heat map (must be before conditional returns)
+  const mapData: USMapDataItem[] = useMemo(() => {
+    if (!stats) return [];
+    return stats.locationData.map((item) => ({
+      name: item.state,
+      value: item.count,
+      revenue: item.revenue,
+    }));
+  }, [stats]);
+
+  // Get cities for selected state
+  const selectedStateCities = useMemo(() => {
+    if (!stats || !selectedState) return [];
+    return stats.cityData
+      .filter((city) => city.state === selectedState)
+      .slice(0, 15);
+  }, [selectedState, stats]);
+
+  // Loading state
   if (isLoading) {
     return (
       <ClientShell>
@@ -321,6 +340,7 @@ const ClientDemographics = () => {
     );
   }
 
+  // Empty state
   if (!organization || !stats) {
     return (
       <ClientShell>
@@ -332,23 +352,6 @@ const ClientDemographics = () => {
       </ClientShell>
     );
   }
-
-  // Prepare map data for US heat map
-  const mapData: USMapDataItem[] = useMemo(() => {
-    return stats.locationData.map((item) => ({
-      name: item.state,
-      value: item.count,
-      revenue: item.revenue,
-    }));
-  }, [stats.locationData]);
-
-  // Get cities for selected state
-  const selectedStateCities = useMemo(() => {
-    if (!selectedState) return [];
-    return stats.cityData
-      .filter((city) => city.state === selectedState)
-      .slice(0, 15);
-  }, [selectedState, stats.cityData]);
 
   // Handle state click on map
   const handleStateClick = (stateAbbr: string, stateName: string) => {
