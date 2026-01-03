@@ -36,15 +36,15 @@ export function QuickAccess({
   if (pinnedItems.length === 0) return null;
 
   return (
-    <SidebarGroup className="mb-4">
-      <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider portal-text-muted px-3 py-2 flex items-center gap-2">
-        <Star className="h-3 w-3 fill-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))]" />
-        <span className={`transition-all duration-200 ${isEffectivelyExpanded ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}>
-          Quick Access
-        </span>
-      </SidebarGroupLabel>
+    <SidebarGroup className={cn("mb-4", !isEffectivelyExpanded && "px-0")}>
+      {isEffectivelyExpanded && (
+        <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider portal-text-muted px-3 py-2 flex items-center gap-2">
+          <Star className="h-3 w-3 fill-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))]" />
+          <span>Quick Access</span>
+        </SidebarGroupLabel>
+      )}
       <SidebarGroupContent>
-        <SidebarMenu className="space-y-1">
+        <SidebarMenu className={cn("space-y-1", !isEffectivelyExpanded && "items-center")}>
           {pinnedItems.map((item) => (
             <SidebarMenuItem key={item.value}>
               <Tooltip>
@@ -58,10 +58,11 @@ export function QuickAccess({
                     }}
                     aria-current={activeTab === item.value ? 'page' : undefined}
                     className={cn(
-                      "relative w-full min-h-[44px] group transition-colors",
-                      collapsed ? 'justify-center px-2' : 'justify-start px-3',
-                      "gap-3 py-2.5 rounded-md",
+                      "relative w-full group transition-colors rounded-md",
                       "hover:bg-[hsl(var(--portal-bg-hover))]",
+                      collapsed 
+                        ? "justify-center !size-10 !p-0 mx-auto" 
+                        : "justify-start px-3 py-2.5 min-h-[44px] gap-3",
                       activeTab === item.value && [
                         "bg-[hsl(var(--portal-accent-blue)/0.1)]",
                         "text-[hsl(var(--portal-accent-blue))]",
