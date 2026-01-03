@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -262,14 +262,10 @@ const SyncScheduler = () => {
         iconColor="blue"
         onRefresh={loadData}
         actions={
-          <Button onClick={runAllJobs} disabled={isRunningAll}>
-            {isRunningAll ? (
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Zap className="w-4 h-4 mr-2" />
-            )}
-            {isRunningAll ? "Running..." : "Run All Now"}
-          </Button>
+          <V3Button onClick={runAllJobs} isLoading={isRunningAll} loadingText="Running...">
+            <Zap className="w-4 h-4" />
+            Run All Now
+          </V3Button>
         }
       />
 
@@ -347,19 +343,16 @@ const SyncScheduler = () => {
                     </div>
 
                     <div className="flex justify-end">
-                      <Button
+                      <V3Button
                         size="sm"
-                        variant="outline"
+                        variant="secondary"
                         onClick={() => runJobNow(job)}
-                        disabled={runningJobs.has(job.id)}
+                        isLoading={runningJobs.has(job.id)}
+                        loadingText="Running..."
                       >
-                        {runningJobs.has(job.id) ? (
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Play className="w-4 h-4 mr-2" />
-                        )}
-                        {runningJobs.has(job.id) ? 'Running...' : 'Run Now'}
-                      </Button>
+                        <Play className="w-4 h-4" />
+                        Run Now
+                      </V3Button>
                     </div>
                   </div>
                 ))}

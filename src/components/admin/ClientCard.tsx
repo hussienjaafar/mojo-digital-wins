@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { TrendingUp, TrendingDown, Minus, Users, AlertTriangle, ExternalLink, CheckCircle2, XCircle, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ClientSparkline } from "./ClientSparkline";
 import { useNavigate } from "react-router-dom";
@@ -198,15 +198,15 @@ export function ClientCard({ client }: ClientCardProps) {
             )}
           </div>
           
-          <Button
+          <V3Button
             variant="ghost"
             size="sm"
-            className="gap-1 flex-shrink-0 portal-btn-secondary"
+            className="flex-shrink-0"
             onClick={() => navigate(`/client/dashboard?org=${client.id}`)}
           >
             View
             <ExternalLink className="h-3 w-3" />
-          </Button>
+          </V3Button>
         </div>
       </div>
     </div>

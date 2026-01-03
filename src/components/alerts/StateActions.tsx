@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -220,18 +220,18 @@ export function StateActions() {
               reportType="state_actions"
               title="State Actions"
               trigger={
-                <Button variant="smooth">
-                  <Download className="w-4 h-4 mr-2" />
+                <V3Button variant="secondary">
+                  <Download className="w-4 h-4" />
                   Export
-                </Button>
+                </V3Button>
               }
             />
             <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
               <DialogTrigger asChild>
-                <Button variant="smooth">
-                  <Plus className="w-4 h-4 mr-2" />
+                <V3Button>
+                  <Plus className="w-4 h-4" />
                   Add Manual
-                </Button>
+                </V3Button>
               </DialogTrigger>
             </Dialog>
           </div>
@@ -344,9 +344,9 @@ export function StateActions() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={addManualAction} disabled={!newAction.title || !newAction.state_code}>
+            <V3Button onClick={addManualAction} disabled={!newAction.title || !newAction.state_code}>
               Add Action
-            </Button>
+            </V3Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { Bell, Clock, Building2, Lightbulb, X, Eye, GripVertical } from "lucide-react";
@@ -199,24 +199,23 @@ export function GlobalAlertsTimeline({ showDragHandle = false }: GlobalAlertsTim
                         </div>
                       </div>
                       <div className="flex flex-col gap-1 flex-shrink-0">
-                        <Button
+                        <V3Button
                           variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
+                          size="icon-sm"
                           onClick={() => navigate(`/admin/client/${alert.organization_id}`)}
                           title="View Dashboard"
                         >
                           <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
+                        </V3Button>
+                        <V3Button
                           variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 portal-text-secondary hover:text-[hsl(var(--portal-accent-red))]"
+                          size="icon-sm"
+                          className="portal-text-secondary hover:text-[hsl(var(--portal-accent-red))]"
                           onClick={() => handleDismiss(alert.id)}
                           title="Dismiss"
                         >
                           <X className="h-4 w-4" />
-                        </Button>
+                        </V3Button>
                       </div>
                     </div>
                   </div>

@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AdminPageHeader, AdminLoadingState } from "@/components/admin/v3";
 
@@ -134,9 +134,9 @@ export const AuditLogs = () => {
                       {(log.old_value || log.new_value) && (
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" size="sm">
+                            <V3Button variant="ghost" size="icon-sm">
                               <Eye className="h-4 w-4" />
-                            </Button>
+                            </V3Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-2xl">
                             <DialogHeader>

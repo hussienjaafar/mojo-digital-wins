@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Shield, RefreshCw, Search, ExternalLink, FileText, Calendar, Download } from "lucide-react";
@@ -151,16 +151,16 @@ export function ExecutiveOrders() {
               reportType="executive_orders"
               title="Executive Orders"
               trigger={
-                <Button variant="smooth">
-                  <Download className="w-4 h-4 mr-2" />
+                <V3Button variant="secondary">
+                  <Download className="w-4 h-4" />
                   Export
-                </Button>
+                </V3Button>
               }
             />
-            <Button onClick={syncOrders} disabled={syncing} variant="smooth">
-              <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            <V3Button onClick={syncOrders} isLoading={syncing} loadingText="Syncing...">
+              <RefreshCw className="w-4 h-4" />
               Sync Orders
-            </Button>
+            </V3Button>
           </div>
         }
       />
@@ -195,9 +195,9 @@ export function ExecutiveOrders() {
         <div className="text-center py-12">
           <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-muted-foreground">No executive orders found</p>
-          <Button onClick={syncOrders} className="mt-4" variant="smooth">
+          <V3Button onClick={syncOrders} className="mt-4">
             Sync from Federal Register
-          </Button>
+          </V3Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
