@@ -134,10 +134,12 @@ verify_jwt = false
 [functions.calculate-donor-ltv]
 verify_jwt = false
 
+# SIMPLIFIED: calculate-attribution now only uses refcode_mappings (no touchpoints)
 [functions.calculate-attribution]
 verify_jwt = false
 
-[functions.backfill-attribution]
+# DISABLED: probabilistic-attribution is disabled - returns error explaining why
+[functions.probabilistic-attribution]
 verify_jwt = false
 
 # --- CLIENT-AUTHENTICATED FUNCTIONS (require user JWT + org membership) ---
@@ -165,6 +167,7 @@ verify_jwt = false
 [functions.sync-actblue-csv]
 verify_jwt = false
 
+# HARDENED: auto-match-attribution now correctly sets is_deterministic and attribution_type
 [functions.auto-match-attribution]
 verify_jwt = true
 
@@ -257,9 +260,6 @@ verify_jwt = false
 [functions.analyze-sms-replies]
 verify_jwt = false
 
-[functions.populate-attribution]
-verify_jwt = false
-
 [functions.refcode-reconcile]
 verify_jwt = false
 
@@ -268,3 +268,7 @@ verify_jwt = false
 
 [functions.validate-attribution]
 verify_jwt = false
+
+# DELETED FUNCTIONS (removed as part of attribution hardening):
+# - populate-attribution: Dead code (click_id/fbclid tables don't exist)
+# - backfill-attribution: Circular dependency, reads/writes same table

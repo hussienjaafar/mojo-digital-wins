@@ -825,6 +825,77 @@ export type Database = {
         }
         Relationships: []
       }
+      attribution_matcher_runs: {
+        Row: {
+          created_at: string | null
+          dry_run: boolean | null
+          errors: Json | null
+          finished_at: string | null
+          id: string
+          matched_revenue: number | null
+          matches_deterministic: number | null
+          matches_heuristic_fuzzy: number | null
+          matches_heuristic_partial: number | null
+          matches_heuristic_pattern: number | null
+          metadata: Json | null
+          organization_id: string | null
+          skipped_deterministic_protected: number | null
+          skipped_existing: number | null
+          started_at: string
+          total_matches: number | null
+          unmatched_count: number | null
+          unmatched_revenue: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          dry_run?: boolean | null
+          errors?: Json | null
+          finished_at?: string | null
+          id?: string
+          matched_revenue?: number | null
+          matches_deterministic?: number | null
+          matches_heuristic_fuzzy?: number | null
+          matches_heuristic_partial?: number | null
+          matches_heuristic_pattern?: number | null
+          metadata?: Json | null
+          organization_id?: string | null
+          skipped_deterministic_protected?: number | null
+          skipped_existing?: number | null
+          started_at?: string
+          total_matches?: number | null
+          unmatched_count?: number | null
+          unmatched_revenue?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          dry_run?: boolean | null
+          errors?: Json | null
+          finished_at?: string | null
+          id?: string
+          matched_revenue?: number | null
+          matches_deterministic?: number | null
+          matches_heuristic_fuzzy?: number | null
+          matches_heuristic_partial?: number | null
+          matches_heuristic_pattern?: number | null
+          metadata?: Json | null
+          organization_id?: string | null
+          skipped_deterministic_protected?: number | null
+          skipped_existing?: number | null
+          started_at?: string
+          total_matches?: number | null
+          unmatched_count?: number | null
+          unmatched_revenue?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attribution_matcher_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attribution_model_log: {
         Row: {
           attribution_method: string | null

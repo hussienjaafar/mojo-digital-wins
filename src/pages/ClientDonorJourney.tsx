@@ -13,6 +13,10 @@ import {
   CheckCircle,
   AlertCircle,
   ArrowRight,
+  Link,
+  Search,
+  Shuffle,
+  Target,
 } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import { toast } from "sonner";
@@ -23,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   V3PageContainer,
   V3KPICard,
@@ -54,6 +59,8 @@ interface Attribution {
   switchboard_campaign_id: string | null;
   match_confidence: number | null;
   is_auto_matched: boolean | null;
+  is_deterministic: boolean | null;
+  attribution_type: string | null;
   match_reason: string | null;
   attributed_revenue: number | null;
   attributed_transactions: number | null;
@@ -65,9 +72,110 @@ interface SuggestedMatch {
   revenue: number;
   transactions: number;
   suggested_campaign: string;
-  confidence: number;
+  match_type: 'pattern' | 'fuzzy';
   reason: string;
 }
+
+// ============================================================================
+// Match Type Badge Component (replaces confidence %)
+// ============================================================================
+
+const MatchTypeBadge = ({ attribution }: { attribution: Attribution }) => {
+  const type = attribution.attribution_type;
+  const isDeterministic = attribution.is_deterministic;
+  
+  // Deterministic matches get green badge
+  if (isDeterministic || type === 'deterministic_url_refcode' || type === 'deterministic_mapping') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <Badge className="bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1">
+              <Link className="h-3 w-3" />
+              Exact URL Match
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p className="font-semibold">Deterministic Attribution</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Refcode was found in Meta creative destination URL. This is a verified, traceable link.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  
+  if (type === 'heuristic_partial_url') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 flex items-center gap-1">
+              <Search className="h-3 w-3" />
+              Partial Match
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p className="font-semibold">Heuristic - Partial URL Match</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Refcode partially matches a URL parameter. May be a variant or related campaign.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  
+  if (type === 'heuristic_pattern') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 flex items-center gap-1">
+              <Target className="h-3 w-3" />
+              Pattern Inferred
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p className="font-semibold">Heuristic - Pattern Match</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Matched based on naming patterns (e.g., "meta_" prefix). Review for accuracy.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  
+  if (type === 'heuristic_fuzzy') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 flex items-center gap-1">
+              <Shuffle className="h-3 w-3" />
+              Directional
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p className="font-semibold">Directional Only</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Fuzzy name similarity. Use for directional insights only, not precise measurement.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  
+  // Legacy or unknown types
+  if (attribution.match_confidence && attribution.match_confidence >= 0.8) {
+    return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Matched</Badge>;
+  }
+  
+  return <Badge variant="outline">Unknown</Badge>;
+};
 
 // ============================================================================
 // Helper Functions
@@ -96,15 +204,12 @@ const inferCampaign = (refcode: string): string => {
   return "Unknown Source";
 };
 
-const calculateConfidence = (refcode: string): number => {
+const getMatchTypeFromPattern = (refcode: string): 'pattern' | 'fuzzy' => {
   const code = refcode.toLowerCase();
   if (code.includes("meta_") || code.includes("fb_") || code.includes("sms_")) {
-    return 85;
+    return 'pattern';
   }
-  if (code.includes("utm") || code.includes("campaign")) {
-    return 70;
-  }
-  return 50;
+  return 'fuzzy';
 };
 
 const generateReason = (refcode: string): string => {
@@ -118,12 +223,23 @@ const generateReason = (refcode: string): string => {
   return "Pattern-based suggestion";
 };
 
-const getMatchTypeBadge = (confidence: number | null, isAutoMatched: boolean | null) => {
-  if (!confidence) return <Badge variant="outline">Unmatched</Badge>;
-  if (confidence >= 80) return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Refcode Match</Badge>;
-  if (confidence >= 60) return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Pattern Match</Badge>;
-  if (isAutoMatched) return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Timing Correlation</Badge>;
-  return <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">Directional</Badge>;
+// ============================================================================
+// Suggestion Match Type Badge
+// ============================================================================
+
+const SuggestionBadge = ({ matchType }: { matchType: 'pattern' | 'fuzzy' }) => {
+  if (matchType === 'pattern') {
+    return (
+      <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">
+        Pattern Inferred
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">
+      Directional
+    </Badge>
+  );
 };
 
 // ============================================================================
@@ -151,6 +267,8 @@ const ClientDonorJourney = () => {
     matchedRevenue: 0,
     unmatchedRevenue: 0,
     matchRate: 0,
+    deterministicCount: 0,
+    heuristicCount: 0,
   });
 
   // Load attribution data when organization is available
@@ -165,7 +283,7 @@ const ClientDonorJourney = () => {
     setIsLoadingAttribution(true);
 
     try {
-      // Load existing attributions
+      // Load existing attributions with new fields
       const { data: attrData, error: attrError } = await supabase
         .from("campaign_attribution")
         .select("*")
@@ -174,6 +292,10 @@ const ClientDonorJourney = () => {
 
       if (attrError) throw attrError;
       setAttributions(attrData || []);
+
+      // Count deterministic vs heuristic
+      const deterministicCount = (attrData || []).filter(a => a.is_deterministic === true).length;
+      const heuristicCount = (attrData || []).filter(a => a.is_deterministic === false).length;
 
       // Calculate stats from ActBlue transactions
       const { data: txData } = await supabase
@@ -193,6 +315,8 @@ const ClientDonorJourney = () => {
           matchedRevenue,
           unmatchedRevenue: totalRevenue - matchedRevenue,
           matchRate: totalRevenue > 0 ? (matchedRevenue / totalRevenue) * 100 : 0,
+          deterministicCount,
+          heuristicCount,
         });
       }
 
@@ -245,7 +369,7 @@ const ClientDonorJourney = () => {
           revenue: stats.revenue,
           transactions: stats.transactions,
           suggested_campaign: inferCampaign(code),
-          confidence: calculateConfidence(code),
+          match_type: getMatchTypeFromPattern(code),
           reason: generateReason(code),
         }))
         .sort((a, b) => b.revenue - a.revenue)
@@ -261,12 +385,18 @@ const ClientDonorJourney = () => {
     setIsRunningMatcher(true);
     try {
       const { data, error } = await supabase.functions.invoke("auto-match-attribution", {
-        body: { organizationId },
+        body: { organizationId, dryRun: false },
       });
 
       if (error) throw error;
 
-      toast.success(`Found ${data?.matchesCreated || 0} new matches`);
+      const summary = data?.summary || {};
+      const deterministicCount = summary.matchBreakdown?.deterministic_url_exact || 0;
+      const heuristicCount = (summary.totalMatched || 0) - deterministicCount;
+      
+      toast.success(
+        `Created ${summary.totalMatched || 0} matches (${deterministicCount} deterministic, ${heuristicCount} heuristic)`
+      );
       await loadAttributions();
     } catch (error) {
       console.error("Error running auto-matcher:", error);
@@ -386,7 +516,7 @@ const ClientDonorJourney = () => {
             icon={CheckCircle}
             label="Match Rate"
             value={`${attributionStats.matchRate.toFixed(1)}%`}
-            subtitle="Revenue with campaign link"
+            subtitle={`${attributionStats.deterministicCount} verified links`}
             accent={attributionStats.matchRate >= 50 ? "green" : "amber"}
           />
           <V3KPICard
@@ -492,11 +622,11 @@ const ClientDonorJourney = () => {
                   </V3Button>
                 </V3CardTitle>
                 <p className="text-sm text-[hsl(var(--portal-text-muted))]">
-                  Automatically match refcodes to campaigns based on patterns and timing
+                  Match refcodes to Meta campaigns by analyzing ad destination URLs
                 </p>
               </V3CardHeader>
               <V3CardContent>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-bg-subtle))]">
                     <p className="text-2xl font-bold text-green-500">{formatCurrency(attributionStats.matchedRevenue)}</p>
                     <p className="text-sm text-[hsl(var(--portal-text-muted))]">Attributed Revenue</p>
@@ -506,8 +636,12 @@ const ClientDonorJourney = () => {
                     <p className="text-sm text-[hsl(var(--portal-text-muted))]">Unattributed Revenue</p>
                   </div>
                   <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-bg-subtle))]">
-                    <p className="text-2xl font-bold text-blue-500">{attributionStats.matchRate.toFixed(1)}%</p>
-                    <p className="text-sm text-[hsl(var(--portal-text-muted))]">Match Rate</p>
+                    <p className="text-2xl font-bold text-green-400">{attributionStats.deterministicCount}</p>
+                    <p className="text-sm text-[hsl(var(--portal-text-muted))]">Verified Links</p>
+                  </div>
+                  <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-bg-subtle))]">
+                    <p className="text-2xl font-bold text-orange-400">{attributionStats.heuristicCount}</p>
+                    <p className="text-sm text-[hsl(var(--portal-text-muted))]">Inferred Matches</p>
                   </div>
                 </div>
               </V3CardContent>
@@ -526,7 +660,9 @@ const ClientDonorJourney = () => {
                 <V3Card>
                   <V3CardHeader>
                     <V3CardTitle>Campaign Attribution Mappings</V3CardTitle>
-                    <p className="text-sm text-[hsl(var(--portal-text-muted))]">Active mappings connecting refcodes to campaigns</p>
+                    <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+                      Active mappings connecting refcodes to campaigns
+                    </p>
                   </V3CardHeader>
                   <V3CardContent>
                     {isLoadingAttribution ? (
@@ -547,7 +683,7 @@ const ClientDonorJourney = () => {
                           <TableRow>
                             <TableHead>Refcode</TableHead>
                             <TableHead>Source</TableHead>
-                            <TableHead>Confidence</TableHead>
+                            <TableHead>Match Type</TableHead>
                             <TableHead className="text-right">Revenue</TableHead>
                             <TableHead className="text-right">Transactions</TableHead>
                           </TableRow>
@@ -568,7 +704,9 @@ const ClientDonorJourney = () => {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell>{getMatchTypeBadge(attr.match_confidence, attr.is_auto_matched)}</TableCell>
+                              <TableCell>
+                                <MatchTypeBadge attribution={attr} />
+                              </TableCell>
                               <TableCell className="text-right font-medium">
                                 {formatCurrency(attr.attributed_revenue || 0)}
                               </TableCell>
@@ -588,7 +726,9 @@ const ClientDonorJourney = () => {
                 <V3Card>
                   <V3CardHeader>
                     <V3CardTitle>Suggested Matches</V3CardTitle>
-                    <p className="text-sm text-[hsl(var(--portal-text-muted))]">Unmatched refcodes that could be attributed to campaigns</p>
+                    <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+                      Unmatched refcodes that could be attributed to campaigns (requires verification)
+                    </p>
                   </V3CardHeader>
                   <V3CardContent>
                     {isLoadingAttribution ? (
@@ -609,7 +749,7 @@ const ClientDonorJourney = () => {
                           <TableRow>
                             <TableHead>Refcode</TableHead>
                             <TableHead>Suggested Campaign</TableHead>
-                            <TableHead>Confidence</TableHead>
+                            <TableHead>Match Type</TableHead>
                             <TableHead className="text-right">Revenue</TableHead>
                             <TableHead className="text-right">Transactions</TableHead>
                           </TableRow>
@@ -629,7 +769,9 @@ const ClientDonorJourney = () => {
                                   {match.reason}
                                 </p>
                               </TableCell>
-                              <TableCell>{getMatchTypeBadge(match.confidence, true)}</TableCell>
+                              <TableCell>
+                                <SuggestionBadge matchType={match.match_type} />
+                              </TableCell>
                               <TableCell className="text-right font-medium text-green-500">
                                 {formatCurrency(match.revenue)}
                               </TableCell>
