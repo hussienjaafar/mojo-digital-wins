@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { RefreshCw, CheckCircle2, AlertCircle, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { AdminCard } from "./v3";
 
 export function DataBackfillPanel() {
   const [isBackfilling, setIsBackfilling] = useState(false);
@@ -46,17 +46,13 @@ export function DataBackfillPanel() {
   };
 
   return (
-    <Card className="hover-scale transition-all duration-300">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 portal-text-primary">
-          <Database className="h-5 w-5" />
-          Data Quality Backfill
-        </CardTitle>
-        <CardDescription className="portal-text-secondary">
-          Reanalyze existing articles to populate demographic and policy category filters
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <AdminCard
+      title="Data Quality Backfill"
+      description="Reanalyze existing articles to populate demographic and policy category filters"
+      icon={Database}
+      interactive
+    >
+      <div className="space-y-4">
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -122,7 +118,7 @@ export function DataBackfillPanel() {
             <li>Updates will appear in News Feed as analysis completes</li>
           </ul>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </AdminCard>
   );
 }

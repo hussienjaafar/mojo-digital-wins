@@ -4,9 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle, XCircle, AlertCircle, RefreshCw, Eye, Calendar, Activity, Database, Clock } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, RefreshCw, Eye, Calendar, Activity, Database, Clock, HeartPulse } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { AdminPageHeader, AdminLoadingState } from "./v3";
 
 interface DataFreshness {
   source: string;
@@ -209,37 +210,27 @@ export default function ClientHealthOverview() {
 
   if (loading) {
     return (
-      <div className="space-y-6 portal-animate-fade-in">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950">
-            <Activity className="h-6 w-6 text-green-600 dark:text-green-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Client Health</h2>
-            <p className="text-sm portal-text-secondary">Loading health metrics...</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
-              <div className="portal-skeleton h-6 w-32" />
-              <div className="portal-skeleton h-10 w-20" />
-              <div className="portal-skeleton h-4 w-full" />
-            </div>
-          ))}
-        </div>
+      <div className="space-y-6">
+        <AdminPageHeader
+          title="Client Health Overview"
+          description="Loading health metrics..."
+          icon={HeartPulse}
+          iconColor="green"
+        />
+        <AdminLoadingState variant="card" count={6} />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Client Health Overview</h2>
-        <p className="text-sm text-muted-foreground">
-          Monitor client activity, data sync status, and API integrations
-        </p>
-      </div>
+      <AdminPageHeader
+        title="Client Health Overview"
+        description="Monitor client activity, data sync status, and API integrations"
+        icon={HeartPulse}
+        iconColor="green"
+        onRefresh={fetchClientHealth}
+      />
 
       <div className="grid gap-4">
         {clients.map((client) => {

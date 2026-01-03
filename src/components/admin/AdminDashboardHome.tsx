@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, parseISO, differenceInDays } from "date-fns";
-import { Building2, DollarSign, AlertTriangle, RefreshCw, Users, LayoutDashboard } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Building2, DollarSign, AlertTriangle, Users, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 import { TrendingTopicsWidget } from "./TrendingTopicsWidget";
 import { HighImpactNewsWidget } from "./HighImpactNewsWidget";
@@ -12,7 +10,7 @@ import { GlobalCreativeInsightsWidget } from "./GlobalCreativeInsightsWidget";
 import { AlertsBannerWidget } from "./AlertsBannerWidget";
 import { ClientsOverviewWidget } from "./ClientsOverviewWidget";
 import { CustomizableDashboard, WidgetConfig } from "@/components/dashboard/CustomizableDashboard";
-import { PortalSectionHeader } from "@/components/portal/PortalSectionHeader";
+import { AdminPageHeader, AdminStatsGrid, AdminStatItem, AdminLoadingState } from "./v3";
 
 interface SummaryStats {
   activeClients: number;
@@ -103,6 +101,38 @@ export function AdminDashboardHome() {
     }).format(value);
   };
 
+  // Stats items for the grid
+  const statsItems: AdminStatItem[] = useMemo(() => [
+    {
+      id: "active-clients",
+      label: "Active Clients",
+      value: summary.activeClients,
+      icon: Building2,
+      accent: "blue",
+    },
+    {
+      id: "total-revenue",
+      label: "Total Revenue (7d)",
+      value: formatCurrency(summary.totalRevenue),
+      icon: DollarSign,
+      accent: "green",
+    },
+    {
+      id: "needs-attention",
+      label: "Needs Attention",
+      value: summary.needsAttention,
+      icon: Users,
+      accent: summary.needsAttention > 0 ? "amber" : "default",
+    },
+    {
+      id: "critical-alerts",
+      label: "Critical Alerts",
+      value: summary.criticalAlerts,
+      icon: AlertTriangle,
+      accent: summary.criticalAlerts > 0 ? "red" : "default",
+    },
+  ], [summary]);
+
   // Widget configurations for customizable dashboard
   const dashboardWidgets: WidgetConfig[] = useMemo(() => [
     {
@@ -144,87 +174,23 @@ export function AdminDashboardHome() {
   ], []);
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-64" />
-          ))}
-        </div>
-      </div>
-    );
+    return <AdminLoadingState variant="page" count={3} />;
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <PortalSectionHeader
+    <div className="space-y-6 portal-animate-fade-in">
+      {/* Header with V3 Styling */}
+      <AdminPageHeader
         title="Client Monitoring Center"
-        subtitle="Monitor performance and health across all organizations"
+        description="Monitor performance and health across all organizations"
         icon={LayoutDashboard}
         iconColor="blue"
-      >
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2 portal-btn-secondary">
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-      </PortalSectionHeader>
+        onRefresh={handleRefresh}
+        isRefreshing={refreshing}
+      />
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="portal-metric">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
-              <Building2 className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
-            </div>
-            <div>
-              <p className="text-sm portal-text-secondary">Active Clients</p>
-              <p className="text-2xl font-bold portal-text-primary">{summary.activeClients}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="portal-metric">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-green)/0.1)]">
-              <DollarSign className="h-5 w-5 text-[hsl(var(--portal-accent-green))]" />
-            </div>
-            <div>
-              <p className="text-sm portal-text-secondary">Total Revenue (7d)</p>
-              <p className="text-2xl font-bold portal-text-primary">{formatCurrency(summary.totalRevenue)}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="portal-metric">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-orange)/0.1)]">
-              <Users className="h-5 w-5 text-[hsl(var(--portal-accent-orange))]" />
-            </div>
-            <div>
-              <p className="text-sm portal-text-secondary">Needs Attention</p>
-              <p className="text-2xl font-bold portal-text-primary">{summary.needsAttention}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="portal-metric">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-red)/0.1)]">
-              <AlertTriangle className="h-5 w-5 text-[hsl(var(--portal-accent-red))]" />
-            </div>
-            <div>
-              <p className="text-sm portal-text-secondary">Critical Alerts</p>
-              <p className="text-2xl font-bold portal-text-primary">{summary.criticalAlerts}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Summary Stats with V3 KPI Cards */}
+      <AdminStatsGrid items={statsItems} isLoading={refreshing} columns={4} />
 
       {/* Customizable Dashboard with All Widgets */}
       <CustomizableDashboard
