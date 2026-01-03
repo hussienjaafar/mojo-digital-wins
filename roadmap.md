@@ -51,6 +51,31 @@ This living doc tracks the phased plan to get optimal use of ActBlue, Meta, and 
 ### Why This Matters
 Previously, the system was creating "fake" per-donor touchpoints from aggregated Meta data, which made it appear we had per-donor attribution when we didn't. This has been removed to prevent misleading users.
 
+## Regression Protection (Added 2026-01-03)
+
+### Backend Guardrails
+1. **sync-meta-ads**: Header comment explicitly prohibits creating attribution_touchpoints. Code logs "[DEPRECATED]" when skipping fake touchpoint creation.
+2. **probabilistic-attribution**: Header comment documents scope constraints. Code checks `is_deterministic=true` before processing and never overwrites deterministic records.
+3. **campaign_attribution table**: `is_deterministic` flag distinguishes hard matches from probabilistic guesses.
+
+### UI Safeguards
+1. **AttributionChart**: Shows warning banner about refcode-only attribution.
+2. **ClientAttribution**: Uses "Match Type" labels instead of misleading "Confidence %" badges.
+3. **ClientDonorJourney**: Page description updated to "Refcode-based attribution".
+4. **DonorIntelligence**: Tooltip explains Meta aggregated data limitation.
+
+### Audit Verification (run periodically)
+```sql
+-- Check for any fake Meta touchpoints (should return 0)
+SELECT COUNT(*) FROM attribution_touchpoints 
+WHERE touchpoint_type LIKE 'meta_ad%' AND donor_email IS NULL;
+
+-- Verify deterministic/probabilistic split
+SELECT is_deterministic, attribution_type, COUNT(*) 
+FROM campaign_attribution 
+GROUP BY is_deterministic, attribution_type;
+```
+
 ## Next Actions
 - Wire scheduled jobs for refcode/click_id reconciliation and LTV refresh.
 - Run identity linking job to populate `donor_identity_links` from ActBlue phone numbers.

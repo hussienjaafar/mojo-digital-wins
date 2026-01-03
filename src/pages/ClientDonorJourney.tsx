@@ -59,7 +59,8 @@ import { V3StageChart, V3BarChart } from "@/components/charts";
 
 const getTouchpointIcon = (type: string): LucideIcon => {
   switch (type) {
-    case "meta_ad_click":
+    // Note: meta_ad_click is legacy - no new records should have this type
+    // All touchpoints now come from refcode-based ActBlue data or SMS events
     case "ad_click":
       return MousePointerClick;
     case "sms_send":
@@ -75,7 +76,7 @@ const getTouchpointIcon = (type: string): LucideIcon => {
 
 const getTouchpointColor = (type: string): string => {
   switch (type) {
-    case "meta_ad_click":
+    // Legacy: meta_ad_click should no longer appear in new data
     case "ad_click":
       return "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] border-[hsl(var(--portal-accent-blue)/0.2)]";
     case "sms_send":
@@ -451,7 +452,7 @@ const ClientDonorJourney = () => {
       <V3PageContainer
         icon={GitBranch}
         title="Donor Journey"
-        description="Multi-touch attribution and conversion funnel analytics"
+        description="Refcode-based attribution and conversion funnel analytics"
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <V3Button

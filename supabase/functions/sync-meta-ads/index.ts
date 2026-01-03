@@ -1,3 +1,33 @@
+/**
+ * ================================================================================
+ * SYNC META ADS - AGGREGATED DATA ONLY
+ * ================================================================================
+ * 
+ * CRITICAL ARCHITECTURAL CONSTRAINT:
+ * The Meta Marketing API ONLY provides aggregated campaign metrics (total clicks,
+ * impressions, spend). It does NOT provide per-user data.
+ * 
+ * Therefore, this function MUST NEVER create records in `attribution_touchpoints`
+ * because we cannot trace Meta interactions back to individual donors.
+ * 
+ * What this function DOES:
+ * - Stores aggregated metrics in meta_campaign_insights, meta_ad_metrics
+ * - Extracts refcodes from creative destination URLs for mapping
+ * - Stores creative content for analysis
+ * 
+ * What this function MUST NEVER DO:
+ * - Create meta_ad_click or meta_ad_impression touchpoints
+ * - Insert into attribution_touchpoints without a verified donor_email
+ * - Imply per-donor Meta attribution is possible
+ * 
+ * Real per-donor attribution can ONLY come from:
+ * - ActBlue webhooks (refcode, click_id, fbclid embedded in donation URL)
+ * - SMS events with phone_hash identity resolution
+ * 
+ * See: Attribution System Audit (2026-01-03) for full rationale.
+ * ================================================================================
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 

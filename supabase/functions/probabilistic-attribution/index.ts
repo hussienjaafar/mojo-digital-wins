@@ -1,3 +1,31 @@
+/**
+ * ================================================================================
+ * PROBABILISTIC ATTRIBUTION - SCOPED TO NON-DETERMINISTIC ONLY
+ * ================================================================================
+ * 
+ * CRITICAL ARCHITECTURAL CONSTRAINTS:
+ * 
+ * 1. This function ONLY runs on transactions that lack deterministic attribution:
+ *    - No refcode, click_id, or fbclid in the ActBlue transaction
+ *    - No existing is_deterministic=true record in campaign_attribution
+ * 
+ * 2. This function MUST NEVER:
+ *    - Overwrite deterministic attribution
+ *    - Create touchpoints for Meta (we don't have per-donor Meta data)
+ *    - Assign high confidence scores without statistical validation
+ * 
+ * 3. All records created by this function are marked:
+ *    - is_deterministic: false
+ *    - attribution_type: 'probabilistic_touchpoint' or 'probabilistic_timing'
+ * 
+ * The match_confidence scores here represent heuristic estimates, NOT
+ * statistically validated probabilities. They should be interpreted as
+ * "directional indicators" not precise measurements.
+ * 
+ * See: Attribution System Audit (2026-01-03) for full rationale.
+ * ================================================================================
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 

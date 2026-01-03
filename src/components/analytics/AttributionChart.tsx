@@ -26,11 +26,11 @@ type Props = {
 };
 
 const MODEL_DESCRIPTIONS: Record<AttributionModel, string> = {
-  firstTouch: 'All credit to first interaction',
-  lastTouch: 'All credit to final interaction',
-  linear: 'Equal credit across all touchpoints',
-  positionBased: '40% first, 40% last, 20% middle',
-  timeDecay: 'More credit to recent touchpoints',
+  firstTouch: 'All credit to first refcode interaction',
+  lastTouch: 'All credit to final refcode interaction',
+  linear: 'Equal credit across all refcode touchpoints',
+  positionBased: '40% first refcode, 40% last refcode, 20% middle',
+  timeDecay: 'More credit to recent refcode touchpoints',
 };
 
 export const AttributionChart = memo(({
@@ -58,6 +58,11 @@ export const AttributionChart = memo(({
         <p className="text-xs sm:text-sm text-[hsl(var(--portal-text-muted))]">
           {MODEL_DESCRIPTIONS[model]}
         </p>
+        <div className="p-2 rounded bg-[hsl(var(--portal-warning)/0.1)] border border-[hsl(var(--portal-warning)/0.2)]">
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+            <strong>Note:</strong> Attribution models only apply to donors with traceable refcodes. Meta ad impressions/clicks cannot be attributed to individuals.
+          </p>
+        </div>
         <EChartsBarChart
           data={chartData}
           series={[{ dataKey: 'value', name: 'Conversions', color: 'hsl(var(--chart-1))' }]}
