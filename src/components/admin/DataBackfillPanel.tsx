@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,34 +79,34 @@ export function DataBackfillPanel() {
         )}
 
         <div className="grid gap-2">
-          <Button
+          <V3Button
             onClick={() => startBackfill(7)}
-            disabled={isBackfilling}
+            isLoading={isBackfilling}
             className="w-full"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isBackfilling ? 'animate-spin' : ''}`} />
+            <RefreshCw className="h-4 w-4" />
             Backfill Last 7 Days (Recommended)
-          </Button>
+          </V3Button>
           
-          <Button
+          <V3Button
             onClick={() => startBackfill(30)}
             disabled={isBackfilling}
             variant="outline"
             className="w-full"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isBackfilling ? 'animate-spin' : ''}`} />
+            <RefreshCw className="h-4 w-4" />
             Backfill Last 30 Days (Slow)
-          </Button>
+          </V3Button>
 
-          <Button
+          <V3Button
             onClick={() => startBackfill(1)}
             disabled={isBackfilling}
             variant="outline"
             className="w-full"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isBackfilling ? 'animate-spin' : ''}`} />
+            <RefreshCw className="h-4 w-4" />
             Backfill Last 24 Hours (Test)
-          </Button>
+          </V3Button>
         </div>
 
         <div className="text-xs text-muted-foreground space-y-1">

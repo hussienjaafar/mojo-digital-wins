@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -270,21 +270,21 @@ export default function OpsPanel() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Button onClick={loadData} variant="secondary" disabled={loading || running} className="gap-2">
+        <V3Button onClick={loadData} variant="secondary" disabled={loading || running}>
           <RefreshCw className="h-4 w-4" /> Refresh
-        </Button>
-        <Button onClick={runDiagnostics} variant="default" disabled={running} className="gap-2">
+        </V3Button>
+        <V3Button onClick={runDiagnostics} variant="primary" disabled={running}>
           <Terminal className="h-4 w-4" /> Run Diagnostics
-        </Button>
-        <Button onClick={triggerAnalyzeArticles} variant="outline" disabled={running} className="gap-2">
+        </V3Button>
+        <V3Button onClick={triggerAnalyzeArticles} variant="outline" disabled={running}>
           <Play className="h-4 w-4" /> Kick Analyze Articles
-        </Button>
-        <Button onClick={triggerBlueskyTrends} variant="outline" disabled={running} className="gap-2">
+        </V3Button>
+        <V3Button onClick={triggerBlueskyTrends} variant="outline" disabled={running}>
           <TrendingUp className="h-4 w-4" /> Run Bluesky Trends
-        </Button>
-        <Button onClick={triggerCorrelate} variant="outline" disabled={running} className="gap-2">
+        </V3Button>
+        <V3Button onClick={triggerCorrelate} variant="outline" disabled={running}>
           <Sparkles className="h-4 w-4" /> Correlate Social ↔ News
-        </Button>
+        </V3Button>
       </div>
 
       <Card className="hover-scale transition-all duration-300">

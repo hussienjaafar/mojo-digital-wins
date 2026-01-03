@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -375,17 +375,17 @@ const ClientOrganizationManager = () => {
             
             <div className="flex items-center justify-between pt-3 mt-3 border-t">
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1">
+                <V3Button variant="ghost" size="sm">
                   {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   <Eye className="w-4 h-4" />
                   Quick Stats
-                </Button>
+                </V3Button>
               </CollapsibleTrigger>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm">
+                  <V3Button variant="ghost" size="icon-sm">
                     <MoreVertical className="h-4 w-4" />
-                  </Button>
+                  </V3Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => handlePreviewAsClient(org)}>
@@ -419,10 +419,10 @@ const ClientOrganizationManager = () => {
         actions={
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <V3Button>
                 <Plus className="w-4 h-4" />
                 New Organization
-              </Button>
+              </V3Button>
             </DialogTrigger>
             <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
               <DialogHeader>
@@ -476,10 +476,10 @@ const ClientOrganizationManager = () => {
                   />
                 </div>
                 <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  <V3Button type="button" variant="secondary" onClick={() => setShowCreateDialog(false)}>
                     Cancel
-                  </Button>
-                  <Button type="submit">Create Organization</Button>
+                  </V3Button>
+                  <V3Button type="submit">Create Organization</V3Button>
                 </div>
               </form>
             </DialogContent>
@@ -507,7 +507,7 @@ const ClientOrganizationManager = () => {
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
+              <V3Button variant="secondary">
                 <Filter className="w-4 h-4" />
                 Filters
                 {(filterStatus !== 'all' || filterIntegrations) && (
@@ -515,7 +515,7 @@ const ClientOrganizationManager = () => {
                     {(filterStatus !== 'all' ? 1 : 0) + (filterIntegrations ? 1 : 0)}
                   </Badge>
                 )}
-              </Button>
+              </V3Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuCheckboxItem
@@ -587,10 +587,9 @@ const ClientOrganizationManager = () => {
                       <>
                         <TableRow key={org.id} className="group">
                           <TableCell className="p-2">
-                            <Button
+                            <V3Button
                               variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
+                              size="icon-sm"
                               onClick={() => setExpandedOrg(isExpanded ? null : org.id)}
                             >
                               {isExpanded ? (
@@ -598,7 +597,7 @@ const ClientOrganizationManager = () => {
                               ) : (
                                 <ChevronRight className="w-4 h-4" />
                               )}
-                            </Button>
+                            </V3Button>
                           </TableCell>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
@@ -631,19 +630,18 @@ const ClientOrganizationManager = () => {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-2 justify-end">
-                              <Button
+                              <V3Button
                                 size="sm"
-                                variant="default"
                                 onClick={() => handlePreviewAsClient(org)}
                               >
-                                <LogIn className="h-4 w-4 mr-2" />
+                                <LogIn className="h-4 w-4" />
                                 Preview as Client
-                              </Button>
+                              </V3Button>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                  <V3Button size="icon-sm" variant="ghost">
                                     <MoreVertical className="h-4 w-4" />
-                                  </Button>
+                                  </V3Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => setExpandedOrg(isExpanded ? null : org.id)}>

@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Zap, GripVertical, RefreshCw, Newspaper, Users, Flame } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { useUnifiedTrends, getSpikeRatioColor, formatSpikeRatio } from "@/hooks/useUnifiedTrends";
 import { cn } from "@/lib/utils";
 
@@ -64,15 +64,14 @@ export function UnifiedTrendsWidget({ showDragHandle = false, compact = false }:
               </p>
             </div>
           </div>
-          <Button 
+          <V3Button 
             variant="ghost" 
-            size="icon" 
-            className="h-7 w-7"
+            size="icon-sm"
             onClick={handleRefresh}
             disabled={isRefreshing}
           >
             <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
-          </Button>
+          </V3Button>
         </div>
       </div>
       

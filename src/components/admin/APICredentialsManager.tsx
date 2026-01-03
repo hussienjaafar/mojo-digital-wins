@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { V3Button } from "@/components/v3/V3Button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -511,15 +511,15 @@ const APICredentialsManager = () => {
           autoComplete="off"
           className="pr-10"
         />
-        <Button
+        <V3Button
           type="button"
           variant="ghost"
-          size="sm"
+          size="icon-sm"
           className="absolute right-0 top-0 h-full px-3"
           onClick={() => toggleSecretVisibility(id)}
         >
           {showSecrets[id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </Button>
+        </V3Button>
       </div>
     </div>
   );
@@ -549,26 +549,21 @@ const APICredentialsManager = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <Button
+          <V3Button
             size="sm"
-            variant="default"
             onClick={() => triggerSync(cred)}
-            disabled={syncingId === cred.id || !cred.is_active}
-            className="h-8"
+            isLoading={syncingId === cred.id}
+            disabled={!cred.is_active}
           >
-            {syncingId === cred.id ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <Zap className="w-3 h-3" />
-            )}
-            <span className="ml-1">Sync</span>
-          </Button>
+            <Zap className="w-3 h-3" />
+            Sync
+          </V3Button>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <V3Button variant="ghost" size="icon-sm">
                 <MoreVertical className="h-4 w-4" />
-              </Button>
+              </V3Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => testConnection(cred)} disabled={testingId === cred.id}>
@@ -635,10 +630,10 @@ const APICredentialsManager = () => {
               Credentials are encrypted and never displayed after saving
             </CardDescription>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
+          <V3Button onClick={() => setShowCreateDialog(true)} size="sm">
+            <Plus className="h-4 w-4" />
             Add Credentials
-          </Button>
+          </V3Button>
         </div>
         
         <div className="relative mt-4">
@@ -844,14 +839,14 @@ const APICredentialsManager = () => {
             </div>
 
             <DialogFooter className="gap-2">
-              <Button type="button" variant="outline" onClick={testFormConnection} disabled={testingForm}>
-                {testingForm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+              <V3Button type="button" variant="secondary" onClick={testFormConnection} isLoading={testingForm}>
+                <Play className="h-4 w-4" />
                 Test
-              </Button>
-              <Button type="submit">
-                <ShieldCheck className="mr-2 h-4 w-4" />
+              </V3Button>
+              <V3Button type="submit">
+                <ShieldCheck className="h-4 w-4" />
                 {editingCredential ? 'Update' : 'Save'} Securely
-              </Button>
+              </V3Button>
             </DialogFooter>
           </form>
         </DialogContent>
