@@ -156,24 +156,22 @@ export function USChoroplethMap({
     return { minValue: min, maxValue: max };
   }, [dataLookup, propMinValue, propMaxValue, getMetricValue]);
 
-  // Color scale with 15 buckets for fine-grained visualization
+  // Color scale with 12 buckets - range from 0.12 to 0.85 for better light mode readability
+  // Avoids very low opacity (hard to see) and very high opacity (looks black)
   const colorRange = useMemo(
     () => [
-      "hsl(var(--portal-accent-blue) / 0.05)",
-      "hsl(var(--portal-accent-blue) / 0.10)",
-      "hsl(var(--portal-accent-blue) / 0.15)",
-      "hsl(var(--portal-accent-blue) / 0.22)",
-      "hsl(var(--portal-accent-blue) / 0.29)",
-      "hsl(var(--portal-accent-blue) / 0.36)",
-      "hsl(var(--portal-accent-blue) / 0.43)",
-      "hsl(var(--portal-accent-blue) / 0.50)",
-      "hsl(var(--portal-accent-blue) / 0.57)",
-      "hsl(var(--portal-accent-blue) / 0.64)",
-      "hsl(var(--portal-accent-blue) / 0.71)",
-      "hsl(var(--portal-accent-blue) / 0.78)",
+      "hsl(var(--portal-accent-blue) / 0.12)",
+      "hsl(var(--portal-accent-blue) / 0.18)",
+      "hsl(var(--portal-accent-blue) / 0.25)",
+      "hsl(var(--portal-accent-blue) / 0.32)",
+      "hsl(var(--portal-accent-blue) / 0.39)",
+      "hsl(var(--portal-accent-blue) / 0.46)",
+      "hsl(var(--portal-accent-blue) / 0.53)",
+      "hsl(var(--portal-accent-blue) / 0.60)",
+      "hsl(var(--portal-accent-blue) / 0.67)",
+      "hsl(var(--portal-accent-blue) / 0.74)",
+      "hsl(var(--portal-accent-blue) / 0.80)",
       "hsl(var(--portal-accent-blue) / 0.85)",
-      "hsl(var(--portal-accent-blue) / 0.92)",
-      "hsl(var(--portal-accent-blue) / 1.0)",
     ],
     []
   );
