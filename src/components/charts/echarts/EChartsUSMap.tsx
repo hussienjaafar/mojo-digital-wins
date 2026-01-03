@@ -105,19 +105,7 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
           },
         }));
 
-        echarts.registerMap("USA", geoJson, {
-          // Position Alaska and Hawaii
-          Alaska: {
-            left: -131,
-            top: 25,
-            width: 15,
-          },
-          Hawaii: {
-            left: -110,
-            top: 24,
-            width: 5,
-          },
-        });
+        echarts.registerMap("USA", geoJson);
         
         setMapRegistered(true);
       } catch (err) {
@@ -203,17 +191,17 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
       type: "continuous",
       min: calculatedMin,
       max: calculatedMax,
-      left: "right",
-      top: "center",
-      orient: "vertical",
+      left: "center",
+      bottom: 10,
+      orient: "horizontal",
       text: ["High", "Low"],
       textStyle: {
         color: "hsl(var(--portal-text-secondary))",
         fontSize: 11,
       },
       calculable: true,
-      itemWidth: 12,
-      itemHeight: 120,
+      itemWidth: 180,
+      itemHeight: 12,
       inRange: {
         color: [
           "hsl(213 90% 95%)",   // Very light blue
@@ -227,43 +215,43 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
         color: ["hsl(var(--portal-bg-tertiary))"],
       },
     },
-    geo: {
-      map: "USA",
-      roam: false,
-      projection: {
-        project: (point: number[]) => point,
-        unproject: (point: number[]) => point,
-      },
-      itemStyle: {
-        areaColor: "hsl(var(--portal-bg-tertiary))",
-        borderColor: "hsl(var(--portal-border))",
-        borderWidth: 0.5,
-      },
-      emphasis: {
-        itemStyle: {
-          areaColor: "hsl(var(--portal-accent-blue) / 0.3)",
-          borderColor: "hsl(var(--portal-accent-blue))",
-          borderWidth: 1.5,
-        },
-        label: {
-          show: false,
-        },
-      },
-      select: {
-        itemStyle: {
-          areaColor: "hsl(var(--portal-accent-blue) / 0.4)",
-          borderColor: "hsl(var(--portal-accent-blue))",
-          borderWidth: 2,
-        },
-      },
-    },
     series: [
       {
         type: "map",
         map: "USA",
-        geoIndex: 0,
+        roam: false,
+        left: "5%",
+        right: "5%",
+        top: "5%",
+        bottom: 50,
+        aspectScale: 0.85,
         data: transformedData,
         selectedMode: onStateClick ? "single" : false,
+        itemStyle: {
+          areaColor: "hsl(var(--portal-bg-tertiary))",
+          borderColor: "hsl(var(--portal-border))",
+          borderWidth: 0.5,
+        },
+        emphasis: {
+          itemStyle: {
+            areaColor: "hsl(var(--portal-accent-blue) / 0.3)",
+            borderColor: "hsl(var(--portal-accent-blue))",
+            borderWidth: 1.5,
+          },
+          label: {
+            show: false,
+          },
+        },
+        select: {
+          itemStyle: {
+            areaColor: "hsl(var(--portal-accent-blue) / 0.4)",
+            borderColor: "hsl(var(--portal-accent-blue))",
+            borderWidth: 2,
+          },
+          label: {
+            show: false,
+          },
+        },
       },
     ],
   }), [transformedData, calculatedMin, calculatedMax, valueLabel, showRevenue, formatValue, onStateClick]);
