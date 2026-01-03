@@ -1,16 +1,29 @@
-import { useMemo, useState, useCallback, useId } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
   ComposableMap,
   Geographies,
   Geography,
 } from "react-simple-maps";
 import { scaleQuantize } from "d3-scale";
+import { geoIdentity } from "d3-geo";
 import { FIPS_TO_STATE, ABBR_TO_FIPS, getStateByFips } from "@/lib/us-fips";
 import { USMapLegend } from "./USMapLegend";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
+import { formatCurrency, formatNumber } from "@/lib/chart-formatters";
 
-// US Atlas TopoJSON - Albers USA projection with AK/HI inset
+// US Atlas TopoJSON (states-albers-10m) is already projected into planar coordinates.
+// Using a geographic projection (e.g. geoAlbersUsa) would double-project and scramble the geometry.
 const GEO_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-albers-10m.json";
+
+// Fixed bbox from the us-atlas file (stable across loads) so we can use an identity projection.
+const ALBERS_BBOX = [
+  -57.66491068874468,
+  12.97635452036684,
+  957.5235629133763,
+  606.5694262668667,
+] as const;
+const ALBERS_WIDTH = ALBERS_BBOX[2] - ALBERS_BBOX[0];
+const ALBERS_HEIGHT = ALBERS_BBOX[3] - ALBERS_BBOX[1];
+const ALBERS_TRANSLATE: [number, number] = [-ALBERS_BBOX[0], -ALBERS_BBOX[1]];
 
 export type MapMetricMode = "donations" | "donors" | "revenue";
 
@@ -45,6 +58,14 @@ export interface USChoroplethMapProps {
 
 const NO_DATA_COLOR = "hsl(var(--portal-bg))";
 
+function useAlbersIdentityProjection() {
+  return useMemo(() => {
+    // react-simple-maps applies translate([width/2,height/2]) automatically only for string projections.
+    // For pre-projected albers geometry we must supply a pre-configured identity projection.
+    return geoIdentity().translate(ALBERS_TRANSLATE).scale(1);
+  }, []);
+}
+
 export function USChoroplethMap({
   data,
   height = 420,
@@ -58,7 +79,8 @@ export function USChoroplethMap({
   minValue: propMinValue,
   maxValue: propMaxValue,
 }: USChoroplethMapProps) {
-  const mapId = useId();
+  const projection = useAlbersIdentityProjection();
+
   const [tooltipContent, setTooltipContent] = useState<React.ReactNode>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [hoveredFips, setHoveredFips] = useState<string | null>(null);
@@ -263,9 +285,11 @@ export function USChoroplethMap({
       )}
 
       <ComposableMap
-        projection="geoAlbersUsa"
-        style={{ width: "100%", height: typeof height === "number" ? height : undefined }}
-        projectionConfig={{ scale: 1000 }}
+        projection={projection}
+        width={ALBERS_WIDTH}
+        height={ALBERS_HEIGHT}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ width: "100%", height }}
       >
         <Geographies geography={GEO_URL}>
           {({ geographies }) =>
@@ -273,7 +297,7 @@ export function USChoroplethMap({
               const fips = geo.id;
               const stateInfo = getStateByFips(fips);
               const stateData = dataLookup.get(fips);
-              const isHovered = hoveredFips === fips;
+              
               const isSelected = selectedFips === fips;
               const metricValue = stateData ? getMetricValue(stateData) : 0;
               const hasData = stateData !== undefined && metricValue > 0;
