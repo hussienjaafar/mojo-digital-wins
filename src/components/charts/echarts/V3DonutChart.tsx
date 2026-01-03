@@ -424,6 +424,7 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
       className={className}
       isLoading={isLoading}
       onEvents={handleEvents}
+      notMerge={true}
     />
   );
 };
