@@ -502,22 +502,17 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
           
           const groupLabel = (
             <SidebarGroupLabel className={cn(
-              "portal-text-secondary text-sm font-bold tracking-wider uppercase",
-              "px-4 py-2 mb-2 bg-[hsl(var(--portal-bg-elevated))] rounded-md border-b border-[hsl(var(--portal-border))]",
-              "flex items-center justify-between cursor-pointer",
-              "hover:bg-[hsl(var(--portal-bg-hover))] transition-colors",
-              "group",
-              groupOpacity
+              "text-xs font-semibold uppercase tracking-wider portal-text-muted",
+              "px-3 py-2 flex items-center justify-between cursor-pointer",
+              "hover:bg-[hsl(var(--portal-bg-hover))] transition-colors rounded-md",
+              "group"
             )}>
               <span className="flex items-center gap-2">
-                {group.icon && <group.icon className="h-4 w-4 opacity-70" />}
+                {group.icon && <group.icon className="h-3.5 w-3.5" />}
                 {group.label}
-                <span className="text-xs opacity-60 ml-1 font-normal normal-case">
-                  ({accessibleItems.length})
-                </span>
               </span>
               <ChevronDown className={cn(
-                "h-4 w-4 transition-transform duration-200",
+                "h-3.5 w-3.5 transition-transform duration-200 opacity-60",
                 isExpanded ? "rotate-0" : "-rotate-90"
               )} />
             </SidebarGroupLabel>
@@ -566,45 +561,48 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                                     isActive={activeTab === item.value}
                                     aria-current={activeTab === item.value ? 'page' : undefined}
                                     className={cn(
-                                      "relative w-full min-h-[48px] group",
-                                      collapsed ? 'justify-center px-0' : 'justify-start px-4',
-                                      "gap-3 py-3 rounded-lg transition-all duration-200",
-                                      "hover:bg-[hsl(var(--portal-bg-hover))] hover:scale-[1.02] active:scale-[0.98]",
-                                      activeTab === item.value 
-                                        ? 'bg-gradient-to-r from-[hsl(var(--portal-accent-blue))] to-[hsl(var(--portal-accent-purple))] text-white font-semibold shadow-lg border-l-4 border-white/50' 
-                                        : 'portal-text-primary hover:font-medium hover:shadow-sm'
+                                      "relative w-full min-h-[44px] group transition-colors",
+                                      collapsed ? 'justify-center px-2' : 'justify-start px-3',
+                                      "gap-3 py-2.5 rounded-md",
+                                      "hover:bg-[hsl(var(--portal-bg-hover))]",
+                                      activeTab === item.value && [
+                                        "bg-[hsl(var(--portal-accent-blue)/0.1)]",
+                                        "text-[hsl(var(--portal-accent-blue))]",
+                                        "font-medium",
+                                        "hover:bg-[hsl(var(--portal-accent-blue)/0.15)]",
+                                        "border-l-2 border-[hsl(var(--portal-accent-blue))]",
+                                      ],
+                                      !activeTab || activeTab !== item.value && "portal-text-secondary"
                                     )}
                                   >
                                     <div className="relative">
                                       <item.icon className={cn(
-                                        collapsed ? 'h-6 w-6' : 'h-5 w-5',
-                                        "shrink-0 transition-all duration-200 group-hover:scale-110",
-                                        activeTab === item.value && 'scale-110'
+                                        "h-5 w-5 shrink-0",
+                                        activeTab === item.value 
+                                          ? "text-[hsl(var(--portal-accent-blue))]" 
+                                          : "text-[hsl(var(--portal-text-secondary))]"
                                       )} />
                                       {badge && !isEffectivelyExpanded && (
-                                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center animate-pulse">
-                                          {badge.count}
-                                        </span>
+                                        <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive" />
                                       )}
                                     </div>
-                                    <span className={cn(
-                                      "text-sm leading-tight flex-1 transition-all duration-200",
-                                      isEffectivelyExpanded ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2 w-0 overflow-hidden"
-                                    )}>
-                                      {item.title}
-                                    </span>
                                     {isEffectivelyExpanded && (
-                                      <div className="flex items-center gap-2">
-                                        {isPinned && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 transition-transform group-hover:rotate-12" />}
-                                        {badge && (
-                                          <Badge 
-                                            variant={badge.status === 'error' ? 'destructive' : 'secondary'}
-                                            className={cn("h-5 px-2 text-xs animate-scale-in", badge.pulse && "animate-pulse")}
-                                          >
-                                            {badge.count}
-                                          </Badge>
-                                        )}
-                                      </div>
+                                      <>
+                                        <span className="flex-1 truncate text-sm">
+                                          {item.title}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                          {isPinned && <Star className="h-3 w-3 fill-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))]" />}
+                                          {badge && (
+                                            <Badge 
+                                              variant="destructive"
+                                              className="ml-auto shrink-0 h-5 min-w-[1.25rem] px-1.5"
+                                            >
+                                              {badge.count}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </>
                                     )}
                                   </SidebarMenuButton>
                                 </TooltipTrigger>
