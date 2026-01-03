@@ -488,16 +488,20 @@ const ClientDemographics = () => {
                     <V3LoadingState variant="chart" className="h-[300px]" />
                   ) : selectedStateCities.length > 0 ? (
                     <EChartsBarChart
-                      data={selectedStateCities.slice(0, 10).map(c => ({
-                        city: c.city,
-                        count: c.unique_donors,
-                      }))}
+                      data={[...selectedStateCities]
+                        .sort((a, b) => b.unique_donors - a.unique_donors)
+                        .slice(0, 10)
+                        .map(c => ({
+                          city: c.city,
+                          count: c.unique_donors,
+                        }))}
                       xAxisKey="city"
                       series={[
                         { dataKey: "count", name: "Donors" }
                       ]}
                       height={300}
                       valueType="number"
+                      xAxisLabelRotate={45}
                     />
                   ) : (
                     <V3EmptyState
