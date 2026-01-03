@@ -1,42 +1,18 @@
-import { useState, useMemo, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { format, formatDistanceToNow } from "date-fns";
+import { useMemo } from "react";
+import { formatDistanceToNow, format } from "date-fns";
 import {
+  BarChart3,
   Users,
-  TrendingUp,
   DollarSign,
-  Target,
+  TrendingUp,
   RefreshCw,
-  Filter,
-  ArrowRight,
-  MessageSquare,
-  Mail,
-  MousePointerClick,
-  Clock,
-  Layers,
+  Trophy,
   Heart,
-  Play,
-  Database,
-  GitBranch,
-  type LucideIcon,
 } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
-import { DataPipelineStatus } from "@/components/client/DataPipelineStatus";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
-import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  useDonorJourneyQuery,
-  useRefreshJourneyData,
-  type DonorJourneyRecord,
-  type FunnelStage,
-} from "@/queries/useDonorJourneyQuery";
-import { AttributionHealthCard } from "@/components/donor/AttributionHealthCard";
+import { useRefcodePerformance } from "@/hooks/useRefcodePerformance";
 import {
   V3PageContainer,
   V3KPICard,
@@ -48,235 +24,11 @@ import {
   V3CardHeader,
   V3CardTitle,
   V3CardContent,
-  V3FilterPill,
 } from "@/components/v3";
-import { PortalTable, type PortalTableColumn } from "@/components/v3/PortalTable";
-import { V3StageChart, V3BarChart } from "@/components/charts";
-
-// ============================================================================
-// Touchpoint Icon Helper
-// ============================================================================
-
-const getTouchpointIcon = (type: string): LucideIcon => {
-  switch (type) {
-    // Note: meta_ad_click is legacy - no new records should have this type
-    // All touchpoints now come from refcode-based ActBlue data or SMS events
-    case "ad_click":
-      return MousePointerClick;
-    case "sms_send":
-    case "sms_click":
-      return MessageSquare;
-    case "email_open":
-    case "email_click":
-      return Mail;
-    default:
-      return Target;
-  }
-};
-
-const getTouchpointColor = (type: string): string => {
-  switch (type) {
-    // Legacy: meta_ad_click should no longer appear in new data
-    case "ad_click":
-      return "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] border-[hsl(var(--portal-accent-blue)/0.2)]";
-    case "sms_send":
-    case "sms_click":
-      return "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.2)]";
-    case "email_open":
-    case "email_click":
-      return "bg-[hsl(var(--portal-accent-purple)/0.1)] text-[hsl(var(--portal-accent-purple))] border-[hsl(var(--portal-accent-purple)/0.2)]";
-    default:
-      return "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-muted))] border-[hsl(var(--portal-border))]";
-  }
-};
-
-// ============================================================================
-// Donor Lifecycle Stage Colors
-// ============================================================================
-
-const FUNNEL_STAGE_COLORS: Record<string, string> = {
-  conversion: "hsl(var(--portal-accent-blue))",  // First-time donors (baseline)
-  retention: "hsl(var(--portal-success))",       // Repeat donors
-  advocacy: "hsl(var(--portal-accent-purple))",  // Recurring donors
-};
-
-// ============================================================================
-// Journey Detail Dialog
-// ============================================================================
-
-interface JourneyDetailDialogProps {
-  journey: DonorJourneyRecord | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-const JourneyDetailDialog = ({ journey, open, onOpenChange }: JourneyDetailDialogProps) => {
-  if (!journey) return null;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-[hsl(var(--portal-bg-primary))] border-[hsl(var(--portal-border))]">
-        <DialogHeader>
-          <DialogTitle className="text-[hsl(var(--portal-text-primary))]">
-            Donor Journey
-          </DialogTitle>
-          <DialogDescription className="text-[hsl(var(--portal-text-muted))]">
-            {journey.donor_email} - {format(new Date(journey.transaction_date), "MMM d, yyyy h:mm a")}
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Donation Summary */}
-        <div className="flex items-center justify-between p-4 rounded-lg bg-[hsl(var(--portal-success)/0.1)] border border-[hsl(var(--portal-success)/0.2)]">
-          <div>
-            <p className="text-sm text-[hsl(var(--portal-text-muted))]">Total Donation</p>
-            <p className="text-2xl font-bold text-[hsl(var(--portal-success))]">
-              ${journey.amount.toFixed(2)}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge className="bg-[hsl(var(--portal-success))] text-white">
-              {journey.touchpoints.length} Touchpoints
-            </Badge>
-          </div>
-        </div>
-
-        {/* Attribution Method Indicator */}
-        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-[hsl(var(--portal-text-muted))]">Attribution Method:</span>
-              {journey.touchpoints.some(tp => tp.utm_campaign || tp.utm_source) ? (
-                <Badge variant="outline" className="bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] border-[hsl(var(--portal-accent-blue)/0.3)]">
-                  <Target className="h-3 w-3 mr-1" />
-                  Deterministic (UTM/Refcode)
-                </Badge>
-              ) : journey.touchpoints.length > 0 ? (
-                <Badge variant="outline" className="bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))] border-[hsl(var(--portal-warning)/0.3)]">
-                  <Layers className="h-3 w-3 mr-1" />
-                  Touchpoint-Based
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="bg-[hsl(var(--portal-text-muted)/0.1)] text-[hsl(var(--portal-text-muted))] border-[hsl(var(--portal-border))]">
-                  <Heart className="h-3 w-3 mr-1" />
-                  Organic / Unattributed
-                </Badge>
-              )}
-            </div>
-            <span className="text-xs text-[hsl(var(--portal-text-muted))]">Model v1.0 (40/20/40)</span>
-          </div>
-        </div>
-
-        {/* Attribution Model */}
-        <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
-          <h4 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-3">
-            Attribution Breakdown
-          </h4>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-[hsl(var(--portal-accent-blue))]">40%</div>
-              <div className="text-xs text-[hsl(var(--portal-text-muted))]">First Touch</div>
-              <div className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
-                ${journey.attribution_weights.first_touch.toFixed(2)}
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-[hsl(var(--portal-success))]">20%</div>
-              <div className="text-xs text-[hsl(var(--portal-text-muted))]">Middle Touches</div>
-              <div className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
-                ${(journey.attribution_weights.middle_touch * Math.max(0, journey.touchpoints.length - 2)).toFixed(2)}
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-[hsl(var(--portal-accent-purple))]">40%</div>
-              <div className="text-xs text-[hsl(var(--portal-text-muted))]">Last Touch</div>
-              <div className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
-                ${journey.attribution_weights.last_touch.toFixed(2)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Journey Timeline */}
-        <div className="relative">
-          <h4 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-4">
-            Journey Timeline
-          </h4>
-          <div className="absolute left-6 top-10 bottom-4 w-0.5 bg-[hsl(var(--portal-border))]" />
-          <div className="space-y-4">
-            {journey.touchpoints.map((touchpoint, idx) => {
-              const isFirst = idx === 0;
-              const isLast = idx === journey.touchpoints.length - 1;
-              const Icon = getTouchpointIcon(touchpoint.touchpoint_type);
-              const weight = isFirst
-                ? journey.attribution_weights.first_touch
-                : isLast
-                ? journey.attribution_weights.last_touch
-                : journey.attribution_weights.middle_touch;
-
-              return (
-                <div key={touchpoint.id} className="relative flex items-start gap-4">
-                  <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-[hsl(var(--portal-bg-elevated))] border-2 border-[hsl(var(--portal-accent-blue))]">
-                    <Icon className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" aria-hidden="true" />
-                  </div>
-                  <div className="flex-1 pt-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className={getTouchpointColor(touchpoint.touchpoint_type)}>
-                        {touchpoint.touchpoint_type.replace(/_/g, " ")}
-                      </Badge>
-                      {isFirst && (
-                        <Badge className="bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] border border-[hsl(var(--portal-accent-blue)/0.2)]">
-                          First Touch (40%)
-                        </Badge>
-                      )}
-                      {isLast && (
-                        <Badge className="bg-[hsl(var(--portal-accent-purple)/0.1)] text-[hsl(var(--portal-accent-purple))] border border-[hsl(var(--portal-accent-purple)/0.2)]">
-                          Last Touch (40%)
-                        </Badge>
-                      )}
-                      {!isFirst && !isLast && (
-                        <Badge variant="secondary">Middle (20%)</Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">
-                      {format(new Date(touchpoint.occurred_at), "MMM d, yyyy h:mm a")}
-                    </p>
-                    {(touchpoint.utm_source || touchpoint.utm_campaign) && (
-                      <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-0.5">
-                        {touchpoint.utm_source && `Source: ${touchpoint.utm_source}`}
-                        {touchpoint.utm_campaign && ` • Campaign: ${touchpoint.utm_campaign}`}
-                      </p>
-                    )}
-                    <p className="text-sm font-medium text-[hsl(var(--portal-accent-blue))] mt-1">
-                      Attribution: ${weight.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Final Conversion */}
-            <div className="relative flex items-start gap-4">
-              <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-[hsl(var(--portal-success))]">
-                <DollarSign className="h-6 w-6 text-white" aria-hidden="true" />
-              </div>
-              <div className="flex-1 pt-1">
-                <Badge className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border border-[hsl(var(--portal-success)/0.2)]">
-                  Donation
-                </Badge>
-                <p className="text-lg font-bold text-[hsl(var(--portal-success))] mt-1">
-                  ${journey.amount.toFixed(2)}
-                </p>
-                <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                  {format(new Date(journey.transaction_date), "MMM d, yyyy h:mm a")}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
+import { RefcodePerformanceTable } from "@/components/analytics/RefcodePerformanceTable";
+import { RevenueByChannelChart } from "@/components/analytics/RevenueByChannelChart";
+import { RetentionMetricsCard } from "@/components/analytics/RetentionMetricsCard";
+import { TopRefcodesByLTVCard } from "@/components/analytics/TopRefcodesByLTVCard";
 
 // ============================================================================
 // Main Page Component
@@ -284,125 +36,47 @@ const JourneyDetailDialog = ({ journey, open, onOpenChange }: JourneyDetailDialo
 
 const ClientDonorJourney = () => {
   const { organizationId, isLoading: orgLoading } = useClientOrganization();
-  const queryClient = useQueryClient();
 
-  // State
-  const [minAmount, setMinAmount] = useState(0);
-  const [selectedJourney, setSelectedJourney] = useState<DonorJourneyRecord | null>(null);
-  const [isRunningJourneys, setIsRunningJourneys] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Query
+  // Query refcode performance data
   const {
     data,
     isLoading,
     error,
     refetch,
     dataUpdatedAt,
-  } = useDonorJourneyQuery(organizationId, minAmount);
+  } = useRefcodePerformance(organizationId);
 
-  const refreshMutation = useRefreshJourneyData(organizationId);
-
-  // Derived data
-  const stats = data?.stats;
-  const journeys = data?.journeys || [];
-  const segments = data?.segments || [];
-  const funnel = data?.funnel || [];
-  const touchpointSummary = data?.touchpointSummary || [];
-
-  // Pipeline status data
-  const pipelineData = useMemo(() => [
-    {
-      name: 'Journeys',
-      table: 'donor_journeys',
-      count: (data?.meta?.journeyEvents as any)?.actualCount || 0,
-      description: 'Journey events',
-    },
-    {
-      name: 'Touchpoints',
-      table: 'attribution_touchpoints',
-      count: (data?.meta?.touchpoints as any)?.actualCount || 0,
-      description: 'Attribution data',
-    },
-    {
-      name: 'Transactions',
-      table: 'actblue_transactions',
-      count: (data?.meta?.transactions as any)?.actualCount || 0,
-      description: 'Donation records',
-    },
-    {
-      name: 'Segments',
-      table: 'donor_demographics',
-      count: segments.reduce((sum, s) => sum + s.count, 0),
-      description: 'Donor tiers',
-    },
-  ], [data, segments]);
-
-  // Touchpoint distribution for chart
-  const touchpointChartData = useMemo(() => {
-    return touchpointSummary
-      .map(tp => ({
-        name: tp.touchpoint_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        value: tp.count,
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
-  }, [touchpointSummary]);
-
-  // Handlers
-  const handleRunJourneysPipeline = async () => {
-    if (!organizationId) return;
+  // Derived stats
+  const stats = useMemo(() => {
+    if (!data) return null;
     
-    setIsRunningJourneys(true);
+    const totalRevenue = data.refcodes.reduce((sum, r) => sum + r.totalRevenue, 0);
+    const totalDonations = data.refcodes.reduce((sum, r) => sum + r.donationCount, 0);
+    const avgGift = totalDonations > 0 ? totalRevenue / totalDonations : 0;
+    
+    return {
+      totalRevenue,
+      totalDonations,
+      avgGift,
+      totalDonors: data.retention.totalDonors,
+      repeatRate: data.retention.repeatRate,
+      recurringRate: data.retention.recurringRate,
+    };
+  }, [data]);
+
+  const handleRefresh = async () => {
     try {
-      const { data: result, error } = await supabase.functions.invoke('populate-donor-journeys', {
-        body: { 
-          organization_id: organizationId,
-          days_back: 365
-        }
-      });
-      
-      if (error) {
-        console.error('Journeys pipeline error:', error);
-        toast.error('Failed to run journeys pipeline');
-      } else {
-        await queryClient.invalidateQueries({ queryKey: ['donorJourney'] });
-        toast.success(`Journeys populated: ${result?.events_created || 0} events for ${result?.unique_donors || 0} donors`);
-      }
-    } catch (err) {
-      console.error('Journeys pipeline error:', err);
-      toast.error('Failed to run journeys pipeline');
-    } finally {
-      setIsRunningJourneys(false);
+      await refetch();
+      toast.success("Data refreshed");
+    } catch {
+      toast.error("Failed to refresh data");
     }
   };
 
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      await refreshMutation.mutateAsync();
-      toast.success('Journey data refreshed');
-    } catch {
-      toast.error('Unable to refresh journey data');
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [refreshMutation]);
-
-  const isPipelineRunning = isRunningJourneys || isRefreshing;
-
-  // Amount filter options
-  const amountFilters = [
-    { label: "All", value: 0 },
-    { label: "$25+", value: 25 },
-    { label: "$50+", value: 50 },
-    { label: "$100+", value: 100 },
-    { label: "$250+", value: 250 },
-  ];
-
+  // Loading state
   if (orgLoading || !organizationId) {
     return (
-      <ClientShell pageTitle="Donor Journey">
+      <ClientShell pageTitle="Attribution & Retention">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="animate-pulse text-muted-foreground">Loading...</div>
         </div>
@@ -412,11 +86,11 @@ const ClientDonorJourney = () => {
 
   if (isLoading) {
     return (
-      <ClientShell pageTitle="Donor Journey">
+      <ClientShell pageTitle="Attribution & Retention">
         <V3PageContainer
-          icon={GitBranch}
-          title="Donor Journey"
-          description="Multi-touch attribution and conversion funnel analytics"
+          icon={BarChart3}
+          title="Attribution & Retention Analytics"
+          description="Refcode performance and donor retention insights"
         >
           <V3LoadingState variant="kpi-grid" count={4} />
           <div className="mt-6">
@@ -429,15 +103,15 @@ const ClientDonorJourney = () => {
 
   if (error) {
     return (
-      <ClientShell pageTitle="Donor Journey">
+      <ClientShell pageTitle="Attribution & Retention">
         <V3PageContainer
-          icon={GitBranch}
-          title="Donor Journey"
-          description="Multi-touch attribution and conversion funnel analytics"
+          icon={BarChart3}
+          title="Attribution & Retention Analytics"
+          description="Refcode performance and donor retention insights"
         >
           <V3EmptyState
             title="Failed to Load Data"
-            description={error?.message || "An error occurred while loading journey data"}
+            description={error?.message || "An error occurred while loading data"}
             accent="red"
           />
         </V3PageContainer>
@@ -446,360 +120,115 @@ const ClientDonorJourney = () => {
   }
 
   return (
-    <ClientShell pageTitle="Donor Journey">
+    <ClientShell pageTitle="Attribution & Retention">
       <V3PageContainer
-        icon={GitBranch}
-        title="Donor Journey"
-        description="Refcode-based attribution and conversion funnel analytics"
+        icon={BarChart3}
+        title="Attribution & Retention Analytics"
+        description="See which campaigns drive donations and which donors stick around"
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
-            <V3Button
-              variant="outline"
-              size="sm"
-              onClick={handleRunJourneysPipeline}
-              disabled={isPipelineRunning}
-              title="Generate donor journey events from transactions"
-            >
-              <Play className={`h-4 w-4 mr-2 ${isRunningJourneys ? 'animate-pulse' : ''}`} />
-              {isRunningJourneys ? 'Running...' : 'Run Pipeline'}
-            </V3Button>
-            <V3Button
-              variant="secondary"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isPipelineRunning}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </V3Button>
-          </div>
+          <V3Button
+            variant="secondary"
+            size="sm"
+            onClick={handleRefresh}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </V3Button>
         }
       >
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <V3KPICard
+            icon={DollarSign}
+            label="Total Revenue"
+            value={`$${(stats?.totalRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+            subtitle="All attributed donations"
+            accent="green"
+          />
+          <V3KPICard
             icon={Users}
-            label="Total Donors"
+            label="Unique Donors"
             value={(stats?.totalDonors || 0).toLocaleString()}
-            subtitle="Unique donors analyzed"
+            subtitle="Across all refcodes"
             accent="blue"
           />
           <V3KPICard
             icon={TrendingUp}
-            label="Avg Touchpoints"
-            value={(stats?.avgTouchpointsBeforeConversion || 0).toFixed(1)}
-            subtitle="Before conversion"
-            accent="purple"
+            label="Repeat Rate"
+            value={`${(stats?.repeatRate || 0).toFixed(0)}%`}
+            subtitle="Donors who gave again"
+            accent={(stats?.repeatRate || 0) >= 20 ? "green" : "amber"}
           />
           <V3KPICard
             icon={Heart}
-            label="Retention Rate"
-            value={`${(stats?.retentionMetrics.retentionRate || 0).toFixed(0)}%`}
-            subtitle="Repeat donors"
-            accent={(stats?.retentionMetrics.retentionRate || 0) >= 50 ? "green" : "amber"}
-          />
-          <V3KPICard
-            icon={DollarSign}
-            label="Avg Donation"
-            value={`$${(stats?.avgDonation || 0).toFixed(0)}`}
-            subtitle="Per transaction"
-            accent="green"
+            label="Recurring Rate"
+            value={`${(stats?.recurringRate || 0).toFixed(0)}%`}
+            subtitle="Monthly/sustaining donors"
+            accent={(stats?.recurringRate || 0) >= 15 ? "green" : "purple"}
           />
         </div>
 
-        {/* Filter Bar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-[hsl(var(--portal-text-muted))]">
-            <Filter className="h-4 w-4" />
-            <span>Min Amount:</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {amountFilters.map((filter) => (
-              <V3FilterPill
-                key={filter.value}
-                label={filter.label}
-                isActive={minAmount === filter.value}
-                onClick={() => setMinAmount(filter.value)}
-              />
-            ))}
-          </div>
-        </div>
+        {/* Retention Metrics */}
+        <V3Card>
+          <V3CardHeader>
+            <V3CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Donor Retention Overview
+            </V3CardTitle>
+          </V3CardHeader>
+          <V3CardContent>
+            {data && (
+              <RetentionMetricsCard data={data.retention} isLoading={isLoading} />
+            )}
+          </V3CardContent>
+        </V3Card>
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Donor Lifecycle Distribution (NOT a funnel - stages are independent) */}
+          {/* Revenue by Channel */}
           <V3ChartWrapper
-            title="Donor Lifecycle Distribution"
-            description="Donor progression from first gift to recurring — based on ActBlue data"
-            icon={Target}
+            title="Revenue by Channel"
+            description="Total revenue grouped by acquisition channel"
+            icon={BarChart3}
             isLoading={isLoading}
-            ariaLabel="Chart showing donor lifecycle stages"
+            ariaLabel="Bar chart showing revenue by channel"
           >
-            {funnel.length === 0 || funnel.every(f => f.count === 0) ? (
-              <div className="h-[280px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
-                <div className="text-center">
-                  <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No lifecycle data available</p>
-                  <p className="text-sm">Run the pipeline to generate journey events</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="mb-2 p-2 rounded bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))]">
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                    <strong>Data source:</strong> ActBlue transaction records only. 
-                    Shows unique donors at each lifecycle stage. Stages are <strong>not cumulative</strong> — a donor appears in only one stage.
-                  </p>
-                </div>
-                <V3StageChart
-                  stages={funnel.map(stage => ({
-                    name: stage.label,
-                    value: stage.count,
-                    color: FUNNEL_STAGE_COLORS[stage.stage],
-                  }))}
-                  height={240}
-                  showConversionRates
-                  valueType="number"
-                  showDropOffAnnotation={false}
-                  forceBarMode={true}
-                />
-              </>
+            {data && (
+              <RevenueByChannelChart data={data.channels} isLoading={isLoading} />
             )}
           </V3ChartWrapper>
 
-          {/* Touchpoint Distribution */}
+          {/* Top Refcodes by LTV */}
           <V3ChartWrapper
-            title="Touchpoint Distribution"
-            description="Verified interactions linked to individual donors"
-            icon={Layers}
+            title="Top Sources by Recurring Rate"
+            description="Which refcodes produce donors that keep giving"
+            icon={Trophy}
             isLoading={isLoading}
-            ariaLabel="Bar chart showing touchpoint types"
+            ariaLabel="List of top refcodes by lifetime value"
           >
-            {touchpointChartData.length === 0 ? (
-              <div className="h-[280px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
-                <div className="text-center">
-                  <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No touchpoint data available</p>
-                  <p className="text-sm">Touchpoints are created from ActBlue refcodes and SMS events</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="mb-2 p-2 rounded bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))]">
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                    <strong>Note:</strong> Only shows touchpoints with donor identity. 
-                    Sourced from ActBlue refcodes and SMS events — not Meta ad data.
-                  </p>
-                </div>
-                <V3BarChart
-                  data={touchpointChartData}
-                  nameKey="name"
-                  valueKey="value"
-                  valueName="Touchpoints"
-                  height={260}
-                  valueType="number"
-                  horizontal
-                  topN={8}
-                />
-              </>
+            {data && (
+              <TopRefcodesByLTVCard data={data.topRefcodesByLTV} isLoading={isLoading} />
             )}
           </V3ChartWrapper>
         </div>
 
-        {/* Attribution Model - Renamed and clarified */}
+        {/* Refcode Performance Table */}
         <V3Card>
           <V3CardHeader>
             <V3CardTitle className="flex items-center gap-2">
-              <Layers className="h-4 w-4" />
-              Refcode Attribution Model
+              <BarChart3 className="h-4 w-4" />
+              Refcode Performance
             </V3CardTitle>
             <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
-              When multiple refcodes exist for a donor, revenue is weighted: 40% First • 20% Middle • 40% Last
+              {data?.refcodes.length || 0} refcodes tracked • Sortable by any column
             </p>
           </V3CardHeader>
           <V3CardContent>
-            <div className="p-3 mb-4 rounded-lg bg-[hsl(var(--portal-warning)/0.1)] border border-[hsl(var(--portal-warning)/0.3)]">
-              <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                <strong>Note:</strong> Multi-touch weighting only applies to donors with multiple refcode interactions. 
-                Meta impressions/clicks cannot be attributed to individual donors — we can only track aggregated campaign performance.
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
-                <div className="text-3xl font-bold text-[hsl(var(--portal-accent-blue))]">40%</div>
-                <div className="text-sm text-[hsl(var(--portal-text-muted))]">First Refcode</div>
-                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Initial campaign</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-success)/0.1)]">
-                <div className="text-3xl font-bold text-[hsl(var(--portal-success))]">20%</div>
-                <div className="text-sm text-[hsl(var(--portal-text-muted))]">Middle Refcodes</div>
-                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Intermediate touches</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]">
-                <div className="text-3xl font-bold text-[hsl(var(--portal-accent-purple))]">40%</div>
-                <div className="text-sm text-[hsl(var(--portal-text-muted))]">Last Refcode</div>
-                <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Final conversion</p>
-              </div>
-            </div>
+            {data && (
+              <RefcodePerformanceTable data={data.refcodes} isLoading={isLoading} />
+            )}
           </V3CardContent>
         </V3Card>
-
-        {/* Recent Journeys Table */}
-        <V3Card>
-          <V3CardHeader>
-            <V3CardTitle className="flex items-center gap-2">
-              <ArrowRight className="h-4 w-4" />
-              Recent Donor Journeys
-            </V3CardTitle>
-            <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
-              {journeys.length} journeys with attribution paths
-            </p>
-          </V3CardHeader>
-          <V3CardContent>
-            <PortalTable
-              columns={[
-                {
-                  key: "donor",
-                  header: "Donor",
-                  render: (journey) => (
-                    <span className="font-mono text-xs text-[hsl(var(--portal-text-primary))]">
-                      {journey.donor_email?.slice(0, 20)}...
-                    </span>
-                  ),
-                },
-                {
-                  key: "amount",
-                  header: "Amount",
-                  align: "right",
-                  render: (journey) => (
-                    <span className="font-semibold text-[hsl(var(--portal-success))]">
-                      ${journey.amount.toFixed(2)}
-                    </span>
-                  ),
-                },
-                {
-                  key: "firstTouchpoint",
-                  header: "First Touchpoint",
-                  render: (journey) => {
-                    if (journey.touchpoints.length === 0) {
-                      return <span className="text-xs text-[hsl(var(--portal-text-muted))]">Direct</span>;
-                    }
-                    const firstTp = journey.touchpoints[0];
-                    const Icon = getTouchpointIcon(firstTp.touchpoint_type);
-                    return (
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-6 h-6 rounded-full bg-[hsl(var(--portal-accent-blue)/0.1)] flex items-center justify-center"
-                          title={firstTp.touchpoint_type}
-                        >
-                          <Icon className="h-3 w-3 text-[hsl(var(--portal-accent-blue))]" />
-                        </div>
-                        <span className="text-xs text-[hsl(var(--portal-text-muted))] capitalize">
-                          {firstTp.touchpoint_type.replace(/_/g, " ")}
-                        </span>
-                      </div>
-                    );
-                  },
-                },
-                {
-                  key: "daysToConvert",
-                  header: "Days to Convert",
-                  align: "center",
-                  render: (journey) => {
-                    if (journey.touchpoints.length === 0) {
-                      return <span className="text-xs text-[hsl(var(--portal-text-muted))]">—</span>;
-                    }
-                    const firstTouchDate = new Date(journey.touchpoints[0].occurred_at);
-                    const donationDate = new Date(journey.transaction_date);
-                    const daysDiff = Math.round(
-                      (donationDate.getTime() - firstTouchDate.getTime()) / (1000 * 60 * 60 * 24)
-                    );
-                    return (
-                      <span
-                        className={cn(
-                          "text-xs font-medium",
-                          daysDiff <= 1
-                            ? "text-[hsl(var(--portal-success))]"
-                            : daysDiff <= 7
-                            ? "text-[hsl(var(--portal-accent-blue))]"
-                            : "text-[hsl(var(--portal-text-muted))]"
-                        )}
-                      >
-                        {daysDiff === 0 ? "Same day" : `${daysDiff}d`}
-                      </span>
-                    );
-                  },
-                },
-                {
-                  key: "touchpoints",
-                  header: "Touchpoints",
-                  align: "center",
-                  render: (journey) => (
-                    <div className="flex items-center justify-center gap-1">
-                      {journey.touchpoints.slice(0, 3).map((tp, tpIdx) => {
-                        const Icon = getTouchpointIcon(tp.touchpoint_type);
-                        return (
-                          <div
-                            key={tpIdx}
-                            className="w-6 h-6 rounded-full bg-[hsl(var(--portal-bg-elevated))] flex items-center justify-center"
-                            title={tp.touchpoint_type}
-                          >
-                            <Icon className="h-3 w-3 text-[hsl(var(--portal-text-muted))]" />
-                          </div>
-                        );
-                      })}
-                      {journey.touchpoints.length > 3 && (
-                        <span className="text-xs text-[hsl(var(--portal-text-muted))]">
-                          +{journey.touchpoints.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  ),
-                },
-                {
-                  key: "date",
-                  header: "Date",
-                  render: (journey) => (
-                    <span className="text-[hsl(var(--portal-text-muted))]">
-                      {formatDistanceToNow(new Date(journey.transaction_date), { addSuffix: true })}
-                    </span>
-                  ),
-                },
-                {
-                  key: "actions",
-                  header: "Actions",
-                  render: (journey) => (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedJourney(journey)}
-                      className="text-[hsl(var(--portal-accent-blue))]"
-                    >
-                      View
-                    </Button>
-                  ),
-                },
-              ] as PortalTableColumn<DonorJourneyRecord>[]}
-              data={journeys.slice(0, 10)}
-              getRowKey={(journey, idx) => journey.id || idx}
-              emptyContent={
-                <div className="h-[200px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
-                  <div className="text-center">
-                    <ArrowRight className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No journey data available</p>
-                    <p className="text-sm">Run the pipeline to generate donor journeys</p>
-                  </div>
-                </div>
-              }
-            />
-          </V3CardContent>
-        </V3Card>
-
-        {/* Attribution Health Card */}
-        <AttributionHealthCard organizationId={organizationId} />
-
-        {/* Data Pipeline Status */}
-        <DataPipelineStatus pipelines={pipelineData} isLoading={isLoading} />
 
         {/* Data Freshness */}
         {dataUpdatedAt > 0 && (
@@ -808,13 +237,6 @@ const ClientDonorJourney = () => {
           </p>
         )}
       </V3PageContainer>
-
-      {/* Journey Detail Dialog */}
-      <JourneyDetailDialog
-        journey={selectedJourney}
-        open={!!selectedJourney}
-        onOpenChange={(open) => !open && setSelectedJourney(null)}
-      />
     </ClientShell>
   );
 };
