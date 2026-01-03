@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { EChartsLineChart } from "@/components/charts/echarts/EChartsLineChart";
 import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
-import { EChartsPieChart } from "@/components/charts/echarts/EChartsPieChart";
+import { V3DonutChart } from "@/components/charts/echarts/V3DonutChart";
 import {
   TrendingUp, TrendingDown, DollarSign, Eye, MousePointer,
   Target, AlertCircle, ChevronDown, ChevronUp, Download,
@@ -493,7 +493,7 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
                       <Image className="h-4 w-4" />
                       Creative Type Performance
                     </h3>
-                    <EChartsPieChart
+                    <V3DonutChart
                       data={creativePerformance.map((entry) => ({
                         name: entry.type,
                         value: entry.spend,
@@ -501,6 +501,8 @@ export default function EnhancedMetaAdsMetrics({ organizationId, startDate, endD
                       }))}
                       height={200}
                       valueType="currency"
+                      centerLabel="Total Spend"
+                      topN={6}
                     />
                   </div>
 

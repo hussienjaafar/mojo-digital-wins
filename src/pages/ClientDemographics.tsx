@@ -15,7 +15,7 @@ import {
   V3DataTable,
   type V3Column,
 } from "@/components/v3";
-import { EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
+import { EChartsBarChart, V3DonutChart } from "@/components/charts/echarts";
 import { USChoroplethMap, type ChoroplethDataItem, type MapMetricMode } from "@/components/charts";
 import { getStateName } from "@/lib/us-states";
 import { formatCurrency, formatNumber } from "@/lib/chart-formatters";
@@ -549,13 +549,12 @@ const ClientDemographics = () => {
             icon={Briefcase}
             ariaLabel="Pie chart showing donor distribution by occupation"
           >
-            <EChartsPieChart
+            <V3DonutChart
               data={occupationPieData}
               height={300}
-              variant="donut"
               valueType="number"
-              showLabels={true}
-              labelThreshold={8}
+              centerLabel="Total Donors"
+              topN={8}
               legendPosition="bottom"
             />
           </V3ChartWrapper>
@@ -566,12 +565,12 @@ const ClientDemographics = () => {
             icon={Share2}
             ariaLabel="Pie chart showing donor distribution by acquisition channel"
           >
-            <EChartsPieChart
+            <V3DonutChart
               data={channelPieData}
               height={300}
-              variant="donut"
               valueType="currency"
-              showLabels={true}
+              centerLabel="Total Revenue"
+              topN={8}
               legendPosition="bottom"
             />
           </V3ChartWrapper>

@@ -6,7 +6,7 @@ import { V3ChartWrapper } from "@/components/v3/V3ChartWrapper";
 import { TrendingUp, DollarSign, Users, Target } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { PortalSkeleton } from "@/components/portal/PortalSkeleton";
-import { EChartsLineChart, EChartsPieChart } from "@/components/charts/echarts";
+import { EChartsLineChart, V3DonutChart } from "@/components/charts/echarts";
 import { NoDataEmptyState } from "@/components/portal/PortalEmptyState";
 import { formatCurrency, formatPercent } from "@/lib/chart-formatters";
 
@@ -148,14 +148,13 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
           ariaLabel="Donut chart showing spend breakdown by channel"
           accent="blue"
         >
-          <EChartsPieChart
+          <V3DonutChart
             data={spendByChannel}
             height={250}
-            variant="donut"
             valueType="currency"
-            showLabels={true}
+            centerLabel="Total Spend"
             legendPosition="right"
-            disableHoverEmphasis
+            topN={6}
           />
         </V3ChartWrapper>
       </div>

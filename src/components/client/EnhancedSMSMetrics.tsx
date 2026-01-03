@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { EChartsLineChart } from "@/components/charts/echarts/EChartsLineChart";
 import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
-import { EChartsPieChart } from "@/components/charts/echarts/EChartsPieChart";
+import { V3DonutChart } from "@/components/charts/echarts/V3DonutChart";
 import { 
   TrendingUp, TrendingDown, MessageSquare, Users, 
   DollarSign, AlertCircle, Clock, Target, ChevronDown,
@@ -452,7 +452,7 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
       {segmentPerformance.length > 1 && (
         <V3Card title="Audience Segment Performance">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <EChartsPieChart
+            <V3DonutChart
               data={segmentPerformance.map((seg, index) => ({
                 name: seg.segment,
                 value: seg.conversions,
@@ -460,6 +460,8 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
               }))}
               height={250}
               valueType="number"
+              centerLabel="Total Conversions"
+              topN={6}
             />
 
             <div className="space-y-3">
