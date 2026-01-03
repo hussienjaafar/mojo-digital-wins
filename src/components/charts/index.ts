@@ -29,6 +29,37 @@ export {
   type V3TimeHeatmapMetricToggleProps,
 } from "./V3TimeHeatmap";
 
+// V3 Premium Charts
+export { V3BarChart, type V3BarChartProps, type V3BarValueType } from "./V3BarChart";
+export { V3FunnelChart, type V3FunnelChartProps, type V3FunnelValueType } from "./V3FunnelChart";
+
+// Bar chart utilities
+export {
+  processBarChartData,
+  truncateLabel,
+  createLabelFormatter,
+  calculatePercentOfTotal,
+  normalizeCategory,
+  mergeDuplicateCategories,
+  type BarDataItem,
+  type ProcessedBarData,
+  type BarChartProcessOptions,
+} from "@/lib/bar-chart-utils";
+
+// Funnel chart utilities
+export {
+  analyzeFunnel,
+  isSequentialFunnel,
+  findInvalidStages,
+  funnelToRankedBars,
+  formatConversionRate,
+  getDropOffSeverity,
+  getSeverityColor,
+  type FunnelStage,
+  type ProcessedFunnelStage,
+  type FunnelAnalysis,
+} from "@/lib/funnel-chart-utils";
+
 // Heatmap utilities
 export {
   type HeatmapDataPoint as V3HeatmapDataPoint,

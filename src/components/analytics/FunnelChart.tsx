@@ -1,8 +1,8 @@
 import { memo, useMemo } from 'react';
 import { Filter } from 'lucide-react';
 import { ChartPanel } from '@/components/charts/ChartPanel';
-import { EChartsFunnelChart } from '@/components/charts/echarts';
-import { formatNumber } from '@/lib/chart-formatters';
+import { V3FunnelChart } from '@/components/charts/V3FunnelChart';
+import { analyzeFunnel, formatConversionRate } from '@/lib/funnel-chart-utils';
 
 type FunnelStage = {
   name: string;
@@ -29,24 +29,9 @@ export const FunnelChart = memo(({
 }: Props) => {
   const isEmpty = !stages || stages.length === 0;
   
-  const overallConversion = useMemo(() => {
-    if (stages.length < 2) return 0;
-    return ((stages[stages.length - 1]?.value / stages[0]?.value) * 100) || 0;
-  }, [stages]);
-
-  // Transform stages to ECharts funnel data format
-  const funnelData = useMemo(() => {
-    return stages.map((stage) => ({
-      name: stage.name,
-      value: stage.value,
-      itemStyle: { color: stage.color },
-    }));
-  }, [stages]);
-
-  // Calculate summary metrics
-  const totalDropOff = useMemo(() => {
-    if (stages.length < 2) return 0;
-    return (stages[0]?.value || 0) - (stages[stages.length - 1]?.value || 0);
+  // Analyze funnel to get conversion rate for status badge
+  const analysis = useMemo(() => {
+    return analyzeFunnel(stages);
   }, [stages]);
 
   return (
@@ -55,10 +40,10 @@ export const FunnelChart = memo(({
       description={description}
       icon={Filter}
       status={
-        !isEmpty
+        !isEmpty && analysis.stages.length >= 2
           ? {
-              text: `${overallConversion.toFixed(1)}% conversion`,
-              variant: overallConversion >= 10 ? 'success' : overallConversion >= 5 ? 'warning' : 'error',
+              text: `${formatConversionRate(analysis.overallConversionRate)} conversion`,
+              variant: analysis.overallConversionRate >= 10 ? 'success' : analysis.overallConversionRate >= 5 ? 'warning' : 'error',
             }
           : undefined
       }
@@ -69,33 +54,14 @@ export const FunnelChart = memo(({
       emptyMessage="No funnel data available"
       minHeight={380}
     >
-      <div className="space-y-4">
-        {/* ECharts Funnel */}
-        <EChartsFunnelChart
-          data={funnelData}
-          height={280}
-          valueType="number"
-          showConversionRates={true}
-          orientation="vertical"
-          showLegend={false}
-        />
-
-        {/* Summary metrics */}
-        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[hsl(var(--portal-border)/0.5)]">
-          <div className="text-center">
-            <div className="text-xl sm:text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
-              {overallConversion.toFixed(1)}%
-            </div>
-            <div className="text-xs sm:text-sm text-[hsl(var(--portal-text-muted))]">Overall Conversion</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xl sm:text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
-              {formatNumber(totalDropOff)}
-            </div>
-            <div className="text-xs sm:text-sm text-[hsl(var(--portal-text-muted))]">Total Drop-off</div>
-          </div>
-        </div>
-      </div>
+      <V3FunnelChart
+        stages={stages}
+        height={280}
+        valueType="number"
+        showConversionRates
+        showDropOffAnnotation
+        showSequenceWarning
+      />
     </ChartPanel>
   );
 });
