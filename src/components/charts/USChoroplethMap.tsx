@@ -156,14 +156,18 @@ export function USChoroplethMap({
     return { minValue: min, maxValue: max };
   }, [dataLookup, propMinValue, propMaxValue, getMetricValue]);
 
-  // Color scale with 5 buckets
+  // Color scale with 9 buckets for more granular visualization
   const colorRange = useMemo(
     () => [
-      "hsl(var(--portal-accent-blue) / 0.15)",
-      "hsl(var(--portal-accent-blue) / 0.35)",
-      "hsl(var(--portal-accent-blue) / 0.55)",
-      "hsl(var(--portal-accent-blue) / 0.75)",
-      "hsl(var(--portal-accent-blue) / 0.95)",
+      "hsl(var(--portal-accent-blue) / 0.10)",
+      "hsl(var(--portal-accent-blue) / 0.20)",
+      "hsl(var(--portal-accent-blue) / 0.30)",
+      "hsl(var(--portal-accent-blue) / 0.40)",
+      "hsl(var(--portal-accent-blue) / 0.50)",
+      "hsl(var(--portal-accent-blue) / 0.60)",
+      "hsl(var(--portal-accent-blue) / 0.70)",
+      "hsl(var(--portal-accent-blue) / 0.85)",
+      "hsl(var(--portal-accent-blue) / 1.0)",
     ],
     []
   );
