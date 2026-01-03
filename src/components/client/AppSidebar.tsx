@@ -104,14 +104,8 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
       label: "Donors",
       items: [
         { title: "Demographics", url: "/client/demographics", icon: Users },
-        { title: "Donor Journey", url: "/client/journey", icon: TrendingUp },
+        { title: "Attribution & Performance", url: "/client/journey", icon: GitBranch },
         { title: "Donor Intelligence", url: "/client/donor-intelligence", icon: Brain },
-      ],
-    },
-    {
-      label: "Attribution",
-      items: [
-        { title: "Attribution", url: "/client/attribution", icon: GitBranch },
       ],
     },
     {
