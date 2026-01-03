@@ -16,7 +16,7 @@ import {
   type V3Column,
 } from "@/components/v3";
 import { EChartsBarChart, EChartsPieChart, EChartsUSMap, type USMapDataItem } from "@/components/charts/echarts";
-import { getStateName } from "@/lib/us-states";
+import { getStateName, getStateAbbreviation, isValidStateAbbreviation } from "@/lib/us-states";
 
 type Organization = {
   id: string;
@@ -102,32 +102,55 @@ const ClientDemographics = () => {
       const totalRevenue = transactions?.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0) || 0;
       const averageDonation = totalDonors > 0 ? totalRevenue / transactions.length : 0;
 
+      // Helper to normalize state to 2-letter abbreviation
+      const normalizeState = (rawState: string): string => {
+        if (!rawState) return "";
+        const trimmed = rawState.trim().toUpperCase();
+        // Already a valid abbreviation
+        if (trimmed.length === 2 && isValidStateAbbreviation(trimmed)) {
+          return trimmed;
+        }
+        // Try to get abbreviation from full name
+        const abbr = getStateAbbreviation(rawState);
+        if (abbr !== rawState && isValidStateAbbreviation(abbr)) {
+          return abbr.toUpperCase();
+        }
+        // Return original if we can't normalize
+        return trimmed;
+      };
+
       // State-level aggregation (keep ALL states for map, not just top 10)
       const locationMap = new Map<string, { count: number; revenue: number }>();
       transactions?.forEach((t: any) => {
         if (t.state) {
-          const existing = locationMap.get(t.state) || { count: 0, revenue: 0 };
-          locationMap.set(t.state, {
-            count: existing.count + 1,
-            revenue: existing.revenue + Number(t.amount || 0),
-          });
+          const normalizedState = normalizeState(t.state);
+          if (normalizedState) {
+            const existing = locationMap.get(normalizedState) || { count: 0, revenue: 0 };
+            locationMap.set(normalizedState, {
+              count: existing.count + 1,
+              revenue: existing.revenue + Number(t.amount || 0),
+            });
+          }
         }
       });
       const locationData = Array.from(locationMap.entries())
         .map(([state, data]) => ({ state, ...data }))
         .sort((a, b) => b.revenue - a.revenue);
 
-      // City-level aggregation for drill-down
+      // City-level aggregation for drill-down (using normalized state)
       const cityMap = new Map<string, { count: number; revenue: number; state: string }>();
       transactions?.forEach((t: any) => {
         if (t.city && t.state) {
-          const key = `${t.city}|${t.state}`;
-          const existing = cityMap.get(key) || { count: 0, revenue: 0, state: t.state };
-          cityMap.set(key, {
-            count: existing.count + 1,
-            revenue: existing.revenue + Number(t.amount || 0),
-            state: t.state,
-          });
+          const normalizedState = normalizeState(t.state);
+          if (normalizedState) {
+            const key = `${t.city}|${normalizedState}`;
+            const existing = cityMap.get(key) || { count: 0, revenue: 0, state: normalizedState };
+            cityMap.set(key, {
+              count: existing.count + 1,
+              revenue: existing.revenue + Number(t.amount || 0),
+              state: normalizedState,
+            });
+          }
         }
       });
       const cityData = Array.from(cityMap.entries())
