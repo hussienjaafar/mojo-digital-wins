@@ -413,7 +413,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         onTouchEnd={isMobile ? handleTouchEnd as any : undefined}
         aria-expanded={isEffectivelyExpanded}
       >
-      <SidebarContent className="py-6 px-2 portal-scrollbar" role="navigation" aria-label="Admin navigation">
+      <SidebarContent className={cn("py-6 portal-scrollbar", collapsed ? "px-1" : "px-2")} role="navigation" aria-label="Admin navigation">
         {/* Mobile refresh indicator */}
         {isMobile && isRefreshing && (
           <div className="px-4 pb-2">
@@ -494,16 +494,16 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
               open={isExpanded}
               onOpenChange={() => toggleGroup(group.label)}
             >
-              <SidebarGroup className="mb-4">
+              <SidebarGroup className={cn("mb-4", collapsed && "px-0")}>
                 {isEffectivelyExpanded && (
                   <CollapsibleTrigger asChild>
                     {groupLabel}
                   </CollapsibleTrigger>
                 )}
                 
-                <CollapsibleContent className="animate-accordion-down">
+                <CollapsibleContent className="animate-accordion-down" forceMount={collapsed ? true : undefined}>
                   <SidebarGroupContent>
-                    <SidebarMenu className="space-y-1">
+                    <SidebarMenu className={cn("space-y-1", collapsed && "items-center")}>
                       {group.items.map((item, itemIndex) => {
                         const isPinned = pinnedItemValues.includes(item.value);
                         const badge = item.badge || (item.value === 'contacts' && unreadCounts.contacts > 0 
@@ -531,10 +531,11 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                                     isActive={activeTab === item.value}
                                     aria-current={activeTab === item.value ? 'page' : undefined}
                                     className={cn(
-                                      "relative w-full min-h-[44px] group transition-colors",
-                                      collapsed ? 'justify-center px-2' : 'justify-start px-3',
-                                      "gap-3 py-2.5 rounded-md",
+                                      "relative w-full group transition-colors rounded-md",
                                       "hover:bg-[hsl(var(--portal-bg-hover))]",
+                                      collapsed 
+                                        ? "justify-center !size-10 !p-0 mx-auto" 
+                                        : "justify-start px-3 py-2.5 min-h-[44px] gap-3",
                                       activeTab === item.value && [
                                         "bg-[hsl(var(--portal-accent-blue)/0.1)]",
                                         "text-[hsl(var(--portal-accent-blue))]",
