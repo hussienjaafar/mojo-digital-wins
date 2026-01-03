@@ -91,15 +91,13 @@ const getTouchpointColor = (type: string): string => {
 };
 
 // ============================================================================
-// Funnel Stage Colors
+// Donor Lifecycle Stage Colors
 // ============================================================================
 
 const FUNNEL_STAGE_COLORS: Record<string, string> = {
-  awareness: "hsl(var(--portal-accent-blue))",
-  engagement: "hsl(var(--portal-accent-purple))",
-  conversion: "hsl(var(--portal-success))",
-  retention: "hsl(var(--portal-warning))",
-  advocacy: "hsl(var(--portal-error))",
+  conversion: "hsl(var(--portal-accent-blue))",  // First-time donors (baseline)
+  retention: "hsl(var(--portal-success))",       // Repeat donors
+  advocacy: "hsl(var(--portal-accent-purple))",  // Recurring donors
 };
 
 // ============================================================================
@@ -529,19 +527,19 @@ const ClientDonorJourney = () => {
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Conversion Funnel */}
+          {/* Donor Lifecycle Distribution (NOT a funnel - stages are independent) */}
           <V3ChartWrapper
-            title="Conversion Funnel"
-            description="Donor journey stages based on verified events only"
+            title="Donor Lifecycle Distribution"
+            description="Donor progression from first gift to recurring — based on ActBlue data"
             icon={Target}
             isLoading={isLoading}
-            ariaLabel="Funnel chart showing donor journey stages"
+            ariaLabel="Chart showing donor lifecycle stages"
           >
             {funnel.length === 0 || funnel.every(f => f.count === 0) ? (
               <div className="h-[280px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
                 <div className="text-center">
                   <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No funnel data available</p>
+                  <p>No lifecycle data available</p>
                   <p className="text-sm">Run the pipeline to generate journey events</p>
                 </div>
               </div>
@@ -549,8 +547,8 @@ const ClientDonorJourney = () => {
               <>
                 <div className="mb-2 p-2 rounded bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))]">
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                    <strong>Note:</strong> Funnel stages are based on events linked to individual donors (SMS, email, refcode visits). 
-                    Meta ad impressions/clicks are excluded as they cannot be attributed to specific donors.
+                    <strong>Data source:</strong> ActBlue transaction records only. 
+                    Shows unique donors at each lifecycle stage. Stages are <strong>not cumulative</strong> — a donor appears in only one stage.
                   </p>
                 </div>
                 <V3StageChart
@@ -559,10 +557,11 @@ const ClientDonorJourney = () => {
                     value: stage.count,
                     color: FUNNEL_STAGE_COLORS[stage.stage],
                   }))}
-                  height={260}
+                  height={240}
                   showConversionRates
                   valueType="number"
-                  showDropOffAnnotation
+                  showDropOffAnnotation={false}
+                  forceBarMode={true}
                 />
               </>
             )}

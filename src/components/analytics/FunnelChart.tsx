@@ -1,3 +1,24 @@
+/**
+ * FunnelChart - Stage Analysis Chart Component
+ * 
+ * IMPORTANT USAGE CONSTRAINTS:
+ * 
+ * This component uses V3StageChart which automatically detects whether data
+ * is truly sequential (monotonically decreasing). If data is NOT sequential:
+ * - It renders a horizontal bar chart instead of a funnel
+ * - Conversion percentages are hidden
+ * - Drop-off annotations are disabled
+ * 
+ * Before using this for "funnel" visualization, verify your data meets these criteria:
+ * 1. Each stage count represents UNIQUE entities (donors, users, etc.)
+ * 2. Stages are logically progressive (awareness → engagement → conversion)
+ * 3. Each entity can only be counted in ONE stage (their max stage reached)
+ * 4. Stage counts are monotonically decreasing: Stage[n] >= Stage[n+1]
+ * 
+ * If your data doesn't meet these criteria, use forceBarMode or rename the chart
+ * to avoid implying causality that doesn't exist.
+ */
+
 import { memo, useMemo } from 'react';
 import { Filter } from 'lucide-react';
 import { ChartPanel } from '@/components/charts/ChartPanel';
