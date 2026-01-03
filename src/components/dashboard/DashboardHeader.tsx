@@ -228,19 +228,21 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
           // Fallback: render dateControls + separate refresh button
           return (
-            <DateInputGroup
+            <div
               className={cn(
-                // Mobile: full width, ensure proper touch targets
+                // Mobile: full width, stack vertically
                 "w-full sm:w-auto",
+                // Controls container: flex with proper gaps
+                "flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3",
                 // Wrap on smaller tablets if needed
-                "flex-wrap lg:flex-nowrap"
+                "lg:flex-nowrap"
               )}
             >
               {dateControls}
               {showRefresh && onRefresh && (
                 <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
               )}
-            </DateInputGroup>
+            </div>
           );
         })()}
       </div>

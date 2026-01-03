@@ -350,6 +350,27 @@ interface CalendarTriggerProps {
   size?: "sm" | "md";
 }
 
+/**
+ * Format date range in compact form:
+ * - Same year: "Dec 3 – Jan 2, 2026"
+ * - Different years: "Dec 3, 2025 – Jan 2, 2026"
+ * - Mobile: "Dec 3 – Jan 2"
+ */
+const formatCompactDateRange = (startDate: Date, endDate: Date, isMobile: boolean): string => {
+  const startYear = startDate.getFullYear();
+  const endYear = endDate.getFullYear();
+
+  if (isMobile) {
+    return `${format(startDate, "MMM d")} – ${format(endDate, "MMM d")}`;
+  }
+
+  if (startYear === endYear) {
+    return `${format(startDate, "MMM d")} – ${format(endDate, "MMM d, yyyy")}`;
+  }
+
+  return `${format(startDate, "MMM d, yyyy")} – ${format(endDate, "MMM d, yyyy")}`;
+};
+
 const CalendarTrigger = React.forwardRef<
   HTMLButtonElement,
   CalendarTriggerProps & React.ButtonHTMLAttributes<HTMLButtonElement>
@@ -360,22 +381,21 @@ const CalendarTrigger = React.forwardRef<
       size={size}
       accent="blue"
       isOpen={isOpen}
-      className={className}
+      className={cn("max-w-[280px]", className)}
       aria-label={`Open date range calendar (${format(startDate, "MMM d, yyyy")} to ${format(endDate, "MMM d, yyyy")})`}
       {...props}
     >
       <DateInputIcon isOpen={isOpen} accent="blue">
         <CalendarIcon className="h-4 w-4" />
       </DateInputIcon>
-      {/* Full date on larger screens */}
-      <span className="hidden sm:inline text-sm">
-        {format(startDate, "MMM d, yyyy")} to {format(endDate, "MMM d, yyyy")}
+      {/* Compact date display */}
+      <span className="hidden sm:inline text-sm truncate">
+        {formatCompactDateRange(startDate, endDate, false)}
       </span>
-      {/* Compact date on mobile */}
-      <span className="sm:hidden text-sm">
-        {format(startDate, "MMM d")} - {format(endDate, "MMM d")}
+      <span className="sm:hidden text-sm truncate">
+        {formatCompactDateRange(startDate, endDate, true)}
       </span>
-      <DateInputIcon isOpen={isOpen} accent="blue" rotateOnOpen className="ml-auto">
+      <DateInputIcon isOpen={isOpen} accent="blue" rotateOnOpen className="ml-auto shrink-0">
         <ChevronDown className="h-4 w-4" />
       </DateInputIcon>
     </DateInputTrigger>

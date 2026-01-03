@@ -408,8 +408,10 @@ const ClientDashboard = () => {
                     </Tooltip>
                   ].filter(Boolean)}
                   controls={
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <DateRangeControl pillPresets={["7d", "14d", "30d", "90d"]} />
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                      {/* Row 1: Date controls */}
+                      <DateRangeControl pillPresets={["7d", "14d", "30d", "90d"]} size="sm" />
+                      {/* Row 2 on mobile / inline on desktop: Filters */}
                       {organizationId && (
                         <CampaignCreativeFilters organizationId={organizationId} />
                       )}
