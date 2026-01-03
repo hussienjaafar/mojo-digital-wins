@@ -329,91 +329,97 @@ async function fetchDonorJourneyData(
     }
   );
 
-  // Calculate funnel stages from REAL journey events data
-  // IMPORTANT: Only include event types that can be deterministically linked to individual donors
-  // Meta ad events (meta_ad_click, meta_ad_impression) are EXCLUDED because:
-  // - Meta Marketing API only provides aggregated campaign metrics
-  // - We cannot attribute impressions/clicks to specific donors without pixel/CAPI integration
-  // - Including them would imply per-donor tracking that doesn't exist
-  const awarenessEventTypes = [
-    'email_open', 'landing_page_view', 'sms_sent', 'sms_delivered',
-    'organic_search', 'social_click', 'direct_visit', 'refcode_visit'
-  ];
-  
-  const engagementEventTypes = [
-    'sms_click', 'email_click', 'landing_page_view', 'sms_reply', 'refcode_click'
-  ];
-  
-  const awarenessEvents = journeyEvents.filter((e: any) => 
-    awarenessEventTypes.includes(e.event_type)
-  );
-  const engagementEvents = journeyEvents.filter((e: any) => 
-    engagementEventTypes.includes(e.event_type)
-  );
-  const conversionEvents = journeyEvents.filter((e: any) => 
-    e.event_type === 'first_donation'
-  );
-  const retentionEvents = journeyEvents.filter((e: any) => 
-    ['repeat_donation', 'recurring_donation'].includes(e.event_type)
-  );
-  const advocacyEvents = journeyEvents.filter((e: any) => 
-    e.event_type === 'recurring_signup'
-  );
+  // ============================================================================
+  // DONOR LIFECYCLE DISTRIBUTION (formerly "Conversion Funnel")
+  // ============================================================================
+  // 
+  // ARCHITECTURAL CONSTRAINTS (DO NOT REMOVE):
+  // 
+  // 1. This is NOT a traditional funnel because:
+  //    - We don't track pre-donation awareness for most donors
+  //    - A donor can appear in "Conversion" without any awareness event
+  //    - Stages are counted independently, not progressively
+  //
+  // 2. What we CAN reliably track (from ActBlue):
+  //    - first_donation: Donor made their first gift
+  //    - repeat_donation: Donor gave again (non-recurring)
+  //    - recurring_donation: Donor made a recurring gift
+  //    - recurring_signup: Donor signed up for recurring
+  //
+  // 3. What we CANNOT reliably track:
+  //    - Awareness: No per-donor ad impression/click data from Meta
+  //    - Engagement: SMS/email clicks require identity resolution
+  //
+  // 4. NO FALLBACKS ALLOWED:
+  //    - Never fabricate counts when data is missing
+  //    - Never mix event counts with donor counts
+  //    - If a stage has 0 donors, show 0
+  //
+  // ============================================================================
 
-  // Get unique donors at each stage
-  const awarenessCount = new Set(awarenessEvents.map((e: any) => e.donor_key)).size || touchpoints.length;
-  const engagementCount = new Set(engagementEvents.map((e: any) => e.donor_key)).size || 
-    new Set(touchpoints.map((t: any) => t.donor_email)).size;
-  const conversionCount = new Set(conversionEvents.map((e: any) => e.donor_key)).size;
-  const retentionCount = new Set(retentionEvents.map((e: any) => e.donor_key)).size;
-  const advocacyCount = new Set(advocacyEvents.map((e: any) => e.donor_key)).size;
+  // Stage definitions based on VERIFIABLE ActBlue data only
+  // Awareness/Engagement stages are disabled until we have reliable per-donor tracking
+  const stageDefinitions = {
+    // awareness: ['email_open', 'sms_delivered', 'direct_visit'], // DISABLED: unreliable
+    // engagement: ['sms_click', 'email_click'], // DISABLED: 0 events in DB
+    conversion: ['first_donation'],
+    retention: ['repeat_donation', 'recurring_donation'],
+    advocacy: ['recurring_signup'],
+  };
+
+  // Count unique donors per stage (no fallbacks)
+  const conversionDonors = new Set(
+    journeyEvents.filter((e: any) => stageDefinitions.conversion.includes(e.event_type))
+      .map((e: any) => e.donor_key)
+  );
+  const retentionDonors = new Set(
+    journeyEvents.filter((e: any) => stageDefinitions.retention.includes(e.event_type))
+      .map((e: any) => e.donor_key)
+  );
+  const advocacyDonors = new Set(
+    journeyEvents.filter((e: any) => stageDefinitions.advocacy.includes(e.event_type))
+      .map((e: any) => e.donor_key)
+  );
 
   // Calculate revenue at each stage
-  const conversionValue = conversionEvents.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
-  const retentionValue = retentionEvents.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
-  const advocacyValue = advocacyEvents.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+  const conversionValue = journeyEvents
+    .filter((e: any) => stageDefinitions.conversion.includes(e.event_type))
+    .reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+  const retentionValue = journeyEvents
+    .filter((e: any) => stageDefinitions.retention.includes(e.event_type))
+    .reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
+  const advocacyValue = journeyEvents
+    .filter((e: any) => stageDefinitions.advocacy.includes(e.event_type))
+    .reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
 
-  // Calculate baseline for funnel - use awareness count as the top
-  const funnelBaseline = awarenessCount || segments.length || 100;
+  // Build lifecycle distribution (NOT a funnel - stages are independent)
+  // Use conversion as the baseline since it's our most reliable data
+  const conversionCount = conversionDonors.size;
+  const retentionCount = retentionDonors.size;
+  const advocacyCount = advocacyDonors.size;
 
   const funnel: FunnelStage[] = [
     {
-      stage: "awareness",
-      label: "Awareness",
-      count: awarenessCount || segments.length,
-      percentage: 100,
-      value: 0,
+      stage: "conversion",
+      label: "First-Time Donors",
+      count: conversionCount,
+      percentage: 100, // Baseline
+      value: conversionValue,
       dropoffRate: 0,
     },
     {
-      stage: "engagement",
-      label: "Engagement",
-      count: engagementCount || Math.round(funnelBaseline * 0.7),
-      percentage: funnelBaseline > 0 ? Math.round((engagementCount / funnelBaseline) * 100) : 70,
-      value: 0,
-      dropoffRate: funnelBaseline > 0 ? Math.round(((funnelBaseline - engagementCount) / funnelBaseline) * 100) : 30,
-    },
-    {
-      stage: "conversion",
-      label: "Conversion",
-      count: conversionCount || journeys.length,
-      percentage: engagementCount > 0 ? Math.round(((conversionCount || journeys.length) / engagementCount) * 100) : 0,
-      value: conversionValue || transactions.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0),
-      dropoffRate: engagementCount > 0 ? Math.round(((engagementCount - (conversionCount || journeys.length)) / engagementCount) * 100) : 0,
-    },
-    {
       stage: "retention",
-      label: "Retention",
-      count: retentionCount || segments.filter((s: any) => Number(s.donation_count || 1) > 1).length,
+      label: "Repeat Donors",
+      count: retentionCount,
       percentage: conversionCount > 0 ? Math.round((retentionCount / conversionCount) * 100) : 0,
       value: retentionValue,
       dropoffRate: conversionCount > 0 ? Math.round(((conversionCount - retentionCount) / conversionCount) * 100) : 0,
     },
     {
       stage: "advocacy",
-      label: "Advocacy",
-      count: advocacyCount || segments.filter((s: any) => Number(s.donation_count || 1) >= 5).length,
-      percentage: retentionCount > 0 ? Math.round((advocacyCount / retentionCount) * 100) : 0,
+      label: "Recurring Donors",
+      count: advocacyCount,
+      percentage: conversionCount > 0 ? Math.round((advocacyCount / conversionCount) * 100) : 0,
       value: advocacyValue,
       dropoffRate: retentionCount > 0 ? Math.round(((retentionCount - advocacyCount) / retentionCount) * 100) : 0,
     },
