@@ -4,8 +4,10 @@ import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getStateName, getStateAbbreviation } from "@/lib/us-states";
+import { getStateName, getStateAbbreviation, STATE_ABBREVIATIONS } from "@/lib/us-states";
 import { formatCurrency, formatNumber } from "@/lib/chart-formatters";
+import { getPortalChartColors, getMapGradientColors } from "@/lib/resolve-css-color";
+import { useTheme } from "next-themes";
 
 export interface USMapDataItem {
   /** State abbreviation (e.g., "CA") or full name (e.g., "California") */
@@ -41,10 +43,10 @@ export interface EChartsUSMapProps {
   maxValue?: number;
 }
 
-// TopoJSON URL for USA map (us-atlas)
-const USA_GEOJSON_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
+// Albers-projected TopoJSON (has AK/HI inset correctly)
+const USA_ALBERS_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-albers-10m.json";
 
-// FIPS codes to state names mapping
+// FIPS codes to state names mapping (excluding territories for cleaner map bounds)
 const FIPS_TO_STATE: Record<string, string> = {
   "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas",
   "06": "California", "08": "Colorado", "09": "Connecticut", "10": "Delaware",
@@ -58,8 +60,11 @@ const FIPS_TO_STATE: Record<string, string> = {
   "40": "Oklahoma", "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island",
   "45": "South Carolina", "46": "South Dakota", "47": "Tennessee", "48": "Texas",
   "49": "Utah", "50": "Vermont", "51": "Virginia", "53": "Washington",
-  "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming", "72": "Puerto Rico",
+  "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming",
 };
+
+// All 50 states + DC for complete data coverage
+const ALL_STATE_NAMES = Object.values(FIPS_TO_STATE);
 
 export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
   data,
@@ -77,6 +82,7 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [mapRegistered, setMapRegistered] = React.useState(false);
   const [mapError, setMapError] = React.useState<string | null>(null);
+  const { theme } = useTheme();
 
   // Register the USA map on mount
   React.useEffect(() => {
@@ -88,7 +94,7 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
           return;
         }
 
-        const response = await fetch(USA_GEOJSON_URL);
+        const response = await fetch(USA_ALBERS_URL);
         if (!response.ok) throw new Error("Failed to load map data");
         
         const topoJson = await response.json();
@@ -97,20 +103,24 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
         const { feature } = await import("topojson-client");
         const geoJson = feature(topoJson, topoJson.objects.states) as any;
         
-        // Add state names to features using normalized FIPS codes
-        geoJson.features = geoJson.features.map((f: any) => {
-          // Normalize FIPS ID - can be number or string, pad to 2 digits
-          const fips = String(f.id).padStart(2, "0");
-          const stateName = FIPS_TO_STATE[fips] || f.properties?.name || "Unknown";
-          
-          return {
-            ...f,
-            properties: {
-              ...f.properties,
-              name: stateName,
-            },
-          };
-        });
+        // Add state names and filter out Puerto Rico/territories
+        geoJson.features = geoJson.features
+          .map((f: any) => {
+            const fips = String(f.id).padStart(2, "0");
+            const stateName = FIPS_TO_STATE[fips];
+            
+            // Skip territories (Puerto Rico = 72, etc.)
+            if (!stateName) return null;
+            
+            return {
+              ...f,
+              properties: {
+                ...f.properties,
+                name: stateName,
+              },
+            };
+          })
+          .filter(Boolean);
 
         echarts.registerMap("USA", geoJson);
         setMapRegistered(true);
@@ -123,26 +133,34 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
     registerMap();
   }, []);
 
-  // Resize chart when map is registered or container changes
+  // Resize chart after map registration
   React.useEffect(() => {
     if (!mapRegistered || !chartRef.current) return;
     
     const chart = chartRef.current.getEchartsInstance();
-    if (chart) {
-      // Delay resize to ensure container has settled
-      const timer = setTimeout(() => chart.resize(), 100);
-      return () => clearTimeout(timer);
+    if (chart && !chart.isDisposed?.()) {
+      requestAnimationFrame(() => {
+        try {
+          chart.resize();
+        } catch (e) {
+          // Chart may have been disposed
+        }
+      });
     }
   }, [mapRegistered]);
 
   // ResizeObserver for container size changes
   React.useEffect(() => {
-    if (!containerRef.current || !chartRef.current) return;
+    if (!containerRef.current) return;
 
     const resizeObserver = new ResizeObserver(() => {
       const chart = chartRef.current?.getEchartsInstance();
-      if (chart) {
-        chart.resize();
+      if (chart && !chart.isDisposed?.()) {
+        try {
+          chart.resize();
+        } catch (e) {
+          // Chart may have been disposed
+        }
       }
     });
 
@@ -150,21 +168,59 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
     return () => resizeObserver.disconnect();
   }, [mapRegistered]);
 
-  // Transform data to use full state names for GeoJSON matching
+  // Resolve theme-aware colors
+  const colors = React.useMemo(() => {
+    return getPortalChartColors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme, mapRegistered]);
+
+  const gradientColors = React.useMemo(() => {
+    return getMapGradientColors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme, mapRegistered]);
+
+  // Transform data: ensure ALL states have entries, use full names for GeoJSON matching
   const transformedData = React.useMemo(() => {
-    return data.map((item) => ({
-      ...item,
-      // Convert abbreviation to full name if needed
-      name: item.name.length === 2 ? getStateName(item.name) : item.name,
-      originalAbbr: item.name.length === 2 ? item.name : getStateAbbreviation(item.name),
-    }));
+    // Create a lookup from input data
+    const dataLookup = new Map<string, USMapDataItem>();
+    
+    data.forEach((item) => {
+      // Normalize to full state name
+      const fullName = item.name.length === 2 
+        ? getStateName(item.name.toUpperCase()) 
+        : item.name;
+      const abbr = item.name.length === 2 
+        ? item.name.toUpperCase() 
+        : getStateAbbreviation(item.name);
+      
+      dataLookup.set(fullName, {
+        ...item,
+        name: fullName,
+        originalAbbr: abbr,
+      });
+    });
+
+    // Build complete dataset for all states
+    return ALL_STATE_NAMES.map((stateName) => {
+      const existing = dataLookup.get(stateName);
+      if (existing) {
+        return existing;
+      }
+      // Default entry for states with no data
+      return {
+        name: stateName,
+        value: 0,
+        revenue: 0,
+        originalAbbr: getStateAbbreviation(stateName),
+      };
+    });
   }, [data]);
 
   // Calculate min/max for visualMap
   const { calculatedMin, calculatedMax } = React.useMemo(() => {
-    const values = transformedData.map((d) => d.value);
+    const values = transformedData.map((d) => d.value).filter((v) => v > 0);
     return {
-      calculatedMin: minValue ?? Math.min(...values, 0),
+      calculatedMin: minValue ?? 0,
       calculatedMax: maxValue ?? Math.max(...values, 1),
     };
   }, [transformedData, minValue, maxValue]);
@@ -181,38 +237,42 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
     }
   }, [valueType]);
 
-  // ECharts option - using layoutCenter/layoutSize for reliable sizing
+  // ECharts option with resolved colors
   const option = React.useMemo<EChartsOption>(() => ({
     tooltip: {
       trigger: "item",
-      backgroundColor: "hsl(var(--portal-bg-elevated))",
-      borderColor: "hsl(var(--portal-border))",
+      backgroundColor: colors.bgElevated,
+      borderColor: colors.border,
       textStyle: {
-        color: "hsl(var(--portal-text-primary))",
+        color: colors.textPrimary,
         fontSize: 13,
       },
-      extraCssText: "box-shadow: 0 4px 16px rgba(0,0,0,0.25); border-radius: 8px; backdrop-filter: blur(8px);",
+      extraCssText: "box-shadow: 0 4px 16px rgba(0,0,0,0.25); border-radius: 8px;",
       formatter: (params: any) => {
-        if (!params.data) {
+        const stateName = params.name || "Unknown";
+        const stateData = params.data;
+        
+        if (!stateData || stateData.value === 0) {
           return `<div style="padding: 4px 0;">
-            <div style="font-weight: 600; margin-bottom: 4px;">${params.name}</div>
-            <div style="color: hsl(var(--portal-text-muted));">No data available</div>
+            <div style="font-weight: 600; margin-bottom: 4px;">${stateName}</div>
+            <div style="color: ${colors.textMuted};">No data available</div>
           </div>`;
         }
-        const { name, value, revenue, originalAbbr } = params.data;
-        const displayName = originalAbbr ? `${name} (${originalAbbr})` : name;
+        
+        const { value, revenue, originalAbbr } = stateData;
+        const displayName = originalAbbr ? `${stateName} (${originalAbbr})` : stateName;
         
         let content = `<div style="padding: 4px 0;">
           <div style="font-weight: 600; margin-bottom: 8px; font-size: 14px;">${displayName}</div>
           <div style="display: flex; justify-content: space-between; gap: 16px; margin-bottom: 4px;">
-            <span style="color: hsl(var(--portal-text-muted));">${valueLabel}:</span>
-            <span style="font-weight: 600; color: hsl(var(--portal-accent-blue));">${formatValue(value)}</span>
+            <span style="color: ${colors.textMuted};">${valueLabel}:</span>
+            <span style="font-weight: 600; color: ${colors.accentBlue};">${formatValue(value)}</span>
           </div>`;
         
-        if (showRevenue && revenue !== undefined) {
+        if (showRevenue && revenue !== undefined && revenue > 0) {
           content += `<div style="display: flex; justify-content: space-between; gap: 16px;">
-            <span style="color: hsl(var(--portal-text-muted));">Revenue:</span>
-            <span style="font-weight: 600; color: hsl(var(--portal-success));">${formatCurrency(revenue)}</span>
+            <span style="color: ${colors.textMuted};">Revenue:</span>
+            <span style="font-weight: 600; color: ${colors.success};">${formatCurrency(revenue)}</span>
           </div>`;
         }
         
@@ -229,23 +289,17 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
       orient: "horizontal",
       text: ["High", "Low"],
       textStyle: {
-        color: "hsl(var(--portal-text-secondary))",
+        color: colors.textSecondary,
         fontSize: 11,
       },
-      calculable: false, // Disable draggable handles for cleaner UI
+      calculable: false,
       itemWidth: 200,
       itemHeight: 12,
       inRange: {
-        color: [
-          "hsl(213 90% 95%)",   // Very light blue
-          "hsl(213 90% 75%)",   // Light blue
-          "hsl(213 90% 55%)",   // Medium blue
-          "hsl(213 90% 45%)",   // Portal blue
-          "hsl(213 90% 35%)",   // Dark blue
-        ],
+        color: gradientColors,
       },
       outOfRange: {
-        color: ["hsl(var(--portal-bg-tertiary))"],
+        color: [colors.bgTertiary],
       },
     },
     series: [
@@ -253,23 +307,27 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
         type: "map",
         map: "USA",
         roam: false,
-        // Use layoutCenter/layoutSize for reliable positioning
-        layoutCenter: ["50%", "45%"],
-        layoutSize: "95%",
+        projection: {
+          // Albers projection is already applied in the TopoJSON
+          project: (point) => point,
+          unproject: (point) => point,
+        },
+        layoutCenter: ["50%", "50%"],
+        layoutSize: "100%",
         data: transformedData,
         selectedMode: onStateClick ? "single" : false,
         label: {
           show: false,
         },
         itemStyle: {
-          areaColor: "hsl(var(--portal-bg-tertiary))",
-          borderColor: "hsl(var(--portal-border))",
+          areaColor: colors.bgTertiary,
+          borderColor: colors.border,
           borderWidth: 0.5,
         },
         emphasis: {
           itemStyle: {
-            areaColor: "hsl(var(--portal-accent-blue) / 0.3)",
-            borderColor: "hsl(var(--portal-accent-blue))",
+            areaColor: colors.accentBlueLight,
+            borderColor: colors.accentBlue,
             borderWidth: 1.5,
           },
           label: {
@@ -278,8 +336,8 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
         },
         select: {
           itemStyle: {
-            areaColor: "hsl(var(--portal-accent-blue) / 0.4)",
-            borderColor: "hsl(var(--portal-accent-blue))",
+            areaColor: colors.accentBlueLight,
+            borderColor: colors.accentBlue,
             borderWidth: 2,
           },
           label: {
@@ -288,17 +346,24 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
         },
       },
     ],
-  }), [transformedData, calculatedMin, calculatedMax, valueLabel, showRevenue, formatValue, onStateClick]);
+  }), [transformedData, calculatedMin, calculatedMax, valueLabel, showRevenue, formatValue, onStateClick, colors, gradientColors]);
 
-  // Handle click events
+  // Handle click events - works even for states with no data
   const handleEvents = React.useMemo(() => {
     if (!onStateClick) return {};
     
     return {
       click: (params: any) => {
-        if (params.componentType === "series" && params.data) {
-          const { name, originalAbbr } = params.data;
-          onStateClick(originalAbbr || getStateAbbreviation(name), name, params.data);
+        if (params.componentType === "series") {
+          const stateName = params.name;
+          const stateData = params.data || {
+            name: stateName,
+            value: 0,
+            revenue: 0,
+            originalAbbr: getStateAbbreviation(stateName),
+          };
+          const abbr = stateData.originalAbbr || getStateAbbreviation(stateName);
+          onStateClick(abbr, stateName, stateData);
         }
       },
     };
@@ -341,7 +406,7 @@ export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
         ref={chartRef}
         option={option}
         style={{ width: "100%", height: "100%" }}
-        opts={{ renderer: "canvas" }} // Canvas renderer for reliable sizing
+        opts={{ renderer: "canvas" }}
         onEvents={handleEvents}
         notMerge
       />
