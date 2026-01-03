@@ -7659,6 +7659,7 @@ export type Database = {
           _timezone?: string
         }
         Returns: {
+          count: number
           day_of_week: number
           hour: number
           value: number

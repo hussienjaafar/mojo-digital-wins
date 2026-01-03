@@ -139,6 +139,7 @@ export function normalizeHeatmapData(
 
 /**
  * Transform grid data for a different metric
+ * Preserves hasData, count, and revenue for tooltip display
  */
 export function transformGridForMetric(
   grid: HeatmapDataPoint[],
@@ -146,24 +147,28 @@ export function transformGridForMetric(
 ): HeatmapDataPoint[] {
   return grid.map(point => {
     let value = 0;
+    const count = point.count || 0;
+    const revenue = point.revenue || point.value || 0;
     
     switch (metric) {
       case 'revenue':
-        value = point.revenue || point.value || 0;
+        value = revenue;
         break;
       case 'count':
-        value = point.count || 0;
+        value = count;
         break;
       case 'avg_donation':
-        value = (point.count && point.count > 0) 
-          ? (point.revenue || point.value || 0) / point.count 
-          : 0;
+        value = count > 0 ? revenue / count : 0;
         break;
     }
     
     return {
       ...point,
       value,
+      // Ensure hasData is preserved - true if count > 0
+      hasData: count > 0,
+      count,
+      revenue,
     };
   });
 }

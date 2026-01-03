@@ -185,7 +185,8 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
           const percentOfTotal = stats.totalValue > 0 ? (value / stats.totalValue) * 100 : 0;
           const isAboveAvg = value > stats.avgValue;
           const isBelowAvg = value < stats.avgValue && value > 0;
-          const hasNoData = !cell?.hasData;
+          // Check hasData based on count - cell exists and has count > 0
+          const hasNoData = !cell || (cell.count === undefined || cell.count === 0);
           
           // Above/below average indicator
           const avgIndicator = hasNoData 
