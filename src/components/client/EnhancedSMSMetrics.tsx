@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { EChartsLineChart } from "@/components/charts/echarts/EChartsLineChart";
-import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
+import { V3BarChart } from "@/components/charts/V3BarChart";
 import { V3DonutChart } from "@/components/charts/echarts/V3DonutChart";
 import { 
   TrendingUp, TrendingDown, MessageSquare, Users, 
@@ -406,13 +406,16 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
 
       {/* Conversion Funnel */}
       <V3ChartWrapper title="Conversion Funnel" ariaLabel="SMS conversion funnel chart">
-        <EChartsBarChart
+        <V3BarChart
           data={funnelData as unknown as Record<string, unknown>[]}
-          xAxisKey="stage"
-          series={[{ dataKey: "value", name: "Count", color: CHART_COLORS.primary }]}
+          nameKey="stage"
+          valueKey="value"
+          valueName="Count"
+          barColor={CHART_COLORS.primary}
           height={300}
           horizontal
-          disableHoverEmphasis
+          topN={10}
+          showRankBadges={false}
         />
       </V3ChartWrapper>
 

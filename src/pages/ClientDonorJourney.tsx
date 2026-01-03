@@ -51,7 +51,7 @@ import {
   V3FilterPill,
 } from "@/components/v3";
 import { PortalTable, type PortalTableColumn } from "@/components/v3/PortalTable";
-import { EChartsFunnelChart, EChartsBarChart } from "@/components/charts/echarts";
+import { V3FunnelChart, V3BarChart } from "@/components/charts";
 
 // ============================================================================
 // Touchpoint Icon Helper
@@ -545,8 +545,8 @@ const ClientDonorJourney = () => {
                 </div>
               </div>
             ) : (
-              <EChartsFunnelChart
-                data={funnel.map(stage => ({
+              <V3FunnelChart
+                stages={funnel.map(stage => ({
                   name: stage.label,
                   value: stage.count,
                   color: FUNNEL_STAGE_COLORS[stage.stage],
@@ -554,6 +554,7 @@ const ClientDonorJourney = () => {
                 height={280}
                 showConversionRates
                 valueType="number"
+                showDropOffAnnotation
               />
             )}
           </V3ChartWrapper>
@@ -575,12 +576,15 @@ const ClientDonorJourney = () => {
                 </div>
               </div>
             ) : (
-              <EChartsBarChart
+              <V3BarChart
                 data={touchpointChartData}
-                xAxisKey="name"
-                series={[{ dataKey: "value", name: "Touchpoints" }]}
+                nameKey="name"
+                valueKey="value"
+                valueName="Touchpoints"
                 height={280}
                 valueType="number"
+                horizontal
+                topN={8}
               />
             )}
           </V3ChartWrapper>

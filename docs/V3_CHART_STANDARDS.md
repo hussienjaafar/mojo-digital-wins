@@ -29,9 +29,17 @@ V3ChartWrapper (accessibility, header, actions)
 | Component | Import | Use Case | Key Props |
 |-----------|--------|----------|-----------|
 | `EChartsLineChart` | `@/components/charts/echarts` | Time series, trends | `xAxisType`, `dualYAxis`, `showRollingAverage` |
-| `EChartsBarChart` | `@/components/charts/echarts` | Comparisons, rankings | `horizontal`, `valueType`, `enableCrossHighlight` |
+| `EChartsBarChart` | `@/components/charts/echarts` | Multi-series comparisons | `horizontal`, `valueType`, `enableCrossHighlight` |
 | `EChartsPieChart` | `@/components/charts/echarts` | Distribution, composition | `variant` ("pie" \| "donut"), `showPercentage` |
-| `EChartsFunnelChart` | `@/components/charts/echarts` | Conversion flows | `showConversionRates`, `orientation` |
+| `EChartsFunnelChart` | `@/components/charts/echarts` | Simple conversion flows | `showConversionRates`, `orientation` |
+
+### Premium V3 Charts
+
+| Component | Import | Use Case | Key Props |
+|-----------|--------|----------|-----------|
+| `V3BarChart` | `@/components/charts` | Sorted rankings, Top N + Other | `topN`, `showRankBadges`, `onCategorySelect` |
+| `V3FunnelChart` | `@/components/charts` | Validated funnels, drop-off analysis | `showDropOffAnnotation`, `showSequenceWarning` |
+| `V3TimeHeatmap` | `@/components/charts` | Day×Hour activity patterns | `metric`, `onCellSelect`, `scaleMode` |
 
 ### Tables
 
