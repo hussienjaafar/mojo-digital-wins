@@ -3,7 +3,6 @@ import {
   ComposableMap,
   Geographies,
   Geography,
-  ZoomableGroup,
 } from "react-simple-maps";
 import { scaleQuantize } from "d3-scale";
 import { FIPS_TO_STATE, ABBR_TO_FIPS, getStateByFips } from "@/lib/us-fips";
@@ -268,81 +267,79 @@ export function USChoroplethMap({
         style={{ width: "100%", height: typeof height === "number" ? height : undefined }}
         projectionConfig={{ scale: 1000 }}
       >
-        <ZoomableGroup center={[0, 0]} zoom={1} minZoom={1} maxZoom={1}>
-          <Geographies geography={GEO_URL}>
-            {({ geographies }) =>
-              geographies.map((geo) => {
-                const fips = geo.id;
-                const stateInfo = getStateByFips(fips);
-                const stateData = dataLookup.get(fips);
-                const isHovered = hoveredFips === fips;
-                const isSelected = selectedFips === fips;
-                const metricValue = stateData ? getMetricValue(stateData) : 0;
-                const hasData = stateData !== undefined && metricValue > 0;
+        <Geographies geography={GEO_URL}>
+          {({ geographies }) =>
+            geographies.map((geo) => {
+              const fips = geo.id;
+              const stateInfo = getStateByFips(fips);
+              const stateData = dataLookup.get(fips);
+              const isHovered = hoveredFips === fips;
+              const isSelected = selectedFips === fips;
+              const metricValue = stateData ? getMetricValue(stateData) : 0;
+              const hasData = stateData !== undefined && metricValue > 0;
 
-                // Determine fill color
-                let fillColor: string;
-                if (!hasData) {
-                  fillColor = NO_DATA_COLOR;
-                } else {
-                  fillColor = colorScale(metricValue);
-                }
+              // Determine fill color
+              let fillColor: string;
+              if (!hasData) {
+                fillColor = NO_DATA_COLOR;
+              } else {
+                fillColor = colorScale(metricValue);
+              }
 
-                // Selected state has accent outline
-                const strokeColor = isSelected
-                  ? "hsl(var(--portal-accent-blue))"
-                  : "hsl(var(--portal-border))";
-                const strokeWidth = isSelected ? 2 : 0.5;
+              // Selected state has accent outline
+              const strokeColor = isSelected
+                ? "hsl(var(--portal-accent-blue))"
+                : "hsl(var(--portal-border))";
+              const strokeWidth = isSelected ? 2 : 0.5;
 
-                // Aria label for accessibility
-                const ariaLabel = stateInfo
-                  ? `View details for ${stateInfo.name} (${stateInfo.abbreviation}). ${
-                      hasData ? `${formatMetricValue(metricValue)} ${metricLabel.toLowerCase()}.` : "No data."
-                    }`
-                  : undefined;
+              // Aria label for accessibility
+              const ariaLabel = stateInfo
+                ? `View details for ${stateInfo.name} (${stateInfo.abbreviation}). ${
+                    hasData ? `${formatMetricValue(metricValue)} ${metricLabel.toLowerCase()}.` : "No data."
+                  }`
+                : undefined;
 
-                return (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
-                    tabIndex={onStateClick ? 0 : -1}
-                    role="button"
-                    aria-label={ariaLabel}
-                    onClick={() => handleClick(geo)}
-                    onMouseEnter={(e) => handleMouseEnter(geo, e)}
-                    onMouseMove={handleMouseMove}
-                    onMouseLeave={handleMouseLeave}
-                    onKeyDown={(e) => handleKeyDown(geo, e)}
-                    style={{
-                      default: {
-                        fill: fillColor,
-                        stroke: strokeColor,
-                        strokeWidth,
-                        outline: "none",
-                        cursor: onStateClick ? "pointer" : "default",
-                      },
-                      hover: {
-                        fill: hasData
-                          ? "hsl(var(--portal-accent-blue))"
-                          : "hsl(var(--portal-card-bg))",
-                        stroke: "hsl(var(--portal-text-primary))",
-                        strokeWidth: 1.5,
-                        outline: "none",
-                        cursor: onStateClick ? "pointer" : "default",
-                      },
-                      pressed: {
-                        fill: "hsl(var(--portal-accent-blue))",
-                        stroke: "hsl(var(--portal-text-primary))",
-                        strokeWidth: 2,
-                        outline: "none",
-                      },
-                    }}
-                  />
-                );
-              })
-            }
-          </Geographies>
-        </ZoomableGroup>
+              return (
+                <Geography
+                  key={geo.rsmKey}
+                  geography={geo}
+                  tabIndex={onStateClick ? 0 : -1}
+                  role="button"
+                  aria-label={ariaLabel}
+                  onClick={() => handleClick(geo)}
+                  onMouseEnter={(e) => handleMouseEnter(geo, e)}
+                  onMouseMove={handleMouseMove}
+                  onMouseLeave={handleMouseLeave}
+                  onKeyDown={(e) => handleKeyDown(geo, e)}
+                  style={{
+                    default: {
+                      fill: fillColor,
+                      stroke: strokeColor,
+                      strokeWidth,
+                      outline: "none",
+                      cursor: onStateClick ? "pointer" : "default",
+                    },
+                    hover: {
+                      fill: hasData
+                        ? "hsl(var(--portal-accent-blue))"
+                        : "hsl(var(--portal-card-bg))",
+                      stroke: "hsl(var(--portal-text-primary))",
+                      strokeWidth: 1.5,
+                      outline: "none",
+                      cursor: onStateClick ? "pointer" : "default",
+                    },
+                    pressed: {
+                      fill: "hsl(var(--portal-accent-blue))",
+                      stroke: "hsl(var(--portal-text-primary))",
+                      strokeWidth: 2,
+                      outline: "none",
+                    },
+                  }}
+                />
+              );
+            })
+          }
+        </Geographies>
       </ComposableMap>
 
       {/* Legend */}
