@@ -21,24 +21,36 @@ export {
   V3TimeHeatmapLegend, 
   V3TimeHeatmapPeakChips, 
   V3TimeHeatmapDetailsPanel,
-  type V3TimeHeatmapProps 
+  V3TimeHeatmapMetricToggle,
+  type V3TimeHeatmapProps,
+  type V3TimeHeatmapLegendProps,
+  type V3TimeHeatmapPeakChipsProps,
+  type V3TimeHeatmapDetailsPanelProps,
+  type V3TimeHeatmapMetricToggleProps,
 } from "./V3TimeHeatmap";
 
 // Heatmap utilities
 export {
   type HeatmapDataPoint as V3HeatmapDataPoint,
+  type HeatmapMetric,
   type RankedCell,
   type ProcessedHeatmapData,
+  type HeatmapStats,
   normalizeHeatmapData,
+  transformGridForMetric,
   processHeatmapData,
+  calculateHeatmapStats,
   getRankedCells,
+  getCellRank,
   exportHeatmapToCSV,
   formatTimeSlot,
   formatTimeSlotShort,
+  getMetricLabel,
   DAY_LABELS_SHORT,
   DAY_LABELS_FULL,
   HOUR_LABELS_SHORT,
   HOUR_LABELS_FULL,
+  TOTAL_TIME_SLOTS,
 } from "@/lib/heatmap-utils";
 
 // US Choropleth Map (react-simple-maps based - recommended)

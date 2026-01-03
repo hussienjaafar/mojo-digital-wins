@@ -3,7 +3,7 @@
  * Provides consistent data transformation for 7x24 time heatmaps
  */
 
-export type HeatmapMetric = 'revenue' | 'count' | 'unique_donors';
+export type HeatmapMetric = 'revenue' | 'count' | 'avg_donation';
 
 export interface HeatmapDataPoint {
   dayOfWeek: number; // 0 = Sunday, 6 = Saturday
@@ -11,15 +11,21 @@ export interface HeatmapDataPoint {
   value: number;
   count?: number;
   uniqueDonors?: number;
+  revenue?: number; // Always store revenue for avg calculation
+  hasData?: boolean; // True if any donations exist (even if sum is 0)
 }
 
 export interface ProcessedHeatmapData {
   grid: HeatmapDataPoint[];
   maxValue: number;
+  minValue: number;
   totalValue: number;
+  avgValue: number;
   peakCells: RankedCell[];
   hasData: boolean;
   p95Value: number;
+  totalSlots: number;
+  slotsWithData: number;
 }
 
 export interface RankedCell {
@@ -28,6 +34,19 @@ export interface RankedCell {
   value: number;
   rank: number;
   percentOfTotal: number;
+  count?: number;
+  revenue?: number;
+}
+
+export interface HeatmapStats {
+  totalValue: number;
+  maxValue: number;
+  minValue: number;
+  avgValue: number;
+  p95Value: number;
+  peakCells: RankedCell[];
+  totalCount: number;
+  slotsWithData: number;
 }
 
 // Day labels (Sunday = 0)
@@ -46,10 +65,22 @@ export const HOUR_LABELS_FULL = Array.from({ length: 24 }, (_, i) =>
 // Tick-reduced labels (every 3 hours)
 export const HOUR_LABELS_REDUCED = ['12a', '', '', '3a', '', '', '6a', '', '', '9a', '', '', '12p', '', '', '3p', '', '', '6p', '', '', '9p', '', ''];
 
+// Total time slots in a week
+export const TOTAL_TIME_SLOTS = 168;
+
 /**
- * Get human-friendly time description
+ * Get human-friendly time description with hour range
  */
 export function formatTimeSlot(dayOfWeek: number, hour: number): string {
+  const startHour = HOUR_LABELS_FULL[hour];
+  const endHour = hour === 23 ? '11:59 PM' : HOUR_LABELS_FULL[(hour + 1) % 24].replace(':00', ':59');
+  return `${DAY_LABELS_FULL[dayOfWeek]}, ${startHour}–${endHour}`;
+}
+
+/**
+ * Get compact time description for chips
+ */
+export function formatTimeSlotCompact(dayOfWeek: number, hour: number): string {
   return `${DAY_LABELS_FULL[dayOfWeek]} at ${HOUR_LABELS_FULL[hour]}`;
 }
 
@@ -67,7 +98,7 @@ export function initializeGrid(): HeatmapDataPoint[] {
   const grid: HeatmapDataPoint[] = [];
   for (let day = 0; day < 7; day++) {
     for (let hour = 0; hour < 24; hour++) {
-      grid.push({ dayOfWeek: day, hour, value: 0 });
+      grid.push({ dayOfWeek: day, hour, value: 0, hasData: false });
     }
   }
   return grid;
@@ -92,13 +123,49 @@ export function normalizeHeatmapData(
     const key = `${row.day_of_week}-${row.hour}`;
     const point = lookup.get(key);
     if (point) {
-      point.value = Number(row.value) || 0;
-      if (row.count !== undefined) point.count = row.count;
+      const revenue = Number(row.value) || 0;
+      const count = row.count || 0;
+      
+      point.value = revenue;
+      point.revenue = revenue;
+      point.count = count;
+      point.hasData = count > 0; // Mark as having data if any transactions exist
       if (row.unique_donors !== undefined) point.uniqueDonors = row.unique_donors;
     }
   });
   
   return grid;
+}
+
+/**
+ * Transform grid data for a different metric
+ */
+export function transformGridForMetric(
+  grid: HeatmapDataPoint[],
+  metric: HeatmapMetric
+): HeatmapDataPoint[] {
+  return grid.map(point => {
+    let value = 0;
+    
+    switch (metric) {
+      case 'revenue':
+        value = point.revenue || point.value || 0;
+        break;
+      case 'count':
+        value = point.count || 0;
+        break;
+      case 'avg_donation':
+        value = (point.count && point.count > 0) 
+          ? (point.revenue || point.value || 0) / point.count 
+          : 0;
+        break;
+    }
+    
+    return {
+      ...point,
+      value,
+    };
+  });
 }
 
 /**
@@ -109,6 +176,25 @@ export function calculateP95(values: number[]): number {
   if (sorted.length === 0) return 1;
   const p95Index = Math.floor(sorted.length * 0.95);
   return sorted[Math.min(p95Index, sorted.length - 1)] || 1;
+}
+
+/**
+ * Calculate comprehensive stats for a heatmap grid
+ */
+export function calculateHeatmapStats(grid: HeatmapDataPoint[], topN: number = 5): HeatmapStats {
+  const values = grid.map(d => d.value);
+  const nonZeroValues = values.filter(v => v > 0);
+  const slotsWithData = grid.filter(p => p.hasData).length;
+  
+  const totalValue = values.reduce((sum, v) => sum + v, 0);
+  const totalCount = grid.reduce((sum, p) => sum + (p.count || 0), 0);
+  const maxValue = nonZeroValues.length > 0 ? Math.max(...nonZeroValues) : 0;
+  const minValue = nonZeroValues.length > 0 ? Math.min(...nonZeroValues) : 0;
+  const avgValue = nonZeroValues.length > 0 ? totalValue / nonZeroValues.length : 0;
+  const p95Value = calculateP95(values);
+  const peakCells = getRankedCells(grid, topN);
+  
+  return { totalValue, maxValue, minValue, avgValue, p95Value, peakCells, totalCount, slotsWithData };
 }
 
 /**
@@ -132,9 +218,27 @@ export function getRankedCells(grid: HeatmapDataPoint[], topN: number = 5): Rank
       dayOfWeek: point.dayOfWeek,
       hour: point.hour,
       value: point.value,
+      count: point.count,
+      revenue: point.revenue,
       rank: index + 1,
       percentOfTotal: totalValue > 0 ? (point.value / totalValue) * 100 : 0,
     }));
+}
+
+/**
+ * Get rank of a specific cell within all 168 slots
+ */
+export function getCellRank(grid: HeatmapDataPoint[], dayOfWeek: number, hour: number): number | null {
+  const sortedGrid = [...grid]
+    .filter(p => p.value > 0)
+    .sort((a, b) => {
+      if (b.value !== a.value) return b.value - a.value;
+      if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
+      return a.hour - b.hour;
+    });
+  
+  const index = sortedGrid.findIndex(p => p.dayOfWeek === dayOfWeek && p.hour === hour);
+  return index >= 0 ? index + 1 : null;
 }
 
 /**
@@ -145,19 +249,27 @@ export function processHeatmapData(
 ): ProcessedHeatmapData {
   const grid = normalizeHeatmapData(rawData);
   const values = grid.map(p => p.value);
-  const maxValue = Math.max(...values, 0);
+  const nonZeroValues = values.filter(v => v > 0);
+  const maxValue = nonZeroValues.length > 0 ? Math.max(...nonZeroValues) : 0;
+  const minValue = nonZeroValues.length > 0 ? Math.min(...nonZeroValues) : 0;
   const totalValue = values.reduce((sum, v) => sum + v, 0);
+  const avgValue = nonZeroValues.length > 0 ? totalValue / nonZeroValues.length : 0;
   const p95Value = calculateP95(values);
   const peakCells = getRankedCells(grid, 5);
   const hasData = totalValue > 0;
+  const slotsWithData = grid.filter(p => p.hasData).length;
   
   return {
     grid,
     maxValue,
+    minValue,
     totalValue,
+    avgValue,
     peakCells,
     hasData,
     p95Value,
+    totalSlots: TOTAL_TIME_SLOTS,
+    slotsWithData,
   };
 }
 
@@ -184,6 +296,30 @@ export function isSameCell(a: { dayOfWeek: number; hour: number } | null, b: { d
 }
 
 /**
+ * Get metric label for display
+ */
+export function getMetricLabel(metric: HeatmapMetric): string {
+  switch (metric) {
+    case 'revenue': return 'Net Revenue';
+    case 'count': return 'Donation Count';
+    case 'avg_donation': return 'Average Donation';
+    default: return 'Value';
+  }
+}
+
+/**
+ * Get metric description for tooltips
+ */
+export function getMetricDescription(metric: HeatmapMetric): string {
+  switch (metric) {
+    case 'revenue': return 'Total net revenue per hour';
+    case 'count': return 'Number of donations per hour';
+    case 'avg_donation': return 'Average donation amount per hour';
+    default: return 'Value per hour';
+  }
+}
+
+/**
  * Export heatmap data to CSV with proper escaping
  */
 export function exportHeatmapToCSV(
@@ -192,9 +328,15 @@ export function exportHeatmapToCSV(
     metricLabel?: string;
     filename?: string;
     formatValue?: (value: number) => string;
+    includeCount?: boolean;
   } = {}
 ): void {
-  const { metricLabel = 'Value', filename = 'heatmap-export.csv', formatValue = (v) => v.toString() } = options;
+  const { 
+    metricLabel = 'Value', 
+    filename = 'heatmap-export.csv', 
+    formatValue = (v) => v.toString(),
+    includeCount = true,
+  } = options;
   
   // Escape CSV field
   const escapeCSV = (field: string): string => {
@@ -204,14 +346,23 @@ export function exportHeatmapToCSV(
     return field;
   };
   
-  const headers = ['Day', 'Hour', escapeCSV(metricLabel)];
+  const headers = includeCount 
+    ? ['Day', 'Hour', escapeCSV(metricLabel), 'Transactions']
+    : ['Day', 'Hour', escapeCSV(metricLabel)];
+    
   const rows = [...grid]
     .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.hour - b.hour)
-    .map(point => [
-      escapeCSV(DAY_LABELS_FULL[point.dayOfWeek]),
-      escapeCSV(HOUR_LABELS_FULL[point.hour]),
-      escapeCSV(formatValue(point.value)),
-    ]);
+    .map(point => {
+      const baseRow = [
+        escapeCSV(DAY_LABELS_FULL[point.dayOfWeek]),
+        escapeCSV(HOUR_LABELS_FULL[point.hour]),
+        escapeCSV(formatValue(point.value)),
+      ];
+      if (includeCount) {
+        baseRow.push(String(point.count || 0));
+      }
+      return baseRow;
+    });
   
   const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
