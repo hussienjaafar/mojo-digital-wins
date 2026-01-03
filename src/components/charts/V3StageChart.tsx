@@ -318,26 +318,19 @@ export const V3StageChart: React.FC<V3StageChartProps> = ({
         },
       },
       grid: {
-        left: 120,
-        right: 60,
-        top: 16,
-        bottom: 16,
+        left: 140,
+        right: 50,
+        top: 8,
+        bottom: 8,
+        containLabel: false,
       },
       xAxis: {
         type: 'value',
+        show: false, // Hide x-axis completely to reduce bottom padding
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: {
-          color: 'hsl(var(--portal-text-muted))',
-          fontSize: 10,
-          formatter: (value: number) => formatValue(value, true),
-        },
-        splitLine: {
-          lineStyle: {
-            color: 'hsl(var(--portal-border) / 0.5)',
-            type: 'dashed',
-          },
-        },
+        axisLabel: { show: false },
+        splitLine: { show: false },
       },
       yAxis: {
         type: 'category',
@@ -348,8 +341,11 @@ export const V3StageChart: React.FC<V3StageChartProps> = ({
         axisLabel: {
           color: 'hsl(var(--portal-text-muted))',
           fontSize: 11,
-          formatter: (value: string) => value.length > 16 ? value.slice(0, 14) + '…' : value,
+          width: 130,
+          overflow: 'truncate',
+          ellipsis: '…',
         },
+        triggerEvent: true, // Enable hover events for tooltip on truncated labels
       },
       series: [
         {
