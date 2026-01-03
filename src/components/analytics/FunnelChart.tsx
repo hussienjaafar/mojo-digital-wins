@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
 import { Filter } from 'lucide-react';
 import { ChartPanel } from '@/components/charts/ChartPanel';
-import { V3FunnelChart } from '@/components/charts/V3FunnelChart';
+import { V3StageChart } from '@/components/charts/V3StageChart';
 import { analyzeFunnel, formatConversionRate } from '@/lib/funnel-chart-utils';
 
 type FunnelStage = {
@@ -34,19 +34,23 @@ export const FunnelChart = memo(({
     return analyzeFunnel(stages);
   }, [stages]);
 
+  // Only show conversion status for truly sequential funnels
+  const statusBadge = useMemo(() => {
+    if (isEmpty || analysis.stages.length < 2) return undefined;
+    if (!analysis.isSequential) return undefined; // Don't show conversion % for non-sequential
+    
+    return {
+      text: `${formatConversionRate(analysis.overallConversionRate)} conversion`,
+      variant: analysis.overallConversionRate >= 10 ? 'success' as const : analysis.overallConversionRate >= 5 ? 'warning' as const : 'error' as const,
+    };
+  }, [isEmpty, analysis]);
+
   return (
     <ChartPanel
       title={title}
       description={description}
       icon={Filter}
-      status={
-        !isEmpty && analysis.stages.length >= 2
-          ? {
-              text: `${formatConversionRate(analysis.overallConversionRate)} conversion`,
-              variant: analysis.overallConversionRate >= 10 ? 'success' : analysis.overallConversionRate >= 5 ? 'warning' : 'error',
-            }
-          : undefined
-      }
+      status={statusBadge}
       isLoading={isLoading}
       error={error}
       onRetry={onRetry}
@@ -54,13 +58,12 @@ export const FunnelChart = memo(({
       emptyMessage="No funnel data available"
       minHeight={380}
     >
-      <V3FunnelChart
+      <V3StageChart
         stages={stages}
         height={280}
         valueType="number"
         showConversionRates
         showDropOffAnnotation
-        showSequenceWarning
       />
     </ChartPanel>
   );

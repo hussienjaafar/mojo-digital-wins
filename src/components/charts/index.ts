@@ -31,6 +31,7 @@ export {
 
 // V3 Premium Charts
 export { V3BarChart, type V3BarChartProps, type V3BarValueType } from "./V3BarChart";
+export { V3StageChart, type V3StageChartProps, type V3StageValueType } from "./V3StageChart";
 export { V3FunnelChart, type V3FunnelChartProps, type V3FunnelValueType } from "./V3FunnelChart";
 
 // Bar chart utilities
