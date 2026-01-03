@@ -11,9 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Building2, Plus, Eye, LogIn, MoreVertical, Search, Users, Plug, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Filter, Command } from "lucide-react";
+import { Building2, Plus, Eye, LogIn, MoreVertical, Search, Users, Plug, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Filter, Command, RefreshCw } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { AdminPageHeader, AdminLoadingState } from "./v3";
+import { cn } from "@/lib/utils";
 
 type Organization = {
   id: string;
@@ -306,24 +308,24 @@ const ClientOrganizationManager = () => {
   const OrgStatsRow = ({ org }: { org: Organization }) => {
     const stats = orgStats[org.id];
     return (
-      <div className="px-4 py-3 bg-muted/30 border-t space-y-3">
+      <div className="px-4 py-3 bg-[hsl(var(--portal-bg-tertiary))] border-t border-[hsl(var(--portal-border))] space-y-3">
         <div className="grid grid-cols-3 gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-muted-foreground" />
-            <span>{stats?.userCount || 0} Users</span>
+            <Users className="w-4 h-4 text-[hsl(var(--portal-text-muted))]" />
+            <span className="text-[hsl(var(--portal-text-primary))]">{stats?.userCount || 0} Users</span>
           </div>
           <div className="flex items-center gap-2">
-            <Plug className="w-4 h-4 text-muted-foreground" />
-            <span>{stats?.integrationCount || 0} Integrations</span>
+            <Plug className="w-4 h-4 text-[hsl(var(--portal-text-muted))]" />
+            <span className="text-[hsl(var(--portal-text-primary))]">{stats?.integrationCount || 0} Integrations</span>
           </div>
-          <div className="text-muted-foreground">
+          <div className="text-[hsl(var(--portal-text-muted))]">
             {stats?.lastActivity 
               ? `Last sync: ${new Date(stats.lastActivity).toLocaleDateString()}`
               : 'No activity'}
           </div>
         </div>
         {org.primary_contact_email && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[hsl(var(--portal-text-muted))]">
             Contact: {org.primary_contact_email}
           </p>
         )}
@@ -333,25 +335,14 @@ const ClientOrganizationManager = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 portal-animate-fade-in">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
-            <Building2 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Client Organizations</h2>
-            <p className="text-sm text-muted-foreground">Loading organizations...</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-card border rounded-lg p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
-              <div className="h-12 w-12 bg-muted animate-pulse rounded-lg" />
-              <div className="h-6 w-3/4 bg-muted animate-pulse rounded" />
-              <div className="h-4 w-full bg-muted animate-pulse rounded" />
-            </div>
-          ))}
-        </div>
+      <div className="space-y-6">
+        <AdminPageHeader
+          title="Client Organizations"
+          description="Loading organizations..."
+          icon={Building2}
+          iconColor="blue"
+        />
+        <AdminLoadingState variant="card" count={6} />
       </div>
     );
   }
@@ -418,22 +409,18 @@ const ClientOrganizationManager = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
-              Client Organizations
-            </CardTitle>
-            <CardDescription>
-              Manage client organizations and their access
-            </CardDescription>
-          </div>
+    <div className="space-y-6">
+      <AdminPageHeader
+        title="Client Organizations"
+        description="Manage client organizations and their access"
+        icon={Building2}
+        iconColor="blue"
+        onRefresh={loadOrganizations}
+        actions={
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
-                <Plus className="w-4 h-4 mr-2" />
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
                 New Organization
               </Button>
             </DialogTrigger>
@@ -464,7 +451,7 @@ const ClientOrganizationManager = () => {
                     placeholder="acme-corporation"
                     required
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">
                     Auto-generated from name, can be customized
                   </p>
                 </div>
@@ -497,9 +484,12 @@ const ClientOrganizationManager = () => {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        }
+      />
+
+      {/* Main Content Card */}
+      <Card className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]">
+        <CardContent className="p-4 sm:p-6 space-y-4">
         {/* Search and Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
@@ -685,7 +675,8 @@ const ClientOrganizationManager = () => {
           </div>
         )}
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 };
 

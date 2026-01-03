@@ -9,12 +9,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Users, Mail, Eye, Edit, Trash2, Key, MoreVertical } from "lucide-react";
+import { UserPlus, Users, Mail, Eye, Edit, Trash2, Key, MoreVertical, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AdminPageHeader, AdminLoadingState } from "./v3";
 
 type Organization = {
   id: string;
@@ -270,28 +271,14 @@ const ClientUserManager = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 portal-animate-fade-in">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
-            <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Client Users</h2>
-            <p className="text-sm portal-text-secondary">Loading user accounts...</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="portal-card p-4 flex items-center gap-4" style={{ animationDelay: `${i * 50}ms` }}>
-              <div className="portal-skeleton h-10 w-10 rounded-full" />
-              <div className="flex-1 space-y-2">
-                <div className="portal-skeleton h-5 w-48" />
-                <div className="portal-skeleton h-4 w-32" />
-              </div>
-              <div className="portal-skeleton h-8 w-20 rounded-full" />
-            </div>
-          ))}
-        </div>
+      <div className="space-y-6">
+        <AdminPageHeader
+          title="Client Users"
+          description="Loading user accounts..."
+          icon={Users}
+          iconColor="blue"
+        />
+        <AdminLoadingState variant="table" count={6} />
       </div>
     );
   }

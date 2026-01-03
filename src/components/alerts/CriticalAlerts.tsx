@@ -19,6 +19,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { ExportDialog } from "@/components/reports/ExportDialog";
+import { AdminPageHeader, AdminLoadingState } from "@/components/admin/v3";
 
 interface CriticalAlert {
   source_type: string;

@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { AdminPageHeader, AdminLoadingState } from "@/components/admin/v3";
 
 import type { Database } from "@/integrations/supabase/types";
 

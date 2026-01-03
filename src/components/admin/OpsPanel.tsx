@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RefreshCw, Activity, Clock, AlertTriangle, CheckCircle, Server, Play, Terminal, TrendingUp, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { AdminPageHeader, AdminLoadingState } from "./v3";
 
 interface ScheduledJob {
   id: string;
