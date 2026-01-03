@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { AdminPageHeader, AdminLoadingState } from "./v3";
+import { V3Button } from "@/components/v3/V3Button";
 
 type Organization = {
   id: string;
@@ -301,20 +301,19 @@ const ClientUserManager = () => {
         </div>
         
         <div className="flex items-center justify-between pt-2 border-t">
-          <Button
+          <V3Button
             variant="ghost"
             size="sm"
             onClick={() => handleViewPortal(user)}
-            className="hover:bg-blue-50 dark:hover:bg-blue-950"
           >
             <Eye className="h-4 w-4 mr-1" />
             View Portal
-          </Button>
+          </V3Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <V3Button variant="ghost" size="icon-sm">
                 <MoreVertical className="h-4 w-4" />
-              </Button>
+              </V3Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => handleEditClick(user)}>
@@ -355,10 +354,9 @@ const ClientUserManager = () => {
           </div>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
-                <UserPlus className="w-4 h-4 mr-2" />
+              <V3Button variant="primary" className="w-full sm:w-auto" leftIcon={<UserPlus className="w-4 h-4" />}>
                 Add User
-              </Button>
+              </V3Button>
             </DialogTrigger>
             <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
               <DialogHeader>
@@ -434,17 +432,17 @@ const ClientUserManager = () => {
                   </Select>
                 </div>
                 <div className="flex gap-2 justify-end">
-                  <Button 
+                  <V3Button 
                     type="button" 
                     variant="outline" 
                     onClick={() => setShowCreateDialog(false)}
                     disabled={isCreating}
                   >
                     Cancel
-                  </Button>
-                  <Button type="submit" disabled={isCreating}>
-                    {isCreating ? "Creating..." : "Create User"}
-                  </Button>
+                  </V3Button>
+                  <V3Button type="submit" isLoading={isCreating} loadingText="Creating...">
+                    Create User
+                  </V3Button>
                 </div>
               </form>
             </DialogContent>
@@ -503,20 +501,19 @@ const ClientUserManager = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button
+                        <V3Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleViewPortal(user)}
-                          className="hover:bg-blue-50 dark:hover:bg-blue-950"
                         >
                           <Eye className="h-4 w-4 mr-1" />
                           View Portal
-                        </Button>
+                        </V3Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
+                            <V3Button variant="ghost" size="icon-sm">
                               <MoreVertical className="h-4 w-4" />
-                            </Button>
+                            </V3Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => handleEditClick(user)}>
@@ -602,17 +599,17 @@ const ClientUserManager = () => {
               </Select>
             </div>
             <div className="flex gap-2 justify-end">
-              <Button 
+              <V3Button 
                 type="button" 
                 variant="outline" 
                 onClick={() => setShowEditDialog(false)}
                 disabled={isProcessing}
               >
                 Cancel
-              </Button>
-              <Button type="submit" disabled={isProcessing}>
-                {isProcessing ? "Updating..." : "Update User"}
-              </Button>
+              </V3Button>
+              <V3Button type="submit" isLoading={isProcessing} loadingText="Updating...">
+                Update User
+              </V3Button>
             </div>
           </form>
         </DialogContent>

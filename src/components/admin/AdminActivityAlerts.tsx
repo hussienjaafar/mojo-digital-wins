@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, CheckCircle, Eye, TrendingUp, Users, Activity } from "lucide-react";
+import { AlertTriangle, CheckCircle, Eye, TrendingUp, Users, Activity, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { AdminPageHeader, AdminLoadingState } from "./v3";
+import { V3Button } from "@/components/v3/V3Button";
 
 interface ActivityAlert {
   id: string;
@@ -124,59 +124,45 @@ export default function AdminActivityAlerts() {
 
   if (loading) {
     return (
-      <div className="space-y-6 portal-animate-fade-in">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
-            <Activity className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Activity Alerts</h2>
-            <p className="text-sm portal-text-secondary">Loading recent activity...</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="portal-card p-6 space-y-3" style={{ animationDelay: `${i * 50}ms` }}>
-              <div className="flex justify-between items-start">
-                <div className="flex-1 space-y-2">
-                  <div className="portal-skeleton h-5 w-48" />
-                  <div className="portal-skeleton h-4 w-full" />
-                </div>
-                <div className="portal-skeleton h-6 w-20 rounded-full" />
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="space-y-6">
+        <AdminPageHeader
+          title="Activity Alerts"
+          description="Loading recent activity..."
+          icon={Activity}
+          iconColor="amber"
+        />
+        <AdminLoadingState variant="card" count={4} />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Activity Alerts</h2>
-          <p className="text-sm text-muted-foreground">
-            Monitor unusual client activity and usage patterns
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={filter === 'unresolved' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter('unresolved')}
-          >
-            Unresolved {unresolvedCount > 0 && `(${unresolvedCount})`}
-          </Button>
-          <Button
-            variant={filter === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter('all')}
-          >
-            All
-          </Button>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Activity Alerts"
+        description="Monitor unusual client activity and usage patterns"
+        icon={Activity}
+        iconColor="amber"
+        onRefresh={fetchAlerts}
+        actions={
+          <div className="flex gap-2">
+            <V3Button
+              variant={filter === 'unresolved' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFilter('unresolved')}
+            >
+              Unresolved {unresolvedCount > 0 && `(${unresolvedCount})`}
+            </V3Button>
+            <V3Button
+              variant={filter === 'all' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFilter('all')}
+            >
+              All
+            </V3Button>
+          </div>
+        }
+      />
 
       {unresolvedCount > 0 && filter === 'unresolved' && (
         <Alert className="border-destructive/50 bg-destructive/10">
@@ -189,90 +175,84 @@ export default function AdminActivityAlerts() {
 
       <div className="space-y-4">
         {alerts.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                {filter === 'unresolved' 
-                  ? 'No unresolved activity alerts' 
-                  : 'No activity alerts found'}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="portal-card p-12 text-center">
+            <CheckCircle className="h-12 w-12 text-[hsl(var(--portal-text-muted))] mx-auto mb-4" />
+            <p className="text-[hsl(var(--portal-text-muted))]">
+              {filter === 'unresolved' 
+                ? 'No unresolved activity alerts' 
+                : 'No activity alerts found'}
+            </p>
+          </div>
         ) : (
           alerts.map((alert) => (
-            <Card key={alert.id} className={!alert.is_resolved ? "border-destructive/50" : ""}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    {getAlertIcon(alert.alert_type)}
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <CardTitle className="text-base">
-                          {getAlertTypeLabel(alert.alert_type)}
-                        </CardTitle>
-                        {alert.is_resolved ? (
-                          <Badge variant="outline" className="text-xs">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Resolved
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs">
-                            Active
-                          </Badge>
-                        )}
-                      </div>
-                      <CardDescription>
-                        {alert.organization && (
-                          <span className="font-medium">
-                            {alert.organization.name}
-                          </span>
-                        )}
-                        {alert.entity_name && ` • Entity: ${alert.entity_name}`}
-                        {` • ${new Date(alert.created_at).toLocaleDateString()}`}
-                      </CardDescription>
+            <div key={alert.id} className={`portal-card p-6 ${!alert.is_resolved ? "border-destructive/50" : ""}`}>
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  {getAlertIcon(alert.alert_type)}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-base font-semibold portal-text-primary">
+                        {getAlertTypeLabel(alert.alert_type)}
+                      </h3>
+                      {alert.is_resolved ? (
+                        <Badge variant="outline" className="text-xs">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Resolved
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-xs">
+                          Active
+                        </Badge>
+                      )}
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {alert.organization_id && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/admin/client-view/${alert.organization_id}`)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Client
-                      </Button>
-                    )}
-                    {!alert.is_resolved && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => resolveAlert(alert.id)}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Resolve
-                      </Button>
-                    )}
+                    <p className="text-sm portal-text-secondary">
+                      {alert.organization && (
+                        <span className="font-medium">
+                          {alert.organization.name}
+                        </span>
+                      )}
+                      {alert.entity_name && ` • Entity: ${alert.entity_name}`}
+                      {` • ${new Date(alert.created_at).toLocaleDateString()}`}
+                    </p>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {alert.details && (
-                    <p className="text-sm text-muted-foreground">{alert.details}</p>
+                <div className="flex gap-2">
+                  {alert.organization_id && (
+                    <V3Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/admin/client-view/${alert.organization_id}`)}
+                      leftIcon={<Eye className="h-4 w-4" />}
+                    >
+                      View Client
+                    </V3Button>
                   )}
-                  <div className="flex gap-4 text-xs text-muted-foreground">
-                    {alert.relevance_score !== null && (
-                      <span>Relevance Score: {alert.relevance_score}%</span>
-                    )}
-                    {alert.usage_count !== null && (
-                      <span>Usage Count: {alert.usage_count}</span>
-                    )}
-                  </div>
+                  {!alert.is_resolved && (
+                    <V3Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => resolveAlert(alert.id)}
+                      leftIcon={<CheckCircle className="h-4 w-4" />}
+                    >
+                      Resolve
+                    </V3Button>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div className="mt-4 space-y-2">
+                {alert.details && (
+                  <p className="text-sm portal-text-secondary">{alert.details}</p>
+                )}
+                <div className="flex gap-4 text-xs portal-text-muted">
+                  {alert.relevance_score !== null && (
+                    <span>Relevance Score: {alert.relevance_score}%</span>
+                  )}
+                  {alert.usage_count !== null && (
+                    <span>Usage Count: {alert.usage_count}</span>
+                  )}
+                </div>
+              </div>
+            </div>
           ))
         )}
       </div>

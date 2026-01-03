@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -34,6 +33,7 @@ import {
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPageHeader, AdminLoadingState } from "@/components/admin/v3";
+import { V3Button } from "@/components/v3/V3Button";
 
 import type { Database } from "@/integrations/supabase/types";
 
@@ -189,16 +189,17 @@ export function DailyBriefing() {
               </div>
             </div>
           </div>
-          <Button
+          <V3Button
             onClick={generateBriefing}
-            disabled={generating}
-            variant="smooth"
+            isLoading={generating}
+            loadingText={isMobile ? "" : "Generating..."}
+            variant="primary"
             size={isMobile ? "sm" : "default"}
             className="shrink-0"
+            leftIcon={<RefreshCw className="w-4 h-4" />}
           >
-            <RefreshCw className={`w-4 h-4 ${isMobile ? '' : 'mr-2'} ${generating ? 'animate-spin' : ''}`} />
-            {!isMobile && (generating ? 'Generating...' : 'Refresh')}
-          </Button>
+            {!isMobile && "Refresh"}
+          </V3Button>
         </div>
       </div>
 
@@ -327,7 +328,7 @@ export function DailyBriefing() {
               <ScrollArea className="h-[400px] pr-4">
                 <div className="space-y-3">
                   {breakingNews.map((cluster) => (
-                    <Button
+                    <V3Button
                       key={cluster.id}
                       variant="outline"
                       className="w-full h-auto p-4 text-left hover:bg-accent transition-colors"
@@ -369,7 +370,7 @@ export function DailyBriefing() {
                           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                         </div>
                       </div>
-                    </Button>
+                    </V3Button>
                   ))}
                 </div>
               </ScrollArea>
@@ -407,7 +408,7 @@ export function DailyBriefing() {
                                 item.type === 'state_action' ? Building2 : Shield;
 
                     return (
-                      <Button
+                      <V3Button
                         key={`${item.type}-${item.id}`}
                         variant="outline"
                         className="w-full h-auto p-4 text-left hover:bg-accent transition-colors border-red-200 dark:border-red-900"
@@ -439,7 +440,7 @@ export function DailyBriefing() {
                             <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                           </div>
                         </div>
-                      </Button>
+                      </V3Button>
                     );
                   })}
                 </div>
@@ -662,13 +663,14 @@ export function DailyBriefing() {
                 {/* Actions */}
                 {selectedCriticalItem.url && (
                   <div>
-                    <Button
+                    <V3Button
+                      variant="primary"
                       className="w-full"
                       onClick={() => window.open(selectedCriticalItem.url, '_blank')}
+                      leftIcon={<ExternalLink className="h-4 w-4" />}
                     >
-                      <ExternalLink className="h-4 w-4 mr-2" />
                       View Full Article
-                    </Button>
+                    </V3Button>
                   </div>
                 )}
               </div>

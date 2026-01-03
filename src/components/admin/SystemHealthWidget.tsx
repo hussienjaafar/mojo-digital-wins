@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { Activity, AlertCircle, CheckCircle, Clock, RefreshCw, Zap } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useSystemHealth, getJobStatusColor, getExecutionStatusBadge } from '@/hooks/useSystemHealth';
 import { formatDistanceToNow } from 'date-fns';
+import { V3Button } from '@/components/v3/V3Button';
 
 interface SystemHealthWidgetProps {
   showDragHandle?: boolean;
@@ -25,18 +23,16 @@ export function SystemHealthWidget({ showDragHandle = false }: SystemHealthWidge
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader className="pb-2">
-          <Skeleton className="h-5 w-40" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="portal-card h-full">
+        <div className="p-4 pb-2">
+          <div className="portal-skeleton h-5 w-40" />
+        </div>
+        <div className="p-4 pt-0 space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="portal-skeleton h-12 w-full" />
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -47,22 +43,22 @@ export function SystemHealthWidget({ showDragHandle = false }: SystemHealthWidge
   );
 
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+    <div className="portal-card h-full flex flex-col">
+      <div className="p-4 pb-2 flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
           {showDragHandle && (
             <div className="cursor-grab active:cursor-grabbing p-1">
               <div className="w-4 h-4 grid grid-cols-2 gap-0.5">
                 {[...Array(4)].map((_, i) => (
-                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--portal-text-muted))]/30" />
                 ))}
               </div>
             </div>
           )}
-          <CardTitle className="text-base font-medium flex items-center gap-2">
+          <h3 className="text-base font-medium flex items-center gap-2 portal-text-primary">
             <Activity className="h-4 w-4 text-blue-500" />
             System Health
-          </CardTitle>
+          </h3>
           <Badge 
             variant={healthScore >= 90 ? 'default' : healthScore >= 70 ? 'secondary' : 'destructive'}
             className="text-xs"
@@ -70,45 +66,45 @@ export function SystemHealthWidget({ showDragHandle = false }: SystemHealthWidge
             {healthScore}%
           </Badge>
         </div>
-        <Button
+        <V3Button
           variant="ghost"
-          size="sm"
+          size="icon-sm"
           onClick={handleRefresh}
-          disabled={isRefreshing}
+          isLoading={isRefreshing}
         >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </Button>
-      </CardHeader>
-      <CardContent className="pt-0 space-y-4">
+          <RefreshCw className="h-4 w-4" />
+        </V3Button>
+      </div>
+      <div className="p-4 pt-0 space-y-4 flex-1">
         {/* Health Overview */}
         <div className="grid grid-cols-4 gap-2">
-          <div className="text-center p-2 rounded-lg bg-muted/50">
+          <div className="text-center p-2 rounded-lg bg-[hsl(var(--portal-bg-tertiary))]">
             <div className="text-lg font-bold text-green-500">{stats.activeJobs}</div>
-            <div className="text-[10px] text-muted-foreground">Active</div>
+            <div className="text-[10px] portal-text-muted">Active</div>
           </div>
-          <div className="text-center p-2 rounded-lg bg-muted/50">
-            <div className="text-lg font-bold">{stats.successRate}%</div>
-            <div className="text-[10px] text-muted-foreground">Success</div>
+          <div className="text-center p-2 rounded-lg bg-[hsl(var(--portal-bg-tertiary))]">
+            <div className="text-lg font-bold portal-text-primary">{stats.successRate}%</div>
+            <div className="text-[10px] portal-text-muted">Success</div>
           </div>
-          <div className="text-center p-2 rounded-lg bg-muted/50">
+          <div className="text-center p-2 rounded-lg bg-[hsl(var(--portal-bg-tertiary))]">
             <div className={`text-lg font-bold ${stats.failingJobs > 0 ? 'text-orange-500' : 'text-green-500'}`}>
               {stats.failingJobs}
             </div>
-            <div className="text-[10px] text-muted-foreground">Failing</div>
+            <div className="text-[10px] portal-text-muted">Failing</div>
           </div>
-          <div className="text-center p-2 rounded-lg bg-muted/50">
+          <div className="text-center p-2 rounded-lg bg-[hsl(var(--portal-bg-tertiary))]">
             <div className={`text-lg font-bold ${(stats as any).circuitOpenJobs > 0 ? 'text-destructive' : 'text-green-500'}`}>
               {(stats as any).circuitOpenJobs || 0}
             </div>
-            <div className="text-[10px] text-muted-foreground">Circuits</div>
+            <div className="text-[10px] portal-text-muted">Circuits</div>
           </div>
         </div>
 
         {/* Success Rate Bar */}
         <div className="space-y-1">
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Job Success Rate</span>
-            <span>{stats.successRate}%</span>
+            <span className="portal-text-muted">Job Success Rate</span>
+            <span className="portal-text-primary">{stats.successRate}%</span>
           </div>
           <Progress value={stats.successRate} className="h-1.5" />
         </div>
@@ -140,7 +136,7 @@ export function SystemHealthWidget({ showDragHandle = false }: SystemHealthWidge
 
         {/* Recent Executions */}
         <div className="space-y-2">
-          <div className="text-xs font-medium text-muted-foreground">Recent Activity</div>
+          <div className="text-xs font-medium portal-text-muted">Recent Activity</div>
           <ScrollArea className="h-[120px]">
             <div className="space-y-1">
               {recentExecutions.slice(0, 8).map((exec) => {
@@ -148,7 +144,7 @@ export function SystemHealthWidget({ showDragHandle = false }: SystemHealthWidge
                 return (
                   <div 
                     key={exec.id}
-                    className="flex items-center justify-between p-1.5 rounded bg-muted/30 text-xs"
+                    className="flex items-center justify-between p-1.5 rounded bg-[hsl(var(--portal-bg-tertiary))] text-xs"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {exec.status === 'success' ? (
@@ -158,11 +154,11 @@ export function SystemHealthWidget({ showDragHandle = false }: SystemHealthWidge
                       ) : (
                         <Zap className="h-3 w-3 text-blue-500 flex-shrink-0" />
                       )}
-                      <span className="truncate">{job?.job_name || 'Unknown'}</span>
+                      <span className="truncate portal-text-primary">{job?.job_name || 'Unknown'}</span>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {exec.duration_ms && (
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="text-[10px] portal-text-muted">
                           {exec.duration_ms < 1000 
                             ? `${exec.duration_ms}ms` 
                             : `${(exec.duration_ms / 1000).toFixed(1)}s`}
@@ -180,8 +176,8 @@ export function SystemHealthWidget({ showDragHandle = false }: SystemHealthWidge
         </div>
 
         {/* Footer Stats */}
-        <div className="pt-2 border-t space-y-2">
-          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+        <div className="pt-2 border-t border-[hsl(var(--portal-border))] space-y-2">
+          <div className="flex items-center justify-between text-[10px] portal-text-muted">
             <span>Avg duration: {stats.avgDurationMs < 1000 
               ? `${stats.avgDurationMs}ms` 
               : `${(stats.avgDurationMs / 1000).toFixed(1)}s`}</span>
@@ -204,8 +200,8 @@ export function SystemHealthWidget({ showDragHandle = false }: SystemHealthWidge
             </Badge>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

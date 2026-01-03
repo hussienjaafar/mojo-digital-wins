@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, Zap, Clock, AlertTriangle, CheckCircle, Timer } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
+import { AdminPageHeader, AdminLoadingState } from "./v3";
+import { V3Button } from "@/components/v3/V3Button";
 
 interface SyncStatus {
   credential_id: string;
@@ -261,60 +261,47 @@ const MetaSyncPriorityManager = () => {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Timer className="h-5 w-5" />
-            Meta Sync Priority Manager
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-12 bg-muted animate-pulse rounded" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <AdminPageHeader
+          title="Meta Sync Priority Manager"
+          description="Loading sync configurations..."
+          icon={Timer}
+          iconColor="blue"
+        />
+        <AdminLoadingState variant="table" count={5} />
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Timer className="h-5 w-5" />
-              Meta Sync Priority Manager
-            </CardTitle>
-            <CardDescription>
-              Configure sync frequency tiers for each client's Meta Ads integration
-            </CardDescription>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={loadData}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-            <Button size="sm" onClick={runTieredSync} disabled={isRunningTieredSync}>
-              {isRunningTieredSync ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Zap className="h-4 w-4 mr-2" />
-              )}
-              Run Tiered Sync
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
+    <div className="space-y-6">
+      <AdminPageHeader
+        title="Meta Sync Priority Manager"
+        description="Configure sync frequency tiers for each client's Meta Ads integration"
+        icon={Timer}
+        iconColor="blue"
+        onRefresh={loadData}
+        actions={
+          <V3Button
+            variant="primary"
+            size="sm"
+            onClick={runTieredSync}
+            isLoading={isRunningTieredSync}
+            loadingText="Running..."
+            leftIcon={<Zap className="h-4 w-4" />}
+          >
+            Run Tiered Sync
+          </V3Button>
+        }
+      />
+
+      <div className="portal-card">
         {/* Tier Legend */}
-        <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted/50 rounded-lg">
+        <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-[hsl(var(--portal-bg-tertiary))] rounded-lg">
           {syncConfigs.map(config => (
             <div key={config.tier} className="text-center">
               {getPriorityBadge(config.tier)}
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs portal-text-muted mt-1">
                 Every {config.interval_minutes} min • {config.date_range_days} day range
               </p>
             </div>
@@ -389,24 +376,20 @@ const MetaSyncPriorityManager = () => {
                   )}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
+                  <V3Button
                     variant="ghost"
-                    size="sm"
+                    size="icon-sm"
                     onClick={() => triggerSyncNow(status.organization_id, status.organization_name)}
-                    disabled={syncingOrgs.has(status.organization_id)}
+                    isLoading={syncingOrgs.has(status.organization_id)}
                   >
-                    {syncingOrgs.has(status.organization_id) ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                  </Button>
+                    <RefreshCw className="h-4 w-4" />
+                  </V3Button>
                 </TableCell>
               </TableRow>
             ))}
             {syncStatuses.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 portal-text-muted">
                   No Meta integrations configured
                 </TableCell>
               </TableRow>
@@ -429,8 +412,8 @@ const MetaSyncPriorityManager = () => {
               ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 
