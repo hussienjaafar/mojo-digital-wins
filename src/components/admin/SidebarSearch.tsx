@@ -50,17 +50,17 @@ export function SidebarSearch({
   // When collapsed, show only a search icon button
   if (!isEffectivelyExpanded) {
     return (
-      <div className="px-2 pb-4">
+      <div className="flex justify-center pb-4">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="w-10 h-10 hover:bg-[hsl(var(--portal-bg-hover))] mx-auto flex"
+              className="size-10 hover:bg-[hsl(var(--portal-bg-hover))]"
               onClick={onExpandSidebar}
               aria-label="Expand sidebar to search"
             >
-              <Search className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+              <Search className="h-5 w-5 text-[hsl(var(--portal-text-muted))]" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right">

@@ -603,7 +603,10 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
 
         {/* Theme Toggle - Fixed at bottom */}
         <div className="mt-auto pt-4 border-t border-[hsl(var(--portal-border))]">
-          <div className="px-4 py-3 flex items-center justify-between">
+          <div className={cn(
+            "py-3 flex items-center",
+            collapsed ? "justify-center px-1" : "justify-between px-4"
+          )}>
             {isEffectivelyExpanded && (
               <span className="text-sm font-medium portal-text-secondary">Theme</span>
             )}
