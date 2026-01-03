@@ -434,8 +434,6 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         ref={sidebarRef}
         className={cn(
           "portal-sidebar border-r border-[hsl(var(--portal-border))]",
-          "transition-all duration-500 ease-in-out",
-          isEffectivelyExpanded ? "w-64" : "w-16",
           isMobile && open && "animate-slide-in-right"
         )}
         collapsible="icon"
