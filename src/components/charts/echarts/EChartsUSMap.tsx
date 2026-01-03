@@ -42,7 +42,7 @@ export interface EChartsUSMapProps {
 }
 
 // GeoJSON URL for USA map
-const USA_GEOJSON_URL = "https://cdn.jsdelivr.net/npm/usa-atlas@3/states-10m.json";
+const USA_GEOJSON_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
 
 export const EChartsUSMap: React.FC<EChartsUSMapProps> = ({
   data,
