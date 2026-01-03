@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 import { V3EmptyState } from "@/components/v3/V3EmptyState";
-import { EChartsPieChart } from "@/components/charts/echarts";
+import { V3DonutChart } from "@/components/charts/echarts";
 import { 
   RefreshCw, 
   TrendingUp, 
@@ -189,13 +189,13 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Pie Chart */}
             <div className="h-[280px]">
-              <EChartsPieChart
+              <V3DonutChart
                 data={statusBreakdownData}
                 height={280}
+                valueType="number"
+                centerLabel="Total Recurring"
                 showLegend={true}
                 legendPosition="bottom"
-                variant="donut"
-                showLabels={false}
               />
             </div>
 

@@ -22,7 +22,7 @@ import {
   V3CardContent,
 } from "@/components/v3";
 import { PortalTable, type PortalTableColumn } from "@/components/v3/PortalTable";
-import { EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
+import { EChartsBarChart, V3DonutChart } from "@/components/charts/echarts";
 import { useState } from "react";
 
 export default function ClientDonorIntelligence() {
@@ -458,13 +458,13 @@ export default function ClientDonorIntelligence() {
             isLoading={isLoading}
           >
             {churnRiskData.length > 0 ? (
-              <EChartsPieChart
+              <V3DonutChart
                 data={churnRiskData}
                 height={280}
-                variant="donut"
                 valueType="number"
-                showLabels={true}
+                centerLabel="Total Donors"
                 legendPosition="bottom"
+                topN={6}
               />
             ) : (
               <div className="h-[280px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">

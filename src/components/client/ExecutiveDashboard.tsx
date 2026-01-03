@@ -35,7 +35,7 @@ import { useDateRange } from "@/stores/dashboardStore";
 import { useRealtimeMetrics } from "@/hooks/useRealtimeMetrics";
 import { EChartsLineChart } from "@/components/charts/echarts/EChartsLineChart";
 import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
-import { EChartsPieChart } from "@/components/charts/echarts/EChartsPieChart";
+import { V3DonutChart } from "@/components/charts/echarts/V3DonutChart";
 import { getChartColors } from "@/lib/design-tokens";
 
 // ============================================================================
@@ -630,12 +630,12 @@ const ExecutiveDashboard = () => {
               isLoading={isLoading}
               minHeight={280}
             >
-              <EChartsPieChart
+              <V3DonutChart
                 data={attributionData.map((d) => ({ name: d.name, value: d.linear }))}
                 valueType="currency"
                 height={240}
-                variant="donut"
-                disableHoverEmphasis
+                centerLabel="Total Revenue"
+                topN={6}
               />
             </ChartPanel>
           </div>

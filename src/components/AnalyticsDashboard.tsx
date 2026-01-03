@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { V3Card, V3CardContent, V3CardDescription, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
 import { V3KPICard } from "@/components/v3/V3KPICard";
 import { V3ChartWrapper } from "@/components/v3/V3ChartWrapper";
-import { EChartsLineChart, EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
+import { EChartsLineChart, EChartsBarChart, V3DonutChart } from "@/components/charts/echarts";
 import { useToast } from "@/hooks/use-toast";
 import { format, subDays, startOfDay } from "date-fns";
 import { logger } from "@/lib/logger";
@@ -254,14 +254,13 @@ export const AnalyticsDashboard = () => {
           description="Breakdown by priority level"
           accent="amber"
         >
-          <EChartsPieChart
+          <V3DonutChart
             data={priorityPieData}
             height={300}
             valueType="number"
-            showLabels={true}
+            centerLabel="Total Items"
             legendPosition="bottom"
-            variant="donut"
-            disableHoverEmphasis
+            topN={6}
           />
         </V3ChartWrapper>
 
@@ -272,14 +271,13 @@ export const AnalyticsDashboard = () => {
           description="Current status distribution"
           accent="green"
         >
-          <EChartsPieChart
+          <V3DonutChart
             data={statusPieData}
             height={300}
             valueType="number"
-            showLabels={true}
+            centerLabel="Total Items"
             legendPosition="bottom"
-            variant="donut"
-            disableHoverEmphasis
+            topN={6}
           />
         </V3ChartWrapper>
       </div>

@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, DollarSign, Users, Repeat, TrendingUp, PieChart, BarChart3, ShieldAlert, Receipt, ArrowUpDown, Filter } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { EChartsLineChart, EChartsBarChart, EChartsPieChart } from "@/components/charts/echarts";
+import { EChartsLineChart, EChartsBarChart, V3DonutChart } from "@/components/charts/echarts";
 import { usePIIAccess } from "@/hooks/usePIIAccess";
 import { maskName, maskEmail } from "@/lib/pii-masking";
 import { useDonationMetricsQuery, DonationRow } from "@/queries";
@@ -312,17 +312,16 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
             description="Distribution of donations by refcode and source campaign"
             accent="blue"
           >
-            <EChartsPieChart
+            <V3DonutChart
               data={attributionData.map((d, i) => ({ 
                 name: d.name, 
                 value: d.value,
                 color: CHART_COLORS[i % CHART_COLORS.length]
               }))}
               valueType="currency"
-              variant="donut"
-              showLabels
-              labelThreshold={5}
               height={280}
+              centerLabel="Total Revenue"
+              topN={8}
             />
           </V3ChartWrapper>
         )}
