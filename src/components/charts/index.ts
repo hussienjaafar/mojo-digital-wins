@@ -16,6 +16,30 @@ export {
 
 // Advanced charts
 export { CalendarHeatmap, type CalendarHeatmapProps, type HeatmapDataPoint } from "./CalendarHeatmap";
+export { 
+  V3TimeHeatmap, 
+  V3TimeHeatmapLegend, 
+  V3TimeHeatmapPeakChips, 
+  V3TimeHeatmapDetailsPanel,
+  type V3TimeHeatmapProps 
+} from "./V3TimeHeatmap";
+
+// Heatmap utilities
+export {
+  type HeatmapDataPoint as V3HeatmapDataPoint,
+  type RankedCell,
+  type ProcessedHeatmapData,
+  normalizeHeatmapData,
+  processHeatmapData,
+  getRankedCells,
+  exportHeatmapToCSV,
+  formatTimeSlot,
+  formatTimeSlotShort,
+  DAY_LABELS_SHORT,
+  DAY_LABELS_FULL,
+  HOUR_LABELS_SHORT,
+  HOUR_LABELS_FULL,
+} from "@/lib/heatmap-utils";
 
 // US Choropleth Map (react-simple-maps based - recommended)
 export { USChoroplethMap, type USChoroplethMapProps, type ChoroplethDataItem, type MapMetricMode } from "./USChoroplethMap";
