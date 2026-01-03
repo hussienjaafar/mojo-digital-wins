@@ -32,9 +32,9 @@ export function SidebarSearch({ searchTerm, onSearchChange, onKeyDown, collapsed
   }, [onSearchChange]);
 
   return (
-    <div className={`px-3 pb-4 transition-all duration-200 ${!isEffectivelyExpanded ? 'px-1' : ''}`}>
+    <div className={`px-3 pb-4 transition-all duration-200 ${!isEffectivelyExpanded ? 'px-2' : ''}`}>
       <div className="relative">
-        <Search className={`absolute top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-all duration-200 ${isEffectivelyExpanded ? 'left-3' : 'left-1/2 -translate-x-1/2'}`} />
+        <Search className={`absolute top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))] transition-all duration-200 ${isEffectivelyExpanded ? 'left-3' : 'left-1/2 -translate-x-1/2'}`} />
         <Input
           ref={inputRef}
           type="text"
@@ -42,7 +42,7 @@ export function SidebarSearch({ searchTerm, onSearchChange, onKeyDown, collapsed
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={onKeyDown}
-          className={`h-10 bg-muted/50 border-border/50 focus-visible:ring-primary transition-all duration-200 ${
+          className={`h-10 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus-visible:ring-[hsl(var(--portal-accent-blue))] focus-visible:border-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-text-primary))] placeholder:text-[hsl(var(--portal-text-muted))] transition-all duration-200 ${
             isEffectivelyExpanded ? 'pl-9 pr-9' : 'pl-2 pr-2 w-10 text-transparent caret-transparent cursor-pointer'
           }`}
           aria-label="Search navigation items"
@@ -51,7 +51,7 @@ export function SidebarSearch({ searchTerm, onSearchChange, onKeyDown, collapsed
           <Button
             variant="ghost"
             size="icon"
-            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 hover:bg-[hsl(var(--portal-bg-hover))]"
             onClick={() => onSearchChange("")}
             aria-label="Clear search"
           >
@@ -60,7 +60,7 @@ export function SidebarSearch({ searchTerm, onSearchChange, onKeyDown, collapsed
         )}
       </div>
       {isEffectivelyExpanded && searchTerm && (
-        <p className="text-xs text-muted-foreground mt-2 px-1">
+        <p className="text-xs portal-text-muted mt-2 px-1">
           Use ↑↓ to navigate, Enter to select
         </p>
       )}

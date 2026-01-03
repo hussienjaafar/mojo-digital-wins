@@ -15,22 +15,8 @@ export function RecentItems({ recentItems, activeTab, onTabChange, collapsed }: 
   return (
     <SidebarGroup className="mb-4">
       {!collapsed && (
-        <SidebarGroupLabel className="
-          text-muted-foreground 
-          text-sm 
-          font-bold 
-          tracking-wider 
-          uppercase 
-          px-4 
-          py-2
-          mb-2
-          opacity-90
-          bg-muted/30
-          rounded-md
-          border-b border-border/50
-          flex items-center gap-2
-        ">
-          <Clock className="h-3.5 w-3.5" />
+        <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider portal-text-muted px-3 py-2 flex items-center gap-2">
+          <Clock className="h-3 w-3" />
           Recently Viewed
         </SidebarGroupLabel>
       )}
@@ -44,36 +30,31 @@ export function RecentItems({ recentItems, activeTab, onTabChange, collapsed }: 
                 tooltip={collapsed ? item.title : undefined}
                 aria-current={activeTab === item.value ? 'page' : undefined}
                 className={`
-                  relative
-                  w-full 
-                  min-h-[48px]
-                  ${collapsed ? 'justify-center px-0' : 'justify-start px-4'}
-                  gap-3 
-                  py-3
-                  rounded-lg
-                  transition-all duration-200
-                  hover:bg-accent hover:text-accent-foreground
+                  relative w-full min-h-[44px] group transition-colors
+                  ${collapsed ? 'justify-center px-2' : 'justify-start px-3'}
+                  gap-3 py-2.5 rounded-md
+                  hover:bg-[hsl(var(--portal-bg-hover))]
                   ${activeTab === item.value 
-                    ? 'bg-gradient-to-r from-primary/90 to-primary text-primary-foreground font-semibold shadow-lg border-l-4 border-primary-foreground/50' 
-                    : 'text-foreground hover:font-medium hover:shadow-sm'
+                    ? 'bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] font-medium hover:bg-[hsl(var(--portal-accent-blue)/0.15)] border-l-2 border-[hsl(var(--portal-accent-blue))]' 
+                    : 'portal-text-secondary'
                   }
                 `}
               >
                 <item.icon className={`
-                  ${collapsed ? 'h-6 w-6' : 'h-5 w-5'} 
-                  shrink-0
-                  transition-transform duration-200
-                  ${activeTab === item.value ? 'scale-110' : ''}
+                  h-5 w-5 shrink-0
+                  ${activeTab === item.value 
+                    ? 'text-[hsl(var(--portal-accent-blue))]' 
+                    : 'text-[hsl(var(--portal-text-secondary))]'
+                  }
                 `} />
                 {!collapsed && (
-                  <span className="text-sm leading-tight">{item.title}</span>
+                  <span className="flex-1 truncate text-sm">{item.title}</span>
                 )}
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
       </SidebarGroupContent>
-      {!collapsed && <div className="h-px bg-border/50 mt-4" />}
     </SidebarGroup>
   );
 }
