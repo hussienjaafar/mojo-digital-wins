@@ -43,7 +43,12 @@ serve(async (req) => {
 
     console.log(`[PROBABILISTIC] Starting attribution for org ${organization_id}`);
 
-    // Find unattributed transactions (no refcode, no click_id, no existing attribution)
+    // IMPORTANT: Only process transactions that:
+    // 1. Have no deterministic attribution (no refcode, click_id, fbclid)
+    // 2. Don't already have a campaign_attribution record marked as deterministic
+    // This ensures we NEVER overwrite deterministic attribution with probabilistic guesses.
+    
+    // First, get transactions without deterministic identifiers
     const { data: unattributed, error: unattribErr } = await supabase
       .from('actblue_transactions')
       .select('transaction_id, donor_email, transaction_date, amount, net_amount')
@@ -60,7 +65,17 @@ serve(async (req) => {
       throw unattribErr;
     }
 
-    console.log(`[PROBABILISTIC] Found ${unattributed?.length || 0} unattributed transactions`);
+    console.log(`[PROBABILISTIC] Found ${unattributed?.length || 0} transactions without deterministic identifiers`);
+    
+    // Check which ones already have deterministic attribution (must not overwrite)
+    const { data: existingDeterministic, error: existingErr } = await supabase
+      .from('campaign_attribution')
+      .select('refcode')
+      .eq('organization_id', organization_id)
+      .eq('is_deterministic', true);
+    
+    const deterministicRefcodes = new Set((existingDeterministic || []).map(r => r.refcode));
+    console.log(`[PROBABILISTIC] ${deterministicRefcodes.size} existing deterministic attributions to preserve`);
 
     if (!unattributed || unattributed.length === 0) {
       return new Response(
@@ -185,16 +200,27 @@ serve(async (req) => {
     console.log(`[PROBABILISTIC] Matched ${matchedCount} transactions`);
 
     // Update campaign_attribution table with probabilistic matches
+    // CRITICAL: Never overwrite deterministic attribution
     for (const attr of attributionUpdates) {
+      const syntheticRefcode = `prob_${attr.transaction_id.slice(0, 8)}`;
+      
+      // Double-check we're not overwriting deterministic
+      if (deterministicRefcodes.has(syntheticRefcode)) {
+        console.log(`[PROBABILISTIC] Skipping ${syntheticRefcode} - already has deterministic attribution`);
+        continue;
+      }
+      
       const { error: upsertErr } = await supabase
         .from('campaign_attribution')
         .upsert({
           organization_id,
-          refcode: `prob_${attr.transaction_id.slice(0, 8)}`, // Synthetic refcode for tracking
+          refcode: syntheticRefcode,
           meta_campaign_id: attr.campaign_id,
           match_confidence: attr.confidence,
           match_reason: attr.match_reason,
           is_auto_matched: true,
+          is_deterministic: false, // Explicitly mark as NOT deterministic
+          attribution_type: attr.attribution_method, // probabilistic_touchpoint or probabilistic_timing
           last_matched_at: new Date().toISOString(),
         }, { onConflict: 'organization_id,refcode' });
 

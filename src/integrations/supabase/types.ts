@@ -829,6 +829,7 @@ export type Database = {
         Row: {
           attribution_method: string | null
           attribution_model_version: string | null
+          attribution_type: string | null
           calculated_at: string | null
           channels: Json | null
           created_at: string | null
@@ -840,6 +841,7 @@ export type Database = {
         Insert: {
           attribution_method?: string | null
           attribution_model_version?: string | null
+          attribution_type?: string | null
           calculated_at?: string | null
           channels?: Json | null
           created_at?: string | null
@@ -851,6 +853,7 @@ export type Database = {
         Update: {
           attribution_method?: string | null
           attribution_model_version?: string | null
+          attribution_type?: string | null
           calculated_at?: string | null
           channels?: Json | null
           created_at?: string | null
@@ -1589,9 +1592,11 @@ export type Database = {
         Row: {
           attributed_revenue: number | null
           attributed_transactions: number | null
+          attribution_type: string | null
           created_at: string | null
           id: string
           is_auto_matched: boolean | null
+          is_deterministic: boolean | null
           last_matched_at: string | null
           match_confidence: number | null
           match_reason: string | null
@@ -1606,9 +1611,11 @@ export type Database = {
         Insert: {
           attributed_revenue?: number | null
           attributed_transactions?: number | null
+          attribution_type?: string | null
           created_at?: string | null
           id?: string
           is_auto_matched?: boolean | null
+          is_deterministic?: boolean | null
           last_matched_at?: string | null
           match_confidence?: number | null
           match_reason?: string | null
@@ -1623,9 +1630,11 @@ export type Database = {
         Update: {
           attributed_revenue?: number | null
           attributed_transactions?: number | null
+          attribution_type?: string | null
           created_at?: string | null
           id?: string
           is_auto_matched?: boolean | null
+          is_deterministic?: boolean | null
           last_matched_at?: string | null
           match_confidence?: number | null
           match_reason?: string | null

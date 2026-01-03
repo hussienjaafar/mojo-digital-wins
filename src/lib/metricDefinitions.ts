@@ -31,9 +31,9 @@ export const metricDefinitions: Record<string, MetricDefinition> = {
     calculation: "Sum of recurring transaction amounts",
   },
   "Attribution Quality": {
-    title: "Attribution Quality Score",
-    description: "Percentage of donations with deterministic attribution (refcode or click ID)",
-    calculation: "(Attributed Donations / Total Donations) × 100",
+    title: "Refcode Match Rate",
+    description: "Percentage of donations with a traceable refcode or click ID linking to a campaign",
+    calculation: "(Donations with refcode/click_id / Total Donations) × 100",
   },
   "Unique Donors": {
     title: "Unique Donors",
@@ -57,9 +57,9 @@ export const metricDefinitions: Record<string, MetricDefinition> = {
     description: "Donations with an AI-identified creative topic from ad content",
   },
   "Deterministic": {
-    title: "Deterministic Attribution",
-    description: "Attribution based on direct identifiers like refcodes, click IDs, or campaign mappings",
-    calculation: "Refcode + Click ID + Campaign matches",
+    title: "Refcode Match",
+    description: "Attribution based on refcodes or click IDs embedded in ActBlue donation links. This is the only reliable per-donor attribution method.",
+    calculation: "Refcode + Click ID matches from ActBlue transactions",
   },
   "Meta CPA": {
     title: "Meta Cost Per Acquisition",
