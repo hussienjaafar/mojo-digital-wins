@@ -205,9 +205,10 @@ function useContainerWidth(ref: React.RefObject<HTMLElement | null>): number {
 }
 
 function getLayoutMode(width: number): LayoutMode {
-  if (width >= 720) return "lg";
-  if (width >= 520) return "md";
-  if (width >= 420) return "sm";
+  // Lower thresholds to trigger reflow earlier and prevent clipping
+  if (width >= 640) return "lg";
+  if (width >= 480) return "md";
+  if (width >= 360) return "sm";
   return "xs";
 }
 
@@ -469,8 +470,8 @@ const DateRangeButton = React.forwardRef<HTMLButtonElement, DateRangeButtonProps
               ref={ref}
               type="button"
               className={cn(
-                // Size
-                "h-9 min-w-0",
+                // Size - fully shrinkable
+                "h-9 min-w-0 max-w-full w-full",
                 "px-3",
                 // Shape
                 "rounded-[var(--portal-radius-sm)]",
@@ -508,7 +509,7 @@ const DateRangeButton = React.forwardRef<HTMLButtonElement, DateRangeButtonProps
                   "text-[hsl(var(--portal-accent-blue))]"
                 )} 
               />
-              <span className="truncate max-w-[180px]">{displayText}</span>
+              <span className="truncate min-w-0 flex-1">{displayText}</span>
               <ChevronDown 
                 className={cn(
                   "h-4 w-4 shrink-0 ml-auto",
@@ -820,7 +821,7 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
       {/* Row 1: Presets (or dropdown) + Date Range + Refresh */}
       <div
         className={cn(
-          "flex items-center gap-2 min-w-0",
+          "flex flex-wrap items-center gap-2 min-w-0 max-w-full",
           // On md, span full first row
           layoutMode === "md" && "col-span-3",
           // On sm/xs, full width
@@ -838,16 +839,17 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
           <PresetDropdown value={selectedPreset} onChange={handlePresetChange} />
         )}
 
-        {/* Date Range Picker */}
-        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-          <PopoverTrigger asChild>
-            <DateRangeButton
-              startDate={startDate}
-              endDate={endDate}
-              containerWidth={containerWidth}
-              isOpen={isCalendarOpen}
-            />
-          </PopoverTrigger>
+        {/* Date Range Picker - shrinkable wrapper */}
+        <div className="min-w-0 max-w-full flex-1">
+          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+            <PopoverTrigger asChild>
+              <DateRangeButton
+                startDate={startDate}
+                endDate={endDate}
+                containerWidth={containerWidth}
+                isOpen={isCalendarOpen}
+              />
+            </PopoverTrigger>
           <PopoverContent
             className={cn(
               "w-auto p-0",
@@ -866,8 +868,9 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
               numberOfMonths={containerWidth >= 640 ? 2 : 1}
               defaultMonth={subDays(new Date(), 30)}
             />
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+        </div>
 
         {/* Refresh button - always visible in row 1 */}
         {showRefresh && onRefresh && (

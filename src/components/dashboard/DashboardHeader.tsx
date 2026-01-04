@@ -178,7 +178,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       elevation="elevated"
       border="gradient"
       padding="md"
-      className={cn("overflow-hidden", className)}
+      className={cn(className)}
     >
       {/* Header Layout:
           - Mobile: Stack vertically, controls full width
