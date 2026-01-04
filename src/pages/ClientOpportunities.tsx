@@ -20,7 +20,9 @@ import { toast } from "sonner";
 import { ClientShell } from "@/components/client/ClientShell";
 import { ChartPanel } from "@/components/charts/ChartPanel";
 import { OpportunityCard } from "@/components/client/OpportunityCard";
+import { LastRunStatus } from "@/components/client/LastRunStatus";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
+import { useLatestOpportunityRun } from "@/hooks/useOpportunityDetectorRuns";
 import {
   useOpportunitiesQuery,
   useMarkOpportunityComplete,
@@ -353,6 +355,7 @@ export default function ClientOpportunities() {
   const { data, isLoading, isFetching, error, refetch } = useOpportunitiesQuery(
     organizationId
   );
+  const { data: lastRun, isLoading: lastRunLoading } = useLatestOpportunityRun(organizationId);
   const markCompleteMutation = useMarkOpportunityComplete(organizationId);
   const dismissMutation = useDismissOpportunity(organizationId);
 
@@ -431,8 +434,12 @@ export default function ClientOpportunities() {
               <span className="hidden sm:inline">Refresh</span>
             </Button>
           }
-          minHeight={120}
+          minHeight={140}
         >
+          {/* Last Run Status */}
+          <div className="mb-4">
+            <LastRunStatus lastRun={lastRun} isLoading={lastRunLoading} variant="opportunities" />
+          </div>
           {/* Hero Metrics */}
           <div className="flex flex-wrap gap-3">
             <V3MetricChip
@@ -538,15 +545,21 @@ export default function ClientOpportunities() {
 
             <TabsContent value={filterStatus} className="mt-0">
               {filteredOpportunities.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="flex flex-col items-center justify-center py-12 text-center max-w-md mx-auto">
                   <Sparkles className="h-12 w-12 text-[hsl(var(--portal-accent-purple))] mb-4" />
-                  <p className="text-[hsl(var(--portal-text-secondary))]">
+                  <p className="text-[hsl(var(--portal-text-secondary))] mb-2">
                     {filterStatus === "active"
-                      ? "No active opportunities. New AI-generated moments will appear here!"
+                      ? "No active opportunities detected yet."
                       : filterStatus === "completed"
                       ? "No completed opportunities yet."
                       : "No opportunities match your filters."}
                   </p>
+                  {filterStatus === "active" && lastRun && (
+                    <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                      Last scan processed {lastRun.trends_processed} trends, created {lastRun.created_count ?? 0}, skipped {lastRun.skipped_count ?? 0} (below threshold).
+                      {lastRun.skipped_count && lastRun.skipped_count > lastRun.created_count ? " Scores may be low due to limited historical correlation data." : ""}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <ScrollArea className="h-[600px] pr-4">

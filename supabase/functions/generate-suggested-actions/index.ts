@@ -93,7 +93,8 @@ serve(async (req) => {
   try {
     console.log('🎯 Generating suggested actions for high-score alerts...');
 
-    // Get high-scoring actionable alerts from last 24h
+    // Get high-scoring actionable alerts from last 7 days (extended from 24h for bootstrap)
+    // UPSERT with unique constraint prevents duplicates, so wider window is safe
     const { data: alerts, error: alertsError } = await supabase
       .from('client_entity_alerts')
       .select(`
@@ -110,9 +111,9 @@ serve(async (req) => {
       `)
       .eq('is_actionable', true)
       .gte('actionable_score', 60)
-      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
       .order('actionable_score', { ascending: false })
-      .limit(30);
+      .limit(50);
 
     if (alertsError) {
       errors.push({ phase: 'fetch_alerts', error: alertsError.message });

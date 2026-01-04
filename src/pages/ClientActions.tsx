@@ -20,7 +20,9 @@ import {
 import { ClientShell } from "@/components/client/ClientShell";
 import { ChartPanel } from "@/components/charts/ChartPanel";
 import { ActionCard } from "@/components/client/ActionCard";
+import { LastRunStatus } from "@/components/client/LastRunStatus";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
+import { useLatestActionGeneratorRun } from "@/hooks/useActionGeneratorRuns";
 import {
   useSuggestedActionsQuery,
   useMarkActionUsed,
@@ -335,6 +337,7 @@ const ClientActions = () => {
   const { data, isLoading, isFetching, error, refetch } = useSuggestedActionsQuery(
     organizationId
   );
+  const { data: lastRun, isLoading: lastRunLoading } = useLatestActionGeneratorRun(organizationId);
   const markUsedMutation = useMarkActionUsed(organizationId);
   const markAllUsedMutation = useMarkAllActionsUsed(organizationId);
   const dismissMutation = useDismissAction(organizationId);
@@ -461,8 +464,12 @@ const ClientActions = () => {
               )}
             </div>
           }
-          minHeight={120}
+          minHeight={140}
         >
+          {/* Last Run Status */}
+          <div className="mb-4">
+            <LastRunStatus lastRun={lastRun} isLoading={lastRunLoading} variant="actions" />
+          </div>
           {/* Hero Metrics */}
           <div className="flex flex-wrap gap-3">
             <V3MetricChip
@@ -577,20 +584,27 @@ const ClientActions = () => {
 
             <TabsContent value={filterStatus} className="mt-0">
               {filteredActions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="flex flex-col items-center justify-center py-12 text-center max-w-md mx-auto">
                   <Lightbulb className="h-12 w-12 text-[hsl(var(--portal-text-muted))] mb-4" />
-                  <p className="text-[hsl(var(--portal-text-secondary))]">
+                  <p className="text-[hsl(var(--portal-text-secondary))] mb-2">
                     {filterStatus === "pending"
-                      ? "No pending actions. Check back later for new suggestions!"
+                      ? "No pending actions available."
                       : filterStatus === "used"
                       ? "No used actions yet."
                       : "No actions match your filters."}
                   </p>
+                  {filterStatus === "pending" && lastRun && (
+                    <p className="text-xs text-[hsl(var(--portal-text-muted))] mb-4">
+                      Last run processed {lastRun.alerts_processed} alerts, created {lastRun.actions_created ?? 0} actions
+                      ({lastRun.ai_generated_count ?? 0} AI, {lastRun.template_generated_count ?? 0} template).
+                      {lastRun.alerts_processed === 0 ? " No actionable alerts found in the last 7 days." : ""}
+                    </p>
+                  )}
                   {filterStatus === "pending" && (
                     <Button
                       variant="outline"
                       onClick={() => navigate("/client/alerts")}
-                      className="mt-4 min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white border-0"
+                      className="mt-2 min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white border-0"
                     >
                       View Alerts
                     </Button>
