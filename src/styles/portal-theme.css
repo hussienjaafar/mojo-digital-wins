@@ -644,12 +644,33 @@
 /* === PORTAL ICON BUTTONS === */
 /* Clean, subtle icon buttons for header actions */
 
+/* === PORTAL TOOLBAR === */
+/* V3 header toolbar with proper ARIA and touch targets */
+
+.portal-toolbar {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Ensure no overflow/clipping on toolbar */
+.portal-toolbar > * {
+  flex-shrink: 0;
+}
+
+/* === PORTAL ICON BUTTONS === */
+/* Clean, subtle icon buttons for header actions
+   WCAG 2.1 AA: 44px minimum touch target */
+
 .portal-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  /* 44px touch target for accessibility */
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   background: transparent;
   border: 1px solid transparent;
@@ -657,6 +678,14 @@
   color: hsl(var(--portal-text-secondary));
   cursor: pointer;
   transition: all var(--portal-transition-fast);
+}
+
+/* Slightly smaller on mobile to save space */
+@media (min-width: 420px) {
+  .portal-icon-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
 }
 
 .portal-icon-btn:hover {
@@ -667,11 +696,14 @@
 
 .portal-icon-btn:active {
   background: hsl(var(--portal-bg-tertiary));
+  transform: scale(0.98);
 }
 
 .portal-icon-btn:focus-visible {
-  outline: 2px solid hsl(var(--portal-accent-blue));
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 
+    0 0 0 2px hsl(var(--portal-bg-secondary)),
+    0 0 0 4px hsl(var(--portal-accent-blue));
 }
 
 .portal-icon-btn-danger:hover {
