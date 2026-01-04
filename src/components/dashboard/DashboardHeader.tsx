@@ -182,15 +182,20 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     >
       {/* Header Layout:
           - Mobile: Stack vertically, controls full width
-          - Desktop (>=1024px): Two-column layout with bounded controls column */}
+          - Desktop (>=1024px): Two-column grid with auto-sized controls column */}
       <div
         className={cn(
-          // Grid-first so the controls column has a real width (prevents clipping)
-          "grid grid-cols-1 gap-[var(--portal-space-md)] min-w-0",
-          "lg:grid-cols-[minmax(0,1fr)_minmax(0,720px)] lg:items-start lg:gap-4"
+          // Base: stack vertically
+          "relative w-full",
+          "grid grid-cols-1",
+          "gap-[var(--portal-space-md)]",
+          // Large screens: two columns - left grows, right sizes to content
+          "lg:grid-cols-[minmax(0,1fr)_auto]",
+          "lg:items-start",
+          "lg:gap-6"
         )}
       >
-        {/* Left: Title Block with Icon and Status */}
+        {/* Left Column: Title Block with Icon and Status */}
         <div className="flex flex-col gap-[var(--portal-space-sm)] min-w-0">
           <TitleBlock
             title={title}
@@ -199,12 +204,24 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             iconVariant="gradient"
             size="lg"
             statusBadge={statusBadge}
+            className="[&_p]:max-w-[52ch]"
           />
         </div>
 
-        {/* Right: Controls (date controls + refresh) */}
+        {/* Right Column: Controls (date controls + refresh) */}
         {hasControls && (
-          <div className="min-w-0 w-full lg:justify-self-end">
+          <div
+            className={cn(
+              // Sizing: shrink to fit content, max 720px, don't overflow
+              "min-w-0",
+              "w-full",
+              "lg:w-auto",
+              "lg:max-w-[720px]",
+              // Alignment
+              "lg:justify-self-end",
+              "lg:self-start"
+            )}
+          >
             {(() => {
               const isDateRangeControl =
                 React.isValidElement(dateControls) &&
