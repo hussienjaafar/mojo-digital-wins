@@ -2,7 +2,6 @@ import { ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
-import { LogOut, Sun, Moon, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { useTheme } from "@/components/ThemeProvider";
@@ -16,9 +15,7 @@ import { AppSidebar } from "@/components/client/AppSidebar";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { SkipNavigation } from "@/components/accessibility/SkipNavigation";
 import { OrganizationSelector } from "@/components/client/OrganizationSelector";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
-import { DateRangeControl } from "@/components/ui/DateRangeControl";
+import { ClientHeaderControls } from "@/components/client/ClientHeaderControls";
 import { cn } from "@/lib/utils";
 
 // ============================================================================
@@ -332,86 +329,14 @@ export const ClientShell = ({
                   </div>
 
                   {/* Right: Controls */}
-                  <TooltipProvider delayDuration={300}>
-                    <nav
-                      className="portal-header-actions flex items-center gap-1 sm:gap-2"
-                      aria-label="Header actions"
-                    >
-                      {/* Date Range Picker */}
-                      {showDateControls && (
-                        <div className="hidden sm:block">
-                          <DateRangeControl size="sm" />
-                        </div>
-                      )}
-
-                      {/* Back to Admin Button */}
-                      {showBackToAdmin && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleBackToAdmin}
-                              className={cn(
-                                "h-9 gap-1.5 px-2 sm:px-3",
-                                "bg-[hsl(var(--portal-bg-elevated))]",
-                                "border-[hsl(var(--portal-border))]",
-                                "text-[hsl(var(--portal-text-primary))]",
-                                "hover:bg-[hsl(var(--portal-bg-hover))]",
-                                "hover:border-[hsl(var(--portal-accent-blue))]"
-                              )}
-                            >
-                              <ArrowLeft className="h-4 w-4" />
-                              <span className="hidden sm:inline">Admin</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            <p>Back to Admin Dashboard</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-
-                      {/* Theme Toggle */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <motion.button
-                            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                            className="portal-icon-btn"
-                            aria-label="Toggle theme"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            {theme === "dark" ? (
-                              <Sun className="h-[18px] w-[18px]" />
-                            ) : (
-                              <Moon className="h-[18px] w-[18px]" />
-                            )}
-                          </motion.button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          <p>Toggle theme</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      {/* Logout */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <motion.button
-                            onClick={handleLogout}
-                            className="portal-icon-btn portal-icon-btn-danger"
-                            aria-label="Log out of your account"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            <LogOut className="h-[18px] w-[18px]" aria-hidden="true" />
-                          </motion.button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          <p>Logout</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </nav>
-                  </TooltipProvider>
+                  <ClientHeaderControls
+                    showDateControls={showDateControls}
+                    showBackToAdmin={showBackToAdmin}
+                    theme={theme}
+                    onThemeToggle={() => setTheme(theme === "dark" ? "light" : "dark")}
+                    onBackToAdmin={handleBackToAdmin}
+                    onLogout={handleLogout}
+                  />
                 </div>
               </div>
             </header>
