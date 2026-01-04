@@ -249,17 +249,102 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // =========================================================================
+  // FAIL-SAFE AUDIT LOGGING PATTERN (Gate C Compliance)
+  // 1. Create audit record IMMEDIATELY at start with finished_at = null
+  // 2. Update on successful completion with all stats
+  // 3. Update on ANY error with error details
+  // 4. Use try/finally to GUARANTEE finalization
+  // =========================================================================
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+
+  const startedAt = new Date().toISOString();
+  let runId: string | null = null;
+  let organizationId: string | null = null;
+  let dryRun = true;
+
+  // Parse request body early to get org_id for audit record
+  let requestBody: { organizationId?: string; dryRun?: boolean; minConfidence?: number } = {};
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { persistSession: false, autoRefreshToken: false } }
-    );
+    requestBody = await req.json();
+    organizationId = requestBody.organizationId || null;
+    dryRun = requestBody.dryRun ?? true;
+  } catch {
+    // Will be handled in main try block
+  }
 
-    const { organizationId, dryRun = true, minConfidence = 0.5 } = await req.json();
+  // CREATE AUDIT RECORD IMMEDIATELY - before any processing
+  try {
+    const { data: runRecord, error: runError } = await supabase
+      .from('attribution_matcher_runs')
+      .insert({
+        organization_id: organizationId,
+        started_at: startedAt,
+        finished_at: null, // Will be updated on completion/error
+        dry_run: dryRun,
+        total_matches: 0,
+        matches_deterministic: 0,
+        matches_heuristic_partial: 0,
+        matches_heuristic_pattern: 0,
+        matches_heuristic_fuzzy: 0,
+        skipped_existing: 0,
+        skipped_deterministic_protected: 0,
+        unmatched_count: 0,
+        matched_revenue: 0,
+        unmatched_revenue: 0,
+        errors: null,
+        metadata: { version: 'v2.2-audited', started_by: 'auto-match-attribution' }
+      })
+      .select('id')
+      .single();
 
-    // Track timing for audit log
-    const startedAt = new Date().toISOString();
+    if (!runError && runRecord) {
+      runId = runRecord.id;
+      console.log(`[AUTO-MATCH] Audit record created: ${runId}`);
+    } else {
+      console.error('[AUTO-MATCH] Failed to create audit record:', runError);
+    }
+  } catch (auditErr) {
+    console.error('[AUTO-MATCH] Critical: Could not create audit record:', auditErr);
+  }
+
+  // Helper to finalize audit record (success or error)
+  const finalizeAuditRecord = async (
+    stats: {
+      matches_deterministic?: number;
+      matches_heuristic_partial?: number;
+      matches_heuristic_pattern?: number;
+      matches_heuristic_fuzzy?: number;
+      total_matches?: number;
+      skipped_existing?: number;
+      skipped_deterministic_protected?: number;
+      unmatched_count?: number;
+      matched_revenue?: number;
+      unmatched_revenue?: number;
+      errors?: string[] | null;
+    } = {}
+  ) => {
+    if (!runId) return;
+    try {
+      await supabase
+        .from('attribution_matcher_runs')
+        .update({
+          finished_at: new Date().toISOString(),
+          ...stats
+        })
+        .eq('id', runId);
+      console.log(`[AUTO-MATCH] Audit record finalized: ${runId}`);
+    } catch (err) {
+      console.error('[AUTO-MATCH] Failed to finalize audit record:', err);
+    }
+  };
+
+  try {
+    const { minConfidence = 0.5 } = requestBody;
 
     console.log(`[AUTO-MATCH] Starting for org: ${organizationId || 'all'}, dryRun: ${dryRun}`);
 
@@ -550,13 +635,8 @@ serve(async (req) => {
     console.log(`[AUTO-MATCH] Unmatched: ${unmatched.length}`);
     console.log(`[AUTO-MATCH] ===================================`);
 
-    // Write to audit log table (Gate C requirement)
-    const finishedAt = new Date().toISOString();
-    const auditLogData = {
-      organization_id: organizationId || null,
-      started_at: startedAt,
-      finished_at: finishedAt,
-      dry_run: dryRun,
+    // FINALIZE AUDIT RECORD WITH SUCCESS STATS (Gate C requirement)
+    await finalizeAuditRecord({
       matches_deterministic: deterministicCount,
       matches_heuristic_partial: heuristicPartialCount,
       matches_heuristic_pattern: heuristicPatternCount,
@@ -567,24 +647,25 @@ serve(async (req) => {
       unmatched_count: unmatched.length,
       matched_revenue: matches.reduce((sum, m) => sum + m.revenue, 0),
       unmatched_revenue: unmatched.reduce((sum, u) => sum + u.revenue, 0),
-      errors: upsertErrors
-    };
+      errors: upsertErrors.length > 0 ? upsertErrors : null
+    });
 
-    const { error: auditError } = await supabase
-      .from('attribution_matcher_runs')
-      .insert(auditLogData);
-
-    if (auditError) {
-      console.error('[AUTO-MATCH] Failed to write audit log:', auditError);
-      // Don't fail the whole operation for audit log errors
-    } else {
-      console.log('[AUTO-MATCH] Audit log written successfully');
-    }
+    console.log(`[AUTO-MATCH] ========== MATCH SUMMARY ==========`);
+    console.log(`[AUTO-MATCH] Audit Run ID: ${runId}`);
+    console.log(`[AUTO-MATCH] Deterministic (url_exact): ${deterministicCount}`);
+    console.log(`[AUTO-MATCH] Heuristic (url_partial): ${heuristicPartialCount}`);
+    console.log(`[AUTO-MATCH] Heuristic (pattern): ${heuristicPatternCount}`);
+    console.log(`[AUTO-MATCH] Heuristic (fuzzy): ${heuristicFuzzyCount}`);
+    console.log(`[AUTO-MATCH] Skipped (deterministic protected): ${skippedDeterministic}`);
+    console.log(`[AUTO-MATCH] Skipped (existing heuristic): ${skippedExisting}`);
+    console.log(`[AUTO-MATCH] Unmatched: ${unmatched.length}`);
+    console.log(`[AUTO-MATCH] ===================================`);
 
     return new Response(
       JSON.stringify({
         success: true,
         dryRun,
+        runId,
         matches,
         unmatched: unmatched.slice(0, 50),
         summary: {
@@ -607,9 +688,16 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
+    // FINALIZE AUDIT RECORD WITH ERROR (Gate C requirement - fail-loud)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('[AUTO-MATCH] Error:', error);
+    
+    await finalizeAuditRecord({
+      errors: [errorMessage]
+    });
+
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ error: errorMessage, runId }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
