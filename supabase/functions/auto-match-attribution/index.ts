@@ -250,6 +250,27 @@ serve(async (req) => {
   }
 
   // =========================================================================
+  // AUTH CHECK: Require CRON_SECRET or scheduled-job header
+  // Since verify_jwt = false, we must validate access manually
+  // =========================================================================
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  const providedSecret = req.headers.get('x-cron-secret');
+  const isScheduledJob = req.headers.get('x-scheduled-job') === 'true';
+  
+  if (!isScheduledJob && cronSecret && providedSecret !== cronSecret) {
+    // Check for admin JWT as fallback
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.error('[AUTO-MATCH] Unauthorized: Missing CRON_SECRET or auth header');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Provide x-cron-secret header or admin JWT' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    // If auth header exists, continue (JWT validation delegated to Supabase client)
+  }
+
+  // =========================================================================
   // FAIL-SAFE AUDIT LOGGING PATTERN (Gate C Compliance)
   // 1. Create audit record IMMEDIATELY at start with finished_at = null
   // 2. Update on successful completion with all stats

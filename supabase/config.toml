@@ -168,8 +168,9 @@ verify_jwt = false
 verify_jwt = false
 
 # HARDENED: auto-match-attribution now correctly sets is_deterministic and attribution_type
+# Set verify_jwt = false to allow CRON_SECRET auth for scheduled jobs
 [functions.auto-match-attribution]
-verify_jwt = true
+verify_jwt = false
 
 [functions.analyze-sms-creatives]
 verify_jwt = true
