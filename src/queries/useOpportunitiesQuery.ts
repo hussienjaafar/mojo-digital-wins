@@ -29,6 +29,9 @@ export interface Opportunity {
   created_at: string;
   updated_at?: string;
   expires_at?: string | null;
+  // Personalization fields
+  org_relevance_score?: number | null;
+  org_relevance_reasons?: string[] | null;
 }
 
 export interface OpportunityStats {

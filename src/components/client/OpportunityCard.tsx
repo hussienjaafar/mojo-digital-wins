@@ -18,6 +18,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { FeedbackButtons } from "./FeedbackButtons";
+import { RelevanceReasons } from "./RelevanceReasons";
 import type {
   Opportunity,
   OpportunityStatus,
@@ -281,6 +283,21 @@ export const OpportunityCard = memo(
               </span>
             )}
             <span className="text-xs">{timeAgo}</span>
+          </div>
+
+          {/* Relevance and Feedback */}
+          <div className="flex items-center justify-between mb-3">
+            <RelevanceReasons 
+              score={opportunity.org_relevance_score} 
+              reasons={opportunity.org_relevance_reasons} 
+            />
+            <FeedbackButtons
+              objectType="opportunity"
+              objectId={opportunity.id}
+              entityName={opportunity.entity_name}
+              relevanceScore={opportunity.org_relevance_score ?? undefined}
+              size="sm"
+            />
           </div>
 
           {/* Historical Context */}

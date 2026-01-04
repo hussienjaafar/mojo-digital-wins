@@ -3454,6 +3454,8 @@ export type Database = {
           notes: string | null
           opportunity_score: number
           opportunity_type: string | null
+          org_relevance_reasons: string[] | null
+          org_relevance_score: number | null
           organization_id: string
           sample_sources: Json | null
           similar_past_events: number | null
@@ -3478,6 +3480,8 @@ export type Database = {
           notes?: string | null
           opportunity_score: number
           opportunity_type?: string | null
+          org_relevance_reasons?: string[] | null
+          org_relevance_score?: number | null
           organization_id: string
           sample_sources?: Json | null
           similar_past_events?: number | null
@@ -3502,6 +3506,8 @@ export type Database = {
           notes?: string | null
           opportunity_score?: number
           opportunity_type?: string | null
+          org_relevance_reasons?: string[] | null
+          org_relevance_score?: number | null
           organization_id?: string
           sample_sources?: Json | null
           similar_past_events?: number | null
@@ -4518,6 +4524,215 @@ export type Database = {
           },
         ]
       }
+      org_alert_preferences: {
+        Row: {
+          created_at: string | null
+          digest_mode: string | null
+          id: string
+          max_alerts_per_day: number | null
+          min_relevance_score: number | null
+          min_urgency_score: number | null
+          notify_channels: string[] | null
+          organization_id: string
+          quiet_hours: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          digest_mode?: string | null
+          id?: string
+          max_alerts_per_day?: number | null
+          min_relevance_score?: number | null
+          min_urgency_score?: number | null
+          notify_channels?: string[] | null
+          organization_id: string
+          quiet_hours?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          digest_mode?: string | null
+          id?: string
+          max_alerts_per_day?: number | null
+          min_relevance_score?: number | null
+          min_urgency_score?: number | null
+          notify_channels?: string[] | null
+          organization_id?: string
+          quiet_hours?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_alert_preferences_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_feedback_events: {
+        Row: {
+          created_at: string | null
+          entity_name: string | null
+          event_type: string
+          id: string
+          object_id: string
+          object_type: string
+          organization_id: string
+          relevance_score_at_time: number | null
+          topic_tags: string[] | null
+          urgency_score_at_time: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entity_name?: string | null
+          event_type: string
+          id?: string
+          object_id: string
+          object_type: string
+          organization_id: string
+          relevance_score_at_time?: number | null
+          topic_tags?: string[] | null
+          urgency_score_at_time?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entity_name?: string | null
+          event_type?: string
+          id?: string
+          object_id?: string
+          object_type?: string
+          organization_id?: string
+          relevance_score_at_time?: number | null
+          topic_tags?: string[] | null
+          urgency_score_at_time?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_feedback_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_interest_entities: {
+        Row: {
+          created_at: string | null
+          entity_name: string
+          id: string
+          organization_id: string
+          reason: string | null
+          rule_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          entity_name: string
+          id?: string
+          organization_id: string
+          reason?: string | null
+          rule_type: string
+        }
+        Update: {
+          created_at?: string | null
+          entity_name?: string
+          id?: string
+          organization_id?: string
+          reason?: string | null
+          rule_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_interest_entities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_interest_model_runs: {
+        Row: {
+          created_at: string | null
+          error_count: number | null
+          errors: Json | null
+          feedback_events_processed: number | null
+          finished_at: string | null
+          id: string
+          metadata: Json | null
+          orgs_processed: number | null
+          started_at: string
+          topics_updated: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_count?: number | null
+          errors?: Json | null
+          feedback_events_processed?: number | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json | null
+          orgs_processed?: number | null
+          started_at?: string
+          topics_updated?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          error_count?: number | null
+          errors?: Json | null
+          feedback_events_processed?: number | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json | null
+          orgs_processed?: number | null
+          started_at?: string
+          topics_updated?: number | null
+        }
+        Relationships: []
+      }
+      org_interest_topics: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string
+          source: string | null
+          topic: string
+          updated_at: string | null
+          weight: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          source?: string | null
+          topic: string
+          updated_at?: string | null
+          weight?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          source?: string | null
+          topic?: string
+          updated_at?: string | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_interest_topics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_mentions: {
         Row: {
           created_at: string
@@ -4560,40 +4775,61 @@ export type Database = {
       organization_profiles: {
         Row: {
           ai_extracted_data: Json | null
+          audiences: string[] | null
+          channels_enabled: string[] | null
           created_at: string | null
+          display_name: string | null
           focus_areas: string[] | null
+          geographies: string[] | null
           id: string
           key_issues: string[] | null
           mission_summary: string | null
+          org_type: string | null
           organization_id: string | null
+          primary_goals: string[] | null
           related_orgs: string[] | null
           scraped_at: string | null
+          sensitivity_redlines: Json | null
           updated_at: string | null
           website_url: string | null
         }
         Insert: {
           ai_extracted_data?: Json | null
+          audiences?: string[] | null
+          channels_enabled?: string[] | null
           created_at?: string | null
+          display_name?: string | null
           focus_areas?: string[] | null
+          geographies?: string[] | null
           id?: string
           key_issues?: string[] | null
           mission_summary?: string | null
+          org_type?: string | null
           organization_id?: string | null
+          primary_goals?: string[] | null
           related_orgs?: string[] | null
           scraped_at?: string | null
+          sensitivity_redlines?: Json | null
           updated_at?: string | null
           website_url?: string | null
         }
         Update: {
           ai_extracted_data?: Json | null
+          audiences?: string[] | null
+          channels_enabled?: string[] | null
           created_at?: string | null
+          display_name?: string | null
           focus_areas?: string[] | null
+          geographies?: string[] | null
           id?: string
           key_issues?: string[] | null
           mission_summary?: string | null
+          org_type?: string | null
           organization_id?: string | null
+          primary_goals?: string[] | null
           related_orgs?: string[] | null
           scraped_at?: string | null
+          sensitivity_redlines?: Json | null
           updated_at?: string | null
           website_url?: string | null
         }
@@ -6011,6 +6247,8 @@ export type Database = {
           id: string
           is_dismissed: boolean | null
           is_used: boolean | null
+          org_relevance_reasons: string[] | null
+          org_relevance_score: number | null
           organization_id: string | null
           status: string | null
           suggested_copy: string | null
@@ -6033,6 +6271,8 @@ export type Database = {
           id?: string
           is_dismissed?: boolean | null
           is_used?: boolean | null
+          org_relevance_reasons?: string[] | null
+          org_relevance_score?: number | null
           organization_id?: string | null
           status?: string | null
           suggested_copy?: string | null
@@ -6055,6 +6295,8 @@ export type Database = {
           id?: string
           is_dismissed?: boolean | null
           is_used?: boolean | null
+          org_relevance_reasons?: string[] | null
+          org_relevance_score?: number | null
           organization_id?: string | null
           status?: string | null
           suggested_copy?: string | null
