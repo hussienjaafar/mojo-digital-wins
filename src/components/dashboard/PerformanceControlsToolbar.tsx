@@ -205,10 +205,11 @@ function useContainerWidth(ref: React.RefObject<HTMLElement | null>): number {
 }
 
 function getLayoutMode(width: number): LayoutMode {
-  // Lower thresholds to trigger reflow earlier and prevent clipping
-  if (width >= 640) return "lg";
-  if (width >= 480) return "md";
-  if (width >= 360) return "sm";
+  // NOTE: the header constrains the toolbar to max ~720px.
+  // Trigger the "lg" layout only when we have enough room to keep it tidy.
+  if (width >= 680) return "lg";
+  if (width >= 520) return "md";
+  if (width >= 420) return "sm";
   return "xs";
 }
 
@@ -807,25 +808,18 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
         "w-full min-w-0 max-w-full",
         // Container queries support
         "[container-type:inline-size]",
-        // Grid layout that reflows based on space
-        "grid gap-2",
-        // Desktop (lg): single row
-        layoutMode === "lg" && "grid-cols-[auto_1fr_auto_auto]",
-        // Medium: two rows
-        layoutMode === "md" && "grid-cols-[auto_1fr_auto] grid-rows-[auto_auto]",
-        // Small/XS: stack vertically
-        (layoutMode === "sm" || layoutMode === "xs") && "grid-cols-1",
+        // Keep the root layout simple: children manage their own reflow.
+        // (Avoid multi-column CSS grid here, which can trap Row 1 in a narrow auto column.)
+        "grid grid-cols-1 gap-2",
         className
       )}
     >
       {/* Row 1: Presets (or dropdown) + Date Range + Refresh */}
       <div
         className={cn(
-          "flex flex-wrap items-center gap-2 min-w-0 max-w-full",
-          // On md, span full first row
-          layoutMode === "md" && "col-span-3",
-          // On sm/xs, full width
-          (layoutMode === "sm" || layoutMode === "xs") && "w-full"
+          "flex flex-wrap items-center gap-2 min-w-0 max-w-full w-full",
+          // Desktop: align cluster to the right edge of the header
+          layoutMode === "lg" && "justify-end"
         )}
       >
         {/* Presets: Segmented on lg, dropdown on smaller */}
@@ -872,21 +866,30 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
           </Popover>
         </div>
 
+        {/* Filters inline on wide layouts (wraps to a second line if needed) */}
+        {hasFilters && layoutMode === "lg" && (
+          <div className="min-w-0">
+            <FilterControl
+              campaignOptions={campaignOptions}
+              creativeOptions={creativeOptions}
+              selectedCampaignId={selectedCampaignId}
+              selectedCreativeId={selectedCreativeId}
+              onCampaignChange={setSelectedCampaignId}
+              onCreativeChange={setSelectedCreativeId}
+              layoutMode={layoutMode}
+            />
+          </div>
+        )}
+
         {/* Refresh button - always visible in row 1 */}
         {showRefresh && onRefresh && (
           <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
         )}
       </div>
 
-      {/* Row 2 (md+): Filters */}
-      {hasFilters && (layoutMode === "lg" || layoutMode === "md") && (
-        <div
-          className={cn(
-            "flex items-center min-w-0",
-            layoutMode === "lg" && "justify-end",
-            layoutMode === "md" && "col-span-3 justify-start"
-          )}
-        >
+      {/* Row 2 (md): Filters */}
+      {hasFilters && layoutMode === "md" && (
+        <div className="min-w-0 w-full">
           <FilterControl
             campaignOptions={campaignOptions}
             creativeOptions={creativeOptions}
