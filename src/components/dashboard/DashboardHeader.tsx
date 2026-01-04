@@ -182,18 +182,18 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     >
       {/* Header Layout:
           - Mobile: Stack vertically, controls full width
-          - Desktop (>=1024px): Two-column grid with auto-sized controls column */}
+          - Mid desktops: keep controls on a second row to avoid collisions
+          - Wide desktops (>=1280px): two-column grid with a constrained, shrinkable controls column */}
       <div
         className={cn(
           // Base: stack vertically
           "relative w-full",
           "grid grid-cols-1",
           "gap-[var(--portal-space-md)]",
-          // Large screens: two columns - right column has a real (shrinkable) width
-          // so controls can wrap instead of pushing off-screen.
-          "lg:grid-cols-[minmax(0,1fr)_minmax(0,720px)]",
-          "lg:items-start",
-          "lg:gap-6"
+          // Wide screens: allow side-by-side without risking overlap
+          "xl:grid-cols-[minmax(0,1fr)_minmax(0,720px)]",
+          "xl:items-start",
+          "xl:gap-6"
         )}
       >
         {/* Left Column: Title Block with Icon and Status */}
@@ -215,13 +215,13 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             className={cn(
               // Critical: allow this grid child to shrink and wrap instead of overflowing
               "min-w-0",
-              // Mobile: full width below title
+              // Mobile + mid desktops: full width below title
               "w-full",
-              // Desktop: fill the right grid column (max 720px)
-              "lg:w-full",
-              // Alignment
-              "lg:justify-self-end",
-              "lg:self-start"
+              // Wide desktop: fill the right grid column (max 720px)
+              "xl:w-full",
+              // Alignment (only when side-by-side)
+              "xl:justify-self-end",
+              "xl:self-start"
             )}
           >
             {(() => {
