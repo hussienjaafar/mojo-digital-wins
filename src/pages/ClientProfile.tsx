@@ -2,9 +2,10 @@ import { ClientLayout } from "@/components/client/ClientLayout";
 import { OrganizationDetails } from "@/components/client/OrganizationDetails";
 import { TeamManagement } from "@/components/client/TeamManagement";
 import OrganizationProfile from "@/components/client/OrganizationProfile";
+import { ProfileSetupWizard } from "@/components/client/ProfileSetupWizard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PortalCard, PortalCardHeader, PortalCardTitle, PortalCardDescription, PortalCardContent } from "@/components/portal/PortalCard";
-import { Building2, Users, Sparkles } from "lucide-react";
+import { Building2, Users, Sparkles, Settings2 } from "lucide-react";
 
 export default function ClientProfile() {
   return (
@@ -19,7 +20,7 @@ export default function ClientProfile() {
             <h1 className="text-2xl sm:text-3xl font-bold portal-text-primary">Organization Profile</h1>
           </div>
           <p className="portal-text-secondary text-sm sm:text-base">
-            Manage your organization settings, team members, and AI profile
+            Manage your organization settings, team members, and personalization preferences
           </p>
         </div>
 
@@ -33,6 +34,10 @@ export default function ClientProfile() {
             <TabsTrigger value="team" className="gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Team</span>
+            </TabsTrigger>
+            <TabsTrigger value="personalization" className="gap-2">
+              <Settings2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Personalization</span>
             </TabsTrigger>
             <TabsTrigger value="ai-profile" className="gap-2">
               <Sparkles className="h-4 w-4" />
@@ -64,6 +69,20 @@ export default function ClientProfile() {
               </PortalCardHeader>
               <PortalCardContent>
                 <TeamManagement />
+              </PortalCardContent>
+            </PortalCard>
+          </TabsContent>
+
+          <TabsContent value="personalization">
+            <PortalCard>
+              <PortalCardHeader>
+                <PortalCardTitle>Personalization Settings</PortalCardTitle>
+                <PortalCardDescription>
+                  Configure your topic interests, geographic focus, and alert preferences to receive more relevant opportunities
+                </PortalCardDescription>
+              </PortalCardHeader>
+              <PortalCardContent>
+                <ProfileSetupWizard />
               </PortalCardContent>
             </PortalCard>
           </TabsContent>
