@@ -11,13 +11,10 @@ import {
   ChevronLeft,
   Check,
   Sparkles,
-  Loader2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -34,10 +31,23 @@ import {
   useUpdateInterestTopics,
   useUpdateAlertPreferences 
 } from "@/queries/useOrgProfileQuery";
-import { PortalCard, PortalCardContent } from "@/components/portal/PortalCard";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+
+// V3 Design System Components
+import {
+  V3Card,
+  V3CardHeader,
+  V3CardTitle,
+  V3CardDescription,
+  V3CardContent,
+  V3CardFooter,
+} from "@/components/v3/V3Card";
+import { V3Button } from "@/components/v3/V3Button";
+import { V3Badge } from "@/components/v3/V3Badge";
+import { V3LoadingState } from "@/components/v3/V3LoadingState";
+import { V3SectionHeader } from "@/components/v3/V3SectionHeader";
 
 // ============================================================================
 // Types & Configuration
@@ -67,11 +77,11 @@ const GEOGRAPHIES = [
 ];
 
 const STEPS = [
-  { id: "org-type", label: "Organization Type", icon: Building2 },
-  { id: "mission", label: "Mission & Goals", icon: Target },
-  { id: "topics", label: "Topic Interests", icon: Sparkles },
-  { id: "geography", label: "Geographic Focus", icon: MapPin },
-  { id: "alerts", label: "Alert Preferences", icon: Bell },
+  { id: "org-type", label: "Organization", icon: Building2 },
+  { id: "mission", label: "Mission", icon: Target },
+  { id: "topics", label: "Topics", icon: Sparkles },
+  { id: "geography", label: "Geography", icon: MapPin },
+  { id: "alerts", label: "Alerts", icon: Bell },
 ];
 
 interface TopicWeight {
@@ -94,7 +104,156 @@ interface WizardState {
 }
 
 // ============================================================================
-// Component
+// Step Progress Component (V3 Styled)
+// ============================================================================
+
+interface StepProgressProps {
+  steps: typeof STEPS;
+  currentStep: number;
+  onStepClick: (index: number) => void;
+}
+
+function StepProgress({ steps, currentStep, onStepClick }: StepProgressProps) {
+  return (
+    <div className="flex items-center justify-between mb-6 sm:mb-8 overflow-x-auto pb-2 -mx-2 px-2">
+      {steps.map((step, index) => {
+        const StepIcon = step.icon;
+        const isActive = index === currentStep;
+        const isCompleted = index < currentStep;
+
+        return (
+          <div key={step.id} className="flex items-center flex-shrink-0">
+            <button
+              onClick={() => index < currentStep && onStepClick(index)}
+              disabled={index > currentStep}
+              className={cn(
+                "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg transition-all duration-200",
+                isActive && "bg-[hsl(var(--portal-accent-blue)/0.1)]",
+                isCompleted && "cursor-pointer hover:bg-[hsl(var(--portal-success)/0.08)]",
+                !isActive && !isCompleted && "opacity-50"
+              )}
+              aria-current={isActive ? "step" : undefined}
+            >
+              <div className={cn(
+                "w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200",
+                isActive && "bg-[hsl(var(--portal-accent-blue))] text-white shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.4)]",
+                isCompleted && "bg-[hsl(var(--portal-success))] text-white",
+                !isActive && !isCompleted && "bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-muted))]"
+              )}>
+                {isCompleted ? <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <StepIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+              </div>
+              <span className={cn(
+                "hidden sm:inline text-xs sm:text-sm font-medium transition-colors",
+                isActive && "text-[hsl(var(--portal-accent-blue))]",
+                isCompleted && "text-[hsl(var(--portal-success))]",
+                !isActive && !isCompleted && "text-[hsl(var(--portal-text-muted))]"
+              )}>
+                {step.label}
+              </span>
+            </button>
+            {index < steps.length - 1 && (
+              <ChevronRight className={cn(
+                "h-4 w-4 mx-1 sm:mx-2 flex-shrink-0",
+                index < currentStep ? "text-[hsl(var(--portal-success))]" : "text-[hsl(var(--portal-text-muted))]"
+              )} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================================================
+// Selectable Chip Component (V3 Styled)
+// ============================================================================
+
+interface SelectableChipProps {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+  icon?: React.ReactNode;
+  variant?: "blue" | "green" | "purple";
+}
+
+function SelectableChip({ label, selected, onClick, icon, variant = "blue" }: SelectableChipProps) {
+  const variantStyles = {
+    blue: selected 
+      ? "bg-[hsl(var(--portal-accent-blue))] text-white border-[hsl(var(--portal-accent-blue))]" 
+      : "hover:border-[hsl(var(--portal-accent-blue)/0.5)] hover:bg-[hsl(var(--portal-accent-blue)/0.05)]",
+    green: selected 
+      ? "bg-[hsl(var(--portal-success))] text-white border-[hsl(var(--portal-success))]" 
+      : "hover:border-[hsl(var(--portal-success)/0.5)] hover:bg-[hsl(var(--portal-success)/0.05)]",
+    purple: selected 
+      ? "bg-[hsl(var(--portal-accent-purple))] text-white border-[hsl(var(--portal-accent-purple))]" 
+      : "hover:border-[hsl(var(--portal-accent-purple)/0.5)] hover:bg-[hsl(var(--portal-accent-purple)/0.05)]",
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium",
+        "border transition-all duration-200 cursor-pointer select-none",
+        selected ? variantStyles[variant] : [
+          "bg-transparent border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-secondary))]",
+          variantStyles[variant]
+        ]
+      )}
+      aria-pressed={selected}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+// ============================================================================
+// Topic Slider Component (V3 Styled)
+// ============================================================================
+
+interface TopicSliderProps {
+  topic: string;
+  weight: number;
+  onChange: (weight: number) => void;
+}
+
+function TopicSlider({ topic, weight, onChange }: TopicSliderProps) {
+  const displayWeight = Math.round(weight * 100);
+  const isActive = weight > 0;
+
+  return (
+    <div className={cn(
+      "flex items-center gap-3 sm:gap-4 p-2 sm:p-3 rounded-lg transition-all duration-200",
+      isActive && "bg-[hsl(var(--portal-accent-blue)/0.05)] border border-[hsl(var(--portal-accent-blue)/0.2)]",
+      !isActive && "bg-[hsl(var(--portal-bg-elevated))/0.5]"
+    )}>
+      <span className={cn(
+        "w-24 sm:w-32 text-xs sm:text-sm capitalize truncate",
+        isActive ? "text-[hsl(var(--portal-text-primary))] font-medium" : "text-[hsl(var(--portal-text-secondary))]"
+      )}>
+        {topic.replace(/_/g, " ")}
+      </span>
+      <Slider
+        value={[displayWeight]}
+        onValueChange={([v]) => onChange(v / 100)}
+        max={100}
+        step={10}
+        className="flex-1"
+      />
+      <span className={cn(
+        "w-10 sm:w-12 text-xs sm:text-sm text-right font-mono",
+        isActive ? "text-[hsl(var(--portal-accent-blue))] font-semibold" : "text-[hsl(var(--portal-text-muted))]"
+      )}>
+        {displayWeight}%
+      </span>
+    </div>
+  );
+}
+
+// ============================================================================
+// Main Component
 // ============================================================================
 
 export function ProfileSetupWizard() {
@@ -190,7 +349,6 @@ export function ProfileSetupWizard() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Update profile
       await updateProfile.mutateAsync({
         org_type: state.orgType,
         display_name: state.displayName,
@@ -200,12 +358,10 @@ export function ProfileSetupWizard() {
         audiences: state.audiences,
       });
 
-      // Update topics
       await updateTopics.mutateAsync({
         topics: state.topicWeights.filter(t => t.weight > 0),
       });
 
-      // Update preferences
       await updatePreferences.mutateAsync({
         min_relevance_score: state.minRelevanceScore,
         max_alerts_per_day: state.maxAlertsPerDay,
@@ -235,398 +391,370 @@ export function ProfileSetupWizard() {
       case 0: return !!state.orgType;
       case 1: return !!state.missionSummary;
       case 2: return state.topicWeights.filter(t => t.weight > 0).length > 0;
-      case 3: return true; // Geography is optional
-      case 4: return true; // Alert preferences have defaults
+      case 3: return true;
+      case 4: return true;
       default: return false;
     }
   };
 
   if (profileLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--portal-accent-blue))]" />
+      <div className="max-w-3xl mx-auto px-4">
+        <V3LoadingState variant="card" height={400} />
       </div>
     );
   }
 
-  return (
-    <div className="max-w-3xl mx-auto">
-      {/* Progress Steps */}
-      <div className="flex items-center justify-between mb-8">
-        {STEPS.map((step, index) => {
-          const StepIcon = step.icon;
-          const isActive = index === currentStep;
-          const isCompleted = index < currentStep;
+  const activeTopicsCount = state.topicWeights.filter(t => t.weight > 0).length;
 
-          return (
-            <div key={step.id} className="flex items-center">
-              <button
-                onClick={() => index < currentStep && setCurrentStep(index)}
-                disabled={index > currentStep}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-lg transition-colors",
-                  isActive && "bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))]",
-                  isCompleted && "text-[hsl(var(--portal-success))] cursor-pointer hover:bg-[hsl(var(--portal-success)/0.1)]",
-                  !isActive && !isCompleted && "text-[hsl(var(--portal-text-muted))]"
-                )}
-              >
-                <div className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center",
-                  isActive && "bg-[hsl(var(--portal-accent-blue))] text-white",
-                  isCompleted && "bg-[hsl(var(--portal-success))] text-white",
-                  !isActive && !isCompleted && "bg-[hsl(var(--portal-bg-tertiary))]"
-                )}>
-                  {isCompleted ? <Check className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
-                </div>
-                <span className="hidden md:inline text-sm font-medium">{step.label}</span>
-              </button>
-              {index < STEPS.length - 1 && (
-                <ChevronRight className="h-4 w-4 mx-2 text-[hsl(var(--portal-text-muted))]" />
-              )}
-            </div>
-          );
-        })}
-      </div>
+  return (
+    <div className="max-w-3xl mx-auto px-2 sm:px-4">
+      {/* Step Progress */}
+      <StepProgress 
+        steps={STEPS} 
+        currentStep={currentStep} 
+        onStepClick={setCurrentStep} 
+      />
 
       {/* Step Content */}
-      <PortalCard>
-        <PortalCardContent className="p-6">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              {/* Step 0: Organization Type */}
-              {currentStep === 0 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-semibold text-[hsl(var(--portal-text-primary))] mb-2">
-                      What type of organization are you?
-                    </h2>
-                    <p className="text-[hsl(var(--portal-text-secondary))]">
-                      This helps us tailor opportunities and actions to your specific needs.
-                    </p>
-                  </div>
-
+      <V3Card>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentStep}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* Step 0: Organization Type */}
+            {currentStep === 0 && (
+              <>
+                <V3CardHeader>
+                  <V3CardTitle as="h2">What type of organization are you?</V3CardTitle>
+                  <V3CardDescription>
+                    This helps us tailor opportunities and actions to your specific needs.
+                  </V3CardDescription>
+                </V3CardHeader>
+                <V3CardContent>
                   <RadioGroup value={state.orgType} onValueChange={(v) => updateState("orgType", v)}>
-                    <div className="grid gap-3">
+                    <div className="grid gap-2 sm:gap-3">
                       {ORG_TYPES.map((type) => (
                         <label
                           key={type.value}
                           className={cn(
-                            "flex items-start gap-4 p-4 rounded-lg border cursor-pointer transition-all",
+                            "flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-200",
                             state.orgType === type.value
-                              ? "border-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-accent-blue)/0.05)]"
-                              : "border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"
+                              ? "border-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-accent-blue)/0.05)] shadow-[0_0_0_1px_hsl(var(--portal-accent-blue)/0.2)]"
+                              : "border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))] hover:bg-[hsl(var(--portal-bg-hover))]"
                           )}
                         >
-                          <RadioGroupItem value={type.value} className="mt-1" />
-                          <div>
-                            <div className="font-medium text-[hsl(var(--portal-text-primary))]">{type.label}</div>
-                            <div className="text-sm text-[hsl(var(--portal-text-secondary))]">{type.description}</div>
+                          <RadioGroupItem value={type.value} className="mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm sm:text-base text-[hsl(var(--portal-text-primary))]">
+                              {type.label}
+                            </div>
+                            <div className="text-xs sm:text-sm text-[hsl(var(--portal-text-secondary))] mt-0.5">
+                              {type.description}
+                            </div>
                           </div>
                         </label>
                       ))}
                     </div>
                   </RadioGroup>
-                </div>
-              )}
+                </V3CardContent>
+              </>
+            )}
 
-              {/* Step 1: Mission & Goals */}
-              {currentStep === 1 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-semibold text-[hsl(var(--portal-text-primary))] mb-2">
-                      Tell us about your mission
-                    </h2>
-                    <p className="text-[hsl(var(--portal-text-secondary))]">
-                      A brief description helps personalize your opportunities.
-                    </p>
+            {/* Step 1: Mission & Goals */}
+            {currentStep === 1 && (
+              <>
+                <V3CardHeader>
+                  <V3CardTitle as="h2">Tell us about your mission</V3CardTitle>
+                  <V3CardDescription>
+                    A brief description helps personalize your opportunities.
+                  </V3CardDescription>
+                </V3CardHeader>
+                <V3CardContent className="space-y-4 sm:space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="displayName" className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                      Organization Name
+                    </Label>
+                    <Input
+                      id="displayName"
+                      value={state.displayName}
+                      onChange={(e) => updateState("displayName", e.target.value)}
+                      placeholder="Your organization name"
+                      className="h-10 sm:h-11"
+                    />
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="displayName">Organization Name</Label>
-                      <Input
-                        id="displayName"
-                        value={state.displayName}
-                        onChange={(e) => updateState("displayName", e.target.value)}
-                        placeholder="Your organization name"
-                        className="mt-1"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="missionSummary">Mission Summary</Label>
-                      <Textarea
-                        id="missionSummary"
-                        value={state.missionSummary}
-                        onChange={(e) => updateState("missionSummary", e.target.value)}
-                        placeholder="Describe your organization's mission in 2-3 sentences..."
-                        rows={4}
-                        className="mt-1"
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Primary Goals (select all that apply)</Label>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {["Fundraising", "Advocacy", "Voter Mobilization", "Member Engagement", "Public Education", "Policy Change"].map((goal) => (
-                          <Badge
-                            key={goal}
-                            variant={state.primaryGoals.includes(goal) ? "default" : "outline"}
-                            className={cn(
-                              "cursor-pointer transition-colors",
-                              state.primaryGoals.includes(goal)
-                                ? "bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))]"
-                                : "hover:bg-[hsl(var(--portal-bg-tertiary))]"
-                            )}
-                            onClick={() => toggleArrayItem("primaryGoals", goal)}
-                          >
-                            {goal}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Topic Interests */}
-              {currentStep === 2 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-semibold text-[hsl(var(--portal-text-primary))] mb-2">
-                      What topics matter most to you?
-                    </h2>
-                    <p className="text-[hsl(var(--portal-text-secondary))]">
-                      Adjust the sliders to indicate importance. Higher values = more relevant opportunities.
-                    </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="missionSummary" className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                      Mission Summary
+                    </Label>
+                    <Textarea
+                      id="missionSummary"
+                      value={state.missionSummary}
+                      onChange={(e) => updateState("missionSummary", e.target.value)}
+                      placeholder="Describe your organization's mission in 2-3 sentences..."
+                      rows={4}
+                      className="resize-none"
+                    />
                   </div>
 
-                  <div className="space-y-6">
-                    {TOPIC_TAXONOMY.map((category) => (
-                      <div key={category.category}>
-                        <h3 className="font-medium text-[hsl(var(--portal-text-primary))] mb-3">
-                          {category.category}
-                        </h3>
-                        <div className="grid gap-3">
-                          {category.topics.map((topic) => (
-                            <div key={topic} className="flex items-center gap-4">
-                              <span className="w-32 text-sm text-[hsl(var(--portal-text-secondary))] capitalize">
-                                {topic.replace(/_/g, " ")}
-                              </span>
-                              <Slider
-                                value={[getTopicWeight(topic) * 100]}
-                                onValueChange={([v]) => updateTopicWeight(topic, v / 100)}
-                                max={100}
-                                step={10}
-                                className="flex-1"
-                              />
-                              <span className="w-12 text-sm text-[hsl(var(--portal-text-muted))] text-right">
-                                {Math.round(getTopicWeight(topic) * 100)}%
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Geographic Focus */}
-              {currentStep === 3 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-semibold text-[hsl(var(--portal-text-primary))] mb-2">
-                      Where do you focus your work?
-                    </h2>
-                    <p className="text-[hsl(var(--portal-text-secondary))]">
-                      Select regions that matter to your organization. This helps filter relevant news and opportunities.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {GEOGRAPHIES.map((geo) => (
-                      <Badge
-                        key={geo}
-                        variant={state.geographies.includes(geo) ? "default" : "outline"}
-                        className={cn(
-                          "cursor-pointer transition-colors",
-                          state.geographies.includes(geo)
-                            ? "bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))]"
-                            : "hover:bg-[hsl(var(--portal-bg-tertiary))]"
-                        )}
-                        onClick={() => toggleArrayItem("geographies", geo)}
-                      >
-                        <MapPin className="h-3 w-3 mr-1" />
-                        {geo}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  <div>
-                    <Label>Target Audiences</Label>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                      Primary Goals
+                    </Label>
+                    <p className="text-xs text-[hsl(var(--portal-text-muted))]">Select all that apply</p>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {["Donors", "Volunteers", "Members", "Voters", "Media", "Policymakers"].map((audience) => (
-                        <Badge
-                          key={audience}
-                          variant={state.audiences.includes(audience) ? "default" : "outline"}
-                          className={cn(
-                            "cursor-pointer transition-colors",
-                            state.audiences.includes(audience)
-                              ? "bg-[hsl(var(--portal-success))] hover:bg-[hsl(var(--portal-success))]"
-                              : "hover:bg-[hsl(var(--portal-bg-tertiary))]"
-                          )}
-                          onClick={() => toggleArrayItem("audiences", audience)}
-                        >
-                          <Users className="h-3 w-3 mr-1" />
-                          {audience}
-                        </Badge>
+                      {["Fundraising", "Advocacy", "Voter Mobilization", "Member Engagement", "Public Education", "Policy Change"].map((goal) => (
+                        <SelectableChip
+                          key={goal}
+                          label={goal}
+                          selected={state.primaryGoals.includes(goal)}
+                          onClick={() => toggleArrayItem("primaryGoals", goal)}
+                          variant="purple"
+                        />
                       ))}
                     </div>
                   </div>
-                </div>
-              )}
+                </V3CardContent>
+              </>
+            )}
 
-              {/* Step 4: Alert Preferences */}
-              {currentStep === 4 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-semibold text-[hsl(var(--portal-text-primary))] mb-2">
-                      Configure your alert preferences
-                    </h2>
-                    <p className="text-[hsl(var(--portal-text-secondary))]">
-                      Control how and when you receive opportunities and suggested actions.
-                    </p>
+            {/* Step 2: Topic Interests */}
+            {currentStep === 2 && (
+              <>
+                <V3CardHeader>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <V3CardTitle as="h2">What topics matter most to you?</V3CardTitle>
+                      <V3CardDescription>
+                        Adjust sliders to indicate importance. Higher = more relevant opportunities.
+                      </V3CardDescription>
+                    </div>
+                    {activeTopicsCount > 0 && (
+                      <V3Badge variant="blue" size="sm">
+                        {activeTopicsCount} active
+                      </V3Badge>
+                    )}
                   </div>
-
-                  <div className="space-y-6">
-                    <div>
-                      <Label>Minimum Relevance Score</Label>
-                      <p className="text-sm text-[hsl(var(--portal-text-muted))] mb-2">
-                        Only show opportunities with at least this relevance score
-                      </p>
-                      <div className="flex items-center gap-4">
-                        <Slider
-                          value={[state.minRelevanceScore]}
-                          onValueChange={([v]) => updateState("minRelevanceScore", v)}
-                          min={20}
-                          max={90}
-                          step={5}
-                          className="flex-1"
-                        />
-                        <span className="w-16 text-lg font-semibold text-[hsl(var(--portal-accent-blue))]">
-                          {state.minRelevanceScore}%
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Maximum Alerts Per Day</Label>
-                      <p className="text-sm text-[hsl(var(--portal-text-muted))] mb-2">
-                        Limit how many new alerts you see daily to avoid fatigue
-                      </p>
-                      <div className="flex items-center gap-4">
-                        <Slider
-                          value={[state.maxAlertsPerDay]}
-                          onValueChange={([v]) => updateState("maxAlertsPerDay", v)}
-                          min={1}
-                          max={20}
-                          step={1}
-                          className="flex-1"
-                        />
-                        <span className="w-16 text-lg font-semibold text-[hsl(var(--portal-accent-blue))]">
-                          {state.maxAlertsPerDay}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Delivery Mode</Label>
-                      <Select value={state.digestMode} onValueChange={(v) => updateState("digestMode", v)}>
-                        <SelectTrigger className="mt-2">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="realtime">Real-time (as they happen)</SelectItem>
-                          <SelectItem value="hourly_digest">Hourly Digest</SelectItem>
-                          <SelectItem value="daily_digest">Daily Digest</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Notification Channels</Label>
-                      <div className="flex flex-wrap gap-4 mt-2">
-                        {[
-                          { value: "in_app", label: "In-App" },
-                          { value: "email", label: "Email" },
-                          { value: "sms", label: "SMS" },
-                        ].map((channel) => (
-                          <label key={channel.value} className="flex items-center gap-2 cursor-pointer">
-                            <Switch
-                              checked={state.notifyChannels.includes(channel.value)}
-                              onCheckedChange={() => toggleArrayItem("notifyChannels", channel.value)}
-                            />
-                            <span className="text-sm">{channel.label}</span>
-                          </label>
+                </V3CardHeader>
+                <V3CardContent className="space-y-6">
+                  {TOPIC_TAXONOMY.map((category) => (
+                    <div key={category.category}>
+                      <V3SectionHeader 
+                        title={category.category} 
+                        size="sm"
+                        className="mb-3"
+                      />
+                      <div className="space-y-1.5 sm:space-y-2">
+                        {category.topics.map((topic) => (
+                          <TopicSlider
+                            key={topic}
+                            topic={topic}
+                            weight={getTopicWeight(topic)}
+                            onChange={(w) => updateTopicWeight(topic, w)}
+                          />
                         ))}
                       </div>
                     </div>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Navigation */}
-          <div className="flex items-center justify-between mt-8 pt-6 border-t border-[hsl(var(--portal-border))]">
-            <Button
-              variant="ghost"
-              onClick={() => setCurrentStep((s) => s - 1)}
-              disabled={currentStep === 0}
-              className="gap-2"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Back
-            </Button>
-
-            {currentStep < STEPS.length - 1 ? (
-              <Button
-                onClick={() => setCurrentStep((s) => s + 1)}
-                disabled={!canProceed()}
-                className="gap-2 bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))]"
-              >
-                Continue
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSave}
-                disabled={saving}
-                className="gap-2 bg-[hsl(var(--portal-success))] hover:bg-[hsl(var(--portal-success))]"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-4 w-4" />
-                    Save Profile
-                  </>
-                )}
-              </Button>
+                  ))}
+                </V3CardContent>
+              </>
             )}
-          </div>
-        </PortalCardContent>
-      </PortalCard>
+
+            {/* Step 3: Geographic Focus */}
+            {currentStep === 3 && (
+              <>
+                <V3CardHeader>
+                  <V3CardTitle as="h2">Where do you focus your work?</V3CardTitle>
+                  <V3CardDescription>
+                    Select regions that matter to your organization. This helps filter relevant news.
+                  </V3CardDescription>
+                </V3CardHeader>
+                <V3CardContent className="space-y-6">
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                      Geographic Focus
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {GEOGRAPHIES.map((geo) => (
+                        <SelectableChip
+                          key={geo}
+                          label={geo}
+                          selected={state.geographies.includes(geo)}
+                          onClick={() => toggleArrayItem("geographies", geo)}
+                          icon={<MapPin className="h-3 w-3" />}
+                          variant="blue"
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                      Target Audiences
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {["Donors", "Volunteers", "Members", "Voters", "Media", "Policymakers"].map((audience) => (
+                        <SelectableChip
+                          key={audience}
+                          label={audience}
+                          selected={state.audiences.includes(audience)}
+                          onClick={() => toggleArrayItem("audiences", audience)}
+                          icon={<Users className="h-3 w-3" />}
+                          variant="green"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </V3CardContent>
+              </>
+            )}
+
+            {/* Step 4: Alert Preferences */}
+            {currentStep === 4 && (
+              <>
+                <V3CardHeader>
+                  <V3CardTitle as="h2">Configure your alert preferences</V3CardTitle>
+                  <V3CardDescription>
+                    Control how and when you receive opportunities and suggested actions.
+                  </V3CardDescription>
+                </V3CardHeader>
+                <V3CardContent className="space-y-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                          Minimum Relevance Score
+                        </Label>
+                        <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                          Only show opportunities with at least this relevance
+                        </p>
+                      </div>
+                      <span className="text-lg font-bold text-[hsl(var(--portal-accent-blue))] tabular-nums">
+                        {state.minRelevanceScore}%
+                      </span>
+                    </div>
+                    <Slider
+                      value={[state.minRelevanceScore]}
+                      onValueChange={([v]) => updateState("minRelevanceScore", v)}
+                      min={20}
+                      max={90}
+                      step={5}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                          Maximum Alerts Per Day
+                        </Label>
+                        <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                          Limit daily alerts to avoid fatigue
+                        </p>
+                      </div>
+                      <span className="text-lg font-bold text-[hsl(var(--portal-accent-blue))] tabular-nums">
+                        {state.maxAlertsPerDay}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[state.maxAlertsPerDay]}
+                      onValueChange={([v]) => updateState("maxAlertsPerDay", v)}
+                      min={1}
+                      max={20}
+                      step={1}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                      Delivery Mode
+                    </Label>
+                    <Select value={state.digestMode} onValueChange={(v) => updateState("digestMode", v)}>
+                      <SelectTrigger className="h-10 sm:h-11">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="realtime">Real-time (as they happen)</SelectItem>
+                        <SelectItem value="hourly_digest">Hourly Digest</SelectItem>
+                        <SelectItem value="daily_digest">Daily Digest</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                      Notification Channels
+                    </Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {[
+                        { value: "in_app", label: "In-App" },
+                        { value: "email", label: "Email" },
+                        { value: "sms", label: "SMS" },
+                      ].map((channel) => (
+                        <label 
+                          key={channel.value} 
+                          className={cn(
+                            "flex items-center justify-between gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200",
+                            state.notifyChannels.includes(channel.value)
+                              ? "border-[hsl(var(--portal-accent-blue)/0.5)] bg-[hsl(var(--portal-accent-blue)/0.05)]"
+                              : "border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"
+                          )}
+                        >
+                          <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                            {channel.label}
+                          </span>
+                          <Switch
+                            checked={state.notifyChannels.includes(channel.value)}
+                            onCheckedChange={() => toggleArrayItem("notifyChannels", channel.value)}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </V3CardContent>
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Navigation Footer */}
+        <V3CardFooter className="flex items-center justify-between pt-6 border-t border-[hsl(var(--portal-border))]">
+          <V3Button
+            variant="ghost"
+            onClick={() => setCurrentStep((s) => s - 1)}
+            disabled={currentStep === 0}
+            leftIcon={<ChevronLeft className="h-4 w-4" />}
+          >
+            Back
+          </V3Button>
+
+          {currentStep < STEPS.length - 1 ? (
+            <V3Button
+              variant="primary"
+              onClick={() => setCurrentStep((s) => s + 1)}
+              disabled={!canProceed()}
+              rightIcon={<ChevronRight className="h-4 w-4" />}
+            >
+              Continue
+            </V3Button>
+          ) : (
+            <V3Button
+              variant="success"
+              onClick={handleSave}
+              isLoading={saving}
+              loadingText="Saving..."
+              leftIcon={!saving ? <Check className="h-4 w-4" /> : undefined}
+            >
+              Save Profile
+            </V3Button>
+          )}
+        </V3CardFooter>
+      </V3Card>
     </div>
   );
 }
