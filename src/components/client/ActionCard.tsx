@@ -11,13 +11,17 @@ import {
   TrendingUp,
   MessageSquare,
   Clock,
+  ThumbsUp,
+  ThumbsDown,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { SuggestedAction } from "@/queries/useSuggestedActionsQuery";
+import { useRecordFeedback } from "@/queries/useOrgFeedbackMutation";
 
 // ============================================================================
 // Configuration
@@ -88,6 +92,7 @@ export interface ActionCardProps {
   isCopying?: boolean;
   isDismissing?: boolean;
   variant?: "full" | "compact";
+  organizationId?: string;
 }
 
 // ============================================================================
@@ -103,8 +108,10 @@ export const ActionCard = memo(
     isCopying = false,
     isDismissing = false,
     variant = "full",
+    organizationId,
   }: ActionCardProps) => {
     const [copied, setCopied] = useState(false);
+    const recordFeedback = useRecordFeedback(organizationId);
     
     const urgencyLevel = getUrgencyLevel(action.urgency_score);
     const urgency = urgencyConfig[urgencyLevel];
@@ -129,6 +136,32 @@ export const ActionCard = memo(
     const handleDismiss = (e: React.MouseEvent) => {
       e.stopPropagation();
       onDismiss(action.id);
+    };
+
+    const handleRelevantFeedback = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      await recordFeedback.mutateAsync({
+        event_type: 'relevant_feedback',
+        object_type: 'suggested_action',
+        object_id: action.id,
+        entity_name: action.alert?.entity_name,
+        topic_tags: [action.topic],
+        relevance_score_at_time: action.topic_relevance_score,
+        urgency_score_at_time: action.urgency_score,
+      });
+    };
+
+    const handleIrrelevantFeedback = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      await recordFeedback.mutateAsync({
+        event_type: 'irrelevant_feedback',
+        object_type: 'suggested_action',
+        object_id: action.id,
+        entity_name: action.alert?.entity_name,
+        topic_tags: [action.topic],
+        relevance_score_at_time: action.topic_relevance_score,
+        urgency_score_at_time: action.urgency_score,
+      });
     };
 
     // Compact variant for "used" actions
@@ -349,10 +382,43 @@ export const ActionCard = memo(
               </Button>
             </div>
 
-            <div className="flex items-center gap-1 text-sm text-[hsl(var(--portal-text-muted))] group-hover:text-[hsl(var(--portal-accent-blue))] transition-colors">
-              <span className="hidden sm:inline">Details</span>
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </div>
+            {/* Feedback Buttons */}
+            <TooltipProvider>
+              <div className="flex items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRelevantFeedback}
+                      className="h-8 w-8 p-0 text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-success))] hover:bg-[hsl(var(--portal-success)/0.1)]"
+                      aria-label="Mark as relevant"
+                    >
+                      <ThumbsUp className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Relevant - show more like this</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleIrrelevantFeedback}
+                      className="h-8 w-8 p-0 text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-error))] hover:bg-[hsl(var(--portal-error)/0.1)]"
+                      aria-label="Mark as not relevant"
+                    >
+                      <ThumbsDown className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Not relevant - show less like this</TooltipContent>
+                </Tooltip>
+                <div className="flex items-center gap-1 text-sm text-[hsl(var(--portal-text-muted))] group-hover:text-[hsl(var(--portal-accent-blue))] transition-colors ml-2">
+                  <span className="hidden sm:inline">Details</span>
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </div>
+              </div>
+            </TooltipProvider>
           </div>
         </div>
       </motion.article>
