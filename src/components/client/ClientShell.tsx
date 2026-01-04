@@ -280,9 +280,12 @@ export const ClientShell = ({
             <ImpersonationBanner />
 
             {/* Header */}
-            <header className="portal-header-clean" role="banner">
-              <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-3">
-                <div className="flex items-center justify-between gap-4">
+            <header 
+              className="portal-header-clean" 
+              role="banner"
+            >
+              <div className="max-w-[1800px] mx-auto px-3 sm:px-4 lg:px-6 py-2 sm:py-3">
+                <div className="flex items-center justify-between gap-2 sm:gap-4">
                   {/* Left: Sidebar Trigger + Organization */}
                   <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                     <SidebarTrigger
