@@ -212,10 +212,12 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {hasControls && (
           <div
             className={cn(
-              // Sizing: shrink to fit content, max 720px, don't overflow
+              // Critical: allow this grid child to shrink and wrap instead of overflowing
               "min-w-0",
+              // Mobile: full width below title
               "w-full",
-              "lg:w-auto",
+              // Desktop: give the toolbar a real width so it doesn't collapse to min-content
+              "lg:w-[min(720px,100%)]",
               "lg:max-w-[720px]",
               // Alignment
               "lg:justify-self-end",
@@ -223,12 +225,17 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             )}
           >
             {(() => {
+              // If there is no refresh control to append, render dateControls as-is.
+              // (Avoid wrapping a full toolbar component in an extra flex container,
+              // which can cause shrink-to-fit sizing quirks in the grid auto column.)
+              if (!showRefresh || !onRefresh) return dateControls;
+
               const isDateRangeControl =
                 React.isValidElement(dateControls) &&
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (dateControls.type as any)?.displayName === "DateRangeControl";
 
-              if (isDateRangeControl && showRefresh && onRefresh) {
+              if (isDateRangeControl) {
                 return React.cloneElement(
                   dateControls as React.ReactElement<DateRangeControlProps>,
                   {
@@ -243,9 +250,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               return (
                 <div className={cn("min-w-0 w-full", "flex flex-wrap items-center gap-2")}>
                   {dateControls}
-                  {showRefresh && onRefresh && (
-                    <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
-                  )}
+                  <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
                 </div>
               );
             })()}
