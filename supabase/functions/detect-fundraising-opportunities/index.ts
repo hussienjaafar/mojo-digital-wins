@@ -1,5 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { 
+  calculateOrgRelevance, 
+  passesOrgThresholds,
+  type OrgInterestTopic,
+  type OrgInterestEntity,
+  type OrgProfile,
+  type OrgAlertPreferences,
+} from "../_shared/orgRelevance.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,7 +52,7 @@ serve(async (req) => {
 
   // Create audit record at START (fail-safe pattern)
   const auditData: Partial<AuditRun> = {
-    organization_id: null, // Will track all orgs
+    organization_id: null,
     started_at: new Date().toISOString(),
     finished_at: null,
     trends_processed: 0,
@@ -57,7 +65,7 @@ serve(async (req) => {
     low_priority_count: 0,
     error_count: 0,
     errors: [],
-    metadata: { version: '2.0.0', trigger: 'scheduled' },
+    metadata: { version: '3.0.0', trigger: 'scheduled', personalization: true },
   };
 
   const { data: auditRun, error: auditCreateError } = await supabase
@@ -68,14 +76,13 @@ serve(async (req) => {
 
   if (auditCreateError) {
     console.error('Failed to create audit record:', auditCreateError);
-    // Continue anyway - don't fail the whole job for audit issues
   }
 
   const auditId = auditRun?.id;
   const errors: any[] = [];
 
   try {
-    console.log('🎯 Detecting fundraising opportunities...');
+    console.log('🎯 Detecting fundraising opportunities with org personalization...');
 
     // Get all active organizations
     const { data: orgs, error: orgsError } = await supabase
@@ -90,7 +97,6 @@ serve(async (req) => {
 
     if (!orgs || orgs.length === 0) {
       console.log('No active organizations found');
-      // Finalize audit
       if (auditId) {
         await supabase
           .from('opportunity_detector_runs')
@@ -105,14 +111,63 @@ serve(async (req) => {
       });
     }
 
-    // Get trending entities - use correct column names: mentions_24h, first_seen_at
+    // Fetch org profiles, interest topics, interest entities, and preferences for all orgs
+    const orgIds = orgs.map(o => o.id);
+    
+    const [profilesResult, topicsResult, entitiesResult, prefsResult] = await Promise.all([
+      supabase.from('organization_profiles').select('*').in('organization_id', orgIds),
+      supabase.from('org_interest_topics').select('*').in('organization_id', orgIds),
+      supabase.from('org_interest_entities').select('*').in('organization_id', orgIds),
+      supabase.from('org_alert_preferences').select('*').in('organization_id', orgIds),
+    ]);
+
+    // Build lookup maps
+    const profileMap = new Map<string, OrgProfile>();
+    (profilesResult.data || []).forEach(p => {
+      profileMap.set(p.organization_id, {
+        org_type: p.org_type,
+        display_name: p.display_name,
+        mission_summary: p.mission_summary,
+        focus_areas: p.focus_areas,
+        key_issues: p.key_issues,
+        geographies: p.geographies,
+        primary_goals: p.primary_goals,
+        audiences: p.audiences,
+      });
+    });
+
+    const topicsMap = new Map<string, OrgInterestTopic[]>();
+    (topicsResult.data || []).forEach(t => {
+      const existing = topicsMap.get(t.organization_id) || [];
+      existing.push({ topic: t.topic, weight: t.weight, source: t.source });
+      topicsMap.set(t.organization_id, existing);
+    });
+
+    const entitiesMap = new Map<string, OrgInterestEntity[]>();
+    (entitiesResult.data || []).forEach(e => {
+      const existing = entitiesMap.get(e.organization_id) || [];
+      existing.push({ entity_name: e.entity_name, rule_type: e.rule_type, reason: e.reason });
+      entitiesMap.set(e.organization_id, existing);
+    });
+
+    const prefsMap = new Map<string, OrgAlertPreferences>();
+    (prefsResult.data || []).forEach(p => {
+      prefsMap.set(p.organization_id, {
+        min_relevance_score: p.min_relevance_score,
+        min_urgency_score: p.min_urgency_score,
+        max_alerts_per_day: p.max_alerts_per_day,
+        digest_mode: p.digest_mode,
+      });
+    });
+
+    // Get trending entities - use last_seen_at for better time decay
     const { data: trendingEntities, error: trendsError } = await supabase
       .from('entity_trends')
       .select('*')
       .gt('velocity', 30)
       .eq('is_trending', true)
       .order('velocity', { ascending: false })
-      .limit(50);
+      .limit(100);
 
     if (trendsError) {
       errors.push({ phase: 'fetch_trends', error: trendsError.message });
@@ -140,16 +195,43 @@ serve(async (req) => {
     }
 
     let createdCount = 0;
-    let updatedCount = 0;
     let skippedCount = 0;
+    let filteredByRelevance = 0;
+    let filteredByThreshold = 0;
     let highPriorityCount = 0;
     let mediumPriorityCount = 0;
     let lowPriorityCount = 0;
 
     for (const org of orgs) {
+      const profile = profileMap.get(org.id) || null;
+      const interestTopics = topicsMap.get(org.id) || [];
+      const interestEntities = entitiesMap.get(org.id) || [];
+      const preferences = prefsMap.get(org.id) || null;
+
       for (const entity of trendingEntities) {
         try {
-          // Check historical performance (optional correlation data)
+          // Calculate org-specific relevance
+          const relevanceResult = calculateOrgRelevance(
+            {
+              entityName: entity.entity_name,
+              entityType: entity.entity_type,
+              topics: entity.related_topics || [],
+              velocity: entity.velocity,
+              mentions: entity.mentions_24h,
+            },
+            profile,
+            interestTopics,
+            interestEntities
+          );
+
+          // Skip if blocked by deny list
+          if (relevanceResult.isBlocked) {
+            skippedCount++;
+            filteredByRelevance++;
+            continue;
+          }
+
+          // Check historical performance
           const { data: pastCorrelations } = await supabase
             .from('event_impact_correlations')
             .select('correlation_strength, amount_raised_48h_after')
@@ -166,39 +248,58 @@ serve(async (req) => {
             ? pastCorrelations.reduce((sum, c) => sum + (c.amount_raised_48h_after || 0), 0) / pastCorrelations.length
             : 0;
 
-          // Calculate time sensitivity - use first_seen_at (correct column)
-          const firstSeenAt = entity.first_seen_at ? new Date(entity.first_seen_at).getTime() : Date.now();
-          const hoursTrending = (Date.now() - firstSeenAt) / (1000 * 60 * 60);
-          const timeSensitivity = Math.max(0, 100 - (hoursTrending * 5));
+          // Calculate time sensitivity - use last_seen_at with slower decay (0.5/hour)
+          const lastSeenAt = entity.last_seen_at 
+            ? new Date(entity.last_seen_at).getTime() 
+            : (entity.first_seen_at ? new Date(entity.first_seen_at).getTime() : Date.now());
+          const hoursSinceLastSeen = (Date.now() - lastSeenAt) / (1000 * 60 * 60);
+          const timeSensitivity = Math.max(0, 100 - (hoursSinceLastSeen * 2.5));
 
-          // Use mentions_24h (correct column) for mentions weight - more generous scoring
-          const mentionsScore = Math.min((entity.mentions_24h || 0) / 5, 25); // Cap at 25 points
-
-          // Calculate transparent opportunity score (REBALANCED: achievable without historical data)
-          // Without historical correlations, max achievable = 50 + 20 + 25 = 95
-          const velocityPoints = Math.min((entity.velocity || 0) / 100 * 50, 50); // Velocity: up to 50 points
-          const timePoints = Math.max(0, 20 - (hoursTrending * 1)); // Time sensitivity: up to 20 points (decays slower)
-          const correlationPoints = avgCorrelation * 25; // Historical: up to 25 points (bonus)
+          // Calculate base opportunity score
+          const mentionsScore = Math.min((entity.mentions_24h || 0) / 5, 25);
+          const velocityPoints = Math.min((entity.velocity || 0) / 100 * 50, 50);
+          const timePoints = Math.max(0, 20 - (hoursSinceLastSeen * 0.5)); // Slower decay
+          const correlationPoints = avgCorrelation * 25;
           
-          const opportunityScore = Math.min(100, Math.round(
-            velocityPoints +      // Up to 50 points from velocity
-            mentionsScore +       // Up to 25 points from mentions
-            timePoints +          // Up to 20 points from recency
-            correlationPoints     // Up to 25 bonus points from historical
+          const baseOpportunityScore = Math.min(100, Math.round(
+            velocityPoints + mentionsScore + timePoints + correlationPoints
           ));
 
-          // Skip low-scoring opportunities - lowered threshold from 60 to 45
-          if (opportunityScore < 45) {
+          // Combine base score with org relevance (weighted blend)
+          // If org has personalization set up, weight relevance more heavily
+          const hasPersonalization = interestTopics.length > 0 || interestEntities.length > 0;
+          const orgRelevanceWeight = hasPersonalization ? 0.4 : 0.2;
+          const baseWeight = 1 - orgRelevanceWeight;
+          
+          const finalScore = Math.round(
+            baseOpportunityScore * baseWeight + relevanceResult.score * orgRelevanceWeight
+          );
+
+          // Check against org thresholds
+          const thresholdCheck = passesOrgThresholds(
+            relevanceResult.score,
+            finalScore,
+            preferences
+          );
+
+          if (!thresholdCheck.passes) {
+            skippedCount++;
+            filteredByThreshold++;
+            continue;
+          }
+
+          // Skip low-scoring opportunities
+          if (finalScore < 40) {
             skippedCount++;
             continue;
           }
 
           // Track priority buckets
-          if (opportunityScore >= 80) highPriorityCount++;
-          else if (opportunityScore >= 60) mediumPriorityCount++;
+          if (finalScore >= 80) highPriorityCount++;
+          else if (finalScore >= 60) mediumPriorityCount++;
           else lowPriorityCount++;
 
-          // Get sample mentions for context
+          // Get sample mentions
           const { data: mentions } = await supabase
             .from('entity_mentions')
             .select('source_type, source_id, mentioned_at')
@@ -208,14 +309,16 @@ serve(async (req) => {
             .order('mentioned_at', { ascending: false })
             .limit(3);
 
-          // Upsert opportunity with all required fields
-          const { data: upsertResult, error: insertError } = await supabase
+          // Upsert opportunity with personalization data
+          const { error: insertError } = await supabase
             .from('fundraising_opportunities')
             .upsert({
               organization_id: org.id,
               entity_name: entity.entity_name,
               entity_type: entity.entity_type || 'topic',
-              opportunity_score: opportunityScore,
+              opportunity_score: finalScore,
+              org_relevance_score: relevanceResult.score,
+              org_relevance_reasons: relevanceResult.reasons,
               velocity: entity.velocity || 0,
               current_mentions: entity.mentions_24h || 0,
               time_sensitivity: timeSensitivity,
@@ -231,8 +334,7 @@ serve(async (req) => {
             }, {
               onConflict: 'organization_id,entity_name',
               ignoreDuplicates: false,
-            })
-            .select('id');
+            });
 
           if (insertError) {
             console.error(`Error upserting opportunity for ${entity.entity_name}:`, insertError);
@@ -243,9 +345,10 @@ serve(async (req) => {
               error: insertError.message 
             });
           } else {
-            // Check if this was a create or update (simplified - count as created)
             createdCount++;
-            console.log(`✅ Created opportunity for ${entity.entity_name} (score: ${opportunityScore})`);
+            if (relevanceResult.reasons.length > 0 && relevanceResult.score > 50) {
+              console.log(`✅ Created personalized opportunity for ${entity.entity_name} (score: ${finalScore}, relevance: ${relevanceResult.score})`);
+            }
           }
         } catch (entityError: any) {
           console.error(`Error processing entity ${entity.entity_name}:`, entityError);
@@ -273,17 +376,16 @@ serve(async (req) => {
       console.log(`🗑️ Deactivated ${expiredCount} expired opportunities`);
     }
 
-    console.log(`✨ Opportunity detection complete. Created: ${createdCount}, Skipped: ${skippedCount}, Expired: ${expiredCount}`);
+    console.log(`✨ Opportunity detection complete. Created: ${createdCount}, Skipped: ${skippedCount} (relevance: ${filteredByRelevance}, threshold: ${filteredByThreshold})`);
 
     // Finalize audit record
     if (auditId) {
-      const { error: auditUpdateError } = await supabase
+      await supabase
         .from('opportunity_detector_runs')
         .update({
           finished_at: new Date().toISOString(),
           trends_processed: trendingEntities?.length || 0,
           created_count: createdCount,
-          updated_count: updatedCount,
           skipped_count: skippedCount,
           expired_count: expiredCount,
           high_priority_count: highPriorityCount,
@@ -294,14 +396,12 @@ serve(async (req) => {
           metadata: { 
             ...auditData.metadata, 
             orgs_processed: orgs.length,
+            filtered_by_relevance: filteredByRelevance,
+            filtered_by_threshold: filteredByThreshold,
             success: true 
           },
         })
         .eq('id', auditId);
-
-      if (auditUpdateError) {
-        console.error('Failed to finalize audit record:', auditUpdateError);
-      }
     }
 
     return new Response(
@@ -312,6 +412,10 @@ serve(async (req) => {
         opportunities_expired: expiredCount,
         trends_processed: trendingEntities?.length || 0,
         orgs_processed: orgs.length,
+        personalization_stats: {
+          filtered_by_relevance: filteredByRelevance,
+          filtered_by_threshold: filteredByThreshold,
+        },
         errors: errors.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -321,7 +425,6 @@ serve(async (req) => {
     console.error('❌ Error in detect-fundraising-opportunities:', error);
     errors.push({ phase: 'main', error: error.message });
 
-    // Finalize audit record with error
     if (auditId) {
       await supabase
         .from('opportunity_detector_runs')
