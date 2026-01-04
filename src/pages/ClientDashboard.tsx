@@ -17,12 +17,12 @@ import {
   V3LoadingState,
   V3DataFreshnessPanel,
 } from "@/components/v3";
-import { DateRangeControl } from "@/components/ui/DateRangeControl";
+import { PerformanceControlsToolbar } from "@/components/dashboard/PerformanceControlsToolbar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useDashboardStore, useDateRange, useSelectedCampaignId, useSelectedCreativeId } from "@/stores/dashboardStore";
 import { DashboardTopSection } from "@/components/client/DashboardTopSection";
-import { CampaignCreativeFilters } from "@/components/dashboard/CampaignCreativeFilters";
+import { useFilterOptions } from "@/hooks/useFilterOptions";
 import { useClientDashboardMetricsQuery } from "@/queries";
 import { buildHeroKpis } from "@/utils/buildHeroKpis";
 import { logger } from "@/lib/logger";
@@ -248,6 +248,13 @@ const ClientDashboard = () => {
   // Data fetching with TanStack Query
   const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useClientDashboardMetricsQuery(organizationId);
 
+  // Fetch filter options for campaigns and creatives
+  const { data: filterOptions } = useFilterOptions(
+    organizationId,
+    dateRange.startDate,
+    dateRange.endDate
+  );
+
   // Build hero KPIs from query data
   const heroKpis = useMemo(() => {
     if (!data?.kpis) return [];
@@ -405,25 +412,25 @@ const ClientDashboard = () => {
                     </Tooltip>
                   ].filter(Boolean)}
                   controls={
-                    <div className="flex flex-wrap items-center gap-1 xs:gap-1.5 sm:gap-2 w-full lg:w-auto min-w-0">
-                      {/* Date controls - shrinks responsively */}
-                      <DateRangeControl pillPresets={["7d", "14d", "30d", "90d"]} size="sm" />
-                      {/* Filters - inline, also shrinks */}
-                      {organizationId && (
-                        <CampaignCreativeFilters organizationId={organizationId} />
-                      )}
-                    </div>
+                    <PerformanceControlsToolbar
+                      organizationId={organizationId}
+                      campaignOptions={filterOptions?.campaigns || []}
+                      creativeOptions={filterOptions?.creatives || []}
+                      showRefresh
+                      onRefresh={() => {
+                        triggerRefresh();
+                        refetch();
+                      }}
+                      isRefreshing={isFetching}
+                    />
                   }
                   kpis={heroKpis}
                   isLoading={isLoading}
                   error={error instanceof Error ? error.message : error ? String(error) : null}
                   onRetry={() => refetch()}
-                  onRefresh={() => {
-                    triggerRefresh();
-                    refetch();
-                  }}
-                  showRefresh
-                  isRefreshing={isFetching}
+                  onRefresh={undefined}
+                  showRefresh={false}
+                  isRefreshing={false}
                   gridColumns={{ mobile: 2, tablet: 3, desktop: 6 }}
                   expansionMode="inline"
                 />
