@@ -171,19 +171,24 @@ serve(async (req) => {
           const hoursTrending = (Date.now() - firstSeenAt) / (1000 * 60 * 60);
           const timeSensitivity = Math.max(0, 100 - (hoursTrending * 5));
 
-          // Use mentions_24h (correct column) for mentions weight
-          const mentionsScore = Math.min((entity.mentions_24h || 0) / 10, 20); // Cap at 20 points
+          // Use mentions_24h (correct column) for mentions weight - more generous scoring
+          const mentionsScore = Math.min((entity.mentions_24h || 0) / 5, 25); // Cap at 25 points
 
-          // Calculate transparent opportunity score
+          // Calculate transparent opportunity score (REBALANCED: achievable without historical data)
+          // Without historical correlations, max achievable = 50 + 20 + 25 = 95
+          const velocityPoints = Math.min((entity.velocity || 0) / 100 * 50, 50); // Velocity: up to 50 points
+          const timePoints = Math.max(0, 20 - (hoursTrending * 1)); // Time sensitivity: up to 20 points (decays slower)
+          const correlationPoints = avgCorrelation * 25; // Historical: up to 25 points (bonus)
+          
           const opportunityScore = Math.min(100, Math.round(
-            (Math.min(entity.velocity || 0, 100) * 0.35) +  // Velocity: up to 35 points
-            (avgCorrelation * 30) +                          // Historical correlation: up to 30 points
-            (timeSensitivity * 0.15) +                       // Time sensitivity: up to 15 points
-            (mentionsScore)                                  // Mentions: up to 20 points
+            velocityPoints +      // Up to 50 points from velocity
+            mentionsScore +       // Up to 25 points from mentions
+            timePoints +          // Up to 20 points from recency
+            correlationPoints     // Up to 25 bonus points from historical
           ));
 
-          // Skip low-scoring opportunities
-          if (opportunityScore < 60) {
+          // Skip low-scoring opportunities - lowered threshold from 60 to 45
+          if (opportunityScore < 45) {
             skippedCount++;
             continue;
           }

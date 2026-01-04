@@ -3459,6 +3459,7 @@ export type Database = {
           similar_past_events: number | null
           status: string | null
           time_sensitivity: number | null
+          trend_window_start: string | null
           updated_at: string
           velocity: number | null
         }
@@ -3482,6 +3483,7 @@ export type Database = {
           similar_past_events?: number | null
           status?: string | null
           time_sensitivity?: number | null
+          trend_window_start?: string | null
           updated_at?: string
           velocity?: number | null
         }
@@ -3505,6 +3507,7 @@ export type Database = {
           similar_past_events?: number | null
           status?: string | null
           time_sensitivity?: number | null
+          trend_window_start?: string | null
           updated_at?: string
           velocity?: number | null
         }
