@@ -191,7 +191,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.detect-fundraising-opportunities]
-verify_jwt = true
+verify_jwt = false
 
 [functions.generate-campaign-messages]
 verify_jwt = true

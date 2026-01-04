@@ -181,6 +181,62 @@ export type Database = {
           },
         ]
       }
+      action_generator_runs: {
+        Row: {
+          actions_created: number | null
+          ai_generated_count: number | null
+          alerts_processed: number | null
+          created_at: string | null
+          error_count: number | null
+          errors: Json | null
+          finished_at: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string | null
+          skipped_count: number | null
+          started_at: string
+          template_generated_count: number | null
+        }
+        Insert: {
+          actions_created?: number | null
+          ai_generated_count?: number | null
+          alerts_processed?: number | null
+          created_at?: string | null
+          error_count?: number | null
+          errors?: Json | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          skipped_count?: number | null
+          started_at?: string
+          template_generated_count?: number | null
+        }
+        Update: {
+          actions_created?: number | null
+          ai_generated_count?: number | null
+          alerts_processed?: number | null
+          created_at?: string | null
+          error_count?: number | null
+          errors?: Json | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          skipped_count?: number | null
+          started_at?: string
+          template_generated_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_generator_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_activity_alerts: {
         Row: {
           alert_type: string
@@ -3384,6 +3440,7 @@ export type Database = {
       }
       fundraising_opportunities: {
         Row: {
+          assigned_to: string | null
           created_at: string
           current_mentions: number | null
           detected_at: string
@@ -3394,15 +3451,19 @@ export type Database = {
           historical_success_rate: number | null
           id: string
           is_active: boolean
+          notes: string | null
           opportunity_score: number
+          opportunity_type: string | null
           organization_id: string
           sample_sources: Json | null
           similar_past_events: number | null
+          status: string | null
           time_sensitivity: number | null
           updated_at: string
           velocity: number | null
         }
         Insert: {
+          assigned_to?: string | null
           created_at?: string
           current_mentions?: number | null
           detected_at?: string
@@ -3413,15 +3474,19 @@ export type Database = {
           historical_success_rate?: number | null
           id?: string
           is_active?: boolean
+          notes?: string | null
           opportunity_score: number
+          opportunity_type?: string | null
           organization_id: string
           sample_sources?: Json | null
           similar_past_events?: number | null
+          status?: string | null
           time_sensitivity?: number | null
           updated_at?: string
           velocity?: number | null
         }
         Update: {
+          assigned_to?: string | null
           created_at?: string
           current_mentions?: number | null
           detected_at?: string
@@ -3432,10 +3497,13 @@ export type Database = {
           historical_success_rate?: number | null
           id?: string
           is_active?: boolean
+          notes?: string | null
           opportunity_score?: number
+          opportunity_type?: string | null
           organization_id?: string
           sample_sources?: Json | null
           similar_past_events?: number | null
+          status?: string | null
           time_sensitivity?: number | null
           updated_at?: string
           velocity?: number | null
@@ -4381,6 +4449,71 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      opportunity_detector_runs: {
+        Row: {
+          created_at: string | null
+          created_count: number | null
+          error_count: number | null
+          errors: Json | null
+          expired_count: number | null
+          finished_at: string | null
+          high_priority_count: number | null
+          id: string
+          low_priority_count: number | null
+          medium_priority_count: number | null
+          metadata: Json | null
+          organization_id: string | null
+          skipped_count: number | null
+          started_at: string
+          trends_processed: number | null
+          updated_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_count?: number | null
+          error_count?: number | null
+          errors?: Json | null
+          expired_count?: number | null
+          finished_at?: string | null
+          high_priority_count?: number | null
+          id?: string
+          low_priority_count?: number | null
+          medium_priority_count?: number | null
+          metadata?: Json | null
+          organization_id?: string | null
+          skipped_count?: number | null
+          started_at?: string
+          trends_processed?: number | null
+          updated_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          created_count?: number | null
+          error_count?: number | null
+          errors?: Json | null
+          expired_count?: number | null
+          finished_at?: string | null
+          high_priority_count?: number | null
+          id?: string
+          low_priority_count?: number | null
+          medium_priority_count?: number | null
+          metadata?: Json | null
+          organization_id?: string | null
+          skipped_count?: number | null
+          started_at?: string
+          trends_processed?: number | null
+          updated_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_detector_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization_mentions: {
         Row: {
@@ -5866,10 +5999,15 @@ export type Database = {
           action_type: string
           alert_id: string | null
           audience_segment: string | null
+          character_count: number | null
           created_at: string | null
           entity_name: string | null
+          estimated_impact: string | null
+          generation_method: string | null
           historical_performance: Json | null
           id: string
+          is_dismissed: boolean | null
+          is_used: boolean | null
           organization_id: string | null
           status: string | null
           suggested_copy: string | null
@@ -5883,10 +6021,15 @@ export type Database = {
           action_type: string
           alert_id?: string | null
           audience_segment?: string | null
+          character_count?: number | null
           created_at?: string | null
           entity_name?: string | null
+          estimated_impact?: string | null
+          generation_method?: string | null
           historical_performance?: Json | null
           id?: string
+          is_dismissed?: boolean | null
+          is_used?: boolean | null
           organization_id?: string | null
           status?: string | null
           suggested_copy?: string | null
@@ -5900,10 +6043,15 @@ export type Database = {
           action_type?: string
           alert_id?: string | null
           audience_segment?: string | null
+          character_count?: number | null
           created_at?: string | null
           entity_name?: string | null
+          estimated_impact?: string | null
+          generation_method?: string | null
           historical_performance?: Json | null
           id?: string
+          is_dismissed?: boolean | null
+          is_used?: boolean | null
           organization_id?: string | null
           status?: string | null
           suggested_copy?: string | null
