@@ -189,8 +189,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           "relative w-full",
           "grid grid-cols-1",
           "gap-[var(--portal-space-md)]",
-          // Large screens: two columns - left grows, right sizes to content
-          "lg:grid-cols-[minmax(0,1fr)_auto]",
+          // Large screens: two columns - right column has a real (shrinkable) width
+          // so controls can wrap instead of pushing off-screen.
+          "lg:grid-cols-[minmax(0,1fr)_minmax(0,720px)]",
           "lg:items-start",
           "lg:gap-6"
         )}
@@ -216,9 +217,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               "min-w-0",
               // Mobile: full width below title
               "w-full",
-              // Desktop: give the toolbar a real width so it doesn't collapse to min-content
-              "lg:w-[min(720px,100%)]",
-              "lg:max-w-[720px]",
+              // Desktop: fill the right grid column (max 720px)
+              "lg:w-full",
               // Alignment
               "lg:justify-self-end",
               "lg:self-start"
