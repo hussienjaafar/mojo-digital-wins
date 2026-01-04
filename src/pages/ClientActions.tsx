@@ -145,6 +145,18 @@ const ActionDetailDialog = ({
                 High Relevance
               </Badge>
             )}
+            {/* Generation method indicator */}
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-xs",
+                action.generation_method === "ai" 
+                  ? "bg-[hsl(var(--portal-accent-purple)/0.1)] text-[hsl(var(--portal-accent-purple))] border-[hsl(var(--portal-accent-purple)/0.2)]"
+                  : "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-muted))] border-[hsl(var(--portal-border))]"
+              )}
+            >
+              {action.generation_method === "ai" ? "AI-Generated" : "Template"}
+            </Badge>
             {action.is_used && (
               <Badge className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border border-[hsl(var(--portal-success)/0.2)]">
                 <Check className="h-3 w-3 mr-1" />

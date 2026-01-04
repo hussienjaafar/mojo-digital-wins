@@ -13,6 +13,7 @@ import {
   Copy,
   Check,
   X,
+  MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -206,14 +207,17 @@ const OpportunityDetailDialog = ({
             </div>
           )}
 
-          {/* AI-Generated Message */}
+          {/* Draft Message Templates - NOT AI-Generated */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-[hsl(var(--portal-accent-purple))]" />
+                <MessageSquare className="h-4 w-4 text-[hsl(var(--portal-accent-blue))]" />
                 <span className="font-semibold text-[hsl(var(--portal-text-primary))]">
-                  AI-Generated Message
+                  Draft Message Templates
                 </span>
+                <Badge variant="outline" className="text-xs bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))]">
+                  Template
+                </Badge>
               </div>
               <div className="flex gap-1">
                 {messageVariants.map((_, idx) => (

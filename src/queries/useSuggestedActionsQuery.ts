@@ -31,6 +31,7 @@ export interface SuggestedAction {
     entity_name: string;
     actionable_score: number;
   } | null;
+  generation_method?: "ai" | "template" | string;
 }
 
 export interface ActionStats {
@@ -107,7 +108,30 @@ async function fetchSuggestedActions(organizationId: string): Promise<SuggestedA
     throw error;
   }
 
-  const actions = (data || []) as unknown as SuggestedAction[];
+  // Map database columns to expected interface
+  // DB columns: entity_name, suggested_copy, topic_relevance, value_prop, audience_segment, status, is_used, is_dismissed
+  // Interface expects: topic, sms_copy, topic_relevance_score, value_proposition, target_audience
+  const actions: SuggestedAction[] = (data || []).map((a: any) => ({
+    id: a.id,
+    organization_id: a.organization_id,
+    alert_id: a.alert_id,
+    topic: a.entity_name || a.topic || "Unknown",
+    action_type: a.action_type || "other",
+    sms_copy: a.suggested_copy || "",
+    topic_relevance_score: a.topic_relevance || 0,
+    urgency_score: a.urgency_score || 0,
+    estimated_impact: a.estimated_impact || `${a.urgency_score || 0}% urgency`,
+    value_proposition: a.value_prop || "Timely engagement opportunity",
+    target_audience: a.audience_segment || "Active supporters",
+    historical_context: a.historical_performance ? JSON.stringify(a.historical_performance) : null,
+    character_count: a.character_count || (a.suggested_copy?.length || 0),
+    is_used: a.is_used === true || a.status === "used",
+    is_dismissed: a.is_dismissed === true || a.status === "dismissed",
+    used_at: a.used_at,
+    created_at: a.created_at,
+    alert: a.alert,
+    generation_method: a.generation_method || "template",
+  }));
 
   // Calculate aggregated stats
   const pendingActions = actions.filter((a) => !a.is_used && !a.is_dismissed);
