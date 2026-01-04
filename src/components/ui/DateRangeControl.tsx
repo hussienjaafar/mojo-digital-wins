@@ -375,25 +375,33 @@ const CalendarTrigger = React.forwardRef<
   HTMLButtonElement,
   CalendarTriggerProps & React.ButtonHTMLAttributes<HTMLButtonElement>
 >(({ startDate, endDate, isOpen, size = "md", className, ...props }, ref) => {
+  // Ultra-compact format for extra-small screens: "12/3 - 1/2"
+  const ultraCompactFormat = `${format(startDate, "M/d")} - ${format(endDate, "M/d")}`;
+  
   return (
     <DateInputTrigger
       ref={ref}
       size={size}
       accent="blue"
       isOpen={isOpen}
-      className={cn("max-w-[280px]", className)}
+      className={cn("min-w-0 max-w-[160px] xs:max-w-[200px] sm:max-w-[280px]", className)}
       aria-label={`Open date range calendar (${format(startDate, "MMM d, yyyy")} to ${format(endDate, "MMM d, yyyy")})`}
       {...props}
     >
       <DateInputIcon isOpen={isOpen} accent="blue">
-        <CalendarIcon className="h-4 w-4" />
+        <CalendarIcon className="h-4 w-4 shrink-0" />
       </DateInputIcon>
-      {/* Compact date display */}
+      {/* Ultra-compact on xs: 12/3 - 1/2 */}
+      <span className="xs:hidden text-xs truncate">
+        {ultraCompactFormat}
+      </span>
+      {/* Compact on xs-sm: Dec 3 – Jan 2 */}
+      <span className="hidden xs:inline sm:hidden text-sm truncate">
+        {formatCompactDateRange(startDate, endDate, true)}
+      </span>
+      {/* Full on sm+: Dec 3 – Jan 2, 2026 */}
       <span className="hidden sm:inline text-sm truncate">
         {formatCompactDateRange(startDate, endDate, false)}
-      </span>
-      <span className="sm:hidden text-sm truncate">
-        {formatCompactDateRange(startDate, endDate, true)}
       </span>
       <DateInputIcon isOpen={isOpen} accent="blue" rotateOnOpen className="ml-auto shrink-0">
         <ChevronDown className="h-4 w-4" />
@@ -750,7 +758,7 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
         </div>
       )}
 
-      {/* Mobile Preset Selector */}
+      {/* Mobile Preset Selector - shrinks on extra-small screens */}
       {showPresets && (
         <Select
           value={selectedPreset}
@@ -761,12 +769,14 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
             className={getSelectTriggerClasses({
               size,
               accent: "blue",
-              widthClass: "w-[110px]",
-              className: "md:hidden",
+              widthClass: "min-w-0 w-[80px] xs:w-[100px]",
+              className: "md:hidden shrink-0",
             })}
             style={getDateInputTransitionStyle("base")}
           >
-            <SelectValue />
+            <span className="truncate">
+              <SelectValue />
+            </span>
           </SelectTrigger>
           <SelectContent
             className={cn(

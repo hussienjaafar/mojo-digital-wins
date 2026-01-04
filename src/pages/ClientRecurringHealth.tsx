@@ -1,17 +1,13 @@
-import { useState } from "react";
 import { ClientLayout } from "@/components/client/ClientLayout";
 import { RecurringDonorHealth } from "@/components/client/RecurringDonorHealth";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { Skeleton } from "@/components/ui/skeleton";
-import { V3DateRangePicker } from "@/components/v3/V3DateRangePicker";
-import { subDays, format } from "date-fns";
+import { DateRangeControl } from "@/components/ui/DateRangeControl";
+import { useDashboardStore } from "@/stores/dashboardStore";
 
 const ClientRecurringHealth = () => {
   const { organizationId, isLoading } = useClientOrganization();
-  const [dateRange, setDateRange] = useState({
-    start: subDays(new Date(), 90),
-    end: new Date(),
-  });
+  const dateRange = useDashboardStore((s) => s.dateRange);
 
   if (isLoading) {
     return (
@@ -27,21 +23,23 @@ const ClientRecurringHealth = () => {
   return (
     <ClientLayout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Recurring Donor Health</h1>
-            <p className="text-muted-foreground mt-1">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold truncate">Recurring Donor Health</h1>
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
               Monitor MRR, churn rates, and recurring donation performance
             </p>
           </div>
-          <V3DateRangePicker />
+          <div className="shrink-0">
+            <DateRangeControl pillPresets={["30d", "90d", "mtd"]} size="sm" />
+          </div>
         </div>
         
         {organizationId && (
           <RecurringDonorHealth 
             organizationId={organizationId}
-            startDate={format(dateRange.start, 'yyyy-MM-dd')}
-            endDate={format(dateRange.end, 'yyyy-MM-dd')}
+            startDate={dateRange.startDate}
+            endDate={dateRange.endDate}
           />
         )}
       </div>

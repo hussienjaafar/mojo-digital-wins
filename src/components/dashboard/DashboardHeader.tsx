@@ -188,14 +188,14 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         className={cn(
           // Base: Stack vertically on mobile
           "flex flex-col gap-[var(--portal-space-md)]",
-          // Tablet+: Row layout with wrap support
-          "sm:flex-row sm:items-start sm:justify-between sm:flex-wrap",
-          // Desktop: Align items center, no wrap
-          "lg:items-center lg:flex-nowrap"
+          // Large screens: Row layout, aligned center
+          "lg:flex-row lg:items-center lg:justify-between",
+          // Prevent horizontal overflow
+          "min-w-0 overflow-hidden"
         )}
       >
         {/* Left: Title Block with Icon and Status */}
-        <div className="flex flex-col gap-[var(--portal-space-sm)] min-w-0 flex-shrink-0">
+        <div className="flex flex-col gap-[var(--portal-space-sm)] min-w-0 shrink-0 lg:max-w-[45%]">
           <TitleBlock
             title={title}
             subtitle={subtitle}
@@ -230,12 +230,12 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           return (
             <div
               className={cn(
-                // Mobile: full width, stack vertically
-                "w-full sm:w-auto",
-                // Controls container: flex with proper gaps
-                "flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3",
-                // Wrap on smaller tablets if needed
-                "lg:flex-nowrap"
+                // Full width on mobile, auto on desktop
+                "w-full lg:w-auto",
+                // Flex with wrap for responsiveness
+                "flex flex-wrap items-center gap-1.5 xs:gap-2",
+                // Prevent overflow
+                "min-w-0"
               )}
             >
               {dateControls}
