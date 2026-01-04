@@ -403,7 +403,17 @@ serve(async (req) => {
       console.log(`Successfully upserted ${campaignsToUpsert.length} SMS campaigns`);
     }
 
-    // Per-recipient events for donor journey and churn analytics
+    // =========================================================================
+    // PER-RECIPIENT EVENTS - FAIL-LOUD OBSERVABILITY (Gate C Compliance)
+    // Track all message fetch attempts, successes, and failures explicitly.
+    // Silent failures are NOT acceptable for donor journey attribution.
+    // =========================================================================
+    let totalMessageEvents = 0;
+    let totalMessagesFailed = 0;
+    let broadcastsWithNoMessages = 0;
+    let broadcastsWithMessages = 0;
+    const messageErrors: Array<{ broadcast_id: string; error: string }> = [];
+
     for (const broadcast of allBroadcasts) {
       try {
         let msgNext: string | null = null;
@@ -425,6 +435,14 @@ serve(async (req) => {
           }
         } while (msgNext && msgPageCount < 100);
 
+        // OBSERVABILITY: Track broadcasts with zero messages
+        if (messageEvents.length === 0) {
+          broadcastsWithNoMessages++;
+          console.warn(`[SMS SYNC] Broadcast ${broadcast.id} ("${broadcast.title}") returned 0 message events`);
+        } else {
+          broadcastsWithMessages++;
+        }
+
         if (messageEvents.length > 0) {
           // Compute phone hashes for all messages in parallel
           const phoneHashes = await Promise.all(
@@ -439,7 +457,7 @@ serve(async (req) => {
             phone_hash: phoneHashes[idx], // Non-PII hash for donor matching
             event_type: deriveEventType(msg),
             link_clicked: msg.click_url || null,
-            reply_text: msg.reply_text || msg.reply || null, // Capture reply content for sentiment analysis
+            reply_text: msg.reply_text || msg.reply || null,
             occurred_at: deriveOccurredAt(msg),
             metadata: {
               clicks: msg.clicks || 0,
@@ -465,16 +483,41 @@ serve(async (req) => {
             .upsert(eventsToUpsert, { onConflict: 'organization_id,message_id' });
 
           if (eventError) {
-            console.error(`[SMS SYNC] Failed to upsert sms_events for broadcast ${broadcast.id}:`, eventError);
+            console.error(`[SMS SYNC] HARD ERROR upserting sms_events for broadcast ${broadcast.id}:`, eventError);
+            messageErrors.push({ broadcast_id: broadcast.id, error: eventError.message });
           } else {
+            totalMessageEvents += eventsToUpsert.length;
             console.log(`[SMS SYNC] Upserted ${eventsToUpsert.length} sms_events for broadcast ${broadcast.id}`);
           }
         }
       } catch (eventErr) {
         const errMessage = eventErr instanceof Error ? eventErr.message : String(eventErr);
-        console.warn(`[SMS SYNC] Skipping sms_events for broadcast ${broadcast.id}:`, errMessage);
+        console.error(`[SMS SYNC] HARD ERROR fetching messages for broadcast ${broadcast.id}:`, errMessage);
+        totalMessagesFailed++;
+        messageErrors.push({ broadcast_id: broadcast.id, error: errMessage });
+        
+        // Log to job_failures table for visibility (fail-loud)
+        try {
+          await supabase.rpc('log_job_failure', {
+            p_function_name: 'sync-switchboard-sms',
+            p_error_message: `Message fetch failed for broadcast ${broadcast.id}: ${errMessage}`,
+            p_context: { organization_id, broadcast_id: broadcast.id, broadcast_title: broadcast.title }
+          });
+        } catch (_) { /* ignore logging errors */ }
       }
     }
+
+    // OBSERVABILITY SUMMARY for sms_events
+    console.log(`[SMS SYNC] ========== MESSAGE EVENTS SUMMARY ==========`);
+    console.log(`[SMS SYNC] Broadcasts processed: ${allBroadcasts.length}`);
+    console.log(`[SMS SYNC] Broadcasts with messages: ${broadcastsWithMessages}`);
+    console.log(`[SMS SYNC] Broadcasts with NO messages: ${broadcastsWithNoMessages}`);
+    console.log(`[SMS SYNC] Total message events synced: ${totalMessageEvents}`);
+    console.log(`[SMS SYNC] Broadcasts with fetch failures: ${totalMessagesFailed}`);
+    if (messageErrors.length > 0) {
+      console.log(`[SMS SYNC] Errors:`, JSON.stringify(messageErrors.slice(0, 5)));
+    }
+    console.log(`[SMS SYNC] ===============================================`);
 
     // Aggregate daily metrics
     const dailyMetrics: Record<string, {
@@ -557,7 +600,15 @@ serve(async (req) => {
         success: true, 
         campaigns_synced: allBroadcasts.length,
         daily_metrics: Object.keys(dailyMetrics).length,
-        message: `Successfully synced ${allBroadcasts.length} SMS broadcasts`
+        // OBSERVABILITY: Include per-recipient stats in response
+        message_events: {
+          synced: totalMessageEvents,
+          broadcasts_with_messages: broadcastsWithMessages,
+          broadcasts_with_no_messages: broadcastsWithNoMessages,
+          fetch_failures: totalMessagesFailed,
+          errors: messageErrors.length > 0 ? messageErrors.slice(0, 10) : null
+        },
+        message: `Successfully synced ${allBroadcasts.length} SMS broadcasts, ${totalMessageEvents} message events`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
