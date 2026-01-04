@@ -121,11 +121,11 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
   if (!hasFilters && !isLoading) return null;
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      {/* Filter icon label */}
-      <div className="hidden sm:flex h-11 sm:h-9 px-2.5 rounded-[var(--portal-radius-sm)] border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] items-center gap-1.5 text-xs text-[hsl(var(--portal-text-muted))]">
+    <div className={cn("flex items-center gap-1.5 xs:gap-2 min-w-0", className)}>
+      {/* Filter icon - always visible, no label on mobile */}
+      <div className="flex h-9 px-2 rounded-[var(--portal-radius-sm)] border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] items-center gap-1.5 text-xs text-[hsl(var(--portal-text-muted))] shrink-0">
         <Filter className="h-3.5 w-3.5" aria-hidden="true" />
-        <span>Filters</span>
+        <span className="hidden sm:inline">Filters</span>
       </div>
 
       {/* Campaign Filter */}
@@ -136,7 +136,7 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
         >
           <SelectTrigger
             className={cn(
-              "h-11 sm:h-9 w-[130px] sm:w-[150px]",
+              "h-9 min-w-0 w-[90px] xs:w-[110px] sm:w-[140px]",
               "rounded-[var(--portal-radius-sm)]",
               "border border-[hsl(var(--portal-border))]",
               "bg-[hsl(var(--portal-bg-secondary))]",
@@ -149,7 +149,9 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
             )}
             aria-label="Filter by campaign"
           >
-            <SelectValue placeholder="All Campaigns" />
+            <span className="truncate">
+              <SelectValue placeholder="Campaigns" />
+            </span>
           </SelectTrigger>
           <SelectContent
             className={cn(
@@ -186,7 +188,7 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
         >
           <SelectTrigger
             className={cn(
-              "h-11 sm:h-9 w-[130px] sm:w-[150px]",
+              "h-9 min-w-0 w-[90px] xs:w-[110px] sm:w-[140px]",
               "rounded-[var(--portal-radius-sm)]",
               "border border-[hsl(var(--portal-border))]",
               "bg-[hsl(var(--portal-bg-secondary))]",
@@ -199,7 +201,9 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
             )}
             aria-label="Filter by creative"
           >
-            <SelectValue placeholder="All Creatives" />
+            <span className="truncate">
+              <SelectValue placeholder="Creatives" />
+            </span>
           </SelectTrigger>
           <SelectContent
             className={cn(

@@ -1062,6 +1062,54 @@
 }
 
 /* === RESPONSIVE UTILITIES === */
+
+/* Horizontal scroll container for pills/chips on mobile */
+.portal-scroll-pills {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: var(--portal-space-xs);
+}
+
+.portal-scroll-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.portal-scroll-pills > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* No-overflow container for controls */
+.portal-controls-container {
+  display: flex;
+  align-items: center;
+  gap: var(--portal-space-sm);
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Responsive controls wrapper - wraps on mobile, inline on desktop */
+.portal-responsive-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--portal-space-xs);
+  min-width: 0;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .portal-responsive-controls {
+    width: auto;
+    flex-wrap: nowrap;
+    gap: var(--portal-space-sm);
+  }
+}
+
 @media (max-width: 768px) {
   .portal-card {
     border-radius: var(--portal-radius-md);

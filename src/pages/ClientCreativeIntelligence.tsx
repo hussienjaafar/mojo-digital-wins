@@ -387,8 +387,8 @@ export default function ClientCreativeIntelligence() {
           {/* Gallery Tab */}
           <TabsContent value="gallery" className="space-y-4">
             {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
                 <Input 
                   placeholder="Search by topic, headline, or text..."
@@ -397,28 +397,34 @@ export default function ClientCreativeIntelligence() {
                   className="pl-9 bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
                 />
               </div>
-              <Select value={channelFilter} onValueChange={setChannelFilter}>
-                <SelectTrigger className="w-[140px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="video">Videos</SelectItem>
-                  <SelectItem value="image">Images</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={tierFilter} onValueChange={setTierFilter}>
-                <SelectTrigger className="w-[160px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
-                  <SelectValue placeholder="Performance" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Performance</SelectItem>
-                  <SelectItem value="top">Top Performers</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2 shrink-0">
+                <Select value={channelFilter} onValueChange={setChannelFilter}>
+                  <SelectTrigger className="w-[100px] xs:w-[120px] sm:w-[140px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+                    <span className="truncate">
+                      <SelectValue placeholder="Type" />
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="video">Videos</SelectItem>
+                    <SelectItem value="image">Images</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={tierFilter} onValueChange={setTierFilter}>
+                  <SelectTrigger className="w-[100px] xs:w-[130px] sm:w-[160px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+                    <span className="truncate">
+                      <SelectValue placeholder="Performance" />
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Performance</SelectItem>
+                    <SelectItem value="top">Top Performers</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Creative Grid */}
