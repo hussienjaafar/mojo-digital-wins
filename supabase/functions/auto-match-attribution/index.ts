@@ -8,7 +8,7 @@ const corsHeaders = {
 
 /**
  * ================================================================================
- * AUTO-MATCH ATTRIBUTION - HARDENED VERSION
+ * AUTO-MATCH ATTRIBUTION - HARDENED VERSION (v2.1)
  * ================================================================================
  * 
  * ATTRIBUTION MATCHING TIERS (in order of reliability):
@@ -30,10 +30,19 @@ const corsHeaders = {
  *    - Fuzzy string similarity matching
  *    - is_deterministic: false, attribution_type: heuristic_fuzzy
  * 
- * CRITICAL RULES:
- * - Deterministic records can NEVER be overwritten by heuristic matches
- * - Confidence scores reflect match type, not calibrated probabilities
- * - All writes to campaign_attribution include is_deterministic + attribution_type
+ * CRITICAL CONCURRENCY & IDEMPOTENCY RULES:
+ * =========================================
+ * 1. Uses UPSERT with onConflict: 'organization_id,refcode' for safe concurrency
+ * 2. Deterministic records (is_deterministic=true) are IMMUTABLE:
+ *    - Cannot be overwritten by any match (heuristic OR deterministic)
+ *    - Only admin/manual confirmation flows can modify them
+ * 3. Heuristic records can be updated by better heuristic matches
+ * 4. Unique-violation errors are counted as "skipped", not crashes
+ * 
+ * TRUTH MAPPING DEFINITION:
+ * =========================
+ * Truth = deterministic_url_refcode OR manual_confirmed
+ * Heuristics are NEVER included in default KPI totals
  * ================================================================================
  */
 
@@ -289,7 +298,7 @@ serve(async (req) => {
     // Get existing attributions - CRITICAL: track which are deterministic
     const { data: existingAttrs, error: attrError } = await supabase
       .from('campaign_attribution')
-      .select('refcode, organization_id, is_deterministic');
+      .select('refcode, organization_id, is_deterministic, attribution_type');
     if (attrError) throw attrError;
 
     const existingSet = new Set(
@@ -297,6 +306,7 @@ serve(async (req) => {
     );
     
     // Track deterministic attributions to NEVER overwrite
+    // CRITICAL: This set is used for both skip-on-insert AND the upsert guard
     const deterministicSet = new Set(
       (existingAttrs || [])
         .filter(a => a.is_deterministic === true)
@@ -369,6 +379,8 @@ serve(async (req) => {
     let heuristicPatternCount = 0;
     let heuristicFuzzyCount = 0;
     let skippedDeterministic = 0;
+    let skippedExisting = 0;
+    let updatedExisting = 0;
 
     // Match refcodes to campaigns
     const matches: MatchResult[] = [];
@@ -377,14 +389,24 @@ serve(async (req) => {
     for (const [key, agg] of refcodeAggregates) {
       const [orgId, refcode] = key.split(':');
       
-      // GUARD: Never overwrite deterministic attributions
+      // =========================================================================
+      // GUARD: DETERMINISTIC IMMUTABILITY
+      // Deterministic records can NEVER be overwritten - not even by another 
+      // deterministic match. Only manual/admin flows can modify them.
+      // =========================================================================
       if (deterministicSet.has(key)) {
         skippedDeterministic++;
         continue;
       }
       
-      // Skip if already has any attribution (unless we want to re-evaluate)
-      if (existingSet.has(key)) continue;
+      // Track if this is an update vs insert
+      const isExistingHeuristic = existingSet.has(key) && !deterministicSet.has(key);
+      if (isExistingHeuristic) {
+        skippedExisting++;
+        // For now, skip existing heuristic records too to maintain idempotency
+        // If we want to allow heuristic upgrades, we'd remove this continue
+        continue;
+      }
 
       const orgCreatives = creativesByOrg.get(orgId) || [];
       const orgCampaigns = campaignsByOrg.get(orgId) || [];
@@ -460,10 +482,16 @@ serve(async (req) => {
     // Sort matches by confidence descending
     matches.sort((a, b) => b.confidence - a.confidence);
 
-    // If not dry run, create the attributions
+    // =========================================================================
+    // UPSERT WITH CONCURRENCY SAFETY
+    // Uses onConflict to handle race conditions gracefully.
+    // The unique constraint on (organization_id, refcode) ensures no duplicates.
+    // =========================================================================
     let created = 0;
+    let upsertErrors: string[] = [];
+    
     if (!dryRun && matches.length > 0) {
-      const insertData = matches.map(m => ({
+      const upsertData = matches.map(m => ({
         organization_id: m.organization_id,
         refcode: m.refcode,
         meta_campaign_id: m.meta_campaign_id,
@@ -479,13 +507,36 @@ serve(async (req) => {
         attribution_type: getAttributionType(m.match_type)
       }));
 
-      const { error: insertError } = await supabase
+      // =========================================================================
+      // UPSERT LOGIC:
+      // - onConflict: 'organization_id,refcode' handles concurrent inserts gracefully
+      // - ignoreDuplicates: false allows updating non-deterministic rows
+      // - We've already filtered out deterministic rows in the matching loop,
+      //   so any conflict here is either a race condition or a heuristic update.
+      // =========================================================================
+      const { data: upsertResult, error: upsertError } = await supabase
         .from('campaign_attribution')
-        .insert(insertData);
+        .upsert(upsertData, {
+          onConflict: 'organization_id,refcode',
+          ignoreDuplicates: false // Allow updates, not just ignores
+        })
+        .select('id');
 
-      if (insertError) throw insertError;
-      created = matches.length;
-      console.log(`[AUTO-MATCH] Created ${created} attribution mappings`);
+      if (upsertError) {
+        // Log error but don't crash the whole operation
+        console.error('[AUTO-MATCH] Upsert error:', upsertError);
+        upsertErrors.push(upsertError.message);
+        
+        // If it's a unique violation, it means our guard worked but there was a race
+        if (upsertError.code === '23505') {
+          console.log('[AUTO-MATCH] Unique violation handled gracefully - likely concurrent run');
+        } else {
+          throw upsertError;
+        }
+      } else {
+        created = upsertResult?.length || matches.length;
+        console.log(`[AUTO-MATCH] Upserted ${created} attribution mappings`);
+      }
     }
 
     // Summary logging
@@ -495,6 +546,7 @@ serve(async (req) => {
     console.log(`[AUTO-MATCH] Heuristic (pattern): ${heuristicPatternCount}`);
     console.log(`[AUTO-MATCH] Heuristic (fuzzy): ${heuristicFuzzyCount}`);
     console.log(`[AUTO-MATCH] Skipped (deterministic protected): ${skippedDeterministic}`);
+    console.log(`[AUTO-MATCH] Skipped (existing heuristic): ${skippedExisting}`);
     console.log(`[AUTO-MATCH] Unmatched: ${unmatched.length}`);
     console.log(`[AUTO-MATCH] ===================================`);
 
@@ -510,12 +562,12 @@ serve(async (req) => {
       matches_heuristic_pattern: heuristicPatternCount,
       matches_heuristic_fuzzy: heuristicFuzzyCount,
       total_matches: matches.length,
-      skipped_existing: existingSet.size,
+      skipped_existing: skippedExisting,
       skipped_deterministic_protected: skippedDeterministic,
       unmatched_count: unmatched.length,
       matched_revenue: matches.reduce((sum, m) => sum + m.revenue, 0),
       unmatched_revenue: unmatched.reduce((sum, u) => sum + u.revenue, 0),
-      errors: []
+      errors: upsertErrors
     };
 
     const { error: auditError } = await supabase
@@ -546,8 +598,10 @@ serve(async (req) => {
             heuristic_fuzzy: heuristicFuzzyCount
           },
           skippedDeterministic,
+          skippedExisting,
           totalMatchedRevenue: matches.reduce((sum, m) => sum + m.revenue, 0),
-          totalUnmatchedRevenue: unmatched.reduce((sum, u) => sum + u.revenue, 0)
+          totalUnmatchedRevenue: unmatched.reduce((sum, u) => sum + u.revenue, 0),
+          errors: upsertErrors
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

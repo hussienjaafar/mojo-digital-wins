@@ -44,6 +44,8 @@ import { RefcodePerformanceTable } from "@/components/analytics/RefcodePerforman
 import { RevenueByChannelChart } from "@/components/analytics/RevenueByChannelChart";
 import { RetentionMetricsCard } from "@/components/analytics/RetentionMetricsCard";
 import { TopRefcodesByLTVCard } from "@/components/analytics/TopRefcodesByLTVCard";
+// CRITICAL: Single source of truth for attribution classification
+import { isTruthMapping, getTruthRefcodeSet, filterHeuristicMappings, calculateAttributionCounts } from "@/utils/attributionTruth";
 
 // ============================================================================
 // Types for Attribution Management
@@ -82,10 +84,14 @@ interface SuggestedMatch {
 
 const MatchTypeBadge = ({ attribution }: { attribution: Attribution }) => {
   const type = attribution.attribution_type;
-  const isDeterministic = attribution.is_deterministic;
   
-  // Deterministic matches get green badge
-  if (isDeterministic || type === 'deterministic_url_refcode' || type === 'deterministic_mapping') {
+  // =========================================================================
+  // TRUTH TYPES: deterministic_url_refcode + manual_confirmed
+  // These are included in KPI totals and shown with green/blue badges
+  // =========================================================================
+  
+  // Deterministic URL matches (green) - URL-proven
+  if (type === 'deterministic_url_refcode') {
     return (
       <TooltipProvider>
         <Tooltip>
@@ -96,15 +102,43 @@ const MatchTypeBadge = ({ attribution }: { attribution: Attribution }) => {
             </Badge>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">
-            <p className="font-semibold">Deterministic Attribution</p>
+            <p className="font-semibold">Deterministic Attribution (Truth)</p>
             <p className="text-xs text-muted-foreground mt-1">
               Refcode was found in Meta creative destination URL. This is a verified, traceable link.
             </p>
+            <p className="text-xs text-green-400 mt-1">✓ Included in KPI totals</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
   }
+  
+  // Manual confirmations (blue) - Human-verified
+  if (type === 'manual_confirmed') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 flex items-center gap-1">
+              <CheckCircle className="h-3 w-3" />
+              Manual Confirmed
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p className="font-semibold">Manually Verified (Truth)</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              This mapping was verified by a human analyst.
+            </p>
+            <p className="text-xs text-blue-400 mt-1">✓ Included in KPI totals</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  
+  // =========================================================================
+  // HEURISTIC TYPES: Excluded from KPI totals, shown as suggestions
+  // =========================================================================
   
   if (type === 'heuristic_partial_url') {
     return (
@@ -119,8 +153,9 @@ const MatchTypeBadge = ({ attribution }: { attribution: Attribution }) => {
           <TooltipContent className="max-w-xs">
             <p className="font-semibold">Heuristic - Partial URL Match</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Refcode partially matches a URL parameter. May be a variant or related campaign.
+              Refcode partially matches a URL parameter. Verify in Meta creative URL.
             </p>
+            <p className="text-xs text-yellow-400 mt-1">⚠ Not included in KPI totals</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -140,8 +175,9 @@ const MatchTypeBadge = ({ attribution }: { attribution: Attribution }) => {
           <TooltipContent className="max-w-xs">
             <p className="font-semibold">Heuristic - Pattern Match</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Matched based on naming patterns (e.g., "meta_" prefix). Review for accuracy.
+              Matched based on naming patterns. Verify in Meta creative URL / naming.
             </p>
+            <p className="text-xs text-orange-400 mt-1">⚠ Not included in KPI totals</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -163,17 +199,37 @@ const MatchTypeBadge = ({ attribution }: { attribution: Attribution }) => {
             <p className="text-xs text-muted-foreground mt-1">
               Fuzzy name similarity. Use for directional insights only, not precise measurement.
             </p>
+            <p className="text-xs text-gray-400 mt-1">⚠ Not included in KPI totals</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
   }
   
-  // Legacy or unknown types
-  if (attribution.match_confidence && attribution.match_confidence >= 0.8) {
-    return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Matched</Badge>;
+  // Legacy deterministic_refcode (non-URL) - treat as heuristic until reclassified
+  if (type === 'deterministic_refcode') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Legacy Match
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p className="font-semibold">Legacy Deterministic (Non-URL)</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              This mapping predates URL-based verification. Consider re-verifying.
+            </p>
+            <p className="text-xs text-amber-400 mt-1">⚠ Not included in KPI totals until verified</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
   }
   
+  // Unknown types
   return <Badge variant="outline">Unknown</Badge>;
 };
 
@@ -303,9 +359,12 @@ const ClientDonorJourney = () => {
       if (attrError) throw attrError;
       setAttributions(attrData || []);
 
-      // Count deterministic vs heuristic
-      const deterministicCount = (attrData || []).filter(a => a.is_deterministic === true).length;
-      const heuristicCount = (attrData || []).filter(a => a.is_deterministic === false).length;
+      // =========================================================================
+      // TRUTH MAPPING: Use centralized helper for consistent classification
+      // Truth = deterministic_url_refcode OR manual_confirmed
+      // Heuristics = partial/pattern/fuzzy (excluded from default KPIs)
+      // =========================================================================
+      const attrCounts = calculateAttributionCounts(attrData || []);
 
       // Calculate stats from ActBlue transactions
       const { data: txData } = await supabase
@@ -316,39 +375,31 @@ const ClientDonorJourney = () => {
       if (txData) {
         const totalRevenue = txData.reduce((sum, tx) => sum + (tx.amount || 0), 0);
         
-        // GATE D: Separate deterministic vs heuristic refcodes for proper attribution
-        const deterministicRefcodes = new Set(
-          (attrData || [])
-            .filter(a => a.is_deterministic === true)
-            .map(a => a.refcode?.toLowerCase())
-            .filter(Boolean)
-        );
-        const allMatchedRefcodes = new Set(
-          (attrData || []).map(a => a.refcode?.toLowerCase()).filter(Boolean)
-        );
+        // TRUTH TOTALS: Use centralized helper - only deterministic_url_refcode + manual_confirmed
+        const truthRefcodes = getTruthRefcodeSet(attrData || []);
         
-        // Calculate revenue only from deterministic matches for "matched" totals
+        // Calculate revenue only from TRUTH matches (not heuristics)
         const matchedRevenue = txData
-          .filter(tx => tx.refcode && deterministicRefcodes.has(tx.refcode.toLowerCase()))
+          .filter(tx => tx.refcode && truthRefcodes.has(tx.refcode.toLowerCase()))
           .reduce((sum, tx) => sum + (tx.amount || 0), 0);
         
-        // Calculate heuristic-only revenue separately
+        // Heuristic revenue (for display but NOT included in default KPIs)
+        const heuristicMappings = filterHeuristicMappings(attrData || []);
         const heuristicRefcodes = new Set(
-          (attrData || [])
-            .filter(a => a.is_deterministic === false)
+          heuristicMappings
             .map(a => a.refcode?.toLowerCase())
-            .filter(Boolean)
+            .filter((r): r is string => Boolean(r))
         );
         const heuristicRevenue = txData
           .filter(tx => tx.refcode && heuristicRefcodes.has(tx.refcode.toLowerCase()))
           .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
         setAttributionStats({
-          matchedRevenue, // Now only deterministic
-          unmatchedRevenue: totalRevenue - matchedRevenue - heuristicRevenue, // True unattributed
+          matchedRevenue, // TRUTH only: deterministic_url_refcode + manual_confirmed
+          unmatchedRevenue: totalRevenue - matchedRevenue - heuristicRevenue,
           matchRate: totalRevenue > 0 ? (matchedRevenue / totalRevenue) * 100 : 0,
-          deterministicCount,
-          heuristicCount,
+          deterministicCount: attrCounts.truthCount, // Truth count
+          heuristicCount: attrCounts.heuristicCount,
         });
       }
 
