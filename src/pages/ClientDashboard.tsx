@@ -388,13 +388,10 @@ const ClientDashboard = () => {
                     ),
                     <Tooltip key="attribution-model">
                       <TooltipTrigger asChild>
-                        <Badge
-                          variant="outline"
-                          className="gap-1 cursor-help bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-muted))]"
-                        >
+                        <span className="inline-flex items-center gap-1 text-xs text-[hsl(var(--portal-text-muted))] cursor-help hover:text-[hsl(var(--portal-text-secondary))] transition-colors">
                           <Info className="h-3 w-3" />
-                          Last-touch Attribution
-                        </Badge>
+                          <span className="hidden sm:inline">Last-touch</span>
+                        </span>
                       </TooltipTrigger>
                       <TooltipContent
                         side="bottom"
@@ -408,7 +405,7 @@ const ClientDashboard = () => {
                     </Tooltip>
                   ].filter(Boolean)}
                   controls={
-                    <div className="flex flex-wrap items-center gap-1.5 xs:gap-2 w-full lg:w-auto min-w-0">
+                    <div className="flex flex-wrap items-center gap-1 xs:gap-1.5 sm:gap-2 w-full lg:w-auto min-w-0">
                       {/* Date controls - shrinks responsively */}
                       <DateRangeControl pillPresets={["7d", "14d", "30d", "90d"]} size="sm" />
                       {/* Filters - inline, also shrinks */}

@@ -121,11 +121,13 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
   if (!hasFilters && !isLoading) return null;
 
   return (
-    <div className={cn("flex items-center gap-1.5 xs:gap-2 min-w-0", className)}>
-      {/* Filter icon - always visible, no label on mobile */}
-      <div className="flex h-9 px-2 rounded-[var(--portal-radius-sm)] border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] items-center gap-1.5 text-xs text-[hsl(var(--portal-text-muted))] shrink-0">
-        <Filter className="h-3.5 w-3.5" aria-hidden="true" />
-        <span className="hidden sm:inline">Filters</span>
+    <div className={cn("flex items-center gap-1 xs:gap-1.5 min-w-0", className)}>
+      {/* Filter icon only - dropdowns with placeholders are self-explanatory */}
+      <div 
+        className="flex h-9 w-9 rounded-[var(--portal-radius-sm)] border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] items-center justify-center text-[hsl(var(--portal-text-muted))] shrink-0"
+        aria-hidden="true"
+      >
+        <Filter className="h-3.5 w-3.5" />
       </div>
 
       {/* Campaign Filter */}
@@ -136,7 +138,7 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
         >
           <SelectTrigger
             className={cn(
-              "h-9 min-w-0 w-[90px] xs:w-[110px] sm:w-[140px]",
+              "h-9 min-w-0 w-[80px] xs:w-[100px] sm:w-[130px]",
               "rounded-[var(--portal-radius-sm)]",
               "border border-[hsl(var(--portal-border))]",
               "bg-[hsl(var(--portal-bg-secondary))]",
@@ -188,7 +190,7 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
         >
           <SelectTrigger
             className={cn(
-              "h-9 min-w-0 w-[90px] xs:w-[110px] sm:w-[140px]",
+              "h-9 min-w-0 w-[80px] xs:w-[100px] sm:w-[130px]",
               "rounded-[var(--portal-radius-sm)]",
               "border border-[hsl(var(--portal-border))]",
               "bg-[hsl(var(--portal-bg-secondary))]",

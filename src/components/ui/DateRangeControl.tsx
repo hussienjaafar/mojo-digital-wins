@@ -359,15 +359,25 @@ interface CalendarTriggerProps {
 const formatCompactDateRange = (startDate: Date, endDate: Date, isMobile: boolean): string => {
   const startYear = startDate.getFullYear();
   const endYear = endDate.getFullYear();
+  const currentYear = new Date().getFullYear();
 
   if (isMobile) {
+    // Mobile: always omit year for brevity
     return `${format(startDate, "MMM d")} – ${format(endDate, "MMM d")}`;
   }
 
+  // Smart year display: only show year if spanning multiple years OR not current year
+  if (startYear === endYear && startYear === currentYear) {
+    // Same year and current year: omit year entirely
+    return `${format(startDate, "MMM d")} – ${format(endDate, "MMM d")}`;
+  }
+  
   if (startYear === endYear) {
+    // Same year but not current year: show year once at end
     return `${format(startDate, "MMM d")} – ${format(endDate, "MMM d, yyyy")}`;
   }
 
+  // Different years: show both
   return `${format(startDate, "MMM d, yyyy")} – ${format(endDate, "MMM d, yyyy")}`;
 };
 
