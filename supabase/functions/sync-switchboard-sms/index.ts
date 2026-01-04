@@ -274,6 +274,17 @@ serve(async (req) => {
       console.log('[SMS SYNC] Authorized via INTERNAL_TRIGGER_SECRET');
     }
     
+    // SECURITY: Accept calls from run-scheduled-jobs via supabase.functions.invoke
+    // These come with Authorization: Bearer <service_role_key> which we can verify
+    if (!isAuthorized && authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      // Check if this is the service role key (used by run-scheduled-jobs)
+      if (token === serviceRoleKey) {
+        isAuthorized = true;
+        console.log('[SMS SYNC] Authorized via service role key (internal invocation)');
+      }
+    }
+    
     // Check JWT auth (user must belong to org or be admin)
     if (!isAuthorized && authHeader) {
       const userClient = createClient(supabaseUrl, anonKey, {
@@ -414,6 +425,9 @@ serve(async (req) => {
     let broadcastsWithMessages = 0;
     const messageErrors: Array<{ broadcast_id: string; error: string }> = [];
 
+    // DIAGNOSTIC: Log first broadcast's message API response shape (sanitized)
+    let firstBroadcastDiagnostic = false;
+    
     for (const broadcast of allBroadcasts) {
       try {
         let msgNext: string | null = null;
@@ -423,6 +437,27 @@ serve(async (req) => {
         do {
           msgPageCount++;
           const msgResp = await fetchBroadcastMessages(account_id, api_key, broadcast.id, msgNext || undefined);
+          
+          // DIAGNOSTIC: Log first broadcast's response structure (once per sync)
+          if (!firstBroadcastDiagnostic) {
+            firstBroadcastDiagnostic = true;
+            console.log(`[SMS SYNC] DIAGNOSTIC - First broadcast message API response:`);
+            console.log(`[SMS SYNC]   Broadcast ID: ${broadcast.id}`);
+            console.log(`[SMS SYNC]   Broadcast title: ${broadcast.title}`);
+            console.log(`[SMS SYNC]   Broadcast total_messages: ${broadcast.total_messages}`);
+            console.log(`[SMS SYNC]   Response has data: ${!!msgResp.data}`);
+            console.log(`[SMS SYNC]   Response has page: ${!!msgResp.data?.page}`);
+            console.log(`[SMS SYNC]   Page length: ${msgResp.data?.page?.length ?? 'N/A'}`);
+            console.log(`[SMS SYNC]   Has next_page: ${!!msgResp.data?.next_page}`);
+            console.log(`[SMS SYNC]   Has errors: ${msgResp.errors?.length > 0}`);
+            if (msgResp.data?.page && msgResp.data.page.length > 0) {
+              const sample = msgResp.data.page[0];
+              console.log(`[SMS SYNC]   Sample message keys: ${Object.keys(sample).join(', ')}`);
+              console.log(`[SMS SYNC]   Sample has phone_number: ${!!sample.phone_number}`);
+              console.log(`[SMS SYNC]   Sample phone_number length: ${sample.phone_number?.length ?? 'N/A'}`);
+            }
+          }
+          
           if (msgResp.errors && msgResp.errors.length > 0) {
             const errorMsg = msgResp.errors.map(e => e.description || e.title).join(', ');
             throw new Error(`Switchboard message API errors: ${errorMsg}`);
