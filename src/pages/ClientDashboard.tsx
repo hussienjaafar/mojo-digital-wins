@@ -380,37 +380,10 @@ const ClientDashboard = () => {
               <motion.section variants={sectionVariants}>
                 <DashboardTopSection
                   title="Performance Overview"
-                  subtitle="Key performance indicators for your campaign"
+                  subtitle="Campaign metrics at a glance"
                   icon={LayoutDashboard}
                   isLive={isRealtimeConnected}
                   lastUpdated={dataUpdatedAt ? new Date(dataUpdatedAt) : undefined}
-                  badges={[
-                    // Data Freshness Indicator - shows sync status for all sources
-                    organizationId && (
-                      <V3DataFreshnessPanel
-                        key="data-freshness"
-                        organizationId={organizationId}
-                        compact
-                      />
-                    ),
-                    <Tooltip key="attribution-model">
-                      <TooltipTrigger asChild>
-                        <span className="inline-flex items-center gap-1 text-xs text-[hsl(var(--portal-text-muted))] cursor-help hover:text-[hsl(var(--portal-text-secondary))] transition-colors">
-                          <Info className="h-3 w-3" />
-                          <span className="hidden sm:inline">Last-touch</span>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="bottom"
-                        className="max-w-xs bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
-                      >
-                        <p className="font-medium mb-1">Attribution Model: Last-Touch Deterministic</p>
-                        <p className="text-sm text-[hsl(var(--portal-text-muted))]">
-                          Priority: refcode &gt; click_id/fbclid &gt; SMS (7-day window) &gt; unattributed
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ].filter(Boolean)}
                   controls={
                     <PerformanceControlsToolbar
                       organizationId={organizationId}
