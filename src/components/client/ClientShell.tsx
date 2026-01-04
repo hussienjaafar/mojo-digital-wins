@@ -347,7 +347,10 @@ export const ClientShell = ({
             {/* Main Content */}
             <main
               id="main-content"
-              className={cn("portal-scrollbar flex-1 overflow-auto", contentClassName)}
+              className={cn(
+                "portal-scrollbar flex-1 overflow-y-auto overflow-x-hidden",
+                contentClassName
+              )}
               role="main"
               tabIndex={-1}
             >
