@@ -181,21 +181,17 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       className={cn("overflow-hidden", className)}
     >
       {/* Header Layout:
-          - Mobile (<640px): Stack vertically, controls full width
-          - Tablet (640-1024px): Row layout, may wrap
-          - Desktop (>1024px): Full row layout, aligned center */}
+          - Mobile: Stack vertically, controls full width
+          - Desktop (>=1024px): Two-column layout with bounded controls column */}
       <div
         className={cn(
-          // Base: Stack vertically on mobile
-          "flex flex-col gap-[var(--portal-space-md)]",
-          // Large screens: Row layout, aligned center
-          "lg:flex-row lg:items-center lg:justify-between",
-          // Prevent horizontal overflow
-          "min-w-0 overflow-hidden"
+          // Grid-first so the controls column has a real width (prevents clipping)
+          "grid grid-cols-1 gap-[var(--portal-space-md)] min-w-0",
+          "lg:grid-cols-[minmax(0,1fr)_minmax(0,720px)] lg:items-start lg:gap-4"
         )}
       >
         {/* Left: Title Block with Icon and Status */}
-        <div className="flex flex-col gap-[var(--portal-space-sm)] min-w-0 shrink-0 lg:max-w-[45%]">
+        <div className="flex flex-col gap-[var(--portal-space-sm)] min-w-0">
           <TitleBlock
             title={title}
             subtitle={subtitle}
@@ -207,44 +203,37 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </div>
 
         {/* Right: Controls (date controls + refresh) */}
-        {hasControls && (() => {
-          // Check if dateControls is a DateRangeControl element
-          const isDateRangeControl = React.isValidElement(dateControls) &&
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (dateControls.type as any)?.displayName === "DateRangeControl";
+        {hasControls && (
+          <div className="min-w-0 w-full lg:justify-self-end">
+            {(() => {
+              const isDateRangeControl =
+                React.isValidElement(dateControls) &&
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (dateControls.type as any)?.displayName === "DateRangeControl";
 
-          // If it's DateRangeControl and we have refresh, inject segmented props
-          if (isDateRangeControl && showRefresh && onRefresh) {
-            return React.cloneElement(
-              dateControls as React.ReactElement<DateRangeControlProps>,
-              {
-                variant: "segmented",
-                trailingControl: (
-                  <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
-                ),
+              if (isDateRangeControl && showRefresh && onRefresh) {
+                return React.cloneElement(
+                  dateControls as React.ReactElement<DateRangeControlProps>,
+                  {
+                    variant: "segmented",
+                    trailingControl: (
+                      <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
+                    ),
+                  }
+                );
               }
-            );
-          }
 
-          // Fallback: render dateControls + separate refresh button
-          return (
-            <div
-              className={cn(
-                // Full width on mobile, auto on desktop
-                "w-full lg:w-auto",
-                // Flex with wrap for responsiveness
-                "flex flex-wrap items-center gap-1.5 xs:gap-2",
-                // Prevent overflow
-                "min-w-0"
-              )}
-            >
-              {dateControls}
-              {showRefresh && onRefresh && (
-                <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
-              )}
-            </div>
-          );
-        })()}
+              return (
+                <div className={cn("min-w-0 w-full", "flex flex-wrap items-center gap-2")}>
+                  {dateControls}
+                  {showRefresh && onRefresh && (
+                    <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
     </HeaderCard>
   );

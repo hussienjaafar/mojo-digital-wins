@@ -729,7 +729,6 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
   const containerRef = React.useRef<HTMLDivElement>(null);
   const containerWidth = useContainerWidth(containerRef);
   const layoutMode = getLayoutMode(containerWidth);
-
   const { dateRange, setDateRange } = useDashboardStore();
   const [selectedPreset, setSelectedPreset] = React.useState<PresetKey>("30d");
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
@@ -799,9 +798,12 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
   return (
     <div
       ref={containerRef}
+      data-testid="perf-controls-toolbar"
       role="toolbar"
       aria-label="Dashboard controls"
       className={cn(
+        // Always allow the toolbar to shrink within a flex/grid parent
+        "w-full min-w-0 max-w-full",
         // Container queries support
         "[container-type:inline-size]",
         // Grid layout that reflows based on space
@@ -818,7 +820,7 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
       {/* Row 1: Presets (or dropdown) + Date Range + Refresh */}
       <div
         className={cn(
-          "flex items-center gap-2",
+          "flex items-center gap-2 min-w-0",
           // On md, span full first row
           layoutMode === "md" && "col-span-3",
           // On sm/xs, full width
@@ -877,7 +879,7 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
       {hasFilters && (layoutMode === "lg" || layoutMode === "md") && (
         <div
           className={cn(
-            "flex items-center",
+            "flex items-center min-w-0",
             layoutMode === "lg" && "justify-end",
             layoutMode === "md" && "col-span-3 justify-start"
           )}
@@ -896,7 +898,7 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
 
       {/* Row 2 (sm/xs): Filters stacked */}
       {hasFilters && (layoutMode === "sm" || layoutMode === "xs") && (
-        <div className="flex items-center gap-1.5 w-full overflow-x-auto">
+        <div className="flex items-center gap-1.5 w-full min-w-0 overflow-x-auto">
           <FilterControl
             campaignOptions={campaignOptions}
             creativeOptions={creativeOptions}
