@@ -17,3 +17,5 @@ export { SourceFreshnessIndicator, SourceFreshnessCompact } from "./SourceFreshn
 export { ConfidenceIndicator, calculateTrendConfidence } from "./ConfidenceIndicator";
 export { RelevanceExplanation, RelevanceBadge } from "./RelevanceExplanation";
 export { TrendFeedback, TrendFeedbackInline } from "./TrendFeedback";
+export { ProvenancePanel, ProvenanceCompact } from "./ProvenancePanel";
+export { SuggestedActionsPanel, SuggestedActionsCompact } from "./SuggestedActionsPanel";
