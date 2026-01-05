@@ -689,14 +689,52 @@ export type Database = {
           },
         ]
       }
+      article_dedupe_registry: {
+        Row: {
+          article_id: string | null
+          canonical_url: string | null
+          content_hash: string
+          first_seen_at: string | null
+          id: string
+          published_date: string | null
+          source_id: string | null
+          source_type: string
+          title_snippet: string | null
+        }
+        Insert: {
+          article_id?: string | null
+          canonical_url?: string | null
+          content_hash: string
+          first_seen_at?: string | null
+          id?: string
+          published_date?: string | null
+          source_id?: string | null
+          source_type: string
+          title_snippet?: string | null
+        }
+        Update: {
+          article_id?: string | null
+          canonical_url?: string | null
+          content_hash?: string
+          first_seen_at?: string | null
+          id?: string
+          published_date?: string | null
+          source_id?: string | null
+          source_type?: string
+          title_snippet?: string | null
+        }
+        Relationships: []
+      }
       articles: {
         Row: {
           affected_groups: string[] | null
           affected_organizations: string[] | null
           ai_confidence_score: number | null
           ai_summary: string | null
+          canonical_url: string | null
           category: string | null
           content: string | null
+          content_hash: string | null
           created_at: string | null
           dedupe_key: string | null
           description: string | null
@@ -736,8 +774,10 @@ export type Database = {
           affected_organizations?: string[] | null
           ai_confidence_score?: number | null
           ai_summary?: string | null
+          canonical_url?: string | null
           category?: string | null
           content?: string | null
+          content_hash?: string | null
           created_at?: string | null
           dedupe_key?: string | null
           description?: string | null
@@ -777,8 +817,10 @@ export type Database = {
           affected_organizations?: string[] | null
           ai_confidence_score?: number | null
           ai_summary?: string | null
+          canonical_url?: string | null
           category?: string | null
           content?: string | null
+          content_hash?: string | null
           created_at?: string | null
           dedupe_key?: string | null
           description?: string | null
@@ -3685,6 +3727,8 @@ export type Database = {
           ai_sentiment: number | null
           ai_sentiment_label: string | null
           ai_topics: string[] | null
+          canonical_url: string | null
+          content_hash: string | null
           created_at: string | null
           description: string | null
           duplicate_of: string | null
@@ -3706,6 +3750,8 @@ export type Database = {
           ai_sentiment?: number | null
           ai_sentiment_label?: string | null
           ai_topics?: string[] | null
+          canonical_url?: string | null
+          content_hash?: string | null
           created_at?: string | null
           description?: string | null
           duplicate_of?: string | null
@@ -3727,6 +3773,8 @@ export type Database = {
           ai_sentiment?: number | null
           ai_sentiment_label?: string | null
           ai_topics?: string[] | null
+          canonical_url?: string | null
+          content_hash?: string | null
           created_at?: string | null
           description?: string | null
           duplicate_of?: string | null
@@ -3752,6 +3800,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      google_news_sources: {
+        Row: {
+          backoff_until: string | null
+          consecutive_errors: number | null
+          created_at: string | null
+          expected_cadence_mins: number | null
+          id: string
+          is_active: boolean | null
+          last_error: string | null
+          last_failure_at: string | null
+          last_fetched_at: string | null
+          last_success_at: string | null
+          name: string
+          success_count: number | null
+          tags: string[] | null
+          tier: string | null
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          backoff_until?: string | null
+          consecutive_errors?: number | null
+          created_at?: string | null
+          expected_cadence_mins?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_fetched_at?: string | null
+          last_success_at?: string | null
+          name: string
+          success_count?: number | null
+          tags?: string[] | null
+          tier?: string | null
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          backoff_until?: string | null
+          consecutive_errors?: number | null
+          created_at?: string | null
+          expected_cadence_mins?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_fetched_at?: string | null
+          last_success_at?: string | null
+          name?: string
+          success_count?: number | null
+          tags?: string[] | null
+          tier?: string | null
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: []
       }
       government_announcements: {
         Row: {
@@ -5671,10 +5776,12 @@ export type Database = {
       }
       rss_sources: {
         Row: {
+          backoff_until: string | null
           category: string
           consecutive_errors: number | null
           created_at: string | null
           error_count: number | null
+          expected_cadence_mins: number | null
           fetch_error: string | null
           fetch_frequency_minutes: number | null
           geographic_scope: string | null
@@ -5683,17 +5790,24 @@ export type Database = {
           last_error_message: string | null
           last_fetch_status: string | null
           last_fetched_at: string | null
+          last_success_at: string | null
           logo_url: string | null
           name: string
           political_leaning: string | null
+          source_type: string | null
+          success_count: number | null
+          tags: string[] | null
+          tier: string | null
           updated_at: string | null
           url: string
         }
         Insert: {
+          backoff_until?: string | null
           category: string
           consecutive_errors?: number | null
           created_at?: string | null
           error_count?: number | null
+          expected_cadence_mins?: number | null
           fetch_error?: string | null
           fetch_frequency_minutes?: number | null
           geographic_scope?: string | null
@@ -5702,17 +5816,24 @@ export type Database = {
           last_error_message?: string | null
           last_fetch_status?: string | null
           last_fetched_at?: string | null
+          last_success_at?: string | null
           logo_url?: string | null
           name: string
           political_leaning?: string | null
+          source_type?: string | null
+          success_count?: number | null
+          tags?: string[] | null
+          tier?: string | null
           updated_at?: string | null
           url: string
         }
         Update: {
+          backoff_until?: string | null
           category?: string
           consecutive_errors?: number | null
           created_at?: string | null
           error_count?: number | null
+          expected_cadence_mins?: number | null
           fetch_error?: string | null
           fetch_frequency_minutes?: number | null
           geographic_scope?: string | null
@@ -5721,9 +5842,14 @@ export type Database = {
           last_error_message?: string | null
           last_fetch_status?: string | null
           last_fetched_at?: string | null
+          last_success_at?: string | null
           logo_url?: string | null
           name?: string
           political_leaning?: string | null
+          source_type?: string | null
+          success_count?: number | null
+          tags?: string[] | null
+          tier?: string | null
           updated_at?: string | null
           url?: string
         }
@@ -8452,6 +8578,40 @@ export type Database = {
         }
         Relationships: []
       }
+      source_health: {
+        Row: {
+          backoff_until: string | null
+          expected_cadence_mins: number | null
+          failure_count: number | null
+          health_status: string | null
+          id: string | null
+          is_active: boolean | null
+          last_error: string | null
+          last_failure_at: string | null
+          last_fetched_at: string | null
+          last_success_at: string | null
+          mins_since_success: number | null
+          name: string | null
+          source_type: string | null
+          tags: string[] | null
+          tier: string | null
+          url: string | null
+        }
+        Relationships: []
+      }
+      source_health_summary: {
+        Row: {
+          active_sources: number | null
+          avg_mins_since_success: number | null
+          healthy_sources: number | null
+          max_mins_since_success: number | null
+          source_type: string | null
+          stale_sources: number | null
+          total_sources: number | null
+          unhealthy_sources: number | null
+        }
+        Relationships: []
+      }
       transaction_attribution_secure: {
         Row: {
           attribution_calculated_at: string | null
@@ -8579,6 +8739,14 @@ export type Database = {
       can_access_organization_data: {
         Args: { _organization_id: string }
         Returns: boolean
+      }
+      check_article_duplicate: {
+        Args: { p_canonical_url?: string; p_content_hash: string }
+        Returns: {
+          existing_article_id: string
+          existing_source_type: string
+          is_duplicate: boolean
+        }[]
       }
       check_authenticated_access: { Args: never; Returns: boolean }
       check_contact_rate_limit: { Args: never; Returns: boolean }
@@ -8928,6 +9096,16 @@ export type Database = {
           p_function_name: string
           p_last_processed_id?: string
           p_records_processed?: number
+        }
+        Returns: undefined
+      }
+      update_source_health: {
+        Args: {
+          p_error_message?: string
+          p_items_fetched?: number
+          p_source_id: string
+          p_source_type: string
+          p_success: boolean
         }
         Returns: undefined
       }

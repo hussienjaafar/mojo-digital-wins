@@ -1,17 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, validateCronOrAdmin, logJobFailure, checkRateLimit } from "../_shared/security.ts";
+import { normalizeUrl, generateContentHash, extractCanonicalUrl } from "../_shared/urlNormalizer.ts";
 
-// Google News RSS feeds for political topics (FREE - no API key needed)
-const GOOGLE_NEWS_RSS_FEEDS = [
-  'https://news.google.com/rss/topics/CAAqIggKIhxDQkFTRHdvSkwyMHZNRFZ4ZERBU0FtVnVLQUFQAQ?hl=en-US&gl=US&ceid=US:en', // US Politics
-  'https://news.google.com/rss/search?q=congress+legislation&hl=en-US&gl=US&ceid=US:en',
-  'https://news.google.com/rss/search?q=white+house+biden+trump&hl=en-US&gl=US&ceid=US:en',
-  'https://news.google.com/rss/search?q=supreme+court+ruling&hl=en-US&gl=US&ceid=US:en',
-  'https://news.google.com/rss/search?q=election+2024+campaign&hl=en-US&gl=US&ceid=US:en',
-  'https://news.google.com/rss/search?q=immigration+policy+border&hl=en-US&gl=US&ceid=US:en',
-  'https://news.google.com/rss/search?q=civil+rights+discrimination&hl=en-US&gl=US&ceid=US:en',
-];
+const corsHeaders = getCorsHeaders();
 
 interface NewsItem {
   title: string;
@@ -20,6 +12,19 @@ interface NewsItem {
   description: string | null;
   published_at: string;
   url: string;
+  canonical_url: string;
+  content_hash: string;
+}
+
+interface GoogleNewsSource {
+  id: string;
+  name: string;
+  url: string;
+  tier: string;
+  tags: string[];
+  is_active: boolean;
+  backoff_until: string | null;
+  consecutive_errors: number;
 }
 
 function parseRSSDate(dateStr: string): string {
@@ -41,7 +46,68 @@ function extractSourceFromTitle(title: string): { cleanTitle: string; source: st
   return { cleanTitle: title, source: 'Unknown' };
 }
 
-async function fetchRSSFeed(feedUrl: string): Promise<NewsItem[]> {
+/**
+ * Check if source is in backoff period
+ */
+function isInBackoff(source: GoogleNewsSource): boolean {
+  if (!source.backoff_until) return false;
+  return new Date(source.backoff_until) > new Date();
+}
+
+/**
+ * Update source health via RPC
+ */
+async function updateSourceHealth(
+  supabase: any,
+  sourceId: string,
+  success: boolean,
+  errorMessage?: string,
+  itemsFetched?: number
+): Promise<void> {
+  try {
+    await supabase.rpc('update_source_health', {
+      p_source_id: sourceId,
+      p_source_type: 'google_news',
+      p_success: success,
+      p_error_message: errorMessage || null,
+      p_items_fetched: itemsFetched || 0
+    });
+  } catch (err) {
+    console.error(`Failed to update source health for ${sourceId}:`, err);
+  }
+}
+
+/**
+ * Register article in dedupe registry for cross-source deduplication
+ */
+async function registerForDedupe(
+  supabase: any,
+  contentHash: string,
+  canonicalUrl: string,
+  sourceId: string,
+  articleId: string,
+  titleSnippet: string,
+  publishedDate: string
+): Promise<void> {
+  try {
+    await supabase.from('article_dedupe_registry').upsert({
+      content_hash: contentHash,
+      canonical_url: canonicalUrl,
+      source_type: 'google_news',
+      source_id: sourceId,
+      article_id: articleId,
+      title_snippet: titleSnippet.substring(0, 100),
+      published_date: publishedDate.split('T')[0]
+    }, { 
+      onConflict: 'content_hash,source_type',
+      ignoreDuplicates: true 
+    });
+  } catch (err) {
+    console.warn('Failed to register for dedupe:', err);
+  }
+}
+
+async function fetchRSSFeed(feedUrl: string, sourceName: string): Promise<NewsItem[]> {
   const items: NewsItem[] = [];
   
   try {
@@ -52,8 +118,7 @@ async function fetchRSSFeed(feedUrl: string): Promise<NewsItem[]> {
     });
     
     if (!response.ok) {
-      console.error(`Failed to fetch ${feedUrl}: ${response.status}`);
-      return items;
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
     const xml = await response.text();
@@ -79,27 +144,35 @@ async function fetchRSSFeed(feedUrl: string): Promise<NewsItem[]> {
       if (titleMatch && linkMatch) {
         const rawTitle = titleMatch[1] || titleMatch[2] || '';
         const { cleanTitle, source } = extractSourceFromTitle(rawTitle);
+        const rawUrl = linkMatch[1];
+        const normalizedUrl = normalizeUrl(rawUrl);
+        const publishedAt = pubDateMatch ? parseRSSDate(pubDateMatch[1]) : new Date().toISOString();
+        
+        // Generate canonical URL and content hash for deduplication
+        const canonicalUrl = extractCanonicalUrl(normalizedUrl);
+        const contentHash = generateContentHash(cleanTitle, normalizedUrl, publishedAt, source);
         
         items.push({
           title: cleanTitle,
           source_name: sourceMatch ? sourceMatch[2] : source,
           source_url: sourceMatch ? sourceMatch[1] : null,
           description: descMatch ? (descMatch[1] || descMatch[2] || null) : null,
-          published_at: pubDateMatch ? parseRSSDate(pubDateMatch[1]) : new Date().toISOString(),
-          url: linkMatch[1],
+          published_at: publishedAt,
+          url: normalizedUrl,
+          canonical_url: canonicalUrl,
+          content_hash: contentHash,
         });
       }
     }
   } catch (error) {
     console.error(`Error fetching RSS feed ${feedUrl}:`, error);
+    throw error; // Re-throw to handle in caller
   }
   
   return items;
 }
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders();
-  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -129,67 +202,126 @@ serve(async (req) => {
       );
     }
 
-    console.log('Fetching Google News RSS feeds...');
+    console.log('Fetching Google News sources from database...');
     
-    // Fetch all feeds in parallel
-    const feedPromises = GOOGLE_NEWS_RSS_FEEDS.map(feed => fetchRSSFeed(feed));
-    const feedResults = await Promise.all(feedPromises);
+    // Fetch sources from DB (not hardcoded) - skip those in backoff
+    const { data: sources, error: sourcesError } = await supabase
+      .from('google_news_sources')
+      .select('*')
+      .eq('is_active', true)
+      .or('backoff_until.is.null,backoff_until.lt.now()')
+      .order('last_fetched_at', { ascending: true, nullsFirst: true });
+
+    if (sourcesError) {
+      throw new Error(`Failed to fetch sources: ${sourcesError.message}`);
+    }
+
+    if (!sources || sources.length === 0) {
+      console.log('No active Google News sources found');
+      return new Response(
+        JSON.stringify({ success: true, message: 'No active sources', fetched: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Processing ${sources.length} Google News sources...`);
     
-    // Flatten and deduplicate
-    const allItems = feedResults.flat();
-    const uniqueItems = new Map<string, NewsItem>();
-    
-    for (const item of allItems) {
-      if (!uniqueItems.has(item.url)) {
-        uniqueItems.set(item.url, item);
+    let totalFetched = 0;
+    let totalInserted = 0;
+    let totalDuplicates = 0;
+    let sourcesProcessed = 0;
+    let sourceErrors = 0;
+
+    // Process each source individually with health tracking
+    for (const source of sources as GoogleNewsSource[]) {
+      // Double-check backoff
+      if (isInBackoff(source)) {
+        console.log(`Skipping ${source.name} - in backoff until ${source.backoff_until}`);
+        continue;
+      }
+
+      try {
+        console.log(`Fetching ${source.name}...`);
+        const items = await fetchRSSFeed(source.url, source.name);
+        console.log(`Found ${items.length} items from ${source.name}`);
+        
+        totalFetched += items.length;
+
+        if (items.length > 0) {
+          // Insert with upsert on URL + content_hash for deduplication
+          const { data: insertedData, error: insertError } = await supabase
+            .from('google_news_articles')
+            .upsert(items.map(item => ({
+              title: item.title,
+              source_name: item.source_name,
+              source_url: item.source_url,
+              description: item.description,
+              published_at: item.published_at,
+              url: item.url,
+              canonical_url: item.canonical_url,
+              content_hash: item.content_hash,
+            })), { 
+              onConflict: 'url',
+              ignoreDuplicates: true 
+            })
+            .select('id, content_hash, canonical_url, title, published_at');
+
+          if (insertError) {
+            console.error(`Insert error for ${source.name}:`, insertError.message);
+            sourceErrors++;
+            await updateSourceHealth(supabase, source.id, false, insertError.message);
+          } else {
+            const insertedCount = insertedData?.length || 0;
+            totalInserted += insertedCount;
+            totalDuplicates += items.length - insertedCount;
+            
+            // Register for cross-source dedupe
+            for (const article of insertedData || []) {
+              await registerForDedupe(
+                supabase,
+                article.content_hash,
+                article.canonical_url,
+                source.id,
+                article.id,
+                article.title,
+                article.published_at
+              );
+            }
+            
+            await updateSourceHealth(supabase, source.id, true, undefined, insertedCount);
+          }
+        } else {
+          // No items but successful fetch
+          await updateSourceHealth(supabase, source.id, true, undefined, 0);
+        }
+
+        sourcesProcessed++;
+
+      } catch (error: any) {
+        console.error(`Error processing source ${source.name}:`, error.message);
+        sourceErrors++;
+        await updateSourceHealth(supabase, source.id, false, error.message);
       }
     }
-    
-    const itemsToInsert = Array.from(uniqueItems.values());
-    console.log(`Found ${allItems.length} items, ${itemsToInsert.length} unique`);
-    
-    // Insert in batches, ignoring duplicates
-    let inserted = 0;
-    let duplicates = 0;
-    const batchSize = 50;
-    
-    for (let i = 0; i < itemsToInsert.length; i += batchSize) {
-      const batch = itemsToInsert.slice(i, i + batchSize);
-      
-      const { data, error } = await supabase
-        .from('google_news_articles')
-        .upsert(batch, { 
-          onConflict: 'url',
-          ignoreDuplicates: true 
-        })
-        .select('id');
-      
-      if (error) {
-        console.error('Insert error:', error);
-      } else {
-        inserted += data?.length || 0;
-      }
-    }
-    
-    duplicates = itemsToInsert.length - inserted;
     
     // Log batch stats
     await supabase.from('processing_batches').insert({
       batch_type: 'google_news',
-      items_count: allItems.length,
-      unique_items: itemsToInsert.length,
-      duplicates_removed: duplicates,
+      items_count: totalFetched,
+      unique_items: totalInserted,
+      duplicates_removed: totalDuplicates,
       processing_time_ms: Date.now() - startTime,
       completed_at: new Date().toISOString(),
-      status: 'completed'
+      status: sourceErrors > 0 ? 'completed_with_errors' : 'completed'
     });
 
     const result = {
       success: true,
-      fetched: allItems.length,
-      unique: itemsToInsert.length,
-      inserted,
-      duplicates,
+      sources_processed: sourcesProcessed,
+      source_errors: sourceErrors,
+      fetched: totalFetched,
+      inserted: totalInserted,
+      duplicates: totalDuplicates,
       duration_ms: Date.now() - startTime
     };
     
@@ -201,6 +333,9 @@ serve(async (req) => {
   } catch (error: unknown) {
     console.error('Error in fetch-google-news:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
+    
+    await logJobFailure(supabase, 'fetch-google-news', message);
+    
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
