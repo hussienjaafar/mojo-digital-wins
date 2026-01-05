@@ -429,7 +429,7 @@ const PresetDropdown: React.FC<PresetDropdownProps> = ({ value, onChange }) => {
       </SelectTrigger>
       <SelectContent
         className={cn(
-          "z-[100]",
+          "z-[200]",
           "bg-[hsl(var(--portal-bg-secondary))]",
           "border-[hsl(var(--portal-border))]",
           "rounded-[var(--portal-radius-sm)]",
