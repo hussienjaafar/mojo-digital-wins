@@ -13,3 +13,7 @@ export { DataStatusBar } from "./DataStatusBar";
 export { PipelineHealthDrawer } from "./PipelineHealthDrawer";
 export { TrendExplainability, TrendExplainabilityCompact } from "./TrendExplainability";
 export { ClusterDrilldownView } from "./ClusterDrilldownView";
+export { SourceFreshnessIndicator, SourceFreshnessCompact } from "./SourceFreshnessIndicator";
+export { ConfidenceIndicator, calculateTrendConfidence } from "./ConfidenceIndicator";
+export { RelevanceExplanation, RelevanceBadge } from "./RelevanceExplanation";
+export { TrendFeedback, TrendFeedbackInline } from "./TrendFeedback";

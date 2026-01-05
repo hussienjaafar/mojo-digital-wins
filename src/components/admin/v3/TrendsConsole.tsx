@@ -20,6 +20,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useUnifiedTrends, UnifiedTrend, getSpikeRatioColor } from '@/hooks/useUnifiedTrends';
 import { DataFreshnessIndicator } from './DataFreshnessIndicator';
 import { TrendExplainabilityCompact } from './TrendExplainability';
+import { ConfidenceIndicator, calculateTrendConfidence } from './ConfidenceIndicator';
+import { TrendFeedback } from './TrendFeedback';
 import { cn } from '@/lib/utils';
 
 interface TrendsConsoleProps {
@@ -114,8 +116,8 @@ function TrendCard({
             )}
           </div>
 
-          {/* Metrics Row */}
-          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+          {/* Metrics Row with Confidence */}
+          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
             <span className="font-medium">{trend.total_mentions_24h.toLocaleString()} mentions</span>
             {trend.velocity > 0 && (
               <span className={cn("font-medium", getSpikeRatioColor(trend.spike_ratio))}>
@@ -127,6 +129,10 @@ function TrendCard({
                 {trend.source_count} sources
               </span>
             )}
+            <ConfidenceIndicator 
+              factors={calculateTrendConfidence(trend).factors}
+              size="sm"
+            />
           </div>
 
           {/* Source Distribution Bar */}
@@ -191,47 +197,57 @@ function TrendCard({
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7"
-                onClick={(e) => { e.stopPropagation(); onAddToWatchlist?.(); }}
-              >
-                <PlusCircle className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Add to Watchlist</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7"
-                onClick={(e) => { e.stopPropagation(); onCreateAlert?.(); }}
-              >
-                <Bell className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Create Alert Rule</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7"
-                onClick={(e) => { e.stopPropagation(); onDrilldown?.(); }}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>View Details</TooltipContent>
-          </Tooltip>
+        {/* Actions column */}
+        <div className="flex flex-col items-end gap-2">
+          {/* Action buttons - visible on hover */}
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7"
+                  onClick={(e) => { e.stopPropagation(); onAddToWatchlist?.(); }}
+                >
+                  <PlusCircle className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Add to Watchlist</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7"
+                  onClick={(e) => { e.stopPropagation(); onCreateAlert?.(); }}
+                >
+                  <Bell className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Create Alert Rule</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7"
+                  onClick={(e) => { e.stopPropagation(); onDrilldown?.(); }}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>View Details</TooltipContent>
+            </Tooltip>
+          </div>
+          
+          {/* Feedback controls - always visible */}
+          <TrendFeedback 
+            trendId={trend.normalized_name}
+            trendName={trend.name}
+            size="sm"
+          />
         </div>
       </div>
     </div>

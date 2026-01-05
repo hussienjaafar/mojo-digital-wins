@@ -5,7 +5,8 @@ import {
   Clock,
   ChevronRight,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  CheckCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +15,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { usePipelineFreshness, formatAge, FreshnessStatus } from '@/hooks/usePipelineFreshness';
+import { useSourceFreshness, formatSourceAge, getStatusColor, FreshnessStatus } from '@/hooks/useSourceFreshness';
 import { useAdminPipelineHealth } from '@/hooks/useAdminPipelineHealth';
 import { cn } from '@/lib/utils';
 
@@ -23,50 +24,15 @@ interface DataStatusBarProps {
   className?: string;
 }
 
-const STATUS_CONFIG: Record<FreshnessStatus, {
-  icon: typeof Radio;
-  label: string;
-  color: string;
-  bgColor: string;
-  borderColor: string;
-  animate: boolean;
-}> = {
-  live: { 
-    icon: Radio, 
-    label: 'LIVE', 
-    color: 'text-status-success',
-    bgColor: 'bg-status-success/10',
-    borderColor: 'border-status-success/30',
-    animate: true 
-  },
-  stale: { 
-    icon: Clock, 
-    label: 'STALE', 
-    color: 'text-status-warning',
-    bgColor: 'bg-status-warning/10',
-    borderColor: 'border-status-warning/30',
-    animate: false 
-  },
-  critical: { 
-    icon: AlertTriangle, 
-    label: 'CRITICAL', 
-    color: 'text-status-error',
-    bgColor: 'bg-status-error/10',
-    borderColor: 'border-status-error/30',
-    animate: false 
-  },
-  unknown: { 
-    icon: AlertCircle, 
-    label: 'UNKNOWN', 
-    color: 'text-muted-foreground',
-    bgColor: 'bg-muted/10',
-    borderColor: 'border-muted/30',
-    animate: false 
-  },
+const STATUS_ICONS = {
+  live: CheckCircle,
+  stale: Clock,
+  critical: AlertTriangle,
+  unknown: AlertCircle,
 };
 
 export function DataStatusBar({ onOpenDetails, className }: DataStatusBarProps) {
-  const { data: freshnessData, isLoading: freshnessLoading, refetch: refetchFreshness } = usePipelineFreshness();
+  const { data: freshnessData, isLoading: freshnessLoading, refetch: refetchFreshness } = useSourceFreshness();
   const { data: healthData, isLoading: healthLoading, refetch: refetchHealth } = useAdminPipelineHealth();
 
   const isLoading = freshnessLoading || healthLoading;
@@ -85,7 +51,7 @@ export function DataStatusBar({ onOpenDetails, className }: DataStatusBarProps) 
       )}>
         <div className="flex items-center gap-2 text-status-error">
           <AlertCircle className="h-4 w-4" />
-          <span className="text-sm font-medium">Pipeline health unavailable</span>
+          <span className="text-sm font-medium">Data sources unavailable</span>
         </div>
         <Button variant="ghost" size="sm" onClick={onOpenDetails}>
           Details <ChevronRight className="h-3 w-3 ml-1" />
@@ -95,78 +61,106 @@ export function DataStatusBar({ onOpenDetails, className }: DataStatusBarProps) 
   }
 
   const status = freshnessData?.overallStatus || 'unknown';
-  const config = STATUS_CONFIG[status];
-  const StatusIcon = config.icon;
+  const statusColors = getStatusColor(status);
+  const StatusIcon = STATUS_ICONS[status];
 
   // Calculate stats from health data
   const totalBacklog = healthData?.backlog.reduce((sum, b) => sum + b.pending_count, 0) || 0;
   const failingJobs = healthData?.jobs.filter(j => j.freshness_status === 'error').length || 0;
   
   // Get actual last updated from freshness data
-  const lastUpdated = freshnessData?.lastSuccessfulUpdate;
+  const lastUpdated = freshnessData?.lastDataTimestamp;
   const lastUpdatedText = lastUpdated 
-    ? formatAge(Math.floor((Date.now() - lastUpdated.getTime()) / (1000 * 60)))
-    : 'Never';
+    ? formatSourceAge(Math.floor((Date.now() - lastUpdated.getTime()) / (1000 * 60)))
+    : 'No data';
 
   const isUnhealthy = status !== 'live';
-
-  // Build stale reason for tooltip
-  const staleReason = freshnessData?.overallStatusReason || 'Unknown status';
-  const stalePipelineCount = freshnessData?.criticalStaleCount || 0;
 
   return (
     <div className={cn(
       "flex items-center justify-between px-4 py-2 h-12 rounded-lg border",
       "bg-card/50 backdrop-blur-sm",
-      config.borderColor,
+      statusColors.border,
       className
     )}>
-      {/* Left: Status indicator with tooltip */}
+      {/* Left: Overall status + per-source indicators */}
       <div className="flex items-center gap-4">
+        {/* Overall Status Badge */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Badge 
               variant="outline" 
               className={cn(
                 "gap-1.5 font-semibold text-xs px-2 py-0.5 cursor-help",
-                config.bgColor,
-                config.borderColor,
-                config.color
+                statusColors.bg,
+                statusColors.border,
+                statusColors.text
               )}
             >
               {isLoading ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
-                <StatusIcon className={cn("h-3 w-3", config.animate && "animate-pulse")} />
+                <StatusIcon className={cn("h-3 w-3", status === 'live' && "animate-pulse")} />
               )}
-              {isLoading ? 'Loading...' : config.label}
+              {isLoading ? 'Loading...' : status.toUpperCase()}
             </Badge>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-xs">
-            <div className="space-y-1">
-              <p className="font-medium">{staleReason}</p>
-              {stalePipelineCount > 0 && freshnessData?.stalePipelines && (
-                <div className="text-xs text-muted-foreground">
-                  <p className="font-medium mt-1">Stale pipelines:</p>
-                  <ul className="list-disc list-inside">
-                    {freshnessData.stalePipelines.slice(0, 5).map(p => (
-                      <li key={p.jobType}>
-                        {p.jobName}: {formatAge(p.ageMinutes)}
-                      </li>
-                    ))}
-                    {freshnessData.stalePipelines.length > 5 && (
-                      <li>...and {freshnessData.stalePipelines.length - 5} more</li>
-                    )}
-                  </ul>
-                </div>
+            <div className="space-y-2">
+              <p className="font-medium">
+                {status === 'live' && 'All data sources are fresh'}
+                {status === 'stale' && 'Some data sources have delayed updates'}
+                {status === 'critical' && 'Critical data gap - sources are significantly behind'}
+                {status === 'unknown' && 'Unable to determine data freshness'}
+              </p>
+              {freshnessData?.dataGapDays && freshnessData.dataGapDays > 0 && (
+                <p className="text-xs text-status-error">
+                  Data gap: {freshnessData.dataGapDays} day(s) since last update
+                </p>
               )}
             </div>
           </TooltipContent>
         </Tooltip>
 
+        {/* Per-Source Status Indicators */}
+        {!isLoading && freshnessData && (
+          <div className="flex items-center gap-2 text-xs">
+            {Object.values(freshnessData.sources).map(source => {
+              const sourceColors = getStatusColor(source.status);
+              return (
+                <Tooltip key={source.source}>
+                  <TooltipTrigger asChild>
+                    <span className={cn(
+                      "inline-flex items-center gap-1 cursor-help",
+                      sourceColors.text
+                    )}>
+                      <span>{source.icon}</span>
+                      <span className="hidden sm:inline">{sourceColors.icon}</span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <div className="text-xs space-y-1">
+                      <p className="font-medium">{source.label}</p>
+                      <p>Latest: {formatSourceAge(source.ageMinutes)}</p>
+                      <p>{source.articleCount24h.toLocaleString()} items in 24h</p>
+                      {source.pipelineLastRun && (
+                        <p className="text-muted-foreground">
+                          Pipeline ran: {formatSourceAge(
+                            Math.floor((Date.now() - source.pipelineLastRun.getTime()) / (1000 * 60))
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
+        )}
+
         {!isLoading && (
           <span className={cn(
-            "text-xs hidden sm:inline",
+            "text-xs hidden md:inline",
             isUnhealthy ? "text-status-warning" : "text-muted-foreground"
           )}>
             Last data: {lastUpdatedText}
@@ -179,13 +173,15 @@ export function DataStatusBar({ onOpenDetails, className }: DataStatusBarProps) 
         {!isLoading && (
           <>
             {/* Backlog */}
-            <div className={cn(
-              "hidden sm:flex items-center gap-1.5",
-              totalBacklog > 0 ? "text-status-warning" : "text-muted-foreground"
-            )}>
-              <span>Backlog:</span>
-              <span className="font-medium">{totalBacklog.toLocaleString()}</span>
-            </div>
+            {totalBacklog > 0 && (
+              <div className={cn(
+                "hidden sm:flex items-center gap-1.5",
+                totalBacklog > 100 ? "text-status-warning" : "text-muted-foreground"
+              )}>
+                <span>Backlog:</span>
+                <span className="font-medium">{totalBacklog.toLocaleString()}</span>
+              </div>
+            )}
 
             {/* Failing jobs */}
             {failingJobs > 0 && (
@@ -195,11 +191,20 @@ export function DataStatusBar({ onOpenDetails, className }: DataStatusBarProps) 
               </div>
             )}
 
-            {/* Stale pipelines indicator */}
-            {stalePipelineCount > 0 && (
-              <div className="hidden md:flex items-center gap-1.5 text-status-warning">
-                <span>Stale:</span>
-                <span className="font-medium">{stalePipelineCount} pipeline(s)</span>
+            {/* 24h totals */}
+            {freshnessData && (
+              <div className="hidden lg:flex items-center gap-1.5 text-muted-foreground">
+                <span>24h:</span>
+                <span className="font-medium">
+                  {(
+                    (freshnessData.sources.rss?.articleCount24h || 0) +
+                    (freshnessData.sources.google_news?.articleCount24h || 0)
+                  ).toLocaleString()} articles
+                </span>
+                <span className="text-muted-foreground/50">•</span>
+                <span className="font-medium">
+                  {(freshnessData.sources.bluesky?.articleCount24h || 0).toLocaleString()} posts
+                </span>
               </div>
             )}
           </>
@@ -224,11 +229,11 @@ export function DataStatusBar({ onOpenDetails, className }: DataStatusBarProps) 
           onClick={onOpenDetails}
           className={cn(
             "h-7 text-xs gap-1",
-            isUnhealthy && config.borderColor,
-            isUnhealthy && config.color
+            isUnhealthy && statusColors.border,
+            isUnhealthy && statusColors.text
           )}
         >
-          {isUnhealthy ? 'View Issues' : 'Pipeline Details'}
+          {isUnhealthy ? 'View Issues' : 'Details'}
           <ChevronRight className="h-3 w-3" />
         </Button>
       </div>
