@@ -17,8 +17,10 @@ import { formatDistanceToNow, parseISO } from "date-fns";
 import { 
   ChevronUp, ChevronDown, Filter, Columns, Download, 
   ExternalLink, Search, RefreshCw, X, AlertTriangle,
-  Newspaper, Clock
+  Newspaper, Clock, Globe
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +83,7 @@ export function NewsInvestigationTable() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [threatFilter, setThreatFilter] = useState<string>("all");
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
+  const [includeGoogleNews, setIncludeGoogleNews] = useState<boolean>(true);
   
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -370,6 +373,19 @@ export function NewsInvestigationTable() {
               <SelectItem value="negative">Negative</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Google News Toggle */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card border border-border">
+            <Globe className="h-4 w-4 text-muted-foreground" />
+            <Label htmlFor="google-news-toggle" className="text-sm cursor-pointer">
+              Google News
+            </Label>
+            <Switch
+              id="google-news-toggle"
+              checked={includeGoogleNews}
+              onCheckedChange={setIncludeGoogleNews}
+            />
+          </div>
         </div>
         
         <div className="flex items-center gap-2">

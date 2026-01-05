@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { UnifiedTrendingPanel } from "@/components/analytics/UnifiedTrendingPanel";
+import { WatchlistTrendsCompact } from "@/components/analytics/WatchlistTrendsCompact";
 import { TopicContentSheet } from "@/components/analytics/TopicContentSheet";
 import { PriorityAlertsPanel } from "@/components/analytics/PriorityAlertsPanel";
 import { TodaysBriefing } from "@/components/analytics/TodaysBriefing";
@@ -740,9 +740,9 @@ export default function Analytics() {
         </span>
       </motion.div>
 
-      {/* Unified Trending Topics - Main content */}
+      {/* Watchlist Trends - Focused on what matters to the user */}
       <motion.div variants={itemVariants}>
-        <UnifiedTrendingPanel onTopicClick={handleTopicClick} />
+        <WatchlistTrendsCompact onTopicClick={handleTopicClick} maxItems={10} />
       </motion.div>
 
       {/* Topic Content Sheet */}
