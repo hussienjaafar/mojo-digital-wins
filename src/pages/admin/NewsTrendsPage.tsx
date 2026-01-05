@@ -9,34 +9,9 @@ import {
 import { DataStatusBar } from "@/components/admin/v3/DataStatusBar";
 import { PipelineHealthDrawer } from "@/components/admin/v3/PipelineHealthDrawer";
 import { NewsInvestigationTable } from "@/components/admin/v3/NewsInvestigationTable";
+import { ClusterDrilldownView } from "@/components/admin/v3/ClusterDrilldownView";
 
 type ViewMode = "trends" | "feed" | "cluster";
-
-interface ClusterDrilldownProps {
-  clusterId: string;
-  onBack: () => void;
-}
-
-function ClusterDrilldown({ clusterId, onBack }: ClusterDrilldownProps) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={onBack}>
-          ← Back to Trends
-        </Button>
-        <h2 className="text-lg font-semibold">Cluster Details</h2>
-      </div>
-      <div className="rounded-lg border border-border bg-card p-6">
-        <p className="text-muted-foreground">
-          Cluster drilldown for: <code className="text-foreground">{clusterId}</code>
-        </p>
-        <p className="text-sm text-muted-foreground mt-2">
-          Timeline, top articles, entities, and action buttons coming soon.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export function NewsTrendsPage() {
   const [mode, setMode] = useState<ViewMode>("trends");
@@ -103,7 +78,7 @@ export function NewsTrendsPage() {
       )}
       
       {mode === "cluster" && selectedCluster && (
-        <ClusterDrilldown 
+        <ClusterDrilldownView 
           clusterId={selectedCluster} 
           onBack={handleBackFromCluster} 
         />
