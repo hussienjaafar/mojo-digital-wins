@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, validateCronOrAdmin, logJobFailure, checkRateLimit } from "../_shared/security.ts";
 import { fetchAndParseFeed } from "../_shared/xmlParser.ts";
-import { normalizeUrl, generateDedupeKey } from "../_shared/urlNormalizer.ts";
+import { normalizeUrl, generateDedupeKey, generateContentHash, extractCanonicalUrl } from "../_shared/urlNormalizer.ts";
 
 const corsHeaders = getCorsHeaders();
 
@@ -153,18 +153,6 @@ function calculateThreatLevel(text: string, sourceName: string): { level: string
   return { level, score: Math.min(score, 100), affectedOrgs };
 }
 
-function generateHash(title: string, content: string): string {
-  const text = (title + content).toLowerCase().replace(/\s+/g, '');
-  let hash = 0;
-  const textSubstring = text.substring(0, 100);
-  for (let i = 0; i < textSubstring.length; i++) {
-    const char = textSubstring.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return hash.toString(36);
-}
-
 function sanitizeText(text: string): string {
   if (!text) return '';
   let decoded = text
@@ -200,7 +188,70 @@ async function parseRSSFeed(url: string): Promise<any[]> {
     }));
   } catch (error) {
     console.error(`Error parsing RSS feed ${url}:`, error);
-    return [];
+    throw error; // Re-throw to handle in caller
+  }
+}
+
+/**
+ * Check if source is in backoff period
+ */
+function isInBackoff(source: any): boolean {
+  if (!source.backoff_until) return false;
+  return new Date(source.backoff_until) > new Date();
+}
+
+/**
+ * Update source health via RPC
+ */
+async function updateSourceHealth(
+  supabase: any,
+  sourceId: string,
+  success: boolean,
+  errorMessage?: string,
+  itemsFetched?: number
+): Promise<void> {
+  try {
+    await supabase.rpc('update_source_health', {
+      p_source_id: sourceId,
+      p_source_type: 'rss',
+      p_success: success,
+      p_error_message: errorMessage || null,
+      p_items_fetched: itemsFetched || 0
+    });
+  } catch (err) {
+    console.error(`Failed to update source health for ${sourceId}:`, err);
+  }
+}
+
+/**
+ * Register article in dedupe registry
+ */
+async function registerForDedupe(
+  supabase: any,
+  contentHash: string,
+  canonicalUrl: string,
+  sourceType: string,
+  sourceId: string,
+  articleId: string,
+  titleSnippet: string,
+  publishedDate: string
+): Promise<void> {
+  try {
+    await supabase.from('article_dedupe_registry').upsert({
+      content_hash: contentHash,
+      canonical_url: canonicalUrl,
+      source_type: sourceType,
+      source_id: sourceId,
+      article_id: articleId,
+      title_snippet: titleSnippet.substring(0, 100),
+      published_date: publishedDate.split('T')[0]
+    }, { 
+      onConflict: 'content_hash,source_type',
+      ignoreDuplicates: true 
+    });
+  } catch (err) {
+    // Non-critical, just log
+    console.warn('Failed to register for dedupe:', err);
   }
 }
 
@@ -236,21 +287,31 @@ serve(async (req) => {
 
     console.log('Starting incremental RSS feed fetch...');
     
+    // Fetch sources from DB (not hardcoded) - skip those in backoff
     const { data: sources, error: sourcesError } = await supabase
       .from('rss_sources')
       .select('*')
       .eq('is_active', true)
+      .or('backoff_until.is.null,backoff_until.lt.now()')
       .order('last_fetched_at', { ascending: true, nullsFirst: true })
       .limit(30);
 
     if (sourcesError) throw sourcesError;
 
-    console.log(`Processing batch: ${sources?.length || 0} sources (oldest first)`);
+    console.log(`Processing batch: ${sources?.length || 0} sources (oldest first, excluding backoff)`);
 
     let totalArticles = 0;
     let totalErrors = 0;
+    let sourcesProcessed = 0;
+    let duplicatesSkipped = 0;
 
     for (const source of sources || []) {
+      // Double-check backoff (in case filter didn't work)
+      if (isInBackoff(source)) {
+        console.log(`Skipping ${source.name} - in backoff until ${source.backoff_until}`);
+        continue;
+      }
+
       try {
         console.log(`Fetching ${source.name}...`);
         const items = await parseRSSFeed(source.url);
@@ -262,6 +323,11 @@ serve(async (req) => {
           const sanitizedTitle = sanitizeText(item.title);
           const sanitizedDescription = sanitizeText(item.description);
           const fullContent = sanitizedDescription.substring(0, 1000);
+          
+          // Generate canonical URL and content hash for cross-source dedupe
+          const canonicalUrl = extractCanonicalUrl(item.link);
+          const contentHash = generateContentHash(sanitizedTitle, item.link, item.pubDate, source.name);
+          
           // Use robust dedup key combining URL, title, date, and source
           const dedupeKey = generateDedupeKey(item.link, sanitizedTitle, item.pubDate, source.id);
           const tags = extractTags(sanitizedTitle, sanitizedDescription, sanitizedDescription);
@@ -275,6 +341,8 @@ serve(async (req) => {
             source_id: source.id,
             source_name: source.name,
             source_url: item.link,
+            canonical_url: canonicalUrl,
+            content_hash: contentHash,
             published_date: item.pubDate,
             image_url: item.imageUrl,
             tags,
@@ -291,38 +359,58 @@ serve(async (req) => {
           const { data: upsertedArticles, error: upsertError } = await supabase
             .from('articles')
             .upsert(articlesToUpsert, { onConflict: 'hash_signature', ignoreDuplicates: true })
-            .select('id, hash_signature');
+            .select('id, hash_signature, content_hash, canonical_url, title, published_date');
 
           if (upsertError) {
             console.error(`Batch upsert error for ${source.name}:`, upsertError.message);
             totalErrors++;
+            await updateSourceHealth(supabase, source.id, false, upsertError.message);
           } else {
-            totalArticles += upsertedArticles?.length || 0;
+            const insertedCount = upsertedArticles?.length || 0;
+            totalArticles += insertedCount;
+            duplicatesSkipped += articlesToUpsert.length - insertedCount;
+            
+            // Register new articles in dedupe registry
+            for (const article of upsertedArticles || []) {
+              await registerForDedupe(
+                supabase,
+                article.content_hash,
+                article.canonical_url,
+                'rss',
+                source.id,
+                article.id,
+                article.title,
+                article.published_date
+              );
+            }
+            
+            // Update source health on success
+            await updateSourceHealth(supabase, source.id, true, undefined, insertedCount);
           }
+        } else {
+          // No items but successful fetch
+          await updateSourceHealth(supabase, source.id, true, undefined, 0);
         }
 
-        await supabase
-          .from('rss_sources')
-          .update({ last_fetched_at: new Date().toISOString(), fetch_error: null })
-          .eq('id', source.id);
+        sourcesProcessed++;
 
       } catch (sourceError: any) {
         console.error(`Error processing source ${source.name}:`, sourceError.message);
         totalErrors++;
-        await supabase
-          .from('rss_sources')
-          .update({ fetch_error: sourceError.message, last_fetched_at: new Date().toISOString() })
-          .eq('id', source.id);
+        
+        // Update source health with error (triggers exponential backoff)
+        await updateSourceHealth(supabase, source.id, false, sourceError.message);
       }
     }
 
-    console.log(`RSS fetch complete: ${totalArticles} articles, ${totalErrors} errors`);
+    console.log(`RSS fetch complete: ${totalArticles} articles, ${duplicatesSkipped} duplicates skipped, ${totalErrors} errors`);
 
     return new Response(
       JSON.stringify({
         success: true,
         articles_added: totalArticles,
-        sources_processed: sources?.length || 0,
+        duplicates_skipped: duplicatesSkipped,
+        sources_processed: sourcesProcessed,
         errors: totalErrors,
         timestamp: new Date().toISOString()
       }),
