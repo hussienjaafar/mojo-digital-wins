@@ -3,8 +3,76 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
+
+// ============================================================================
+// Auth Validation
+// ============================================================================
+
+function validateCronSecret(req: Request): boolean {
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  if (!cronSecret) {
+    console.warn('CRON_SECRET not configured - allowing request');
+    return true;
+  }
+  const providedSecret = req.headers.get('x-cron-secret');
+  return providedSecret === cronSecret;
+}
+
+async function validateAuth(req: Request, supabase: any): Promise<{ user: any; isAdmin: boolean } | null> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) return null;
+
+  const { data: { user }, error } = await supabase.auth.getUser(
+    authHeader.replace('Bearer ', '')
+  );
+
+  if (error || !user) return null;
+
+  const { data: roles } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id);
+
+  const isAdmin = roles?.some((r: any) => r.role === 'admin') || false;
+  return { user, isAdmin };
+}
+
+async function validateCronOrAdmin(req: Request, supabase: any): Promise<{ valid: boolean; isAdmin?: boolean; user?: any }> {
+  if (validateCronSecret(req)) {
+    console.log('[track-event-impact] Authorized via cron');
+    return { valid: true };
+  }
+
+  const auth = await validateAuth(req, supabase);
+  if (auth?.isAdmin) {
+    console.log('[track-event-impact] Authorized via admin JWT');
+    return { valid: true, isAdmin: true, user: auth.user };
+  }
+
+  return { valid: false };
+}
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface ActionWithOutcomes {
+  organization_id: string;
+  trend_event_id: string | null;
+  trend_key: string;
+  actions_sent: number;
+  total_outcomes: number;
+  sms_responses: number;
+  meta_clicks: number;
+  donation_count: number;
+  donation_amount: number;
+}
+
+// ============================================================================
+// Main Handler
+// ============================================================================
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -16,9 +84,23 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('Starting event-impact correlation tracking...');
+    // Auth check: require cron or admin
+    const authResult = await validateCronOrAdmin(req, supabase);
+    if (!authResult.valid) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - requires cron secret or admin role' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Get all organizations
+    console.log('📊 Starting outcome aggregation for trend_outcome_correlation...');
+
+    // Define time windows
+    const now = new Date();
+    const windowEnd = now;
+    const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000); // Last 24h
+
+    // Get all active organizations
     const { data: orgs } = await supabase
       .from('client_organizations')
       .select('id')
@@ -32,101 +114,180 @@ serve(async (req) => {
     }
 
     let totalCorrelations = 0;
+    let boostedCount = 0;
 
     for (const org of orgs) {
-      // Get trending topics from last 48 hours
-      const { data: trendingTopics } = await supabase
-        .from('entity_trends')
-        .select('*')
+      // Get all actions with trend references in the window
+      const { data: actions } = await supabase
+        .from('intelligence_actions')
+        .select('id, organization_id, trend_event_id, entity_name, action_type, sent_at')
         .eq('organization_id', org.id)
-        .gte('trend_window_start', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-        .gt('velocity', 50)
-        .order('velocity', { ascending: false })
-        .limit(20);
+        .eq('action_status', 'sent')
+        .gte('sent_at', windowStart.toISOString())
+        .lte('sent_at', windowEnd.toISOString());
 
-      if (!trendingTopics || trendingTopics.length === 0) continue;
+      if (!actions || actions.length === 0) {
+        console.log(`No actions found for org ${org.id} in window`);
+        continue;
+      }
 
-      for (const topic of trendingTopics) {
-        // Get donations in 48 hour window after topic started trending
-        const windowStart = new Date(topic.trend_window_start);
-        const windowEnd = new Date(windowStart.getTime() + 48 * 60 * 60 * 1000);
+      // Get all outcomes linked to these actions
+      const actionIds = actions.map(a => a.id);
+      const { data: outcomes } = await supabase
+        .from('outcome_events')
+        .select('action_id, outcome_type, outcome_value, outcome_count')
+        .in('action_id', actionIds);
 
-        const { data: donations, count } = await supabase
-          .from('actblue_transactions')
-          .select('amount, transaction_date', { count: 'exact' })
-          .eq('organization_id', org.id)
-          .gte('transaction_date', windowStart.toISOString())
-          .lte('transaction_date', windowEnd.toISOString());
+      // Build outcome map
+      const outcomeByAction = new Map<string, any[]>();
+      for (const o of outcomes || []) {
+        if (!outcomeByAction.has(o.action_id)) {
+          outcomeByAction.set(o.action_id, []);
+        }
+        outcomeByAction.get(o.action_id)!.push(o);
+      }
 
-        if (!donations || donations.length === 0) continue;
+      // Aggregate by trend_key (entity_name normalized)
+      const trendAggregates = new Map<string, ActionWithOutcomes>();
 
-        const totalAmount = donations.reduce((sum, d) => sum + d.amount, 0);
-        const avgDonation = totalAmount / donations.length;
+      for (const action of actions) {
+        const trendKey = action.entity_name?.toLowerCase().replace(/[^\w\s]/g, '').trim() || 'unknown';
+        
+        if (!trendAggregates.has(trendKey)) {
+          trendAggregates.set(trendKey, {
+            organization_id: org.id,
+            trend_event_id: action.trend_event_id,
+            trend_key: trendKey,
+            actions_sent: 0,
+            total_outcomes: 0,
+            sms_responses: 0,
+            meta_clicks: 0,
+            donation_count: 0,
+            donation_amount: 0,
+          });
+        }
 
-        // Get baseline (same period from week before)
-        const baselineStart = new Date(windowStart.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const baselineEnd = new Date(windowEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const agg = trendAggregates.get(trendKey)!;
+        agg.actions_sent++;
 
-        const { data: baselineDonations, count: baselineCount } = await supabase
-          .from('actblue_transactions')
-          .select('amount', { count: 'exact' })
-          .eq('organization_id', org.id)
-          .gte('transaction_date', baselineStart.toISOString())
-          .lte('transaction_date', baselineEnd.toISOString());
+        // If we have a trend_event_id, prefer it
+        if (action.trend_event_id && !agg.trend_event_id) {
+          agg.trend_event_id = action.trend_event_id;
+        }
 
-        const baselineAmount = baselineDonations?.reduce((sum, d) => sum + d.amount, 0) || 0;
-        const baselineAvg = (baselineCount || 0) > 0 ? baselineAmount / (baselineCount || 1) : 0;
+        // Aggregate outcomes
+        const actionOutcomes = outcomeByAction.get(action.id) || [];
+        for (const outcome of actionOutcomes) {
+          agg.total_outcomes += outcome.outcome_count || 1;
+          
+          if (outcome.outcome_type?.startsWith('sms_')) {
+            agg.sms_responses += outcome.outcome_count || 1;
+          } else if (outcome.outcome_type?.startsWith('meta_')) {
+            agg.meta_clicks += outcome.outcome_count || 1;
+          } else if (outcome.outcome_type === 'donation') {
+            agg.donation_count += outcome.outcome_count || 1;
+            agg.donation_amount += parseFloat(outcome.outcome_value) || 0;
+          }
+        }
+      }
 
-        // Calculate correlation strength
-        const donationIncrease = totalAmount - baselineAmount;
-        const donationIncreasePercent = baselineAmount > 0 
-          ? ((totalAmount - baselineAmount) / baselineAmount) * 100 
+      // Get baseline response rates (30-day average for this org)
+      const baselineStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const { data: historicalCorrelations } = await supabase
+        .from('trend_outcome_correlation')
+        .select('response_rate, donation_rate')
+        .eq('organization_id', org.id)
+        .gte('window_start', baselineStart.toISOString())
+        .lt('window_start', windowStart.toISOString());
+
+      let baselineResponseRate = 5.0; // Default 5%
+      if (historicalCorrelations && historicalCorrelations.length >= 3) {
+        const avgResponse = historicalCorrelations.reduce((sum, c) => sum + (c.response_rate || 0), 0) / historicalCorrelations.length;
+        if (avgResponse > 0) baselineResponseRate = avgResponse;
+      }
+
+      // Upsert correlations
+      for (const [trendKey, agg] of trendAggregates) {
+        const responseRate = agg.actions_sent > 0 
+          ? (agg.total_outcomes / agg.actions_sent) * 100 
+          : 0;
+        
+        const donationRate = agg.actions_sent > 0 
+          ? (agg.donation_count / agg.actions_sent) * 100 
+          : 0;
+        
+        const avgDonation = agg.donation_count > 0 
+          ? agg.donation_amount / agg.donation_count 
           : 0;
 
-        // Store correlation if significant
-        if (donationIncreasePercent > 20 || donationIncrease > 1000) {
-          const correlationStrength = Math.min(100, 
-            (donationIncreasePercent * 0.5) + (topic.velocity * 0.3) + (donations.length * 0.2)
-          );
+        const performanceDelta = responseRate - baselineResponseRate;
+        
+        // Determine if this should boost relevance
+        // Positive signal: response rate above baseline by 20%+ OR donation rate > 2%
+        const shouldBoost = performanceDelta > (baselineResponseRate * 0.2) || donationRate > 2;
+        
+        let learningSignal = 'neutral';
+        if (performanceDelta > baselineResponseRate * 0.5) {
+          learningSignal = 'strong_positive';
+        } else if (performanceDelta > baselineResponseRate * 0.2) {
+          learningSignal = 'positive';
+        } else if (performanceDelta < -baselineResponseRate * 0.3) {
+          learningSignal = 'negative';
+        }
 
-          const { error: insertError } = await supabase
-            .from('event_impact_correlations')
-            .insert({
-              organization_id: org.id,
-              entity_name: topic.entity_name,
-              entity_type: topic.entity_type,
-              event_date: windowStart.toISOString(),
-              donations_48h_after: donations.length,
-              amount_raised_48h_after: totalAmount,
-              avg_donation_48h_after: avgDonation,
-              baseline_donations: baselineCount || 0,
-              baseline_amount: baselineAmount,
-              baseline_avg_donation: baselineAvg,
-              correlation_strength: correlationStrength,
-              topic_velocity: topic.velocity,
-              topic_mentions: topic.current_mentions,
-            });
+        const correlation = {
+          organization_id: org.id,
+          trend_event_id: agg.trend_event_id,
+          trend_key: trendKey,
+          actions_sent: agg.actions_sent,
+          total_outcomes: agg.total_outcomes,
+          total_donations: agg.donation_count,
+          total_donation_amount: agg.donation_amount,
+          total_clicks: agg.meta_clicks,
+          response_rate: parseFloat(responseRate.toFixed(2)),
+          donation_rate: parseFloat(donationRate.toFixed(2)),
+          avg_donation: parseFloat(avgDonation.toFixed(2)),
+          baseline_response_rate: parseFloat(baselineResponseRate.toFixed(2)),
+          performance_delta: parseFloat(performanceDelta.toFixed(2)),
+          should_boost_relevance: shouldBoost,
+          learning_signal: learningSignal,
+          computed_at: now.toISOString(),
+          window_start: windowStart.toISOString(),
+          window_end: windowEnd.toISOString(),
+        };
 
-          if (!insertError) {
-            totalCorrelations++;
-            console.log(`Stored correlation for ${topic.entity_name}: +${donationIncreasePercent.toFixed(1)}%`);
-          }
+        const { error: upsertError } = await supabase
+          .from('trend_outcome_correlation')
+          .upsert(correlation, {
+            onConflict: 'organization_id,trend_key,window_start',
+            ignoreDuplicates: false,
+          });
+
+        if (upsertError) {
+          console.error(`Error upserting correlation for ${trendKey}:`, upsertError);
+        } else {
+          totalCorrelations++;
+          if (shouldBoost) boostedCount++;
+          console.log(`📈 ${trendKey}: response=${responseRate.toFixed(1)}% (baseline=${baselineResponseRate.toFixed(1)}%), signal=${learningSignal}`);
         }
       }
     }
 
-    console.log(`Event-impact tracking complete. Found ${totalCorrelations} correlations.`);
+    console.log(`✅ Outcome aggregation complete. Created ${totalCorrelations} correlations, ${boostedCount} with boost signal.`);
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        correlations_found: totalCorrelations,
+        correlations_created: totalCorrelations,
+        boost_signals: boostedCount,
+        window_start: windowStart.toISOString(),
+        window_end: windowEnd.toISOString(),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
-    console.error('Error in track-event-impact:', error);
+    console.error('❌ Error in track-event-impact:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

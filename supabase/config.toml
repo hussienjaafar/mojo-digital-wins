@@ -199,10 +199,12 @@ verify_jwt = true
 [functions.optimize-send-timing]
 verify_jwt = true
 
+# Outcome aggregation job (requires cron or admin)
 [functions.track-event-impact]
-verify_jwt = true
+verify_jwt = false
 
-[functions.create-client-user]
+[functions.compute-org-relevance]
+verify_jwt = false
 verify_jwt = true
 
 [functions.reset-client-password]

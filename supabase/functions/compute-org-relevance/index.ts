@@ -160,6 +160,14 @@ function fuzzyMatch(a: string, b: string): number {
 // Relevance Scoring Engine
 // ============================================================================
 
+interface OutcomeCorrelation {
+  trend_key: string;
+  should_boost_relevance: boolean;
+  learning_signal: string;
+  performance_delta: number;
+  response_rate: number;
+}
+
 function calculateRelevance(
   trendTitle: string,
   trendVelocity: number,
@@ -167,7 +175,8 @@ function calculateRelevance(
   trendSourceCount: number,
   profile: OrgProfile | null,
   interestTopics: InterestTopic[],
-  interestEntities: InterestEntity[]
+  interestEntities: InterestEntity[],
+  outcomeCorrelation?: OutcomeCorrelation
 ): OrgRelevanceScore {
   const result: OrgRelevanceScore = {
     organization_id: profile?.organization_id || '',
@@ -329,6 +338,26 @@ function calculateRelevance(
     result.explanation.reasons.push(`Multi-source: ${trendSourceCount} sources (+5)`);
   }
 
+  // 10. Outcome-based learning boost (up to 10 points)
+  // Conservative boost based on positive outcome signals
+  if (outcomeCorrelation?.should_boost_relevance) {
+    let outcomeBoost = 0;
+    
+    if (outcomeCorrelation.learning_signal === 'strong_positive') {
+      outcomeBoost = 10;
+    } else if (outcomeCorrelation.learning_signal === 'positive') {
+      outcomeBoost = 6;
+    }
+    
+    if (outcomeBoost > 0) {
+      score += outcomeBoost;
+      result.explanation.score_breakdown.outcome_boost = outcomeBoost;
+      result.explanation.reasons.push(
+        `Outcome signal: ${outcomeCorrelation.learning_signal} (${outcomeCorrelation.performance_delta > 0 ? '+' : ''}${outcomeCorrelation.performance_delta.toFixed(1)}% vs baseline) (+${outcomeBoost})`
+      );
+    }
+  }
+
   // Calculate urgency score based on velocity + breaking
   result.urgency_score = Math.min(100, Math.round(trendVelocity / 2) + (trendIsBreaking ? 25 : 0));
 
@@ -433,16 +462,44 @@ serve(async (req) => {
     const trends: TrendEvent[] = trendEvents || [];
     console.log(`📈 Scoring ${trends.length} trend_events for ${orgs?.length || 0} orgs`);
 
+    // Fetch recent outcome correlations for learning signal (last 7 days)
+    const correlationWindowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: outcomeCorrelations } = await supabase
+      .from('trend_outcome_correlation')
+      .select('organization_id, trend_key, should_boost_relevance, learning_signal, performance_delta, response_rate')
+      .gte('window_start', correlationWindowStart)
+      .eq('should_boost_relevance', true);
+
+    // Build a map: org_id -> trend_key -> correlation
+    const correlationMap = new Map<string, Map<string, OutcomeCorrelation>>();
+    for (const corr of outcomeCorrelations || []) {
+      if (!correlationMap.has(corr.organization_id)) {
+        correlationMap.set(corr.organization_id, new Map());
+      }
+      // Keep the most recent/strongest signal per trend_key
+      const existing = correlationMap.get(corr.organization_id)!.get(corr.trend_key);
+      if (!existing || corr.performance_delta > existing.performance_delta) {
+        correlationMap.get(corr.organization_id)!.set(corr.trend_key, corr as OutcomeCorrelation);
+      }
+    }
+    console.log(`📊 Loaded ${outcomeCorrelations?.length || 0} outcome correlations for learning boosts`);
+
     // Compute relevance for each org x trend
     const scoresToUpsert: any[] = [];
     let highPriorityCount = 0;
+    let outcomeBoostCount = 0;
 
     for (const org of orgs || []) {
       const profile = profileMap.get(org.id) || null;
       const interestTopics = topicsMap.get(org.id) || [];
       const interestEntities = entitiesMap.get(org.id) || [];
+      const orgCorrelations = correlationMap.get(org.id);
 
       for (const trend of trends) {
+        // Look up outcome correlation for this trend
+        const trendKeyNormalized = trend.event_title.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+        const outcomeCorrelation = orgCorrelations?.get(trendKeyNormalized);
+
         const relevance = calculateRelevance(
           trend.event_title,
           trend.velocity || 0,
@@ -450,8 +507,13 @@ serve(async (req) => {
           trend.source_count || 1,
           profile ? { ...profile, organization_id: org.id } : { organization_id: org.id },
           interestTopics,
-          interestEntities
+          interestEntities,
+          outcomeCorrelation
         );
+
+        if (outcomeCorrelation && relevance.explanation.score_breakdown.outcome_boost) {
+          outcomeBoostCount++;
+        }
 
         // Only store scores above minimum threshold
         if (relevance.relevance_score >= 10 || relevance.is_blocked) {
@@ -480,7 +542,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`💾 Upserting ${scoresToUpsert.length} org-trend scores (${highPriorityCount} high priority)`);
+    console.log(`💾 Upserting ${scoresToUpsert.length} org-trend scores (${highPriorityCount} high priority, ${outcomeBoostCount} with outcome boost)`);
 
     // Upsert in batches
     const BATCH_SIZE = 100;
@@ -509,7 +571,7 @@ serve(async (req) => {
       console.warn('Cleanup error:', cleanupError);
     }
 
-    console.log('✅ Org relevance computation complete (trend_events only)');
+    console.log('✅ Org relevance computation complete (with outcome learning)');
 
     return new Response(
       JSON.stringify({ 
@@ -518,6 +580,7 @@ serve(async (req) => {
         trendsScored: trends.length,
         scoresCreated: scoresToUpsert.length,
         highPriorityScores: highPriorityCount,
+        outcomeBoosts: outcomeBoostCount,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
