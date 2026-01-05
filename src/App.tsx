@@ -60,6 +60,7 @@ const ClientDonorIntelligence = lazy(() => import("./pages/ClientDonorIntelligen
 const ClientCreativeIntelligence = lazy(() => import("./pages/ClientCreativeIntelligence"));
 const ClientABTests = lazy(() => import("./pages/ClientABTests"));
 const ClientRecurringHealth = lazy(() => import("./pages/ClientRecurringHealth"));
+const ClientNewsTrends = lazy(() => import("./pages/ClientNewsTrends"));
 
 const queryClient = new QueryClient();
 
@@ -124,6 +125,7 @@ const AppContent = () => {
             <Route path="/client/attribution" element={<Navigate to="/client/journey" replace />} />
             <Route path="/client/ab-tests" element={<ClientABTests />} />
             <Route path="/client/recurring-health" element={<ClientRecurringHealth />} />
+            <Route path="/client/news-trends" element={<ClientNewsTrends />} />
             <Route path="/access-denied" element={<AccessDenied />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

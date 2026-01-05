@@ -384,8 +384,8 @@ export default function ClientNewsTrends() {
           </Button>
         </header>
 
-        {/* Data Freshness Banner */}
-        <DataFreshnessBanner lastUpdated={lastRefresh} />
+        {/* Data Freshness Banner - SLA-driven from pipeline_freshness */}
+        <DataFreshnessBanner />
 
         {/* Breaking Now - Full Width */}
         {breakingTrends.length > 0 && (
