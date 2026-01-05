@@ -6470,6 +6470,36 @@ export type Database = {
         }
         Relationships: []
       }
+      source_tiers: {
+        Row: {
+          authority_weight: number | null
+          category: string | null
+          created_at: string | null
+          domain: string
+          id: string
+          name: string | null
+          tier: string
+        }
+        Insert: {
+          authority_weight?: number | null
+          category?: string | null
+          created_at?: string | null
+          domain: string
+          id?: string
+          name?: string | null
+          tier: string
+        }
+        Update: {
+          authority_weight?: number | null
+          category?: string | null
+          created_at?: string | null
+          domain?: string
+          id?: string
+          name?: string | null
+          tier?: string
+        }
+        Relationships: []
+      }
       spike_alerts: {
         Row: {
           alert_type: string
@@ -6996,6 +7026,42 @@ export type Database = {
         }
         Relationships: []
       }
+      trend_baselines: {
+        Row: {
+          avg_sentiment: number | null
+          baseline_date: string
+          created_at: string | null
+          event_key: string
+          hourly_average: number | null
+          id: string
+          mentions_count: number | null
+          news_mentions: number | null
+          social_mentions: number | null
+        }
+        Insert: {
+          avg_sentiment?: number | null
+          baseline_date: string
+          created_at?: string | null
+          event_key: string
+          hourly_average?: number | null
+          id?: string
+          mentions_count?: number | null
+          news_mentions?: number | null
+          social_mentions?: number | null
+        }
+        Update: {
+          avg_sentiment?: number | null
+          baseline_date?: string
+          created_at?: string | null
+          event_key?: string
+          hourly_average?: number | null
+          id?: string
+          mentions_count?: number | null
+          news_mentions?: number | null
+          social_mentions?: number | null
+        }
+        Relationships: []
+      }
       trend_clusters: {
         Row: {
           acceleration: number | null
@@ -7198,6 +7264,189 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trend_events: {
+        Row: {
+          acceleration: number | null
+          baseline_30d: number | null
+          baseline_7d: number | null
+          baseline_updated_at: string | null
+          confidence_factors: Json | null
+          confidence_score: number | null
+          corroboration_score: number | null
+          created_at: string | null
+          current_1h: number | null
+          current_24h: number | null
+          current_6h: number | null
+          entity_type: string | null
+          event_key: string
+          event_title: string
+          evidence_count: number | null
+          first_seen_at: string
+          id: string
+          is_breaking: boolean | null
+          is_trending: boolean | null
+          is_verified: boolean | null
+          last_seen_at: string
+          news_source_count: number | null
+          peak_at: string | null
+          related_topics: string[] | null
+          sentiment_label: string | null
+          sentiment_score: number | null
+          social_source_count: number | null
+          source_count: number | null
+          top_headline: string | null
+          trend_stage: string | null
+          updated_at: string | null
+          velocity: number | null
+          velocity_1h: number | null
+          velocity_6h: number | null
+        }
+        Insert: {
+          acceleration?: number | null
+          baseline_30d?: number | null
+          baseline_7d?: number | null
+          baseline_updated_at?: string | null
+          confidence_factors?: Json | null
+          confidence_score?: number | null
+          corroboration_score?: number | null
+          created_at?: string | null
+          current_1h?: number | null
+          current_24h?: number | null
+          current_6h?: number | null
+          entity_type?: string | null
+          event_key: string
+          event_title: string
+          evidence_count?: number | null
+          first_seen_at?: string
+          id?: string
+          is_breaking?: boolean | null
+          is_trending?: boolean | null
+          is_verified?: boolean | null
+          last_seen_at?: string
+          news_source_count?: number | null
+          peak_at?: string | null
+          related_topics?: string[] | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          social_source_count?: number | null
+          source_count?: number | null
+          top_headline?: string | null
+          trend_stage?: string | null
+          updated_at?: string | null
+          velocity?: number | null
+          velocity_1h?: number | null
+          velocity_6h?: number | null
+        }
+        Update: {
+          acceleration?: number | null
+          baseline_30d?: number | null
+          baseline_7d?: number | null
+          baseline_updated_at?: string | null
+          confidence_factors?: Json | null
+          confidence_score?: number | null
+          corroboration_score?: number | null
+          created_at?: string | null
+          current_1h?: number | null
+          current_24h?: number | null
+          current_6h?: number | null
+          entity_type?: string | null
+          event_key?: string
+          event_title?: string
+          evidence_count?: number | null
+          first_seen_at?: string
+          id?: string
+          is_breaking?: boolean | null
+          is_trending?: boolean | null
+          is_verified?: boolean | null
+          last_seen_at?: string
+          news_source_count?: number | null
+          peak_at?: string | null
+          related_topics?: string[] | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          social_source_count?: number | null
+          source_count?: number | null
+          top_headline?: string | null
+          trend_stage?: string | null
+          updated_at?: string | null
+          velocity?: number | null
+          velocity_1h?: number | null
+          velocity_6h?: number | null
+        }
+        Relationships: []
+      }
+      trend_evidence: {
+        Row: {
+          canonical_url: string | null
+          content_hash: string | null
+          contribution_score: number | null
+          created_at: string | null
+          event_id: string
+          id: string
+          indexed_at: string | null
+          is_primary: boolean | null
+          published_at: string | null
+          sentiment_label: string | null
+          sentiment_score: number | null
+          source_domain: string | null
+          source_id: string | null
+          source_title: string | null
+          source_type: string
+          source_url: string | null
+        }
+        Insert: {
+          canonical_url?: string | null
+          content_hash?: string | null
+          contribution_score?: number | null
+          created_at?: string | null
+          event_id: string
+          id?: string
+          indexed_at?: string | null
+          is_primary?: boolean | null
+          published_at?: string | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          source_domain?: string | null
+          source_id?: string | null
+          source_title?: string | null
+          source_type: string
+          source_url?: string | null
+        }
+        Update: {
+          canonical_url?: string | null
+          content_hash?: string | null
+          contribution_score?: number | null
+          created_at?: string | null
+          event_id?: string
+          id?: string
+          indexed_at?: string | null
+          is_primary?: boolean | null
+          published_at?: string | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          source_domain?: string | null
+          source_id?: string | null
+          source_title?: string | null
+          source_type?: string
+          source_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_evidence_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_evidence_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events_active"
             referencedColumns: ["id"]
           },
         ]
@@ -8674,6 +8923,129 @@ export type Database = {
           },
         ]
       }
+      trend_events_active: {
+        Row: {
+          acceleration: number | null
+          baseline_30d: number | null
+          baseline_7d: number | null
+          baseline_delta_pct: number | null
+          baseline_updated_at: string | null
+          confidence_factors: Json | null
+          confidence_score: number | null
+          corroboration_score: number | null
+          created_at: string | null
+          current_1h: number | null
+          current_24h: number | null
+          current_6h: number | null
+          entity_type: string | null
+          event_key: string | null
+          event_title: string | null
+          evidence_count: number | null
+          first_seen_at: string | null
+          freshness: string | null
+          id: string | null
+          is_breaking: boolean | null
+          is_trending: boolean | null
+          is_verified: boolean | null
+          last_seen_at: string | null
+          news_evidence_count: number | null
+          news_source_count: number | null
+          peak_at: string | null
+          related_topics: string[] | null
+          sentiment_label: string | null
+          sentiment_score: number | null
+          social_evidence_count: number | null
+          social_source_count: number | null
+          source_count: number | null
+          top_headline: string | null
+          trend_stage: string | null
+          updated_at: string | null
+          velocity: number | null
+          velocity_1h: number | null
+          velocity_6h: number | null
+        }
+        Insert: {
+          acceleration?: number | null
+          baseline_30d?: number | null
+          baseline_7d?: number | null
+          baseline_delta_pct?: never
+          baseline_updated_at?: string | null
+          confidence_factors?: Json | null
+          confidence_score?: number | null
+          corroboration_score?: number | null
+          created_at?: string | null
+          current_1h?: number | null
+          current_24h?: number | null
+          current_6h?: number | null
+          entity_type?: string | null
+          event_key?: string | null
+          event_title?: string | null
+          evidence_count?: number | null
+          first_seen_at?: string | null
+          freshness?: never
+          id?: string | null
+          is_breaking?: boolean | null
+          is_trending?: boolean | null
+          is_verified?: boolean | null
+          last_seen_at?: string | null
+          news_evidence_count?: never
+          news_source_count?: number | null
+          peak_at?: string | null
+          related_topics?: string[] | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          social_evidence_count?: never
+          social_source_count?: number | null
+          source_count?: number | null
+          top_headline?: string | null
+          trend_stage?: string | null
+          updated_at?: string | null
+          velocity?: number | null
+          velocity_1h?: number | null
+          velocity_6h?: number | null
+        }
+        Update: {
+          acceleration?: number | null
+          baseline_30d?: number | null
+          baseline_7d?: number | null
+          baseline_delta_pct?: never
+          baseline_updated_at?: string | null
+          confidence_factors?: Json | null
+          confidence_score?: number | null
+          corroboration_score?: number | null
+          created_at?: string | null
+          current_1h?: number | null
+          current_24h?: number | null
+          current_6h?: number | null
+          entity_type?: string | null
+          event_key?: string | null
+          event_title?: string | null
+          evidence_count?: number | null
+          first_seen_at?: string | null
+          freshness?: never
+          id?: string | null
+          is_breaking?: boolean | null
+          is_trending?: boolean | null
+          is_verified?: boolean | null
+          last_seen_at?: string | null
+          news_evidence_count?: never
+          news_source_count?: number | null
+          peak_at?: string | null
+          related_topics?: string[] | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          social_evidence_count?: never
+          social_source_count?: number | null
+          source_count?: number | null
+          top_headline?: string | null
+          trend_stage?: string | null
+          updated_at?: string | null
+          velocity?: number | null
+          velocity_1h?: number | null
+          velocity_6h?: number | null
+        }
+        Relationships: []
+      }
       unmatched_refcodes: {
         Row: {
           first_seen: string | null
@@ -8731,6 +9103,17 @@ export type Database = {
           topic_name: string
         }
         Returns: number
+      }
+      calculate_trend_confidence: {
+        Args: {
+          p_baseline_7d: number
+          p_current_1h: number
+          p_evidence_count: number
+          p_news_source_count: number
+          p_source_count: number
+          p_velocity: number
+        }
+        Returns: Json
       }
       calculate_trend_velocity_v2: {
         Args: { mentions_1h: number; mentions_24h: number; mentions_6h: number }
@@ -8970,6 +9353,17 @@ export type Database = {
       is_client_admin: { Args: never; Returns: boolean }
       is_org_admin_or_manager: { Args: never; Returns: boolean }
       is_system_admin: { Args: never; Returns: boolean }
+      is_trend_breaking: {
+        Args: {
+          p_baseline_7d: number
+          p_current_1h: number
+          p_first_seen_at: string
+          p_news_source_count: number
+          p_source_count: number
+          p_velocity: number
+        }
+        Returns: boolean
+      }
       log_admin_action: {
         Args: {
           _action_type: string
