@@ -157,11 +157,12 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
           </SelectTrigger>
           <SelectContent
             className={cn(
-              "z-50",
+              "z-[200]",
               "bg-[hsl(var(--portal-bg-elevated))]",
               "border-[hsl(var(--portal-border))]",
               "rounded-[var(--portal-radius-sm)]",
-              "shadow-lg"
+              "shadow-lg",
+              "opacity-100"
             )}
           >
             <SelectItem value="all" className="text-xs">
@@ -209,11 +210,12 @@ export const CampaignCreativeFilters: React.FC<CampaignCreativeFiltersProps> = (
           </SelectTrigger>
           <SelectContent
             className={cn(
-              "z-50",
+              "z-[200]",
               "bg-[hsl(var(--portal-bg-elevated))]",
               "border-[hsl(var(--portal-border))]",
               "rounded-[var(--portal-radius-sm)]",
-              "shadow-lg"
+              "shadow-lg",
+              "opacity-100"
             )}
           >
             <SelectItem value="all" className="text-xs">

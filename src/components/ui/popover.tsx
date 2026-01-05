@@ -19,7 +19,7 @@ const PopoverContent = React.forwardRef<
       sideOffset={sideOffset}
       className={cn(
         // Base layout
-        "z-[100] w-72 rounded-lg p-4 outline-none",
+        "z-[200] w-72 rounded-lg p-4 outline-none",
         // V3 Portal surface - opaque background
         "bg-[hsl(var(--portal-bg-secondary))] text-[hsl(var(--portal-text-primary))]",
         // Border and shadow

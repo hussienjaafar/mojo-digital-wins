@@ -46,7 +46,7 @@ const DropdownMenuSubContent = React.forwardRef<
     ref={ref}
     className={cn(
       // Base layout
-      "z-[100] min-w-[8rem] overflow-hidden rounded-md p-1",
+      "z-[200] min-w-[8rem] overflow-hidden rounded-md p-1",
       // V3 Portal surface - opaque background
       "bg-[hsl(var(--portal-bg-secondary))] text-[hsl(var(--portal-text-primary))]",
       // Border and shadow
@@ -76,7 +76,7 @@ const DropdownMenuContent = React.forwardRef<
       sideOffset={sideOffset}
       className={cn(
         // Base layout
-        "z-[100] min-w-[8rem] overflow-hidden rounded-md p-1",
+        "z-[200] min-w-[8rem] overflow-hidden rounded-md p-1",
         // V3 Portal surface - opaque background
         "bg-[hsl(var(--portal-bg-secondary))] text-[hsl(var(--portal-text-primary))]",
         // Border and shadow

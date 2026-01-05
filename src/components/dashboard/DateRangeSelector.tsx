@@ -107,7 +107,7 @@ export function DateRangeSelector({
             </button>
           </PopoverTrigger>
           <PopoverContent 
-            className="w-auto p-0 z-50 !bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] rounded-lg shadow-lg" 
+            className="w-auto p-0 z-[200] !bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] rounded-lg shadow-lg opacity-100" 
             align="end"
             side={isMobile ? "bottom" : "bottom"}
             sideOffset={8}

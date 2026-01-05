@@ -68,7 +68,7 @@ const SelectContent = React.forwardRef<
       ref={ref}
       className={cn(
         // Base layout
-        "relative z-[100] max-h-96 min-w-[8rem] overflow-hidden rounded-md",
+        "relative z-[200] max-h-96 min-w-[8rem] overflow-hidden rounded-md",
         // V3 Portal surface - opaque background
         "bg-[hsl(var(--portal-bg-secondary))] text-[hsl(var(--portal-text-primary))]",
         // Border and shadow
