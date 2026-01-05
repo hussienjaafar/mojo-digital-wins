@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   Sparkles,
+  Newspaper,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ const navigationSections: NavigationSection[] = [
   {
     title: "Intelligence Hub",
     items: [
+      { label: "News & Trends", path: "/client/news-trends", icon: Newspaper },
       { label: "Entity Watchlist", path: "/client/watchlist", icon: Eye },
       { label: "Polling Intelligence", path: "/client/polling", icon: BarChart3 },
       { label: "Polling Alerts", path: "/client/polling-alerts", icon: Bell },
