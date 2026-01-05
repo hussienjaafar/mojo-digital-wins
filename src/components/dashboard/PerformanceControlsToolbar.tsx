@@ -429,11 +429,12 @@ const PresetDropdown: React.FC<PresetDropdownProps> = ({ value, onChange }) => {
       </SelectTrigger>
       <SelectContent
         className={cn(
-          "z-50",
-          "bg-[hsl(var(--portal-bg-elevated))]",
+          "z-[100]",
+          "bg-[hsl(var(--portal-bg-secondary))]",
           "border-[hsl(var(--portal-border))]",
           "rounded-[var(--portal-radius-sm)]",
-          "shadow-lg"
+          "shadow-lg",
+          "opacity-100"
         )}
       >
         {(Object.keys(presets) as PresetKey[]).map((key) => (
@@ -653,11 +654,12 @@ const FilterControl: React.FC<FilterControlProps> = ({
           </SelectTrigger>
           <SelectContent
             className={cn(
-              "z-50",
-              "bg-[hsl(var(--portal-bg-elevated))]",
+              "z-[100]",
+              "bg-[hsl(var(--portal-bg-secondary))]",
               "border-[hsl(var(--portal-border))]",
               "rounded-[var(--portal-radius-sm)]",
-              "shadow-lg"
+              "shadow-lg",
+              "opacity-100"
             )}
           >
             <SelectItem value="all" className="text-xs">All Campaigns</SelectItem>
@@ -696,11 +698,12 @@ const FilterControl: React.FC<FilterControlProps> = ({
           </SelectTrigger>
           <SelectContent
             className={cn(
-              "z-50",
-              "bg-[hsl(var(--portal-bg-elevated))]",
+              "z-[100]",
+              "bg-[hsl(var(--portal-bg-secondary))]",
               "border-[hsl(var(--portal-border))]",
               "rounded-[var(--portal-radius-sm)]",
-              "shadow-lg"
+              "shadow-lg",
+              "opacity-100"
             )}
           >
             <SelectItem value="all" className="text-xs">All Creatives</SelectItem>
@@ -847,10 +850,12 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
           <PopoverContent
             className={cn(
               "w-auto p-0",
-              "bg-[hsl(var(--portal-bg-elevated))]",
+              "z-[100]",
+              "bg-[hsl(var(--portal-bg-secondary))]",
               "border-[hsl(var(--portal-border))]",
               "rounded-[var(--portal-radius-lg)]",
-              "shadow-lg"
+              "shadow-lg",
+              "opacity-100"
             )}
             align="start"
             sideOffset={4}
