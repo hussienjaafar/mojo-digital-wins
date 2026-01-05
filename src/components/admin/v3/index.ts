@@ -8,3 +8,4 @@ export { AdminLoadingState } from "./AdminLoadingState";
 export { PipelineHealthPanel } from "./PipelineHealthPanel";
 export { DataFreshnessIndicator } from "./DataFreshnessIndicator";
 export { TrendsConsole } from "./TrendsConsole";
+export { NewsInvestigationTable } from "./NewsInvestigationTable";
