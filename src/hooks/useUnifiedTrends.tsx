@@ -30,7 +30,7 @@ export interface UnifiedTrend {
   acceleration?: number;
   velocity_1h?: number;
   velocity_6h?: number;
-  // Phase 5: Source distribution and summary (merged from PoliticalTrendsFeed)
+  // Phase 5: Source distribution and summary
   source_distribution?: {
     google_news?: number;
     reddit?: number;
@@ -38,12 +38,19 @@ export interface UnifiedTrend {
     rss?: number;
   };
   cluster_summary?: string;
+  // Phase 6: Org relevance
+  org_relevance_score?: number;
+  org_priority_bucket?: 'high' | 'medium' | 'low';
+  org_relevance_reasons?: string[];
+  org_matched_topics?: string[];
+  org_matched_entities?: string[];
 }
 
 interface UseUnifiedTrendsOptions {
   limit?: number;
   breakthroughOnly?: boolean;
   excludeEvergreen?: boolean;
+  organizationId?: string;
 }
 
 // Common evergreen terms that should be filtered out (only truly generic ones)
@@ -117,7 +124,7 @@ const isBreakthrough = (trend: any): boolean => {
 };
 
 export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
-  const { limit = 30, breakthroughOnly = false, excludeEvergreen = true } = options;
+  const { limit = 30, breakthroughOnly = false, excludeEvergreen = true, organizationId } = options;
   const { isMaintenanceMode } = useMaintenanceMode();
   
   const [trends, setTrends] = useState<UnifiedTrend[]>([]);
@@ -137,21 +144,39 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     setError(null);
     
     try {
-      // Fetch from trend_clusters directly for better source-weighted scoring
-      // Remove broken is_trending filter - rely on volume + source weighting instead
-      const [clustersResult, watchlistResult, headlinesResult, evergreenResult] = await Promise.all([
-        supabase.from('trend_clusters')
-          .select('*')
-          .gte('mentions_last_24h', 3) // Lower threshold to get more topics
-          .order('mentions_last_24h', { ascending: false }) // Order by volume
-          .limit(limit + 50), // Fetch extra for filtering
-        supabase.from('entity_watchlist').select('entity_name'),
-        supabase.from('articles')
-          .select('title, tags')
-          .gte('published_date', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-          .order('published_date', { ascending: false })
-          .limit(100),
-        supabase.from('evergreen_topics').select('topic'),
+      // Build parallel queries
+      const clustersPromise = supabase.from('trend_clusters')
+        .select('*')
+        .gte('mentions_last_24h', 3)
+        .order('mentions_last_24h', { ascending: false })
+        .limit(limit + 50);
+      
+      const watchlistPromise = supabase.from('entity_watchlist').select('entity_name');
+      
+      const headlinesPromise = supabase.from('articles')
+        .select('title, tags')
+        .gte('published_date', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order('published_date', { ascending: false })
+        .limit(100);
+      
+      const evergreenPromise = supabase.from('evergreen_topics').select('topic');
+
+      // Fetch org relevance scores if organizationId provided
+      const orgScoresPromise = organizationId 
+        ? supabase.from('org_trend_scores')
+            .select('trend_key, relevance_score, priority_bucket, matched_topics, matched_entities, explanation')
+            .eq('organization_id', organizationId)
+            .eq('is_blocked', false)
+            .gte('relevance_score', 10)
+            .gt('expires_at', new Date().toISOString())
+        : Promise.resolve({ data: null, error: null });
+
+      const [clustersResult, watchlistResult, headlinesResult, evergreenResult, orgScoresResult] = await Promise.all([
+        clustersPromise,
+        watchlistPromise,
+        headlinesPromise,
+        evergreenPromise,
+        orgScoresPromise,
       ]);
 
       if (clustersResult.error) {
@@ -164,6 +189,14 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
       const headlines = headlinesResult.data || [];
       const dbEvergreen = (evergreenResult.data || []).map((e: any) => e.topic?.toLowerCase() || '');
       const allEvergreenPatterns = [...new Set([...EVERGREEN_PATTERNS, ...dbEvergreen])];
+
+      // Build org relevance lookup map
+      const orgRelevanceMap = new Map<string, any>();
+      if (orgScoresResult?.data) {
+        for (const score of orgScoresResult.data) {
+          orgRelevanceMap.set(score.trend_key, score);
+        }
+      }
 
       // Transform and score trends
       let enrichedTrends = (clustersResult.data || [])
@@ -228,6 +261,10 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
             (article.tags && article.tags.some((tag: string) => tag?.toLowerCase().includes(trendNameLower)))
           );
 
+          // Look up org relevance from map
+          const normalizedKey = trendNameLower.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+          const orgRelevance = orgRelevanceMap.get(normalizedKey);
+
           return {
             name: trend.cluster_title,
             normalized_name: trend.cluster_title?.toLowerCase() || '',
@@ -260,10 +297,21 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
               rss: trend.rss_count || 0,
             },
             cluster_summary: trend.cluster_summary || '',
+            org_relevance_score: orgRelevance?.relevance_score,
+            org_priority_bucket: orgRelevance?.priority_bucket,
+            org_relevance_reasons: orgRelevance?.explanation?.reasons || [],
+            org_matched_topics: orgRelevance?.matched_topics || [],
+            org_matched_entities: orgRelevance?.matched_entities || [],
           } as UnifiedTrend;
         })
-        // Sort by unified score (quality-weighted)
-        .sort((a, b) => b.unified_score - a.unified_score);
+        // Sort by unified score (or org relevance if provided)
+        .sort((a, b) => {
+          // Prioritize org relevance if both have scores
+          if (a.org_relevance_score && b.org_relevance_score) {
+            return b.org_relevance_score - a.org_relevance_score;
+          }
+          return b.unified_score - a.unified_score;
+        });
 
       // Filter for breakthrough only if requested
       if (breakthroughOnly) {
@@ -280,7 +328,7 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     } finally {
       setIsLoading(false);
     }
-  }, [limit, breakthroughOnly, excludeEvergreen, isMaintenanceMode]);
+  }, [limit, breakthroughOnly, excludeEvergreen, isMaintenanceMode, organizationId]);
 
   useEffect(() => {
     fetchTrends();

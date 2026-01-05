@@ -4895,6 +4895,85 @@ export type Database = {
           },
         ]
       }
+      org_trend_scores: {
+        Row: {
+          computed_at: string | null
+          expires_at: string | null
+          explanation: Json | null
+          id: string
+          is_allowlisted: boolean | null
+          is_blocked: boolean | null
+          matched_entities: string[] | null
+          matched_geographies: string[] | null
+          matched_topics: string[] | null
+          organization_id: string
+          priority_bucket: string | null
+          relevance_score: number
+          trend_cluster_id: string | null
+          trend_event_id: string | null
+          trend_key: string
+          urgency_score: number
+        }
+        Insert: {
+          computed_at?: string | null
+          expires_at?: string | null
+          explanation?: Json | null
+          id?: string
+          is_allowlisted?: boolean | null
+          is_blocked?: boolean | null
+          matched_entities?: string[] | null
+          matched_geographies?: string[] | null
+          matched_topics?: string[] | null
+          organization_id: string
+          priority_bucket?: string | null
+          relevance_score?: number
+          trend_cluster_id?: string | null
+          trend_event_id?: string | null
+          trend_key: string
+          urgency_score?: number
+        }
+        Update: {
+          computed_at?: string | null
+          expires_at?: string | null
+          explanation?: Json | null
+          id?: string
+          is_allowlisted?: boolean | null
+          is_blocked?: boolean | null
+          matched_entities?: string[] | null
+          matched_geographies?: string[] | null
+          matched_topics?: string[] | null
+          organization_id?: string
+          priority_bucket?: string | null
+          relevance_score?: number
+          trend_cluster_id?: string | null
+          trend_event_id?: string | null
+          trend_key?: string
+          urgency_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_trend_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_trend_scores_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_trend_scores_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events_active"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_mentions: {
         Row: {
           created_at: string
@@ -8708,6 +8787,33 @@ export type Database = {
         }
         Relationships: []
       }
+      org_relevant_trends: {
+        Row: {
+          confidence_score: number | null
+          current_1h: number | null
+          current_24h: number | null
+          current_6h: number | null
+          event_title: string | null
+          explanation: Json | null
+          is_breaking: boolean | null
+          is_trending: boolean | null
+          matched_topics: string[] | null
+          organization_id: string | null
+          priority_bucket: string | null
+          relevance_score: number | null
+          trend_key: string | null
+          velocity: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_trend_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_backlog: {
         Row: {
           ingested_24h: number | null
@@ -9277,6 +9383,23 @@ export type Database = {
           organization_id: string
           organization_name: string
           sync_priority: string
+        }[]
+      }
+      get_org_trend_relevance: {
+        Args: {
+          p_limit?: number
+          p_min_score?: number
+          p_organization_id: string
+        }
+        Returns: {
+          explanation: Json
+          matched_entities: string[]
+          matched_topics: string[]
+          priority_bucket: string
+          relevance_score: number
+          trend_event_id: string
+          trend_key: string
+          urgency_score: number
         }[]
       }
       get_recurring_health: {
