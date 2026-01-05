@@ -698,6 +698,7 @@ export type Database = {
           category: string | null
           content: string | null
           created_at: string | null
+          dedupe_key: string | null
           description: string | null
           duplicate_of: string | null
           extracted_hashtags: string[] | null
@@ -707,10 +708,14 @@ export type Database = {
           id: string
           image_url: string | null
           is_duplicate: boolean | null
+          last_processing_error: string | null
+          last_processing_error_at: string | null
           political_leaning: string | null
+          processing_state: string | null
           processing_status: string | null
           published_date: string
           relevance_category: string | null
+          retry_count: number | null
           sentiment_confidence: number | null
           sentiment_label: string | null
           sentiment_score: number | null
@@ -734,6 +739,7 @@ export type Database = {
           category?: string | null
           content?: string | null
           created_at?: string | null
+          dedupe_key?: string | null
           description?: string | null
           duplicate_of?: string | null
           extracted_hashtags?: string[] | null
@@ -743,10 +749,14 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_duplicate?: boolean | null
+          last_processing_error?: string | null
+          last_processing_error_at?: string | null
           political_leaning?: string | null
+          processing_state?: string | null
           processing_status?: string | null
           published_date: string
           relevance_category?: string | null
+          retry_count?: number | null
           sentiment_confidence?: number | null
           sentiment_label?: string | null
           sentiment_score?: number | null
@@ -770,6 +780,7 @@ export type Database = {
           category?: string | null
           content?: string | null
           created_at?: string | null
+          dedupe_key?: string | null
           description?: string | null
           duplicate_of?: string | null
           extracted_hashtags?: string[] | null
@@ -779,10 +790,14 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_duplicate?: boolean | null
+          last_processing_error?: string | null
+          last_processing_error_at?: string | null
           political_leaning?: string | null
+          processing_state?: string | null
           processing_status?: string | null
           published_date?: string
           relevance_category?: string | null
+          retry_count?: number | null
           sentiment_confidence?: number | null
           sentiment_label?: string | null
           sentiment_score?: number | null
@@ -4982,6 +4997,66 @@ export type Database = {
           },
         ]
       }
+      pipeline_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          duration_ms: number | null
+          error_details: Json | null
+          error_summary: string | null
+          id: string
+          idempotency_key: string | null
+          job_name: string | null
+          job_type: string
+          records_created: number | null
+          records_failed: number | null
+          records_ingested: number | null
+          records_processed: number | null
+          started_at: string | null
+          status: string | null
+          triggered_by: string | null
+          triggered_by_user: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_details?: Json | null
+          error_summary?: string | null
+          id?: string
+          idempotency_key?: string | null
+          job_name?: string | null
+          job_type: string
+          records_created?: number | null
+          records_failed?: number | null
+          records_ingested?: number | null
+          records_processed?: number | null
+          started_at?: string | null
+          status?: string | null
+          triggered_by?: string | null
+          triggered_by_user?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_details?: Json | null
+          error_summary?: string | null
+          id?: string
+          idempotency_key?: string | null
+          job_name?: string | null
+          job_type?: string
+          records_created?: number | null
+          records_failed?: number | null
+          records_ingested?: number | null
+          records_processed?: number | null
+          started_at?: string | null
+          status?: string | null
+          triggered_by?: string | null
+          triggered_by_user?: string | null
+        }
+        Relationships: []
+      }
       polling_alert_configs: {
         Row: {
           created_at: string
@@ -6810,6 +6885,74 @@ export type Database = {
         }
         Relationships: []
       }
+      trend_detection_config: {
+        Row: {
+          baseline_min_deviation_pct: number | null
+          baseline_window_days: number | null
+          created_at: string | null
+          evergreen_volume_override: number | null
+          id: string
+          is_global_default: boolean | null
+          min_mentions_breakthrough: number | null
+          min_mentions_to_trend: number | null
+          min_source_count: number | null
+          min_spike_ratio: number | null
+          min_velocity_score: number | null
+          organization_id: string | null
+          source_weights: Json | null
+          spike_window_hours: number | null
+          suppress_evergreen: boolean | null
+          trend_window_hours: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          baseline_min_deviation_pct?: number | null
+          baseline_window_days?: number | null
+          created_at?: string | null
+          evergreen_volume_override?: number | null
+          id?: string
+          is_global_default?: boolean | null
+          min_mentions_breakthrough?: number | null
+          min_mentions_to_trend?: number | null
+          min_source_count?: number | null
+          min_spike_ratio?: number | null
+          min_velocity_score?: number | null
+          organization_id?: string | null
+          source_weights?: Json | null
+          spike_window_hours?: number | null
+          suppress_evergreen?: boolean | null
+          trend_window_hours?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          baseline_min_deviation_pct?: number | null
+          baseline_window_days?: number | null
+          created_at?: string | null
+          evergreen_volume_override?: number | null
+          id?: string
+          is_global_default?: boolean | null
+          min_mentions_breakthrough?: number | null
+          min_mentions_to_trend?: number | null
+          min_source_count?: number | null
+          min_spike_ratio?: number | null
+          min_velocity_score?: number | null
+          organization_id?: string | null
+          source_weights?: Json | null
+          spike_window_hours?: number | null
+          suppress_evergreen?: boolean | null
+          trend_window_hours?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_detection_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trending_news_topics: {
         Row: {
           calculated_at: string | null
@@ -8009,6 +8152,38 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_backlog: {
+        Row: {
+          ingested_24h: number | null
+          needs_extraction: number | null
+          pending_count: number | null
+          pipeline: string | null
+          processed_24h: number | null
+          processed_count: number | null
+        }
+        Relationships: []
+      }
+      pipeline_health: {
+        Row: {
+          avg_duration_ms_24h: number | null
+          failures_24h: number | null
+          freshness_status: string | null
+          job_name: string | null
+          job_type: string | null
+          last_completed_at: string | null
+          last_duration_ms: number | null
+          last_error: string | null
+          last_records_created: number | null
+          last_records_processed: number | null
+          last_run_at: string | null
+          last_status: string | null
+          minutes_since_last_run: number | null
+          records_created_24h: number | null
+          runs_24h: number | null
+          successes_24h: number | null
+        }
+        Relationships: []
+      }
       profiles_secure: {
         Row: {
           created_at: string | null
@@ -8174,6 +8349,17 @@ export type Database = {
       check_contact_rate_limit: { Args: never; Returns: boolean }
       cleanup_expired_invite_codes: { Args: never; Returns: undefined }
       cleanup_old_cache: { Args: never; Returns: number }
+      complete_pipeline_run: {
+        Args: {
+          p_error_summary?: string
+          p_records_created?: number
+          p_records_failed?: number
+          p_records_processed?: number
+          p_run_id: string
+          p_status: string
+        }
+        Returns: undefined
+      }
       count_keyword_mentions: {
         Args: { search_keyword: string; time_window?: unknown }
         Returns: {
@@ -8394,6 +8580,21 @@ export type Database = {
           _failure_reason?: string
           _successful: boolean
           _user_id: string
+        }
+        Returns: string
+      }
+      log_pipeline_run: {
+        Args: {
+          p_error_details?: Json
+          p_error_summary?: string
+          p_idempotency_key?: string
+          p_job_name?: string
+          p_job_type: string
+          p_records_created?: number
+          p_records_failed?: number
+          p_records_processed?: number
+          p_status?: string
+          p_triggered_by?: string
         }
         Returns: string
       }
