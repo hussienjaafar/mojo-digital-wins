@@ -98,10 +98,10 @@ export function NewsInvestigationTable() {
     dataUpdatedAt,
   } = useInfiniteQuery({
     queryKey: ["articles-investigation", threatFilter, sentimentFilter, globalFilter, includeGoogleNews],
-    queryFn: async ({ pageParam = 0 }) => {
-      const table = includeGoogleNews ? "news_investigation_view" : "articles";
+    queryFn: async ({ pageParam = 0 }): Promise<{ articles: Article[]; nextPage: number | undefined }> => {
+      // Always query 'articles' table directly to avoid TypeScript issues with dynamic table names
       let query = supabase
-        .from(table)
+        .from("articles")
         .select("id, title, description, source_name, source_url, published_date, sentiment_label, sentiment_score, threat_level, tags, category, processing_status, ai_summary, created_at")
         .order("published_date", { ascending: false })
         .range(pageParam * PAGE_SIZE, (pageParam + 1) * PAGE_SIZE - 1);
@@ -120,7 +120,7 @@ export function NewsInvestigationTable() {
       if (error) throw error;
       
       return {
-        articles: data || [],
+        articles: (data || []) as Article[],
         nextPage: data?.length === PAGE_SIZE ? pageParam + 1 : undefined,
       };
     },

@@ -224,6 +224,8 @@ serve(async (req) => {
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - account.date_range_days);
 
+        // CRITICAL: Pass the cron secret so admin-sync-meta can authenticate
+        const cronSecretForSync = Deno.env.get('CRON_SECRET');
         const { data: syncData, error: syncError } = await supabase.functions.invoke('admin-sync-meta', {
           body: {
             organization_id: account.organization_id,
@@ -231,10 +233,9 @@ serve(async (req) => {
             end_date: endDate.toISOString().split('T')[0],
             mode: 'tiered'
           },
-          headers: { 
-            'x-admin-key': 'internal-sync-trigger',
-            'x-scheduled-job': 'true'
-          }
+          headers: cronSecretForSync 
+            ? { 'x-cron-secret': cronSecretForSync }
+            : {}
         });
 
         if (syncError) {
