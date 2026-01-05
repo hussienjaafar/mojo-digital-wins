@@ -285,8 +285,9 @@ export const ClientShell = ({
               role="banner"
             >
               <div className="max-w-[1800px] mx-auto px-3 sm:px-4 lg:px-6 py-2 sm:py-3">
-                <div className="flex items-center justify-between gap-2 sm:gap-4">
-                  {/* Left: Sidebar Trigger + Organization */}
+                {/* Two-row layout on mobile/tablet, single row on xl+ */}
+                <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between xl:gap-4">
+                  {/* Row 1: Sidebar Trigger + Logo + Organization */}
                   <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                     <SidebarTrigger
                       className="portal-icon-btn shrink-0"
@@ -331,15 +332,17 @@ export const ClientShell = ({
                     </div>
                   </div>
 
-                  {/* Right: Controls */}
-                  <ClientHeaderControls
-                    showDateControls={showDateControls}
-                    showBackToAdmin={showBackToAdmin}
-                    theme={theme}
-                    onThemeToggle={() => setTheme(theme === "dark" ? "light" : "dark")}
-                    onBackToAdmin={handleBackToAdmin}
-                    onLogout={handleLogout}
-                  />
+                  {/* Row 2 on mobile/tablet, inline on xl+: Controls */}
+                  <div className="flex items-center justify-start xl:justify-end xl:shrink-0">
+                    <ClientHeaderControls
+                      showDateControls={showDateControls}
+                      showBackToAdmin={showBackToAdmin}
+                      theme={theme}
+                      onThemeToggle={() => setTheme(theme === "dark" ? "light" : "dark")}
+                      onBackToAdmin={handleBackToAdmin}
+                      onLogout={handleLogout}
+                    />
+                  </div>
                 </div>
               </div>
             </header>
