@@ -179,7 +179,7 @@ serve(async (req) => {
       }
 
       try {
-        // Create execution record
+        // Create execution record (legacy table)
         const { data: execution } = await supabase
           .from('job_executions')
           .insert({
@@ -190,6 +190,16 @@ serve(async (req) => {
           .maybeSingle();
 
         executionId = execution?.id;
+
+        // Write heartbeat start
+        await supabase.rpc('update_pipeline_heartbeat', {
+          p_job_type: job.job_type,
+          p_status: 'running',
+          p_duration_ms: null,
+          p_error: null,
+          p_records_processed: 0,
+          p_records_created: 0,
+        });
 
         // Update job status to running
         await supabase
@@ -530,6 +540,16 @@ serve(async (req) => {
           p_error: null,
         });
 
+        // Write heartbeat success
+        await supabase.rpc('update_pipeline_heartbeat', {
+          p_job_type: job.job_type,
+          p_status: 'success',
+          p_duration_ms: duration,
+          p_error: null,
+          p_records_processed: itemsProcessed,
+          p_records_created: itemsCreated,
+        });
+
         results.push({
           job_name: job.job_name,
           job_type: job.job_type,
@@ -564,6 +584,16 @@ serve(async (req) => {
           p_status: 'failed',
           p_duration_ms: duration,
           p_error: jobError.message,
+        });
+
+        // Write heartbeat failure
+        await supabase.rpc('update_pipeline_heartbeat', {
+          p_job_type: job.job_type,
+          p_status: 'failed',
+          p_duration_ms: duration,
+          p_error: jobError.message,
+          p_records_processed: 0,
+          p_records_created: 0,
         });
 
         // Log job failure
