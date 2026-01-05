@@ -29,6 +29,7 @@ import { TrendExplainability } from './TrendExplainability';
 import { cn } from '@/lib/utils';
 import type { UnifiedTrend } from '@/hooks/useUnifiedTrends';
 import { formatDistanceToNow } from 'date-fns';
+import { ProvenancePanel, RelevanceExplanation, SuggestedActionsPanel } from '@/components/admin/v3';
 
 interface ClusterDrilldownViewProps {
   clusterId: string; // This is the normalized_name (cluster_title lowercased)
@@ -78,10 +79,35 @@ interface ArticleData {
   relevance_category: string | null;
 }
 
+interface SuggestedActionCard {
+  id: string;
+  type: 'response' | 'comms' | 'compliance' | 'fundraising';
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  trendId?: string;
+  trendName?: string;
+}
+
+function mapActionType(rawType: string | null): SuggestedActionCard['type'] {
+  const normalized = (rawType || '').toLowerCase();
+  if (normalized.includes('fund')) return 'fundraising';
+  if (normalized.includes('compliance')) return 'compliance';
+  if (normalized.includes('sms') || normalized.includes('email') || normalized.includes('social')) return 'comms';
+  return 'response';
+}
+
+function mapPriority(score?: number | null): SuggestedActionCard['priority'] {
+  if (score && score >= 70) return 'high';
+  if (score && score >= 40) return 'medium';
+  return 'low';
+}
+
 async function fetchClusterData(clusterId: string): Promise<{
   cluster: ClusterData | null;
   articles: ArticleData[];
   unifiedTrend: UnifiedTrend | null;
+  suggestedActions: SuggestedActionCard[];
 }> {
   // Fetch cluster by normalized title
   const { data: clusterData, error: clusterError } = await supabase
@@ -107,8 +133,33 @@ async function fetchClusterData(clusterId: string): Promise<{
     console.error('Error fetching articles:', articlesError);
   }
 
-  // Build unified trend object for TrendExplainability
   const cluster = clusterData as ClusterData | null;
+  let suggestedActions: SuggestedActionCard[] = [];
+
+  if (cluster) {
+    const { data: actionsData, error: actionsError } = await supabase
+      .from('suggested_actions')
+      .select('id, action_type, suggested_copy, value_prop, urgency_score, decision_score, entity_name, estimated_impact')
+      .ilike('entity_name', `%${cluster.cluster_title}%`)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (actionsError) {
+      console.error('Error fetching suggested actions:', actionsError);
+    } else {
+      suggestedActions = (actionsData || []).map((action: any) => ({
+        id: action.id,
+        type: mapActionType(action.action_type),
+        title: action.value_prop || action.entity_name || 'Suggested action',
+        description: action.suggested_copy || action.estimated_impact || 'No description available',
+        priority: mapPriority(action.decision_score ?? action.urgency_score),
+        trendId: cluster.cluster_title.toLowerCase(),
+        trendName: cluster.cluster_title,
+      }));
+    }
+  }
+
+  // Build unified trend object for TrendExplainability
   let unifiedTrend: UnifiedTrend | null = null;
   
   if (cluster) {
@@ -159,6 +210,7 @@ async function fetchClusterData(clusterId: string): Promise<{
     cluster,
     articles: (articlesData || []) as ArticleData[],
     unifiedTrend,
+    suggestedActions,
   };
 }
 
@@ -202,6 +254,7 @@ export function ClusterDrilldownView({ clusterId, onBack }: ClusterDrilldownView
   const cluster = data?.cluster;
   const articles = data?.articles || [];
   const unifiedTrend = data?.unifiedTrend;
+  const suggestedActions = data?.suggestedActions || [];
 
   const stageConfig = STAGE_CONFIG[(cluster?.trend_stage as keyof typeof STAGE_CONFIG) || 'stable'];
   const StageIcon = stageConfig.icon;
@@ -218,6 +271,23 @@ export function ClusterDrilldownView({ clusterId, onBack }: ClusterDrilldownView
     { name: 'Reddit', count: cluster?.reddit_count || 0, color: 'bg-orange-500' },
     { name: 'Bluesky', count: cluster?.bluesky_count || 0, color: 'bg-sky-500' },
   ].filter(s => s.count > 0);
+
+  const issueAreas = useMemo(() => {
+    const areas = articles
+      .map((article) => article.relevance_category)
+      .filter((category): category is string => !!category);
+    return Array.from(new Set(areas));
+  }, [articles]);
+
+  const citations = useMemo(() => {
+    return articles.slice(0, 5).map((article) => ({
+      title: article.title,
+      source: article.source_name,
+      url: article.source_url,
+      sourceType: 'news' as const,
+      publishedAt: article.published_date,
+    }));
+  }, [articles]);
 
   if (isLoading) {
     return (
@@ -362,6 +432,29 @@ export function ClusterDrilldownView({ clusterId, onBack }: ClusterDrilldownView
               {unifiedTrend && (
                 <TrendExplainability trend={unifiedTrend} defaultExpanded />
               )}
+
+              <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <RelevanceExplanation
+                  data={{
+                    issueAreas,
+                    citations,
+                  }}
+                />
+                <ProvenancePanel
+                  distribution={{
+                    rss: cluster.rss_count || 0,
+                    google_news: cluster.google_news_count || 0,
+                    bluesky: cluster.bluesky_count || 0,
+                  }}
+                  topSources={citations}
+                  timeWindow="last 24 hours"
+                  totalMentions={cluster.mentions_last_24h}
+                />
+              </div>
+
+              <div className="mt-6">
+                <SuggestedActionsPanel actions={suggestedActions} />
+              </div>
 
               {/* Related Topics */}
               {cluster.related_topics && cluster.related_topics.length > 0 && (

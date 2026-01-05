@@ -196,10 +196,11 @@ export function calculateTrendConfidence(trend: {
   matchesWatchlist?: boolean;
   cross_source_score?: number;
 }): { score: number; factors: Partial<ConfidenceFactors> } {
+  const sourceCount = trend.source_count || 0;
   const factors: Partial<ConfidenceFactors> = {
-    sourceCount: trend.source_count || 1,
+    sourceCount,
     dataRecency: 'recent', // Trends are always recent by definition
-    crossSourceAgreement: (trend.cross_source_score || 0) > 50,
+    crossSourceAgreement: sourceCount >= 2,
     entityMatchQuality: trend.matchesWatchlist ? 'exact' : 'none',
     velocityConfidence: (trend.velocity || 0) > 0,
   };

@@ -53,7 +53,7 @@ export function TrendFeedback({
   size = 'sm',
   className 
 }: TrendFeedbackProps) {
-  const { submitFeedback, getFeedbackForTrend, isSubmitting: hookSubmitting } = useTrendFeedback();
+  const { submitFeedback, deleteFeedback, getFeedbackForTrend, isSubmitting: hookSubmitting } = useTrendFeedback();
   const existingFeedback = getFeedbackForTrend(trendId);
   const [feedback, setFeedback] = useState<FeedbackType | null>(initialFeedback || existingFeedback);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,6 +83,12 @@ export function TrendFeedback({
         const config = FEEDBACK_CONFIG[newFeedback];
         toast.success(`Marked as ${config.label.toLowerCase()}`, {
           description: `"${trendName}" feedback saved`,
+        });
+      } else {
+        deleteFeedback(trendId);
+        onFeedback?.(trendId, type);
+        toast.info("Feedback cleared", {
+          description: `"${trendName}" feedback removed`,
         });
       }
     } catch (error) {

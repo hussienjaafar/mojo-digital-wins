@@ -97,10 +97,11 @@ export function NewsInvestigationTable() {
     refetch,
     dataUpdatedAt,
   } = useInfiniteQuery({
-    queryKey: ["articles-investigation", threatFilter, sentimentFilter, globalFilter],
+    queryKey: ["articles-investigation", threatFilter, sentimentFilter, globalFilter, includeGoogleNews],
     queryFn: async ({ pageParam = 0 }) => {
+      const table = includeGoogleNews ? "news_investigation_view" : "articles";
       let query = supabase
-        .from("articles")
+        .from(table)
         .select("id, title, description, source_name, source_url, published_date, sentiment_label, sentiment_score, threat_level, tags, category, processing_status, ai_summary, created_at")
         .order("published_date", { ascending: false })
         .range(pageParam * PAGE_SIZE, (pageParam + 1) * PAGE_SIZE - 1);

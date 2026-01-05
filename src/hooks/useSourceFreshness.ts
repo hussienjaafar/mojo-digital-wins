@@ -4,6 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 export type SourceType = 'rss' | 'google_news' | 'bluesky';
 export type FreshnessStatus = 'live' | 'stale' | 'critical' | 'unknown';
 
+const PIPELINE_JOB_TYPES: Record<SourceType, string[]> = {
+  rss: ['fetch_rss', 'fetch_rss_feeds'],
+  google_news: ['fetch_google_news'],
+  bluesky: ['bluesky_stream', 'collect_bluesky'],
+};
+
 // SLA thresholds in minutes for each source type
 const SOURCE_SLA_MINUTES: Record<SourceType, { stale: number; critical: number }> = {
   rss: { stale: 60, critical: 180 },           // RSS: stale after 1h, critical after 3h
@@ -42,6 +48,18 @@ function getStatus(ageMinutes: number, sla: { stale: number; critical: number })
   if (ageMinutes <= sla.stale) return 'live';
   if (ageMinutes <= sla.critical) return 'stale';
   return 'critical';
+}
+
+function getLatestPipelineRun(
+  pipelineMap: Map<string, { lastRun: Date | null; status: string }>,
+  jobTypes: string[]
+): Date | null {
+  const runs = jobTypes
+    .map((jobType) => pipelineMap.get(jobType)?.lastRun || null)
+    .filter((date): date is Date => !!date)
+    .sort((a, b) => b.getTime() - a.getTime());
+
+  return runs[0] || null;
 }
 
 async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
@@ -98,7 +116,11 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
     supabase
       .from('scheduled_jobs')
       .select('job_type, last_run_at, last_run_status')
-      .in('job_type', ['fetch_rss_feeds', 'fetch_google_news', 'bluesky_stream']),
+      .in('job_type', [
+        ...PIPELINE_JOB_TYPES.rss,
+        ...PIPELINE_JOB_TYPES.google_news,
+        ...PIPELINE_JOB_TYPES.bluesky,
+      ]),
   ]);
 
   // Parse pipeline data
@@ -114,13 +136,13 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
   const rssLatestData = rssLatestResult.data?.published_date 
     ? new Date(rssLatestResult.data.published_date) 
     : null;
-  const rssPipeline = pipelineMap.get('fetch_rss_feeds');
+  const rssPipelineLastRun = getLatestPipelineRun(pipelineMap, PIPELINE_JOB_TYPES.rss);
   const rssAgeMinutes = getAgeMinutes(rssLatestData);
   const rssRecord: SourceFreshnessRecord = {
     source: 'rss',
     label: 'RSS Feeds',
     latestDataAt: rssLatestData,
-    pipelineLastRun: rssPipeline?.lastRun || null,
+    pipelineLastRun: rssPipelineLastRun,
     ageMinutes: rssAgeMinutes,
     status: getStatus(rssAgeMinutes, SOURCE_SLA_MINUTES.rss),
     articleCount24h: rssCountResult.count || 0,
@@ -131,13 +153,13 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
   const googleNewsLatestData = googleNewsLatestResult.data?.published_at 
     ? new Date(googleNewsLatestResult.data.published_at) 
     : null;
-  const googleNewsPipeline = pipelineMap.get('fetch_google_news');
+  const googleNewsPipelineLastRun = getLatestPipelineRun(pipelineMap, PIPELINE_JOB_TYPES.google_news);
   const googleNewsAgeMinutes = getAgeMinutes(googleNewsLatestData);
   const googleNewsRecord: SourceFreshnessRecord = {
     source: 'google_news',
     label: 'Google News',
     latestDataAt: googleNewsLatestData,
-    pipelineLastRun: googleNewsPipeline?.lastRun || null,
+    pipelineLastRun: googleNewsPipelineLastRun,
     ageMinutes: googleNewsAgeMinutes,
     status: getStatus(googleNewsAgeMinutes, SOURCE_SLA_MINUTES.google_news),
     articleCount24h: googleNewsCountResult.count || 0,
@@ -148,13 +170,13 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
   const blueskyLatestData = blueskyLatestResult.data?.created_at 
     ? new Date(blueskyLatestResult.data.created_at) 
     : null;
-  const blueskyPipeline = pipelineMap.get('bluesky_stream');
+  const blueskyPipelineLastRun = getLatestPipelineRun(pipelineMap, PIPELINE_JOB_TYPES.bluesky);
   const blueskyAgeMinutes = getAgeMinutes(blueskyLatestData);
   const blueskyRecord: SourceFreshnessRecord = {
     source: 'bluesky',
     label: 'Bluesky',
     latestDataAt: blueskyLatestData,
-    pipelineLastRun: blueskyPipeline?.lastRun || null,
+    pipelineLastRun: blueskyPipelineLastRun,
     ageMinutes: blueskyAgeMinutes,
     status: getStatus(blueskyAgeMinutes, SOURCE_SLA_MINUTES.bluesky),
     articleCount24h: blueskyCountResult.count || 0,
