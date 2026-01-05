@@ -273,8 +273,8 @@ export const ClientShell = ({
       <SkipNavigation />
       <SidebarProvider defaultOpen={!isMobile}>
         <div className="portal-theme min-h-screen w-full flex portal-bg">
+          <div id="portal-floating-root" className="absolute left-0 top-0" />
           <AppSidebar organizationId={organization.id} />
-
           <div className="flex-1 flex flex-col min-w-0">
             {/* Impersonation Banner */}
             <ImpersonationBanner />
