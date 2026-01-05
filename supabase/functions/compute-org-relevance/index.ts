@@ -3,8 +3,56 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
+
+// ============================================================================
+// Auth Validation (from shared security)
+// ============================================================================
+
+function validateCronSecret(req: Request): boolean {
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  if (!cronSecret) {
+    console.warn('CRON_SECRET not configured - allowing request');
+    return true;
+  }
+  const providedSecret = req.headers.get('x-cron-secret');
+  return providedSecret === cronSecret;
+}
+
+async function validateAuth(req: Request, supabase: any): Promise<{ user: any; isAdmin: boolean } | null> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) return null;
+
+  const { data: { user }, error } = await supabase.auth.getUser(
+    authHeader.replace('Bearer ', '')
+  );
+
+  if (error || !user) return null;
+
+  const { data: roles } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id);
+
+  const isAdmin = roles?.some((r: any) => r.role === 'admin') || false;
+  return { user, isAdmin };
+}
+
+async function validateCronOrAdmin(req: Request, supabase: any): Promise<{ valid: boolean; isAdmin?: boolean; user?: any }> {
+  if (validateCronSecret(req)) {
+    console.log('[compute-org-relevance] Authorized via cron');
+    return { valid: true };
+  }
+
+  const auth = await validateAuth(req, supabase);
+  if (auth?.isAdmin) {
+    console.log('[compute-org-relevance] Authorized via admin JWT');
+    return { valid: true, isAdmin: true, user: auth.user };
+  }
+
+  return { valid: false };
+}
 
 // ============================================================================
 // Types
@@ -46,20 +94,12 @@ interface TrendEvent {
   current_1h?: number;
   current_6h?: number;
   current_24h?: number;
-}
-
-interface TrendCluster {
-  id: string;
-  cluster_title: string;
-  mentions_last_24h?: number;
-  velocity_score?: number;
-  sentiment_score?: number;
+  source_count?: number;
 }
 
 interface OrgRelevanceScore {
   organization_id: string;
   trend_event_id?: string;
-  trend_cluster_id?: string;
   trend_key: string;
   relevance_score: number;
   urgency_score: number;
@@ -103,7 +143,6 @@ function fuzzyMatch(a: string, b: string): number {
   if (normA === normB) return 1.0;
   if (normA.includes(normB) || normB.includes(normA)) return 0.85;
   
-  // Simple token overlap
   const tokensA = new Set(normA.split(' ').filter(t => t.length > 2));
   const tokensB = new Set(normB.split(' ').filter(t => t.length > 2));
   
@@ -124,6 +163,8 @@ function fuzzyMatch(a: string, b: string): number {
 function calculateRelevance(
   trendTitle: string,
   trendVelocity: number,
+  trendIsBreaking: boolean,
+  trendSourceCount: number,
   profile: OrgProfile | null,
   interestTopics: InterestTopic[],
   interestEntities: InterestEntity[]
@@ -221,7 +262,6 @@ function calculateRelevance(
 
   // 5. Stakeholders, allies, opponents matching (10 points each)
   if (profile) {
-    // Stakeholders
     const matchedStakeholder = (profile.stakeholders || []).find(s => 
       textContains(trendTitle, s)
     );
@@ -233,7 +273,6 @@ function calculateRelevance(
       result.explanation.reasons.push(`Stakeholder: "${matchedStakeholder}" (+10)`);
     }
 
-    // Allies (positive sentiment bonus)
     const matchedAlly = (profile.allies || []).find(a => textContains(trendTitle, a));
     if (matchedAlly) {
       score += 10;
@@ -243,7 +282,6 @@ function calculateRelevance(
       result.explanation.reasons.push(`Allied org: "${matchedAlly}" (+10)`);
     }
 
-    // Opponents (important to track)
     const matchedOpponent = (profile.opponents || []).find(o => textContains(trendTitle, o));
     if (matchedOpponent) {
       score += 12;
@@ -277,8 +315,22 @@ function calculateRelevance(
     result.explanation.reasons.push(`High velocity: ${trendVelocity.toFixed(0)}% (+${velocityBonus})`);
   }
 
-  // Calculate urgency score based on velocity
-  result.urgency_score = Math.min(100, Math.round(trendVelocity / 2));
+  // 8. Breaking news bonus (10 points)
+  if (trendIsBreaking) {
+    score += 10;
+    result.explanation.score_breakdown.breaking = 10;
+    result.explanation.reasons.push(`Breaking news (+10)`);
+  }
+
+  // 9. Multi-source bonus (5 points if >= 3 sources)
+  if (trendSourceCount >= 3) {
+    score += 5;
+    result.explanation.score_breakdown.multi_source = 5;
+    result.explanation.reasons.push(`Multi-source: ${trendSourceCount} sources (+5)`);
+  }
+
+  // Calculate urgency score based on velocity + breaking
+  result.urgency_score = Math.min(100, Math.round(trendVelocity / 2) + (trendIsBreaking ? 25 : 0));
 
   // Final score capping
   result.relevance_score = Math.min(100, Math.round(score));
@@ -313,7 +365,16 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('🎯 Starting org relevance computation...');
+    // Auth check: require cron or admin
+    const authResult = await validateCronOrAdmin(req, supabase);
+    if (!authResult.valid) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - requires cron secret or admin role' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('🎯 Starting org relevance computation (trend_events only)...');
 
     // Get active organizations with profiles
     const { data: orgs, error: orgsError } = await supabase
@@ -360,51 +421,17 @@ serve(async (req) => {
       entitiesMap.get(e.organization_id)!.push(e as InterestEntity);
     }
 
-    // Get current trends (from trend_events if available, fallback to trend_clusters)
+    // Get current trends from trend_events ONLY (no more trend_clusters fallback)
     const { data: trendEvents } = await supabase
       .from('trend_events')
-      .select('id, event_key, event_title, velocity, is_trending, is_breaking, confidence_score, current_1h, current_6h, current_24h')
+      .select('id, event_key, event_title, velocity, is_trending, is_breaking, confidence_score, current_1h, current_6h, current_24h, source_count')
       .eq('is_trending', true)
       .gte('last_seen_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
       .order('velocity', { ascending: false })
-      .limit(100);
+      .limit(150);
 
-    // Also get trend clusters as fallback
-    const { data: trendClusters } = await supabase
-      .from('trend_clusters')
-      .select('id, cluster_title, mentions_last_24h, velocity_score, sentiment_score')
-      .gte('mentions_last_24h', 3)
-      .order('mentions_last_24h', { ascending: false })
-      .limit(100);
-
-    const trends: Array<{ id: string; title: string; velocity: number; source: 'event' | 'cluster' }> = [];
-    
-    // Prefer trend_events
-    for (const te of trendEvents || []) {
-      trends.push({
-        id: te.id,
-        title: te.event_title,
-        velocity: te.velocity || 0,
-        source: 'event',
-      });
-    }
-
-    // Add clusters not already covered
-    const coveredTitles = new Set(trends.map(t => normalizeText(t.title)));
-    for (const tc of trendClusters || []) {
-      const normTitle = normalizeText(tc.cluster_title);
-      if (!coveredTitles.has(normTitle)) {
-        trends.push({
-          id: tc.id,
-          title: tc.cluster_title,
-          velocity: tc.velocity_score || 0,
-          source: 'cluster',
-        });
-        coveredTitles.add(normTitle);
-      }
-    }
-
-    console.log(`📈 Scoring ${trends.length} trends for ${orgs?.length || 0} orgs`);
+    const trends: TrendEvent[] = trendEvents || [];
+    console.log(`📈 Scoring ${trends.length} trend_events for ${orgs?.length || 0} orgs`);
 
     // Compute relevance for each org x trend
     const scoresToUpsert: any[] = [];
@@ -417,8 +444,10 @@ serve(async (req) => {
 
       for (const trend of trends) {
         const relevance = calculateRelevance(
-          trend.title,
-          trend.velocity,
+          trend.event_title,
+          trend.velocity || 0,
+          trend.is_breaking || false,
+          trend.source_count || 1,
           profile ? { ...profile, organization_id: org.id } : { organization_id: org.id },
           interestTopics,
           interestEntities
@@ -428,8 +457,8 @@ serve(async (req) => {
         if (relevance.relevance_score >= 10 || relevance.is_blocked) {
           scoresToUpsert.push({
             organization_id: org.id,
-            trend_event_id: trend.source === 'event' ? trend.id : null,
-            trend_cluster_id: trend.source === 'cluster' ? trend.id : null,
+            trend_event_id: trend.id,
+            trend_cluster_id: null, // No longer using clusters
             trend_key: relevance.trend_key,
             relevance_score: relevance.relevance_score,
             urgency_score: relevance.urgency_score,
@@ -480,7 +509,7 @@ serve(async (req) => {
       console.warn('Cleanup error:', cleanupError);
     }
 
-    console.log('✅ Org relevance computation complete');
+    console.log('✅ Org relevance computation complete (trend_events only)');
 
     return new Response(
       JSON.stringify({ 

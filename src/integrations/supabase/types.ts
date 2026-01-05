@@ -1919,6 +1919,7 @@ export type Database = {
           sample_sources: Json | null
           severity: string | null
           suggested_action: string | null
+          trend_event_id: string | null
           triggered_at: string | null
           velocity: number | null
           watchlist_id: string | null
@@ -1936,6 +1937,7 @@ export type Database = {
           sample_sources?: Json | null
           severity?: string | null
           suggested_action?: string | null
+          trend_event_id?: string | null
           triggered_at?: string | null
           velocity?: number | null
           watchlist_id?: string | null
@@ -1953,6 +1955,7 @@ export type Database = {
           sample_sources?: Json | null
           severity?: string | null
           suggested_action?: string | null
+          trend_event_id?: string | null
           triggered_at?: string | null
           velocity?: number | null
           watchlist_id?: string | null
@@ -1963,6 +1966,20 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_entity_alerts_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_entity_alerts_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events_active"
             referencedColumns: ["id"]
           },
           {

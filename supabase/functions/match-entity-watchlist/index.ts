@@ -3,14 +3,61 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
+
+// ============================================================================
+// Auth Validation (from shared security)
+// ============================================================================
+
+function validateCronSecret(req: Request): boolean {
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  if (!cronSecret) {
+    console.warn('CRON_SECRET not configured - allowing request');
+    return true;
+  }
+  const providedSecret = req.headers.get('x-cron-secret');
+  return providedSecret === cronSecret;
+}
+
+async function validateAuth(req: Request, supabase: any): Promise<{ user: any; isAdmin: boolean } | null> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) return null;
+
+  const { data: { user }, error } = await supabase.auth.getUser(
+    authHeader.replace('Bearer ', '')
+  );
+
+  if (error || !user) return null;
+
+  const { data: roles } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id);
+
+  const isAdmin = roles?.some((r: any) => r.role === 'admin') || false;
+  return { user, isAdmin };
+}
+
+async function validateCronOrAdmin(req: Request, supabase: any): Promise<{ valid: boolean; isAdmin?: boolean; user?: any }> {
+  if (validateCronSecret(req)) {
+    console.log('[match-entity-watchlist] Authorized via cron');
+    return { valid: true };
+  }
+
+  const auth = await validateAuth(req, supabase);
+  if (auth?.isAdmin) {
+    console.log('[match-entity-watchlist] Authorized via admin JWT');
+    return { valid: true, isAdmin: true, user: auth.user };
+  }
+
+  return { valid: false };
+}
 
 // ============================================================================
 // Matching Utilities
 // ============================================================================
 
-// Levenshtein distance for fuzzy matching
 function levenshteinDistance(str1: string, str2: string): number {
   const m = str1.length;
   const n = str2.length;
@@ -31,7 +78,6 @@ function levenshteinDistance(str1: string, str2: string): number {
   return dp[m][n];
 }
 
-// Calculate string similarity (0-1)
 function stringSimilarity(str1: string, str2: string): number {
   const s1 = str1.toLowerCase().trim();
   const s2 = str2.toLowerCase().trim();
@@ -45,7 +91,6 @@ function stringSimilarity(str1: string, str2: string): number {
   return 1 - (distance / maxLen);
 }
 
-// Normalize text for matching
 function normalizeText(text: string): string {
   return text
     .toLowerCase()
@@ -54,7 +99,6 @@ function normalizeText(text: string): string {
     .trim();
 }
 
-// Common synonyms for political/social topics
 const SYNONYM_MAP: Record<string, string[]> = {
   'immigration': ['migrants', 'immigrants', 'border', 'asylum', 'deportation', 'ice', 'dhs'],
   'healthcare': ['health care', 'medical', 'medicare', 'medicaid', 'aca', 'obamacare'],
@@ -68,7 +112,6 @@ const SYNONYM_MAP: Record<string, string[]> = {
   'economy': ['jobs', 'unemployment', 'inflation', 'wages', 'labor', 'workers'],
 };
 
-// Expand entity name with synonyms
 function expandWithSynonyms(entityName: string): string[] {
   const lower = entityName.toLowerCase();
   const expanded = [entityName];
@@ -114,7 +157,6 @@ const ENTITY_TYPE_CONTEXTS: Record<string, EntityTypeContext> = {
   },
 };
 
-// Check if context matches entity type expectations
 function validateEntityTypeContext(
   entityType: string | null,
   contentText: string,
@@ -127,16 +169,12 @@ function validateEntityTypeContext(
   const context = ENTITY_TYPE_CONTEXTS[entityType];
   const lowerContent = contentText.toLowerCase();
   
-  // Check for exclude terms (should NOT be present for person entities)
   const hasExcludeTerm = context.excludeTerms.some(term => lowerContent.includes(term));
   if (hasExcludeTerm) {
     return { isValid: false, confidence: 0.2 };
   }
   
-  // Check for expected context
   const hasExpectedContext = context.expectedTerms.some(term => lowerContent.includes(term));
-  
-  // Check custom context keywords
   const hasCustomContext = contextKeywords.length > 0 && 
     contextKeywords.some(kw => lowerContent.includes(kw.toLowerCase()));
   
@@ -147,7 +185,6 @@ function validateEntityTypeContext(
   return { isValid: true, confidence: 0.6 };
 }
 
-// Check geographic context match
 function validateGeoContext(
   geoFocus: string[] = [],
   contentText: string
@@ -163,7 +200,6 @@ function validateGeoContext(
     }
   }
   
-  // No geo match found - not necessarily invalid, just lower confidence
   return { matches: false, matchedGeo: null };
 }
 
@@ -186,7 +222,6 @@ function findAliasMatch(
 ): AliasMatch | null {
   const normalizedSearch = normalizeText(searchTerm);
   
-  // Check exact match with entity name
   if (normalizeText(entityName) === normalizedSearch) {
     return {
       matchedAlias: entityName,
@@ -196,7 +231,6 @@ function findAliasMatch(
     };
   }
   
-  // Check aliases array from watchlist
   for (const alias of aliases) {
     if (normalizeText(alias) === normalizedSearch) {
       return {
@@ -208,7 +242,6 @@ function findAliasMatch(
     }
   }
   
-  // Check entity_aliases table
   const dbAlias = entityAliases.get(normalizedSearch);
   if (dbAlias && normalizeText(dbAlias.canonical) === normalizeText(entityName)) {
     return {
@@ -219,7 +252,6 @@ function findAliasMatch(
     };
   }
   
-  // Fuzzy matching with synonyms
   const expandedTerms = [entityName, ...aliases, ...expandWithSynonyms(entityName)];
   let bestMatch: AliasMatch | null = null;
   
@@ -287,7 +319,6 @@ function calculateActionableScore(
 
   let totalScore = Object.values(breakdown).reduce((a, b) => a + b, 0);
   
-  // Breakthrough bonus
   if (isBreakthrough) {
     totalScore = Math.min(100, totalScore * 1.2);
   }
@@ -309,14 +340,22 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('🔍 Starting enhanced watchlist matching with alias/context gating...');
+    // Auth check: require cron or admin
+    const authResult = await validateCronOrAdmin(req, supabase);
+    if (!authResult.valid) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - requires cron secret or admin role' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Fetch data in parallel
+    console.log('🔍 Starting watchlist matching with trend_events...');
+
+    // Fetch data in parallel - NOW USING trend_events + trend_evidence
     const [
       watchlistResult,
-      entityTrendsResult,
-      unifiedTrendsResult,
-      recentMentionsResult,
+      trendEventsResult,
+      trendEvidenceResult,
       recentAlertsResult,
       entityAliasesResult,
     ] = await Promise.all([
@@ -324,22 +363,21 @@ serve(async (req) => {
         .from('entity_watchlist')
         .select('id, organization_id, entity_name, entity_type, aliases, alert_threshold, sentiment_alert, geo_focus, context_keywords, disambiguation_hint')
         .eq('is_active', true),
+      // Use trend_events instead of entity_trends/mv_unified_trends
       supabase
-        .from('entity_trends')
-        .select('*')
-        .or('is_trending.eq.true,velocity.gt.30')
-        .order('velocity', { ascending: false }),
+        .from('trend_events')
+        .select('id, event_key, event_title, velocity, is_trending, is_breaking, confidence_score, current_1h, current_6h, current_24h, source_count, last_seen_at')
+        .eq('is_trending', true)
+        .gte('last_seen_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString())
+        .order('velocity', { ascending: false })
+        .limit(200),
+      // Get evidence for active trends
       supabase
-        .from('mv_unified_trends')
-        .select('*')
-        .order('unified_score', { ascending: false })
-        .limit(100),
-      supabase
-        .from('entity_mentions')
-        .select('entity_name, source_type, source_title, source_url, mentioned_at')
-        .gte('mentioned_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .order('mentioned_at', { ascending: false })
-        .limit(500),
+        .from('trend_evidence')
+        .select('id, event_id, source_type, source_url, source_title, source_domain, published_at, canonical_url, content_hash, sentiment_label')
+        .gte('published_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order('published_at', { ascending: false })
+        .limit(1000),
       supabase
         .from('client_entity_alerts')
         .select('organization_id, entity_name, alert_type')
@@ -354,14 +392,13 @@ serve(async (req) => {
     if (watchlistResult.error) throw watchlistResult.error;
 
     const watchlistItems = watchlistResult.data || [];
-    const entityTrends = entityTrendsResult.data || [];
-    const unifiedTrends = unifiedTrendsResult.data || [];
-    const recentMentions = recentMentionsResult.data || [];
+    const trendEvents = trendEventsResult.data || [];
+    const trendEvidence = trendEvidenceResult.data || [];
     const recentAlerts = recentAlertsResult.data || [];
     const entityAliases = entityAliasesResult.data || [];
 
     console.log(`📋 Processing ${watchlistItems.length} watchlist items`);
-    console.log(`📊 ${entityTrends.length} entity trends, ${unifiedTrends.length} unified trends`);
+    console.log(`📊 ${trendEvents.length} trend events, ${trendEvidence.length} evidence items`);
     console.log(`🔗 ${entityAliases.length} entity aliases loaded`);
 
     // Build alias lookup map
@@ -373,13 +410,14 @@ serve(async (req) => {
       });
     }
 
-    // Build mentions by entity map
-    const mentionsByEntity = new Map<string, any[]>();
-    for (const mention of recentMentions) {
-      if (!mention.entity_name) continue;
-      const key = mention.entity_name.toLowerCase();
-      if (!mentionsByEntity.has(key)) mentionsByEntity.set(key, []);
-      mentionsByEntity.get(key)!.push(mention);
+    // Build evidence by event_id map
+    const evidenceByEvent = new Map<string, any[]>();
+    for (const evidence of trendEvidence) {
+      if (!evidence.event_id) continue;
+      if (!evidenceByEvent.has(evidence.event_id)) {
+        evidenceByEvent.set(evidence.event_id, []);
+      }
+      evidenceByEvent.get(evidence.event_id)!.push(evidence);
     }
 
     // Build recent alerts set
@@ -399,13 +437,13 @@ serve(async (req) => {
         continue;
       }
 
-      // Match against entity_trends
-      for (const trend of entityTrends) {
-        if (!trend.entity_name) continue;
+      // Match against trend_events
+      for (const event of trendEvents) {
+        if (!event.event_title) continue;
         
-        // Try alias matching first
+        // Try alias matching against event title
         const aliasMatch = findAliasMatch(
-          trend.entity_name,
+          event.event_title,
           watchItem.entity_name,
           watchItem.aliases || [],
           aliasMap
@@ -413,8 +451,12 @@ serve(async (req) => {
         
         if (!aliasMatch || aliasMatch.confidence < SIMILARITY_THRESHOLD) continue;
         
+        // Get evidence for this event
+        const eventEvidence = evidenceByEvent.get(event.id) || [];
+        const evidenceText = eventEvidence.map(e => e.source_title || '').join(' ');
+        
         // Context gating - validate entity type
-        const trendContent = trend.entity_name + ' ' + (trend.sample_sources?.join(' ') || '');
+        const trendContent = event.event_title + ' ' + evidenceText;
         const typeContext = validateEntityTypeContext(
           watchItem.entity_type,
           trendContent,
@@ -436,14 +478,22 @@ serve(async (req) => {
         const combinedConfidence = aliasMatch.confidence * typeContext.confidence * 
           (geoContext.matches ? 1.0 : 0.8);
 
+        // Calculate sentiment change from evidence
+        const sentimentScores: number[] = eventEvidence
+          .filter(e => e.sentiment_label)
+          .map(e => e.sentiment_label === 'positive' ? 0.5 : e.sentiment_label === 'negative' ? -0.5 : 0);
+        const avgSentiment = sentimentScores.length > 0 
+          ? sentimentScores.reduce((a: number, b: number) => a + b, 0) / sentimentScores.length 
+          : 0;
+
         const { score, breakdown } = calculateActionableScore(
-          trend.velocity || 0,
-          trend.sentiment_change || 0,
-          trend.mentions_24h || 0,
+          event.velocity || 0,
+          avgSentiment,
+          event.current_24h || 0,
           aliasMatch.confidence,
           watchItem.entity_type || 'topic',
           typeContext.confidence,
-          false
+          event.is_breaking || false
         );
 
         if (score >= (watchItem.alert_threshold || 50)) {
@@ -454,29 +504,33 @@ serve(async (req) => {
 
           // Map to valid alert types
           let alertType = 'spike';
-          if (trend.velocity > 200) alertType = 'trending_spike';
-          else if (Math.abs(trend.sentiment_change || 0) > 0.3) alertType = 'sentiment_shift';
-          else if (trend.is_trending && trend.velocity > 100) alertType = 'breaking';
+          if (event.is_breaking) alertType = 'breaking';
+          else if (event.velocity > 200) alertType = 'trending_spike';
+          else if (Math.abs(avgSentiment) > 0.3) alertType = 'sentiment_shift';
 
           const alertKey = `${watchItem.organization_id}-${watchItem.entity_name.toLowerCase()}-${alertType}`;
           if (recentAlertKeys.has(alertKey)) continue;
 
-          const sources = mentionsByEntity.get(trend.entity_name.toLowerCase())?.slice(0, 3) || [];
-          const sampleSources = sources.map(s => ({
-            type: s.source_type,
-            title: s.source_title,
-            url: s.source_url,
+          // Build sample sources from evidence
+          const sampleSources = eventEvidence.slice(0, 3).map(e => ({
+            type: e.source_type,
+            title: e.source_title,
+            url: e.source_url || e.canonical_url,
+            domain: e.source_domain,
+            content_hash: e.content_hash,
           }));
 
           // Enhanced suggested action with context
           let suggestedAction = '';
-          if (alertType === 'trending_spike') {
-            suggestedAction = `${watchItem.entity_name} is trending with ${trend.velocity?.toFixed(0)}% velocity. Consider capitalizing on this momentum.`;
+          if (alertType === 'breaking') {
+            suggestedAction = `🚨 BREAKING: ${watchItem.entity_name} is in breaking news with ${event.source_count || 1} sources. Immediate attention recommended.`;
+          } else if (alertType === 'trending_spike') {
+            suggestedAction = `${watchItem.entity_name} is trending with ${event.velocity?.toFixed(0)}% velocity. Consider capitalizing on this momentum.`;
           } else if (alertType === 'sentiment_shift') {
-            const direction = (trend.sentiment_change || 0) > 0 ? 'positive' : 'negative';
+            const direction = avgSentiment > 0 ? 'positive' : 'negative';
             suggestedAction = `Sentiment around ${watchItem.entity_name} has shifted ${direction}. Review recent coverage.`;
           } else {
-            suggestedAction = `${watchItem.entity_name} has ${trend.mentions_24h} mentions in 24h. Monitor for developments.`;
+            suggestedAction = `${watchItem.entity_name} has ${event.current_24h || 0} mentions in 24h across ${event.source_count || 1} sources. Monitor for developments.`;
           }
           
           if (geoContext.matchedGeo) {
@@ -491,50 +545,12 @@ serve(async (req) => {
             severity,
             is_actionable: score >= 60,
             actionable_score: score,
-            current_mentions: trend.mentions_24h,
-            velocity: trend.velocity,
+            current_mentions: event.current_24h || 0,
+            velocity: event.velocity,
             sample_sources: sampleSources,
             suggested_action: suggestedAction,
             triggered_at: now,
-          });
-
-          recentAlertKeys.add(alertKey);
-        }
-      }
-
-      // Check unified trends for cross-source breakthroughs
-      for (const unified of unifiedTrends) {
-        if (!unified.topic) continue;
-        
-        const aliasMatch = findAliasMatch(
-          unified.topic,
-          watchItem.entity_name,
-          watchItem.aliases || [],
-          aliasMap
-        );
-
-        if (!aliasMatch || aliasMatch.confidence < SIMILARITY_THRESHOLD) continue;
-        if (!unified.is_breakthrough) continue;
-
-        const alertKey = `${watchItem.organization_id}-${watchItem.entity_name.toLowerCase()}-breaking`;
-        if (recentAlertKeys.has(alertKey)) continue;
-
-        const score = Math.min(100, (unified.unified_score || 50) + 20);
-        
-        if (score >= (watchItem.alert_threshold || 50)) {
-          alerts.push({
-            organization_id: watchItem.organization_id,
-            watchlist_id: watchItem.id,
-            entity_name: watchItem.entity_name,
-            alert_type: 'breaking',
-            severity: score >= 80 ? 'critical' : score >= 60 ? 'high' : 'medium',
-            is_actionable: true,
-            actionable_score: score,
-            current_mentions: unified.total_mentions,
-            velocity: unified.max_velocity,
-            sample_sources: [],
-            suggested_action: `${watchItem.entity_name} detected across ${unified.source_count} sources. This cross-platform signal warrants attention.`,
-            triggered_at: now,
+            trend_event_id: event.id, // Link to trend_event
           });
 
           recentAlertKeys.add(alertKey);
@@ -542,7 +558,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`🚨 Generated ${alerts.length} alerts`);
+    console.log(`🚨 Generated ${alerts.length} alerts from trend_events`);
 
     // Insert alerts
     if (alerts.length > 0) {
@@ -567,14 +583,15 @@ serve(async (req) => {
       await supabase.from('watchlist_usage_log').insert(usageLogs);
     }
 
-    console.log('✅ Enhanced watchlist matching complete');
+    console.log('✅ Watchlist matching complete (trend_events source)');
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         alertsGenerated: alerts.length,
         watchlistItemsProcessed: watchlistItems.length,
-        trendsChecked: entityTrends.length + unifiedTrends.length,
+        trendEventsChecked: trendEvents.length,
+        evidenceItemsLoaded: trendEvidence.length,
         aliasesLoaded: entityAliases.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
