@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 export interface FilterOption {
   id: string;
   label: string;
+  status?: string;
+  isNameAvailable: boolean;
 }
 
 export interface FilterOptions {
@@ -13,7 +15,7 @@ export interface FilterOptions {
 
 /**
  * Hook to fetch available campaign and creative filter options
- * based on the organization and date range.
+ * based on the organization and date range, with human-readable names.
  */
 export function useFilterOptions(
   organizationId: string | undefined,
@@ -30,9 +32,8 @@ export function useFilterOptions(
       const sb = supabase as any;
       const endDateFull = `${endDate}T23:59:59`;
 
-      // Fetch from BOTH donation_attribution AND meta_ad_metrics
-      // This ensures campaigns/creatives with spend but zero donations still appear
-      const [attrResult, metaResult] = await Promise.all([
+      // Fetch IDs from donation_attribution, meta_ad_metrics, AND name lookups
+      const [attrResult, metaResult, campaignNamesResult, creativeNamesResult] = await Promise.all([
         // Campaigns/creatives with attributed donations
         sb
           .from("donation_attribution")
@@ -48,10 +49,41 @@ export function useFilterOptions(
           .eq("organization_id", organizationId)
           .gte("date", startDate)
           .lte("date", endDate),
+        // Campaign names from meta_campaigns
+        sb
+          .from("meta_campaigns")
+          .select("campaign_id, campaign_name, status")
+          .eq("organization_id", organizationId),
+        // Creative names from refcode_mappings
+        sb
+          .from("refcode_mappings")
+          .select("creative_id, creative_name")
+          .eq("organization_id", organizationId),
       ]);
 
       if (attrResult.error) throw attrResult.error;
       if (metaResult.error) throw metaResult.error;
+      // Name lookups are optional - don't throw on error, just use empty
+      const campaignNamesData = campaignNamesResult.data || [];
+      const creativeNamesData = creativeNamesResult.data || [];
+
+      // Build name lookup maps
+      const campaignNameMap = new Map<string, { name: string; status: string }>();
+      campaignNamesData.forEach((c: any) => {
+        if (c.campaign_id && c.campaign_name) {
+          campaignNameMap.set(c.campaign_id, {
+            name: c.campaign_name,
+            status: c.status || "UNKNOWN",
+          });
+        }
+      });
+
+      const creativeNameMap = new Map<string, string>();
+      creativeNamesData.forEach((c: any) => {
+        if (c.creative_id && c.creative_name) {
+          creativeNameMap.set(c.creative_id, c.creative_name);
+        }
+      });
 
       // Extract unique campaign and creative IDs from both sources
       const campaignSet = new Set<string>();
@@ -69,14 +101,35 @@ export function useFilterOptions(
         if (d.ad_creative_id) creativeSet.add(d.ad_creative_id);
       });
 
-      // Convert to arrays and sort
+      // Build campaign options with names
       const campaigns: FilterOption[] = Array.from(campaignSet)
-        .sort()
-        .map((id) => ({ id, label: id }));
+        .map((id) => {
+          const meta = campaignNameMap.get(id);
+          return {
+            id,
+            label: meta?.name || id,
+            status: meta?.status,
+            isNameAvailable: !!meta?.name,
+          };
+        })
+        // Sort: Active first, then by name
+        .sort((a, b) => {
+          if (a.status === "ACTIVE" && b.status !== "ACTIVE") return -1;
+          if (b.status === "ACTIVE" && a.status !== "ACTIVE") return 1;
+          return a.label.localeCompare(b.label);
+        });
 
+      // Build creative options with names
       const creatives: FilterOption[] = Array.from(creativeSet)
-        .sort()
-        .map((id) => ({ id, label: id }));
+        .map((id) => {
+          const name = creativeNameMap.get(id);
+          return {
+            id,
+            label: name || id,
+            isNameAvailable: !!name,
+          };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label));
 
       return { campaigns, creatives };
     },
