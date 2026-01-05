@@ -1,16 +1,14 @@
 import { useState, useCallback } from "react";
-import { TrendingUp, Newspaper, Layers, RefreshCw } from "lucide-react";
+import { TrendingUp, Newspaper } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { 
-  PipelineHealthPanel, 
   TrendsConsole,
-  DataFreshnessIndicator 
+  AdminPageHeader 
 } from "@/components/admin/v3";
+import { DataStatusBar } from "@/components/admin/v3/DataStatusBar";
+import { PipelineHealthDrawer } from "@/components/admin/v3/PipelineHealthDrawer";
 import { NewsInvestigationTable } from "@/components/admin/v3/NewsInvestigationTable";
-import { AdminPageHeader } from "@/components/admin/v3";
 
 type ViewMode = "trends" | "feed" | "cluster";
 
@@ -43,51 +41,7 @@ function ClusterDrilldown({ clusterId, onBack }: ClusterDrilldownProps) {
 export function NewsTrendsPage() {
   const [mode, setMode] = useState<ViewMode>("trends");
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
-  const [isForceRunning, setIsForceRunning] = useState(false);
-
-  const handleForceRun = useCallback(async (jobType?: string) => {
-    setIsForceRunning(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("run-scheduled-jobs", {
-        body: { force: true, job_type: jobType },
-      });
-      
-      if (error) throw error;
-      
-      toast.success("Pipeline jobs triggered successfully", {
-        description: `Processed ${data?.jobs_run || 0} jobs`,
-      });
-    } catch (error: any) {
-      console.error("Force run failed:", error);
-      toast.error("Failed to trigger pipeline", {
-        description: error.message,
-      });
-    } finally {
-      setIsForceRunning(false);
-    }
-  }, []);
-
-  const handleBackfill = useCallback(async (hours: number) => {
-    setIsForceRunning(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("run-scheduled-jobs", {
-        body: { force: true, backfill_hours: hours },
-      });
-      
-      if (error) throw error;
-      
-      toast.success(`Backfill started for last ${hours} hours`, {
-        description: `Processing ${data?.estimated_records || 'unknown'} records`,
-      });
-    } catch (error: any) {
-      console.error("Backfill failed:", error);
-      toast.error("Failed to start backfill", {
-        description: error.message,
-      });
-    } finally {
-      setIsForceRunning(false);
-    }
-  }, []);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleClusterDrilldown = useCallback((clusterId: string) => {
     setSelectedCluster(clusterId);
@@ -100,29 +54,15 @@ export function NewsTrendsPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <AdminPageHeader
         title="News & Trends"
         description="Real-time political intelligence monitoring and trend analysis"
-        actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleForceRun()}
-            disabled={isForceRunning}
-          >
-            <RefreshCw className={cn("h-4 w-4 mr-2", isForceRunning && "animate-spin")} />
-            Force Refresh
-          </Button>
-        }
       />
-
-      {/* Pipeline Health Panel */}
-      <PipelineHealthPanel />
 
       {/* Mode Switcher */}
       {mode !== "cluster" && (
-        <div className="flex items-center gap-2 border-b border-border pb-4">
+        <div className="flex items-center gap-2 border-b border-border pb-3">
           <Button
             variant={mode === "trends" ? "default" : "ghost"}
             size="sm"
@@ -150,6 +90,9 @@ export function NewsTrendsPage() {
         </div>
       )}
 
+      {/* Data Status Bar - Compact pipeline health indicator */}
+      <DataStatusBar onOpenDetails={() => setDrawerOpen(true)} />
+
       {/* Content */}
       {mode === "trends" && (
         <TrendsConsole onDrilldown={handleClusterDrilldown} />
@@ -165,6 +108,9 @@ export function NewsTrendsPage() {
           onBack={handleBackFromCluster} 
         />
       )}
+
+      {/* Pipeline Health Drawer */}
+      <PipelineHealthDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
     </div>
   );
 }
