@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { format, subDays } from "date-fns";
-import { Download, RefreshCw, Activity, WifiOff, AlertCircle, Target, TrendingUp, TrendingDown, Newspaper, Users, ArrowUp, ArrowDown } from "lucide-react";
+import { Download, RefreshCw, Activity, WifiOff, AlertCircle, Target, TrendingUp, TrendingDown, Newspaper, Users, ArrowUp, ArrowDown, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNewsFilters } from "@/contexts/NewsFilterContext";
 import { useTopicContent } from "@/hooks/useTopicContent";
 import { useUnifiedTrends } from "@/hooks/useUnifiedTrends";
+import { useSourceFreshness, formatSourceAge, getStatusColor } from "@/hooks/useSourceFreshness";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -20,6 +21,8 @@ import {
   V3CardContent,
   V3SectionHeader,
 } from "@/components/v3";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface MetricWithComparison {
@@ -120,6 +123,9 @@ export default function Analytics() {
   // Get unified trends stats
   const { stats: trendStats, refresh: refreshTrends } = useUnifiedTrends({ limit: 10 });
 
+  // Get source freshness data for honest status display
+  const { data: sourceFreshness } = useSourceFreshness();
+
   // Error handling utility
   const parseError = (error: any): { message: string; type: string; retryable: boolean } => {
     if (!navigator.onLine) {
@@ -215,15 +221,18 @@ export default function Analytics() {
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
 
-      // Fetch all data in parallel
+      // Fetch all data in parallel (including Google News)
       const [
         watchlistResult,
         todayArticlesResult,
         yesterdayArticlesResult,
+        todayGoogleNewsResult,
+        yesterdayGoogleNewsResult,
         todaySocialResult,
         yesterdaySocialResult
       ] = await Promise.all([
         supabase.from('entity_watchlist').select('entity_name'),
+        // RSS Articles
         supabase
           .from('articles')
           .select('id, title, threat_level, content')
@@ -233,6 +242,17 @@ export default function Analytics() {
           .select('id, title, threat_level, content')
           .gte('published_date', yesterday.toISOString())
           .lt('published_date', today.toISOString()),
+        // Google News Articles (uses description, no threat_level)
+        supabase
+          .from('google_news_articles')
+          .select('id, title, description')
+          .gte('published_at', today.toISOString()),
+        supabase
+          .from('google_news_articles')
+          .select('id, title, description')
+          .gte('published_at', yesterday.toISOString())
+          .lt('published_at', today.toISOString()),
+        // Bluesky Posts
         supabase
           .from('bluesky_posts')
           .select('*', { count: 'exact', head: true })
@@ -249,36 +269,62 @@ export default function Analytics() {
       const watchlistEntities = (watchlistResult.data || []).map(w => w.entity_name?.toLowerCase() || '');
       const todayArticles = todayArticlesResult.data || [];
       const yesterdayArticles = yesterdayArticlesResult.data || [];
+      const todayGoogleNews = todayGoogleNewsResult.data || [];
+      const yesterdayGoogleNews = yesterdayGoogleNewsResult.data || [];
 
-      // Calculate today's watchlist mentions
-      const todayWatchlistMentions = todayArticles.filter(a =>
+      // Combine RSS + Google News for total articles
+      const todayTotalArticles = todayArticles.length + todayGoogleNews.length;
+      const yesterdayTotalArticles = yesterdayArticles.length + yesterdayGoogleNews.length;
+
+      // Calculate today's watchlist mentions (RSS + Google News)
+      const todayRSSWatchlistMentions = todayArticles.filter(a =>
         watchlistEntities.some(entity =>
           entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
         )
       ).length;
+      
+      const todayGoogleWatchlistMentions = todayGoogleNews.filter(a =>
+        watchlistEntities.some(entity =>
+          entity && (a.title?.toLowerCase().includes(entity) || a.description?.toLowerCase().includes(entity))
+        )
+      ).length;
+
+      const todayWatchlistMentions = todayRSSWatchlistMentions + todayGoogleWatchlistMentions;
 
       // Calculate yesterday's watchlist mentions
-      const yesterdayWatchlistMentions = yesterdayArticles.filter(a =>
+      const yesterdayRSSWatchlistMentions = yesterdayArticles.filter(a =>
         watchlistEntities.some(entity =>
           entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
         )
       ).length;
 
-      // Critical items today
-      const todayCritical = todayArticles.filter(a =>
+      const yesterdayGoogleWatchlistMentions = yesterdayGoogleNews.filter(a =>
+        watchlistEntities.some(entity =>
+          entity && (a.title?.toLowerCase().includes(entity) || a.description?.toLowerCase().includes(entity))
+        )
+      ).length;
+
+      const yesterdayWatchlistMentions = yesterdayRSSWatchlistMentions + yesterdayGoogleWatchlistMentions;
+
+      // Critical items today (RSS only - Google News doesn't have threat_level)
+      const todayRSSCritical = todayArticles.filter(a =>
         (a.threat_level === 'critical' || a.threat_level === 'high') &&
         watchlistEntities.some(entity =>
           entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
         )
       ).length;
+
+      const todayCritical = todayRSSCritical;
 
       // Critical items yesterday
-      const yesterdayCritical = yesterdayArticles.filter(a =>
+      const yesterdayRSSCritical = yesterdayArticles.filter(a =>
         (a.threat_level === 'critical' || a.threat_level === 'high') &&
         watchlistEntities.some(entity =>
           entity && (a.title?.toLowerCase().includes(entity) || a.content?.toLowerCase().includes(entity))
         )
       ).length;
+
+      const yesterdayCritical = yesterdayRSSCritical;
 
       setMetrics({
         watchlistMentions: {
@@ -292,9 +338,9 @@ export default function Analytics() {
           change: calculateChange(todayCritical, yesterdayCritical)
         },
         newArticles: {
-          current: todayArticles.length,
-          previous: yesterdayArticles.length,
-          change: calculateChange(todayArticles.length, yesterdayArticles.length)
+          current: todayTotalArticles,
+          previous: yesterdayTotalArticles,
+          change: calculateChange(todayTotalArticles, yesterdayTotalArticles)
         },
         socialPosts: {
           current: todaySocialResult.count || 0,
@@ -479,17 +525,37 @@ export default function Analytics() {
             <div className="flex-1">
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[hsl(var(--portal-text-primary))]">News Pulse</h1>
-                <motion.div
-                  className="flex items-center gap-2 px-3 py-1 bg-[hsl(var(--portal-error))] text-white rounded-full text-sm font-semibold"
-                  animate={{ opacity: [1, 0.7, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                  </span>
-                  LIVE
-                </motion.div>
+                {/* Honest freshness indicator instead of misleading LIVE badge */}
+                {sourceFreshness && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge 
+                        variant="outline"
+                        className={cn(
+                          "gap-1.5 font-semibold text-xs cursor-help",
+                          getStatusColor(sourceFreshness.overallStatus).bg,
+                          getStatusColor(sourceFreshness.overallStatus).border,
+                          getStatusColor(sourceFreshness.overallStatus).text
+                        )}
+                      >
+                        {sourceFreshness.overallStatus === 'live' && <CheckCircle className="h-3 w-3" />}
+                        {sourceFreshness.overallStatus === 'stale' && <Clock className="h-3 w-3" />}
+                        {sourceFreshness.overallStatus === 'critical' && <AlertTriangle className="h-3 w-3" />}
+                        {sourceFreshness.overallStatus.toUpperCase()}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <div className="space-y-1 text-xs">
+                        <p className="font-medium">Data Freshness</p>
+                        {Object.values(sourceFreshness.sources).map(source => (
+                          <p key={source.source} className={getStatusColor(source.status).text}>
+                            {source.icon} {source.label}: {formatSourceAge(source.ageMinutes)}
+                          </p>
+                        ))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-4 mt-1 text-sm text-[hsl(var(--portal-text-muted))]">
                 <span className="flex items-center gap-1">
