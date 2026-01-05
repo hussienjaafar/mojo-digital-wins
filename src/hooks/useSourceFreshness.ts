@@ -66,6 +66,18 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
+  // First, try to get freshness from pipeline_freshness view (more reliable)
+  const { data: pipelineData } = await supabase
+    .from('pipeline_freshness')
+    .select('*')
+    .in('job_type', ['fetch_rss', 'fetch_google_news', 'collect_bluesky']);
+
+  // Create a map of pipeline freshness by job type
+  const pipelineMap = new Map<string, any>();
+  for (const p of pipelineData || []) {
+    pipelineMap.set(p.job_type, p);
+  }
+
   // Fetch latest data timestamps from each table in parallel
   const [
     rssLatestResult,
@@ -74,7 +86,6 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
     googleNewsCountResult,
     blueskyLatestResult,
     blueskyCountResult,
-    pipelinesResult,
   ] = await Promise.all([
     // RSS/Articles - latest published_date
     supabase
@@ -112,31 +123,33 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
       .from('bluesky_posts')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', yesterday.toISOString()),
-    // Pipeline last run times
-    supabase
-      .from('scheduled_jobs')
-      .select('job_type, last_run_at, last_run_status')
-      .in('job_type', [
-        ...PIPELINE_JOB_TYPES.rss,
-        ...PIPELINE_JOB_TYPES.google_news,
-        ...PIPELINE_JOB_TYPES.bluesky,
-      ]),
   ]);
 
-  // Parse pipeline data
-  const pipelineMap = new Map<string, { lastRun: Date | null; status: string }>();
-  for (const job of pipelinesResult.data || []) {
-    pipelineMap.set(job.job_type, {
-      lastRun: job.last_run_at ? new Date(job.last_run_at) : null,
-      status: job.last_run_status || 'unknown',
-    });
-  }
+  // Helper to get status from pipeline freshness data or fall back to data age
+  const getStatusFromPipeline = (
+    jobType: string, 
+    dataAge: number, 
+    sla: { stale: number; critical: number }
+  ): FreshnessStatus => {
+    const pipeline = pipelineMap.get(jobType);
+    if (pipeline?.freshness_status) {
+      // Map pipeline status to our status type
+      const pStatus = pipeline.freshness_status as string;
+      if (pStatus === 'live') return 'live';
+      if (pStatus === 'stale') return 'stale';
+      if (pStatus === 'critical') return 'critical';
+      return 'unknown';
+    }
+    // Fall back to data-based status
+    return getStatus(dataAge, sla);
+  };
 
   // Build RSS source record
   const rssLatestData = rssLatestResult.data?.published_date 
     ? new Date(rssLatestResult.data.published_date) 
     : null;
-  const rssPipelineLastRun = getLatestPipelineRun(pipelineMap, PIPELINE_JOB_TYPES.rss);
+  const rssPipeline = pipelineMap.get('fetch_rss');
+  const rssPipelineLastRun = rssPipeline?.last_success_at ? new Date(rssPipeline.last_success_at) : null;
   const rssAgeMinutes = getAgeMinutes(rssLatestData);
   const rssRecord: SourceFreshnessRecord = {
     source: 'rss',
@@ -144,7 +157,7 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
     latestDataAt: rssLatestData,
     pipelineLastRun: rssPipelineLastRun,
     ageMinutes: rssAgeMinutes,
-    status: getStatus(rssAgeMinutes, SOURCE_SLA_MINUTES.rss),
+    status: getStatusFromPipeline('fetch_rss', rssAgeMinutes, SOURCE_SLA_MINUTES.rss),
     articleCount24h: rssCountResult.count || 0,
     icon: '📰',
   };
@@ -153,7 +166,8 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
   const googleNewsLatestData = googleNewsLatestResult.data?.published_at 
     ? new Date(googleNewsLatestResult.data.published_at) 
     : null;
-  const googleNewsPipelineLastRun = getLatestPipelineRun(pipelineMap, PIPELINE_JOB_TYPES.google_news);
+  const googleNewsPipeline = pipelineMap.get('fetch_google_news');
+  const googleNewsPipelineLastRun = googleNewsPipeline?.last_success_at ? new Date(googleNewsPipeline.last_success_at) : null;
   const googleNewsAgeMinutes = getAgeMinutes(googleNewsLatestData);
   const googleNewsRecord: SourceFreshnessRecord = {
     source: 'google_news',
@@ -161,7 +175,7 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
     latestDataAt: googleNewsLatestData,
     pipelineLastRun: googleNewsPipelineLastRun,
     ageMinutes: googleNewsAgeMinutes,
-    status: getStatus(googleNewsAgeMinutes, SOURCE_SLA_MINUTES.google_news),
+    status: getStatusFromPipeline('fetch_google_news', googleNewsAgeMinutes, SOURCE_SLA_MINUTES.google_news),
     articleCount24h: googleNewsCountResult.count || 0,
     icon: '🔍',
   };
@@ -170,7 +184,8 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
   const blueskyLatestData = blueskyLatestResult.data?.created_at 
     ? new Date(blueskyLatestResult.data.created_at) 
     : null;
-  const blueskyPipelineLastRun = getLatestPipelineRun(pipelineMap, PIPELINE_JOB_TYPES.bluesky);
+  const blueskyPipeline = pipelineMap.get('collect_bluesky');
+  const blueskyPipelineLastRun = blueskyPipeline?.last_success_at ? new Date(blueskyPipeline.last_success_at) : null;
   const blueskyAgeMinutes = getAgeMinutes(blueskyLatestData);
   const blueskyRecord: SourceFreshnessRecord = {
     source: 'bluesky',
@@ -178,7 +193,7 @@ async function fetchSourceFreshness(): Promise<SourceFreshnessData> {
     latestDataAt: blueskyLatestData,
     pipelineLastRun: blueskyPipelineLastRun,
     ageMinutes: blueskyAgeMinutes,
-    status: getStatus(blueskyAgeMinutes, SOURCE_SLA_MINUTES.bluesky),
+    status: getStatusFromPipeline('collect_bluesky', blueskyAgeMinutes, SOURCE_SLA_MINUTES.bluesky),
     articleCount24h: blueskyCountResult.count || 0,
     icon: '🦋',
   };

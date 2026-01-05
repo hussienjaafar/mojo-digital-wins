@@ -4953,6 +4953,57 @@ export type Database = {
           },
         ]
       }
+      pipeline_deadman_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          actual_age_minutes: number | null
+          alert_type: string
+          consecutive_failures: number | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          job_name: string | null
+          job_type: string
+          message: string
+          resolved_at: string | null
+          severity: string
+          sla_minutes: number | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          actual_age_minutes?: number | null
+          alert_type: string
+          consecutive_failures?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          job_name?: string | null
+          job_type: string
+          message: string
+          resolved_at?: string | null
+          severity: string
+          sla_minutes?: number | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          actual_age_minutes?: number | null
+          alert_type?: string
+          consecutive_failures?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          job_name?: string | null
+          job_type?: string
+          message?: string
+          resolved_at?: string | null
+          severity?: string
+          sla_minutes?: number | null
+        }
+        Relationships: []
+      }
       pipeline_health_snapshots: {
         Row: {
           actionable_alerts_24h: number | null
@@ -5017,6 +5068,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pipeline_heartbeat: {
+        Row: {
+          consecutive_failures: number | null
+          created_at: string | null
+          id: string
+          is_critical: boolean | null
+          job_name: string | null
+          job_type: string
+          last_duration_ms: number | null
+          last_error: string | null
+          last_failure_at: string | null
+          last_started_at: string | null
+          last_status: string | null
+          last_success_at: string | null
+          sla_minutes: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          consecutive_failures?: number | null
+          created_at?: string | null
+          id?: string
+          is_critical?: boolean | null
+          job_name?: string | null
+          job_type: string
+          last_duration_ms?: number | null
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_started_at?: string | null
+          last_status?: string | null
+          last_success_at?: string | null
+          sla_minutes?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          consecutive_failures?: number | null
+          created_at?: string | null
+          id?: string
+          is_critical?: boolean | null
+          job_name?: string | null
+          job_type?: string
+          last_duration_ms?: number | null
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_started_at?: string | null
+          last_status?: string | null
+          last_success_at?: string | null
+          sla_minutes?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       pipeline_runs: {
         Row: {
@@ -8242,6 +8344,60 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_freshness: {
+        Row: {
+          age_minutes: number | null
+          consecutive_failures: number | null
+          freshness_status: string | null
+          is_critical: boolean | null
+          job_name: string | null
+          job_type: string | null
+          last_duration_ms: number | null
+          last_error: string | null
+          last_failure_at: string | null
+          last_started_at: string | null
+          last_status: string | null
+          last_success_at: string | null
+          minutes_until_sla_breach: number | null
+          sla_minutes: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          age_minutes?: never
+          consecutive_failures?: number | null
+          freshness_status?: never
+          is_critical?: boolean | null
+          job_name?: string | null
+          job_type?: string | null
+          last_duration_ms?: number | null
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_started_at?: string | null
+          last_status?: string | null
+          last_success_at?: string | null
+          minutes_until_sla_breach?: never
+          sla_minutes?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          age_minutes?: never
+          consecutive_failures?: number | null
+          freshness_status?: never
+          is_critical?: boolean | null
+          job_name?: string | null
+          job_type?: string | null
+          last_duration_ms?: number | null
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_started_at?: string | null
+          last_status?: string | null
+          last_success_at?: string | null
+          minutes_until_sla_breach?: never
+          sla_minutes?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       pipeline_health: {
         Row: {
           avg_duration_ms_24h: number | null
@@ -8426,6 +8582,18 @@ export type Database = {
       }
       check_authenticated_access: { Args: never; Returns: boolean }
       check_contact_rate_limit: { Args: never; Returns: boolean }
+      check_pipeline_deadman: {
+        Args: never
+        Returns: {
+          age_minutes: number
+          alert_needed: boolean
+          freshness_status: string
+          is_critical: boolean
+          job_name: string
+          job_type: string
+          sla_minutes: number
+        }[]
+      }
       cleanup_expired_invite_codes: { Args: never; Returns: undefined }
       cleanup_old_cache: { Args: never; Returns: number }
       complete_pipeline_run: {
@@ -8742,6 +8910,17 @@ export type Database = {
           p_status: string
         }
         Returns: undefined
+      }
+      update_pipeline_heartbeat: {
+        Args: {
+          p_duration_ms?: number
+          p_error?: string
+          p_job_type: string
+          p_records_created?: number
+          p_records_processed?: number
+          p_status: string
+        }
+        Returns: string
       }
       update_processing_checkpoint: {
         Args: {
