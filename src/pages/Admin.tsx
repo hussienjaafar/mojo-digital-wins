@@ -396,11 +396,12 @@ const Admin = () => {
         <PortalErrorBoundary>
           <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarChange}>
             <div className="portal-theme min-h-screen flex w-full portal-bg">
-            <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+              <div id="portal-floating-root" className="absolute left-0 top-0" />
+              <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-          <div className="flex-1 flex flex-col min-w-0">
-            {/* Mobile-optimized header with breadcrumb */}
-            <header className="portal-header">
+              <div className="flex-1 flex flex-col min-w-0">
+                {/* Mobile-optimized header with breadcrumb */}
+                <header className="portal-header">
               <div className="flex flex-col">
                 <div className="flex h-14 sm:h-16 items-center gap-2 sm:gap-4 px-3 sm:px-6">
                   {/* Mobile menu trigger - always visible */}
