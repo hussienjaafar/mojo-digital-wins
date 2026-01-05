@@ -407,9 +407,9 @@ const ClientActions = () => {
   }, [markAllUsedMutation, toast]);
 
   const handleDismiss = useCallback(
-    async (id: string) => {
+    async (id: string, reasonCode?: string, reasonDetail?: string) => {
       try {
-        await dismissMutation.mutateAsync(id);
+        await dismissMutation.mutateAsync({ actionId: id, reasonCode, reasonDetail });
         toast({
           title: "Action Dismissed",
           description: "This suggestion has been hidden",
