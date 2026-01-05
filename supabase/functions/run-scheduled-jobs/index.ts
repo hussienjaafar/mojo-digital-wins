@@ -466,8 +466,16 @@ serve(async (req) => {
 
           case 'sync_meta_ads':
             console.log('[SCHEDULER] Running tiered Meta Ads sync');
-            const tieredSyncResponse = await supabase.functions.invoke('tiered-meta-sync', { body: {} });
-            if (tieredSyncResponse.error) throw new Error(tieredSyncResponse.error.message);
+            // CRITICAL: Pass the cron secret so tiered-meta-sync can authenticate
+            const cronSecretForMeta = Deno.env.get('CRON_SECRET');
+            const tieredSyncResponse = await supabase.functions.invoke('tiered-meta-sync', { 
+              body: {},
+              headers: cronSecretForMeta ? { 'x-cron-secret': cronSecretForMeta } : {}
+            });
+            if (tieredSyncResponse.error) {
+              console.error('[SCHEDULER] tiered-meta-sync error:', tieredSyncResponse.error);
+              throw new Error(tieredSyncResponse.error.message);
+            }
             result = tieredSyncResponse.data;
             itemsProcessed = result?.accounts_synced || 0;
             itemsCreated = result?.accounts_synced || 0;
