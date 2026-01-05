@@ -55,6 +55,7 @@ interface Article {
   processing_status: string | null;
   ai_summary: string | null;
   created_at: string | null;
+  source_type?: string; // 'rss' or 'google' - from the view
 }
 
 const PAGE_SIZE = 50;
@@ -99,30 +100,67 @@ export function NewsInvestigationTable() {
   } = useInfiniteQuery({
     queryKey: ["articles-investigation", threatFilter, sentimentFilter, globalFilter, includeGoogleNews],
     queryFn: async ({ pageParam = 0 }): Promise<{ articles: Article[]; nextPage: number | undefined }> => {
-      // Always query 'articles' table directly to avoid TypeScript issues with dynamic table names
-      let query = supabase
-        .from("articles")
-        .select("id, title, description, source_name, source_url, published_date, sentiment_label, sentiment_score, threat_level, tags, category, processing_status, ai_summary, created_at")
-        .order("published_date", { ascending: false })
-        .range(pageParam * PAGE_SIZE, (pageParam + 1) * PAGE_SIZE - 1);
+      const selectColumns = "id, title, description, source_name, source_url, published_date, sentiment_label, sentiment_score, threat_level, tags, category, processing_status, ai_summary, created_at, source_type";
       
-      if (threatFilter !== "all") {
-        query = query.eq("threat_level", threatFilter);
+      // Use the unified view when Google News is included, otherwise just articles
+      if (includeGoogleNews) {
+        // Query the unified view that includes both RSS articles and Google News
+        const { data, error } = await supabase
+          .from("news_investigation_view")
+          .select(selectColumns)
+          .order("published_date", { ascending: false })
+          .range(pageParam * PAGE_SIZE, (pageParam + 1) * PAGE_SIZE - 1)
+          .then(result => {
+            // Apply filters in memory since view doesn't support all filter types
+            if (!result.error && result.data) {
+              let filtered = result.data;
+              if (threatFilter !== "all") {
+                filtered = filtered.filter(a => a.threat_level === threatFilter);
+              }
+              if (sentimentFilter !== "all") {
+                filtered = filtered.filter(a => a.sentiment_label === sentimentFilter);
+              }
+              if (globalFilter) {
+                const lowerFilter = globalFilter.toLowerCase();
+                filtered = filtered.filter(a => a.title?.toLowerCase().includes(lowerFilter));
+              }
+              return { data: filtered, error: null };
+            }
+            return result;
+          });
+        
+        if (error) throw error;
+        
+        return {
+          articles: (data || []) as Article[],
+          nextPage: data?.length === PAGE_SIZE ? pageParam + 1 : undefined,
+        };
+      } else {
+        // Query only the articles table (RSS sources)
+        let query = supabase
+          .from("articles")
+          .select("id, title, description, source_name, source_url, published_date, sentiment_label, sentiment_score, threat_level, tags, category, processing_status, ai_summary, created_at")
+          .order("published_date", { ascending: false })
+          .range(pageParam * PAGE_SIZE, (pageParam + 1) * PAGE_SIZE - 1);
+        
+        if (threatFilter !== "all") {
+          query = query.eq("threat_level", threatFilter);
+        }
+        if (sentimentFilter !== "all") {
+          query = query.eq("sentiment_label", sentimentFilter);
+        }
+        if (globalFilter) {
+          query = query.ilike("title", `%${globalFilter}%`);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        return {
+          articles: (data || []).map(a => ({ ...a, source_type: 'rss' })) as Article[],
+          nextPage: data?.length === PAGE_SIZE ? pageParam + 1 : undefined,
+        };
       }
-      if (sentimentFilter !== "all") {
-        query = query.eq("sentiment_label", sentimentFilter);
-      }
-      if (globalFilter) {
-        query = query.ilike("title", `%${globalFilter}%`);
-      }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      
-      return {
-        articles: (data || []) as Article[],
-        nextPage: data?.length === PAGE_SIZE ? pageParam + 1 : undefined,
-      };
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
     initialPageParam: 0,
