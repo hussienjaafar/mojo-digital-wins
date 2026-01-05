@@ -24,7 +24,7 @@ import AdminActivityAlerts from "@/components/admin/AdminActivityAlerts";
 import UsageAnalytics from "@/components/admin/UsageAnalytics";
 import ClientHealthOverview from "@/components/admin/ClientHealthOverview";
 import { AdminDashboardHome } from "@/components/admin/AdminDashboardHome";
-import { NewsFeed } from "@/components/news/NewsFeed";
+import { NewsTrendsPage } from "@/pages/admin/NewsTrendsPage";
 import { BillTracker } from "@/components/bills/BillTracker";
 import Analytics from "@/pages/Analytics";
 import Bookmarks from "@/pages/Bookmarks";
@@ -312,7 +312,7 @@ const Admin = () => {
       case "state-actions":
         return <StateActions />;
       case "news":
-        return <NewsFeed />;
+        return <NewsTrendsPage />;
       case "bills":
         return <BillTracker />;
       case "content-analytics":

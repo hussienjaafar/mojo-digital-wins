@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, validateCronOrAdmin, logJobFailure, checkRateLimit } from "../_shared/security.ts";
+import { fetchAndParseFeed } from "../_shared/xmlParser.ts";
+import { normalizeUrl, generateDedupeKey } from "../_shared/urlNormalizer.ts";
 
 const corsHeaders = getCorsHeaders();
 
@@ -187,71 +189,15 @@ function extractTags(title: string, description: string, content: string): strin
 
 async function parseRSSFeed(url: string): Promise<any[]> {
   try {
-    const response = await fetch(url);
-    const text = await response.text();
-    const items: any[] = [];
-    const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
-    const entryRegex = /<entry>([\s\S]*?)<\/entry>/gi;
+    const feed = await fetchAndParseFeed(url, { timeout: 15000 });
     
-    const extractText = (xml: string, tag: string): string => {
-      const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
-      const match = xml.match(regex);
-      return match ? match[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim() : '';
-    };
-    
-    const extractAttr = (xml: string, tag: string, attr: string): string => {
-      const regex = new RegExp(`<${tag}[^>]*${attr}=["']([^"']+)["']`, 'i');
-      const match = xml.match(regex);
-      return match ? match[1] : '';
-    };
-    
-    let matches = text.matchAll(itemRegex);
-    let hasItems = false;
-    
-    for (const match of matches) {
-      hasItems = true;
-      const itemXml = match[1];
-      const title = extractText(itemXml, 'title');
-      const description = extractText(itemXml, 'description') || extractText(itemXml, 'content:encoded');
-      const link = extractText(itemXml, 'link') || extractAttr(itemXml, 'link', 'href');
-      const pubDate = extractText(itemXml, 'pubDate') || extractText(itemXml, 'published');
-      let imageUrl = extractAttr(itemXml, 'media:thumbnail', 'url') || extractAttr(itemXml, 'enclosure', 'url');
-      if (!imageUrl && description) {
-        const imgMatch = description.match(/<img[^>]+src=["']([^"']+)["']/);
-        imageUrl = imgMatch ? imgMatch[1] : '';
-      }
-      if (title && link) {
-        items.push({
-          title,
-          description: description.replace(/<[^>]*>/g, '').substring(0, 500),
-          link,
-          pubDate: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
-          imageUrl: imageUrl || null
-        });
-      }
-    }
-    
-    if (!hasItems) {
-      matches = text.matchAll(entryRegex);
-      for (const match of matches) {
-        const entryXml = match[1];
-        const title = extractText(entryXml, 'title');
-        const summary = extractText(entryXml, 'summary') || extractText(entryXml, 'content');
-        const link = extractAttr(entryXml, 'link', 'href');
-        const published = extractText(entryXml, 'published') || extractText(entryXml, 'updated');
-        if (title && link) {
-          items.push({
-            title,
-            description: summary.replace(/<[^>]*>/g, '').substring(0, 500),
-            link,
-            pubDate: published ? new Date(published).toISOString() : new Date().toISOString(),
-            imageUrl: null
-          });
-        }
-      }
-    }
-    
-    return items;
+    return feed.items.map(item => ({
+      title: item.title,
+      description: item.description.substring(0, 500),
+      link: normalizeUrl(item.link),
+      pubDate: item.pubDate,
+      imageUrl: item.imageUrl || null
+    }));
   } catch (error) {
     console.error(`Error parsing RSS feed ${url}:`, error);
     return [];
@@ -316,7 +262,8 @@ serve(async (req) => {
           const sanitizedTitle = sanitizeText(item.title);
           const sanitizedDescription = sanitizeText(item.description);
           const fullContent = sanitizedDescription.substring(0, 1000);
-          const hash = generateHash(sanitizedTitle, sanitizedDescription);
+          // Use robust dedup key combining URL, title, date, and source
+          const dedupeKey = generateDedupeKey(item.link, sanitizedTitle, item.pubDate, source.id);
           const tags = extractTags(sanitizedTitle, sanitizedDescription, sanitizedDescription);
           const textToAnalyze = `${sanitizedTitle} ${fullContent}`;
           const { level: threatLevel, affectedOrgs } = calculateThreatLevel(textToAnalyze, source.name);
@@ -331,7 +278,8 @@ serve(async (req) => {
             published_date: item.pubDate,
             image_url: item.imageUrl,
             tags,
-            hash_signature: hash,
+            hash_signature: dedupeKey,
+            dedupe_key: dedupeKey,
             category: source.category,
             threat_level: threatLevel,
             affected_organizations: affectedOrgs,
