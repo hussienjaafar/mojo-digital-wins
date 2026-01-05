@@ -8211,6 +8211,26 @@ export type Database = {
         }
         Relationships: []
       }
+      news_investigation_view: {
+        Row: {
+          ai_summary: string | null
+          category: string | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          processing_status: string | null
+          published_date: string | null
+          sentiment_label: string | null
+          sentiment_score: number | null
+          source_name: string | null
+          source_type: string | null
+          source_url: string | null
+          tags: string[] | null
+          threat_level: string | null
+          title: string | null
+        }
+        Relationships: []
+      }
       pipeline_backlog: {
         Row: {
           ingested_24h: number | null
