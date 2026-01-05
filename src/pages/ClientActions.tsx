@@ -15,14 +15,20 @@ import {
   Copy,
   AlertCircle,
   X,
+  Rocket,
+  Eye,
+  Activity,
 } from "lucide-react";
 
 import { ClientShell } from "@/components/client/ClientShell";
 import { ChartPanel } from "@/components/charts/ChartPanel";
-import { ActionCard } from "@/components/client/ActionCard";
+import { ActionCard, getTriageTier } from "@/components/client/ActionCard";
+import { PipelineHealthPanel } from "@/components/client/actions/PipelineHealthPanel";
+import { DismissReasonModal } from "@/components/client/actions/DismissReasonModal";
 import { LastRunStatus } from "@/components/client/LastRunStatus";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { useLatestActionGeneratorRun } from "@/hooks/useActionGeneratorRuns";
+import { usePipelineHealth } from "@/hooks/usePipelineHealth";
 import {
   useSuggestedActionsQuery,
   useMarkActionUsed,
@@ -53,6 +59,7 @@ import { V3MetricChip, V3FilterPill } from "@/components/v3";
 
 type FilterStatus = "all" | "pending" | "used";
 type FilterType = "all" | string;
+type TriageView = "triage" | "list";
 
 const STATUS_OPTIONS: { value: FilterStatus; label: string }[] = [
   { value: "all", label: "All" },
@@ -338,16 +345,32 @@ const ClientActions = () => {
     organizationId
   );
   const { data: lastRun, isLoading: lastRunLoading } = useLatestActionGeneratorRun(organizationId);
+  const pipelineHealth = usePipelineHealth(organizationId);
   const markUsedMutation = useMarkActionUsed(organizationId);
   const markAllUsedMutation = useMarkAllActionsUsed(organizationId);
   const dismissMutation = useDismissAction(organizationId);
 
   // Local state
   const [selectedAction, setSelectedAction] = useState<SuggestedAction | null>(null);
+  const [dismissActionId, setDismissActionId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("pending");
   const [filterType, setFilterType] = useState<FilterType>("all");
+  const [triageView, setTriageView] = useState<TriageView>("triage");
 
-  // Filter actions (exclude dismissed for main view)
+  // Group actions by triage tier
+  const actionsByTier = useMemo(() => {
+    if (!data?.actions) return { act_now: [], consider: [], watch: [] };
+
+    const pending = data.actions.filter((a) => !a.is_dismissed && !a.is_used);
+    
+    return {
+      act_now: pending.filter((a) => getTriageTier(a) === "act_now"),
+      consider: pending.filter((a) => getTriageTier(a) === "consider"),
+      watch: pending.filter((a) => getTriageTier(a) === "watch"),
+    };
+  }, [data?.actions]);
+
+  // Filter actions for list view
   const filteredActions = useMemo(() => {
     if (!data?.actions) return [];
 
@@ -425,218 +448,408 @@ const ClientActions = () => {
     [dismissMutation, toast]
   );
 
+  const handleDismissWithReason = useCallback((id: string) => {
+    setDismissActionId(id);
+  }, []);
+
+  const handleConfirmDismiss = useCallback(
+    async (reasonCode: string, reasonDetail?: string) => {
+      if (dismissActionId) {
+        await handleDismiss(dismissActionId, reasonCode, reasonDetail);
+        setDismissActionId(null);
+      }
+    },
+    [dismissActionId, handleDismiss]
+  );
+
   const stats = data?.stats;
   const isPageLoading = orgLoading || isLoading;
+  const totalPending = (stats?.pending ?? 0);
+
+  // Triage section renderer
+  const renderTriageSection = (
+    tier: "act_now" | "consider" | "watch",
+    actions: SuggestedAction[],
+    icon: React.ReactNode,
+    title: string,
+    description: string,
+    accentColor: string
+  ) => {
+    if (actions.length === 0) return null;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div className={cn("p-2 rounded-lg", accentColor)}>
+            {icon}
+          </div>
+          <div>
+            <h3 className="font-semibold text-[hsl(var(--portal-text-primary))]">
+              {title} <span className="text-[hsl(var(--portal-text-muted))]">({actions.length})</span>
+            </h3>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">{description}</p>
+          </div>
+        </div>
+        <div className="space-y-3 pl-11">
+          <AnimatePresence mode="popLayout">
+            {actions.map((action) => (
+              <ActionCard
+                key={action.id}
+                action={action}
+                onSelect={setSelectedAction}
+                onCopy={handleCopy}
+                onDismiss={handleDismiss}
+                onDismissWithReason={handleDismissWithReason}
+                isCopying={markUsedMutation.isPending}
+                isDismissing={dismissMutation.isPending}
+                organizationId={organizationId}
+                variant="full"
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <ClientShell pageTitle="Suggested Actions" showDateControls={false}>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
-        {/* Hero Panel */}
-        <ChartPanel
-          title="AI-Powered Suggestions"
-          description="Campaign recommendations based on your alerts and intelligence"
-          icon={Zap}
-          isLoading={isPageLoading}
-          error={error}
-          onRetry={refetch}
-          actions={
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refetch()}
-                disabled={isFetching}
-                className="gap-2 border-[hsl(var(--portal-border))] hover:bg-[hsl(var(--portal-bg-hover))]"
-              >
-                <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
-                <span className="hidden sm:inline">Refresh</span>
-              </Button>
-              {(stats?.pending ?? 0) > 0 && (
-                <Button
-                  onClick={handleMarkAllUsed}
-                  size="sm"
-                  disabled={markAllUsedMutation.isPending}
-                  className="gap-2 bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white"
-                >
-                  <Check className="h-4 w-4" />
-                  <span className="hidden sm:inline">Mark All Used</span>
-                </Button>
+        {/* Pipeline Health Panel */}
+        <PipelineHealthPanel 
+          organizationId={organizationId}
+          onRefresh={refetch}
+        />
+
+        {/* Hero Metrics */}
+        <div className="flex flex-wrap gap-3 p-4 bg-[hsl(var(--portal-bg-elevated))] rounded-xl border border-[hsl(var(--portal-border))]">
+          <V3MetricChip
+            label="Act Now"
+            value={actionsByTier.act_now.length}
+            icon={Rocket}
+            variant="success"
+          />
+          <V3MetricChip
+            label="Consider"
+            value={actionsByTier.consider.length}
+            icon={Eye}
+            variant="info"
+          />
+          <V3MetricChip
+            label="Watch"
+            value={actionsByTier.watch.length}
+            icon={Clock}
+            variant="warning"
+          />
+          <div className="w-px h-8 bg-[hsl(var(--portal-border))] mx-2 self-center" />
+          <V3MetricChip
+            label="Used"
+            value={stats?.used ?? 0}
+            icon={Check}
+            variant="default"
+          />
+          <V3MetricChip
+            label="Avg Relevance"
+            value={`${stats?.avgRelevance ?? 0}%`}
+            icon={Target}
+            variant="default"
+          />
+
+          {/* View Toggle + Actions */}
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant={triageView === "triage" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setTriageView("triage")}
+              className={cn(
+                "gap-2 h-9",
+                triageView === "triage" 
+                  ? "bg-[hsl(var(--portal-accent-blue))] text-white" 
+                  : "border-[hsl(var(--portal-border))]"
               )}
-            </div>
-          }
-          minHeight={140}
-        >
-          {/* Last Run Status */}
-          <div className="mb-4">
-            <LastRunStatus lastRun={lastRun} isLoading={lastRunLoading} variant="actions" />
+            >
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">Triage</span>
+            </Button>
+            <Button
+              variant={triageView === "list" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setTriageView("list")}
+              className={cn(
+                "gap-2 h-9",
+                triageView === "list" 
+                  ? "bg-[hsl(var(--portal-accent-blue))] text-white" 
+                  : "border-[hsl(var(--portal-border))]"
+              )}
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">List</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="gap-2 h-9 border-[hsl(var(--portal-border))] hover:bg-[hsl(var(--portal-bg-hover))]"
+            >
+              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+            </Button>
+            {totalPending > 0 && (
+              <Button
+                onClick={handleMarkAllUsed}
+                size="sm"
+                disabled={markAllUsedMutation.isPending}
+                className="gap-2 h-9 bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white"
+              >
+                <Check className="h-4 w-4" />
+                <span className="hidden sm:inline">Mark All Used</span>
+              </Button>
+            )}
           </div>
-          {/* Hero Metrics */}
-          <div className="flex flex-wrap gap-3">
-            <V3MetricChip
-              label="Pending Actions"
-              value={stats?.pending ?? 0}
-              icon={Lightbulb}
-              variant="warning"
-            />
-            <V3MetricChip
-              label="Used This Period"
-              value={stats?.used ?? 0}
-              icon={Check}
-              variant="success"
-            />
-            <V3MetricChip
-              label="High Urgency"
-              value={stats?.highUrgencyCount ?? 0}
-              icon={Zap}
-              variant="error"
-            />
-            <V3MetricChip
-              label="Avg Relevance"
-              value={`${stats?.avgRelevance ?? 0}%`}
-              icon={Target}
-              variant="info"
-            />
-          </div>
-        </ChartPanel>
-
-        {/* Filters Panel */}
-        <div className="flex flex-wrap items-center gap-4 p-4 bg-[hsl(var(--portal-bg-elevated))] rounded-xl border border-[hsl(var(--portal-border))]">
-          <div className="flex items-center gap-2 text-[hsl(var(--portal-text-muted))]">
-            <Filter className="h-4 w-4" aria-hidden="true" />
-            <span className="text-sm font-medium">Filters:</span>
-          </div>
-
-          {/* Status Filters */}
-          <div className="flex flex-wrap gap-2">
-            {STATUS_OPTIONS.map(({ value, label }) => (
-              <V3FilterPill
-                key={value}
-                label={label}
-                isActive={filterStatus === value}
-                onClick={() => setFilterStatus(value)}
-                count={
-                  value === "all"
-                    ? stats?.total
-                    : value === "pending"
-                    ? stats?.pending
-                    : stats?.used
-                }
-              />
-            ))}
-          </div>
-
-          {actionTypes.length > 1 && (
-            <>
-              <div className="w-px h-6 bg-[hsl(var(--portal-border))] mx-1" />
-
-              {/* Type Filters */}
-              <div className="flex flex-wrap gap-2">
-                <V3FilterPill
-                  label="All Types"
-                  isActive={filterType === "all"}
-                  onClick={() => setFilterType("all")}
-                />
-                {actionTypes.map((type) => (
-                  <V3FilterPill
-                    key={type}
-                    label={type}
-                    isActive={filterType === type}
-                    onClick={() => setFilterType(type)}
-                    count={stats?.byType[type]}
-                  />
-                ))}
-              </div>
-            </>
-          )}
         </div>
 
-        {/* Actions List Panel */}
-        <ChartPanel
-          title="Action Suggestions"
-          description={`${filteredActions.length} ${filterStatus === "all" ? "total" : filterStatus} actions`}
-          icon={MessageSquare}
-          isLoading={isPageLoading}
-          isEmpty={data?.actions.filter((a) => !a.is_dismissed).length === 0}
-          emptyMessage="No action suggestions yet. New AI-generated suggestions will appear here based on your alerts."
-          minHeight={400}
-        >
-          <Tabs value={filterStatus} onValueChange={(v) => setFilterStatus(v as FilterStatus)} className="w-full">
-            <TabsList className="h-auto bg-[hsl(var(--portal-bg-tertiary))] mb-4">
-              <TabsTrigger
-                value="pending"
-                className="min-h-[44px] px-4 data-[state=active]:bg-[hsl(var(--portal-bg-elevated))]"
-              >
-                Pending ({stats?.pending ?? 0})
-              </TabsTrigger>
-              <TabsTrigger
-                value="used"
-                className="min-h-[44px] px-4 data-[state=active]:bg-[hsl(var(--portal-bg-elevated))]"
-              >
-                Used ({stats?.used ?? 0})
-              </TabsTrigger>
-              <TabsTrigger
-                value="all"
-                className="min-h-[44px] px-4 data-[state=active]:bg-[hsl(var(--portal-bg-elevated))]"
-              >
-                All ({stats?.total ?? 0})
-              </TabsTrigger>
-            </TabsList>
+        {/* Main Content */}
+        {triageView === "triage" ? (
+          /* Triage View - Actions grouped by priority */
+          <div className="space-y-6">
+            {/* Act Now Section */}
+            {renderTriageSection(
+              "act_now",
+              actionsByTier.act_now,
+              <Rocket className="h-5 w-5 text-[hsl(var(--portal-success))]" />,
+              "Act Now",
+              "High opportunity, low risk, high confidence",
+              "bg-[hsl(var(--portal-success)/0.1)]"
+            )}
 
-            <TabsContent value={filterStatus} className="mt-0">
-              {filteredActions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center max-w-md mx-auto">
+            {/* Consider Section */}
+            {renderTriageSection(
+              "consider",
+              actionsByTier.consider,
+              <Eye className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />,
+              "Worth Considering",
+              "Medium scores, worth reviewing",
+              "bg-[hsl(var(--portal-accent-blue)/0.1)]"
+            )}
+
+            {/* Watch Section */}
+            {renderTriageSection(
+              "watch",
+              actionsByTier.watch,
+              <Clock className="h-5 w-5 text-[hsl(var(--portal-warning))]" />,
+              "Watch",
+              "Lower scores or flagged for review",
+              "bg-[hsl(var(--portal-warning)/0.1)]"
+            )}
+
+            {/* Empty State */}
+            {totalPending === 0 && (
+              <ChartPanel
+                title="No Pending Actions"
+                description="Check the pipeline health above for status"
+                icon={Lightbulb}
+                isLoading={isPageLoading}
+                isEmpty
+                emptyMessage="No action suggestions yet. New AI-generated suggestions will appear here based on your alerts."
+                minHeight={200}
+              >
+                <div className="flex flex-col items-center justify-center py-8 text-center">
                   <Lightbulb className="h-12 w-12 text-[hsl(var(--portal-text-muted))] mb-4" />
                   <p className="text-[hsl(var(--portal-text-secondary))] mb-2">
-                    {filterStatus === "pending"
-                      ? "No pending actions available."
-                      : filterStatus === "used"
-                      ? "No used actions yet."
-                      : "No actions match your filters."}
+                    No pending actions available.
                   </p>
-                  {filterStatus === "pending" && lastRun && (
-                    <p className="text-xs text-[hsl(var(--portal-text-muted))] mb-4">
-                      Last run processed {lastRun.alerts_processed} alerts, created {lastRun.actions_created ?? 0} actions
-                      ({lastRun.ai_generated_count ?? 0} AI, {lastRun.template_generated_count ?? 0} template).
-                      {lastRun.alerts_processed === 0 ? " No actionable alerts found in the last 7 days." : ""}
+                  {lastRun && (
+                    <p className="text-xs text-[hsl(var(--portal-text-muted))] mb-4 max-w-md">
+                      Last run processed {lastRun.alerts_processed} alerts, created {lastRun.actions_created ?? 0} actions.
+                      {lastRun.alerts_processed === 0 ? " No actionable alerts found." : ""}
                     </p>
                   )}
-                  {filterStatus === "pending" && (
-                    <Button
-                      variant="outline"
-                      onClick={() => navigate("/client/alerts")}
-                      className="mt-2 min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white border-0"
-                    >
-                      View Alerts
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate("/client/alerts")}
+                    className="mt-2 min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white border-0"
+                  >
+                    View Alerts
+                  </Button>
                 </div>
-              ) : (
-                <ScrollArea className="h-[600px] pr-4">
-                  <div className={cn(
-                    filterStatus === "used"
-                      ? "grid gap-4 sm:grid-cols-2"
-                      : "space-y-4"
-                  )}>
+              </ChartPanel>
+            )}
+
+            {/* Used Actions (collapsed) */}
+            {(stats?.used ?? 0) > 0 && (
+              <ChartPanel
+                title="Recently Used"
+                description={`${stats?.used ?? 0} actions used`}
+                icon={Check}
+                minHeight={100}
+              >
+                <ScrollArea className="max-h-[300px]">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <AnimatePresence mode="popLayout">
-                      {filteredActions.map((action) => (
-                        <ActionCard
-                          key={action.id}
-                          action={action}
-                          onSelect={setSelectedAction}
-                          onCopy={handleCopy}
-                          onDismiss={handleDismiss}
-                          isCopying={markUsedMutation.isPending}
-                          isDismissing={dismissMutation.isPending}
-                          variant={action.is_used ? "compact" : "full"}
-                        />
-                      ))}
+                      {data?.actions
+                        .filter((a) => a.is_used && !a.is_dismissed)
+                        .slice(0, 6)
+                        .map((action) => (
+                          <ActionCard
+                            key={action.id}
+                            action={action}
+                            onSelect={setSelectedAction}
+                            onCopy={handleCopy}
+                            onDismiss={handleDismiss}
+                            variant="compact"
+                          />
+                        ))}
                     </AnimatePresence>
                   </div>
                 </ScrollArea>
+              </ChartPanel>
+            )}
+          </div>
+        ) : (
+          /* List View - Traditional tabbed view */
+          <>
+            {/* Filters Panel */}
+            <div className="flex flex-wrap items-center gap-4 p-4 bg-[hsl(var(--portal-bg-elevated))] rounded-xl border border-[hsl(var(--portal-border))]">
+              <div className="flex items-center gap-2 text-[hsl(var(--portal-text-muted))]">
+                <Filter className="h-4 w-4" aria-hidden="true" />
+                <span className="text-sm font-medium">Filters:</span>
+              </div>
+
+              {/* Status Filters */}
+              <div className="flex flex-wrap gap-2">
+                {STATUS_OPTIONS.map(({ value, label }) => (
+                  <V3FilterPill
+                    key={value}
+                    label={label}
+                    isActive={filterStatus === value}
+                    onClick={() => setFilterStatus(value)}
+                    count={
+                      value === "all"
+                        ? stats?.total
+                        : value === "pending"
+                        ? stats?.pending
+                        : stats?.used
+                    }
+                  />
+                ))}
+              </div>
+
+              {actionTypes.length > 1 && (
+                <>
+                  <div className="w-px h-6 bg-[hsl(var(--portal-border))] mx-1" />
+
+                  {/* Type Filters */}
+                  <div className="flex flex-wrap gap-2">
+                    <V3FilterPill
+                      label="All Types"
+                      isActive={filterType === "all"}
+                      onClick={() => setFilterType("all")}
+                    />
+                    {actionTypes.map((type) => (
+                      <V3FilterPill
+                        key={type}
+                        label={type}
+                        isActive={filterType === type}
+                        onClick={() => setFilterType(type)}
+                        count={stats?.byType[type]}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
-            </TabsContent>
-          </Tabs>
-        </ChartPanel>
+            </div>
+
+            {/* Actions List Panel */}
+            <ChartPanel
+              title="Action Suggestions"
+              description={`${filteredActions.length} ${filterStatus === "all" ? "total" : filterStatus} actions`}
+              icon={MessageSquare}
+              isLoading={isPageLoading}
+              isEmpty={data?.actions.filter((a) => !a.is_dismissed).length === 0}
+              emptyMessage="No action suggestions yet. New AI-generated suggestions will appear here based on your alerts."
+              minHeight={400}
+            >
+              <Tabs value={filterStatus} onValueChange={(v) => setFilterStatus(v as FilterStatus)} className="w-full">
+                <TabsList className="h-auto bg-[hsl(var(--portal-bg-tertiary))] mb-4">
+                  <TabsTrigger
+                    value="pending"
+                    className="min-h-[44px] px-4 data-[state=active]:bg-[hsl(var(--portal-bg-elevated))]"
+                  >
+                    Pending ({stats?.pending ?? 0})
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="used"
+                    className="min-h-[44px] px-4 data-[state=active]:bg-[hsl(var(--portal-bg-elevated))]"
+                  >
+                    Used ({stats?.used ?? 0})
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="all"
+                    className="min-h-[44px] px-4 data-[state=active]:bg-[hsl(var(--portal-bg-elevated))]"
+                  >
+                    All ({stats?.total ?? 0})
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value={filterStatus} className="mt-0">
+                  {filteredActions.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center max-w-md mx-auto">
+                      <Lightbulb className="h-12 w-12 text-[hsl(var(--portal-text-muted))] mb-4" />
+                      <p className="text-[hsl(var(--portal-text-secondary))] mb-2">
+                        {filterStatus === "pending"
+                          ? "No pending actions available."
+                          : filterStatus === "used"
+                          ? "No used actions yet."
+                          : "No actions match your filters."}
+                      </p>
+                      {filterStatus === "pending" && lastRun && (
+                        <p className="text-xs text-[hsl(var(--portal-text-muted))] mb-4">
+                          Last run processed {lastRun.alerts_processed} alerts, created {lastRun.actions_created ?? 0} actions
+                          ({lastRun.ai_generated_count ?? 0} AI, {lastRun.template_generated_count ?? 0} template).
+                          {lastRun.alerts_processed === 0 ? " No actionable alerts found in the last 7 days." : ""}
+                        </p>
+                      )}
+                      {filterStatus === "pending" && (
+                        <Button
+                          variant="outline"
+                          onClick={() => navigate("/client/alerts")}
+                          className="mt-2 min-h-[44px] bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white border-0"
+                        >
+                          View Alerts
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[600px] pr-4">
+                      <div className={cn(
+                        filterStatus === "used"
+                          ? "grid gap-4 sm:grid-cols-2"
+                          : "space-y-4"
+                      )}>
+                        <AnimatePresence mode="popLayout">
+                          {filteredActions.map((action) => (
+                            <ActionCard
+                              key={action.id}
+                              action={action}
+                              onSelect={setSelectedAction}
+                              onCopy={handleCopy}
+                              onDismiss={handleDismiss}
+                              onDismissWithReason={handleDismissWithReason}
+                              isCopying={markUsedMutation.isPending}
+                              isDismissing={dismissMutation.isPending}
+                              organizationId={organizationId}
+                              variant={action.is_used ? "compact" : "full"}
+                            />
+                          ))}
+                        </AnimatePresence>
+                      </div>
+                    </ScrollArea>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </ChartPanel>
+          </>
+        )}
       </div>
 
       {/* Action Detail Dialog */}
@@ -646,6 +859,14 @@ const ClientActions = () => {
         onCopy={handleCopy}
         onDismiss={handleDismiss}
         isCopying={markUsedMutation.isPending}
+      />
+
+      {/* Dismiss Reason Modal */}
+      <DismissReasonModal
+        isOpen={!!dismissActionId}
+        onClose={() => setDismissActionId(null)}
+        onConfirm={handleConfirmDismiss}
+        isLoading={dismissMutation.isPending}
       />
     </ClientShell>
   );
