@@ -19,3 +19,5 @@ export { RelevanceExplanation, RelevanceBadge } from "./RelevanceExplanation";
 export { TrendFeedback, TrendFeedbackInline } from "./TrendFeedback";
 export { ProvenancePanel, ProvenanceCompact } from "./ProvenancePanel";
 export { SuggestedActionsPanel, SuggestedActionsCompact } from "./SuggestedActionsPanel";
+export { DeltaSinceLoginCard } from "./DeltaSinceLoginCard";
+export { RiskImpactSummary } from "./RiskImpactSummary";

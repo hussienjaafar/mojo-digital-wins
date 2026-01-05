@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { 
   TrendsConsole,
-  AdminPageHeader 
+  AdminPageHeader,
+  DeltaSinceLoginCard,
+  RiskImpactSummary,
 } from "@/components/admin/v3";
 import { DataStatusBar } from "@/components/admin/v3/DataStatusBar";
 import { PipelineHealthDrawer } from "@/components/admin/v3/PipelineHealthDrawer";
@@ -67,6 +69,14 @@ export function NewsTrendsPage() {
 
       {/* Data Status Bar - Compact pipeline health indicator */}
       <DataStatusBar onOpenDetails={() => setDrawerOpen(true)} />
+
+      {/* Executive Summary Cards */}
+      {mode !== "cluster" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <DeltaSinceLoginCard />
+          <RiskImpactSummary />
+        </div>
+      )}
 
       {/* Content */}
       {mode === "trends" && (
