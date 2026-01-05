@@ -1,17 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, validateCronOrAdmin, logJobFailure, checkRateLimit } from "../_shared/security.ts";
-import { normalizeText, generateHash } from "../_shared/urlNormalizer.ts";
+import { normalizeText, generateHash, extractCanonicalUrl, normalizeUrl, generateContentHash, extractDomain as extractDomainUtil } from "../_shared/urlNormalizer.ts";
 
 /**
- * Evidence-Based Trend Detection
+ * Evidence-Based Trend Detection v2
  * 
- * This function replaces naive clustering with a baseline-aware,
- * corroborated trend detection system that:
- * 1. Uses historical baselines (7d/30d rolling averages)
- * 2. Requires cross-source corroboration for "breaking" classification
- * 3. Computes confidence scores with explicit factors
- * 4. Provides full explainability of why something is trending
+ * Improvements:
+ * 1. Rolling baselines from trend_baselines (7d/30d)
+ * 2. Deduplication via content_hash/canonical_url
+ * 3. Deduped counts for velocity/confidence
+ * 4. Evidence includes canonical_url + content_hash
  */
 
 interface SourceMention {
@@ -24,12 +23,15 @@ interface SourceMention {
   sentiment_label?: string;
   topics: string[];
   domain?: string;
+  content_hash?: string;
+  canonical_url?: string;
 }
 
 interface TopicAggregate {
   event_key: string;
   event_title: string;
   mentions: SourceMention[];
+  dedupedMentions: Map<string, SourceMention>; // key = content_hash
   first_seen_at: Date;
   last_seen_at: Date;
   by_source: {
@@ -37,8 +39,20 @@ interface TopicAggregate {
     google_news: number;
     bluesky: number;
   };
+  by_source_deduped: {
+    rss: number;
+    google_news: number;
+    bluesky: number;
+  };
   sentiment_sum: number;
   sentiment_count: number;
+}
+
+interface RollingBaseline {
+  baseline_7d: number;
+  baseline_30d: number;
+  data_points_7d: number;
+  data_points_30d: number;
 }
 
 // Topic normalization with aliasing
@@ -67,7 +81,6 @@ function normalizeTopicTitle(topic: string): string {
   if (TOPIC_ALIASES[lower]) {
     return TOPIC_ALIASES[lower];
   }
-  // Title case
   return topic.split(/\s+/)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ');
@@ -75,12 +88,7 @@ function normalizeTopicTitle(topic: string): string {
 
 function extractDomain(url?: string): string {
   if (!url) return '';
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname.replace(/^www\./, '').toLowerCase();
-  } catch {
-    return '';
-  }
+  return extractDomainUtil(url);
 }
 
 serve(async (req) => {
@@ -115,12 +123,14 @@ serve(async (req) => {
       );
     }
 
-    console.log('[detect-trend-events] Starting evidence-based trend detection...');
+    console.log('[detect-trend-events] Starting evidence-based trend detection v2 (with rolling baselines + dedupe)...');
     
     const now = new Date();
     const hour1Ago = new Date(now.getTime() - 60 * 60 * 1000);
     const hours6Ago = new Date(now.getTime() - 6 * 60 * 60 * 1000);
     const hours24Ago = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const days7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const days30Ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     
     // Load source tiers for authority weighting
     const { data: tierData } = await supabase
@@ -132,30 +142,115 @@ serve(async (req) => {
       sourceTiers.set(t.domain, { tier: t.tier, weight: t.authority_weight || 1 });
     }
     
-    // Aggregate topics from all sources
+    // ========================================
+    // STEP 1: Load rolling baselines from trend_baselines
+    // ========================================
+    console.log('[detect-trend-events] Loading rolling baselines...');
+    
+    const { data: baselineData } = await supabase
+      .from('trend_baselines')
+      .select('event_key, baseline_date, hourly_average')
+      .gte('baseline_date', days30Ago.toISOString().split('T')[0])
+      .order('baseline_date', { ascending: false });
+    
+    // Compute rolling averages per event_key
+    const rollingBaselines = new Map<string, RollingBaseline>();
+    const baselinesByKey = new Map<string, { date: string; hourly_avg: number }[]>();
+    
+    for (const b of baselineData || []) {
+      if (!baselinesByKey.has(b.event_key)) {
+        baselinesByKey.set(b.event_key, []);
+      }
+      baselinesByKey.get(b.event_key)!.push({
+        date: b.baseline_date,
+        hourly_avg: Number(b.hourly_average) || 0,
+      });
+    }
+    
+    const today = now.toISOString().split('T')[0];
+    const date7dAgo = days7Ago.toISOString().split('T')[0];
+    
+    for (const [key, baselines] of baselinesByKey) {
+      // Filter to 7d and 30d windows (excluding today to avoid counting current data)
+      const last7d = baselines.filter(b => b.date >= date7dAgo && b.date < today);
+      const last30d = baselines.filter(b => b.date < today);
+      
+      const avg7d = last7d.length > 0 
+        ? last7d.reduce((sum, b) => sum + b.hourly_avg, 0) / last7d.length 
+        : 0;
+      const avg30d = last30d.length > 0 
+        ? last30d.reduce((sum, b) => sum + b.hourly_avg, 0) / last30d.length 
+        : 0;
+      
+      rollingBaselines.set(key, {
+        baseline_7d: avg7d,
+        baseline_30d: avg30d,
+        data_points_7d: last7d.length,
+        data_points_30d: last30d.length,
+      });
+    }
+    
+    console.log(`[detect-trend-events] Loaded rolling baselines for ${rollingBaselines.size} topics`);
+    
+    // ========================================
+    // STEP 2: Aggregate topics with deduplication
+    // ========================================
     const topicMap = new Map<string, TopicAggregate>();
     
-    // Helper to add mention to topic
+    // Helper to generate content hash for deduplication
+    const generateMentionHash = (mention: SourceMention): string => {
+      // For Bluesky, use text hash since no URL
+      if (mention.source_type === 'bluesky') {
+        return generateHash(normalizeText(mention.title || '').substring(0, 100));
+      }
+      // For articles, use canonical URL + title hash
+      return generateContentHash(
+        mention.title || '',
+        mention.url || '',
+        mention.published_at
+      );
+    };
+    
+    // Helper to add mention to topic with deduplication
     const addMention = (topic: string, mention: SourceMention) => {
       const key = normalizeTopicKey(topic);
       if (!key || key.length < 2) return;
+      
+      // Generate content hash for dedupe
+      const contentHash = generateMentionHash(mention);
+      mention.content_hash = contentHash;
+      
+      // Generate canonical URL
+      if (mention.url) {
+        mention.canonical_url = extractCanonicalUrl(mention.url);
+      }
       
       if (!topicMap.has(key)) {
         topicMap.set(key, {
           event_key: key,
           event_title: normalizeTopicTitle(topic),
           mentions: [],
+          dedupedMentions: new Map(),
           first_seen_at: new Date(mention.published_at),
           last_seen_at: new Date(mention.published_at),
           by_source: { rss: 0, google_news: 0, bluesky: 0 },
+          by_source_deduped: { rss: 0, google_news: 0, bluesky: 0 },
           sentiment_sum: 0,
           sentiment_count: 0,
         });
       }
       
       const agg = topicMap.get(key)!;
+      
+      // Add to raw mentions (for evidence)
       agg.mentions.push(mention);
       agg.by_source[mention.source_type]++;
+      
+      // Deduplicate: only count unique content hashes
+      if (!agg.dedupedMentions.has(contentHash)) {
+        agg.dedupedMentions.set(contentHash, mention);
+        agg.by_source_deduped[mention.source_type]++;
+      }
       
       const pubDate = new Date(mention.published_at);
       if (pubDate < agg.first_seen_at) agg.first_seen_at = pubDate;
@@ -170,8 +265,9 @@ serve(async (req) => {
     // 1. Fetch articles with topics (RSS)
     const { data: articles } = await supabase
       .from('articles')
-      .select('id, title, source_url, published_date, sentiment_score, sentiment_label, tags')
+      .select('id, title, source_url, canonical_url, content_hash, published_date, sentiment_score, sentiment_label, tags')
       .gte('published_date', hours24Ago.toISOString())
+      .eq('is_duplicate', false)
       .not('tags', 'is', null);
     
     for (const article of articles || []) {
@@ -179,6 +275,8 @@ serve(async (req) => {
         id: article.id,
         title: article.title,
         url: article.source_url,
+        canonical_url: article.canonical_url || undefined,
+        content_hash: article.content_hash || undefined,
         published_at: article.published_date,
         source_type: 'rss',
         sentiment_score: article.sentiment_score,
@@ -195,8 +293,9 @@ serve(async (req) => {
     // 2. Fetch Google News with topics
     const { data: googleNews } = await supabase
       .from('google_news_articles')
-      .select('id, title, url, published_at, ai_sentiment, ai_sentiment_label, ai_topics')
+      .select('id, title, url, canonical_url, content_hash, published_at, ai_sentiment, ai_sentiment_label, ai_topics')
       .eq('ai_processed', true)
+      .eq('is_duplicate', false)
       .gte('published_at', hours24Ago.toISOString())
       .not('ai_topics', 'is', null);
     
@@ -205,6 +304,8 @@ serve(async (req) => {
         id: item.id,
         title: item.title,
         url: item.url,
+        canonical_url: item.canonical_url || undefined,
+        content_hash: item.content_hash || undefined,
         published_at: item.published_at,
         source_type: 'google_news',
         sentiment_score: item.ai_sentiment,
@@ -224,7 +325,8 @@ serve(async (req) => {
       .select('id, text, post_uri, created_at, ai_sentiment, ai_sentiment_label, ai_topics')
       .eq('ai_processed', true)
       .gte('created_at', hours24Ago.toISOString())
-      .not('ai_topics', 'is', null);
+      .not('ai_topics', 'is', null)
+      .limit(5000); // Limit to avoid massive queries
     
     for (const post of blueskyPosts || []) {
       const mention: SourceMention = {
@@ -245,72 +347,74 @@ serve(async (req) => {
     
     console.log(`[detect-trend-events] Aggregated ${topicMap.size} unique topics from sources`);
     
-    // 4. Load existing baselines
-    const eventKeys = Array.from(topicMap.keys());
-    const { data: existingEvents } = await supabase
-      .from('trend_events')
-      .select('id, event_key, baseline_7d, baseline_30d, first_seen_at')
-      .in('event_key', eventKeys.slice(0, 500)); // Limit for query size
-    
-    const existingMap = new Map<string, any>();
-    for (const e of existingEvents || []) {
-      existingMap.set(e.event_key, e);
-    }
-    
-    // 5. Process each topic into trend events
+    // ========================================
+    // STEP 3: Process topics with deduped counts + rolling baselines
+    // ========================================
     const eventsToUpsert: any[] = [];
     const evidenceToInsert: any[] = [];
     let trendingCount = 0;
     let breakingCount = 0;
+    let dedupedSavings = 0;
     
     for (const [key, agg] of topicMap) {
-      const mentions = agg.mentions;
-      const totalMentions = mentions.length;
+      // Use DEDUPED counts for all calculations
+      const dedupedMentions = Array.from(agg.dedupedMentions.values());
+      const totalMentionsRaw = agg.mentions.length;
+      const totalMentionsDeduped = dedupedMentions.length;
       
-      // Skip low-volume topics
-      if (totalMentions < 3) continue;
+      dedupedSavings += (totalMentionsRaw - totalMentionsDeduped);
       
-      // Calculate window counts
-      const current1h = mentions.filter(m => new Date(m.published_at) > hour1Ago).length;
-      const current6h = mentions.filter(m => new Date(m.published_at) > hours6Ago).length;
-      const current24h = totalMentions;
+      // Skip low-volume topics (using deduped count)
+      if (totalMentionsDeduped < 3) continue;
       
-      // Get baseline from existing event or estimate
-      const existing = existingMap.get(key);
-      const baseline7d = existing?.baseline_7d || (current24h / 24); // Fallback: use current as baseline
-      const baseline30d = existing?.baseline_30d || baseline7d;
+      // Calculate window counts using DEDUPED mentions
+      const current1h_deduped = dedupedMentions.filter(m => new Date(m.published_at) > hour1Ago).length;
+      const current6h_deduped = dedupedMentions.filter(m => new Date(m.published_at) > hours6Ago).length;
+      const current24h_deduped = totalMentionsDeduped;
       
-      // Calculate velocity (% above baseline)
+      // Get rolling baseline from historical data
+      const rolling = rollingBaselines.get(key);
+      const hasHistoricalBaseline = rolling && rolling.data_points_7d >= 3;
+      
+      // Use rolling baseline if available, else use conservative fallback
+      const baseline7d = hasHistoricalBaseline 
+        ? rolling!.baseline_7d 
+        : (current24h_deduped / 24) * 0.5; // Conservative: assume current is 2x normal
+      
+      const baseline30d = rolling?.baseline_30d || baseline7d;
+      
+      // Calculate velocity using deduped hourly rate vs baseline
+      const currentHourlyRate = current1h_deduped;
       const velocity = baseline7d > 0 
-        ? ((current1h - baseline7d) / baseline7d) * 100 
-        : (current1h > 0 ? current1h * 50 : 0);
+        ? ((currentHourlyRate - baseline7d) / baseline7d) * 100 
+        : (currentHourlyRate > 0 ? currentHourlyRate * 50 : 0);
       
       const velocity1h = velocity;
+      const rate6h = current6h_deduped / 6;
       const velocity6h = baseline7d > 0 
-        ? (((current6h / 6) - baseline7d) / baseline7d) * 100 
+        ? ((rate6h - baseline7d) / baseline7d) * 100 
         : 0;
       
-      // Calculate acceleration (change in velocity)
-      const rate1h = current1h;
-      const rate6h = current6h / 6;
-      const acceleration = rate6h > 0 ? ((rate1h - rate6h) / rate6h) * 100 : 0;
+      // Calculate acceleration
+      const acceleration = rate6h > 0 ? ((currentHourlyRate - rate6h) / rate6h) * 100 : 0;
       
-      // Source counts
-      const newsCount = agg.by_source.rss + agg.by_source.google_news;
-      const socialCount = agg.by_source.bluesky;
-      const sourceCount = (agg.by_source.rss > 0 ? 1 : 0) + 
-                          (agg.by_source.google_news > 0 ? 1 : 0) + 
-                          (agg.by_source.bluesky > 0 ? 1 : 0);
+      // Source counts using DEDUPED counts
+      const newsCount = agg.by_source_deduped.rss + agg.by_source_deduped.google_news;
+      const socialCount = agg.by_source_deduped.bluesky;
+      const sourceCount = (agg.by_source_deduped.rss > 0 ? 1 : 0) + 
+                          (agg.by_source_deduped.google_news > 0 ? 1 : 0) + 
+                          (agg.by_source_deduped.bluesky > 0 ? 1 : 0);
       
-      // Corroboration score (0-100)
+      // Corroboration score
       const corroborationScore = Math.min(100, sourceCount * 25 + (newsCount > 0 && socialCount > 0 ? 25 : 0));
       
-      // Calculate confidence using DB function logic
+      // Calculate confidence with baseline quality factor
+      const baselineQuality = hasHistoricalBaseline ? 1.0 : 0.6; // Penalize if no historical data
       const confidenceFactors = {
-        baseline_delta: Math.min(30, Math.max(0, velocity / 10)),
+        baseline_delta: Math.min(30, Math.max(0, velocity / 10)) * baselineQuality,
         cross_source: Math.min(30, sourceCount * 8 + (newsCount > 0 ? 5 : 0)),
-        volume: Math.min(20, current24h * 2),
-        velocity: Math.min(20, Math.max(0, velocity / 10)),
+        volume: Math.min(20, current24h_deduped * 2),
+        velocity: Math.min(20, Math.max(0, velocity / 10)) * baselineQuality,
       };
       const confidenceScore = Object.values(confidenceFactors).reduce((a, b) => a + b, 0);
       
@@ -329,12 +433,12 @@ serve(async (req) => {
         trendStage = 'surging';
       }
       
-      // Determine if trending (threshold-based)
-      const isTrending = confidenceScore >= 40 && current24h >= 5 && sourceCount >= 2;
+      // Determine if trending (using deduped counts)
+      const isTrending = confidenceScore >= 40 && current24h_deduped >= 5 && sourceCount >= 2;
       
-      // Determine if breaking (requires cross-source + high velocity + recent)
-      const baselineDelta = baseline7d > 0 ? (current1h - baseline7d) / baseline7d : current1h;
-      const isBreaking = (
+      // Determine if breaking (requires cross-source + high velocity + recent + good baseline)
+      const baselineDelta = baseline7d > 0 ? (currentHourlyRate - baseline7d) / baseline7d : currentHourlyRate;
+      const isBreaking = hasHistoricalBaseline && (
         (velocity > 150 && sourceCount >= 2 && newsCount >= 1 && hoursOld < 6) ||
         (velocity > 300 && newsCount >= 1) ||
         (baselineDelta > 5 && sourceCount >= 2 && hoursOld < 12)
@@ -351,12 +455,10 @@ serve(async (req) => {
         else if (avgSentiment < -0.2) sentimentLabel = 'negative';
       }
       
-      // Get top headline (prefer news sources)
-      const sortedMentions = [...mentions].sort((a, b) => {
-        // Prefer news over social
+      // Get top headline (prefer news sources, use deduped list)
+      const sortedMentions = [...dedupedMentions].sort((a, b) => {
         if (a.source_type !== 'bluesky' && b.source_type === 'bluesky') return -1;
         if (a.source_type === 'bluesky' && b.source_type !== 'bluesky') return 1;
-        // Then by recency
         return new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
       });
       const topHeadline = sortedMentions[0]?.title?.substring(0, 200) || '';
@@ -365,30 +467,33 @@ serve(async (req) => {
       const eventRecord = {
         event_key: key,
         event_title: agg.event_title,
-        first_seen_at: existing?.first_seen_at || agg.first_seen_at.toISOString(),
+        first_seen_at: agg.first_seen_at.toISOString(),
         last_seen_at: agg.last_seen_at.toISOString(),
         peak_at: trendStage === 'peaking' ? now.toISOString() : null,
         baseline_7d: baseline7d,
         baseline_30d: baseline30d,
         baseline_updated_at: now.toISOString(),
-        current_1h: current1h,
-        current_6h: current6h,
-        current_24h: current24h,
+        current_1h: current1h_deduped,
+        current_6h: current6h_deduped,
+        current_24h: current24h_deduped,
         velocity,
         velocity_1h: velocity1h,
         velocity_6h: velocity6h,
         acceleration,
         confidence_score: Math.round(confidenceScore),
-        confidence_factors: confidenceFactors,
+        confidence_factors: {
+          ...confidenceFactors,
+          baseline_quality: baselineQuality,
+          has_historical_baseline: hasHistoricalBaseline,
+        },
         is_trending: isTrending,
         is_breaking: isBreaking,
         trend_stage: trendStage,
         source_count: sourceCount,
-        news_source_count: agg.by_source.rss > 0 || agg.by_source.google_news > 0 ? 
-          (agg.by_source.rss > 0 ? 1 : 0) + (agg.by_source.google_news > 0 ? 1 : 0) : 0,
-        social_source_count: agg.by_source.bluesky > 0 ? 1 : 0,
+        news_source_count: (agg.by_source_deduped.rss > 0 ? 1 : 0) + (agg.by_source_deduped.google_news > 0 ? 1 : 0),
+        social_source_count: agg.by_source_deduped.bluesky > 0 ? 1 : 0,
         corroboration_score: corroborationScore,
-        evidence_count: totalMentions,
+        evidence_count: totalMentionsDeduped,
         top_headline: topHeadline,
         sentiment_score: avgSentiment,
         sentiment_label: sentimentLabel,
@@ -397,14 +502,14 @@ serve(async (req) => {
       
       eventsToUpsert.push(eventRecord);
       
-      // Prepare evidence records (top 10 per topic to control volume)
+      // Prepare evidence records (top 10 per topic, from deduped list)
       const topEvidence = sortedMentions.slice(0, 10);
       for (const mention of topEvidence) {
         const domain = mention.domain || extractDomain(mention.url);
         const tierInfo = sourceTiers.get(domain);
         
         evidenceToInsert.push({
-          event_key: key, // Will be resolved to event_id after upsert
+          event_key: key,
           source_type: mention.source_type === 'rss' ? 'article' : mention.source_type,
           source_id: mention.id,
           source_url: mention.url,
@@ -413,6 +518,8 @@ serve(async (req) => {
           published_at: mention.published_at,
           contribution_score: tierInfo?.weight || 1,
           is_primary: mention === sortedMentions[0],
+          canonical_url: mention.canonical_url || null,
+          content_hash: mention.content_hash || null,
           sentiment_score: mention.sentiment_score,
           sentiment_label: mention.sentiment_label,
         });
@@ -420,8 +527,11 @@ serve(async (req) => {
     }
     
     console.log(`[detect-trend-events] Processing ${eventsToUpsert.length} topics, ${trendingCount} trending, ${breakingCount} breaking`);
+    console.log(`[detect-trend-events] Deduplication removed ${dedupedSavings} duplicate mentions`);
     
-    // 6. Upsert trend events
+    // ========================================
+    // STEP 4: Upsert trend events and evidence
+    // ========================================
     if (eventsToUpsert.length > 0) {
       const { data: upsertedEvents, error: upsertError } = await supabase
         .from('trend_events')
@@ -439,17 +549,27 @@ serve(async (req) => {
           eventIdMap.set(e.event_key, e.id);
         }
         
-        // 7. Insert evidence with resolved event IDs
+        // Insert evidence with resolved event IDs
         const resolvedEvidence = evidenceToInsert
           .filter(e => eventIdMap.has(e.event_key))
           .map(e => ({
-            ...e,
             event_id: eventIdMap.get(e.event_key),
-            event_key: undefined, // Remove temp field
+            source_type: e.source_type,
+            source_id: e.source_id,
+            source_url: e.source_url,
+            source_title: e.source_title,
+            source_domain: e.source_domain,
+            published_at: e.published_at,
+            contribution_score: e.contribution_score,
+            is_primary: e.is_primary,
+            canonical_url: e.canonical_url,
+            content_hash: e.content_hash,
+            sentiment_score: e.sentiment_score,
+            sentiment_label: e.sentiment_label,
           }));
         
         if (resolvedEvidence.length > 0) {
-          // Delete old evidence for these events first (to refresh)
+          // Delete old evidence for these events first
           const eventIds = Array.from(new Set(resolvedEvidence.map(e => e.event_id)));
           await supabase
             .from('trend_evidence')
@@ -464,28 +584,31 @@ serve(async (req) => {
           if (evidenceError) {
             console.error('[detect-trend-events] Error inserting evidence:', evidenceError.message);
           } else {
-            console.log(`[detect-trend-events] Inserted ${resolvedEvidence.length} evidence records`);
+            console.log(`[detect-trend-events] Inserted ${resolvedEvidence.length} evidence records with canonical_url/content_hash`);
           }
         }
       }
     }
     
-    // 8. Update baselines for today (for future runs)
-    const today = now.toISOString().split('T')[0];
+    // ========================================
+    // STEP 5: Update baselines for today
+    // ========================================
     const baselineUpdates = eventsToUpsert.slice(0, 200).map(e => ({
       event_key: e.event_key,
       baseline_date: today,
       mentions_count: e.current_24h,
       hourly_average: e.current_24h / 24,
-      news_mentions: (topicMap.get(e.event_key)?.by_source.rss || 0) + 
-                     (topicMap.get(e.event_key)?.by_source.google_news || 0),
-      social_mentions: topicMap.get(e.event_key)?.by_source.bluesky || 0,
+      news_mentions: (topicMap.get(e.event_key)?.by_source_deduped.rss || 0) + 
+                     (topicMap.get(e.event_key)?.by_source_deduped.google_news || 0),
+      social_mentions: topicMap.get(e.event_key)?.by_source_deduped.bluesky || 0,
     }));
     
     if (baselineUpdates.length > 0) {
       await supabase
         .from('trend_baselines')
         .upsert(baselineUpdates, { onConflict: 'event_key,baseline_date' });
+      
+      console.log(`[detect-trend-events] Updated ${baselineUpdates.length} baseline records for ${today}`);
     }
     
     const duration = Date.now() - startTime;
@@ -497,6 +620,8 @@ serve(async (req) => {
       trending_count: trendingCount,
       breaking_count: breakingCount,
       evidence_count: evidenceToInsert.length,
+      deduped_savings: dedupedSavings,
+      baselines_loaded: rollingBaselines.size,
       duration_ms: duration,
     };
     
