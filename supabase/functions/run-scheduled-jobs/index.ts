@@ -214,9 +214,16 @@ serve(async (req) => {
         let itemsProcessed = 0;
         let itemsCreated = 0;
 
+        // Get cron secret once for all jobs that need it
+        const cronSecret = Deno.env.get('CRON_SECRET');
+        const authHeaders: { [key: string]: string } = cronSecret ? { 'x-cron-secret': cronSecret } : {};
+
         switch (job.job_type) {
           case 'fetch_rss':
-            const rssResponse = await supabase.functions.invoke('fetch-rss-feeds', { body: {} });
+            const rssResponse = await supabase.functions.invoke('fetch-rss-feeds', { 
+              body: {},
+              headers: authHeaders
+            });
             if (rssResponse.error) throw new Error(rssResponse.error.message);
             result = rssResponse.data;
             itemsProcessed = result?.processed || 0;
@@ -284,7 +291,10 @@ serve(async (req) => {
             break;
 
           case 'correlate_social_news':
-            const correlateResponse = await supabase.functions.invoke('correlate-social-news', { body: {} });
+            const correlateResponse = await supabase.functions.invoke('correlate-social-news', { 
+              body: {},
+              headers: authHeaders
+            });
             if (correlateResponse.error) throw new Error(correlateResponse.error.message);
             result = correlateResponse.data;
             itemsProcessed = result?.trends_analyzed || 0;
@@ -306,7 +316,10 @@ serve(async (req) => {
             break;
 
           case 'cleanup_cache':
-            const cleanupResponse = await supabase.functions.invoke('cleanup-old-cache', { body: {} });
+            const cleanupResponse = await supabase.functions.invoke('cleanup-old-cache', { 
+              body: {},
+              headers: authHeaders
+            });
             if (cleanupResponse.error) throw new Error(cleanupResponse.error.message);
             result = cleanupResponse.data;
             itemsProcessed = result?.deleted || 0;
@@ -314,7 +327,10 @@ serve(async (req) => {
 
           case 'collect_bluesky':
           case 'bluesky_stream_keepalive':
-            const collectBlueskyResponse = await supabase.functions.invoke('bluesky-stream', { body: { durationMs: 45000 } });
+            const collectBlueskyResponse = await supabase.functions.invoke('bluesky-stream', { 
+              body: { durationMs: 45000 },
+              headers: authHeaders
+            });
             if (collectBlueskyResponse.error) throw new Error(collectBlueskyResponse.error.message);
             result = collectBlueskyResponse.data;
             itemsProcessed = result?.postsCollected || 0;
@@ -322,7 +338,10 @@ serve(async (req) => {
             break;
 
           case 'calculate_news_trends':
-            const newsTrendsResponse = await supabase.functions.invoke('calculate-news-trends', { body: {} });
+            const newsTrendsResponse = await supabase.functions.invoke('calculate-news-trends', { 
+              body: {},
+              headers: authHeaders
+            });
             if (newsTrendsResponse.error) throw new Error(newsTrendsResponse.error.message);
             result = newsTrendsResponse.data;
             itemsProcessed = result?.topics_updated || 0;
@@ -330,14 +349,20 @@ serve(async (req) => {
             break;
 
           case 'detect_spikes':
-            const spikesResponse = await supabase.functions.invoke('detect-spikes', { body: {} });
+            const spikesResponse = await supabase.functions.invoke('detect-spikes', { 
+              body: {},
+              headers: authHeaders
+            });
             if (spikesResponse.error) throw new Error(spikesResponse.error.message);
             result = spikesResponse.data;
             itemsProcessed = result?.spikes_detected || 0;
             break;
 
           case 'detect_breaking_news':
-            const breakingNewsResponse = await supabase.functions.invoke('detect-breaking-news', { body: {} });
+            const breakingNewsResponse = await supabase.functions.invoke('detect-breaking-news', { 
+              body: {},
+              headers: authHeaders
+            });
             if (breakingNewsResponse.error) throw new Error(breakingNewsResponse.error.message);
             result = breakingNewsResponse.data;
             itemsProcessed = result?.clusters_found || 0;
@@ -352,7 +377,10 @@ serve(async (req) => {
             break;
 
           case 'calculate_entity_trends':
-            const entityTrendsResponse = await supabase.functions.invoke('calculate-entity-trends', { body: {} });
+            const entityTrendsResponse = await supabase.functions.invoke('calculate-entity-trends', { 
+              body: {},
+              headers: authHeaders
+            });
             if (entityTrendsResponse.error) throw new Error(entityTrendsResponse.error.message);
             result = entityTrendsResponse.data;
             itemsProcessed = result?.entities_processed || 0;
