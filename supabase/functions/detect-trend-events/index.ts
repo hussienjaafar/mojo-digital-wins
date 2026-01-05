@@ -434,7 +434,8 @@ serve(async (req) => {
       }
       
       // Determine if trending (using deduped counts)
-      const isTrending = confidenceScore >= 40 && current24h_deduped >= 5 && sourceCount >= 2;
+      // Relaxed: require confidence >= 40, 3+ deduped mentions in 24h, OR 2+ sources
+      const isTrending = confidenceScore >= 40 && current24h_deduped >= 3 && (sourceCount >= 2 || current24h_deduped >= 8);
       
       // Determine if breaking (requires cross-source + high velocity + recent + good baseline)
       const baselineDelta = baseline7d > 0 ? (currentHourlyRate - baseline7d) / baseline7d : currentHourlyRate;
