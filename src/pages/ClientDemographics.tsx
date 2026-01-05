@@ -419,7 +419,7 @@ const ClientDemographics = () => {
   // Loading state
   if (isLoading) {
     return (
-      <ClientShell>
+      <ClientShell showDateControls={false}>
         <div className="p-6">
           <V3LoadingState variant="kpi-grid" count={3} />
           <div className="mt-6">
@@ -433,7 +433,7 @@ const ClientDemographics = () => {
   // Empty state
   if (!organization || !summary || !totals) {
     return (
-      <ClientShell>
+      <ClientShell showDateControls={false}>
         <V3EmptyState
           title="No Donor Data"
           description="There is no transaction data available to analyze demographics."
@@ -460,7 +460,7 @@ const ClientDemographics = () => {
   }));
 
   return (
-    <ClientShell>
+    <ClientShell showDateControls={false}>
       <V3PageContainer
         title="Donor Demographics"
         description="Analyze your donor base by location, occupation, and acquisition channel"
