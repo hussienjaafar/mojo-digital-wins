@@ -3900,6 +3900,77 @@ export type Database = {
         }
         Relationships: []
       }
+      intelligence_actions: {
+        Row: {
+          action_status: string
+          action_type: string
+          alert_id: string | null
+          audience_id: string | null
+          copy_text: string | null
+          copy_variant: string | null
+          created_at: string | null
+          entity_name: string | null
+          id: string
+          meta_adset_id: string | null
+          meta_campaign_id: string | null
+          meta_creative_id: string | null
+          metadata: Json | null
+          organization_id: string
+          sent_at: string | null
+          sms_message_id: string | null
+          suggested_action_id: string | null
+          trend_event_id: string | null
+        }
+        Insert: {
+          action_status?: string
+          action_type: string
+          alert_id?: string | null
+          audience_id?: string | null
+          copy_text?: string | null
+          copy_variant?: string | null
+          created_at?: string | null
+          entity_name?: string | null
+          id?: string
+          meta_adset_id?: string | null
+          meta_campaign_id?: string | null
+          meta_creative_id?: string | null
+          metadata?: Json | null
+          organization_id: string
+          sent_at?: string | null
+          sms_message_id?: string | null
+          suggested_action_id?: string | null
+          trend_event_id?: string | null
+        }
+        Update: {
+          action_status?: string
+          action_type?: string
+          alert_id?: string | null
+          audience_id?: string | null
+          copy_text?: string | null
+          copy_variant?: string | null
+          created_at?: string | null
+          entity_name?: string | null
+          id?: string
+          meta_adset_id?: string | null
+          meta_campaign_id?: string | null
+          meta_creative_id?: string | null
+          metadata?: Json | null
+          organization_id?: string
+          sent_at?: string | null
+          sms_message_id?: string | null
+          suggested_action_id?: string | null
+          trend_event_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intelligence_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_executions: {
         Row: {
           completed_at: string | null
@@ -5130,6 +5201,82 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "organization_quotas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outcome_events: {
+        Row: {
+          action_id: string | null
+          attributed: boolean | null
+          attribution_confidence: number | null
+          id: string
+          meta_campaign_id: string | null
+          meta_creative_id: string | null
+          metadata: Json | null
+          occurred_at: string
+          organization_id: string
+          outcome_count: number | null
+          outcome_type: string
+          outcome_value: number | null
+          recorded_at: string | null
+          sms_message_id: string | null
+          transaction_id: string | null
+        }
+        Insert: {
+          action_id?: string | null
+          attributed?: boolean | null
+          attribution_confidence?: number | null
+          id?: string
+          meta_campaign_id?: string | null
+          meta_creative_id?: string | null
+          metadata?: Json | null
+          occurred_at?: string
+          organization_id: string
+          outcome_count?: number | null
+          outcome_type: string
+          outcome_value?: number | null
+          recorded_at?: string | null
+          sms_message_id?: string | null
+          transaction_id?: string | null
+        }
+        Update: {
+          action_id?: string | null
+          attributed?: boolean | null
+          attribution_confidence?: number | null
+          id?: string
+          meta_campaign_id?: string | null
+          meta_creative_id?: string | null
+          metadata?: Json | null
+          occurred_at?: string
+          organization_id?: string
+          outcome_count?: number | null
+          outcome_type?: string
+          outcome_value?: number | null
+          recorded_at?: string | null
+          sms_message_id?: string | null
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outcome_events_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "action_outcome_summary"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "outcome_events_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "intelligence_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outcome_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "client_organizations"
@@ -7568,6 +7715,80 @@ export type Database = {
           },
         ]
       }
+      trend_outcome_correlation: {
+        Row: {
+          actions_sent: number | null
+          avg_donation: number | null
+          baseline_response_rate: number | null
+          computed_at: string | null
+          donation_rate: number | null
+          id: string
+          learning_signal: string | null
+          organization_id: string
+          performance_delta: number | null
+          response_rate: number | null
+          should_boost_relevance: boolean | null
+          total_clicks: number | null
+          total_donation_amount: number | null
+          total_donations: number | null
+          total_outcomes: number | null
+          trend_event_id: string | null
+          trend_key: string
+          window_end: string | null
+          window_start: string | null
+        }
+        Insert: {
+          actions_sent?: number | null
+          avg_donation?: number | null
+          baseline_response_rate?: number | null
+          computed_at?: string | null
+          donation_rate?: number | null
+          id?: string
+          learning_signal?: string | null
+          organization_id: string
+          performance_delta?: number | null
+          response_rate?: number | null
+          should_boost_relevance?: boolean | null
+          total_clicks?: number | null
+          total_donation_amount?: number | null
+          total_donations?: number | null
+          total_outcomes?: number | null
+          trend_event_id?: string | null
+          trend_key: string
+          window_end?: string | null
+          window_start?: string | null
+        }
+        Update: {
+          actions_sent?: number | null
+          avg_donation?: number | null
+          baseline_response_rate?: number | null
+          computed_at?: string | null
+          donation_rate?: number | null
+          id?: string
+          learning_signal?: string | null
+          organization_id?: string
+          performance_delta?: number | null
+          response_rate?: number | null
+          should_boost_relevance?: boolean | null
+          total_clicks?: number | null
+          total_donation_amount?: number | null
+          total_donations?: number | null
+          total_outcomes?: number | null
+          trend_event_id?: string | null
+          trend_key?: string
+          window_end?: string | null
+          window_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_outcome_correlation_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trending_news_topics: {
         Row: {
           calculated_at: string | null
@@ -8141,6 +8362,31 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      action_outcome_summary: {
+        Row: {
+          action_id: string | null
+          action_type: string | null
+          copy_variant: string | null
+          donation_count: number | null
+          donation_total: number | null
+          entity_name: string | null
+          meta_outcomes: number | null
+          organization_id: string | null
+          sent_at: string | null
+          sms_outcomes: number | null
+          total_outcomes: number | null
+          trend_event_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intelligence_actions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "client_organizations"
