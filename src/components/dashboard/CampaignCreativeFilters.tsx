@@ -129,7 +129,21 @@ function useFilterOptions(organizationId: string, startDate: string, endDate: st
       // Build creative options with names
       const creatives: FilterOption[] = Array.from(creativeSet)
         .map((id) => {
-          const name = creativeNameMap.get(id);
+          let name = creativeNameMap.get(id);
+          
+          // Clean up template placeholders like "{{product.name}} 2025-09-11-hash"
+          if (name && name.startsWith("{{")) {
+            // Extract date portion if present (format: YYYY-MM-DD)
+            const dateMatch = name.match(/(\d{4}-\d{2}-\d{2})/);
+            if (dateMatch) {
+              const date = new Date(dateMatch[1]);
+              const formatted = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              name = `Product Ad (${formatted})`;
+            } else {
+              name = undefined; // Fall back to ID
+            }
+          }
+          
           return {
             id,
             label: name || id,
