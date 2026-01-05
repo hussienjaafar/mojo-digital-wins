@@ -191,6 +191,7 @@ export type Database = {
           errors: Json | null
           finished_at: string | null
           id: string
+          last_error: string | null
           metadata: Json | null
           organization_id: string | null
           skipped_count: number | null
@@ -206,6 +207,7 @@ export type Database = {
           errors?: Json | null
           finished_at?: string | null
           id?: string
+          last_error?: string | null
           metadata?: Json | null
           organization_id?: string | null
           skipped_count?: number | null
@@ -221,6 +223,7 @@ export type Database = {
           errors?: Json | null
           finished_at?: string | null
           id?: string
+          last_error?: string | null
           metadata?: Json | null
           organization_id?: string | null
           skipped_count?: number | null
@@ -4526,10 +4529,12 @@ export type Database = {
       }
       org_alert_preferences: {
         Row: {
+          always_generate_safe_variant: boolean | null
           created_at: string | null
           digest_mode: string | null
           id: string
           max_alerts_per_day: number | null
+          min_decision_score: number | null
           min_relevance_score: number | null
           min_urgency_score: number | null
           notify_channels: string[] | null
@@ -4538,10 +4543,12 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          always_generate_safe_variant?: boolean | null
           created_at?: string | null
           digest_mode?: string | null
           id?: string
           max_alerts_per_day?: number | null
+          min_decision_score?: number | null
           min_relevance_score?: number | null
           min_urgency_score?: number | null
           notify_channels?: string[] | null
@@ -4550,10 +4557,12 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          always_generate_safe_variant?: boolean | null
           created_at?: string | null
           digest_mode?: string | null
           id?: string
           max_alerts_per_day?: number | null
+          min_decision_score?: number | null
           min_relevance_score?: number | null
           min_urgency_score?: number | null
           notify_channels?: string[] | null
@@ -4573,39 +4582,51 @@ export type Database = {
       }
       org_feedback_events: {
         Row: {
+          copy_diff: string | null
           created_at: string | null
+          edited_final_copy: string | null
           entity_name: string | null
           event_type: string
           id: string
           object_id: string
           object_type: string
           organization_id: string
+          reason_code: string | null
+          reason_detail: string | null
           relevance_score_at_time: number | null
           topic_tags: string[] | null
           urgency_score_at_time: number | null
           user_id: string | null
         }
         Insert: {
+          copy_diff?: string | null
           created_at?: string | null
+          edited_final_copy?: string | null
           entity_name?: string | null
           event_type: string
           id?: string
           object_id: string
           object_type: string
           organization_id: string
+          reason_code?: string | null
+          reason_detail?: string | null
           relevance_score_at_time?: number | null
           topic_tags?: string[] | null
           urgency_score_at_time?: number | null
           user_id?: string | null
         }
         Update: {
+          copy_diff?: string | null
           created_at?: string | null
+          edited_final_copy?: string | null
           entity_name?: string | null
           event_type?: string
           id?: string
           object_id?: string
           object_type?: string
           organization_id?: string
+          reason_code?: string | null
+          reason_detail?: string | null
           relevance_score_at_time?: number | null
           topic_tags?: string[] | null
           urgency_score_at_time?: number | null
@@ -4889,6 +4910,71 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "organization_quotas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_health_snapshots: {
+        Row: {
+          actionable_alerts_24h: number | null
+          actions_generated_24h: number | null
+          ai_generated_count: number | null
+          created_at: string | null
+          generate_actions_count: number | null
+          generate_actions_last_error: string | null
+          generate_actions_last_run: string | null
+          generate_actions_status: string
+          id: string
+          match_watchlist_alerts_created: number | null
+          match_watchlist_last_error: string | null
+          match_watchlist_last_run: string | null
+          match_watchlist_status: string
+          organization_id: string | null
+          snapshot_at: string | null
+          template_generated_count: number | null
+        }
+        Insert: {
+          actionable_alerts_24h?: number | null
+          actions_generated_24h?: number | null
+          ai_generated_count?: number | null
+          created_at?: string | null
+          generate_actions_count?: number | null
+          generate_actions_last_error?: string | null
+          generate_actions_last_run?: string | null
+          generate_actions_status?: string
+          id?: string
+          match_watchlist_alerts_created?: number | null
+          match_watchlist_last_error?: string | null
+          match_watchlist_last_run?: string | null
+          match_watchlist_status?: string
+          organization_id?: string | null
+          snapshot_at?: string | null
+          template_generated_count?: number | null
+        }
+        Update: {
+          actionable_alerts_24h?: number | null
+          actions_generated_24h?: number | null
+          ai_generated_count?: number | null
+          created_at?: string | null
+          generate_actions_count?: number | null
+          generate_actions_last_error?: string | null
+          generate_actions_last_run?: string | null
+          generate_actions_status?: string
+          id?: string
+          match_watchlist_alerts_created?: number | null
+          match_watchlist_last_error?: string | null
+          match_watchlist_last_run?: string | null
+          match_watchlist_status?: string
+          organization_id?: string | null
+          snapshot_at?: string | null
+          template_generated_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_health_snapshots_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "client_organizations"
@@ -6239,17 +6325,28 @@ export type Database = {
           alert_id: string | null
           audience_segment: string | null
           character_count: number | null
+          compliance_checks: Json | null
+          compliance_status: string | null
+          confidence_score: number | null
           created_at: string | null
+          decision_score: number | null
+          dedupe_key: string | null
+          edited_copy: string | null
           entity_name: string | null
           estimated_impact: string | null
+          fit_score: number | null
           generation_method: string | null
+          generation_rationale: Json | null
           historical_performance: Json | null
           id: string
           is_dismissed: boolean | null
           is_used: boolean | null
+          opportunity_score: number | null
           org_relevance_reasons: string[] | null
           org_relevance_score: number | null
           organization_id: string | null
+          original_copy: string | null
+          risk_score: number | null
           status: string | null
           suggested_copy: string | null
           topic_relevance: number | null
@@ -6257,23 +6354,38 @@ export type Database = {
           urgency_score: number | null
           used_at: string | null
           value_prop: string | null
+          variant_group_id: string | null
+          variant_type: string | null
+          was_edited: boolean | null
+          was_sent: boolean | null
         }
         Insert: {
           action_type: string
           alert_id?: string | null
           audience_segment?: string | null
           character_count?: number | null
+          compliance_checks?: Json | null
+          compliance_status?: string | null
+          confidence_score?: number | null
           created_at?: string | null
+          decision_score?: number | null
+          dedupe_key?: string | null
+          edited_copy?: string | null
           entity_name?: string | null
           estimated_impact?: string | null
+          fit_score?: number | null
           generation_method?: string | null
+          generation_rationale?: Json | null
           historical_performance?: Json | null
           id?: string
           is_dismissed?: boolean | null
           is_used?: boolean | null
+          opportunity_score?: number | null
           org_relevance_reasons?: string[] | null
           org_relevance_score?: number | null
           organization_id?: string | null
+          original_copy?: string | null
+          risk_score?: number | null
           status?: string | null
           suggested_copy?: string | null
           topic_relevance?: number | null
@@ -6281,23 +6393,38 @@ export type Database = {
           urgency_score?: number | null
           used_at?: string | null
           value_prop?: string | null
+          variant_group_id?: string | null
+          variant_type?: string | null
+          was_edited?: boolean | null
+          was_sent?: boolean | null
         }
         Update: {
           action_type?: string
           alert_id?: string | null
           audience_segment?: string | null
           character_count?: number | null
+          compliance_checks?: Json | null
+          compliance_status?: string | null
+          confidence_score?: number | null
           created_at?: string | null
+          decision_score?: number | null
+          dedupe_key?: string | null
+          edited_copy?: string | null
           entity_name?: string | null
           estimated_impact?: string | null
+          fit_score?: number | null
           generation_method?: string | null
+          generation_rationale?: Json | null
           historical_performance?: Json | null
           id?: string
           is_dismissed?: boolean | null
           is_used?: boolean | null
+          opportunity_score?: number | null
           org_relevance_reasons?: string[] | null
           org_relevance_score?: number | null
           organization_id?: string | null
+          original_copy?: string | null
+          risk_score?: number | null
           status?: string | null
           suggested_copy?: string | null
           topic_relevance?: number | null
@@ -6305,6 +6432,10 @@ export type Database = {
           urgency_score?: number | null
           used_at?: string | null
           value_prop?: string | null
+          variant_group_id?: string | null
+          variant_type?: string | null
+          was_edited?: boolean | null
+          was_sent?: boolean | null
         }
         Relationships: [
           {
