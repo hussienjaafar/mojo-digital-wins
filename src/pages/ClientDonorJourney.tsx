@@ -565,7 +565,7 @@ const ClientDonorJourney = () => {
   // Loading state
   if (orgLoading || !organizationId) {
     return (
-      <ClientShell pageTitle="Attribution & Performance">
+      <ClientShell pageTitle="Attribution & Performance" showDateControls={false}>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="animate-pulse text-muted-foreground">Loading...</div>
         </div>
@@ -575,7 +575,7 @@ const ClientDonorJourney = () => {
 
   if (isLoading) {
     return (
-      <ClientShell pageTitle="Attribution & Performance">
+      <ClientShell pageTitle="Attribution & Performance" showDateControls={false}>
         <V3PageContainer
           icon={GitBranch}
           title="Attribution & Performance"
@@ -592,7 +592,7 @@ const ClientDonorJourney = () => {
 
   if (error) {
     return (
-      <ClientShell pageTitle="Attribution & Performance">
+      <ClientShell pageTitle="Attribution & Performance" showDateControls={false}>
         <V3PageContainer
           icon={GitBranch}
           title="Attribution & Performance"
@@ -609,7 +609,7 @@ const ClientDonorJourney = () => {
   }
 
   return (
-    <ClientShell pageTitle="Attribution & Performance">
+    <ClientShell pageTitle="Attribution & Performance" showDateControls={false}>
       <V3PageContainer
         icon={GitBranch}
         title="Attribution & Performance"

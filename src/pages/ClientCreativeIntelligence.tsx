@@ -220,7 +220,7 @@ export default function ClientCreativeIntelligence() {
 
   if (orgLoading || isLoading) {
     return (
-      <ClientShell>
+      <ClientShell showDateControls={false}>
         <div className="p-6">
           <V3LoadingState variant="kpi-grid" count={7} />
           <div className="mt-6">
@@ -233,7 +233,7 @@ export default function ClientCreativeIntelligence() {
 
   if (creatives.length === 0 && !showImport) {
     return (
-      <ClientShell>
+      <ClientShell showDateControls={false}>
         <V3EmptyState
           icon={Sparkles}
           title="Creative Intelligence"
@@ -252,7 +252,7 @@ export default function ClientCreativeIntelligence() {
 
   if (showImport) {
     return (
-      <ClientShell>
+      <ClientShell showDateControls={false}>
         <V3PageContainer title="Import Campaign Data" description="Import your Meta Ads creative data">
           <V3Button 
             variant="secondary" 
@@ -274,7 +274,7 @@ export default function ClientCreativeIntelligence() {
   }
 
   return (
-    <ClientShell>
+    <ClientShell showDateControls={false}>
       <V3PageContainer
         title="Creative Intelligence"
         description="AI-powered analysis of your ad creatives"
