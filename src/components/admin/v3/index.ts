@@ -11,3 +11,5 @@ export { TrendsConsole } from "./TrendsConsole";
 export { NewsInvestigationTable } from "./NewsInvestigationTable";
 export { DataStatusBar } from "./DataStatusBar";
 export { PipelineHealthDrawer } from "./PipelineHealthDrawer";
+export { TrendExplainability, TrendExplainabilityCompact } from "./TrendExplainability";
+export { ClusterDrilldownView } from "./ClusterDrilldownView";

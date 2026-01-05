@@ -6,8 +6,6 @@ import {
   Eye,
   PlusCircle,
   Bell,
-  ExternalLink,
-  Filter,
   ChevronRight,
   Rocket,
   TrendingDown,
@@ -18,10 +16,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUnifiedTrends, UnifiedTrend, getSpikeRatioColor } from '@/hooks/useUnifiedTrends';
 import { DataFreshnessIndicator } from './DataFreshnessIndicator';
+import { TrendExplainabilityCompact } from './TrendExplainability';
 import { cn } from '@/lib/utils';
 
 interface TrendsConsoleProps {
@@ -163,19 +161,24 @@ function TrendCard({
             )}
           </div>
 
-          {/* Why Trending */}
+          {/* Why Trending - using TrendExplainability */}
+          <div className="mt-2">
+            <TrendExplainabilityCompact trend={trend} />
+          </div>
+
+          {/* Sample headline if available */}
           {(trend.cluster_summary || trend.sampleHeadline) && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground cursor-help">
-                  <Info className="h-3 w-3" />
+                <div className="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground cursor-help">
+                  <Info className="h-3 w-3 shrink-0" />
                   <span className="line-clamp-1">
                     {trend.cluster_summary || trend.sampleHeadline}
                   </span>
                 </div>
               </TooltipTrigger>
               <TooltipContent className="max-w-sm">
-                <p className="font-medium mb-1">Why is this trending?</p>
+                <p className="font-medium mb-1">Context</p>
                 <p className="text-xs">{trend.cluster_summary || trend.sampleHeadline}</p>
                 {trend.related_topics && trend.related_topics.length > 0 && (
                   <p className="text-xs mt-2">
