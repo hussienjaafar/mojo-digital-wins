@@ -6953,6 +6953,44 @@ export type Database = {
           },
         ]
       }
+      trend_feedback: {
+        Row: {
+          created_at: string | null
+          feedback_type: string
+          id: string
+          notes: string | null
+          organization_id: string | null
+          trend_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          feedback_type: string
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          trend_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          feedback_type?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          trend_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_feedback_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trending_news_topics: {
         Row: {
           calculated_at: string | null

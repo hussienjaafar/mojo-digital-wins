@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, X, Pin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -8,8 +8,7 @@ import {
 } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-
-type FeedbackType = 'relevant' | 'not_relevant' | 'follow_up';
+import { useTrendFeedback, FeedbackType } from '@/hooks/useTrendFeedback';
 
 interface TrendFeedbackProps {
   trendId: string;
@@ -54,8 +53,17 @@ export function TrendFeedback({
   size = 'sm',
   className 
 }: TrendFeedbackProps) {
-  const [feedback, setFeedback] = useState<FeedbackType | null>(initialFeedback || null);
+  const { submitFeedback, getFeedbackForTrend, isSubmitting: hookSubmitting } = useTrendFeedback();
+  const existingFeedback = getFeedbackForTrend(trendId);
+  const [feedback, setFeedback] = useState<FeedbackType | null>(initialFeedback || existingFeedback);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Sync with hook data when it loads
+  useEffect(() => {
+    if (existingFeedback && !feedback) {
+      setFeedback(existingFeedback);
+    }
+  }, [existingFeedback]);
 
   const handleFeedback = async (type: FeedbackType) => {
     // Toggle off if clicking the same feedback
@@ -64,11 +72,11 @@ export function TrendFeedback({
     setIsSubmitting(true);
     
     try {
-      // Store feedback locally for now
-      // In a real implementation, this would call an API
       setFeedback(newFeedback);
       
       if (newFeedback) {
+        // Persist to database
+        submitFeedback({ trendId, feedbackType: newFeedback });
         onFeedback?.(trendId, newFeedback);
         
         // Show toast for feedback
