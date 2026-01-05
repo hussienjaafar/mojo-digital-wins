@@ -11,22 +11,23 @@ import {
 import { DataStatusBar } from "@/components/admin/v3/DataStatusBar";
 import { PipelineHealthDrawer } from "@/components/admin/v3/PipelineHealthDrawer";
 import { NewsInvestigationTable } from "@/components/admin/v3/NewsInvestigationTable";
-import { ClusterDrilldownView } from "@/components/admin/v3/ClusterDrilldownView";
+import { TrendEventDrilldownView } from "@/components/admin/v3/TrendEventDrilldownView";
 
-type ViewMode = "trends" | "feed" | "cluster";
+type ViewMode = "trends" | "feed" | "trend_detail";
 
 export function NewsTrendsPage() {
   const [mode, setMode] = useState<ViewMode>("trends");
-  const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
+  const [selectedTrendId, setSelectedTrendId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const handleClusterDrilldown = useCallback((clusterId: string) => {
-    setSelectedCluster(clusterId);
-    setMode("cluster");
+  // Handle drilldown to trend_events detail view
+  const handleTrendDrilldown = useCallback((trendId: string) => {
+    setSelectedTrendId(trendId);
+    setMode("trend_detail");
   }, []);
 
-  const handleBackFromCluster = useCallback(() => {
-    setSelectedCluster(null);
+  const handleBackFromTrendDetail = useCallback(() => {
+    setSelectedTrendId(null);
     setMode("trends");
   }, []);
 
@@ -34,11 +35,11 @@ export function NewsTrendsPage() {
     <div className="space-y-4">
       <AdminPageHeader
         title="News & Trends"
-        description="Real-time political intelligence monitoring and trend analysis"
+        description="Real-time political intelligence monitoring and evidence-based trend analysis"
       />
 
       {/* Mode Switcher */}
-      {mode !== "cluster" && (
+      {mode !== "trend_detail" && (
         <div className="flex items-center gap-2 border-b border-border pb-3">
           <Button
             variant={mode === "trends" ? "default" : "ghost"}
@@ -71,7 +72,7 @@ export function NewsTrendsPage() {
       <DataStatusBar onOpenDetails={() => setDrawerOpen(true)} />
 
       {/* Executive Summary Cards */}
-      {mode !== "cluster" && (
+      {mode !== "trend_detail" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <DeltaSinceLoginCard />
           <RiskImpactSummary />
@@ -80,17 +81,17 @@ export function NewsTrendsPage() {
 
       {/* Content */}
       {mode === "trends" && (
-        <TrendsConsole onDrilldown={handleClusterDrilldown} />
+        <TrendsConsole onDrilldown={handleTrendDrilldown} />
       )}
       
       {mode === "feed" && (
         <NewsInvestigationTable />
       )}
       
-      {mode === "cluster" && selectedCluster && (
-        <ClusterDrilldownView 
-          clusterId={selectedCluster} 
-          onBack={handleBackFromCluster} 
+      {mode === "trend_detail" && selectedTrendId && (
+        <TrendEventDrilldownView 
+          trendId={selectedTrendId} 
+          onBack={handleBackFromTrendDetail} 
         />
       )}
 

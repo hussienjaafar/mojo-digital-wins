@@ -11,21 +11,21 @@ import {
   TrendingDown,
   BarChart3,
   RefreshCw,
-  Info
+  Info,
+  Target
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useUnifiedTrends, UnifiedTrend, getSpikeRatioColor } from '@/hooks/useUnifiedTrends';
+import { useTrendEvents, getConfidenceColor, getTrendStageInfo, type TrendEvent } from '@/hooks/useTrendEvents';
 import { DataFreshnessIndicator } from './DataFreshnessIndicator';
-import { TrendExplainabilityCompact } from './TrendExplainability';
-import { ConfidenceIndicator, calculateTrendConfidence } from './ConfidenceIndicator';
+import { TrendExplainabilityCompact } from './TrendEventExplainability';
 import { TrendFeedback } from './TrendFeedback';
 import { cn } from '@/lib/utils';
 
 interface TrendsConsoleProps {
-  onDrilldown?: (clusterId: string) => void;
+  onDrilldown?: (trendId: string) => void;
   className?: string;
 }
 
@@ -37,14 +37,32 @@ const STAGE_CONFIG = {
   stable: { label: 'Stable', color: 'bg-muted text-muted-foreground border-border', icon: BarChart3 },
 };
 
-function TrendCard({ 
+/**
+ * Calculate spike ratio from baseline comparison
+ */
+function getSpikeRatio(trend: TrendEvent): number {
+  if (trend.baseline_7d <= 0) return 1;
+  return Math.min(5, Math.max(1, trend.current_1h / trend.baseline_7d));
+}
+
+/**
+ * Get color for spike ratio display
+ */
+function getSpikeRatioColor(spikeRatio: number): string {
+  if (spikeRatio >= 4) return 'text-destructive';
+  if (spikeRatio >= 3) return 'text-orange-500';
+  if (spikeRatio >= 2) return 'text-yellow-500';
+  return 'text-muted-foreground';
+}
+
+function TrendEventCard({ 
   trend, 
   rank, 
   onDrilldown,
   onAddToWatchlist,
   onCreateAlert 
 }: { 
-  trend: UnifiedTrend; 
+  trend: TrendEvent; 
   rank: number;
   onDrilldown?: () => void;
   onAddToWatchlist?: () => void;
@@ -52,18 +70,16 @@ function TrendCard({
 }) {
   const stageConfig = STAGE_CONFIG[trend.trend_stage || 'stable'];
   const StageIcon = stageConfig.icon;
+  const spikeRatio = getSpikeRatio(trend);
 
   // Calculate source breakdown for visualization
-  const totalSources = (trend.source_distribution?.google_news || 0) +
-    (trend.source_distribution?.reddit || 0) +
-    (trend.source_distribution?.bluesky || 0) +
-    (trend.source_distribution?.rss || 0);
+  const newsCount = trend.news_source_count || 0;
+  const socialCount = trend.social_source_count || 0;
+  const totalSources = newsCount + socialCount;
 
   const sourcePercentages = {
-    google_news: totalSources > 0 ? ((trend.source_distribution?.google_news || 0) / totalSources) * 100 : 0,
-    reddit: totalSources > 0 ? ((trend.source_distribution?.reddit || 0) / totalSources) * 100 : 0,
-    bluesky: totalSources > 0 ? ((trend.source_distribution?.bluesky || 0) / totalSources) * 100 : 0,
-    rss: totalSources > 0 ? ((trend.source_distribution?.rss || 0) / totalSources) * 100 : 0,
+    news: totalSources > 0 ? (newsCount / totalSources) * 100 : 0,
+    social: totalSources > 0 ? (socialCount / totalSources) * 100 : 0,
   };
 
   return (
@@ -72,7 +88,7 @@ function TrendCard({
         "group relative rounded-lg border p-4 transition-all hover:shadow-md cursor-pointer",
         "bg-card hover:bg-card/80",
         trend.is_breaking && "ring-2 ring-destructive/50 bg-destructive/5",
-        trend.is_breakthrough && !trend.is_breaking && "ring-1 ring-orange-500/30 bg-orange-500/5"
+        !trend.is_breaking && trend.confidence_score >= 70 && "ring-1 ring-orange-500/30 bg-orange-500/5"
       )}
       onClick={onDrilldown}
     >
@@ -100,7 +116,7 @@ function TrendCard({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="font-semibold text-foreground truncate">{trend.name}</h4>
+            <h4 className="font-semibold text-foreground truncate">{trend.event_title}</h4>
             {trend.is_breaking && (
               <Badge variant="destructive" className="text-[10px]">BREAKING</Badge>
             )}
@@ -109,19 +125,14 @@ function TrendCard({
                 {stageConfig.label}
               </Badge>
             )}
-            {trend.matchesWatchlist && (
-              <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30">
-                Watchlist
-              </Badge>
-            )}
           </div>
 
           {/* Metrics Row with Confidence */}
           <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-            <span className="font-medium">{trend.total_mentions_24h.toLocaleString()} mentions</span>
-            {trend.velocity > 0 && (
-              <span className={cn("font-medium", getSpikeRatioColor(trend.spike_ratio))}>
-                {trend.spike_ratio.toFixed(1)}x baseline
+            <span className="font-medium">{trend.current_24h.toLocaleString()} mentions</span>
+            {spikeRatio > 1 && (
+              <span className={cn("font-medium", getSpikeRatioColor(spikeRatio))}>
+                {spikeRatio.toFixed(1)}x baseline
               </span>
             )}
             {trend.source_count >= 2 && (
@@ -129,69 +140,58 @@ function TrendCard({
                 {trend.source_count} sources
               </span>
             )}
-            <ConfidenceIndicator 
-              factors={calculateTrendConfidence(trend).factors}
-              size="sm"
-            />
+            <Badge 
+              variant="outline" 
+              className={cn("text-[10px] py-0 gap-1", getConfidenceColor(trend.confidence_score))}
+            >
+              <Target className="h-2.5 w-2.5" />
+              {trend.confidence_score}%
+            </Badge>
           </div>
 
-          {/* Source Distribution Bar */}
+          {/* Source Distribution Bar - Evidence-based */}
           <div className="mt-3 h-1.5 rounded-full overflow-hidden flex bg-muted">
-            {sourcePercentages.google_news > 0 && (
-              <div 
-                className="bg-blue-500 h-full" 
-                style={{ width: `${sourcePercentages.google_news}%` }}
-                title={`Google News: ${trend.source_distribution?.google_news}`}
-              />
+            {sourcePercentages.news > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className="bg-blue-500 h-full" 
+                    style={{ width: `${sourcePercentages.news}%` }}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>News: {newsCount} sources</TooltipContent>
+              </Tooltip>
             )}
-            {sourcePercentages.rss > 0 && (
-              <div 
-                className="bg-purple-500 h-full" 
-                style={{ width: `${sourcePercentages.rss}%` }}
-                title={`RSS: ${trend.source_distribution?.rss}`}
-              />
-            )}
-            {sourcePercentages.reddit > 0 && (
-              <div 
-                className="bg-orange-500 h-full" 
-                style={{ width: `${sourcePercentages.reddit}%` }}
-                title={`Reddit: ${trend.source_distribution?.reddit}`}
-              />
-            )}
-            {sourcePercentages.bluesky > 0 && (
-              <div 
-                className="bg-sky-500 h-full" 
-                style={{ width: `${sourcePercentages.bluesky}%` }}
-                title={`Bluesky: ${trend.source_distribution?.bluesky}`}
-              />
+            {sourcePercentages.social > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className="bg-sky-400 h-full" 
+                    style={{ width: `${sourcePercentages.social}%` }}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>Social: {socialCount} sources</TooltipContent>
+              </Tooltip>
             )}
           </div>
 
-          {/* Why Trending - using TrendExplainability */}
+          {/* Why Trending - Evidence-based explainability */}
           <div className="mt-2">
             <TrendExplainabilityCompact trend={trend} />
           </div>
 
-          {/* Sample headline if available */}
-          {(trend.cluster_summary || trend.sampleHeadline) && (
+          {/* Top headline if available */}
+          {trend.top_headline && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground cursor-help">
                   <Info className="h-3 w-3 shrink-0" />
-                  <span className="line-clamp-1">
-                    {trend.cluster_summary || trend.sampleHeadline}
-                  </span>
+                  <span className="line-clamp-1">{trend.top_headline}</span>
                 </div>
               </TooltipTrigger>
               <TooltipContent className="max-w-sm">
-                <p className="font-medium mb-1">Context</p>
-                <p className="text-xs">{trend.cluster_summary || trend.sampleHeadline}</p>
-                {trend.related_topics && trend.related_topics.length > 0 && (
-                  <p className="text-xs mt-2">
-                    <span className="text-muted-foreground">Related: </span>
-                    {trend.related_topics.slice(0, 3).join(', ')}
-                  </p>
-                )}
+                <p className="font-medium mb-1">Top Headline</p>
+                <p className="text-xs">{trend.top_headline}</p>
               </TooltipContent>
             </Tooltip>
           )}
@@ -244,8 +244,8 @@ function TrendCard({
           
           {/* Feedback controls - always visible */}
           <TrendFeedback 
-            trendId={trend.normalized_name}
-            trendName={trend.name}
+            trendId={trend.event_key}
+            trendName={trend.event_title}
             size="sm"
           />
         </div>
@@ -255,8 +255,9 @@ function TrendCard({
 }
 
 export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
-  const { trends, isLoading, stats, refresh } = useUnifiedTrends({ limit: 50 });
-  const [activeFilter, setActiveFilter] = useState<'all' | 'breaking' | 'watchlist'>('all');
+  // Use the new evidence-based trend events hook
+  const { events, isLoading, stats, refresh } = useTrendEvents({ limit: 50, minConfidence: 30 });
+  const [activeFilter, setActiveFilter] = useState<'all' | 'breaking' | 'high_confidence'>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -268,18 +269,18 @@ export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
   const filteredTrends = useMemo(() => {
     switch (activeFilter) {
       case 'breaking':
-        return trends.filter(t => t.is_breaking || t.is_breakthrough);
-      case 'watchlist':
-        return trends.filter(t => t.matchesWatchlist);
+        return events.filter(t => t.is_breaking);
+      case 'high_confidence':
+        return events.filter(t => t.confidence_score >= 70);
       default:
-        return trends;
+        return events;
     }
-  }, [trends, activeFilter]);
+  }, [events, activeFilter]);
 
-  // Get latest update time from trends
-  const latestUpdate = trends.length > 0 
-    ? trends.reduce((latest, t) => {
-        const tDate = new Date(t.last_updated);
+  // Get latest update time from events
+  const latestUpdate = events.length > 0 
+    ? events.reduce((latest, t) => {
+        const tDate = new Date(t.last_seen_at);
         return tDate > latest ? tDate : latest;
       }, new Date(0)).toISOString()
     : null;
@@ -295,7 +296,7 @@ export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
           <div>
             <h2 className="font-semibold text-lg">Trends Console</h2>
             <p className="text-xs text-muted-foreground">
-              {stats.totalTrending} trending • {stats.breakthroughs} breakthroughs • {stats.watchlistMatches} watchlist matches
+              {stats.totalEvents} trending • {stats.breakingCount} breaking • {stats.highConfidenceCount} high confidence
             </p>
           </div>
         </div>
@@ -323,7 +324,7 @@ export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
           size="sm"
           onClick={() => setActiveFilter('all')}
         >
-          All ({trends.length})
+          All ({events.length})
         </Button>
         <Button
           variant={activeFilter === 'breaking' ? 'default' : 'outline'}
@@ -331,15 +332,15 @@ export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
           onClick={() => setActiveFilter('breaking')}
         >
           <Zap className="h-3 w-3 mr-1" />
-          Breaking ({trends.filter(t => t.is_breaking || t.is_breakthrough).length})
+          Breaking ({stats.breakingCount})
         </Button>
         <Button
-          variant={activeFilter === 'watchlist' ? 'default' : 'outline'}
+          variant={activeFilter === 'high_confidence' ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setActiveFilter('watchlist')}
+          onClick={() => setActiveFilter('high_confidence')}
         >
-          <Eye className="h-3 w-3 mr-1" />
-          Watchlist ({stats.watchlistMatches})
+          <Target className="h-3 w-3 mr-1" />
+          High Confidence ({stats.highConfidenceCount})
         </Button>
       </div>
 
@@ -358,11 +359,11 @@ export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
             </div>
           ) : (
             filteredTrends.map((trend, index) => (
-              <TrendCard
-                key={trend.normalized_name}
+              <TrendEventCard
+                key={trend.id}
                 trend={trend}
                 rank={index + 1}
-                onDrilldown={() => onDrilldown?.(trend.normalized_name)}
+                onDrilldown={() => onDrilldown?.(trend.id)}
               />
             ))
           )}
