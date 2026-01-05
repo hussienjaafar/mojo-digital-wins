@@ -3264,10 +3264,13 @@ export type Database = {
         Row: {
           alert_threshold: number | null
           aliases: string[] | null
+          context_keywords: string[] | null
           created_at: string | null
           created_by: string | null
+          disambiguation_hint: string | null
           entity_name: string
           entity_type: string
+          geo_focus: string[] | null
           id: string
           is_active: boolean | null
           organization_id: string | null
@@ -3278,10 +3281,13 @@ export type Database = {
         Insert: {
           alert_threshold?: number | null
           aliases?: string[] | null
+          context_keywords?: string[] | null
           created_at?: string | null
           created_by?: string | null
+          disambiguation_hint?: string | null
           entity_name: string
           entity_type: string
+          geo_focus?: string[] | null
           id?: string
           is_active?: boolean | null
           organization_id?: string | null
@@ -3292,10 +3298,13 @@ export type Database = {
         Update: {
           alert_threshold?: number | null
           aliases?: string[] | null
+          context_keywords?: string[] | null
           created_at?: string | null
           created_by?: string | null
+          disambiguation_hint?: string | null
           entity_name?: string
           entity_type?: string
+          geo_focus?: string[] | null
           id?: string
           is_active?: boolean | null
           organization_id?: string | null
@@ -5087,6 +5096,7 @@ export type Database = {
       organization_profiles: {
         Row: {
           ai_extracted_data: Json | null
+          allies: string[] | null
           audiences: string[] | null
           channels_enabled: string[] | null
           created_at: string | null
@@ -5094,19 +5104,24 @@ export type Database = {
           focus_areas: string[] | null
           geographies: string[] | null
           id: string
+          interest_topics: string[] | null
           key_issues: string[] | null
           mission_summary: string | null
+          opponents: string[] | null
           org_type: string | null
           organization_id: string | null
           primary_goals: string[] | null
+          priority_lanes: string[] | null
           related_orgs: string[] | null
           scraped_at: string | null
           sensitivity_redlines: Json | null
+          stakeholders: string[] | null
           updated_at: string | null
           website_url: string | null
         }
         Insert: {
           ai_extracted_data?: Json | null
+          allies?: string[] | null
           audiences?: string[] | null
           channels_enabled?: string[] | null
           created_at?: string | null
@@ -5114,19 +5129,24 @@ export type Database = {
           focus_areas?: string[] | null
           geographies?: string[] | null
           id?: string
+          interest_topics?: string[] | null
           key_issues?: string[] | null
           mission_summary?: string | null
+          opponents?: string[] | null
           org_type?: string | null
           organization_id?: string | null
           primary_goals?: string[] | null
+          priority_lanes?: string[] | null
           related_orgs?: string[] | null
           scraped_at?: string | null
           sensitivity_redlines?: Json | null
+          stakeholders?: string[] | null
           updated_at?: string | null
           website_url?: string | null
         }
         Update: {
           ai_extracted_data?: Json | null
+          allies?: string[] | null
           audiences?: string[] | null
           channels_enabled?: string[] | null
           created_at?: string | null
@@ -5134,14 +5154,18 @@ export type Database = {
           focus_areas?: string[] | null
           geographies?: string[] | null
           id?: string
+          interest_topics?: string[] | null
           key_issues?: string[] | null
           mission_summary?: string | null
+          opponents?: string[] | null
           org_type?: string | null
           organization_id?: string | null
           primary_goals?: string[] | null
+          priority_lanes?: string[] | null
           related_orgs?: string[] | null
           scraped_at?: string | null
           sensitivity_redlines?: Json | null
+          stakeholders?: string[] | null
           updated_at?: string | null
           website_url?: string | null
         }

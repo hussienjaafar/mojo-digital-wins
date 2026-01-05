@@ -390,6 +390,33 @@ serve(async (req) => {
             itemsProcessed = result?.events_tracked || 0;
             break;
 
+          case 'detect_trend_events':
+            console.log('[SCHEDULER] Running evidence-based trend detection');
+            // CRITICAL: Pass the cron secret so detect-trend-events can authenticate
+            const cronSecretForTrends = Deno.env.get('CRON_SECRET');
+            const trendEventsResponse = await supabase.functions.invoke('detect-trend-events', { 
+              body: {},
+              headers: cronSecretForTrends ? { 'x-cron-secret': cronSecretForTrends } : {}
+            });
+            if (trendEventsResponse.error) throw new Error(trendEventsResponse.error.message);
+            result = trendEventsResponse.data;
+            itemsProcessed = result?.topics_processed || 0;
+            itemsCreated = result?.events_created || result?.trending_count || 0;
+            break;
+
+          case 'compute_org_relevance':
+            console.log('[SCHEDULER] Computing org relevance scores');
+            const cronSecretForRelevance = Deno.env.get('CRON_SECRET');
+            const relevanceResponse = await supabase.functions.invoke('compute-org-relevance', { 
+              body: {},
+              headers: cronSecretForRelevance ? { 'x-cron-secret': cronSecretForRelevance } : {}
+            });
+            if (relevanceResponse.error) throw new Error(relevanceResponse.error.message);
+            result = relevanceResponse.data;
+            itemsProcessed = result?.organizations_scored || result?.trends_scored || 0;
+            itemsCreated = result?.scores_created || 0;
+            break;
+
           case 'attribution':
           case 'edge_function':
             // Handle edge_function job types - invoke the function named in the endpoint field
