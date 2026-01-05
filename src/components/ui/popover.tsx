@@ -17,14 +17,14 @@ const PopoverContent = React.forwardRef<
       align={align}
       sideOffset={sideOffset}
       className={cn(
-        // Base styles with portal tokens for opaque, consistent styling
-        "z-50 w-72 rounded-lg p-4 outline-none",
-        // Portal-themed background (opaque) and border
-        "bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]",
-        // Shadow for elevation
-        "shadow-lg",
-        // Text color
-        "text-[hsl(var(--portal-text-primary))]",
+        // Base layout
+        "z-[100] w-72 rounded-lg p-4 outline-none",
+        // V3 Portal surface - opaque background
+        "bg-[hsl(var(--portal-bg-secondary))] text-[hsl(var(--portal-text-primary))]",
+        // Border and shadow
+        "border border-[hsl(var(--portal-border))] shadow-lg",
+        // Ensure fully opaque
+        "opacity-100",
         // Animations
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
