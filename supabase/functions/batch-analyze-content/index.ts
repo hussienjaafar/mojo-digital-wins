@@ -6,51 +6,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Local keyword extraction (no AI needed)
-const POLITICAL_KEYWORDS = {
-  // Named entities (people) - highest specificity
-  persons: [
-    'trump', 'biden', 'harris', 'obama', 'pence', 'desantis', 'newsom',
-    'pelosi', 'mcconnell', 'schumer', 'cruz', 'sanders', 'warren', 'aoc',
-    'ocasio-cortez', 'gaetz', 'greene', 'boebert', 'jordan', 'mccarthy',
-    'kash patel', 'brian cole', 'jack smith', 'merrick garland', 'alito',
-    'kavanaugh', 'gorsuch', 'barrett', 'sotomayor', 'kagan', 'jackson',
-    'musk', 'zuckerberg', 'buttigieg', 'tuberville', 'vance', 'ramaswamy'
-  ],
-  // Organizations - high specificity
-  organizations: [
-    'fbi', 'doj', 'cia', 'nsa', 'dhs', 'ice', 'cbp', 'atf', 'dea',
-    'supreme court', 'congress', 'senate', 'house', 'white house',
-    'pentagon', 'state department', 'treasury', 'federal reserve',
-    'nato', 'democratic party', 'republican party', 'gop', 'dnc', 'rnc'
-  ],
-  // Event indicators - mark headlines as events
-  events: [
-    'arrested', 'arrest', 'indicted', 'indictment', 'verdict', 'ruling',
-    'shooting', 'bombing', 'explosion', 'crash', 'fire', 'attack',
-    'resignation', 'fired', 'dies', 'death', 'killed', 'murder',
-    'election', 'primary', 'debate', 'rally', 'protest', 'riot',
-    'hearing', 'testimony', 'trial', 'sentencing', 'appeal', 'subpoena',
-    'summit', 'meeting', 'conference', 'speech', 'announcement',
-    'scandal', 'leak', 'breach', 'hack', 'exposed', 'reveals'
-  ],
-  // General topics - lower specificity
-  topics: [
-    'immigration', 'border', 'abortion', 'healthcare', 'climate', 'gun',
-    'economy', 'inflation', 'jobs', 'taxes', 'voting', 'ballot',
-    'impeachment', 'executive order', 'legislation', 'bill', 'law',
-    'policy', 'rights', 'discrimination', 'campaign', 'poll', 'approval'
-  ],
-  sentiment_positive: [
-    'victory', 'win', 'success', 'breakthrough', 'progress', 'bipartisan',
-    'agreement', 'support', 'approval', 'praise', 'celebrate', 'unanimous'
-  ],
-  sentiment_negative: [
-    'crisis', 'scandal', 'controversy', 'attack', 'threat', 'failure',
-    'reject', 'oppose', 'condemn', 'criticize', 'backlash', 'outrage',
-    'chaos', 'disaster', 'collapse', 'corruption', 'fraud', 'abuse'
-  ]
-};
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+
+// Database-loaded entity aliases for canonicalization
+let dbAliases: Map<string, { canonical_name: string; entity_type: string }> = new Map();
 
 interface ContentItem {
   id: string;
@@ -59,199 +19,255 @@ interface ContentItem {
   source_type: 'google_news' | 'reddit' | 'bluesky' | 'rss';
 }
 
-interface AnalysisResult {
-  topics: string[];
+interface NERResult {
+  entities: Array<{
+    name: string;
+    type: 'PERSON' | 'ORG' | 'GPE' | 'EVENT' | 'LAW' | 'PRODUCT';
+    canonical: string;
+  }>;
+  event_phrases: string[];
   sentiment: number;
   sentiment_label: string;
-  relevance_score: number;
-  hashtags: string[];
-  entity_types: Record<string, string>; // topic -> entity_type
 }
 
-// Extract hashtags from text
-function extractHashtags(text: string): string[] {
-  const hashtags: string[] = [];
-  const hashtagRegex = /#[A-Za-z][A-Za-z0-9_]{2,30}/g;
-  const matches = text.match(hashtagRegex);
-  if (matches) {
-    for (const match of matches) {
-      const normalized = match.toLowerCase();
-      if (!hashtags.includes(normalized)) {
-        hashtags.push(normalized);
-      }
-    }
-  }
-  return hashtags;
-}
-
-// Local analysis with entity type classification
-function analyzeContentLocally(title: string, description?: string): AnalysisResult {
-  const text = `${title} ${description || ''}`.toLowerCase();
-  const topics: string[] = [];
-  const entityTypes: Record<string, string> = {};
-  let positiveScore = 0;
-  let negativeScore = 0;
-  let relevanceScore = 0;
-  let hasEventIndicator = false;
-  
-  // Check for event indicators first
-  for (const indicator of POLITICAL_KEYWORDS.events) {
-    if (text.includes(indicator)) {
-      hasEventIndicator = true;
-      break;
-    }
-  }
-  
-  // Extract persons (highest priority)
-  for (const person of POLITICAL_KEYWORDS.persons) {
-    if (text.includes(person)) {
-      // Proper case the name
-      const normalized = person.split(' ')
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
-      if (!topics.includes(normalized)) {
-        topics.push(normalized);
-        entityTypes[normalized] = hasEventIndicator ? 'event' : 'person';
-      }
-      relevanceScore += 0.2;
-    }
-  }
-  
-  // Extract organizations
-  for (const org of POLITICAL_KEYWORDS.organizations) {
-    if (text.includes(org)) {
-      const normalized = org.toUpperCase() === org 
-        ? org.toUpperCase() 
-        : org.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-      if (!topics.includes(normalized)) {
-        topics.push(normalized);
-        entityTypes[normalized] = 'organization';
-      }
-      relevanceScore += 0.15;
-    }
-  }
-  
-  // Extract general topics
-  for (const topic of POLITICAL_KEYWORDS.topics) {
-    if (text.includes(topic)) {
-      const normalized = topic.charAt(0).toUpperCase() + topic.slice(1);
-      if (!topics.includes(normalized)) {
-        topics.push(normalized);
-        entityTypes[normalized] = 'category';
-      }
-      relevanceScore += 0.1;
-    }
-  }
-  
-  // Extract hashtags as topics
-  const hashtags = extractHashtags(`${title} ${description || ''}`);
-  for (const hashtag of hashtags) {
-    if (!topics.includes(hashtag)) {
-      topics.push(hashtag);
-      entityTypes[hashtag] = 'hashtag';
-    }
-    relevanceScore += 0.15;
-  }
-  
-  // Simple sentiment analysis
-  for (const word of POLITICAL_KEYWORDS.sentiment_positive) {
-    if (text.includes(word)) positiveScore += 1;
-  }
-  for (const word of POLITICAL_KEYWORDS.sentiment_negative) {
-    if (text.includes(word)) negativeScore += 1;
-  }
-  
-  const totalSentimentWords = positiveScore + negativeScore;
-  let sentiment = 0;
-  if (totalSentimentWords > 0) {
-    sentiment = (positiveScore - negativeScore) / totalSentimentWords;
-  }
-  
-  const sentimentLabel = sentiment > 0.2 ? 'positive' : 
-                         sentiment < -0.2 ? 'negative' : 'neutral';
-  
-  return {
-    topics: topics.slice(0, 8), // Max 8 topics
-    sentiment: Math.round(sentiment * 100) / 100,
-    sentiment_label: sentimentLabel,
-    relevance_score: Math.min(relevanceScore, 1),
-    hashtags,
-    entity_types: entityTypes
-  };
-}
-
-// Batch AI analysis for clusters (only when needed)
-async function analyzeClusterWithAI(
-  cluster: { title: string; items: string[] },
-  apiKey: string
-): Promise<{ summary: string; topics: string[] }> {
+/**
+ * Load entity aliases from database for canonicalization
+ */
+async function loadEntityAliases(supabase: any): Promise<void> {
   try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const { data, error } = await supabase
+      .from('entity_aliases')
+      .select('raw_name, canonical_name, entity_type')
+      .order('usage_count', { ascending: false })
+      .limit(1000);
+    
+    if (data && !error) {
+      dbAliases = new Map();
+      for (const alias of data) {
+        dbAliases.set(alias.raw_name.toLowerCase(), {
+          canonical_name: alias.canonical_name,
+          entity_type: alias.entity_type || 'unknown'
+        });
+      }
+      console.log(`Loaded ${dbAliases.size} entity aliases from database`);
+    }
+  } catch (e) {
+    console.error('Failed to load entity aliases:', e);
+  }
+}
+
+/**
+ * Canonicalize entity name using database aliases
+ */
+function canonicalizeEntity(name: string): { canonical: string; type: string } {
+  const lower = name.toLowerCase().trim();
+  
+  // Check database aliases first
+  if (dbAliases.has(lower)) {
+    const alias = dbAliases.get(lower)!;
+    return { canonical: alias.canonical_name, type: alias.entity_type };
+  }
+  
+  // Normalize: collapse whitespace, title case
+  const normalized = name.trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+  
+  return { canonical: normalized, type: 'unknown' };
+}
+
+/**
+ * Validate event phrase quality - must be 2-5 words, descriptive
+ */
+function isValidEventPhrase(phrase: string): boolean {
+  const words = phrase.trim().split(/\s+/);
+  if (words.length < 2 || words.length > 5) return false;
+  
+  // Must contain at least one proper noun or action word
+  const hasProperNoun = /[A-Z][a-z]+/.test(phrase);
+  const actionWords = ['vote', 'bill', 'ruling', 'trial', 'hearing', 'arrest', 'shooting', 
+                       'protest', 'election', 'debate', 'speech', 'summit', 'policy', 
+                       'resignation', 'nomination', 'confirmation', 'sanctions', 'tariffs'];
+  const hasAction = actionWords.some(w => phrase.toLowerCase().includes(w));
+  
+  return hasProperNoun || hasAction;
+}
+
+/**
+ * NER + Keyphrase extraction using AI
+ * Returns canonical entities and multi-word event phrases
+ */
+async function extractNERWithAI(items: ContentItem[]): Promise<Map<string, NERResult>> {
+  if (!LOVABLE_API_KEY) {
+    throw new Error('LOVABLE_API_KEY not configured');
+  }
+  
+  const results = new Map<string, NERResult>();
+  
+  // Batch items (max 20 per request for efficiency)
+  const itemsText = items.slice(0, 20).map((item, i) => 
+    `[${i}] ${item.title}${item.description ? ` - ${item.description.substring(0, 200)}` : ''}`
+  ).join('\n');
+  
+  const prompt = `Extract named entities and event phrases from these headlines. Output structured data for trend detection.
+
+${itemsText}
+
+For EACH item, extract:
+
+1. **entities**: Named entities with types:
+   - PERSON: Full canonical names (e.g., "Donald Trump", NOT "Trump")
+   - ORG: Organizations (e.g., "Supreme Court", "FBI", "Democratic Party")
+   - GPE: Locations (e.g., "Gaza", "Texas", "Washington DC")
+   - EVENT: Specific events (e.g., "Super Bowl", "G20 Summit")
+   - LAW: Bills/laws (e.g., "HR 1234", "Affordable Care Act")
+   - PRODUCT: Products/services (e.g., "TikTok", "Truth Social")
+
+2. **event_phrases**: Multi-word descriptive phrases (2-5 words) like Twitter trends:
+   Examples: "Trump Tariff Policy", "Gaza Ceasefire Talks", "FBI Director Fired", 
+             "Supreme Court Abortion Ruling", "Texas Border Crisis"
+   These should capture WHAT is happening, not just WHO.
+
+3. **sentiment**: -1.0 to 1.0
+
+CRITICAL RULES:
+- Use FULL CANONICAL NAMES for people: "Donald Trump" not "Trump", "Joe Biden" not "Biden"
+- Event phrases must be 2-5 words and descriptive of the news event
+- DO NOT include news publishers (CNN, Reuters, AP) as entities
+- Single-word entities only for well-known acronyms: "NATO", "FBI", "ICE", "DOGE"
+
+Return JSON array:
+[{"index": 0, "entities": [{"name": "Donald Trump", "type": "PERSON"}, {"name": "FBI", "type": "ORG"}], "event_phrases": ["Trump FBI Investigation", "DOJ Probe Expands"], "sentiment": -0.3, "sentiment_label": "negative"}]`;
+
+  try {
+    const response = await fetch(AI_GATEWAY_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          {
-            role: 'system',
-            content: `You are a political news analyst. Extract specific named entities and events.
-Output JSON only: {"summary": "2-sentence summary with specific names/events", "topics": ["PersonName", "OrganizationName", "SpecificEvent"]}`
+          { 
+            role: 'system', 
+            content: 'You are an NER system that extracts canonical entities and multi-word event phrases from news headlines. Output ONLY valid JSON arrays.' 
           },
-          {
-            role: 'user',
-            content: `Analyze this cluster of related headlines:\n${cluster.items.slice(0, 10).join('\n')}`
-          }
-        ],
-        max_tokens: 200
+          { role: 'user', content: prompt }
+        ]
       })
     });
-    
+
     if (!response.ok) {
+      if (response.status === 429) {
+        console.warn('Rate limit hit, falling back to basic extraction');
+        return results;
+      }
       throw new Error(`AI API error: ${response.status}`);
     }
-    
+
     const data = await response.json();
-    const content = data.choices[0]?.message?.content || '';
+    const content = data.choices?.[0]?.message?.content || '';
     
     // Parse JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+    let analyses: any[] = [];
+    try {
+      const cleaned = content.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      analyses = Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+      // Try to extract JSON array
+      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        analyses = JSON.parse(jsonMatch[0]);
+      }
     }
     
-    return { summary: cluster.title, topics: [] };
+    // Map results back to items
+    for (const analysis of analyses) {
+      const idx = analysis.index;
+      if (idx === undefined || idx >= items.length) continue;
+      
+      const item = items[idx];
+      
+      // Canonicalize entities
+      const entities = (analysis.entities || []).map((e: any) => {
+        const canonicalized = canonicalizeEntity(e.name);
+        return {
+          name: e.name,
+          type: e.type || 'unknown',
+          canonical: canonicalized.canonical
+        };
+      }).filter((e: any) => e.canonical && e.canonical.length > 1);
+      
+      // Validate event phrases
+      const eventPhrases = (analysis.event_phrases || [])
+        .map((p: string) => p.trim())
+        .filter((p: string) => isValidEventPhrase(p));
+      
+      results.set(item.id, {
+        entities,
+        event_phrases: eventPhrases,
+        sentiment: analysis.sentiment || 0,
+        sentiment_label: analysis.sentiment_label || 'neutral'
+      });
+    }
+    
+    console.log(`NER extracted ${results.size} items with entities + event phrases`);
+    
   } catch (error) {
-    console.error('AI analysis error:', error);
-    return { summary: cluster.title, topics: [] };
+    console.error('AI NER extraction error:', error);
   }
+  
+  return results;
 }
 
-// Group similar headlines using title hash similarity
-function groupSimilarContent(items: ContentItem[]): Map<string, ContentItem[]> {
-  const groups = new Map<string, ContentItem[]>();
+/**
+ * Fallback: Extract basic entities from text without AI (for rate-limit scenarios)
+ */
+function extractBasicEntities(title: string, description?: string): NERResult {
+  const text = `${title} ${description || ''}`;
+  const entities: NERResult['entities'] = [];
+  const eventPhrases: string[] = [];
   
-  for (const item of items) {
-    // Create a simple fingerprint from key words
-    const words = item.title.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .split(/\s+/)
-      .filter(w => w.length > 3)
-      .sort()
-      .slice(0, 5)
-      .join('_');
+  // Basic proper noun extraction via regex
+  const properNouns = text.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g) || [];
+  
+  for (const noun of properNouns) {
+    if (noun.length < 2) continue;
+    const canonicalized = canonicalizeEntity(noun);
     
-    const key = words || item.id;
+    // Skip common words that look like proper nouns
+    const skipWords = ['The', 'This', 'That', 'Monday', 'Tuesday', 'Wednesday', 
+                       'Thursday', 'Friday', 'Saturday', 'Sunday', 'January', 
+                       'February', 'March', 'April', 'May', 'June', 'July', 
+                       'August', 'September', 'October', 'November', 'December'];
+    if (skipWords.includes(noun)) continue;
     
-    if (!groups.has(key)) {
-      groups.set(key, []);
-    }
-    groups.get(key)!.push(item);
+    entities.push({
+      name: noun,
+      type: 'PERSON', // Default, may be overridden by alias
+      canonical: canonicalized.canonical
+    });
   }
   
-  return groups;
+  // Simple sentiment
+  const posWords = ['win', 'victory', 'success', 'agree', 'support', 'approve'];
+  const negWords = ['crisis', 'scandal', 'attack', 'threat', 'fail', 'reject', 'oppose'];
+  const textLower = text.toLowerCase();
+  let sentiment = 0;
+  posWords.forEach(w => { if (textLower.includes(w)) sentiment += 0.2; });
+  negWords.forEach(w => { if (textLower.includes(w)) sentiment -= 0.2; });
+  sentiment = Math.max(-1, Math.min(1, sentiment));
+  
+  return {
+    entities: entities.slice(0, 5),
+    event_phrases: eventPhrases,
+    sentiment: Math.round(sentiment * 100) / 100,
+    sentiment_label: sentiment > 0.2 ? 'positive' : sentiment < -0.2 ? 'negative' : 'neutral'
+  };
 }
 
 serve(async (req) => {
@@ -264,18 +280,20 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { source_type, batch_size = 100 } = await req.json().catch(() => ({}));
+    // Load entity aliases for canonicalization
+    await loadEntityAliases(supabase);
+
+    const { source_type, batch_size = 50, use_ai = true } = await req.json().catch(() => ({}));
     
-    console.log(`Batch analyzing content with entity classification, source: ${source_type || 'all'}, batch: ${batch_size}`);
+    console.log(`[batch-analyze-content] NER + keyphrase extraction, source: ${source_type || 'all'}, batch: ${batch_size}, use_ai: ${use_ai}`);
     
     let processedCount = 0;
-    let clustersCreated = 0;
-    let hashtagsExtracted = 0;
+    let entitiesExtracted = 0;
+    let phrasesExtracted = 0;
     
-    // Process Google News
+    // Process Google News with AI NER
     if (!source_type || source_type === 'google_news') {
       const { data: newsItems } = await supabase
         .from('google_news_articles')
@@ -285,31 +303,64 @@ serve(async (req) => {
         .limit(batch_size);
       
       if (newsItems && newsItems.length > 0) {
-        console.log(`Processing ${newsItems.length} Google News items...`);
+        console.log(`Processing ${newsItems.length} Google News items with NER...`);
+        
+        // Use AI for NER extraction
+        let nerResults: Map<string, NERResult> = new Map();
+        if (use_ai && LOVABLE_API_KEY) {
+          nerResults = await extractNERWithAI(newsItems.map(item => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            source_type: 'google_news' as const
+          })));
+        }
         
         for (const item of newsItems) {
-          const analysis = analyzeContentLocally(item.title, item.description);
+          // Get AI result or fallback to basic extraction
+          const nerResult = nerResults.get(item.id) || extractBasicEntities(item.title, item.description);
+          
+          // Build topics array from entities + event phrases
+          const topics: string[] = [];
+          const entityTypes: Record<string, string> = {};
+          
+          // Add canonical entity names
+          for (const entity of nerResult.entities) {
+            if (!topics.includes(entity.canonical)) {
+              topics.push(entity.canonical);
+              entityTypes[entity.canonical] = entity.type;
+            }
+          }
+          
+          // Add event phrases (these become trend labels)
+          for (const phrase of nerResult.event_phrases) {
+            if (!topics.includes(phrase)) {
+              topics.push(phrase);
+              entityTypes[phrase] = 'EVENT_PHRASE';
+            }
+          }
+          
+          entitiesExtracted += nerResult.entities.length;
+          phrasesExtracted += nerResult.event_phrases.length;
           
           await supabase
             .from('google_news_articles')
             .update({
               ai_processed: true,
-              ai_topics: analysis.topics,
-              ai_sentiment: analysis.sentiment,
-              ai_sentiment_label: analysis.sentiment_label,
-              relevance_score: analysis.relevance_score,
-              extracted_hashtags: analysis.hashtags,
+              ai_topics: topics.slice(0, 10),
+              ai_sentiment: nerResult.sentiment,
+              ai_sentiment_label: nerResult.sentiment_label,
+              relevance_score: Math.min(1, topics.length * 0.15),
               updated_at: new Date().toISOString()
             })
             .eq('id', item.id);
           
           processedCount++;
-          hashtagsExtracted += analysis.hashtags.length;
         }
       }
     }
     
-    // Process Reddit posts (keeping for future)
+    // Process Reddit posts with AI NER
     if (!source_type || source_type === 'reddit') {
       const { data: redditItems } = await supabase
         .from('reddit_posts')
@@ -319,19 +370,44 @@ serve(async (req) => {
         .limit(batch_size);
       
       if (redditItems && redditItems.length > 0) {
-        console.log(`Processing ${redditItems.length} Reddit posts...`);
+        console.log(`Processing ${redditItems.length} Reddit posts with NER...`);
+        
+        let nerResults: Map<string, NERResult> = new Map();
+        if (use_ai && LOVABLE_API_KEY) {
+          nerResults = await extractNERWithAI(redditItems.map(item => ({
+            id: item.id,
+            title: item.title,
+            description: item.selftext,
+            source_type: 'reddit' as const
+          })));
+        }
         
         for (const item of redditItems) {
-          const analysis = analyzeContentLocally(item.title, item.selftext);
+          const nerResult = nerResults.get(item.id) || extractBasicEntities(item.title, item.selftext);
+          
+          const topics: string[] = [];
+          for (const entity of nerResult.entities) {
+            if (!topics.includes(entity.canonical)) {
+              topics.push(entity.canonical);
+            }
+          }
+          for (const phrase of nerResult.event_phrases) {
+            if (!topics.includes(phrase)) {
+              topics.push(phrase);
+            }
+          }
+          
+          entitiesExtracted += nerResult.entities.length;
+          phrasesExtracted += nerResult.event_phrases.length;
           
           await supabase
             .from('reddit_posts')
             .update({
               ai_processed: true,
-              ai_topics: analysis.topics,
-              ai_sentiment: analysis.sentiment,
-              ai_sentiment_label: analysis.sentiment_label,
-              relevance_score: analysis.relevance_score,
+              ai_topics: topics.slice(0, 10),
+              ai_sentiment: nerResult.sentiment,
+              ai_sentiment_label: nerResult.sentiment_label,
+              relevance_score: Math.min(1, topics.length * 0.15),
               updated_at: new Date().toISOString()
             })
             .eq('id', item.id);
@@ -341,7 +417,7 @@ serve(async (req) => {
       }
     }
     
-    // Process RSS articles  
+    // Process RSS articles with AI NER
     if (!source_type || source_type === 'rss') {
       const { data: rssItems } = await supabase
         .from('articles')
@@ -351,38 +427,62 @@ serve(async (req) => {
         .limit(batch_size);
       
       if (rssItems && rssItems.length > 0) {
-        console.log(`Processing ${rssItems.length} RSS articles...`);
+        console.log(`Processing ${rssItems.length} RSS articles with NER...`);
+        
+        let nerResults: Map<string, NERResult> = new Map();
+        if (use_ai && LOVABLE_API_KEY) {
+          nerResults = await extractNERWithAI(rssItems.map(item => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            source_type: 'rss' as const
+          })));
+        }
         
         for (const item of rssItems) {
-          const analysis = analyzeContentLocally(item.title, item.description);
+          const nerResult = nerResults.get(item.id) || extractBasicEntities(item.title, item.description);
+          
+          // Build extracted_topics with entity types
+          const extractedTopics = [
+            ...nerResult.entities.map(e => ({
+              topic: e.canonical,
+              entity_type: e.type,
+              is_event_phrase: false
+            })),
+            ...nerResult.event_phrases.map(p => ({
+              topic: p,
+              entity_type: 'EVENT_PHRASE',
+              is_event_phrase: true
+            }))
+          ];
+          
+          entitiesExtracted += nerResult.entities.length;
+          phrasesExtracted += nerResult.event_phrases.length;
           
           await supabase
             .from('articles')
             .update({
-              extracted_topics: analysis.topics.map(t => ({
-                topic: t,
-                entity_type: analysis.entity_types[t] || 'category'
-              })),
-              sentiment_score: analysis.sentiment,
-              sentiment_label: analysis.sentiment_label,
-              extracted_hashtags: analysis.hashtags,
+              extracted_topics: extractedTopics.slice(0, 10),
+              sentiment_score: nerResult.sentiment,
+              sentiment_label: nerResult.sentiment_label,
+              topics_extracted: true,
+              topics_extracted_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
             .eq('id', item.id);
           
           processedCount++;
-          hashtagsExtracted += analysis.hashtags.length;
         }
       }
     }
     
     // Log batch stats
     await supabase.from('processing_batches').insert({
-      batch_type: source_type || 'batch_analyze',
+      batch_type: source_type || 'batch_analyze_ner',
       items_count: processedCount,
       unique_items: processedCount,
-      clusters_created: clustersCreated,
-      ai_tokens_used: 0, // Local processing = 0 tokens
+      clusters_created: 0,
+      ai_tokens_used: use_ai ? processedCount * 50 : 0, // Estimate
       processing_time_ms: Date.now() - startTime,
       completed_at: new Date().toISOString(),
       status: 'completed'
@@ -391,13 +491,13 @@ serve(async (req) => {
     const result = {
       success: true,
       processed: processedCount,
-      clusters_created: clustersCreated,
-      hashtags_extracted: hashtagsExtracted,
-      ai_tokens_used: 0,
+      entities_extracted: entitiesExtracted,
+      event_phrases_extracted: phrasesExtracted,
+      ai_used: use_ai && !!LOVABLE_API_KEY,
       duration_ms: Date.now() - startTime
     };
     
-    console.log('Batch analysis complete:', result);
+    console.log('[batch-analyze-content] NER extraction complete:', result);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

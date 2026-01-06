@@ -197,43 +197,41 @@ serve(async (req) => {
         `ID: ${a.id}\nTitle: ${a.title}\nContent: ${(a.description || a.content || '').substring(0, 500)}`
       ).join('\n\n---\n\n');
 
-      const extractionPrompt = `Extract FULL CANONICAL NAMES from these news headlines like Twitter trending. Answer: WHO? WHERE? WHAT specific thing?
+      // Enhanced NER + Keyphrase extraction prompt
+      const extractionPrompt = `Extract named entities AND multi-word event phrases from these headlines for Twitter-style trending.
 
 ${articlesText}
 
-Extract ONLY with FULL NAMES (not abbreviations or last names alone):
-- PEOPLE: Use FULL names: "Donald Trump" (NOT "Trump"), "Nancy Pelosi" (NOT "Pelosi"), "Joe Biden" (NOT "Biden")
-- PLACES: "Gaza", "Ukraine", "Texas", "Washington DC"
-- ORGANIZATIONS: "Supreme Court", "FBI", "NATO", "Department of Justice" (NOT news outlets)
-- BILLS: "HR 1234", "S 456"
-- PRODUCTS/EVENTS: "iPhone", "Super Bowl", "TikTok"
+Extract TWO types of items:
 
-CRITICAL - USE FULL CANONICAL NAMES:
-✅ "Donald Trump" (NOT "Trump" alone)
-✅ "Joe Biden" (NOT "Biden" alone)
-✅ "Elon Musk" (NOT "Musk" alone)
-✅ "Ron DeSantis" (NOT "DeSantis" alone)
-✅ "Pete Hegseth" (NOT "Hegseth" alone)
-✅ "Christopher Wray" (NOT "Wray" alone)
-✅ "Gavin Newsom" (NOT "Newsom" alone)
-✅ "Vladimir Putin" (NOT "Putin" alone)
+1. **ENTITIES** (WHO/WHERE/WHAT specific thing):
+   - PERSON: Full canonical names ("Donald Trump", NOT "Trump")
+   - ORG: Organizations ("Supreme Court", "FBI", "Democratic Party")
+   - GPE: Locations ("Gaza", "Texas", "Washington DC")
+   - Single-word only for acronyms: "NATO", "FBI", "DOGE", "ICE"
 
-DO NOT extract:
-- Categories: "immigration", "healthcare", "politics"
-- Actions: "debate", "reform", "investigation"
-- Descriptions: "administration", "crisis", "tensions"
-- NEWS SOURCES: "Associated Press", "Reuters", "CNN", "BBC" (publishers reporting the news)
-- LAST NAMES ONLY: Never return just "Trump", "Biden", "Musk" - always use full name
+2. **EVENT PHRASES** (2-5 word descriptive trends like Twitter):
+   Examples:
+   - "Trump Tariff Policy" (NOT just "Donald Trump")
+   - "Gaza Ceasefire Talks" (NOT just "Gaza")
+   - "FBI Director Fired"
+   - "Supreme Court Abortion Ruling"
+   - "Texas Border Crisis"
+   - "Pete Hegseth Pentagon Shake-up"
+   
+   Event phrases capture WHAT is happening, not just WHO.
 
-Rules:
-1. Must be a proper noun (starts with capital letter)
-2. Use FULL CANONICAL NAME (First Last for people)
-3. Would have a Wikipedia page
-4. NOT a topic/theme/category
-5. NOT a news organization/publisher
+CRITICAL RULES:
+- Use FULL NAMES for people: "Donald Trump" not "Trump", "Joe Biden" not "Biden"
+- Event phrases must be 2-5 words and descriptive
+- DO NOT include news publishers (CNN, Reuters, AP, BBC)
+- DO NOT extract categories ("immigration", "politics", "healthcare")
+- Prefer EVENT PHRASES over single entities when the headline describes an action
 
-Return JSON array:
-[{"topic": "Full Name Here", "keywords": ["word1", "word2"], "relevance": 0.9}]`;
+Return JSON array with both entities AND event phrases mixed:
+[{"topic": "Trump Tariff Policy", "keywords": ["tariff", "trade", "policy"], "relevance": 0.95, "type": "event_phrase"},
+ {"topic": "Donald Trump", "keywords": ["trump", "president"], "relevance": 0.8, "type": "person"},
+ {"topic": "Gaza", "keywords": ["gaza", "israel"], "relevance": 0.7, "type": "location"}]`;
 
       try {
         // Create timeout promise
