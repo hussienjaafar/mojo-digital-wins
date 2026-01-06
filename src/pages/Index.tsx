@@ -127,7 +127,17 @@ const Index = () => {
   return (
     <PullToRefresh>
       <div className="min-h-screen bg-background">
-        <Helmet>
+      <Helmet>
+          <title>Progressive Digital Fundraising Agency | Molitico</title>
+          <meta name="description" content="We help political campaigns, PACs, and nonprofits raise more with SMS, email, and digital advertising. 425% average ROI. Book a free strategy call." />
+          <link rel="canonical" href="https://molitico.com/" />
+          <meta property="og:title" content="Progressive Digital Fundraising Agency | Molitico" />
+          <meta property="og:description" content="We help political campaigns, PACs, and nonprofits raise more with SMS, email, and digital advertising. 425% average ROI." />
+          <meta property="og:url" content="https://molitico.com/" />
+          <meta property="og:type" content="website" />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content="Progressive Digital Fundraising Agency | Molitico" />
+          <meta name="twitter:description" content="We help political campaigns, PACs, and nonprofits raise more with SMS, email, and digital advertising." />
           <script type="application/ld+json">
             {JSON.stringify(organizationSchema)}
           </script>
@@ -170,7 +180,7 @@ const Index = () => {
                   letterSpacing: '0.02em'
                 }}
               >
-                Outperforming<br/>the Establishment.
+                Progressive Digital Fundraising That Wins
               </h1>
               {/* Red activist underline with swipe animation */}
               <div 

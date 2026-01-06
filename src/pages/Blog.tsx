@@ -71,6 +71,13 @@ const Blog = () => {
   return (
     <div className="min-h-screen">
       <Helmet>
+        <title>Political Digital Strategy Blog | Molitico Insights</title>
+        <meta name="description" content="Expert insights on political campaign marketing, SMS fundraising, digital advertising, and progressive advocacy strategies." />
+        <link rel="canonical" href="https://molitico.com/blog" />
+        <meta property="og:title" content="Political Digital Strategy Blog | Molitico Insights" />
+        <meta property="og:description" content="Expert insights on political campaign marketing, SMS fundraising, digital advertising, and progressive advocacy strategies." />
+        <meta property="og:url" content="https://molitico.com/blog" />
+        <meta property="og:type" content="website" />
         <script type="application/ld+json">
           {JSON.stringify(blogSchema)}
         </script>
@@ -83,7 +90,7 @@ const Blog = () => {
       <Navigation />
       
       <AnimatedPatternHero
-        title="Digital Strategy Insights"
+        title="Political Digital Strategy Insights"
         description="Expert guidance on political campaign marketing, fundraising, and digital advocacy from campaigns that win."
       />
 

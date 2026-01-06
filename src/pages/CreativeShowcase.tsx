@@ -1,3 +1,4 @@
+import { Helmet } from "react-helmet";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Target, TrendingUp, Zap } from "lucide-react";
@@ -10,6 +11,15 @@ import AnimatedPatternHero from "@/components/AnimatedPatternHero";
 const CreativeShowcase = () => {
   return (
     <div className="min-h-screen">
+      <Helmet>
+        <title>Political Campaign Creative & Video | Molitico</title>
+        <meta name="description" content="High-impact political campaign creative that drives donations, sign-ups, and wins. See our portfolio of progressive campaign videos and ads." />
+        <link rel="canonical" href="https://molitico.com/creative" />
+        <meta property="og:title" content="Political Campaign Creative & Video | Molitico" />
+        <meta property="og:description" content="High-impact political campaign creative that drives donations, sign-ups, and wins." />
+        <meta property="og:url" content="https://molitico.com/creative" />
+        <meta property="og:type" content="website" />
+      </Helmet>
       <Navigation />
       <AnimatedPatternHero
         title="Creative That Converts"

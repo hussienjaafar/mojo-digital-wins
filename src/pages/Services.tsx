@@ -65,6 +65,13 @@ const Services = () => {
   return (
     <div className="min-h-screen">
       <Helmet>
+        <title>Political Campaign Services: SMS, Email, Digital Ads | Molitico</title>
+        <meta name="description" content="Full-service digital fundraising for progressive campaigns. SMS fundraising, Meta/Google advertising, email marketing, and voter polling services." />
+        <link rel="canonical" href="https://molitico.com/services" />
+        <meta property="og:title" content="Political Campaign Services | Molitico" />
+        <meta property="og:description" content="Full-service digital fundraising for progressive campaigns. SMS, digital ads, email marketing, and polling." />
+        <meta property="og:url" content="https://molitico.com/services" />
+        <meta property="og:type" content="website" />
         <script type="application/ld+json">
           {JSON.stringify(breadcrumbSchema)}
         </script>
@@ -72,7 +79,7 @@ const Services = () => {
       <ScrollProgressIndicator />
       <Navigation />
       <AnimatedPatternHero
-        title="Services That Drive Progressive Wins"
+        title="Digital Campaign Services for Progressive Organizations"
         description="From digital ads and billboard placements to voter polling and SMS outreach, we offer the full stack of services for campaigns, PACs, and nonprofits—all optimized for achieving your goals."
       />
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Helmet } from "react-helmet";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -145,8 +146,60 @@ const Contact = () => {
     }
   };
 
+  // FAQ Schema for SEO
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What types of organizations do you work with?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "We work with progressive organizations of all types and sizes—political campaigns, PACs, 501(c)(3)s, and 501(c)(4)s. From local races to national advocacy movements, if you're committed to progressive values and ready to make impact, we want to work with you."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How quickly can we get started?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Most projects can launch within 1-2 weeks. We move fast because we know you can't wait."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What's your pricing model?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "We offer flexible pricing based on your organization's size and scope. We'll discuss options on our first call to find what works for your budget."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Do you only work with Democrats?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "We work exclusively with progressive candidates and causes aligned with our values—racial justice, economic equality, climate action, and democracy reform."
+        }
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen">
+      <Helmet>
+        <title>Contact Molitico | Book a Free Strategy Call</title>
+        <meta name="description" content="Ready to scale your campaign fundraising? Book a free 30-minute strategy call with our political digital experts." />
+        <link rel="canonical" href="https://molitico.com/contact" />
+        <meta property="og:title" content="Contact Molitico | Book a Free Strategy Call" />
+        <meta property="og:description" content="Ready to scale your campaign fundraising? Book a free 30-minute strategy call with our political digital experts." />
+        <meta property="og:url" content="https://molitico.com/contact" />
+        <meta property="og:type" content="website" />
+        <script type="application/ld+json">
+          {JSON.stringify(faqSchema)}
+        </script>
+      </Helmet>
       <ScrollProgressIndicator />
       <Navigation />
       <AnimatedPatternHero
