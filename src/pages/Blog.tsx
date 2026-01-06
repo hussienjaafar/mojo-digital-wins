@@ -10,6 +10,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { blogPosts, blogCategories } from "@/data/blogPosts";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
+import { LazyImage } from "@/components/LazyImage";
+
+// Category hero images - abstract, professional, politically neutral
+const categoryHeroImages: Record<string, string> = {
+  "Fundraising": "https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?w=800&h=400&fit=crop",
+  "Campaign Strategy": "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=400&fit=crop",
+  "Digital Advertising": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=400&fit=crop",
+  "GOTV": "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&h=400&fit=crop",
+  "Nonprofit Strategy": "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=400&fit=crop",
+};
 
 const Blog = () => {
   const [activeCategory, setActiveCategory] = useState<string>("All");
@@ -69,7 +79,7 @@ const Blog = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <Helmet>
         <title>Political Digital Strategy Blog | Molitico Insights</title>
         <meta name="description" content="Expert insights on political campaign marketing, SMS fundraising, digital advertising, and progressive advocacy strategies." />
@@ -121,63 +131,76 @@ const Blog = () => {
               blogGrid.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
             }`}
           >
-            {filteredPosts.map((post, index) => (
-              <Card 
-                key={post.id}
-                className={`group hover:shadow-2xl transition-all duration-500 border border-border/50 bg-card backdrop-blur-sm hover:scale-[1.02] ${
-                  blogGrid.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-                }`}
-                style={{ transitionDelay: `${index * 100}ms` }}
-              >
-                <CardContent className="p-6 space-y-4">
-                  {/* Category Badge */}
-                  <div className="flex items-center justify-between">
-                    <span className="inline-block px-3 py-1 text-xs font-semibold bg-secondary/20 text-secondary rounded-full">
-                      {post.category}
-                    </span>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Clock className="w-4 h-4" />
-                      <span>{post.readTime} min read</span>
-                    </div>
+            {filteredPosts.map((post, index) => {
+              const postImage = post.heroImage || categoryHeroImages[post.category] || "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=800&h=400&fit=crop";
+              
+              return (
+                <Card 
+                  key={post.id}
+                  className={`group overflow-hidden hover:shadow-xl transition-all duration-500 border border-border bg-card hover:scale-[1.02] ${
+                    blogGrid.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                  }`}
+                  style={{ transitionDelay: `${index * 100}ms` }}
+                >
+                  {/* Thumbnail Image */}
+                  <div className="aspect-[16/10] overflow-hidden bg-muted">
+                    <LazyImage
+                      src={postImage}
+                      alt={post.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
                   </div>
-
-                  {/* Title */}
-                  <h2 className="font-bebas text-2xl text-foreground leading-tight group-hover:text-secondary transition-colors duration-300">
-                    <Link to={`/blog/${post.slug}`}>
-                      {post.title}
-                    </Link>
-                  </h2>
-
-                  {/* Excerpt */}
-                  <p className="text-muted-foreground leading-relaxed line-clamp-3">
-                    {post.excerpt}
-                  </p>
-
-                  {/* Meta Info */}
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground pt-4 border-t border-border/50">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <time dateTime={post.publishDate}>
-                        {new Date(post.publishDate).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric', 
-                          year: 'numeric' 
-                        })}
-                      </time>
+                  
+                  <CardContent className="p-6 space-y-4">
+                    {/* Category Badge */}
+                    <div className="flex items-center justify-between">
+                      <span className="inline-block px-3 py-1 text-xs font-bold bg-secondary/20 text-secondary rounded-full">
+                        {post.category}
+                      </span>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Clock className="w-4 h-4" />
+                        <span>{post.readTime} min</span>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Read More Link */}
-                  <Link 
-                    to={`/blog/${post.slug}`}
-                    className="inline-flex items-center gap-2 text-secondary font-semibold group-hover:gap-3 transition-all duration-300"
-                  >
-                    Read Full Article
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
+                    {/* Title */}
+                    <h2 className="font-bebas text-2xl text-foreground leading-tight group-hover:text-secondary transition-colors duration-300 line-clamp-2">
+                      <Link to={`/blog/${post.slug}`}>
+                        {post.title}
+                      </Link>
+                    </h2>
+
+                    {/* Excerpt */}
+                    <p className="text-muted-foreground leading-relaxed line-clamp-2 text-sm">
+                      {post.excerpt}
+                    </p>
+
+                    {/* Meta Info */}
+                    <div className="flex items-center justify-between pt-4 border-t border-border">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Calendar className="w-4 h-4" />
+                        <time dateTime={post.publishDate}>
+                          {new Date(post.publishDate).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          })}
+                        </time>
+                      </div>
+
+                      {/* Read More Link */}
+                      <Link 
+                        to={`/blog/${post.slug}`}
+                        className="inline-flex items-center gap-2 text-secondary font-semibold text-sm group-hover:gap-3 transition-all duration-300"
+                      >
+                        Read
+                        <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           {filteredPosts.length === 0 && (
