@@ -9,19 +9,19 @@ import { useUnifiedTrends } from "@/hooks/useUnifiedTrends";
 import { useOrgTrendScores } from "@/hooks/useOrgRelevance";
 import { useOrgTrendOutcomesMap, type OutcomeStats } from "@/hooks/useTrendOutcomes";
 
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
   V3Card,
+  V3CardHeader,
+  V3CardContent,
   V3SectionHeader,
   V3Badge,
   V3EmptyState,
   V3LoadingState,
+  V3Button,
 } from "@/components/v3";
 
 import {
@@ -29,19 +29,11 @@ import {
   TrendingUp,
   Eye,
   Target,
-  AlertTriangle,
   RefreshCw,
-  Clock,
-  ExternalLink,
-  Sparkles,
   ChevronRight,
-  Newspaper,
-  Radio,
-  Users,
-  BarChart3,
-  ShieldAlert,
   Activity,
   Award,
+  BarChart3,
 } from "lucide-react";
 
 import { TrendDrilldownPanel } from "@/components/client/TrendDrilldownPanel";
@@ -52,10 +44,10 @@ import type { TrendEvent } from "@/hooks/useTrendEvents";
 // Types
 // ============================================================================
 
-type IASection = "breaking" | "relevant" | "watchlist" | "trends" | "risk";
+type IASection = "primary" | "explore";
 
 // ============================================================================
-// Trend Card Component
+// Trend Card Component (Simplified V3)
 // ============================================================================
 
 interface TrendCardProps {
@@ -79,11 +71,7 @@ function TrendCard({
   showRank,
   rank 
 }: TrendCardProps) {
-  const hoursAgo = Math.floor(
-    (Date.now() - new Date(trend.first_seen_at).getTime()) / (1000 * 60 * 60)
-  );
-  
-  // Calculate last seen freshness
+  // Calculate freshness
   const lastSeenMs = Date.now() - new Date(trend.last_seen_at).getTime();
   const lastSeenMinutes = Math.floor(lastSeenMs / (1000 * 60));
   const lastSeenHours = Math.floor(lastSeenMs / (1000 * 60 * 60));
@@ -105,126 +93,73 @@ function TrendCard({
   const freshnessState = getFreshnessState();
   const isStale = freshnessState === 'stale' || freshnessState === 'aging';
 
-  // Priority badge logic: Breaking > High Performing > High Match
+  // Single priority badge (Breaking > High Performing > High Match)
   const getPriorityBadge = () => {
     if (trend.is_breaking) {
-      return (
-        <Badge className="bg-[hsl(var(--portal-error))] text-white text-xs gap-1">
-          <Zap className="h-3 w-3" />
-          Breaking
-        </Badge>
-      );
+      return <V3Badge variant="red" icon={<Zap className="h-3 w-3" />}>Breaking</V3Badge>;
     }
     if (outcomeStats?.isHighPerforming && outcomeStats.confidenceLevel !== 'low') {
-      return (
-        <Badge className="bg-[hsl(var(--portal-success)/0.15)] text-[hsl(var(--portal-success))] text-xs gap-1">
-          <Award className="h-3 w-3" />
-          High Performing
-        </Badge>
-      );
+      return <V3Badge variant="success" icon={<Award className="h-3 w-3" />}>High Performing</V3Badge>;
     }
     if (isRelevant && relevanceScore && relevanceScore >= 70) {
-      return (
-        <Badge className="bg-[hsl(var(--portal-accent-blue)/0.15)] text-[hsl(var(--portal-accent-blue))] text-xs gap-1">
-          <Target className="h-3 w-3" />
-          High Match
-        </Badge>
-      );
-    }
-    return null;
-  };
-
-  // Why trending context line
-  const getWhyTrending = () => {
-    if (trend.z_score_velocity && trend.z_score_velocity > 2) {
-      return `${trend.z_score_velocity.toFixed(1)}x spike vs baseline`;
-    }
-    if (trend.velocity > 100) {
-      return `${Math.round(trend.velocity)}% velocity surge`;
-    }
-    if (relevanceReasons && relevanceReasons.length > 0) {
-      return relevanceReasons[0];
-    }
-    if (trend.evidence_count >= 5) {
-      return `Corroborated across ${trend.evidence_count} sources`;
+      return <V3Badge variant="blue" icon={<Target className="h-3 w-3" />}>High Match</V3Badge>;
     }
     return null;
   };
 
   const priorityBadge = getPriorityBadge();
-  const whyTrending = getWhyTrending();
 
   return (
     <motion.button
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={() => onSelect(trend)}
       className={cn(
-        "w-full text-left p-4 rounded-xl",
-        "bg-[hsl(var(--portal-bg-card))]",
+        "w-full text-left p-3 rounded-lg",
+        "bg-[hsl(var(--portal-bg-elevated))]",
         "border border-[hsl(var(--portal-border))]",
-        "hover:border-[hsl(var(--portal-border-hover))]",
-        "hover:shadow-md transition-all duration-200",
-        "focus:outline-none focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue))]",
-        trend.is_breaking && "border-l-4 border-l-[hsl(var(--portal-error))]"
+        "hover:border-[hsl(var(--portal-border-hover))] hover:bg-[hsl(var(--portal-bg-secondary))]",
+        "transition-all duration-150",
+        "focus:outline-none focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.5)]",
+        trend.is_breaking && "border-l-2 border-l-[hsl(var(--portal-error))]"
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         {showRank && rank && (
-          <div className="w-7 h-7 rounded-full bg-[hsl(var(--portal-bg-elevated))] flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-[hsl(var(--portal-text-muted))]">
-              {rank}
-            </span>
-          </div>
+          <span className="text-xs font-medium text-[hsl(var(--portal-text-muted))] tabular-nums w-5 shrink-0">
+            {rank}
+          </span>
         )}
         
-        <div className="flex-1 min-w-0 space-y-2">
-          {/* Single priority badge */}
-          {priorityBadge && (
-            <div className="flex items-center gap-2">
-              {priorityBadge}
-            </div>
-          )}
-
-          <h3 className="font-semibold text-[hsl(var(--portal-text-primary))] truncate">
+        <div className="flex-1 min-w-0 space-y-1">
+          <h3 className="font-medium text-sm text-[hsl(var(--portal-text-primary))] truncate">
             {trend.canonical_label || trend.event_title}
           </h3>
 
-          {/* Combined meta strip: velocity + sources + last seen */}
-          <p className="text-xs text-[hsl(var(--portal-text-muted))] flex items-center gap-1.5 flex-wrap">
-            <span className="flex items-center gap-1">
+          {/* Compact meta line: velocity · sources · freshness · badge */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-[hsl(var(--portal-text-muted))] flex items-center gap-1">
               <TrendingUp className="h-3 w-3" />
               {Math.round(trend.velocity)}%
+              <span className="mx-0.5">·</span>
+              {trend.evidence_count} src
+              <span className="mx-0.5">·</span>
+              <span className={cn(isStale && "text-[hsl(var(--portal-warning))]")}>
+                {getLastSeenLabel()}
+              </span>
             </span>
-            <span>·</span>
-            <span>{trend.evidence_count} sources</span>
-            <span>·</span>
-            <span className={cn(
-              "flex items-center gap-1",
-              isStale && "text-[hsl(var(--portal-warning))]"
-            )}>
-              {getLastSeenLabel()}
-              {isStale && " ⚠"}
-            </span>
-          </p>
-
-          {/* Why trending line */}
-          {whyTrending && (
-            <p className="text-xs text-[hsl(var(--portal-accent-blue))] line-clamp-1">
-              <Sparkles className="h-3 w-3 inline mr-1" />
-              {whyTrending}
-            </p>
-          )}
+            {priorityBadge}
+          </div>
         </div>
 
-        <ChevronRight className="h-5 w-5 text-[hsl(var(--portal-text-muted))] shrink-0" />
+        <ChevronRight className="h-4 w-4 text-[hsl(var(--portal-text-muted))] shrink-0" />
       </div>
     </motion.button>
   );
 }
 
 // ============================================================================
-// Section Cards
+// Section Card (V3 Styled)
 // ============================================================================
 
 interface SectionCardProps {
@@ -233,14 +168,12 @@ interface SectionCardProps {
   icon: typeof Zap;
   iconColor: string;
   count: number;
-  countLabel: string;
-  accent?: "blue" | "red" | "amber" | "green" | "purple";
+  accent?: "blue" | "green" | "purple" | "amber" | "red";
   children: React.ReactNode;
   isLoading?: boolean;
   isEmpty?: boolean;
   emptyMessage?: string;
-  onRefresh?: () => void;
-  isRefreshing?: boolean;
+  maxHeight?: string;
 }
 
 function SectionCard({
@@ -249,66 +182,54 @@ function SectionCard({
   icon: Icon,
   iconColor,
   count,
-  countLabel,
-  accent = "default" as any,
+  accent = "blue",
   children,
   isLoading,
   isEmpty,
   emptyMessage,
-  onRefresh,
-  isRefreshing,
+  maxHeight = "320px",
 }: SectionCardProps) {
   return (
     <V3Card accent={accent} className="h-full">
-      <div className="space-y-4">
+      <V3CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={cn("p-2 rounded-lg", iconColor)}>
-              <Icon className="h-5 w-5" />
+          <div className="flex items-center gap-2">
+            <div className={cn("p-1.5 rounded-lg", iconColor)}>
+              <Icon className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="font-semibold text-[hsl(var(--portal-text-primary))]">
+              <h3 className="font-semibold text-sm text-[hsl(var(--portal-text-primary))]">
                 {title}
-              </h2>
+              </h3>
               <p className="text-xs text-[hsl(var(--portal-text-muted))]">
                 {subtitle}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-xs">
-              {count} {countLabel}
-            </Badge>
-            {onRefresh && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onRefresh}
-                disabled={isRefreshing}
-                className="h-8 w-8 p-0"
-              >
-                <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-              </Button>
-            )}
-          </div>
+          <V3Badge variant="muted" size="sm">{count}</V3Badge>
         </div>
-
+      </V3CardHeader>
+      <V3CardContent className="pt-0">
         {isLoading ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-20 w-full" />
+              <div key={i} className="h-14 rounded-lg bg-[hsl(var(--portal-bg-secondary))] animate-pulse" />
             ))}
           </div>
         ) : isEmpty ? (
-          <div className="py-8 text-center">
-            <p className="text-sm text-[hsl(var(--portal-text-muted))]">
-              {emptyMessage || "No items to display"}
+          <div className="py-6 text-center">
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+              {emptyMessage || "No items"}
             </p>
           </div>
         ) : (
-          children
+          <ScrollArea style={{ height: maxHeight }}>
+            <div className="space-y-2 pr-3">
+              {children}
+            </div>
+          </ScrollArea>
         )}
-      </div>
+      </V3CardContent>
     </V3Card>
   );
 }
@@ -342,15 +263,16 @@ export default function ClientNewsTrends() {
   const [selectedTrend, setSelectedTrend] = useState<TrendEvent | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [activeTab, setActiveTab] = useState<IASection>("primary");
 
   // ============================================================================
   // Computed Values
   // ============================================================================
 
-  // Breaking trends (high confidence, is_breaking flag)
+  // Breaking trends
   const breakingTrends = trendEvents.filter(t => t.is_breaking).slice(0, 5);
 
-  // Relevant to org (from org_trend_scores with high relevance)
+  // Relevant to org
   const relevantTrends = orgScores
     ?.filter(s => s.relevance_score >= 50)
     ?.map(score => {
@@ -364,7 +286,7 @@ export default function ClientNewsTrends() {
     .filter(Boolean)
     .slice(0, 8) as (TrendEvent & { relevanceScore: number; relevanceReasons: string[] })[];
 
-  // Watchlist mentions (trends matching watchlist - check matched_entities)
+  // Watchlist mentions
   const watchlistTrends = orgScores
     ?.filter(s => s.matched_entities?.length > 0)
     ?.map(score => {
@@ -378,19 +300,11 @@ export default function ClientNewsTrends() {
     .filter(Boolean)
     .slice(0, 6) as (TrendEvent & { matchedEntities: string[]; relevanceScore: number })[];
 
-  // Top general trends (by confidence)
+  // Top general trends
   const topTrends = trendEvents
     .filter(t => t.is_trending && t.confidence_score >= 50)
     .sort((a, b) => b.confidence_score - a.confidence_score)
     .slice(0, 10);
-
-  // Risk/Opposition (trends with negative sentiment or matching opposition keywords)
-  const riskTrends = trendEvents
-    .filter(t => {
-      // Simple heuristic: low velocity with high volume or negative indicators
-      return t.is_trending && t.velocity < 30 && t.evidence_count >= 3;
-    })
-    .slice(0, 5);
 
   // ============================================================================
   // Handlers
@@ -430,7 +344,7 @@ export default function ClientNewsTrends() {
 
   return (
     <ClientShell pageTitle="News & Trends" showDateControls={false}>
-      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1800px] mx-auto">
+      <div className="p-4 sm:p-6 space-y-5 max-w-[1600px] mx-auto">
         {/* Header */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <V3SectionHeader
@@ -441,36 +355,52 @@ export default function ClientNewsTrends() {
             isLive
             lastUpdated={lastRefresh}
           />
-          <Button
+          <V3Button
             onClick={handleRefreshAll}
             disabled={isRefreshing}
-            className="gap-2"
             variant="outline"
+            size="sm"
+            leftIcon={<RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />}
           >
-            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
             Refresh
-          </Button>
+          </V3Button>
         </header>
 
-        {/* Data Freshness Banner - SLA-driven from pipeline_freshness */}
+        {/* Data Freshness Banner */}
         <DataFreshnessBanner />
 
-        {/* Breaking Now - Full Width */}
-        {breakingTrends.length > 0 && (
-          <SectionCard
-            title="Breaking Now"
-            subtitle="High-velocity stories requiring immediate attention"
-            icon={Zap}
-            iconColor="bg-[hsl(var(--portal-error)/0.15)] text-[hsl(var(--portal-error))]"
-            count={breakingTrends.length}
-            countLabel="breaking"
-            accent="red"
-            isLoading={trendsLoading}
-            isEmpty={breakingTrends.length === 0}
-            emptyMessage="No breaking stories right now"
-          >
-            <ScrollArea className="h-[200px]">
-              <div className="space-y-3 pr-4">
+        {/* Tabbed Content */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as IASection)}>
+          <TabsList className="bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))] p-1 gap-1">
+            <TabsTrigger 
+              value="primary" 
+              className="data-[state=active]:bg-[hsl(var(--portal-bg-card))] data-[state=active]:shadow-sm text-sm"
+            >
+              Priority Feed
+            </TabsTrigger>
+            <TabsTrigger 
+              value="explore" 
+              className="data-[state=active]:bg-[hsl(var(--portal-bg-card))] data-[state=active]:shadow-sm text-sm"
+            >
+              Explore Trends
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Primary Tab: Breaking, Relevant, Watchlist */}
+          <TabsContent value="primary" className="mt-4 space-y-5">
+            {/* Breaking Now - Compact */}
+            {breakingTrends.length > 0 && (
+              <SectionCard
+                title="Breaking Now"
+                subtitle="High-velocity stories"
+                icon={Zap}
+                iconColor="bg-[hsl(var(--portal-error)/0.15)] text-[hsl(var(--portal-error))]"
+                count={breakingTrends.length}
+                accent="red"
+                maxHeight="200px"
+                isLoading={trendsLoading}
+                isEmpty={breakingTrends.length === 0}
+              >
                 {breakingTrends.map((trend, index) => (
                   <TrendCard
                     key={trend.id}
@@ -481,28 +411,23 @@ export default function ClientNewsTrends() {
                     rank={index + 1}
                   />
                 ))}
-              </div>
-            </ScrollArea>
-          </SectionCard>
-        )}
+              </SectionCard>
+            )}
 
-        {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Relevant to You */}
-          <SectionCard
-            title="Relevant to You"
-            subtitle="Topics matching your mission and interests"
-            icon={Target}
-            iconColor="bg-[hsl(var(--portal-accent-blue)/0.15)] text-[hsl(var(--portal-accent-blue))]"
-            count={relevantTrends?.length || 0}
-            countLabel="matches"
-            accent="blue"
-            isLoading={trendsLoading || scoresLoading}
-            isEmpty={!relevantTrends || relevantTrends.length === 0}
-            emptyMessage="No relevant trends found. Update your profile to improve matching."
-          >
-            <ScrollArea className="h-[400px]">
-              <div className="space-y-3 pr-4">
+            {/* Two Column Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Relevant to You */}
+              <SectionCard
+                title="Relevant to You"
+                subtitle="Topics matching your mission"
+                icon={Target}
+                iconColor="bg-[hsl(var(--portal-accent-blue)/0.15)] text-[hsl(var(--portal-accent-blue))]"
+                count={relevantTrends?.length || 0}
+                accent="blue"
+                isLoading={trendsLoading || scoresLoading}
+                isEmpty={!relevantTrends || relevantTrends.length === 0}
+                emptyMessage="No relevant trends. Update your profile to improve matching."
+              >
                 {relevantTrends?.map((trend, index) => (
                   <TrendCard
                     key={trend.id}
@@ -516,25 +441,20 @@ export default function ClientNewsTrends() {
                     rank={index + 1}
                   />
                 ))}
-              </div>
-            </ScrollArea>
-          </SectionCard>
+              </SectionCard>
 
-          {/* Watchlist Mentions */}
-          <SectionCard
-            title="Watchlist Mentions"
-            subtitle="Your monitored entities in the news"
-            icon={Eye}
-            iconColor="bg-[hsl(var(--portal-accent-purple)/0.15)] text-[hsl(var(--portal-accent-purple))]"
-            count={watchlistTrends?.length || 0}
-            countLabel="mentions"
-            accent="purple"
-            isLoading={trendsLoading || scoresLoading}
-            isEmpty={!watchlistTrends || watchlistTrends.length === 0}
-            emptyMessage="No watchlist mentions. Add entities to your watchlist to track them."
-          >
-            <ScrollArea className="h-[400px]">
-              <div className="space-y-3 pr-4">
+              {/* Watchlist Mentions */}
+              <SectionCard
+                title="Watchlist Mentions"
+                subtitle="Your monitored entities"
+                icon={Eye}
+                iconColor="bg-[hsl(var(--portal-accent-purple)/0.15)] text-[hsl(var(--portal-accent-purple))]"
+                count={watchlistTrends?.length || 0}
+                accent="purple"
+                isLoading={trendsLoading || scoresLoading}
+                isEmpty={!watchlistTrends || watchlistTrends.length === 0}
+                emptyMessage="No watchlist mentions. Add entities to track."
+              >
                 {watchlistTrends?.map((trend) => (
                   <TrendCard
                     key={trend.id}
@@ -545,73 +465,65 @@ export default function ClientNewsTrends() {
                     onSelect={handleSelectTrend}
                   />
                 ))}
-              </div>
-            </ScrollArea>
-          </SectionCard>
-        </div>
-
-        {/* Top Trends - Full Width */}
-        <SectionCard
-          title="Top Trends"
-          subtitle="Highest confidence trending topics across all sources"
-          icon={TrendingUp}
-          iconColor="bg-[hsl(var(--portal-success)/0.15)] text-[hsl(var(--portal-success))]"
-          count={topTrends.length}
-          countLabel="trending"
-          accent="green"
-          isLoading={trendsLoading}
-          isEmpty={topTrends.length === 0}
-          emptyMessage="No trending topics detected"
-          onRefresh={handleRefreshAll}
-          isRefreshing={isRefreshing}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {topTrends.map((trend, index) => (
-              <TrendCard
-                key={trend.id}
-                trend={trend}
-                outcomeStats={getOutcome(trend.id)}
-                onSelect={handleSelectTrend}
-                showRank
-                rank={index + 1}
-              />
-            ))}
-          </div>
-        </SectionCard>
-
-        {/* Opposition/Risk Monitoring */}
-        {riskTrends.length > 0 && (
-          <SectionCard
-            title="Opposition & Risk"
-            subtitle="Stories requiring defensive monitoring"
-            icon={ShieldAlert}
-            iconColor="bg-[hsl(var(--portal-warning)/0.15)] text-[hsl(var(--portal-warning))]"
-            count={riskTrends.length}
-            countLabel="flagged"
-            accent="amber"
-            isLoading={trendsLoading}
-            isEmpty={riskTrends.length === 0}
-            emptyMessage="No risk items flagged"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {riskTrends.map((trend) => (
-                <TrendCard
-                  key={trend.id}
-                  trend={trend}
-                  outcomeStats={getOutcome(trend.id)}
-                  onSelect={handleSelectTrend}
-                />
-              ))}
+              </SectionCard>
             </div>
-          </SectionCard>
-        )}
+          </TabsContent>
+
+          {/* Explore Tab: Top Trends */}
+          <TabsContent value="explore" className="mt-4">
+            <V3Card accent="green">
+              <V3CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-[hsl(var(--portal-success)/0.15)] text-[hsl(var(--portal-success))]">
+                      <BarChart3 className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm text-[hsl(var(--portal-text-primary))]">
+                        Top Trends
+                      </h3>
+                      <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                        Highest confidence trending topics
+                      </p>
+                    </div>
+                  </div>
+                  <V3Badge variant="muted" size="sm">{topTrends.length}</V3Badge>
+                </div>
+              </V3CardHeader>
+              <V3CardContent>
+                {trendsLoading ? (
+                  <V3LoadingState variant="kpi-grid" count={6} />
+                ) : topTrends.length === 0 ? (
+                  <V3EmptyState
+                    title="No trending topics"
+                    description="Check back later for new trends"
+                    icon={TrendingUp}
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {topTrends.map((trend, index) => (
+                      <TrendCard
+                        key={trend.id}
+                        trend={trend}
+                        outcomeStats={getOutcome(trend.id)}
+                        onSelect={handleSelectTrend}
+                        showRank
+                        rank={index + 1}
+                      />
+                    ))}
+                  </div>
+                )}
+              </V3CardContent>
+            </V3Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Drilldown Sheet */}
       <Sheet open={!!selectedTrend} onOpenChange={() => setSelectedTrend(null)}>
         <SheetContent 
           side="right" 
-          className="w-full sm:max-w-2xl overflow-y-auto portal-bg"
+          className="w-full sm:max-w-2xl overflow-y-auto bg-[hsl(var(--portal-bg))]"
         >
           {selectedTrend && (
             <TrendDrilldownPanel

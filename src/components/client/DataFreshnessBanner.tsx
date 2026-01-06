@@ -1,8 +1,7 @@
 import { formatDistanceToNow } from "date-fns";
-import { AlertTriangle, Clock, Wifi, WifiOff, CheckCircle2, Activity } from "lucide-react";
+import { AlertTriangle, Clock, WifiOff, CheckCircle2, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSourceFreshness, type FreshnessStatus, formatSourceAge } from "@/hooks/useSourceFreshness";
-import { Skeleton } from "@/components/ui/skeleton";
 
 interface DataFreshnessBannerProps {
   className?: string;
@@ -46,9 +45,9 @@ const STATUS_CONFIG: Record<FreshnessStatus, {
   unknown: {
     label: "Checking Data Status",
     description: "Unable to determine freshness",
-    bgClass: "bg-muted/50",
-    borderClass: "border-muted",
-    textClass: "text-muted-foreground",
+    bgClass: "bg-[hsl(var(--portal-bg-elevated))]",
+    borderClass: "border-[hsl(var(--portal-border))]",
+    textClass: "text-[hsl(var(--portal-text-muted))]",
     Icon: Activity,
   },
 };
@@ -62,11 +61,11 @@ export function DataFreshnessBanner({
   // Loading state
   if (isLoading) {
     return (
-      <div className={cn("flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50", className)}>
-        <Skeleton className="h-4 w-4 rounded-full" />
+      <div className={cn("flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))]", className)}>
+        <div className="h-4 w-4 rounded-full bg-[hsl(var(--portal-bg-secondary))] animate-pulse" />
         <div className="flex-1 space-y-1">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-3 w-48" />
+          <div className="h-4 w-32 bg-[hsl(var(--portal-bg-secondary))] rounded animate-pulse" />
+          <div className="h-3 w-48 bg-[hsl(var(--portal-bg-secondary))] rounded animate-pulse" />
         </div>
       </div>
     );
@@ -90,7 +89,7 @@ export function DataFreshnessBanner({
           <p className={cn("text-sm font-medium", STATUS_CONFIG.unknown.textClass)}>
             Unable to check data freshness
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">
             Pipeline status unavailable
           </p>
         </div>
@@ -146,7 +145,7 @@ export function DataFreshnessBanner({
             {config.label}
           </p>
           {/* Source health indicators */}
-          <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="hidden sm:flex items-center gap-1 text-xs text-[hsl(var(--portal-text-muted))]">
             {liveCount > 0 && (
               <span className="flex items-center gap-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--portal-success))]" />
@@ -167,13 +166,13 @@ export function DataFreshnessBanner({
             )}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground truncate">
+        <p className="text-xs text-[hsl(var(--portal-text-muted))] truncate">
           {statusMessage}
           {overallStatus !== 'live' && ". Refresh to check for updates."}
         </p>
       </div>
       
-      <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+      <div className="flex items-center gap-2 text-xs text-[hsl(var(--portal-text-muted))] shrink-0">
         <Clock className="h-3.5 w-3.5" />
         <span className="hidden sm:inline">{displayTimestamp}</span>
       </div>
