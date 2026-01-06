@@ -23,3 +23,4 @@ export { ProvenancePanel, ProvenanceCompact } from "./ProvenancePanel";
 export { SuggestedActionsPanel, SuggestedActionsCompact } from "./SuggestedActionsPanel";
 export { DeltaSinceLoginCard } from "./DeltaSinceLoginCard";
 export { RiskImpactSummary } from "./RiskImpactSummary";
+export { CoverageGovernancePanel } from "./CoverageGovernancePanel";
