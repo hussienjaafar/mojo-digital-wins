@@ -81,6 +81,107 @@ const SOURCE_AUTHORITY: Record<string, number> = {
 // Similarity threshold for phrase clustering
 const EMBEDDING_SIMILARITY_THRESHOLD = 0.82;
 
+// ============================================================================
+// QUALITY GATES: Prevent noisy/low-value topics
+// ============================================================================
+
+// Blocklist: evergreen/generic terms that should never trend
+const TOPIC_BLOCKLIST: Set<string> = new Set([
+  // Generic political terms
+  'politics', 'political', 'government', 'democracy', 'freedom', 'liberty',
+  'america', 'american', 'united states', 'usa', 'congress', 'senate', 'house',
+  'republican', 'democrat', 'conservative', 'liberal', 'progressive',
+  // Generic news terms
+  'breaking', 'news', 'update', 'report', 'latest', 'today', 'new',
+  'says', 'said', 'announces', 'announced', 'confirms', 'confirmed',
+  // Common filler words
+  'people', 'time', 'year', 'years', 'day', 'days', 'week', 'weeks',
+  'first', 'last', 'next', 'more', 'most', 'many', 'some', 'other',
+  // Generic actions
+  'says', 'said', 'claims', 'claims', 'calls', 'called', 'asks', 'asked',
+  // Social media noise
+  'thread', 'post', 'tweet', 'retweet', 'share', 'like', 'comment',
+  // Low-value topics
+  'watch', 'video', 'photo', 'image', 'live', 'opinion', 'editorial',
+]);
+
+// Quality thresholds
+const QUALITY_THRESHOLDS = {
+  // Minimum deduped mentions for any topic
+  MIN_MENTIONS_DEFAULT: 3,
+  // Single-word topics need higher thresholds
+  MIN_MENTIONS_SINGLE_WORD: 5,
+  MIN_SOURCES_SINGLE_WORD: 2,
+  MIN_NEWS_SOURCES_SINGLE_WORD: 1,
+  // Source diversity requirements
+  MIN_SOURCES_FOR_TRENDING: 2,
+  MIN_NEWS_FOR_LOW_SOCIAL: 1,
+  // Volume thresholds
+  MIN_1H_MENTIONS: 2,
+  MIN_24H_MENTIONS: 5,
+};
+
+/**
+ * Check if a topic passes quality gates
+ */
+function passesQualityGates(
+  topicKey: string,
+  topicTitle: string,
+  totalMentionsDeduped: number,
+  sourceCount: number,
+  newsCount: number,
+  socialCount: number,
+  current1h: number,
+  current24h: number
+): { passes: boolean; reason?: string } {
+  // Check blocklist
+  const normalizedKey = topicKey.toLowerCase();
+  const normalizedTitle = topicTitle.toLowerCase();
+  
+  if (TOPIC_BLOCKLIST.has(normalizedKey) || TOPIC_BLOCKLIST.has(normalizedTitle)) {
+    return { passes: false, reason: 'blocklisted_term' };
+  }
+  
+  // Check if any word in a multi-word topic is blocklisted (only if ALL words are blocklisted)
+  const words = normalizedTitle.split(/\s+/);
+  if (words.length > 1 && words.every(w => TOPIC_BLOCKLIST.has(w))) {
+    return { passes: false, reason: 'all_words_blocklisted' };
+  }
+  
+  // Single-word topics require higher thresholds
+  const isSingleWord = words.length === 1;
+  
+  if (isSingleWord) {
+    // Must meet higher mention threshold
+    if (totalMentionsDeduped < QUALITY_THRESHOLDS.MIN_MENTIONS_SINGLE_WORD) {
+      return { passes: false, reason: 'single_word_low_volume' };
+    }
+    // Must have source diversity
+    if (sourceCount < QUALITY_THRESHOLDS.MIN_SOURCES_SINGLE_WORD) {
+      return { passes: false, reason: 'single_word_low_sources' };
+    }
+    // Must have at least one news source for credibility
+    if (newsCount < QUALITY_THRESHOLDS.MIN_NEWS_SOURCES_SINGLE_WORD) {
+      return { passes: false, reason: 'single_word_no_news' };
+    }
+  } else {
+    // Multi-word topics: standard threshold
+    if (totalMentionsDeduped < QUALITY_THRESHOLDS.MIN_MENTIONS_DEFAULT) {
+      return { passes: false, reason: 'low_volume' };
+    }
+  }
+  
+  // Source diversity: require either 2+ sources OR 1+ news source with volume
+  const hasSourceDiversity = sourceCount >= QUALITY_THRESHOLDS.MIN_SOURCES_FOR_TRENDING;
+  const hasNewsCorroboration = newsCount >= QUALITY_THRESHOLDS.MIN_NEWS_FOR_LOW_SOCIAL && current24h >= QUALITY_THRESHOLDS.MIN_24H_MENTIONS;
+  
+  if (!hasSourceDiversity && !hasNewsCorroboration) {
+    return { passes: false, reason: 'low_source_diversity' };
+  }
+  
+  return { passes: true };
+}
+
 // Fallback topic aliases (used when DB is unavailable)
 const TOPIC_ALIASES: Record<string, string> = {
   'trump': 'Donald Trump',
@@ -698,6 +799,8 @@ serve(async (req) => {
     let breakingCount = 0;
     let dedupedSavings = 0;
     
+    let qualityGateFiltered = 0;
+    
     for (const [key, agg] of topicMap) {
       // Use DEDUPED counts for all calculations
       const dedupedMentions = Array.from(agg.dedupedMentions.values());
@@ -706,13 +809,37 @@ serve(async (req) => {
       
       dedupedSavings += (totalMentionsRaw - totalMentionsDeduped);
       
-      // Skip low-volume topics (using deduped count)
-      if (totalMentionsDeduped < 3) continue;
-      
       // Calculate window counts using DEDUPED mentions
       const current1h_deduped = dedupedMentions.filter(m => new Date(m.published_at) > hour1Ago).length;
       const current6h_deduped = dedupedMentions.filter(m => new Date(m.published_at) > hours6Ago).length;
       const current24h_deduped = totalMentionsDeduped;
+      
+      // Source counts using DEDUPED counts
+      const newsCount = agg.by_source_deduped.rss + agg.by_source_deduped.google_news;
+      const socialCount = agg.by_source_deduped.bluesky;
+      const sourceCount = (agg.by_source_deduped.rss > 0 ? 1 : 0) + 
+                          (agg.by_source_deduped.google_news > 0 ? 1 : 0) + 
+                          (agg.by_source_deduped.bluesky > 0 ? 1 : 0);
+      
+      // ========================================
+      // QUALITY GATES: Filter low-quality topics
+      // ========================================
+      const qualityResult = passesQualityGates(
+        key,
+        agg.event_title,
+        totalMentionsDeduped,
+        sourceCount,
+        newsCount,
+        socialCount,
+        current1h_deduped,
+        current24h_deduped
+      );
+      
+      if (!qualityResult.passes) {
+        qualityGateFiltered++;
+        console.log(`[detect-trend-events] Quality gate filtered: "${agg.event_title}" (${qualityResult.reason})`);
+        continue;
+      }
       
       // Get rolling baseline from historical data
       const rolling = rollingBaselines.get(key);
@@ -739,13 +866,6 @@ serve(async (req) => {
       
       // Calculate acceleration
       const acceleration = rate6h > 0 ? ((currentHourlyRate - rate6h) / rate6h) * 100 : 0;
-      
-      // Source counts using DEDUPED counts
-      const newsCount = agg.by_source_deduped.rss + agg.by_source_deduped.google_news;
-      const socialCount = agg.by_source_deduped.bluesky;
-      const sourceCount = (agg.by_source_deduped.rss > 0 ? 1 : 0) + 
-                          (agg.by_source_deduped.google_news > 0 ? 1 : 0) + 
-                          (agg.by_source_deduped.bluesky > 0 ? 1 : 0);
       
       // Corroboration score
       const corroborationScore = Math.min(100, sourceCount * 25 + (newsCount > 0 && socialCount > 0 ? 25 : 0));
@@ -941,6 +1061,7 @@ serve(async (req) => {
     }
     
     console.log(`[detect-trend-events] Processing ${eventsToUpsert.length} topics, ${trendingCount} trending, ${breakingCount} breaking`);
+    console.log(`[detect-trend-events] Quality gates filtered ${qualityGateFiltered} low-quality topics`);
     console.log(`[detect-trend-events] Deduplication removed ${dedupedSavings} duplicate mentions`);
     
     // ========================================
@@ -1060,6 +1181,7 @@ serve(async (req) => {
       events_upserted: eventsToUpsert.length,
       trending_count: trendingCount,
       breaking_count: breakingCount,
+      quality_gate_filtered: qualityGateFiltered,
       evidence_count: evidenceToInsert.length,
       clusters_created: multiMemberClusters.length,
       deduped_savings: dedupedSavings,
