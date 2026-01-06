@@ -10,7 +10,7 @@ const CRITICAL_PIPELINES = [
   'fetch_google_news', 
   'analyze_articles',
   'batch_analyze_content',
-  'calculate_trend_clusters',
+  'detect_trend_events',
   'calculate_entity_trends',
 ] as const;
 
@@ -24,7 +24,7 @@ const PIPELINE_SLA_MINUTES: Record<string, number> = {
   analyze_bluesky: 60,              // Bluesky analysis every hour
   analyze_articles: 30,             // Article analysis every 30 min
   batch_analyze_content: 60,        // Batch analyze every hour
-  calculate_trend_clusters: 60,     // Trend clusters every hour
+  detect_trend_events: 30,          // Trend events every 30 min (primary trend pipeline)
   calculate_entity_trends: 60,      // Entity trends every hour
   calculate_news_trends: 60,        // News trends every hour
   detect_breaking_news: 30,         // Breaking news every 30 min

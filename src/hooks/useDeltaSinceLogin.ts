@@ -52,9 +52,9 @@ export function useDeltaSinceLogin() {
             .select("id", { count: "exact", head: true })
             .gte("created_at", lastLoginAt),
           supabase
-            .from("trend_clusters")
+            .from("trend_events")
             .select("id", { count: "exact", head: true })
-            .gte("detected_at", lastLoginAt),
+            .gte("first_seen_at", lastLoginAt),
         ]);
 
         setDelta({

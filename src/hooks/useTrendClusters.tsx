@@ -1,6 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+/**
+ * @deprecated This hook uses the legacy trend_clusters table which is no longer updated.
+ * Use useTrendEvents from '@/hooks/useTrendEvents' instead for the new trend detection model.
+ * 
+ * Migration guide:
+ * - Replace useTrendClusters() with useTrendEvents()
+ * - TrendCluster.cluster_title -> TrendEvent.event_title
+ * - TrendCluster.velocity_score -> TrendEvent.velocity
+ * - TrendCluster.mentions_last_24h -> TrendEvent.current_24h
+ */
+
 export interface TrendCluster {
   id: string;
   cluster_title: string;
