@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 
 import { useTrendEvidence, getConfidenceLabel, getConfidenceColor, getTrendStageInfo } from "@/hooks/useTrendEvents";
 import { useSuggestedActionsQuery } from "@/queries/useSuggestedActionsQuery";
+import { useTrendOutcomeByEventId, type OutcomeStats } from "@/hooks/useTrendOutcomes";
 import type { TrendEvent, TrendEvidence } from "@/hooks/useTrendEvents";
 
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,10 @@ import {
   X,
   Copy,
   Check,
+  Award,
+  TrendingDown,
+  DollarSign,
+  MousePointerClick,
 } from "lucide-react";
 
 // ============================================================================
@@ -167,6 +172,128 @@ function ConfidenceBreakdown({ trend }: ConfidenceBreakdownProps) {
 }
 
 // ============================================================================
+// Outcome Learning Section
+// ============================================================================
+
+interface OutcomeLearningProps {
+  outcomeStats: OutcomeStats | null | undefined;
+  isLoading?: boolean;
+}
+
+function OutcomeLearning({ outcomeStats, isLoading }: OutcomeLearningProps) {
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-20 w-full" />
+      </div>
+    );
+  }
+
+  if (!outcomeStats || outcomeStats.confidenceLevel === 'low') {
+    return (
+      <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center">
+        <Activity className="h-8 w-8 mx-auto text-[hsl(var(--portal-text-muted))] mb-2" />
+        <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+          No outcome data yet. Send actions on this topic to build learning signals.
+        </p>
+      </div>
+    );
+  }
+
+  const { 
+    responseRate, 
+    donationRate, 
+    performanceDelta, 
+    actionsSent, 
+    totalDonations,
+    totalAmount,
+    learningSignal,
+    isHighPerforming,
+    confidenceLevel
+  } = outcomeStats;
+
+  return (
+    <div className="space-y-4">
+      {/* High Performing Badge */}
+      {isHighPerforming && (
+        <div className={cn(
+          "flex items-center gap-2 p-3 rounded-lg",
+          "bg-[hsl(var(--portal-success)/0.1)] border border-[hsl(var(--portal-success)/0.3)]"
+        )}>
+          <Award className="h-5 w-5 text-[hsl(var(--portal-success))]" />
+          <div>
+            <p className="text-sm font-medium text-[hsl(var(--portal-success))]">
+              High Performing Topic
+            </p>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+              This topic shows {performanceDelta > 0 ? '+' : ''}{performanceDelta.toFixed(1)}% better response than baseline
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center">
+          <MousePointerClick className="h-4 w-4 mx-auto mb-1 text-[hsl(var(--portal-accent-blue))]" />
+          <p className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">
+            {responseRate.toFixed(1)}%
+          </p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Response Rate</p>
+        </div>
+        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center">
+          <DollarSign className="h-4 w-4 mx-auto mb-1 text-[hsl(var(--portal-success))]" />
+          <p className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">
+            {donationRate.toFixed(1)}%
+          </p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Donation Rate</p>
+        </div>
+        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center">
+          {performanceDelta >= 0 ? (
+            <TrendingUp className="h-4 w-4 mx-auto mb-1 text-[hsl(var(--portal-success))]" />
+          ) : (
+            <TrendingDown className="h-4 w-4 mx-auto mb-1 text-[hsl(var(--portal-error))]" />
+          )}
+          <p className={cn(
+            "text-xl font-bold",
+            performanceDelta >= 0 
+              ? "text-[hsl(var(--portal-success))]" 
+              : "text-[hsl(var(--portal-error))]"
+          )}>
+            {performanceDelta > 0 ? '+' : ''}{performanceDelta.toFixed(1)}%
+          </p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">vs Baseline</p>
+        </div>
+      </div>
+
+      {/* Sample Size & Confidence */}
+      <div className="flex items-center justify-between text-xs p-2 rounded bg-[hsl(var(--portal-bg-secondary))]">
+        <span className="text-[hsl(var(--portal-text-muted))]">
+          Based on {actionsSent.toLocaleString()} actions • {totalDonations} donations • ${totalAmount.toLocaleString()}
+        </span>
+        <Badge 
+          variant="outline" 
+          className={cn(
+            "text-xs",
+            confidenceLevel === 'high' && "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
+            confidenceLevel === 'medium' && "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]"
+          )}
+        >
+          {confidenceLevel === 'high' ? 'High Confidence' : 'Building Confidence'}
+        </Badge>
+      </div>
+
+      {/* Learning Signal */}
+      {learningSignal && (
+        <p className="text-xs text-[hsl(var(--portal-text-secondary))] italic">
+          💡 {learningSignal}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // Suggested Actions Section
 // ============================================================================
 
@@ -279,6 +406,7 @@ export function TrendDrilldownPanel({
   onClose 
 }: TrendDrilldownPanelProps) {
   const { evidence, isLoading: evidenceLoading } = useTrendEvidence(trend.id);
+  const { data: outcomeStats, isLoading: outcomeLoading } = useTrendOutcomeByEventId(organizationId, trend.id);
   const [showAllEvidence, setShowAllEvidence] = useState(false);
 
   const stageInfo = getTrendStageInfo(trend.trend_stage);
@@ -400,6 +528,17 @@ export function TrendDrilldownPanel({
 
       {/* Confidence Breakdown */}
       <ConfidenceBreakdown trend={trend} />
+
+      <Separator />
+
+      {/* Outcome Learning Section */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] flex items-center gap-2">
+          <Award className="h-4 w-4" />
+          Outcome Learning
+        </h4>
+        <OutcomeLearning outcomeStats={outcomeStats} isLoading={outcomeLoading} />
+      </div>
 
       <Separator />
 
