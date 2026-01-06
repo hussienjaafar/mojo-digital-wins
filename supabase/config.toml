@@ -205,7 +205,9 @@ verify_jwt = false
 
 [functions.compute-org-relevance]
 verify_jwt = false
-verify_jwt = true
+
+[functions.generate-embeddings]
+verify_jwt = false
 
 [functions.reset-client-password]
 verify_jwt = true
