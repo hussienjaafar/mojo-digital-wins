@@ -73,6 +73,16 @@ export interface TrendEvent {
   news_evidence_count?: number;
   social_evidence_count?: number;
   freshness?: 'fresh' | 'recent' | 'aging' | 'stale';
+  
+  // Phase 4: Enhanced explainability fields
+  tier1_count?: number;
+  tier2_count?: number;
+  tier3_count?: number;
+  has_tier12_corroboration?: boolean;
+  weighted_evidence_score?: number;
+  rank_score?: number;
+  recency_decay?: number;
+  evergreen_penalty?: number;
 }
 
 /**
@@ -93,7 +103,68 @@ export interface TrendEvidence {
   contribution_score: number;
   is_primary: boolean;
   sentiment_label: string | null;
+  // Phase 4: Enhanced evidence fields
+  canonical_url?: string | null;
+  source_tier?: 'tier1' | 'tier2' | 'tier3' | null;
 }
+
+/**
+ * Generate a human-readable "why this is trending" summary
+ */
+export const generateWhyTrendingSummary = (trend: TrendEvent): string => {
+  const parts: string[] = [];
+  
+  // Z-score context
+  const zScore = trend.z_score_velocity || 0;
+  const baselineDeltaPct = trend.baseline_7d > 0 
+    ? ((trend.current_24h / 24 - trend.baseline_7d) / trend.baseline_7d * 100)
+    : 0;
+  
+  // Primary trigger
+  if (trend.is_breaking) {
+    parts.push(`Breaking news with ${Math.round(baselineDeltaPct)}% spike above baseline`);
+  } else if (zScore >= 3) {
+    parts.push(`Extreme velocity spike (${zScore.toFixed(1)}σ above normal)`);
+  } else if (zScore >= 2) {
+    parts.push(`Significant baseline spike of ${Math.round(baselineDeltaPct)}%`);
+  } else if (trend.source_count >= 2) {
+    parts.push(`Corroborated across ${trend.source_count} sources`);
+  } else {
+    parts.push(`Rising with ${trend.current_24h} mentions in 24h`);
+  }
+  
+  // Cross-source detail
+  if (trend.news_source_count >= 1 && trend.social_source_count >= 1) {
+    parts.push('verified across news and social');
+  } else if (trend.news_source_count >= 2) {
+    parts.push('confirmed by multiple news outlets');
+  }
+  
+  // Confidence factors
+  const factors = trend.confidence_factors || {};
+  const hasTier12 = (factors as Record<string, unknown>).has_tier12_corroboration;
+  if (hasTier12) {
+    parts.push('with Tier 1/2 source corroboration');
+  }
+  
+  return parts.join(', ') + '.';
+};
+
+/**
+ * Get tier label for display
+ */
+export const getTierLabel = (tier: string | null | undefined): { label: string; color: string } => {
+  switch (tier) {
+    case 'tier1':
+      return { label: 'Tier 1', color: 'text-status-success' };
+    case 'tier2':
+      return { label: 'Tier 2', color: 'text-status-info' };
+    case 'tier3':
+      return { label: 'Tier 3', color: 'text-status-warning' };
+    default:
+      return { label: 'Unclassified', color: 'text-muted-foreground' };
+  }
+};
 
 interface UseTrendEventsOptions {
   limit?: number;
