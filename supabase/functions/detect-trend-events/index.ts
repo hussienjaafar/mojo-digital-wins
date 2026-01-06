@@ -134,6 +134,151 @@ const TOPIC_BLOCKLIST: Set<string> = new Set([
   'watch', 'video', 'photo', 'image', 'live', 'opinion', 'editorial',
 ]);
 
+// ============================================================================
+// PHASE 3: EVERGREEN DETECTION for suppression
+// Topics that are "always on" should be ranked lower unless spiking
+// ============================================================================
+const EVERGREEN_ENTITIES: Set<string> = new Set([
+  // Political figures always in news
+  'trump', 'biden', 'harris', 'obama', 'pelosi', 'mcconnell', 'schumer',
+  // Government bodies
+  'white house', 'pentagon', 'state department', 'justice department',
+  // Recurring topics
+  'immigration', 'border', 'economy', 'inflation', 'healthcare', 'climate',
+  'taxes', 'election', 'campaign', 'poll', 'polls', 'voter', 'voting',
+]);
+
+// Evergreen detection: check if topic is typically always-on
+function isEvergreenTopic(topicKey: string, baseline7d: number, baseline30d: number): boolean {
+  const normalizedKey = topicKey.toLowerCase();
+  
+  // Check explicit evergreen list
+  if (EVERGREEN_ENTITIES.has(normalizedKey)) return true;
+  
+  // Heuristic: if 30d baseline is high and relatively stable, it's evergreen
+  // A topic with consistent high volume (baseline30d > 2/hour) is likely evergreen
+  if (baseline30d >= 2 && baseline7d >= 1.5) {
+    // Check stability: if 7d and 30d are similar, it's steady/evergreen
+    const stabilityRatio = Math.abs(baseline7d - baseline30d) / Math.max(baseline30d, 0.1);
+    if (stabilityRatio < 0.3) return true; // Less than 30% variance = stable/evergreen
+  }
+  
+  return false;
+}
+
+// Calculate evergreen penalty (0.3-1.0): lower for evergreen unless spiking
+function calculateEvergreenPenalty(
+  isEvergreen: boolean, 
+  zScoreVelocity: number, 
+  hasHistoricalBaseline: boolean
+): number {
+  if (!isEvergreen) return 1.0; // No penalty for non-evergreen
+  
+  // If evergreen but genuinely spiking (z-score > 3), reduce penalty
+  if (zScoreVelocity > 4) return 0.9;  // Massive spike overcomes most penalty
+  if (zScoreVelocity > 3) return 0.7;  // Strong spike reduces penalty
+  if (zScoreVelocity > 2) return 0.5;  // Moderate spike gets moderate penalty
+  
+  // Evergreen with no significant spike gets heavy penalty
+  return hasHistoricalBaseline ? 0.3 : 0.4;
+}
+
+// ============================================================================
+// PHASE 3: RECENCY DECAY - Fresh spikes rank higher
+// Decay factor based on hours since last seen (0.3-1.0)
+// ============================================================================
+function calculateRecencyDecay(lastSeenAt: Date, now: Date): number {
+  const hoursSinceLastSeen = (now.getTime() - lastSeenAt.getTime()) / (1000 * 60 * 60);
+  
+  // Full score for topics seen in last 2 hours
+  if (hoursSinceLastSeen <= 2) return 1.0;
+  
+  // Gradual decay from 2-12 hours
+  if (hoursSinceLastSeen <= 12) {
+    return 1.0 - ((hoursSinceLastSeen - 2) / 10) * 0.5; // 1.0 -> 0.5 over 10 hours
+  }
+  
+  // Steeper decay after 12 hours
+  if (hoursSinceLastSeen <= 24) {
+    return 0.5 - ((hoursSinceLastSeen - 12) / 12) * 0.2; // 0.5 -> 0.3 over 12 hours
+  }
+  
+  // Minimum decay for very stale topics
+  return 0.3;
+}
+
+// ============================================================================
+// PHASE 3: RANK SCORE CALCULATION - Twitter-like trending formula
+// Primary: z-score velocity (burst above baseline)
+// Secondary: corroboration (cross-source verification)  
+// Modifiers: recency decay, evergreen penalty
+// ============================================================================
+function calculateRankScore(params: {
+  zScoreVelocity: number;
+  corroborationScore: number;
+  sourceCount: number;
+  hasTier12Corroboration: boolean;
+  newsCount: number;
+  socialCount: number;
+  recencyDecay: number;
+  evergreenPenalty: number;
+  baselineQuality: number;
+  current1h: number;
+  current24h: number;
+}): number {
+  const {
+    zScoreVelocity,
+    corroborationScore,
+    sourceCount,
+    hasTier12Corroboration,
+    newsCount,
+    socialCount,
+    recencyDecay,
+    evergreenPenalty,
+    baselineQuality,
+    current1h,
+    current24h,
+  } = params;
+  
+  // Component 1: Velocity Score (0-50) - PRIMARY FACTOR
+  // z-score measures how many standard deviations above baseline
+  // Capped at 10 to prevent extreme outliers from dominating
+  const velocityComponent = Math.min(50, Math.max(0, zScoreVelocity * 5)) * baselineQuality;
+  
+  // Component 2: Corroboration Boost (0-30)
+  // Cross-source verification is critical for credibility
+  let corroborationComponent = 0;
+  if (sourceCount >= 3) {
+    corroborationComponent = 25; // Multi-platform coverage
+  } else if (sourceCount >= 2) {
+    corroborationComponent = 15; // Two platforms
+  }
+  // Bonus for news+social combo (validates social buzz with journalism)
+  if (newsCount > 0 && socialCount > 0) {
+    corroborationComponent += 10;
+  }
+  // Bonus for tier1/tier2 sources (authoritative corroboration)
+  if (hasTier12Corroboration) {
+    corroborationComponent += 5;
+  }
+  corroborationComponent = Math.min(30, corroborationComponent);
+  
+  // Component 3: Activity Level (0-20) - SECONDARY
+  // Logarithmic scaling to prevent volume from dominating
+  const activityComponent = Math.min(20, 
+    Math.log2(current1h + 1) * 4 + Math.log2(current24h + 1) * 2
+  );
+  
+  // Calculate raw rank score
+  const rawScore = velocityComponent + corroborationComponent + activityComponent;
+  
+  // Apply modifiers: recency decay and evergreen penalty
+  // These multiplicatively reduce the score
+  const finalScore = rawScore * recencyDecay * evergreenPenalty;
+  
+  return Math.round(finalScore * 10) / 10;
+}
+
 // Quality thresholds - PHASE 2: Strengthened single-word suppression
 const QUALITY_THRESHOLDS = {
   // Minimum deduped mentions for any topic
@@ -984,7 +1129,7 @@ serve(async (req) => {
       
       // Get rolling baseline from historical data
       const rolling = rollingBaselines.get(key);
-      const hasHistoricalBaseline = rolling && rolling.data_points_7d >= 3;
+      const hasHistoricalBaseline: boolean = !!(rolling && rolling.data_points_7d >= 3);
       
       // Use rolling baseline if available, else use conservative fallback
       const baseline7d = hasHistoricalBaseline 
@@ -1014,6 +1159,12 @@ serve(async (req) => {
       // Calculate baseline delta for ranking
       const baselineDelta = baseline7d > 0 ? (currentHourlyRate - baseline7d) / baseline7d : currentHourlyRate;
       const baselineDeltaPct = baselineDelta * 100;
+      
+      // ========================================
+      // PHASE 3: EVERGREEN DETECTION & RECENCY DECAY
+      // ========================================
+      const isEvergreen = isEvergreenTopic(key, baseline7d, baseline30d);
+      const recencyDecay = calculateRecencyDecay(agg.last_seen_at, now);
       
       // ========================================
       // PHASE 2: TIER WEIGHTING & CORROBORATION
@@ -1061,26 +1212,51 @@ serve(async (req) => {
       // - 2+ sources (corroboration)
       const meetsVolumeGate = current1h_deduped >= 2 || current24h_deduped >= 5 || sourceCount >= 2;
       
-      // TREND_SCORE: Primary ranking metric (Twitter-like)
+      // ========================================
+      // PHASE 3: EVERGREEN PENALTY CALCULATION
+      // ========================================
+      const evergreenPenalty = calculateEvergreenPenalty(isEvergreen, zScoreVelocity, hasHistoricalBaseline);
+      
+      // ========================================
+      // PHASE 3: RANK SCORE - Twitter-like trending formula
+      // Primary: z-score (burst above baseline)
+      // Secondary: corroboration (cross-source)
+      // Modifiers: recency, evergreen suppression
+      // ========================================
+      const rankScore = calculateRankScore({
+        zScoreVelocity,
+        corroborationScore,
+        sourceCount,
+        hasTier12Corroboration,
+        newsCount,
+        socialCount,
+        recencyDecay,
+        evergreenPenalty,
+        baselineQuality,
+        current1h: current1h_deduped,
+        current24h: current24h_deduped,
+      });
+      
+      // LEGACY TREND_SCORE: Keep for backwards compatibility
       // Components:
       // 1. Z-score velocity (0-100): How much above baseline (primary factor)
       // 2. Corroboration boost (0-30): Cross-source verification
       // 3. Volume bonus (0-20): Raw activity level (secondary)
-      // 4. NEW: Tier boost (0-20): Weighted by tier distribution
+      // 4. Tier boost (0-20): Weighted by tier distribution
       const velocityScore = zScoreVelocity * 10 * baselineQuality; // 0-100
       const corroborationBoost = sourceCount >= 2 
         ? 15 + (newsCount > 0 && socialCount > 0 ? 15 : 0) // 15-30 for cross-source
         : 0;
       const volumeBonus = Math.min(20, Math.log2(current24h_deduped + 1) * 5);
       
-      // NEW: Tier boost - higher for tier1/tier2 presence
+      // Tier boost - higher for tier1/tier2 presence
       const tierBoost = tier1Count > 0 
         ? 20  // Tier1 presence = full boost
         : tier2Count > 0 
           ? 12  // Tier2 presence = moderate boost
           : 0;  // Tier3 only = no boost
       
-      // NEW: Tier3-only penalty for cross-tier corroboration requirement
+      // Tier3-only penalty for cross-tier corroboration requirement
       const tier3OnlyPenalty = REQUIRE_TIER12_CORROBORATION && isTier3Only ? 0.5 : 1.0;
       
       // Apply volume gate + tier penalty: demote tier3-only trends
@@ -1186,7 +1362,12 @@ serve(async (req) => {
       // Build related entities array from the aggregate
       const relatedEntitiesArray = Array.from(agg.related_entities).slice(0, 10);
       
-      // Build event record with clustering info + velocity-based ranking + PHASE 2 label quality
+      // Log evergreen suppression for monitoring
+      if (isEvergreen && evergreenPenalty < 1.0) {
+        console.log(`[detect-trend-events] Evergreen suppressed: "${agg.event_title}" (penalty: ${evergreenPenalty.toFixed(2)}, z-score: ${zScoreVelocity.toFixed(2)})`);
+      }
+      
+      // Build event record with clustering info + velocity-based ranking + PHASE 2 label quality + PHASE 3 rank score
       const eventRecord = {
         event_key: key,
         event_title: agg.event_title,
@@ -1209,10 +1390,14 @@ serve(async (req) => {
         velocity_1h: velocity1h,
         velocity_6h: velocity6h,
         acceleration,
-        // NEW: Velocity-based ranking fields
-        trend_score: Math.round(trendScore * 10) / 10, // Primary ranking metric
+        // Velocity-based ranking fields
+        trend_score: Math.round(trendScore * 10) / 10, // Legacy ranking metric
         z_score_velocity: Math.round(zScoreVelocity * 100) / 100, // For explainability
         confidence_score: Math.round(confidenceScore),
+        // PHASE 3: New rank_score for Twitter-like ranking
+        rank_score: rankScore,
+        recency_decay: Math.round(recencyDecay * 1000) / 1000,
+        evergreen_penalty: Math.round(evergreenPenalty * 1000) / 1000,
         confidence_factors: {
           ...confidenceFactors,
           baseline_quality: baselineQuality,
@@ -1228,6 +1413,12 @@ serve(async (req) => {
           // Phase 2: Tier weighting explainability
           tier_boost: tierBoost,
           tier3_only_penalty: tier3OnlyPenalty,
+          // Phase 3: Rank score explainability
+          rank_score_components: {
+            recency_decay: recencyDecay,
+            evergreen_penalty: evergreenPenalty,
+            is_evergreen: isEvergreen,
+          },
         },
         is_trending: isTrending,
         is_breaking: isBreaking,

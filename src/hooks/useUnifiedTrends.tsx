@@ -51,6 +51,10 @@ export interface UnifiedTrend {
   // trend_events source fields
   event_id?: string;
   confidence_score?: number;
+  // Phase 3: Rank score for Twitter-like ranking
+  rank_score?: number;
+  recency_decay?: number;
+  evergreen_penalty?: number;
 }
 
 interface UseUnifiedTrendsOptions {
@@ -94,11 +98,13 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     
     try {
       // Build parallel queries - now using trend_events as single source of truth
+      // PHASE 3: Order by rank_score (Twitter-like ranking) instead of just confidence
       let trendEventsQuery = supabase
         .from('trend_events')
         .select('*')
         .gte('last_seen_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
         .gte('confidence_score', 20)
+        .order('rank_score', { ascending: false, nullsFirst: false })
         .order('is_breaking', { ascending: false })
         .order('confidence_score', { ascending: false })
         .limit(limit + 50);
@@ -173,11 +179,12 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
           const baselineHourly = baseline7d > 0 ? baseline7d / (7 * 24) : (current24h > 0 ? current24h / 24 : 0);
           const spikeRatio = baselineHourly > 0 ? Math.min(5, Math.max(1, current1h / baselineHourly)) : 1;
           
-          // Calculate unified score from confidence and source corroboration
-          const unifiedScore = (event.confidence_score || 0) * 10 + 
-            (event.corroboration_score || 0) * 50 + 
+          // PHASE 3: Calculate unified score using rank_score as primary factor
+          // rank_score already incorporates: z-score velocity, corroboration, recency, evergreen suppression
+          const rankScore = event.rank_score || 0;
+          const unifiedScore = rankScore * 10 + 
             (event.is_breaking ? 200 : 0) +
-            (event.source_count >= 3 ? 150 : event.source_count >= 2 ? 80 : 0);
+            (event.source_count >= 3 ? 50 : event.source_count >= 2 ? 25 : 0);
           
           // Determine source types
           const sourceTypes: string[] = [];
@@ -232,14 +239,21 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
             org_matched_entities: orgRelevance?.matched_entities || [],
             event_id: event.id,
             confidence_score: event.confidence_score || 0,
+            // Phase 3: Include rank score metrics
+            rank_score: rankScore,
+            recency_decay: event.recency_decay || 1.0,
+            evergreen_penalty: event.evergreen_penalty || 1.0,
           } as UnifiedTrend;
         })
-        // Sort by unified score (or org relevance if provided)
+        // PHASE 3: Sort by rank_score first (Twitter-like), then by org relevance if available
         .sort((a, b) => {
           // Prioritize org relevance if both have scores
           if (a.org_relevance_score && b.org_relevance_score) {
             return b.org_relevance_score - a.org_relevance_score;
           }
+          // Otherwise sort by rank_score (primary) then unified_score (secondary)
+          const rankDiff = (b.rank_score || 0) - (a.rank_score || 0);
+          if (Math.abs(rankDiff) > 0.1) return rankDiff;
           return b.unified_score - a.unified_score;
         });
 
