@@ -46,55 +46,74 @@ interface TriggerExplanation {
 }
 
 function getTriggerExplanation(trend: TrendEvent): TriggerExplanation {
-  // Priority order based on evidence-based model
+  // Twitter-like ranking: velocity vs baseline is PRIMARY
+  const zScore = trend.z_score_velocity || 0;
+  const baselineDeltaPct = trend.confidence_factors?.baseline_delta_pct 
+    ?? (trend.baseline_7d > 0 
+      ? ((trend.current_1h - trend.baseline_7d) / trend.baseline_7d * 100) 
+      : trend.current_1h * 100);
+  
+  // Breaking: highest priority (extreme velocity + corroboration)
   if (trend.is_breaking) {
     return {
       type: 'breaking',
       label: 'Breaking',
-      description: `Cross-source confirmation with ${Math.round(trend.velocity)}% velocity spike`,
+      description: `${Math.round(baselineDeltaPct)}% above baseline with ${trend.source_count} sources confirming`,
       icon: Zap,
       color: 'text-status-error',
       bgColor: 'bg-status-error/10',
     };
   }
 
-  const baselineDelta = trend.baseline_7d > 0 
-    ? ((trend.current_1h - trend.baseline_7d) / trend.baseline_7d * 100) 
-    : trend.current_1h * 100;
+  // Velocity spike: primary ranking signal
+  if (zScore >= 3 || baselineDeltaPct > 300) {
+    return {
+      type: 'velocity_surge',
+      label: 'Velocity Spike',
+      description: `${Math.round(baselineDeltaPct)}% above 7-day baseline (${zScore.toFixed(1)}σ spike)`,
+      icon: TrendingUp,
+      color: 'text-status-error',
+      bgColor: 'bg-status-error/10',
+    };
+  }
 
-  if (baselineDelta > 200) {
+  // Baseline spike: significant but not extreme
+  if (zScore >= 2 || baselineDeltaPct > 200) {
     return {
       type: 'baseline_spike',
       label: 'Baseline Spike',
-      description: `${Math.round(baselineDelta)}% above 7-day baseline (${trend.baseline_7d.toFixed(1)}/hr avg)`,
+      description: `${Math.round(baselineDeltaPct)}% above normal (baseline: ${trend.baseline_7d.toFixed(1)}/hr)`,
       icon: BarChart3,
       color: 'text-status-warning',
       bgColor: 'bg-status-warning/10',
     };
   }
 
-  if (trend.source_count >= 3 || (trend.news_source_count >= 1 && trend.social_source_count >= 1)) {
+  // Cross-source corroboration: secondary boost
+  if (trend.source_count >= 2 && (trend.news_source_count >= 1 && trend.social_source_count >= 1)) {
     return {
       type: 'cross_source',
       label: 'Cross-Source',
-      description: `Verified across ${trend.source_count} source types (${trend.news_source_count} news, ${trend.social_source_count} social)`,
+      description: `Verified across news + social (${Math.round(baselineDeltaPct)}% vs baseline)`,
       icon: Users,
       color: 'text-status-success',
       bgColor: 'bg-status-success/10',
     };
   }
 
-  if (trend.velocity > 100) {
+  // Moderate velocity: above baseline but not spiking
+  if (zScore >= 1 || baselineDeltaPct > 100) {
     return {
       type: 'velocity_surge',
-      label: 'Velocity Surge',
-      description: `${Math.round(trend.velocity)}% above expected rate`,
+      label: 'Rising',
+      description: `${Math.round(baselineDeltaPct)}% above expected rate`,
       icon: TrendingUp,
       color: 'text-status-info',
       bgColor: 'bg-status-info/10',
     };
   }
 
+  // Emerging: new topic with momentum
   if (trend.trend_stage === 'emerging') {
     return {
       type: 'emerging',
@@ -106,10 +125,11 @@ function getTriggerExplanation(trend: TrendEvent): TriggerExplanation {
     };
   }
 
+  // Default: trending but not spiking
   return {
     type: 'velocity_surge',
     label: 'Trending',
-    description: `${trend.evidence_count} mentions in 24 hours`,
+    description: `${trend.current_24h} mentions, ${Math.round(baselineDeltaPct)}% vs baseline`,
     icon: Radio,
     color: 'text-muted-foreground',
     bgColor: 'bg-muted/10',
@@ -147,10 +167,13 @@ export function TrendExplainability({ trend, className, defaultExpanded = false 
   const TriggerIcon = trigger.icon;
   const stageInfo = getTrendStageInfo(trend.trend_stage);
   
-  // Calculate baseline delta
-  const baselineDelta = trend.baseline_7d > 0 
-    ? ((trend.current_1h - trend.baseline_7d) / trend.baseline_7d * 100)
-    : 0;
+  // Velocity-based metrics (primary ranking factors)
+  const zScore = trend.z_score_velocity || 0;
+  const trendScore = trend.trend_score || 0;
+  const baselineDelta = trend.confidence_factors?.baseline_delta_pct 
+    ?? (trend.baseline_7d > 0 
+      ? ((trend.current_1h - trend.baseline_7d) / trend.baseline_7d * 100)
+      : 0);
 
   // Time since first seen
   const firstSeenDate = new Date(trend.first_seen_at);
@@ -161,7 +184,9 @@ export function TrendExplainability({ trend, className, defaultExpanded = false 
     baseline_delta: 0,
     cross_source: 0,
     volume: 0,
-    velocity: 0
+    velocity: 0,
+    z_score: 0,
+    trend_score: 0
   };
 
   return (
@@ -222,21 +247,37 @@ export function TrendExplainability({ trend, className, defaultExpanded = false 
             </div>
           </div>
 
-          {/* Key metrics - Evidence-based */}
-          <div className="grid grid-cols-3 gap-2 text-xs">
+          {/* Key metrics - Velocity-based (Twitter-like ranking) */}
+          <div className="grid grid-cols-4 gap-2 text-xs">
             <div className="rounded-md bg-muted/30 p-2 text-center">
-              <p className="text-lg font-semibold">
+              <p className={cn(
+                "text-lg font-semibold",
+                zScore >= 3 ? "text-status-error" :
+                zScore >= 2 ? "text-status-warning" :
+                zScore >= 1 ? "text-status-info" : ""
+              )}>
+                {zScore >= 0 ? '+' : ''}{zScore.toFixed(1)}σ
+              </p>
+              <p className="text-muted-foreground">Spike</p>
+            </div>
+            <div className="rounded-md bg-muted/30 p-2 text-center">
+              <p className={cn(
+                "text-lg font-semibold",
+                baselineDelta > 300 ? "text-status-error" :
+                baselineDelta > 200 ? "text-status-warning" :
+                baselineDelta > 100 ? "text-status-info" : ""
+              )}>
                 {baselineDelta > 0 ? '+' : ''}{Math.round(baselineDelta)}%
               </p>
-              <p className="text-muted-foreground">vs 7d Baseline</p>
+              <p className="text-muted-foreground">vs Baseline</p>
             </div>
             <div className="rounded-md bg-muted/30 p-2 text-center">
               <p className="text-lg font-semibold">{trend.source_count}</p>
-              <p className="text-muted-foreground">Source Types</p>
+              <p className="text-muted-foreground">Sources</p>
             </div>
             <div className="rounded-md bg-muted/30 p-2 text-center">
-              <p className="text-lg font-semibold">{trend.evidence_count}</p>
-              <p className="text-muted-foreground">Evidence Docs</p>
+              <p className="text-lg font-semibold">{Math.round(trendScore)}</p>
+              <p className="text-muted-foreground">Score</p>
             </div>
           </div>
 
@@ -248,7 +289,7 @@ export function TrendExplainability({ trend, className, defaultExpanded = false 
                 <span className="text-muted-foreground">1h</span>
               </div>
               <p className="font-medium">{trend.current_1h} mentions</p>
-              <p className="text-muted-foreground">{Math.round(trend.velocity_1h)}% velocity</p>
+              <p className="text-muted-foreground">baseline: {trend.baseline_7d.toFixed(1)}/hr</p>
             </div>
             <div className="rounded-md bg-muted/20 p-2">
               <div className="flex items-center gap-1 mb-1">
@@ -272,29 +313,39 @@ export function TrendExplainability({ trend, className, defaultExpanded = false 
             </div>
           </div>
 
-          {/* Confidence breakdown */}
+          {/* Ranking Formula Breakdown (Twitter-like) */}
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-              <Target className="h-3 w-3" />
-              Confidence Breakdown
+              <TrendingUp className="h-3 w-3" />
+              Why Trending (Velocity-Based Ranking)
             </p>
-            {[
-              { factor: 'Baseline Delta', score: factors.baseline_delta || 0, max: 30 },
-              { factor: 'Cross-Source', score: factors.cross_source || 0, max: 30 },
-              { factor: 'Volume', score: factors.volume || 0, max: 20 },
-              { factor: 'Velocity', score: factors.velocity || 0, max: 20 },
-            ].map((item) => (
-              <div key={item.factor} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span>{item.factor}</span>
-                  <span className="text-muted-foreground">{Math.round(item.score)}/{item.max}</span>
-                </div>
-                <Progress 
-                  value={(item.score / item.max) * 100} 
-                  className="h-1.5"
-                />
+            <div className="text-xs space-y-1.5 bg-muted/20 rounded-md p-2">
+              <div className="flex justify-between">
+                <span>Velocity vs Baseline (z-score × 10)</span>
+                <span className="font-mono">{(zScore * 10).toFixed(0)} pts</span>
               </div>
-            ))}
+              <div className="flex justify-between">
+                <span>Cross-Source Boost</span>
+                <span className="font-mono">
+                  {trend.source_count >= 2 
+                    ? (15 + (trend.news_source_count >= 1 && trend.social_source_count >= 1 ? 15 : 0))
+                    : 0} pts
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Volume Bonus</span>
+                <span className="font-mono">{Math.min(20, Math.round(Math.log2(trend.current_24h + 1) * 5))} pts</span>
+              </div>
+              <div className="flex justify-between border-t border-border/50 pt-1 font-medium">
+                <span>Total Trend Score</span>
+                <span className="font-mono">{Math.round(trendScore)} pts</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {trend.confidence_factors?.meets_volume_gate === false 
+                ? "⚠️ Below minimum volume threshold" 
+                : `✓ Volume gate passed (${trend.current_1h}+ in 1h or ${trend.current_24h}+ in 24h)`}
+            </p>
           </div>
 
           {/* Evidence preview */}
