@@ -41,6 +41,13 @@ const CaseStudies = () => {
   return (
     <div className="min-h-screen">
       <Helmet>
+        <title>Political Campaign Case Studies | Molitico Results</title>
+        <meta name="description" content="See how we've helped progressive campaigns raise $10M+ with 300%+ ROI. Real results from Senate races, PACs, and nonprofit advocacy." />
+        <link rel="canonical" href="https://molitico.com/case-studies" />
+        <meta property="og:title" content="Political Campaign Case Studies | Molitico Results" />
+        <meta property="og:description" content="See how we've helped progressive campaigns raise $10M+ with 300%+ ROI. Real results from Senate races, PACs, and nonprofit advocacy." />
+        <meta property="og:url" content="https://molitico.com/case-studies" />
+        <meta property="og:type" content="website" />
         <script type="application/ld+json">
           {JSON.stringify(breadcrumbSchema)}
         </script>
@@ -48,7 +55,7 @@ const CaseStudies = () => {
       <ScrollProgressIndicator />
       <Navigation />
       <AnimatedPatternHero
-        title="Progressive Wins"
+        title="Progressive Campaign Results & Case Studies"
         description="Real results from real organizations. See how we've helped progressive campaigns, PACs, and causes break through, raise millions, and win."
       />
 

@@ -1,3 +1,4 @@
+import { Helmet } from "react-helmet";
 import { Card, CardContent } from "@/components/ui/card";
 import { ParticleButton } from "@/components/ParticleButton";
 import { ClientLogo } from "@/components/ClientLogos";
@@ -21,6 +22,15 @@ const About = () => {
 
   return (
     <div className="min-h-screen">
+      <Helmet>
+        <title>About Molitico | Progressive Political Campaign Agency</title>
+        <meta name="description" content="We're organizers, strategists, and believers in progressive change. Since 2016, we've helped campaigns raise $10M+ with 425% average ROI." />
+        <link rel="canonical" href="https://molitico.com/about" />
+        <meta property="og:title" content="About Molitico | Progressive Political Campaign Agency" />
+        <meta property="og:description" content="We're organizers, strategists, and believers in progressive change who happen to be really good at digital marketing." />
+        <meta property="og:url" content="https://molitico.com/about" />
+        <meta property="og:type" content="website" />
+      </Helmet>
       <ScrollProgressIndicator />
       <Navigation />
       <AnimatedPatternHero
