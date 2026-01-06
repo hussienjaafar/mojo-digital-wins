@@ -30,6 +30,8 @@ interface SourceMention {
 interface TopicAggregate {
   event_key: string;
   event_title: string;
+  is_event_phrase: boolean; // True if multi-word descriptive phrase
+  related_entities: Set<string>; // Single entities that contributed to this phrase
   mentions: SourceMention[];
   dedupedMentions: Map<string, SourceMention>; // key = content_hash
   first_seen_at: Date;
@@ -55,7 +57,10 @@ interface RollingBaseline {
   data_points_30d: number;
 }
 
-// Topic normalization with aliasing
+// Database-loaded entity aliases for canonicalization
+let dbAliases: Map<string, { canonical_name: string; entity_type: string }> = new Map();
+
+// Fallback topic aliases (used when DB is unavailable)
 const TOPIC_ALIASES: Record<string, string> = {
   'trump': 'Donald Trump',
   'biden': 'Joe Biden',
@@ -68,19 +73,76 @@ const TOPIC_ALIASES: Record<string, string> = {
   'potus': 'President',
 };
 
+/**
+ * Load entity aliases from database for canonicalization
+ */
+async function loadEntityAliases(supabase: any): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from('entity_aliases')
+      .select('raw_name, canonical_name, entity_type')
+      .order('usage_count', { ascending: false })
+      .limit(1000);
+    
+    if (data && !error) {
+      dbAliases = new Map();
+      for (const alias of data) {
+        dbAliases.set(alias.raw_name.toLowerCase(), {
+          canonical_name: alias.canonical_name,
+          entity_type: alias.entity_type || 'unknown'
+        });
+      }
+      console.log(`[detect-trend-events] Loaded ${dbAliases.size} entity aliases`);
+    }
+  } catch (e) {
+    console.error('Failed to load entity aliases:', e);
+  }
+}
+
+/**
+ * Check if a topic is an event phrase (multi-word descriptive)
+ */
+function isEventPhrase(topic: string): boolean {
+  const words = topic.trim().split(/\s+/);
+  return words.length >= 2 && words.length <= 5;
+}
+
 function normalizeTopicKey(topic: string): string {
   const lower = topic.toLowerCase().trim();
+  
+  // Check database aliases first
+  if (dbAliases.has(lower)) {
+    return dbAliases.get(lower)!.canonical_name.toLowerCase().replace(/\s+/g, '_');
+  }
+  
+  // Check hardcoded aliases
   if (TOPIC_ALIASES[lower]) {
     return TOPIC_ALIASES[lower].toLowerCase().replace(/\s+/g, '_');
   }
+  
   return lower.replace(/[^\w\s]/g, '').replace(/\s+/g, '_');
 }
 
 function normalizeTopicTitle(topic: string): string {
   const lower = topic.toLowerCase().trim();
+  
+  // Check database aliases first
+  if (dbAliases.has(lower)) {
+    return dbAliases.get(lower)!.canonical_name;
+  }
+  
+  // Check hardcoded aliases
   if (TOPIC_ALIASES[lower]) {
     return TOPIC_ALIASES[lower];
   }
+  
+  // Preserve event phrase formatting
+  if (isEventPhrase(topic)) {
+    return topic.split(/\s+/)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+  }
+  
   return topic.split(/\s+/)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ');
@@ -123,7 +185,10 @@ serve(async (req) => {
       );
     }
 
-    console.log('[detect-trend-events] Starting evidence-based trend detection v2 (with rolling baselines + dedupe)...');
+    console.log('[detect-trend-events] Starting evidence-based trend detection v3 (NER + keyphrases + dedupe)...');
+    
+    // Load entity aliases for canonicalization
+    await loadEntityAliases(supabase);
     
     const now = new Date();
     const hour1Ago = new Date(now.getTime() - 60 * 60 * 1000);
@@ -229,6 +294,8 @@ serve(async (req) => {
         topicMap.set(key, {
           event_key: key,
           event_title: normalizeTopicTitle(topic),
+          is_event_phrase: isEventPhrase(topic),
+          related_entities: new Set(),
           mentions: [],
           dedupedMentions: new Map(),
           first_seen_at: new Date(mention.published_at),
@@ -262,15 +329,36 @@ serve(async (req) => {
       }
     };
     
-    // 1. Fetch articles with topics (RSS)
+    // 1. Fetch articles with topics (RSS) - includes extracted_topics with event phrases
     const { data: articles } = await supabase
       .from('articles')
-      .select('id, title, source_url, canonical_url, content_hash, published_date, sentiment_score, sentiment_label, tags')
+      .select('id, title, source_url, canonical_url, content_hash, published_date, sentiment_score, sentiment_label, tags, extracted_topics')
       .gte('published_date', hours24Ago.toISOString())
-      .eq('is_duplicate', false)
-      .not('tags', 'is', null);
+      .eq('is_duplicate', false);
     
     for (const article of articles || []) {
+      // Build topics list from both tags and extracted_topics
+      let allTopics: string[] = [];
+      
+      // Add tags (legacy)
+      if (article.tags && Array.isArray(article.tags)) {
+        allTopics.push(...article.tags);
+      }
+      
+      // Add extracted_topics with event phrases (new NER output)
+      if (article.extracted_topics && Array.isArray(article.extracted_topics)) {
+        for (const extracted of article.extracted_topics) {
+          if (typeof extracted === 'object' && extracted.topic) {
+            allTopics.push(extracted.topic);
+          } else if (typeof extracted === 'string') {
+            allTopics.push(extracted);
+          }
+        }
+      }
+      
+      // Skip if no topics
+      if (allTopics.length === 0) continue;
+      
       const mention: SourceMention = {
         id: article.id,
         title: article.title,
@@ -281,7 +369,7 @@ serve(async (req) => {
         source_type: 'rss',
         sentiment_score: article.sentiment_score,
         sentiment_label: article.sentiment_label,
-        topics: article.tags || [],
+        topics: allTopics,
         domain: extractDomain(article.source_url),
       };
       
@@ -464,10 +552,11 @@ serve(async (req) => {
       });
       const topHeadline = sortedMentions[0]?.title?.substring(0, 200) || '';
       
-      // Build event record
+      // Build event record with event phrase flag
       const eventRecord = {
         event_key: key,
         event_title: agg.event_title,
+        is_event_phrase: agg.is_event_phrase, // Flag for multi-word descriptive phrases
         first_seen_at: agg.first_seen_at.toISOString(),
         last_seen_at: agg.last_seen_at.toISOString(),
         peak_at: trendStage === 'peaking' ? now.toISOString() : null,
@@ -486,6 +575,8 @@ serve(async (req) => {
           ...confidenceFactors,
           baseline_quality: baselineQuality,
           has_historical_baseline: hasHistoricalBaseline,
+          is_event_phrase: agg.is_event_phrase,
+          related_entities_count: agg.related_entities.size,
         },
         is_trending: isTrending,
         is_breaking: isBreaking,

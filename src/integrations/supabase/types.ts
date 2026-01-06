@@ -7567,6 +7567,7 @@ export type Database = {
           first_seen_at: string
           id: string
           is_breaking: boolean | null
+          is_event_phrase: boolean | null
           is_trending: boolean | null
           is_verified: boolean | null
           last_seen_at: string
@@ -7606,6 +7607,7 @@ export type Database = {
           first_seen_at?: string
           id?: string
           is_breaking?: boolean | null
+          is_event_phrase?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
           last_seen_at?: string
@@ -7645,6 +7647,7 @@ export type Database = {
           first_seen_at?: string
           id?: string
           is_breaking?: boolean | null
+          is_event_phrase?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
           last_seen_at?: string
