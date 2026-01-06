@@ -603,15 +603,74 @@ export function TrendDrilldownPanel({
       </div>
 
       {/* Timing Info */}
-      <div className="text-xs text-[hsl(var(--portal-text-muted))] flex items-center gap-2 pt-2 border-t border-[hsl(var(--portal-border))]">
-        <Clock className="h-3 w-3" />
-        <span>First seen {hoursAgo}h ago</span>
-        {trend.freshness && (
-          <Badge variant="outline" className="text-xs ml-auto">
-            {trend.freshness}
-          </Badge>
-        )}
-      </div>
+      {(() => {
+        const lastSeenMs = Date.now() - new Date(trend.last_seen_at).getTime();
+        const lastSeenMinutes = Math.floor(lastSeenMs / (1000 * 60));
+        const lastSeenHours = Math.floor(lastSeenMs / (1000 * 60 * 60));
+        
+        const getLastSeenLabel = () => {
+          if (lastSeenMinutes < 60) return `${lastSeenMinutes} min ago`;
+          if (lastSeenHours < 24) return `${lastSeenHours} hours ago`;
+          return `${Math.floor(lastSeenHours / 24)} days ago`;
+        };
+        
+        const getFreshnessState = (): 'fresh' | 'recent' | 'aging' | 'stale' => {
+          if (trend.freshness) return trend.freshness;
+          if (lastSeenMinutes < 30) return 'fresh';
+          if (lastSeenHours < 6) return 'recent';
+          if (lastSeenHours < 24) return 'aging';
+          return 'stale';
+        };
+        
+        const freshnessState = getFreshnessState();
+        
+        const freshnessConfig = {
+          fresh: { 
+            label: 'Fresh', 
+            color: 'text-[hsl(var(--portal-success))]', 
+            bg: 'bg-[hsl(var(--portal-success)/0.1)]',
+            description: 'New evidence in last 30 minutes'
+          },
+          recent: { 
+            label: 'Recent', 
+            color: 'text-[hsl(var(--portal-accent-blue))]', 
+            bg: 'bg-[hsl(var(--portal-accent-blue)/0.1)]',
+            description: 'Updated within 6 hours'
+          },
+          aging: { 
+            label: 'Aging', 
+            color: 'text-[hsl(var(--portal-warning))]', 
+            bg: 'bg-[hsl(var(--portal-warning)/0.1)]',
+            description: 'No new evidence for 6-24 hours'
+          },
+          stale: { 
+            label: 'Stale', 
+            color: 'text-[hsl(var(--portal-text-muted))]', 
+            bg: 'bg-[hsl(var(--portal-bg-elevated))]',
+            description: 'No updates for 24+ hours'
+          },
+        };
+        
+        const config = freshnessConfig[freshnessState];
+        
+        return (
+          <div className="text-xs pt-2 border-t border-[hsl(var(--portal-border))] space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[hsl(var(--portal-text-muted))]">
+                <Clock className="h-3 w-3" />
+                <span>First seen {hoursAgo}h ago</span>
+              </div>
+              <Badge variant="outline" className={cn("text-xs gap-1", config.bg, config.color)}>
+                {config.label}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between text-[hsl(var(--portal-text-muted))]">
+              <span>Last updated: {getLastSeenLabel()}</span>
+              <span className="text-[10px]">{config.description}</span>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

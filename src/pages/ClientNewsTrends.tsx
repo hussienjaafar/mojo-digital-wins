@@ -82,6 +82,28 @@ function TrendCard({
   const hoursAgo = Math.floor(
     (Date.now() - new Date(trend.first_seen_at).getTime()) / (1000 * 60 * 60)
   );
+  
+  // Calculate last seen freshness
+  const lastSeenMs = Date.now() - new Date(trend.last_seen_at).getTime();
+  const lastSeenMinutes = Math.floor(lastSeenMs / (1000 * 60));
+  const lastSeenHours = Math.floor(lastSeenMs / (1000 * 60 * 60));
+  
+  const getLastSeenLabel = () => {
+    if (lastSeenMinutes < 60) return `${lastSeenMinutes}m`;
+    if (lastSeenHours < 24) return `${lastSeenHours}h`;
+    return `${Math.floor(lastSeenHours / 24)}d`;
+  };
+  
+  const getFreshnessState = (): 'fresh' | 'recent' | 'aging' | 'stale' => {
+    if (trend.freshness) return trend.freshness;
+    if (lastSeenMinutes < 30) return 'fresh';
+    if (lastSeenHours < 6) return 'recent';
+    if (lastSeenHours < 24) return 'aging';
+    return 'stale';
+  };
+  
+  const freshnessState = getFreshnessState();
+  const isStale = freshnessState === 'stale' || freshnessState === 'aging';
 
   return (
     <motion.button
@@ -142,9 +164,13 @@ function TrendCard({
               <BarChart3 className="h-3 w-3" />
               {trend.evidence_count} sources
             </span>
-            <span className="flex items-center gap-1">
+            <span className={cn(
+              "flex items-center gap-1",
+              isStale && "text-[hsl(var(--portal-warning))]"
+            )}>
               <Clock className="h-3 w-3" />
-              {hoursAgo}h ago
+              {getLastSeenLabel()} ago
+              {isStale && <span className="text-[10px]">⚠</span>}
             </span>
           </div>
 
