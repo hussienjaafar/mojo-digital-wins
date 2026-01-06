@@ -12,7 +12,8 @@ import {
   BarChart3, 
   Palette, 
   Target,
-  Zap
+  Zap,
+  HelpCircle
 } from "lucide-react";
 import billboardMamdani from "@/assets/billboard-mamdani-bus.webp";
 import billboardTimesSquareWide from "@/assets/billboard-times-square-wide.jpg";
@@ -42,6 +43,7 @@ const Services = () => {
   const billboardGallery = useScrollAnimation({ threshold: 0.2 });
   const additionalServices = useScrollAnimation({ threshold: 0.2 });
   const processSection = useScrollAnimation({ threshold: 0.2 });
+  const faqSection = useScrollAnimation({ threshold: 0.2 });
 
   const breadcrumbSchema = {
     "@context": "https://schema.org",
@@ -62,6 +64,103 @@ const Services = () => {
     ]
   };
 
+  const serviceSchema = {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "serviceType": "Political Campaign Digital Services",
+    "provider": {
+      "@type": "Organization",
+      "name": "Molitico",
+      "url": "https://molitico.com"
+    },
+    "areaServed": "United States",
+    "hasOfferCatalog": {
+      "@type": "OfferCatalog",
+      "name": "Campaign Services",
+      "itemListElement": [
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Service",
+            "name": "Digital Advertising",
+            "description": "Precision-targeted Facebook, Instagram, and Google ads for political campaigns"
+          }
+        },
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Service",
+            "name": "SMS & Peer-to-Peer Texting",
+            "description": "Text messaging campaigns that drive donations, volunteer signups, and voter turnout"
+          }
+        },
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Service",
+            "name": "Email Fundraising",
+            "description": "High-ROI email programs for political campaigns and nonprofits"
+          }
+        },
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Service",
+            "name": "Billboard & Out-of-Home Advertising",
+            "description": "Strategic billboard placements for progressive campaigns nationwide"
+          }
+        },
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Service",
+            "name": "Voter Polling & Research",
+            "description": "Specialized polling of Arab American and Muslim American communities"
+          }
+        }
+      ]
+    }
+  };
+
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What ROI can I expect from political SMS fundraising?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Our SMS campaigns typically deliver 300-500% ROI. We've helped campaigns raise millions through strategic text messaging with average donations of $35-50 per contributor."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How quickly can you launch a digital ad campaign?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "We can launch Meta and Google ad campaigns within 48-72 hours. Our rapid deployment process includes creative development, audience targeting, and compliance review."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Do you work with PACs and 501(c)(4) organizations?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, we have extensive experience with PACs, Super PACs, 501(c)(3), and 501(c)(4) organizations. We understand the unique compliance requirements for each entity type."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What makes Molitico different from other political consultants?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "We combine deep political organizing experience with cutting-edge digital marketing expertise. Our team includes former campaign staffers who understand progressive values and deliver measurable results."
+        }
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen">
       <Helmet>
@@ -74,6 +173,12 @@ const Services = () => {
         <meta property="og:type" content="website" />
         <script type="application/ld+json">
           {JSON.stringify(breadcrumbSchema)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(serviceSchema)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(faqSchema)}
         </script>
       </Helmet>
       <ScrollProgressIndicator />
@@ -457,6 +562,66 @@ const Services = () => {
                   <h3 className="text-2xl font-bold text-foreground">{process.title}</h3>
                   <p className="text-muted-foreground leading-relaxed">{process.description}</p>
                 </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="py-12 sm:py-16 md:py-20 lg:py-32 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto space-y-12">
+            <div className="text-center space-y-4">
+              <h2 className="font-bebas text-primary leading-tight" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', letterSpacing: '0.02em' }}>
+                Frequently Asked Questions
+              </h2>
+              <p className="text-lg md:text-xl text-muted-foreground">
+                Common questions about our political campaign services
+              </p>
+            </div>
+
+            <div 
+              ref={faqSection.ref}
+              className={`space-y-6 transition-all duration-1000 ${
+                faqSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+            >
+              {[
+                {
+                  question: "What ROI can I expect from political SMS fundraising?",
+                  answer: "Our SMS campaigns typically deliver 300-500% ROI. We've helped campaigns raise millions through strategic text messaging with average donations of $35-50 per contributor."
+                },
+                {
+                  question: "How quickly can you launch a digital ad campaign?",
+                  answer: "We can launch Meta and Google ad campaigns within 48-72 hours. Our rapid deployment process includes creative development, audience targeting, and compliance review."
+                },
+                {
+                  question: "Do you work with PACs and 501(c)(4) organizations?",
+                  answer: "Yes, we have extensive experience with PACs, Super PACs, 501(c)(3), and 501(c)(4) organizations. We understand the unique compliance requirements for each entity type."
+                },
+                {
+                  question: "What makes Molitico different from other political consultants?",
+                  answer: "We combine deep political organizing experience with cutting-edge digital marketing expertise. Our team includes former campaign staffers who understand progressive values and deliver measurable results."
+                }
+              ].map((faq, index) => (
+                <Card 
+                  key={index}
+                  className={`border border-border/50 bg-card backdrop-blur-sm transition-all duration-700 ${
+                    faqSection.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                  }`}
+                  style={{ transitionDelay: `${index * 100}ms` }}
+                >
+                  <CardContent className="p-6 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <HelpCircle className="h-6 w-6 text-secondary flex-shrink-0 mt-0.5" />
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-bold text-foreground">{faq.question}</h3>
+                        <p className="text-muted-foreground leading-relaxed">{faq.answer}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>
