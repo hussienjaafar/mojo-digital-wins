@@ -1983,6 +1983,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_entity_alerts_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+          {
             foreignKeyName: "client_entity_alerts_watchlist_id_fkey"
             columns: ["watchlist_id"]
             isOneToOne: false
@@ -5078,6 +5085,13 @@ export type Database = {
             referencedRelation: "trend_events_active"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "org_trend_scores_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
         ]
       }
       organization_mentions: {
@@ -7848,6 +7862,13 @@ export type Database = {
             referencedRelation: "trend_events_active"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "trend_evidence_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
         ]
       }
       trend_feedback: {
@@ -8013,6 +8034,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "trend_events_active"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_phrase_clusters_canonical_event_id_fkey"
+            columns: ["canonical_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_quality_flags"
+            referencedColumns: ["trend_id"]
           },
         ]
       }
@@ -9701,6 +9729,54 @@ export type Database = {
           velocity_6h?: number | null
           weighted_evidence_score?: number | null
           z_score_velocity?: number | null
+        }
+        Relationships: []
+      }
+      trend_quality_flags: {
+        Row: {
+          canonical_label: string | null
+          confidence_score: number | null
+          event_title: string | null
+          evidence_count: number | null
+          first_seen_at: string | null
+          flag_count: number | null
+          is_breaking: boolean | null
+          is_trending: boolean | null
+          last_seen_at: string | null
+          low_confidence_flag: boolean | null
+          low_corroboration_flag: boolean | null
+          low_evidence_flag: boolean | null
+          quality_score: number | null
+          single_word_flag: boolean | null
+          stale_flag: boolean | null
+          tier1_count: number | null
+          tier2_count: number | null
+          tier3_count: number | null
+          tier3_only_flag: boolean | null
+          trend_id: string | null
+          trend_stage: string | null
+          velocity: number | null
+          weighted_evidence_score: number | null
+          z_score: number | null
+        }
+        Relationships: []
+      }
+      trend_quality_kpis: {
+        Row: {
+          avg_confidence_score: number | null
+          avg_evidence_count: number | null
+          avg_velocity: number | null
+          avg_weighted_evidence_score: number | null
+          avg_z_score: number | null
+          calculated_at: string | null
+          pct_evidence_tier1: number | null
+          pct_evidence_tier2: number | null
+          pct_evidence_tier3: number | null
+          pct_trends_multi_source: number | null
+          pct_trends_single_word: number | null
+          pct_trends_tier1_corroborated: number | null
+          pct_trends_tier12_corroborated: number | null
+          total_trends_24h: number | null
         }
         Relationships: []
       }
