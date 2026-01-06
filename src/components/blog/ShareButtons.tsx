@@ -37,7 +37,7 @@ export function ShareButtons({ title, url, className }: ShareButtonsProps) {
       <Button
         variant="ghost"
         size="icon"
-        className="w-9 h-9 rounded-full hover:bg-secondary/10 hover:text-secondary"
+        className="w-9 h-9 rounded-full hover:bg-secondary/10 dark:hover:bg-accent/10 hover:text-secondary dark:hover:text-accent"
         asChild
       >
         <a href={shareLinks.twitter} target="_blank" rel="noopener noreferrer" aria-label="Share on Twitter">
@@ -47,7 +47,7 @@ export function ShareButtons({ title, url, className }: ShareButtonsProps) {
       <Button
         variant="ghost"
         size="icon"
-        className="w-9 h-9 rounded-full hover:bg-secondary/10 hover:text-secondary"
+        className="w-9 h-9 rounded-full hover:bg-secondary/10 dark:hover:bg-accent/10 hover:text-secondary dark:hover:text-accent"
         asChild
       >
         <a href={shareLinks.linkedin} target="_blank" rel="noopener noreferrer" aria-label="Share on LinkedIn">
@@ -57,7 +57,7 @@ export function ShareButtons({ title, url, className }: ShareButtonsProps) {
       <Button
         variant="ghost"
         size="icon"
-        className="w-9 h-9 rounded-full hover:bg-secondary/10 hover:text-secondary"
+        className="w-9 h-9 rounded-full hover:bg-secondary/10 dark:hover:bg-accent/10 hover:text-secondary dark:hover:text-accent"
         asChild
       >
         <a href={shareLinks.email} aria-label="Share via Email">
@@ -67,11 +67,11 @@ export function ShareButtons({ title, url, className }: ShareButtonsProps) {
       <Button
         variant="ghost"
         size="icon"
-        className="w-9 h-9 rounded-full hover:bg-secondary/10 hover:text-secondary"
+        className="w-9 h-9 rounded-full hover:bg-secondary/10 dark:hover:bg-accent/10 hover:text-secondary dark:hover:text-accent"
         onClick={copyToClipboard}
         aria-label="Copy link"
       >
-        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Link2 className="w-4 h-4" />}
+        {copied ? <Check className="w-4 h-4 text-status-success" /> : <Link2 className="w-4 h-4" />}
       </Button>
     </div>
   );
