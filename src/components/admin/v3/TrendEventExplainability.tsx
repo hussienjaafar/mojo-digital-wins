@@ -13,7 +13,9 @@ import {
   Radio,
   Activity,
   BarChart3,
-  Target
+  Target,
+  Shield,
+  Layers
 } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +28,7 @@ import {
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import type { TrendEvent, TrendEvidence } from '@/hooks/useTrendEvents';
-import { useTrendEvidence, getConfidenceLabel, getConfidenceColor, getTrendStageInfo } from '@/hooks/useTrendEvents';
+import { useTrendEvidence, getConfidenceLabel, getConfidenceColor, getTrendStageInfo, generateWhyTrendingSummary, getTierLabel } from '@/hooks/useTrendEvents';
 
 interface TrendExplainabilityProps {
   trend: TrendEvent;
@@ -236,6 +238,17 @@ export function TrendExplainability({ trend, className, defaultExpanded = false 
 
         {/* Expanded content */}
         <CollapsibleContent className="space-y-3">
+          {/* Why Trending Summary - Phase 4 */}
+          <div className="rounded-md p-3 bg-primary/5 border border-primary/20">
+            <div className="flex items-start gap-2">
+              <Target className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Why This Is Trending</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{generateWhyTrendingSummary(trend)}</p>
+              </div>
+            </div>
+          </div>
+          
           {/* Trigger explanation */}
           <div className={cn("rounded-md p-3 text-sm", trigger.bgColor)}>
             <div className="flex items-start gap-2">
@@ -348,24 +361,64 @@ export function TrendExplainability({ trend, className, defaultExpanded = false 
             </p>
           </div>
 
+          {/* Source Tier Distribution - Phase 4 */}
+          {(trend.tier1_count || trend.tier2_count || trend.tier3_count) ? (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Layers className="h-3 w-3" />
+                Source Tier Distribution
+              </p>
+              <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <Shield className="h-3 w-3 text-status-success" />
+                  <span className="font-medium">{trend.tier1_count || 0}</span>
+                  <span className="text-muted-foreground">Tier 1</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Shield className="h-3 w-3 text-status-info" />
+                  <span className="font-medium">{trend.tier2_count || 0}</span>
+                  <span className="text-muted-foreground">Tier 2</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Shield className="h-3 w-3 text-status-warning" />
+                  <span className="font-medium">{trend.tier3_count || 0}</span>
+                  <span className="text-muted-foreground">Tier 3</span>
+                </div>
+              </div>
+              {trend.has_tier12_corroboration && (
+                <p className="text-xs text-status-success flex items-center gap-1">
+                  <ShieldCheck className="h-3 w-3" />
+                  Tier 1/2 corroboration confirmed
+                </p>
+              )}
+            </div>
+          ) : null}
+
           {/* Evidence preview */}
           {evidenceLoading ? (
             <p className="text-xs text-muted-foreground">Loading evidence...</p>
           ) : evidence.length > 0 ? (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Top Evidence</p>
+              <p className="text-xs font-medium text-muted-foreground">Top Evidence ({evidence.length} sources)</p>
               <div className="space-y-1.5">
                 {evidence.slice(0, 5).map((e) => {
                   const SourceIcon = getSourceIcon(e.source_type);
+                  const tierInfo = getTierLabel(e.source_tier);
                   return (
-                    <div key={e.id} className="flex items-start gap-2 text-xs">
+                    <div key={e.id} className="flex items-start gap-2 text-xs p-1.5 rounded bg-muted/20">
                       <SourceIcon className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
-                        <p className="truncate">{e.source_title || 'Untitled'}</p>
-                        <p className="text-muted-foreground truncate">
-                          {e.source_domain || formatSourceType(e.source_type)}
-                          {e.is_primary && <span className="ml-1 text-status-info">(primary)</span>}
-                        </p>
+                        <p className="truncate font-medium">{e.source_title || 'Untitled'}</p>
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <span className="truncate">{e.source_domain || formatSourceType(e.source_type)}</span>
+                          {e.source_tier && (
+                            <>
+                              <span>·</span>
+                              <span className={tierInfo.color}>{tierInfo.label}</span>
+                            </>
+                          )}
+                          {e.is_primary && <span className="text-status-info">(primary)</span>}
+                        </div>
                       </div>
                       {e.source_url && (
                         <a 

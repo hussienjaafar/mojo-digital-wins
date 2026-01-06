@@ -17,7 +17,8 @@ import {
   Users,
   Calendar,
   Activity,
-  Radio
+  Radio,
+  Target
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { ProvenancePanel, RelevanceExplanation, SuggestedActionsPanel } from '@/components/admin/v3';
 import type { TrendEvent, TrendEvidence } from '@/hooks/useTrendEvents';
+import { generateWhyTrendingSummary, getTierLabel } from '@/hooks/useTrendEvents';
 
 interface TrendEventDrilldownViewProps {
   trendId: string; // trend_event id (UUID)
@@ -345,6 +347,17 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Why Trending Summary - Phase 4 */}
+              <div className="mb-6 p-4 rounded-lg bg-primary/5 border border-primary/20">
+                <div className="flex items-start gap-3">
+                  <Target className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium">Why This Is Trending</p>
+                    <p className="text-sm text-muted-foreground mt-1">{generateWhyTrendingSummary(trend)}</p>
+                  </div>
+                </div>
+              </div>
+              
               <TrendExplainability trend={trend} defaultExpanded />
 
               <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -392,6 +405,7 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
                   <div className="space-y-3 pr-4">
                     {evidence.map((e) => {
                       const SourceIcon = getSourceIcon(e.source_type);
+                      const tierInfo = getTierLabel(e.source_tier);
                       return (
                         <div 
                           key={e.id} 
@@ -409,6 +423,11 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="font-medium text-sm truncate">{e.source_title || 'Untitled'}</p>
+                              {e.source_tier && (
+                                <Badge variant="outline" className={cn("text-[10px]", tierInfo.color)}>
+                                  {tierInfo.label}
+                                </Badge>
+                              )}
                               {e.is_primary && (
                                 <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary">
                                   Primary
@@ -431,9 +450,9 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
                               )}
                             </div>
                           </div>
-                          {e.source_url && (
+                          {(e.source_url || e.canonical_url) && (
                             <a 
-                              href={e.source_url} 
+                              href={e.canonical_url || e.source_url || ''} 
                               target="_blank" 
                               rel="noopener noreferrer"
                               className="shrink-0 p-2 hover:bg-muted rounded-lg"

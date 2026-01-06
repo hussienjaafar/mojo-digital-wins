@@ -1463,6 +1463,8 @@ serve(async (req) => {
           content_hash: mention.content_hash || null,
           sentiment_score: mention.sentiment_score,
           sentiment_label: mention.sentiment_label,
+          // Phase 4: Include source tier for explainability
+          source_tier: mention.tier || tierInfo?.tier || null,
         });
       }
     }
@@ -1508,6 +1510,8 @@ serve(async (req) => {
             content_hash: e.content_hash,
             sentiment_score: e.sentiment_score,
             sentiment_label: e.sentiment_label,
+            // Phase 4: Include source tier for explainability
+            source_tier: e.source_tier,
           }));
         
         if (resolvedEvidence.length > 0) {

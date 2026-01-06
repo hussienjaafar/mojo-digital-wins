@@ -7822,6 +7822,7 @@ export type Database = {
           sentiment_score: number | null
           source_domain: string | null
           source_id: string | null
+          source_tier: string | null
           source_title: string | null
           source_type: string
           source_url: string | null
@@ -7840,6 +7841,7 @@ export type Database = {
           sentiment_score?: number | null
           source_domain?: string | null
           source_id?: string | null
+          source_tier?: string | null
           source_title?: string | null
           source_type: string
           source_url?: string | null
@@ -7858,6 +7860,7 @@ export type Database = {
           sentiment_score?: number | null
           source_domain?: string | null
           source_id?: string | null
+          source_tier?: string | null
           source_title?: string | null
           source_type?: string
           source_url?: string | null

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { formatDistanceToNow, format } from "date-fns";
 import { motion } from "framer-motion";
 
-import { useTrendEvidence, getConfidenceLabel, getConfidenceColor, getTrendStageInfo } from "@/hooks/useTrendEvents";
+import { useTrendEvidence, getConfidenceLabel, getConfidenceColor, getTrendStageInfo, generateWhyTrendingSummary, getTierLabel } from "@/hooks/useTrendEvents";
 import { useSuggestedActionsQuery } from "@/queries/useSuggestedActionsQuery";
 import { useTrendOutcomeByEventId, type OutcomeStats } from "@/hooks/useTrendOutcomes";
 import type { TrendEvent, TrendEvidence } from "@/hooks/useTrendEvents";
@@ -34,6 +34,9 @@ import {
   TrendingDown,
   DollarSign,
   MousePointerClick,
+  Shield,
+  Layers,
+  ShieldCheck,
 } from "lucide-react";
 
 // ============================================================================
@@ -57,6 +60,7 @@ interface EvidenceItemProps {
 function EvidenceItem({ evidence }: EvidenceItemProps) {
   const SourceIcon = evidence.source_type === 'bluesky' ? MessageCircle : Newspaper;
   const publishedDate = new Date(evidence.published_at);
+  const tierInfo = getTierLabel(evidence.source_tier);
   
   return (
     <motion.div
@@ -83,9 +87,16 @@ function EvidenceItem({ evidence }: EvidenceItemProps) {
           <h4 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] line-clamp-2">
             {evidence.source_title || "Untitled"}
           </h4>
-          {evidence.is_primary && (
-            <V3Badge variant="outline" size="sm">Primary</V3Badge>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {evidence.source_tier && (
+              <V3Badge variant="outline" size="sm" className={tierInfo.color}>
+                {tierInfo.label}
+              </V3Badge>
+            )}
+            {evidence.is_primary && (
+              <V3Badge variant="outline" size="sm">Primary</V3Badge>
+            )}
+          </div>
         </div>
         
         <p className="text-xs text-[hsl(var(--portal-text-muted))] flex items-center gap-1.5">
@@ -95,14 +106,14 @@ function EvidenceItem({ evidence }: EvidenceItemProps) {
           {evidence.contribution_score && (
             <>
               <span>·</span>
-              <span>{Math.round(evidence.contribution_score)}% weight</span>
+              <span>{Math.round(evidence.contribution_score * 10) / 10} score</span>
             </>
           )}
         </p>
 
-        {evidence.source_url && (
+        {(evidence.source_url || evidence.canonical_url) && (
           <a
-            href={evidence.source_url}
+            href={evidence.canonical_url || evidence.source_url || ''}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-[hsl(var(--portal-accent-blue))] hover:underline"
@@ -168,36 +179,82 @@ interface ConfidenceBreakdownProps {
 }
 
 function ConfidenceBreakdown({ trend }: ConfidenceBreakdownProps) {
-  const factors = trend.confidence_factors || {
-    baseline_delta: 0,
-    cross_source: 0,
-    volume: 0,
-    velocity: 0
-  };
+  const factors = trend.confidence_factors || {};
+  const typedFactors = factors as Record<string, unknown>;
 
   const items = [
-    { label: "Baseline Delta", value: factors.baseline_delta || 0, max: 30 },
-    { label: "Cross-Source", value: factors.cross_source || 0, max: 30 },
-    { label: "Volume", value: factors.volume || 0, max: 20 },
-    { label: "Velocity", value: factors.velocity || 0, max: 20 },
+    { label: "Baseline Delta", value: Number(typedFactors.baseline_delta || 0), max: 25, description: "Spike vs 7-day average" },
+    { label: "Cross-Source", value: Number(typedFactors.cross_source || 0), max: 25, description: "Multiple sources verify" },
+    { label: "Volume", value: Number(typedFactors.volume || 0), max: 25, description: "Total mention count" },
+    { label: "Recency", value: Number(typedFactors.recency || 0), max: 25, description: "Recent activity" },
   ];
 
+  // Calculate z-score and baseline delta for display
+  const zScore = trend.z_score_velocity || 0;
+  const baselineDeltaPct = trend.baseline_7d > 0 
+    ? ((trend.current_24h / 24 - trend.baseline_7d) / trend.baseline_7d * 100)
+    : 0;
+
   return (
-    <div className="space-y-2">
-      {items.map((item) => (
-        <div key={item.label} className="space-y-1">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[hsl(var(--portal-text-secondary))]">{item.label}</span>
-            <span className="text-[hsl(var(--portal-text-muted))]">
-              {Math.round(item.value)}/{item.max}
-            </span>
-          </div>
-          <Progress 
-            value={(item.value / item.max) * 100} 
-            className="h-1.5"
-          />
+    <div className="space-y-4">
+      {/* Key Metrics Summary */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="p-2 rounded-lg bg-[hsl(var(--portal-bg-secondary))] text-center">
+          <p className={cn(
+            "text-lg font-bold",
+            zScore >= 3 ? "text-[hsl(var(--portal-error))]" :
+            zScore >= 2 ? "text-[hsl(var(--portal-warning))]" :
+            "text-[hsl(var(--portal-text-primary))]"
+          )}>
+            {zScore >= 0 ? '+' : ''}{zScore.toFixed(1)}σ
+          </p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Spike</p>
         </div>
-      ))}
+        <div className="p-2 rounded-lg bg-[hsl(var(--portal-bg-secondary))] text-center">
+          <p className={cn(
+            "text-lg font-bold",
+            baselineDeltaPct > 200 ? "text-[hsl(var(--portal-error))]" :
+            baselineDeltaPct > 100 ? "text-[hsl(var(--portal-warning))]" :
+            "text-[hsl(var(--portal-text-primary))]"
+          )}>
+            {baselineDeltaPct > 0 ? '+' : ''}{Math.round(baselineDeltaPct)}%
+          </p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">vs Baseline</p>
+        </div>
+        <div className="p-2 rounded-lg bg-[hsl(var(--portal-bg-secondary))] text-center">
+          <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
+            {trend.rank_score?.toFixed(0) || trend.trend_score?.toFixed(0) || '—'}
+          </p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Rank</p>
+        </div>
+      </div>
+
+      {/* Factor Breakdown */}
+      <div className="space-y-2">
+        {items.map((item) => (
+          <div key={item.label} className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-[hsl(var(--portal-text-secondary))]">{item.label}</span>
+                <span className="text-[hsl(var(--portal-text-muted))]">({item.description})</span>
+              </div>
+              <span className="text-[hsl(var(--portal-text-muted))] font-mono">
+                {Math.round(item.value)}/{item.max}
+              </span>
+            </div>
+            <Progress 
+              value={(item.value / item.max) * 100} 
+              className="h-1.5"
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Total Confidence */}
+      <div className="flex items-center justify-between pt-2 border-t border-[hsl(var(--portal-border))]">
+        <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Total Confidence</span>
+        <span className="text-lg font-bold text-[hsl(var(--portal-accent-blue))]">{trend.confidence_score}%</span>
+      </div>
     </div>
   );
 }
@@ -500,6 +557,52 @@ export function TrendDrilldownPanel({
           <p className="text-xs text-[hsl(var(--portal-text-muted))]">Age</p>
         </div>
       </div>
+
+      <Separator className="bg-[hsl(var(--portal-border))]" />
+
+      {/* Why Trending Summary - Phase 4 */}
+      <div className="p-4 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)] border border-[hsl(var(--portal-accent-blue)/0.2)]">
+        <div className="flex items-start gap-3">
+          <Target className="h-5 w-5 text-[hsl(var(--portal-accent-blue))] shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Why This Is Trending</p>
+            <p className="text-sm text-[hsl(var(--portal-text-secondary))] mt-1">{generateWhyTrendingSummary(trend)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Source Tier Distribution - Phase 4 */}
+      {(trend.tier1_count || trend.tier2_count || trend.tier3_count) && (
+        <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+          <div className="flex items-center gap-2 mb-3">
+            <Layers className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+            <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Source Tier Distribution</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 text-sm">
+              <Shield className="h-4 w-4 text-[hsl(var(--portal-success))]" />
+              <span className="font-medium text-[hsl(var(--portal-text-primary))]">{trend.tier1_count || 0}</span>
+              <span className="text-[hsl(var(--portal-text-muted))]">Tier 1</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-sm">
+              <Shield className="h-4 w-4 text-[hsl(var(--portal-accent-blue))]" />
+              <span className="font-medium text-[hsl(var(--portal-text-primary))]">{trend.tier2_count || 0}</span>
+              <span className="text-[hsl(var(--portal-text-muted))]">Tier 2</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-sm">
+              <Shield className="h-4 w-4 text-[hsl(var(--portal-warning))]" />
+              <span className="font-medium text-[hsl(var(--portal-text-primary))]">{trend.tier3_count || 0}</span>
+              <span className="text-[hsl(var(--portal-text-muted))]">Tier 3</span>
+            </div>
+          </div>
+          {trend.has_tier12_corroboration && (
+            <div className="flex items-center gap-1.5 mt-3 text-xs text-[hsl(var(--portal-success))]">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>Tier 1/2 corroboration confirmed</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <Separator className="bg-[hsl(var(--portal-border))]" />
 
