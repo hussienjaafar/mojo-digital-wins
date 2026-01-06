@@ -97,36 +97,78 @@
   
   <!-- Blog Posts -->
   <url>
+    <loc>https://molitico.com/blog/how-political-campaigns-raise-money-online-2026</loc>
+    <lastmod>2026-01-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://molitico.com/blog/how-to-hire-political-fundraising-consultant</loc>
+    <lastmod>2026-01-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
     <loc>https://molitico.com/blog/sms-fundraising-political-campaigns-guide</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   
   <url>
     <loc>https://molitico.com/blog/digital-advertising-progressive-campaigns-meta-google</loc>
-    <lastmod>2025-01-10</lastmod>
+    <lastmod>2026-01-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://molitico.com/blog/email-fundraising-political-campaigns-best-practices</loc>
+    <lastmod>2026-01-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://molitico.com/blog/501c3-vs-501c4-digital-strategy-advocacy</loc>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   
   <url>
     <loc>https://molitico.com/blog/grassroots-fundraising-strategies-progressive-campaigns</loc>
-    <lastmod>2025-01-05</lastmod>
+    <lastmod>2026-01-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://molitico.com/blog/fec-filing-deadlines-2026-fundraising-calendar</loc>
+    <lastmod>2026-01-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://molitico.com/blog/digital-gotv-strategies-online-voters</loc>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   
   <url>
     <loc>https://molitico.com/blog/pac-digital-strategy-independent-expenditures</loc>
-    <lastmod>2024-12-28</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   
   <url>
     <loc>https://molitico.com/blog/nonprofit-digital-fundraising-monthly-donors</loc>
-    <lastmod>2024-12-20</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
