@@ -7,6 +7,7 @@ import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { useTrendEvents, useTrendEvidence } from "@/hooks/useTrendEvents";
 import { useUnifiedTrends } from "@/hooks/useUnifiedTrends";
 import { useOrgTrendScores } from "@/hooks/useOrgRelevance";
+import { useOrgTrendOutcomesMap, type OutcomeStats } from "@/hooks/useTrendOutcomes";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,7 @@ import {
   BarChart3,
   ShieldAlert,
   Activity,
+  Award,
 } from "lucide-react";
 
 import { TrendDrilldownPanel } from "@/components/client/TrendDrilldownPanel";
@@ -61,6 +63,7 @@ interface TrendCardProps {
   isRelevant?: boolean;
   relevanceScore?: number;
   relevanceReasons?: string[];
+  outcomeStats?: OutcomeStats | null;
   onSelect: (trend: TrendEvent) => void;
   showRank?: boolean;
   rank?: number;
@@ -71,6 +74,7 @@ function TrendCard({
   isRelevant, 
   relevanceScore, 
   relevanceReasons,
+  outcomeStats,
   onSelect,
   showRank,
   rank 
@@ -109,6 +113,12 @@ function TrendCard({
               <Badge className="bg-[hsl(var(--portal-error))] text-white text-xs gap-1">
                 <Zap className="h-3 w-3" />
                 Breaking
+              </Badge>
+            )}
+            {outcomeStats?.isHighPerforming && outcomeStats.confidenceLevel !== 'low' && (
+              <Badge className="bg-[hsl(var(--portal-success)/0.15)] text-[hsl(var(--portal-success))] text-xs gap-1">
+                <Award className="h-3 w-3" />
+                High Performing
               </Badge>
             )}
             {isRelevant && relevanceScore && relevanceScore >= 70 && (
@@ -270,6 +280,9 @@ export default function ClientNewsTrends() {
     refetch: refreshScores
   } = useOrgTrendScores(organizationId, { limit: 50 });
 
+  // Fetch outcome correlations for "High Performing" badges
+  const { getByEventId: getOutcome } = useOrgTrendOutcomesMap(organizationId);
+
   // UI State
   const [selectedTrend, setSelectedTrend] = useState<TrendEvent | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -407,6 +420,7 @@ export default function ClientNewsTrends() {
                   <TrendCard
                     key={trend.id}
                     trend={trend}
+                    outcomeStats={getOutcome(trend.id)}
                     onSelect={handleSelectTrend}
                     showRank
                     rank={index + 1}
@@ -441,6 +455,7 @@ export default function ClientNewsTrends() {
                     isRelevant
                     relevanceScore={trend.relevanceScore}
                     relevanceReasons={trend.relevanceReasons}
+                    outcomeStats={getOutcome(trend.id)}
                     onSelect={handleSelectTrend}
                     showRank
                     rank={index + 1}
@@ -471,6 +486,7 @@ export default function ClientNewsTrends() {
                     trend={trend}
                     isRelevant
                     relevanceScore={trend.relevanceScore}
+                    outcomeStats={getOutcome(trend.id)}
                     onSelect={handleSelectTrend}
                   />
                 ))}
@@ -499,6 +515,7 @@ export default function ClientNewsTrends() {
               <TrendCard
                 key={trend.id}
                 trend={trend}
+                outcomeStats={getOutcome(trend.id)}
                 onSelect={handleSelectTrend}
                 showRank
                 rank={index + 1}
@@ -526,6 +543,7 @@ export default function ClientNewsTrends() {
                 <TrendCard
                   key={trend.id}
                   trend={trend}
+                  outcomeStats={getOutcome(trend.id)}
                   onSelect={handleSelectTrend}
                 />
               ))}
