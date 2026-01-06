@@ -9,6 +9,7 @@ export interface BlogPost {
   category: string;
   tags: string[];
   image?: string;
+  heroImage?: string;
   featured?: boolean;
   metaDescription: string;
   readTime: number;
