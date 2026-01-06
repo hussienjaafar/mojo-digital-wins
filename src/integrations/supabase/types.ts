@@ -7550,6 +7550,8 @@ export type Database = {
           baseline_30d: number | null
           baseline_7d: number | null
           baseline_updated_at: string | null
+          canonical_label: string | null
+          cluster_id: string | null
           confidence_factors: Json | null
           confidence_score: number | null
           corroboration_score: number | null
@@ -7573,6 +7575,7 @@ export type Database = {
           last_seen_at: string
           news_source_count: number | null
           peak_at: string | null
+          related_phrases: string[] | null
           related_topics: string[] | null
           sentiment_label: string | null
           sentiment_score: number | null
@@ -7590,6 +7593,8 @@ export type Database = {
           baseline_30d?: number | null
           baseline_7d?: number | null
           baseline_updated_at?: string | null
+          canonical_label?: string | null
+          cluster_id?: string | null
           confidence_factors?: Json | null
           confidence_score?: number | null
           corroboration_score?: number | null
@@ -7613,6 +7618,7 @@ export type Database = {
           last_seen_at?: string
           news_source_count?: number | null
           peak_at?: string | null
+          related_phrases?: string[] | null
           related_topics?: string[] | null
           sentiment_label?: string | null
           sentiment_score?: number | null
@@ -7630,6 +7636,8 @@ export type Database = {
           baseline_30d?: number | null
           baseline_7d?: number | null
           baseline_updated_at?: string | null
+          canonical_label?: string | null
+          cluster_id?: string | null
           confidence_factors?: Json | null
           confidence_score?: number | null
           corroboration_score?: number | null
@@ -7653,6 +7661,7 @@ export type Database = {
           last_seen_at?: string
           news_source_count?: number | null
           peak_at?: string | null
+          related_phrases?: string[] | null
           related_topics?: string[] | null
           sentiment_label?: string | null
           sentiment_score?: number | null
@@ -7847,6 +7856,60 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trend_phrase_clusters: {
+        Row: {
+          canonical_event_id: string | null
+          canonical_phrase: string
+          created_at: string | null
+          id: string
+          member_event_keys: string[] | null
+          member_phrases: string[] | null
+          similarity_threshold: number | null
+          top_authority_score: number | null
+          total_mentions: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          canonical_event_id?: string | null
+          canonical_phrase: string
+          created_at?: string | null
+          id?: string
+          member_event_keys?: string[] | null
+          member_phrases?: string[] | null
+          similarity_threshold?: number | null
+          top_authority_score?: number | null
+          total_mentions?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          canonical_event_id?: string | null
+          canonical_phrase?: string
+          created_at?: string | null
+          id?: string
+          member_event_keys?: string[] | null
+          member_phrases?: string[] | null
+          similarity_threshold?: number | null
+          top_authority_score?: number | null
+          total_mentions?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_phrase_clusters_canonical_event_id_fkey"
+            columns: ["canonical_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_phrase_clusters_canonical_event_id_fkey"
+            columns: ["canonical_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events_active"
             referencedColumns: ["id"]
           },
         ]

@@ -9,6 +9,7 @@ export interface TrendEvent {
   id: string;
   event_key: string;
   event_title: string;
+  canonical_label?: string; // Best label chosen from clustering
   
   // Temporal
   first_seen_at: string;
@@ -35,9 +36,12 @@ export interface TrendEvent {
     cross_source?: number;
     volume?: number;
     velocity?: number;
+    cluster_size?: number;
+    authority_score?: number;
   } | null;
   is_trending: boolean;
   is_breaking: boolean;
+  is_event_phrase?: boolean;
   trend_stage: 'emerging' | 'surging' | 'peaking' | 'declining' | 'stable';
   
   // Corroboration
@@ -52,12 +56,23 @@ export interface TrendEvent {
   sentiment_score: number | null;
   sentiment_label: 'positive' | 'negative' | 'neutral' | 'mixed' | null;
   
+  // Clustering
+  related_phrases?: string[];
+  cluster_id?: string | null;
+  
   // Computed fields from view
   baseline_delta_pct?: number;
   news_evidence_count?: number;
   social_evidence_count?: number;
   freshness?: 'fresh' | 'recent' | 'aging' | 'stale';
 }
+
+/**
+ * Get the display label for a trend event (prefer canonical_label)
+ */
+export const getDisplayLabel = (event: TrendEvent): string => {
+  return event.canonical_label || event.event_title;
+};
 
 export interface TrendEvidence {
   id: string;

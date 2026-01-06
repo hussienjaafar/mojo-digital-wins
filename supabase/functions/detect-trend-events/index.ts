@@ -4,13 +4,14 @@ import { getCorsHeaders, validateCronOrAdmin, logJobFailure, checkRateLimit } fr
 import { normalizeText, generateHash, extractCanonicalUrl, normalizeUrl, generateContentHash, extractDomain as extractDomainUtil } from "../_shared/urlNormalizer.ts";
 
 /**
- * Evidence-Based Trend Detection v2
+ * Evidence-Based Trend Detection v3 with Phrase Clustering
  * 
  * Improvements:
  * 1. Rolling baselines from trend_baselines (7d/30d)
  * 2. Deduplication via content_hash/canonical_url
  * 3. Deduped counts for velocity/confidence
  * 4. Evidence includes canonical_url + content_hash
+ * 5. Embedding-based phrase clustering for unified labels
  */
 
 interface SourceMention {
@@ -48,6 +49,7 @@ interface TopicAggregate {
   };
   sentiment_sum: number;
   sentiment_count: number;
+  authority_score: number; // For label selection
 }
 
 interface RollingBaseline {
@@ -57,8 +59,27 @@ interface RollingBaseline {
   data_points_30d: number;
 }
 
+interface ExistingTrendEvent {
+  id: string;
+  event_key: string;
+  event_title: string;
+  embedding: number[] | null;
+  related_phrases: string[] | null;
+  current_24h: number;
+}
+
 // Database-loaded entity aliases for canonicalization
 let dbAliases: Map<string, { canonical_name: string; entity_type: string }> = new Map();
+
+// Source authority weights for label selection
+const SOURCE_AUTHORITY: Record<string, number> = {
+  'rss': 3,        // News sources have highest authority
+  'google_news': 2.5, // Google News aggregated
+  'bluesky': 1,    // Social media lower authority
+};
+
+// Similarity threshold for phrase clustering
+const EMBEDDING_SIMILARITY_THRESHOLD = 0.82;
 
 // Fallback topic aliases (used when DB is unavailable)
 const TOPIC_ALIASES: Record<string, string> = {
@@ -100,11 +121,63 @@ async function loadEntityAliases(supabase: any): Promise<void> {
 }
 
 /**
+ * Calculate cosine similarity between two embedding vectors
+ */
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (!a || !b || a.length !== b.length || a.length === 0) return 0;
+  
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  
+  const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
+  return magnitude > 0 ? dotProduct / magnitude : 0;
+}
+
+/**
  * Check if a topic is an event phrase (multi-word descriptive)
  */
 function isEventPhrase(topic: string): boolean {
   const words = topic.trim().split(/\s+/);
   return words.length >= 2 && words.length <= 5;
+}
+
+/**
+ * Calculate authority score for label selection
+ * Prefers: event phrases > entities, high-authority sources, higher frequency
+ */
+function calculateAuthorityScore(
+  agg: TopicAggregate,
+  sourceTiers: Map<string, { tier: string; weight: number }>
+): number {
+  // Base score from mention count
+  let score = Math.log2(agg.dedupedMentions.size + 1) * 10;
+  
+  // Boost for event phrases (more descriptive labels)
+  if (agg.is_event_phrase) {
+    score += 25;
+  }
+  
+  // Authority from source types
+  score += agg.by_source_deduped.rss * SOURCE_AUTHORITY['rss'];
+  score += agg.by_source_deduped.google_news * SOURCE_AUTHORITY['google_news'];
+  score += agg.by_source_deduped.bluesky * SOURCE_AUTHORITY['bluesky'];
+  
+  // Domain authority bonus
+  for (const mention of agg.dedupedMentions.values()) {
+    const tierInfo = sourceTiers.get(mention.domain || '');
+    if (tierInfo) {
+      score += tierInfo.weight * 2;
+    }
+  }
+  
+  return score;
 }
 
 function normalizeTopicKey(topic: string): string {
@@ -304,6 +377,7 @@ serve(async (req) => {
           by_source_deduped: { rss: 0, google_news: 0, bluesky: 0 },
           sentiment_sum: 0,
           sentiment_count: 0,
+          authority_score: 0,
         });
       }
       
@@ -435,11 +509,191 @@ serve(async (req) => {
     
     console.log(`[detect-trend-events] Aggregated ${topicMap.size} unique topics from sources`);
     
+    // Calculate authority scores for each topic
+    for (const [key, agg] of topicMap) {
+      agg.authority_score = calculateAuthorityScore(agg, sourceTiers);
+    }
+    
+    // ========================================
+    // STEP 2.5: Load existing trend events with embeddings for clustering
+    // ========================================
+    const { data: existingEvents } = await supabase
+      .from('trend_events')
+      .select('id, event_key, event_title, embedding, related_phrases, current_24h')
+      .not('embedding', 'is', null)
+      .gte('last_seen_at', days7Ago.toISOString())
+      .order('current_24h', { ascending: false })
+      .limit(500);
+    
+    const existingEventsMap = new Map<string, ExistingTrendEvent>();
+    const embeddingsIndex: { key: string; embedding: number[]; title: string; mentions: number }[] = [];
+    
+    for (const event of existingEvents || []) {
+      existingEventsMap.set(event.event_key, event);
+      if (event.embedding) {
+        embeddingsIndex.push({
+          key: event.event_key,
+          embedding: event.embedding,
+          title: event.event_title,
+          mentions: event.current_24h || 0,
+        });
+      }
+    }
+    
+    console.log(`[detect-trend-events] Loaded ${embeddingsIndex.length} existing events with embeddings for clustering`);
+    
+    // ========================================
+    // STEP 2.6: Cluster similar phrases using embedding similarity
+    // ========================================
+    interface PhraseCluster {
+      canonicalKey: string;
+      canonicalTitle: string;
+      memberKeys: Set<string>;
+      memberTitles: Set<string>;
+      totalMentions: number;
+      topAuthorityScore: number;
+      isEventPhrase: boolean;
+    }
+    
+    const clusters = new Map<string, PhraseCluster>();
+    const keyToCluster = new Map<string, string>(); // event_key -> canonical cluster key
+    
+    // For new topics without embeddings, use text-based clustering
+    function textSimilarity(a: string, b: string): number {
+      const aLower = a.toLowerCase();
+      const bLower = b.toLowerCase();
+      
+      // Exact match
+      if (aLower === bLower) return 1.0;
+      
+      // One contains the other
+      if (aLower.includes(bLower) || bLower.includes(aLower)) return 0.85;
+      
+      // Word overlap (Jaccard)
+      const aWords = new Set(aLower.split(/\s+/).filter(w => w.length > 2));
+      const bWords = new Set(bLower.split(/\s+/).filter(w => w.length > 2));
+      
+      if (aWords.size === 0 || bWords.size === 0) return 0;
+      
+      let intersection = 0;
+      for (const word of aWords) {
+        if (bWords.has(word)) intersection++;
+      }
+      
+      const union = aWords.size + bWords.size - intersection;
+      return intersection / union;
+    }
+    
+    // First pass: cluster based on embedding similarity from existing events
+    for (const [key, agg] of topicMap) {
+      if (keyToCluster.has(key)) continue;
+      
+      // Check existing events for embedding match
+      const existing = existingEventsMap.get(key);
+      if (existing?.embedding) {
+        // Find best matching cluster using embedding
+        let bestMatch: { key: string; similarity: number } | null = null;
+        
+        for (const indexed of embeddingsIndex) {
+          if (indexed.key === key) continue;
+          
+          const similarity = cosineSimilarity(existing.embedding, indexed.embedding);
+          if (similarity >= EMBEDDING_SIMILARITY_THRESHOLD) {
+            if (!bestMatch || similarity > bestMatch.similarity) {
+              bestMatch = { key: indexed.key, similarity };
+            }
+          }
+        }
+        
+        if (bestMatch && clusters.has(bestMatch.key)) {
+          // Join existing cluster
+          const cluster = clusters.get(bestMatch.key)!;
+          cluster.memberKeys.add(key);
+          cluster.memberTitles.add(agg.event_title);
+          cluster.totalMentions += agg.dedupedMentions.size;
+          
+          // Update canonical if this phrase has higher authority
+          if (agg.authority_score > cluster.topAuthorityScore) {
+            cluster.canonicalKey = key;
+            cluster.canonicalTitle = agg.event_title;
+            cluster.topAuthorityScore = agg.authority_score;
+            cluster.isEventPhrase = agg.is_event_phrase;
+          }
+          
+          keyToCluster.set(key, cluster.canonicalKey);
+          continue;
+        }
+      }
+      
+      // Create new cluster with this topic as canonical
+      const cluster: PhraseCluster = {
+        canonicalKey: key,
+        canonicalTitle: agg.event_title,
+        memberKeys: new Set([key]),
+        memberTitles: new Set([agg.event_title]),
+        totalMentions: agg.dedupedMentions.size,
+        topAuthorityScore: agg.authority_score,
+        isEventPhrase: agg.is_event_phrase,
+      };
+      clusters.set(key, cluster);
+      keyToCluster.set(key, key);
+    }
+    
+    // Second pass: text-based clustering for topics without embeddings
+    const unclusteredKeys = Array.from(topicMap.keys()).filter(k => !keyToCluster.has(k));
+    
+    for (const key of unclusteredKeys) {
+      const agg = topicMap.get(key)!;
+      let bestMatch: { clusterKey: string; similarity: number } | null = null;
+      
+      for (const [clusterKey, cluster] of clusters) {
+        const similarity = textSimilarity(agg.event_title, cluster.canonicalTitle);
+        if (similarity >= 0.7) { // Lower threshold for text-based
+          if (!bestMatch || similarity > bestMatch.similarity) {
+            bestMatch = { clusterKey, similarity };
+          }
+        }
+      }
+      
+      if (bestMatch) {
+        const cluster = clusters.get(bestMatch.clusterKey)!;
+        cluster.memberKeys.add(key);
+        cluster.memberTitles.add(agg.event_title);
+        cluster.totalMentions += agg.dedupedMentions.size;
+        
+        // Update canonical if higher authority
+        if (agg.authority_score > cluster.topAuthorityScore) {
+          cluster.canonicalKey = key;
+          cluster.canonicalTitle = agg.event_title;
+          cluster.topAuthorityScore = agg.authority_score;
+          cluster.isEventPhrase = agg.is_event_phrase;
+        }
+        
+        keyToCluster.set(key, cluster.canonicalKey);
+      } else {
+        // Create standalone cluster
+        const cluster: PhraseCluster = {
+          canonicalKey: key,
+          canonicalTitle: agg.event_title,
+          memberKeys: new Set([key]),
+          memberTitles: new Set([agg.event_title]),
+          totalMentions: agg.dedupedMentions.size,
+          topAuthorityScore: agg.authority_score,
+          isEventPhrase: agg.is_event_phrase,
+        };
+        clusters.set(key, cluster);
+        keyToCluster.set(key, key);
+      }
+    }
+    
+    console.log(`[detect-trend-events] Created ${clusters.size} phrase clusters from ${topicMap.size} topics`);
+    
     // ========================================
     // STEP 3: Process topics with deduped counts + rolling baselines
     // ========================================
     const eventsToUpsert: any[] = [];
     const evidenceToInsert: any[] = [];
+    const clustersToUpsert: any[] = [];
     let trendingCount = 0;
     let breakingCount = 0;
     let dedupedSavings = 0;
@@ -552,11 +806,26 @@ serve(async (req) => {
       });
       const topHeadline = sortedMentions[0]?.title?.substring(0, 200) || '';
       
-      // Build event record with event phrase flag
+      // Get cluster info for this topic
+      const clusterKey = keyToCluster.get(key) || key;
+      const cluster = clusters.get(clusterKey);
+      
+      // Build related phrases from cluster (excluding self)
+      const relatedPhrases = cluster 
+        ? Array.from(cluster.memberTitles).filter(t => t !== agg.event_title).slice(0, 10)
+        : [];
+      
+      // Determine canonical label from cluster
+      const canonicalLabel = cluster?.canonicalTitle || agg.event_title;
+      
+      // Build event record with clustering info
       const eventRecord = {
         event_key: key,
         event_title: agg.event_title,
-        is_event_phrase: agg.is_event_phrase, // Flag for multi-word descriptive phrases
+        canonical_label: canonicalLabel, // Best label for display
+        is_event_phrase: agg.is_event_phrase,
+        related_phrases: relatedPhrases, // Alternate phrasings from cluster
+        cluster_id: cluster && cluster.memberKeys.size > 1 ? clusterKey : null,
         first_seen_at: agg.first_seen_at.toISOString(),
         last_seen_at: agg.last_seen_at.toISOString(),
         peak_at: trendStage === 'peaking' ? now.toISOString() : null,
@@ -577,6 +846,8 @@ serve(async (req) => {
           has_historical_baseline: hasHistoricalBaseline,
           is_event_phrase: agg.is_event_phrase,
           related_entities_count: agg.related_entities.size,
+          cluster_size: cluster?.memberKeys.size || 1,
+          authority_score: agg.authority_score,
         },
         is_trending: isTrending,
         is_breaking: isBreaking,
@@ -683,6 +954,33 @@ serve(async (req) => {
     }
     
     // ========================================
+    // STEP 4.5: Upsert phrase clusters
+    // ========================================
+    const multiMemberClusters = Array.from(clusters.values()).filter(c => c.memberKeys.size > 1);
+    
+    if (multiMemberClusters.length > 0) {
+      const clusterRecords = multiMemberClusters.map(c => ({
+        canonical_phrase: c.canonicalTitle,
+        member_phrases: Array.from(c.memberTitles),
+        member_event_keys: Array.from(c.memberKeys),
+        similarity_threshold: EMBEDDING_SIMILARITY_THRESHOLD,
+        total_mentions: c.totalMentions,
+        top_authority_score: c.topAuthorityScore,
+        updated_at: now.toISOString(),
+      }));
+      
+      const { error: clusterError } = await supabase
+        .from('trend_phrase_clusters')
+        .upsert(clusterRecords, { onConflict: 'canonical_phrase' });
+      
+      if (clusterError) {
+        console.error('[detect-trend-events] Error upserting clusters:', clusterError.message);
+      } else {
+        console.log(`[detect-trend-events] Upserted ${clusterRecords.length} phrase clusters`);
+      }
+    }
+    
+    // ========================================
     // STEP 5: Update baselines for today
     // ========================================
     const baselineUpdates = eventsToUpsert.slice(0, 200).map(e => ({
@@ -712,6 +1010,7 @@ serve(async (req) => {
       trending_count: trendingCount,
       breaking_count: breakingCount,
       evidence_count: evidenceToInsert.length,
+      clusters_created: multiMemberClusters.length,
       deduped_savings: dedupedSavings,
       baselines_loaded: rollingBaselines.size,
       duration_ms: duration,
