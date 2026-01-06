@@ -79,67 +79,131 @@ function canonicalizeEntity(name: string): { canonical: string; type: string } {
 }
 
 /**
- * Validate event phrase quality - must be 2-5 words, descriptive
+ * Validate event phrase quality - must be 2-5 words, descriptive, verb-centered preferred
  */
 function isValidEventPhrase(phrase: string): boolean {
   const words = phrase.trim().split(/\s+/);
-  if (words.length < 2 || words.length > 5) return false;
+  if (words.length < 2 || words.length > 6) return false;
   
   // Must contain at least one proper noun or action word
   const hasProperNoun = /[A-Z][a-z]+/.test(phrase);
-  const actionWords = ['vote', 'bill', 'ruling', 'trial', 'hearing', 'arrest', 'shooting', 
-                       'protest', 'election', 'debate', 'speech', 'summit', 'policy', 
-                       'resignation', 'nomination', 'confirmation', 'sanctions', 'tariffs'];
-  const hasAction = actionWords.some(w => phrase.toLowerCase().includes(w));
   
-  return hasProperNoun || hasAction;
+  // Verb-centered action words (preferred for event phrases)
+  const actionVerbs = ['vote', 'pass', 'passes', 'block', 'blocks', 'reject', 'rejects', 
+                       'approve', 'approves', 'sign', 'signs', 'fire', 'fires', 'resign',
+                       'announce', 'announces', 'launch', 'launches', 'ban', 'bans',
+                       'arrest', 'arrests', 'indict', 'indicts', 'sue', 'sues'];
+  const hasActionVerb = actionVerbs.some(v => phrase.toLowerCase().includes(v));
+  
+  // Event nouns (acceptable but less preferred)
+  const eventNouns = ['ruling', 'trial', 'hearing', 'shooting', 'protest', 'election', 
+                      'debate', 'speech', 'summit', 'policy', 'crisis', 'scandal',
+                      'resignation', 'nomination', 'confirmation', 'sanctions', 'tariffs',
+                      'investigation', 'indictment', 'verdict', 'vote', 'bill'];
+  const hasEventNoun = eventNouns.some(w => phrase.toLowerCase().includes(w));
+  
+  return hasProperNoun && (hasActionVerb || hasEventNoun);
+}
+
+/**
+ * Generate fallback event phrase from headline when AI only returns entities
+ * Uses NLP rules to extract verb-centered phrases
+ */
+function generateFallbackEventPhrase(title: string, entities: Array<{ name: string; type: string; canonical: string }>): string | null {
+  if (!title || entities.length === 0) return null;
+  
+  // Common headline verb patterns
+  const verbPatterns = [
+    /(\w+)\s+(passes?|blocks?|rejects?|approves?|signs?|fires?|resigns?|announces?|launches?|bans?|arrests?|indicts?|sues?)\s+(.+)/i,
+    /(\w+)\s+(?:to|will)\s+(\w+)\s+(.+)/i,
+    /(\w+)\s+(\w+ed)\s+(?:for|over|after|by)\s+(.+)/i,
+  ];
+  
+  for (const pattern of verbPatterns) {
+    const match = title.match(pattern);
+    if (match) {
+      // Extract subject + verb + object snippet
+      const subject = match[1];
+      const verb = match[2];
+      const objectSnippet = match[3].split(/[,.\-–]/).map(s => s.trim())[0];
+      
+      // Build phrase: limit to 5 words
+      const phraseWords = `${subject} ${verb} ${objectSnippet}`.split(/\s+/).slice(0, 5);
+      const phrase = phraseWords.join(' ');
+      
+      if (phrase.split(/\s+/).length >= 2) {
+        return phrase.split(' ').map(w => 
+          w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+        ).join(' ');
+      }
+    }
+  }
+  
+  // Fallback: Use top entity + first action word from title
+  const actionWords = title.match(/\b(vote|bill|ruling|crisis|ban|tariff|policy|probe|investigation|hearing|trial|arrest|firing|resignation)\b/i);
+  if (actionWords && entities.length > 0) {
+    const topEntity = entities[0].canonical || entities[0].name;
+    const action = actionWords[1];
+    return `${topEntity} ${action.charAt(0).toUpperCase() + action.slice(1).toLowerCase()}`;
+  }
+  
+  return null;
+}
+
+interface NERResultWithQuality extends NERResult {
+  label_quality: 'event_phrase' | 'entity_only' | 'fallback_generated';
 }
 
 /**
  * NER + Keyphrase extraction using AI
  * Returns canonical entities and multi-word event phrases
+ * PHASE 2: Prioritizes event phrases as primary labels
  */
-async function extractNERWithAI(items: ContentItem[]): Promise<Map<string, NERResult>> {
+async function extractNERWithAI(items: ContentItem[]): Promise<Map<string, NERResultWithQuality>> {
   if (!LOVABLE_API_KEY) {
     throw new Error('LOVABLE_API_KEY not configured');
   }
   
-  const results = new Map<string, NERResult>();
+  const results = new Map<string, NERResultWithQuality>();
   
   // Batch items (max 20 per request for efficiency)
   const itemsText = items.slice(0, 20).map((item, i) => 
     `[${i}] ${item.title}${item.description ? ` - ${item.description.substring(0, 200)}` : ''}`
   ).join('\n');
   
-  const prompt = `Extract named entities and event phrases from these headlines. Output structured data for trend detection.
+  // PHASE 2: Enhanced prompt prioritizing event phrases over entities
+  const prompt = `Extract EVENT PHRASES (primary) and named entities (secondary) from these headlines for Twitter-style trending.
 
 ${itemsText}
 
-For EACH item, extract:
+For EACH item, extract in ORDER OF PRIORITY:
 
-1. **entities**: Named entities with types:
+1. **event_phrases** (PRIMARY - these become the trend labels):
+   Multi-word verb-centered phrases (2-5 words) that describe WHAT is happening:
+   - GOOD: "House Passes Border Bill", "Trump Fires FBI Director", "Gaza Ceasefire Collapses"
+   - GOOD: "Supreme Court Blocks Abortion Ban", "DOJ Indicts Senator", "Texas Sues Biden"
+   - BAD: Just names like "Donald Trump", "FBI", "Gaza" (these are entities, not events)
+   
+   REQUIRE: Subject + Verb + Object pattern when possible
+   - "[Who] [Does What] [To Whom/What]"
+
+2. **entities** (SECONDARY - metadata, not primary labels):
    - PERSON: Full canonical names (e.g., "Donald Trump", NOT "Trump")
-   - ORG: Organizations (e.g., "Supreme Court", "FBI", "Democratic Party")
-   - GPE: Locations (e.g., "Gaza", "Texas", "Washington DC")
-   - EVENT: Specific events (e.g., "Super Bowl", "G20 Summit")
-   - LAW: Bills/laws (e.g., "HR 1234", "Affordable Care Act")
-   - PRODUCT: Products/services (e.g., "TikTok", "Truth Social")
-
-2. **event_phrases**: Multi-word descriptive phrases (2-5 words) like Twitter trends:
-   Examples: "Trump Tariff Policy", "Gaza Ceasefire Talks", "FBI Director Fired", 
-             "Supreme Court Abortion Ruling", "Texas Border Crisis"
-   These should capture WHAT is happening, not just WHO.
+   - ORG: Organizations (e.g., "Supreme Court", "FBI")
+   - GPE: Locations (e.g., "Gaza", "Texas")
+   - These should NOT be the trending label if an event phrase exists
 
 3. **sentiment**: -1.0 to 1.0
 
 CRITICAL RULES:
-- Use FULL CANONICAL NAMES for people: "Donald Trump" not "Trump", "Joe Biden" not "Biden"
-- Event phrases must be 2-5 words and descriptive of the news event
+- PRIORITIZE event phrases over single entities as the trending topic
+- Event phrases MUST describe an action/event, not just a person or place
+- Use FULL CANONICAL NAMES for people: "Donald Trump" not "Trump"
 - DO NOT include news publishers (CNN, Reuters, AP) as entities
-- Single-word entities only for well-known acronyms: "NATO", "FBI", "ICE", "DOGE"
+- Each headline should ideally produce at least ONE event phrase
 
 Return JSON array:
-[{"index": 0, "entities": [{"name": "Donald Trump", "type": "PERSON"}, {"name": "FBI", "type": "ORG"}], "event_phrases": ["Trump FBI Investigation", "DOJ Probe Expands"], "sentiment": -0.3, "sentiment_label": "negative"}]`;
+[{"index": 0, "event_phrases": ["Trump Fires FBI Director", "DOJ Investigation Expands"], "entities": [{"name": "Donald Trump", "type": "PERSON"}, {"name": "FBI", "type": "ORG"}], "sentiment": -0.3, "sentiment_label": "negative"}]`;
 
   try {
     const response = await fetch(AI_GATEWAY_URL, {
@@ -153,7 +217,7 @@ Return JSON array:
         messages: [
           { 
             role: 'system', 
-            content: 'You are an NER system that extracts canonical entities and multi-word event phrases from news headlines. Output ONLY valid JSON arrays.' 
+            content: 'You are an NER system that extracts verb-centered event phrases (primary) and canonical entities (secondary) from news headlines. Event phrases describe WHAT HAPPENED, not just WHO. Output ONLY valid JSON arrays.' 
           },
           { role: 'user', content: prompt }
         ]
@@ -203,15 +267,33 @@ Return JSON array:
       }).filter((e: any) => e.canonical && e.canonical.length > 1);
       
       // Validate event phrases
-      const eventPhrases = (analysis.event_phrases || [])
+      let eventPhrases = (analysis.event_phrases || [])
         .map((p: string) => p.trim())
         .filter((p: string) => isValidEventPhrase(p));
+      
+      // PHASE 2: Determine label quality and apply fallback if needed
+      let labelQuality: 'event_phrase' | 'entity_only' | 'fallback_generated' = 'entity_only';
+      
+      if (eventPhrases.length > 0) {
+        labelQuality = 'event_phrase';
+      } else if (entities.length > 0) {
+        // Try to generate fallback event phrase from headline
+        const fallbackPhrase = generateFallbackEventPhrase(item.title, entities);
+        if (fallbackPhrase) {
+          eventPhrases = [fallbackPhrase];
+          labelQuality = 'fallback_generated';
+          console.log(`[batch-analyze] Generated fallback phrase: "${fallbackPhrase}" from "${item.title.substring(0, 50)}..."`);
+        } else {
+          labelQuality = 'entity_only';
+        }
+      }
       
       results.set(item.id, {
         entities,
         event_phrases: eventPhrases,
         sentiment: analysis.sentiment || 0,
-        sentiment_label: analysis.sentiment_label || 'neutral'
+        sentiment_label: analysis.sentiment_label || 'neutral',
+        label_quality: labelQuality
       });
     }
     
@@ -226,11 +308,12 @@ Return JSON array:
 
 /**
  * Fallback: Extract basic entities from text without AI (for rate-limit scenarios)
+ * PHASE 2: Also attempts to generate fallback event phrases
  */
-function extractBasicEntities(title: string, description?: string): NERResult {
+function extractBasicEntities(title: string, description?: string): NERResultWithQuality {
   const text = `${title} ${description || ''}`;
   const entities: NERResult['entities'] = [];
-  const eventPhrases: string[] = [];
+  let eventPhrases: string[] = [];
   
   // Basic proper noun extraction via regex
   const properNouns = text.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g) || [];
@@ -262,11 +345,23 @@ function extractBasicEntities(title: string, description?: string): NERResult {
   negWords.forEach(w => { if (textLower.includes(w)) sentiment -= 0.2; });
   sentiment = Math.max(-1, Math.min(1, sentiment));
   
+  // PHASE 2: Try to generate fallback event phrase
+  let labelQuality: 'event_phrase' | 'entity_only' | 'fallback_generated' = 'entity_only';
+  
+  if (entities.length > 0) {
+    const fallbackPhrase = generateFallbackEventPhrase(title, entities.slice(0, 5));
+    if (fallbackPhrase) {
+      eventPhrases = [fallbackPhrase];
+      labelQuality = 'fallback_generated';
+    }
+  }
+  
   return {
     entities: entities.slice(0, 5),
     event_phrases: eventPhrases,
     sentiment: Math.round(sentiment * 100) / 100,
-    sentiment_label: sentiment > 0.2 ? 'positive' : sentiment < -0.2 ? 'negative' : 'neutral'
+    sentiment_label: sentiment > 0.2 ? 'positive' : sentiment < -0.2 ? 'negative' : 'neutral',
+    label_quality: labelQuality
   };
 }
 
@@ -306,7 +401,7 @@ serve(async (req) => {
         console.log(`Processing ${newsItems.length} Google News items with NER...`);
         
         // Use AI for NER extraction
-        let nerResults: Map<string, NERResult> = new Map();
+        let nerResults: Map<string, NERResultWithQuality> = new Map();
         if (use_ai && LOVABLE_API_KEY) {
           nerResults = await extractNERWithAI(newsItems.map(item => ({
             id: item.id,
@@ -372,7 +467,7 @@ serve(async (req) => {
       if (redditItems && redditItems.length > 0) {
         console.log(`Processing ${redditItems.length} Reddit posts with NER...`);
         
-        let nerResults: Map<string, NERResult> = new Map();
+        let nerResults: Map<string, NERResultWithQuality> = new Map();
         if (use_ai && LOVABLE_API_KEY) {
           nerResults = await extractNERWithAI(redditItems.map(item => ({
             id: item.id,
@@ -429,7 +524,7 @@ serve(async (req) => {
       if (rssItems && rssItems.length > 0) {
         console.log(`Processing ${rssItems.length} RSS articles with NER...`);
         
-        let nerResults: Map<string, NERResult> = new Map();
+        let nerResults: Map<string, NERResultWithQuality> = new Map();
         if (use_ai && LOVABLE_API_KEY) {
           nerResults = await extractNERWithAI(rssItems.map(item => ({
             id: item.id,
