@@ -6071,6 +6071,7 @@ export type Database = {
           name: string
           political_leaning: string | null
           source_type: string | null
+          state_code: string | null
           success_count: number | null
           tags: string[] | null
           tier: string | null
@@ -6097,6 +6098,7 @@ export type Database = {
           name: string
           political_leaning?: string | null
           source_type?: string | null
+          state_code?: string | null
           success_count?: number | null
           tags?: string[] | null
           tier?: string | null
@@ -6123,6 +6125,7 @@ export type Database = {
           name?: string
           political_leaning?: string | null
           source_type?: string | null
+          state_code?: string | null
           success_count?: number | null
           tags?: string[] | null
           tier?: string | null
@@ -9397,6 +9400,16 @@ export type Database = {
           stale_sources: number | null
           total_sources: number | null
           unhealthy_sources: number | null
+        }
+        Relationships: []
+      }
+      state_coverage_summary: {
+        Row: {
+          active_source_count: number | null
+          healthy_source_count: number | null
+          stale_source_count: number | null
+          state_code: string | null
+          state_name: string | null
         }
         Relationships: []
       }
