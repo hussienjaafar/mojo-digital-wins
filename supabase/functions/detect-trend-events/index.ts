@@ -26,6 +26,7 @@ interface SourceMention {
   domain?: string;
   content_hash?: string;
   canonical_url?: string;
+  tier?: 'tier1' | 'tier2' | 'tier3' | null; // Source tier for weighting
 }
 
 interface TopicAggregate {
@@ -46,6 +47,12 @@ interface TopicAggregate {
     rss: number;
     google_news: number;
     bluesky: number;
+  };
+  // Tier distribution (deduped)
+  by_tier_deduped: {
+    tier1: number;
+    tier2: number;
+    tier3: number;
   };
   sentiment_sum: number;
   sentiment_count: number;
@@ -77,6 +84,28 @@ const SOURCE_AUTHORITY: Record<string, number> = {
   'google_news': 2.5, // Google News aggregated
   'bluesky': 1,    // Social media lower authority
 };
+
+// ============================================================================
+// TIER & SOURCE TYPE WEIGHTING for Phase 2
+// ============================================================================
+
+// Tier weights: tier1 is most authoritative, tier3 is least
+const TIER_WEIGHTS: Record<string, number> = {
+  'tier1': 1.0,    // Official/government + high-trust
+  'tier2': 0.7,    // National news + statehouse network
+  'tier3': 0.4,    // Issue specialists + advocacy
+  'unclassified': 0.5, // Unknown tier gets middle weight
+};
+
+// Source type weights
+const SOURCE_TYPE_WEIGHTS: Record<string, number> = {
+  'rss': 1.0,         // Direct RSS feeds (highest trust)
+  'google_news': 0.8, // Aggregated news
+  'bluesky': 0.3,     // Social media (lowest trust)
+};
+
+// Cross-tier corroboration requirement: tier3-only trends are demoted
+const REQUIRE_TIER12_CORROBORATION = true;
 
 // Similarity threshold for phrase clustering
 const EMBEDDING_SIMILARITY_THRESHOLD = 0.82;
@@ -371,7 +400,7 @@ serve(async (req) => {
     const days7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const days30Ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     
-    // Load source tiers for authority weighting
+    // Load source tiers for authority weighting (from source_tiers table)
     const { data: tierData } = await supabase
       .from('source_tiers')
       .select('domain, tier, authority_weight');
@@ -380,6 +409,35 @@ serve(async (req) => {
     for (const t of tierData || []) {
       sourceTiers.set(t.domain, { tier: t.tier, weight: t.authority_weight || 1 });
     }
+    
+    // Load RSS source tiers by URL domain (Phase 2: tier weighting)
+    const { data: rssSourceTiers } = await supabase
+      .from('rss_sources')
+      .select('url, tier')
+      .not('tier', 'is', null);
+    
+    const rssTiersByDomain = new Map<string, string>();
+    for (const s of rssSourceTiers || []) {
+      const domain = extractDomainUtil(s.url);
+      if (domain && s.tier) {
+        rssTiersByDomain.set(domain, s.tier);
+      }
+    }
+    
+    // Load Google News source tiers
+    const { data: gnSourceTiers } = await supabase
+      .from('google_news_sources')
+      .select('name, tier')
+      .not('tier', 'is', null);
+    
+    const gnTiersByName = new Map<string, string>();
+    for (const s of gnSourceTiers || []) {
+      if (s.name && s.tier) {
+        gnTiersByName.set(s.name.toLowerCase(), s.tier);
+      }
+    }
+    
+    console.log(`[detect-trend-events] Loaded ${rssTiersByDomain.size} RSS source tiers, ${gnTiersByName.size} Google News source tiers`);
     
     // ========================================
     // STEP 1: Load rolling baselines from trend_baselines
@@ -476,6 +534,7 @@ serve(async (req) => {
           last_seen_at: new Date(mention.published_at),
           by_source: { rss: 0, google_news: 0, bluesky: 0 },
           by_source_deduped: { rss: 0, google_news: 0, bluesky: 0 },
+          by_tier_deduped: { tier1: 0, tier2: 0, tier3: 0 },
           sentiment_sum: 0,
           sentiment_count: 0,
           authority_score: 0,
@@ -492,6 +551,12 @@ serve(async (req) => {
       if (!agg.dedupedMentions.has(contentHash)) {
         agg.dedupedMentions.set(contentHash, mention);
         agg.by_source_deduped[mention.source_type]++;
+        
+        // Track tier distribution (bluesky is always tier3)
+        const tier = mention.tier || (mention.source_type === 'bluesky' ? 'tier3' : null);
+        if (tier === 'tier1') agg.by_tier_deduped.tier1++;
+        else if (tier === 'tier2') agg.by_tier_deduped.tier2++;
+        else agg.by_tier_deduped.tier3++; // Default unclassified/bluesky to tier3
       }
       
       const pubDate = new Date(mention.published_at);
@@ -534,6 +599,10 @@ serve(async (req) => {
       // Skip if no topics
       if (allTopics.length === 0) continue;
       
+      // Look up tier from RSS source by domain
+      const articleDomain = extractDomain(article.source_url);
+      const articleTier = rssTiersByDomain.get(articleDomain) as 'tier1' | 'tier2' | 'tier3' | undefined;
+      
       const mention: SourceMention = {
         id: article.id,
         title: article.title,
@@ -545,7 +614,8 @@ serve(async (req) => {
         sentiment_score: article.sentiment_score,
         sentiment_label: article.sentiment_label,
         topics: allTopics,
-        domain: extractDomain(article.source_url),
+        domain: articleDomain,
+        tier: articleTier || null, // Phase 2: attach tier for weighting
       };
       
       for (const topic of mention.topics) {
@@ -563,6 +633,10 @@ serve(async (req) => {
       .not('ai_topics', 'is', null);
     
     for (const item of googleNews || []) {
+      // Look up tier from Google News source by domain
+      const gnDomain = extractDomain(item.url);
+      const gnTier = rssTiersByDomain.get(gnDomain) as 'tier1' | 'tier2' | 'tier3' | undefined;
+      
       const mention: SourceMention = {
         id: item.id,
         title: item.title,
@@ -574,7 +648,8 @@ serve(async (req) => {
         sentiment_score: item.ai_sentiment,
         sentiment_label: item.ai_sentiment_label,
         topics: item.ai_topics || [],
-        domain: extractDomain(item.url),
+        domain: gnDomain,
+        tier: gnTier || null, // Phase 2: attach tier for weighting
       };
       
       for (const topic of mention.topics) {
@@ -601,6 +676,7 @@ serve(async (req) => {
         sentiment_score: post.ai_sentiment,
         sentiment_label: post.ai_sentiment_label,
         topics: post.ai_topics || [],
+        tier: 'tier3', // Bluesky is always tier3 (social media)
       };
       
       for (const topic of mention.topics) {
@@ -875,9 +951,34 @@ serve(async (req) => {
       const baselineDeltaPct = baselineDelta * 100;
       
       // ========================================
+      // PHASE 2: TIER WEIGHTING & CORROBORATION
+      // ========================================
+      
+      // Get tier distribution from aggregate
+      const tier1Count = agg.by_tier_deduped.tier1;
+      const tier2Count = agg.by_tier_deduped.tier2;
+      const tier3Count = agg.by_tier_deduped.tier3;
+      
+      // Check if tier1/tier2 source is present (for corroboration)
+      const hasTier12Corroboration = tier1Count > 0 || tier2Count > 0;
+      const isTier3Only = !hasTier12Corroboration && tier3Count > 0;
+      
+      // Calculate weighted evidence score
+      // Each mention weighted by: tier_weight * source_type_weight
+      let weightedEvidenceScore = 0;
+      for (const mention of dedupedMentions) {
+        const tierWeight = TIER_WEIGHTS[mention.tier || 'unclassified'] || TIER_WEIGHTS['unclassified'];
+        const sourceWeight = SOURCE_TYPE_WEIGHTS[mention.source_type] || 1.0;
+        weightedEvidenceScore += tierWeight * sourceWeight;
+      }
+      // Normalize to 0-100 scale (assume 10 perfectly weighted mentions = 100)
+      weightedEvidenceScore = Math.min(100, (weightedEvidenceScore / 10) * 100);
+      
+      // ========================================
       // TWITTER-LIKE RANKING: Velocity vs Baseline (z-score approach)
       // Primary: spike velocity relative to baseline
       // Secondary: corroboration + volume gate
+      // Now includes: tier weighting + cross-tier corroboration
       // ========================================
       
       // Baseline quality factor
@@ -904,15 +1005,26 @@ serve(async (req) => {
       // 1. Z-score velocity (0-100): How much above baseline (primary factor)
       // 2. Corroboration boost (0-30): Cross-source verification
       // 3. Volume bonus (0-20): Raw activity level (secondary)
+      // 4. NEW: Tier boost (0-20): Weighted by tier distribution
       const velocityScore = zScoreVelocity * 10 * baselineQuality; // 0-100
       const corroborationBoost = sourceCount >= 2 
         ? 15 + (newsCount > 0 && socialCount > 0 ? 15 : 0) // 15-30 for cross-source
         : 0;
       const volumeBonus = Math.min(20, Math.log2(current24h_deduped + 1) * 5);
       
-      // Apply volume gate: no score if below minimum thresholds
+      // NEW: Tier boost - higher for tier1/tier2 presence
+      const tierBoost = tier1Count > 0 
+        ? 20  // Tier1 presence = full boost
+        : tier2Count > 0 
+          ? 12  // Tier2 presence = moderate boost
+          : 0;  // Tier3 only = no boost
+      
+      // NEW: Tier3-only penalty for cross-tier corroboration requirement
+      const tier3OnlyPenalty = REQUIRE_TIER12_CORROBORATION && isTier3Only ? 0.5 : 1.0;
+      
+      // Apply volume gate + tier penalty: demote tier3-only trends
       const trendScore = meetsVolumeGate 
-        ? Math.max(0, velocityScore + corroborationBoost + volumeBonus)
+        ? Math.max(0, (velocityScore + corroborationBoost + volumeBonus + tierBoost) * tier3OnlyPenalty)
         : 0;
       
       // Keep confidence score for reference (but not primary ranking)
@@ -947,10 +1059,13 @@ serve(async (req) => {
       }
       
       // Determine if trending: use trend_score threshold + volume gate
+      // NEW: Tier3-only trends with high penalty are not considered "trending" 
+      // unless they have very high velocity to overcome the penalty
       const isTrending = trendScore >= 20 && meetsVolumeGate;
       
       // Determine if breaking: high velocity spike + corroboration + recency
-      const isBreaking = hasHistoricalBaseline && meetsVolumeGate && (
+      // NEW: Breaking requires tier1/tier2 source for higher confidence
+      const isBreaking = hasHistoricalBaseline && meetsVolumeGate && hasTier12Corroboration && (
         (zScoreVelocity > 4 && sourceCount >= 2 && newsCount >= 1 && hoursOld < 6) ||
         (zScoreVelocity > 6 && newsCount >= 1) ||
         (baselineDelta > 5 && sourceCount >= 2 && hoursOld < 12)
@@ -958,6 +1073,11 @@ serve(async (req) => {
       
       if (isTrending) trendingCount++;
       if (isBreaking) breakingCount++;
+      
+      // Log tier3-only trends for monitoring
+      if (isTier3Only && trendScore > 10) {
+        console.log(`[detect-trend-events] Tier3-only trend demoted: "${agg.event_title}" (score: ${trendScore.toFixed(1)}, penalty applied)`);
+      }
       
       // Sentiment
       const avgSentiment = agg.sentiment_count > 0 ? agg.sentiment_sum / agg.sentiment_count : null;
@@ -1022,6 +1142,9 @@ serve(async (req) => {
           related_entities_count: agg.related_entities.size,
           cluster_size: cluster?.memberKeys.size || 1,
           authority_score: agg.authority_score,
+          // Phase 2: Tier weighting explainability
+          tier_boost: tierBoost,
+          tier3_only_penalty: tier3OnlyPenalty,
         },
         is_trending: isTrending,
         is_breaking: isBreaking,
@@ -1034,6 +1157,13 @@ serve(async (req) => {
         top_headline: topHeadline,
         sentiment_score: avgSentiment,
         sentiment_label: sentimentLabel,
+        // Phase 2: Tier distribution fields
+        tier1_count: tier1Count,
+        tier2_count: tier2Count,
+        tier3_count: tier3Count,
+        weighted_evidence_score: Math.round(weightedEvidenceScore * 10) / 10,
+        has_tier12_corroboration: hasTier12Corroboration,
+        is_tier3_only: isTier3Only,
         updated_at: now.toISOString(),
       };
       

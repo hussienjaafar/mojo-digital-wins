@@ -7568,9 +7568,11 @@ export type Database = {
           event_title: string
           evidence_count: number | null
           first_seen_at: string
+          has_tier12_corroboration: boolean | null
           id: string
           is_breaking: boolean | null
           is_event_phrase: boolean | null
+          is_tier3_only: boolean | null
           is_trending: boolean | null
           is_verified: boolean | null
           last_seen_at: string
@@ -7582,6 +7584,9 @@ export type Database = {
           sentiment_score: number | null
           social_source_count: number | null
           source_count: number | null
+          tier1_count: number | null
+          tier2_count: number | null
+          tier3_count: number | null
           top_headline: string | null
           trend_score: number | null
           trend_stage: string | null
@@ -7589,6 +7594,7 @@ export type Database = {
           velocity: number | null
           velocity_1h: number | null
           velocity_6h: number | null
+          weighted_evidence_score: number | null
           z_score_velocity: number | null
         }
         Insert: {
@@ -7614,9 +7620,11 @@ export type Database = {
           event_title: string
           evidence_count?: number | null
           first_seen_at?: string
+          has_tier12_corroboration?: boolean | null
           id?: string
           is_breaking?: boolean | null
           is_event_phrase?: boolean | null
+          is_tier3_only?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
           last_seen_at?: string
@@ -7628,6 +7636,9 @@ export type Database = {
           sentiment_score?: number | null
           social_source_count?: number | null
           source_count?: number | null
+          tier1_count?: number | null
+          tier2_count?: number | null
+          tier3_count?: number | null
           top_headline?: string | null
           trend_score?: number | null
           trend_stage?: string | null
@@ -7635,6 +7646,7 @@ export type Database = {
           velocity?: number | null
           velocity_1h?: number | null
           velocity_6h?: number | null
+          weighted_evidence_score?: number | null
           z_score_velocity?: number | null
         }
         Update: {
@@ -7660,9 +7672,11 @@ export type Database = {
           event_title?: string
           evidence_count?: number | null
           first_seen_at?: string
+          has_tier12_corroboration?: boolean | null
           id?: string
           is_breaking?: boolean | null
           is_event_phrase?: boolean | null
+          is_tier3_only?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
           last_seen_at?: string
@@ -7674,6 +7688,9 @@ export type Database = {
           sentiment_score?: number | null
           social_source_count?: number | null
           source_count?: number | null
+          tier1_count?: number | null
+          tier2_count?: number | null
+          tier3_count?: number | null
           top_headline?: string | null
           trend_score?: number | null
           trend_stage?: string | null
@@ -7681,6 +7698,7 @@ export type Database = {
           velocity?: number | null
           velocity_1h?: number | null
           velocity_6h?: number | null
+          weighted_evidence_score?: number | null
           z_score_velocity?: number | null
         }
         Relationships: []
@@ -9450,27 +9468,23 @@ export type Database = {
           alias_variants: string[] | null
           baseline_30d: number | null
           baseline_7d: number | null
-          baseline_updated_at: string | null
           canonical_label: string | null
-          cluster_id: string | null
           confidence_factors: Json | null
           confidence_score: number | null
           corroboration_score: number | null
-          created_at: string | null
           current_1h: number | null
           current_24h: number | null
           current_6h: number | null
-          embedding: string | null
-          embedding_generated_at: string | null
-          embedding_text: string | null
           entity_type: string | null
           event_key: string | null
           event_title: string | null
           evidence_count: number | null
           first_seen_at: string | null
+          has_tier12_corroboration: boolean | null
           id: string | null
           is_breaking: boolean | null
           is_event_phrase: boolean | null
+          is_tier3_only: boolean | null
           is_trending: boolean | null
           is_verified: boolean | null
           last_seen_at: string | null
@@ -9482,6 +9496,9 @@ export type Database = {
           sentiment_score: number | null
           social_source_count: number | null
           source_count: number | null
+          tier1_count: number | null
+          tier2_count: number | null
+          tier3_count: number | null
           top_headline: string | null
           trend_score: number | null
           trend_stage: string | null
@@ -9489,6 +9506,7 @@ export type Database = {
           velocity: number | null
           velocity_1h: number | null
           velocity_6h: number | null
+          weighted_evidence_score: number | null
           z_score_velocity: number | null
         }
         Insert: {
@@ -9496,27 +9514,23 @@ export type Database = {
           alias_variants?: string[] | null
           baseline_30d?: number | null
           baseline_7d?: number | null
-          baseline_updated_at?: string | null
           canonical_label?: string | null
-          cluster_id?: string | null
           confidence_factors?: Json | null
           confidence_score?: number | null
           corroboration_score?: number | null
-          created_at?: string | null
           current_1h?: number | null
           current_24h?: number | null
           current_6h?: number | null
-          embedding?: string | null
-          embedding_generated_at?: string | null
-          embedding_text?: string | null
           entity_type?: string | null
           event_key?: string | null
           event_title?: string | null
           evidence_count?: number | null
           first_seen_at?: string | null
+          has_tier12_corroboration?: boolean | null
           id?: string | null
           is_breaking?: boolean | null
           is_event_phrase?: boolean | null
+          is_tier3_only?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
           last_seen_at?: string | null
@@ -9528,6 +9542,9 @@ export type Database = {
           sentiment_score?: number | null
           social_source_count?: number | null
           source_count?: number | null
+          tier1_count?: number | null
+          tier2_count?: number | null
+          tier3_count?: number | null
           top_headline?: string | null
           trend_score?: number | null
           trend_stage?: string | null
@@ -9535,6 +9552,7 @@ export type Database = {
           velocity?: number | null
           velocity_1h?: number | null
           velocity_6h?: number | null
+          weighted_evidence_score?: number | null
           z_score_velocity?: number | null
         }
         Update: {
@@ -9542,27 +9560,23 @@ export type Database = {
           alias_variants?: string[] | null
           baseline_30d?: number | null
           baseline_7d?: number | null
-          baseline_updated_at?: string | null
           canonical_label?: string | null
-          cluster_id?: string | null
           confidence_factors?: Json | null
           confidence_score?: number | null
           corroboration_score?: number | null
-          created_at?: string | null
           current_1h?: number | null
           current_24h?: number | null
           current_6h?: number | null
-          embedding?: string | null
-          embedding_generated_at?: string | null
-          embedding_text?: string | null
           entity_type?: string | null
           event_key?: string | null
           event_title?: string | null
           evidence_count?: number | null
           first_seen_at?: string | null
+          has_tier12_corroboration?: boolean | null
           id?: string | null
           is_breaking?: boolean | null
           is_event_phrase?: boolean | null
+          is_tier3_only?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
           last_seen_at?: string | null
@@ -9574,6 +9588,9 @@ export type Database = {
           sentiment_score?: number | null
           social_source_count?: number | null
           source_count?: number | null
+          tier1_count?: number | null
+          tier2_count?: number | null
+          tier3_count?: number | null
           top_headline?: string | null
           trend_score?: number | null
           trend_stage?: string | null
@@ -9581,6 +9598,7 @@ export type Database = {
           velocity?: number | null
           velocity_1h?: number | null
           velocity_6h?: number | null
+          weighted_evidence_score?: number | null
           z_score_velocity?: number | null
         }
         Relationships: []
