@@ -6,6 +6,8 @@ import {
   startOfMonth,
   endOfMonth,
   subMonths,
+  differenceInDays,
+  parseISO,
 } from "date-fns";
 import {
   Calendar as CalendarIcon,
@@ -95,6 +97,36 @@ const presets: Record<PresetKey, { label: string; shortLabel: string; getValue: 
     getValue: () => ({ start: subDays(new Date(), 30), end: new Date() }),
   },
 };
+
+// ============================================================================
+// Preset Detection Helper
+// ============================================================================
+
+/**
+ * Detects which preset matches the given date range.
+ * Returns 'custom' if no preset matches.
+ */
+function detectPresetFromDateRange(startDate: string, endDate: string): PresetKey {
+  const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
+  
+  // Only match presets if the end date is today
+  if (endDate !== todayStr) {
+    return "custom";
+  }
+  
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+  const daysDiff = differenceInDays(end, start);
+  
+  // Match against known presets with small tolerance for edge cases
+  if (daysDiff >= 6 && daysDiff <= 8) return "7d";
+  if (daysDiff >= 13 && daysDiff <= 15) return "14d";
+  if (daysDiff >= 29 && daysDiff <= 31) return "30d";
+  if (daysDiff >= 89 && daysDiff <= 91) return "90d";
+  
+  return "custom";
+}
 
 // ============================================================================
 // Locale-aware Date Formatting with Intl.DateTimeFormat
@@ -735,8 +767,19 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
   const containerWidth = useContainerWidth(containerRef);
   const layoutMode = getLayoutMode(containerWidth);
   const { dateRange, setDateRange } = useDashboardStore();
-  const [selectedPreset, setSelectedPreset] = React.useState<PresetKey>("30d");
+  // Initialize preset based on stored date range, not hardcoded
+  const [selectedPreset, setSelectedPreset] = React.useState<PresetKey>(() => 
+    detectPresetFromDateRange(dateRange.startDate, dateRange.endDate)
+  );
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+
+  // Sync preset when date range changes externally (e.g., from persisted storage or other components)
+  React.useEffect(() => {
+    const detectedPreset = detectPresetFromDateRange(dateRange.startDate, dateRange.endDate);
+    if (detectedPreset !== selectedPreset) {
+      setSelectedPreset(detectedPreset);
+    }
+  }, [dateRange.startDate, dateRange.endDate]);
 
   // Filter state from store
   const selectedCampaignId = useDashboardStore((s) => s.selectedCampaignId);

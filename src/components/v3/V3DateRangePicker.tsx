@@ -1,5 +1,5 @@
 import * as React from "react";
-import { format, subDays, startOfMonth, endOfMonth, subMonths, subYears, differenceInDays } from "date-fns";
+import { format, subDays, startOfMonth, endOfMonth, subMonths, subYears, differenceInDays, parseISO } from "date-fns";
 import { Calendar as CalendarIcon, ChevronDown, GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,42 @@ const presets: Record<PresetKey, Preset> = {
   },
 };
 
+/**
+ * Detects which preset matches the given date range.
+ * Returns 'custom' if no preset matches.
+ */
+function detectPresetFromDateRange(startDate: string, endDate: string): PresetKey {
+  const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
+  
+  // Only match presets if the end date is today
+  if (endDate !== todayStr) {
+    return "custom";
+  }
+  
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+  const daysDiff = differenceInDays(end, start);
+  
+  // Match against known presets with small tolerance
+  if (daysDiff === 0) return "today";
+  if (daysDiff >= 6 && daysDiff <= 8) return "7d";
+  if (daysDiff >= 13 && daysDiff <= 15) return "14d";
+  if (daysDiff >= 29 && daysDiff <= 31) return "30d";
+  if (daysDiff >= 89 && daysDiff <= 91) return "90d";
+  
+  // Check if it's month-to-date
+  const monthStart = format(startOfMonth(today), "yyyy-MM-dd");
+  if (startDate === monthStart) return "mtd";
+  
+  // Check if it's last month
+  const lastMonthStart = format(startOfMonth(subMonths(today, 1)), "yyyy-MM-dd");
+  const lastMonthEnd = format(endOfMonth(subMonths(today, 1)), "yyyy-MM-dd");
+  if (startDate === lastMonthStart && endDate === lastMonthEnd) return "last-month";
+  
+  return "custom";
+}
+
 const compareModes: Record<CompareMode, { label: string; getRange: (start: Date, end: Date) => { start: Date; end: Date } | null }> = {
   none: {
     label: "No comparison",
@@ -109,9 +145,20 @@ export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
   onCompareChange,
 }) => {
   const { dateRange, setDateRange } = useDashboardStore();
-  const [selectedPreset, setSelectedPreset] = React.useState<PresetKey>("30d");
+  // Initialize preset based on stored date range, not hardcoded
+  const [selectedPreset, setSelectedPreset] = React.useState<PresetKey>(() => 
+    detectPresetFromDateRange(dateRange.startDate, dateRange.endDate)
+  );
   const [compareMode, setCompareMode] = React.useState<CompareMode>("none");
   const [isOpen, setIsOpen] = React.useState(false);
+
+  // Sync preset when date range changes externally (e.g., from persisted storage or other components)
+  React.useEffect(() => {
+    const detectedPreset = detectPresetFromDateRange(dateRange.startDate, dateRange.endDate);
+    if (detectedPreset !== selectedPreset) {
+      setSelectedPreset(detectedPreset);
+    }
+  }, [dateRange.startDate, dateRange.endDate]);
 
   const startDate = new Date(dateRange.startDate);
   const endDate = new Date(dateRange.endDate);
