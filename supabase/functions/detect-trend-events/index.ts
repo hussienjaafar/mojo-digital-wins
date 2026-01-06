@@ -916,17 +916,20 @@ serve(async (req) => {
         : 0;
       
       // Keep confidence score for reference (but not primary ranking)
+      // FIXED: Confidence score should be 0-100, with capped components
       const confidenceFactors = {
-        baseline_delta: Math.min(30, Math.max(0, velocity / 10)) * baselineQuality,
-        cross_source: Math.min(30, sourceCount * 8 + (newsCount > 0 ? 5 : 0)),
-        volume: Math.min(20, current24h_deduped * 2),
-        velocity: Math.min(20, Math.max(0, velocity / 10)) * baselineQuality,
-        z_score: zScoreVelocity, // Added for explainability
-        trend_score: trendScore, // Added for explainability
+        baseline_delta: Math.min(25, Math.max(0, baselineDelta * 5)) * baselineQuality, // 0-25: spike vs baseline
+        cross_source: Math.min(25, sourceCount * 8 + (newsCount > 0 && socialCount > 0 ? 5 : 0)), // 0-25: source diversity
+        volume: Math.min(25, Math.log2(current24h_deduped + 1) * 5), // 0-25: volume (log scaled)
+        recency: Math.min(25, current1h_deduped > 0 ? 15 + Math.min(10, current1h_deduped * 2) : 0), // 0-25: recent activity
       };
-      const confidenceScore = Object.values(confidenceFactors)
-        .filter((v): v is number => typeof v === 'number' && !['z_score', 'trend_score'].includes(String(v)))
-        .reduce((a, b) => a + b, 0);
+      // Sum only the scoring components (all capped to ensure max 100)
+      const confidenceScore = Math.min(100, 
+        confidenceFactors.baseline_delta + 
+        confidenceFactors.cross_source + 
+        confidenceFactors.volume + 
+        confidenceFactors.recency
+      );
       
       // Determine trend stage
       const hoursOld = (now.getTime() - agg.first_seen_at.getTime()) / (1000 * 60 * 60);
