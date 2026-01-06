@@ -3832,7 +3832,10 @@ export type Database = {
           backoff_until: string | null
           consecutive_errors: number | null
           created_at: string | null
+          deactivated_at: string | null
+          deactivation_reason: string | null
           expected_cadence_mins: number | null
+          health_status: string | null
           id: string
           is_active: boolean | null
           last_error: string | null
@@ -3850,7 +3853,10 @@ export type Database = {
           backoff_until?: string | null
           consecutive_errors?: number | null
           created_at?: string | null
+          deactivated_at?: string | null
+          deactivation_reason?: string | null
           expected_cadence_mins?: number | null
+          health_status?: string | null
           id?: string
           is_active?: boolean | null
           last_error?: string | null
@@ -3868,7 +3874,10 @@ export type Database = {
           backoff_until?: string | null
           consecutive_errors?: number | null
           created_at?: string | null
+          deactivated_at?: string | null
+          deactivation_reason?: string | null
           expected_cadence_mins?: number | null
+          health_status?: string | null
           id?: string
           is_active?: boolean | null
           last_error?: string | null
@@ -6056,13 +6065,17 @@ export type Database = {
           category: string
           consecutive_errors: number | null
           created_at: string | null
+          deactivated_at: string | null
+          deactivation_reason: string | null
           error_count: number | null
           expected_cadence_mins: number | null
           fetch_error: string | null
           fetch_frequency_minutes: number | null
           geographic_scope: string | null
+          health_status: string | null
           id: string
           is_active: boolean | null
+          last_error_at: string | null
           last_error_message: string | null
           last_fetch_status: string | null
           last_fetched_at: string | null
@@ -6083,13 +6096,17 @@ export type Database = {
           category: string
           consecutive_errors?: number | null
           created_at?: string | null
+          deactivated_at?: string | null
+          deactivation_reason?: string | null
           error_count?: number | null
           expected_cadence_mins?: number | null
           fetch_error?: string | null
           fetch_frequency_minutes?: number | null
           geographic_scope?: string | null
+          health_status?: string | null
           id?: string
           is_active?: boolean | null
+          last_error_at?: string | null
           last_error_message?: string | null
           last_fetch_status?: string | null
           last_fetched_at?: string | null
@@ -6110,13 +6127,17 @@ export type Database = {
           category?: string
           consecutive_errors?: number | null
           created_at?: string | null
+          deactivated_at?: string | null
+          deactivation_reason?: string | null
           error_count?: number | null
           expected_cadence_mins?: number | null
           fetch_error?: string | null
           fetch_frequency_minutes?: number | null
           geographic_scope?: string | null
+          health_status?: string | null
           id?: string
           is_active?: boolean | null
+          last_error_at?: string | null
           last_error_message?: string | null
           last_fetch_status?: string | null
           last_fetched_at?: string | null
@@ -6746,6 +6767,57 @@ export type Database = {
           metric_value?: number
           snapshot_time?: string
           topic?: string | null
+        }
+        Relationships: []
+      }
+      source_health_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          is_resolved: boolean | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          source_id: string
+          source_name: string
+          source_type: string
+          tags: string[] | null
+          tier: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          is_resolved?: boolean | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          source_id: string
+          source_name: string
+          source_type: string
+          tags?: string[] | null
+          tier?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          is_resolved?: boolean | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          source_id?: string
+          source_name?: string
+          source_type?: string
+          tags?: string[] | null
+          tier?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -9390,16 +9462,32 @@ export type Database = {
         }
         Relationships: []
       }
+      source_health_by_tier_tag: {
+        Row: {
+          active_sources: number | null
+          critical_sources: number | null
+          deactivated_sources: number | null
+          failing_sources: number | null
+          healthy_sources: number | null
+          source_type: string | null
+          stale_sources: number | null
+          tag: string | null
+          tier: string | null
+          total_sources: number | null
+        }
+        Relationships: []
+      }
       source_health_summary: {
         Row: {
           active_sources: number | null
-          avg_mins_since_success: number | null
+          critical_sources: number | null
+          deactivated_sources: number | null
+          failing_sources: number | null
           healthy_sources: number | null
-          max_mins_since_success: number | null
           source_type: string | null
           stale_sources: number | null
+          tier: string | null
           total_sources: number | null
-          unhealthy_sources: number | null
         }
         Relationships: []
       }
@@ -9713,6 +9801,14 @@ export type Database = {
           job_name: string
           job_type: string
           sla_minutes: number
+        }[]
+      }
+      check_source_staleness: {
+        Args: never
+        Returns: {
+          alerts_created: number
+          stale_google_news: number
+          stale_rss: number
         }[]
       }
       cleanup_expired_invite_codes: { Args: never; Returns: undefined }
