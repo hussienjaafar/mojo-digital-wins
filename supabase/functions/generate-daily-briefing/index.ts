@@ -22,11 +22,14 @@ serve(async (req) => {
 
     const [watchlistResult, trendsResult, articlesResult] = await Promise.all([
       supabase.from('entity_watchlist').select('entity_name'),
+      // Migrated to trend_events as single source of truth
       supabase
-        .from('mv_unified_trends')
-        .select('name, spike_ratio, total_mentions_24h, avg_sentiment')
-        .gt('spike_ratio', 1.5)
-        .order('unified_score', { ascending: false })
+        .from('trend_events')
+        .select('event_title, velocity, current_24h, sentiment_score, is_breaking')
+        .eq('is_trending', true)
+        .gte('last_seen_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .gte('confidence_score', 40)
+        .order('velocity', { ascending: false })
         .limit(5),
       supabase
         .from('articles')
@@ -57,10 +60,10 @@ serve(async (req) => {
       watchlistMatches: watchlistMatches.length,
       watchlistEntities: watchlistEntities.slice(0, 5),
       topTrends: trends.map(t => ({
-        name: t.name,
-        spikeRatio: t.spike_ratio,
-        mentions: t.total_mentions_24h,
-        sentiment: t.avg_sentiment > 0.2 ? 'positive' : t.avg_sentiment < -0.2 ? 'negative' : 'neutral'
+        name: t.event_title,
+        spikeRatio: (t.velocity || 0) / 100, // velocity is already a percentage, convert to ratio
+        mentions: t.current_24h || 0,
+        sentiment: (t.sentiment_score || 0) > 0.2 ? 'positive' : (t.sentiment_score || 0) < -0.2 ? 'negative' : 'neutral'
       })),
       sampleHeadlines: articles.slice(0, 5).map(a => a.title)
     };

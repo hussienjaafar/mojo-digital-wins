@@ -61,12 +61,13 @@ export function PriorityAlertsPanel({ onAlertClick }: PriorityAlertsPanelProps) 
         .order('published_date', { ascending: false })
         .limit(50);
 
-      // Fetch trending topics that match watchlist
+      // Fetch trending topics that match watchlist - migrated to trend_events
       const { data: trendingData } = await supabase
-        .from('mv_unified_trends')
-        .select('*')
-        .gt('spike_ratio', 1.5)
-        .order('unified_score', { ascending: false })
+        .from('trend_events')
+        .select('id, event_key, event_title, velocity, current_24h, is_trending, confidence_score')
+        .eq('is_trending', true)
+        .gte('last_seen_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order('velocity', { ascending: false })
         .limit(20);
 
       const priorityAlerts: PriorityAlert[] = [];
@@ -93,25 +94,25 @@ export function PriorityAlertsPanel({ onAlertClick }: PriorityAlertsPanelProps) 
         }
       });
 
-      // Match trending topics to watchlist
+      // Match trending topics to watchlist (using trend_events schema)
       (trendingData || []).forEach(trend => {
-        const trendNameLower = trend.topic?.toLowerCase() || '';
+        const trendNameLower = trend.event_title?.toLowerCase() || '';
         const matchedEntity = watchlistEntities.find(entity => 
           trendNameLower.includes(entity.name) || entity.name.includes(trendNameLower)
         );
 
-        // Use combined_velocity as spike indicator (>200 = 2x normal)
-        const spikeRatio = (trend.combined_velocity || 0) / 100;
+        // Use velocity as spike indicator (>200 = 2x normal)
+        const spikeRatio = (trend.velocity || 0) / 100;
         if (matchedEntity && spikeRatio >= 2) {
           priorityAlerts.push({
-            id: `trend-${trend.topic}`,
+            id: `trend-${trend.event_key}`,
             type: 'watchlist_spike',
-            title: `"${trend.topic}" is trending`,
-            description: `${spikeRatio.toFixed(1)}x above normal • ${trend.total_mentions || 0} mentions in 24h`,
+            title: `"${trend.event_title}" is trending`,
+            description: `${spikeRatio.toFixed(1)}x above normal • ${trend.current_24h || 0} mentions in 24h`,
             severity: spikeRatio >= 4 ? 'critical' : spikeRatio >= 3 ? 'high' : 'medium',
-            timestamp: trend.last_updated || new Date().toISOString(),
+            timestamp: new Date().toISOString(),
             entity: matchedEntity.name,
-            mentions: trend.total_mentions || 0,
+            mentions: trend.current_24h || 0,
           });
         }
       });
