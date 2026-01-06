@@ -8,6 +8,7 @@ import { useTrendEvents, useTrendEvidence } from "@/hooks/useTrendEvents";
 import { useUnifiedTrends } from "@/hooks/useUnifiedTrends";
 import { useOrgTrendScores } from "@/hooks/useOrgRelevance";
 import { useOrgTrendOutcomesMap, type OutcomeStats } from "@/hooks/useTrendOutcomes";
+import { useSourceFreshness } from "@/hooks/useSourceFreshness";
 
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -34,6 +35,7 @@ import {
   Activity,
   Award,
   BarChart3,
+  Settings,
 } from "lucide-react";
 
 import { TrendDrilldownPanel } from "@/components/client/TrendDrilldownPanel";
@@ -55,10 +57,12 @@ interface TrendCardProps {
   isRelevant?: boolean;
   relevanceScore?: number;
   relevanceReasons?: string[];
+  relevanceExplanation?: string;
   outcomeStats?: OutcomeStats | null;
   onSelect: (trend: TrendEvent) => void;
   showRank?: boolean;
   rank?: number;
+  isDataStale?: boolean;
 }
 
 function TrendCard({ 
@@ -66,10 +70,12 @@ function TrendCard({
   isRelevant, 
   relevanceScore, 
   relevanceReasons,
+  relevanceExplanation,
   outcomeStats,
   onSelect,
   showRank,
-  rank 
+  rank,
+  isDataStale = false
 }: TrendCardProps) {
   // Calculate freshness
   const lastSeenMs = Date.now() - new Date(trend.last_seen_at).getTime();
@@ -94,8 +100,13 @@ function TrendCard({
   const isStale = freshnessState === 'stale' || freshnessState === 'aging';
 
   // Single priority badge (Breaking > High Performing > High Match)
+  // Tone down Breaking badge when data is stale
   const getPriorityBadge = () => {
     if (trend.is_breaking) {
+      // When data is stale, show muted version
+      if (isDataStale) {
+        return <V3Badge variant="muted" icon={<Zap className="h-3 w-3" />}>Breaking</V3Badge>;
+      }
       return <V3Badge variant="red" icon={<Zap className="h-3 w-3" />}>Breaking</V3Badge>;
     }
     if (outcomeStats?.isHighPerforming && outcomeStats.confidenceLevel !== 'low') {
@@ -108,6 +119,17 @@ function TrendCard({
   };
 
   const priorityBadge = getPriorityBadge();
+  
+  // Build single-line relevance explanation
+  const getRelevanceHint = () => {
+    if (relevanceExplanation) return relevanceExplanation;
+    if (relevanceReasons && relevanceReasons.length > 0) {
+      return relevanceReasons[0];
+    }
+    return null;
+  };
+  
+  const relevanceHint = getRelevanceHint();
 
   return (
     <motion.button
@@ -136,14 +158,17 @@ function TrendCard({
             {trend.canonical_label || trend.event_title}
           </h3>
 
+          {/* Relevance hint (1 line max) */}
+          {relevanceHint && (
+            <p className="text-xs text-[hsl(var(--portal-accent-blue))] truncate">
+              {relevanceHint}
+            </p>
+          )}
+
           {/* Compact meta line: velocity · sources · freshness · badge */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-[hsl(var(--portal-text-muted))] flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" />
-              {Math.round(trend.velocity)}%
-              <span className="mx-0.5">·</span>
-              {trend.evidence_count} src
-              <span className="mx-0.5">·</span>
+              {Math.round(trend.velocity)}% · {trend.evidence_count} src ·
               <span className={cn(isStale && "text-[hsl(var(--portal-warning))]")}>
                 {getLastSeenLabel()}
               </span>
@@ -172,7 +197,9 @@ interface SectionCardProps {
   children: React.ReactNode;
   isLoading?: boolean;
   isEmpty?: boolean;
+  emptyTitle?: string;
   emptyMessage?: string;
+  emptyAction?: React.ReactNode;
   maxHeight?: string;
 }
 
@@ -186,7 +213,9 @@ function SectionCard({
   children,
   isLoading,
   isEmpty,
+  emptyTitle,
   emptyMessage,
+  emptyAction,
   maxHeight = "320px",
 }: SectionCardProps) {
   return (
@@ -217,11 +246,14 @@ function SectionCard({
             ))}
           </div>
         ) : isEmpty ? (
-          <div className="py-6 text-center">
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-              {emptyMessage || "No items"}
-            </p>
-          </div>
+          <V3EmptyState
+            title={emptyTitle || "No items"}
+            description={emptyMessage}
+            action={emptyAction}
+            variant="compact"
+            accent={accent}
+            icon={Icon}
+          />
         ) : (
           <ScrollArea style={{ height: maxHeight }}>
             <div className="space-y-2 pr-3">
@@ -240,6 +272,10 @@ function SectionCard({
 
 export default function ClientNewsTrends() {
   const { organizationId, isLoading: orgLoading } = useClientOrganization();
+  
+  // Fetch data freshness state
+  const { data: freshness } = useSourceFreshness();
+  const isDataStale = freshness?.overallStatus === 'stale' || freshness?.overallStatus === 'critical';
   
   // Fetch trends data with org context
   const { 
@@ -272,33 +308,38 @@ export default function ClientNewsTrends() {
   // Breaking trends
   const breakingTrends = trendEvents.filter(t => t.is_breaking).slice(0, 5);
 
-  // Relevant to org
+  // Relevant to org (with explanation for card display)
   const relevantTrends = orgScores
     ?.filter(s => s.relevance_score >= 50)
     ?.map(score => {
       const trend = trendEvents.find(t => t.id === score.trend_event_id);
+      const reasons = score.explanation?.reasons || [];
       return trend ? { 
         ...trend, 
         relevanceScore: score.relevance_score,
-        relevanceReasons: score.explanation?.reasons || []
+        relevanceReasons: reasons,
+        // Generate 1-line explanation
+        relevanceExplanation: reasons.length > 0 ? reasons[0] : undefined
       } : null;
     })
     .filter(Boolean)
-    .slice(0, 8) as (TrendEvent & { relevanceScore: number; relevanceReasons: string[] })[];
+    .slice(0, 8) as (TrendEvent & { relevanceScore: number; relevanceReasons: string[]; relevanceExplanation?: string })[];
 
-  // Watchlist mentions
+  // Watchlist mentions (with entity as explanation)
   const watchlistTrends = orgScores
     ?.filter(s => s.matched_entities?.length > 0)
     ?.map(score => {
       const trend = trendEvents.find(t => t.id === score.trend_event_id);
+      const entities = score.matched_entities || [];
       return trend ? { 
         ...trend, 
-        matchedEntities: score.matched_entities,
-        relevanceScore: score.relevance_score
+        matchedEntities: entities,
+        relevanceScore: score.relevance_score,
+        relevanceExplanation: entities.length > 0 ? `Mentions: ${entities.slice(0, 2).join(', ')}` : undefined
       } : null;
     })
     .filter(Boolean)
-    .slice(0, 6) as (TrendEvent & { matchedEntities: string[]; relevanceScore: number })[];
+    .slice(0, 6) as (TrendEvent & { matchedEntities: string[]; relevanceScore: number; relevanceExplanation?: string })[];
 
   // Top general trends
   const topTrends = trendEvents
@@ -386,10 +427,46 @@ export default function ClientNewsTrends() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Primary Tab: Breaking, Relevant, Watchlist */}
+          {/* Primary Tab: Relevant first, then Breaking, then Watchlist */}
           <TabsContent value="primary" className="mt-4 space-y-5">
-            {/* Breaking Now - Compact */}
-            {breakingTrends.length > 0 && (
+            {/* Relevant to You - prioritized at top */}
+            <SectionCard
+              title="Relevant to You"
+              subtitle="Topics matching your mission"
+              icon={Target}
+              iconColor="bg-[hsl(var(--portal-accent-blue)/0.15)] text-[hsl(var(--portal-accent-blue))]"
+              count={relevantTrends?.length || 0}
+              accent="blue"
+              isLoading={trendsLoading || scoresLoading}
+              isEmpty={!relevantTrends || relevantTrends.length === 0}
+              emptyTitle="No matching trends yet"
+              emptyMessage="Update your organization profile to see trends relevant to your mission."
+              emptyAction={
+                <V3Button variant="outline" size="sm" leftIcon={<Settings className="h-3 w-3" />}>
+                  Update Profile
+                </V3Button>
+              }
+            >
+              {relevantTrends?.map((trend, index) => (
+                <TrendCard
+                  key={trend.id}
+                  trend={trend}
+                  isRelevant
+                  relevanceScore={trend.relevanceScore}
+                  relevanceReasons={trend.relevanceReasons}
+                  relevanceExplanation={trend.relevanceExplanation}
+                  outcomeStats={getOutcome(trend.id)}
+                  onSelect={handleSelectTrend}
+                  showRank
+                  rank={index + 1}
+                  isDataStale={isDataStale}
+                />
+              ))}
+            </SectionCard>
+
+            {/* Two Column Layout: Breaking + Watchlist */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Breaking Now */}
               <SectionCard
                 title="Breaking Now"
                 subtitle="High-velocity stories"
@@ -397,9 +474,11 @@ export default function ClientNewsTrends() {
                 iconColor="bg-[hsl(var(--portal-error)/0.15)] text-[hsl(var(--portal-error))]"
                 count={breakingTrends.length}
                 accent="red"
-                maxHeight="200px"
+                maxHeight="280px"
                 isLoading={trendsLoading}
                 isEmpty={breakingTrends.length === 0}
+                emptyTitle="No breaking news"
+                emptyMessage="When major stories spike, they'll appear here."
               >
                 {breakingTrends.map((trend, index) => (
                   <TrendCard
@@ -409,36 +488,7 @@ export default function ClientNewsTrends() {
                     onSelect={handleSelectTrend}
                     showRank
                     rank={index + 1}
-                  />
-                ))}
-              </SectionCard>
-            )}
-
-            {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {/* Relevant to You */}
-              <SectionCard
-                title="Relevant to You"
-                subtitle="Topics matching your mission"
-                icon={Target}
-                iconColor="bg-[hsl(var(--portal-accent-blue)/0.15)] text-[hsl(var(--portal-accent-blue))]"
-                count={relevantTrends?.length || 0}
-                accent="blue"
-                isLoading={trendsLoading || scoresLoading}
-                isEmpty={!relevantTrends || relevantTrends.length === 0}
-                emptyMessage="No relevant trends. Update your profile to improve matching."
-              >
-                {relevantTrends?.map((trend, index) => (
-                  <TrendCard
-                    key={trend.id}
-                    trend={trend}
-                    isRelevant
-                    relevanceScore={trend.relevanceScore}
-                    relevanceReasons={trend.relevanceReasons}
-                    outcomeStats={getOutcome(trend.id)}
-                    onSelect={handleSelectTrend}
-                    showRank
-                    rank={index + 1}
+                    isDataStale={isDataStale}
                   />
                 ))}
               </SectionCard>
@@ -453,7 +503,13 @@ export default function ClientNewsTrends() {
                 accent="purple"
                 isLoading={trendsLoading || scoresLoading}
                 isEmpty={!watchlistTrends || watchlistTrends.length === 0}
-                emptyMessage="No watchlist mentions. Add entities to track."
+                emptyTitle="No watchlist activity"
+                emptyMessage="Add entities to your watchlist to track mentions."
+                emptyAction={
+                  <V3Button variant="outline" size="sm" leftIcon={<Eye className="h-3 w-3" />}>
+                    Manage Watchlist
+                  </V3Button>
+                }
               >
                 {watchlistTrends?.map((trend) => (
                   <TrendCard
@@ -461,8 +517,10 @@ export default function ClientNewsTrends() {
                     trend={trend}
                     isRelevant
                     relevanceScore={trend.relevanceScore}
+                    relevanceExplanation={trend.relevanceExplanation}
                     outcomeStats={getOutcome(trend.id)}
                     onSelect={handleSelectTrend}
+                    isDataStale={isDataStale}
                   />
                 ))}
               </SectionCard>
@@ -496,8 +554,9 @@ export default function ClientNewsTrends() {
                 ) : topTrends.length === 0 ? (
                   <V3EmptyState
                     title="No trending topics"
-                    description="Check back later for new trends"
+                    description="When topics surge in the news, they'll appear here."
                     icon={TrendingUp}
+                    accent="green"
                   />
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -509,6 +568,7 @@ export default function ClientNewsTrends() {
                         onSelect={handleSelectTrend}
                         showRank
                         rank={index + 1}
+                        isDataStale={isDataStale}
                       />
                     ))}
                   </div>

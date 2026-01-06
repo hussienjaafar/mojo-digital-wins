@@ -27,16 +27,16 @@ const STATUS_CONFIG: Record<FreshnessStatus, {
     Icon: CheckCircle2,
   },
   stale: {
-    label: "Data is Slightly Stale",
-    description: "Some sources are behind SLA",
+    label: "Data May Be Delayed",
+    description: "Some sources haven't updated recently",
     bgClass: "bg-[hsl(var(--portal-warning)/0.1)]",
     borderClass: "border-[hsl(var(--portal-warning)/0.2)]",
     textClass: "text-[hsl(var(--portal-warning))]",
     Icon: AlertTriangle,
   },
   critical: {
-    label: "Data May Be Outdated",
-    description: "Sources are significantly behind SLA",
+    label: "Data Outdated",
+    description: "Sources are significantly behind — trends may not reflect current news",
     bgClass: "bg-[hsl(var(--portal-error)/0.1)]",
     borderClass: "border-[hsl(var(--portal-error)/0.2)]",
     textClass: "text-[hsl(var(--portal-error))]",
@@ -168,7 +168,8 @@ export function DataFreshnessBanner({
         </div>
         <p className="text-xs text-[hsl(var(--portal-text-muted))] truncate">
           {statusMessage}
-          {overallStatus !== 'live' && ". Refresh to check for updates."}
+          {overallStatus === 'stale' && ". Data may be a few hours old."}
+          {overallStatus === 'critical' && ". Please refresh to check for updates."}
         </p>
       </div>
       

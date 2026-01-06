@@ -46,6 +46,7 @@ import {
 interface TrendDrilldownPanelProps {
   trend: TrendEvent;
   organizationId?: string;
+  relevanceExplanation?: string;
   onClose: () => void;
 }
 
@@ -472,7 +473,8 @@ function SuggestedActions({ trendTitle, organizationId }: SuggestedActionsProps)
 
 export function TrendDrilldownPanel({ 
   trend, 
-  organizationId, 
+  organizationId,
+  relevanceExplanation,
   onClose 
 }: TrendDrilldownPanelProps) {
   const { evidence, isLoading: evidenceLoading } = useTrendEvidence(trend.id);
@@ -506,6 +508,12 @@ export function TrendDrilldownPanel({
             <h2 className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">
               {trend.event_title}
             </h2>
+            {relevanceExplanation && (
+              <p className="text-sm text-[hsl(var(--portal-accent-blue))] flex items-center gap-1.5 mt-1">
+                <Target className="h-3.5 w-3.5" />
+                {relevanceExplanation}
+              </p>
+            )}
           </div>
           <V3Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
