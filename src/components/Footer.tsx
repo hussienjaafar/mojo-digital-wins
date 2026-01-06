@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { logger } from "@/lib/logger";
-import { Shield } from "lucide-react";
+import { Shield, ArrowRight } from "lucide-react";
 
 const Footer = () => {
   const { toast } = useToast();
@@ -130,14 +130,50 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Legal */}
+          {/* Recent Content */}
           <div>
-            <h4 className="font-bold mb-4">Legal</h4>
+            <h4 className="font-bold mb-4">Featured Content</h4>
             <ul className="space-y-2">
               <li>
                 <Link
+                  to="/blog/sms-fundraising-political-campaigns-guide"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors text-sm flex items-center gap-1 group"
+                >
+                  SMS Fundraising Guide
+                  <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/blog/digital-advertising-progressive-campaigns-meta-google"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors text-sm flex items-center gap-1 group"
+                >
+                  Digital Ads Strategy
+                  <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/case-studies/unity-justice-fund"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors text-sm flex items-center gap-1 group"
+                >
+                  Unity Justice Fund Case Study
+                  <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/case-studies/nasser-michigan"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors text-sm flex items-center gap-1 group"
+                >
+                  Nasser for Michigan Case Study
+                  <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              </li>
+              <li className="pt-2">
+                <Link
                   to="/privacy-policy"
-                  className="text-primary-foreground/90 hover:text-accent transition-colors"
+                  className="text-primary-foreground/60 hover:text-accent transition-colors text-xs"
                 >
                   Privacy Policy
                 </Link>

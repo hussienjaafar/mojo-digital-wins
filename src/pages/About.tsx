@@ -20,6 +20,45 @@ const About = () => {
   const graphic1 = useScrollAnimation({ threshold: 0.2 });
   const graphic2 = useScrollAnimation({ threshold: 0.2 });
 
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Molitico",
+    "url": "https://molitico.com",
+    "logo": "https://molitico.com/logo.png",
+    "description": "Full-service political consulting and digital campaign agency specializing in progressive campaigns, PACs, and nonprofits since 2016.",
+    "foundingDate": "2016",
+    "areaServed": "United States",
+    "knowsAbout": [
+      "Political Campaign Digital Strategy",
+      "SMS Fundraising",
+      "Digital Advertising",
+      "Email Marketing",
+      "Voter Polling",
+      "Progressive Politics"
+    ],
+    "sameAs": []
+  };
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://molitico.com"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "About",
+        "item": "https://molitico.com/about"
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen">
       <Helmet>
@@ -30,6 +69,12 @@ const About = () => {
         <meta property="og:description" content="We're organizers, strategists, and believers in progressive change who happen to be really good at digital marketing." />
         <meta property="og:url" content="https://molitico.com/about" />
         <meta property="og:type" content="website" />
+        <script type="application/ld+json">
+          {JSON.stringify(organizationSchema)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbSchema)}
+        </script>
       </Helmet>
       <ScrollProgressIndicator />
       <Navigation />

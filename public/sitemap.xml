@@ -8,7 +8,7 @@
   <!-- Homepage -->
   <url>
     <loc>https://molitico.com/</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -16,7 +16,7 @@
   <!-- About -->
   <url>
     <loc>https://molitico.com/about</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -24,7 +24,7 @@
   <!-- Services -->
   <url>
     <loc>https://molitico.com/services</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
@@ -32,7 +32,7 @@
   <!-- Case Studies -->
   <url>
     <loc>https://molitico.com/case-studies</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
@@ -40,49 +40,49 @@
   <!-- Individual Case Studies -->
   <url>
     <loc>https://molitico.com/case-studies/unity-justice-fund</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
   
   <url>
     <loc>https://molitico.com/case-studies/abdul-senate</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   
   <url>
     <loc>https://molitico.com/case-studies/nasser-michigan</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
   
   <url>
     <loc>https://molitico.com/case-studies/preston-pa</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   
   <url>
     <loc>https://molitico.com/case-studies/rashid-illinois</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
   
   <url>
     <loc>https://molitico.com/case-studies/arab-american-nonprofit</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
   
   <url>
     <loc>https://molitico.com/case-studies/new-policy</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -90,7 +90,7 @@
   <!-- Blog -->
   <url>
     <loc>https://molitico.com/blog</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
@@ -134,7 +134,7 @@
   <!-- Contact -->
   <url>
     <loc>https://molitico.com/contact</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -142,7 +142,7 @@
   <!-- Creative Showcase -->
   <url>
     <loc>https://molitico.com/creative-showcase</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
@@ -150,7 +150,7 @@
   <!-- Privacy Policy -->
   <url>
     <loc>https://molitico.com/privacy-policy</loc>
-    <lastmod>2025-01-15</lastmod>
+    <lastmod>2026-01-06</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
