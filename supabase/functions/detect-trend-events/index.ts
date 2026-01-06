@@ -750,40 +750,86 @@ serve(async (req) => {
       // Corroboration score
       const corroborationScore = Math.min(100, sourceCount * 25 + (newsCount > 0 && socialCount > 0 ? 25 : 0));
       
-      // Calculate confidence with baseline quality factor
-      const baselineQuality = hasHistoricalBaseline ? 1.0 : 0.6; // Penalize if no historical data
+      // Calculate baseline delta for ranking
+      const baselineDelta = baseline7d > 0 ? (currentHourlyRate - baseline7d) / baseline7d : currentHourlyRate;
+      const baselineDeltaPct = baselineDelta * 100;
+      
+      // ========================================
+      // TWITTER-LIKE RANKING: Velocity vs Baseline (z-score approach)
+      // Primary: spike velocity relative to baseline
+      // Secondary: corroboration + volume gate
+      // ========================================
+      
+      // Baseline quality factor
+      const baselineQuality = hasHistoricalBaseline ? 1.0 : 0.6;
+      
+      // Calculate z-score for velocity (how many standard deviations above normal)
+      // Using simplified z-score: (current - baseline) / max(baseline, 1)
+      // Capped to avoid extreme outliers dominating
+      const zScoreVelocity = Math.min(10, Math.max(-2, 
+        baseline7d > 0.5 
+          ? (currentHourlyRate - baseline7d) / Math.max(baseline7d, 0.5)
+          : Math.min(currentHourlyRate * 0.5, 5) // New topics get modest score
+      ));
+      
+      // Volume gate: minimum thresholds to prevent low-volume spikes
+      // Require either:
+      // - 2+ mentions in 1h (recent activity), OR
+      // - 5+ mentions in 24h (sustained interest), OR
+      // - 2+ sources (corroboration)
+      const meetsVolumeGate = current1h_deduped >= 2 || current24h_deduped >= 5 || sourceCount >= 2;
+      
+      // TREND_SCORE: Primary ranking metric (Twitter-like)
+      // Components:
+      // 1. Z-score velocity (0-100): How much above baseline (primary factor)
+      // 2. Corroboration boost (0-30): Cross-source verification
+      // 3. Volume bonus (0-20): Raw activity level (secondary)
+      const velocityScore = zScoreVelocity * 10 * baselineQuality; // 0-100
+      const corroborationBoost = sourceCount >= 2 
+        ? 15 + (newsCount > 0 && socialCount > 0 ? 15 : 0) // 15-30 for cross-source
+        : 0;
+      const volumeBonus = Math.min(20, Math.log2(current24h_deduped + 1) * 5);
+      
+      // Apply volume gate: no score if below minimum thresholds
+      const trendScore = meetsVolumeGate 
+        ? Math.max(0, velocityScore + corroborationBoost + volumeBonus)
+        : 0;
+      
+      // Keep confidence score for reference (but not primary ranking)
       const confidenceFactors = {
         baseline_delta: Math.min(30, Math.max(0, velocity / 10)) * baselineQuality,
         cross_source: Math.min(30, sourceCount * 8 + (newsCount > 0 ? 5 : 0)),
         volume: Math.min(20, current24h_deduped * 2),
         velocity: Math.min(20, Math.max(0, velocity / 10)) * baselineQuality,
+        z_score: zScoreVelocity, // Added for explainability
+        trend_score: trendScore, // Added for explainability
       };
-      const confidenceScore = Object.values(confidenceFactors).reduce((a, b) => a + b, 0);
+      const confidenceScore = Object.values(confidenceFactors)
+        .filter((v): v is number => typeof v === 'number' && !['z_score', 'trend_score'].includes(String(v)))
+        .reduce((a, b) => a + b, 0);
       
       // Determine trend stage
       const hoursOld = (now.getTime() - agg.first_seen_at.getTime()) / (1000 * 60 * 60);
       let trendStage = 'stable';
-      if (velocity > 100 && acceleration > 50 && hoursOld < 3) {
+      if (zScoreVelocity > 3 && acceleration > 50 && hoursOld < 3) {
         trendStage = 'emerging';
-      } else if (velocity > 150 && acceleration > 20) {
+      } else if (zScoreVelocity > 2 && acceleration > 20) {
         trendStage = 'surging';
-      } else if (velocity > 100 && acceleration < -20) {
+      } else if (zScoreVelocity > 1.5 && acceleration < -20) {
         trendStage = 'peaking';
-      } else if (velocity < -20 || (velocity < 50 && acceleration < -30)) {
+      } else if (zScoreVelocity < 0 || (zScoreVelocity < 0.5 && acceleration < -30)) {
         trendStage = 'declining';
-      } else if (velocity > 30) {
+      } else if (zScoreVelocity > 0.5) {
         trendStage = 'surging';
       }
       
-      // Determine if trending (using deduped counts)
-      // Relaxed: require confidence >= 40, 3+ deduped mentions in 24h, OR 2+ sources
-      const isTrending = confidenceScore >= 40 && current24h_deduped >= 3 && (sourceCount >= 2 || current24h_deduped >= 8);
+      // Determine if trending: use trend_score threshold + volume gate
+      const isTrending = trendScore >= 20 && meetsVolumeGate;
       
-      // Determine if breaking (requires cross-source + high velocity + recent + good baseline)
-      const baselineDelta = baseline7d > 0 ? (currentHourlyRate - baseline7d) / baseline7d : currentHourlyRate;
-      const isBreaking = hasHistoricalBaseline && (
-        (velocity > 150 && sourceCount >= 2 && newsCount >= 1 && hoursOld < 6) ||
-        (velocity > 300 && newsCount >= 1) ||
+      // Determine if breaking: high velocity spike + corroboration + recency
+      const isBreaking = hasHistoricalBaseline && meetsVolumeGate && (
+        (zScoreVelocity > 4 && sourceCount >= 2 && newsCount >= 1 && hoursOld < 6) ||
+        (zScoreVelocity > 6 && newsCount >= 1) ||
         (baselineDelta > 5 && sourceCount >= 2 && hoursOld < 12)
       );
       
@@ -818,7 +864,7 @@ serve(async (req) => {
       // Determine canonical label from cluster
       const canonicalLabel = cluster?.canonicalTitle || agg.event_title;
       
-      // Build event record with clustering info
+      // Build event record with clustering info + velocity-based ranking
       const eventRecord = {
         event_key: key,
         event_title: agg.event_title,
@@ -839,11 +885,16 @@ serve(async (req) => {
         velocity_1h: velocity1h,
         velocity_6h: velocity6h,
         acceleration,
+        // NEW: Velocity-based ranking fields
+        trend_score: Math.round(trendScore * 10) / 10, // Primary ranking metric
+        z_score_velocity: Math.round(zScoreVelocity * 100) / 100, // For explainability
         confidence_score: Math.round(confidenceScore),
         confidence_factors: {
           ...confidenceFactors,
           baseline_quality: baselineQuality,
+          baseline_delta_pct: Math.round(baselineDeltaPct * 10) / 10,
           has_historical_baseline: hasHistoricalBaseline,
+          meets_volume_gate: meetsVolumeGate,
           is_event_phrase: agg.is_event_phrase,
           related_entities_count: agg.related_entities.size,
           cluster_size: cluster?.memberKeys.size || 1,

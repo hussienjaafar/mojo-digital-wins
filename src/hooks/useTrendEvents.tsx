@@ -29,6 +29,10 @@ export interface TrendEvent {
   velocity_6h: number;
   acceleration: number;
   
+  // NEW: Velocity-based ranking (Twitter-like)
+  trend_score: number; // Primary ranking metric
+  z_score_velocity: number; // How many std devs above baseline
+  
   // Classification
   confidence_score: number;
   confidence_factors: {
@@ -36,6 +40,10 @@ export interface TrendEvent {
     cross_source?: number;
     volume?: number;
     velocity?: number;
+    z_score?: number;
+    trend_score?: number;
+    baseline_delta_pct?: number;
+    meets_volume_gate?: boolean;
     cluster_size?: number;
     authority_score?: number;
   } | null;
@@ -121,12 +129,14 @@ export const useTrendEvents = (options: UseTrendEventsOptions = {}) => {
     
     try {
       // Try to fetch from new trend_events_active view first
+      // Order by trend_score (velocity-based) instead of confidence_score
       let query = supabase
         .from('trend_events_active')
         .select('*')
         .gte('confidence_score', minConfidence)
         .order('is_breaking', { ascending: false })
-        .order('confidence_score', { ascending: false })
+        .order('trend_score', { ascending: false, nullsFirst: false })
+        .order('velocity', { ascending: false })
         .limit(limit);
       
       if (breakingOnly) {
@@ -143,13 +153,15 @@ export const useTrendEvents = (options: UseTrendEventsOptions = {}) => {
         // Fall back to direct table query if view doesn't exist yet
         console.warn('trend_events_active view error, falling back to table:', queryError.message);
         
+        // Fallback: order by trend_score (velocity-based)
         let fallbackQuery = supabase
           .from('trend_events')
           .select('*')
           .gte('confidence_score', minConfidence)
           .gte('last_seen_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
           .order('is_breaking', { ascending: false })
-          .order('confidence_score', { ascending: false })
+          .order('trend_score', { ascending: false, nullsFirst: false })
+          .order('velocity', { ascending: false })
           .limit(limit);
         
         if (breakingOnly) {
