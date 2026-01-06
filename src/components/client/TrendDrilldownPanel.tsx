@@ -7,14 +7,11 @@ import { useSuggestedActionsQuery } from "@/queries/useSuggestedActionsQuery";
 import { useTrendOutcomeByEventId, type OutcomeStats } from "@/hooks/useTrendOutcomes";
 import type { TrendEvent, TrendEvidence } from "@/hooks/useTrendEvents";
 
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { V3Badge } from "@/components/v3";
+import { V3Badge, V3Button } from "@/components/v3";
 
 import {
   Zap,
@@ -24,7 +21,6 @@ import {
   Sparkles,
   Newspaper,
   MessageCircle,
-  Radio,
   Target,
   Activity,
   BarChart3,
@@ -70,11 +66,11 @@ function EvidenceItem({ evidence }: EvidenceItemProps) {
         "flex items-start gap-3 p-3 rounded-lg",
         "bg-[hsl(var(--portal-bg-elevated))]",
         "border border-[hsl(var(--portal-border))]",
-        evidence.is_primary && "border-l-4 border-l-[hsl(var(--portal-accent-blue))]"
+        evidence.is_primary && "border-l-2 border-l-[hsl(var(--portal-accent-blue))]"
       )}
     >
       <div className={cn(
-        "p-2 rounded-lg shrink-0",
+        "p-1.5 rounded-lg shrink-0",
         evidence.source_type === 'bluesky' 
           ? "bg-blue-500/10 text-blue-500" 
           : "bg-[hsl(var(--portal-accent-purple)/0.15)] text-[hsl(var(--portal-accent-purple))]"
@@ -88,23 +84,21 @@ function EvidenceItem({ evidence }: EvidenceItemProps) {
             {evidence.source_title || "Untitled"}
           </h4>
           {evidence.is_primary && (
-            <Badge variant="outline" className="shrink-0 text-xs">
-              Primary
-            </Badge>
+            <V3Badge variant="outline" size="sm">Primary</V3Badge>
           )}
         </div>
         
-        <div className="flex items-center gap-2 text-xs text-[hsl(var(--portal-text-muted))]">
+        <p className="text-xs text-[hsl(var(--portal-text-muted))] flex items-center gap-1.5">
           <span>{evidence.source_domain || evidence.source_type}</span>
-          <span>•</span>
+          <span>·</span>
           <span>{formatDistanceToNow(publishedDate, { addSuffix: true })}</span>
           {evidence.contribution_score && (
             <>
-              <span>•</span>
+              <span>·</span>
               <span>{Math.round(evidence.contribution_score)}% weight</span>
             </>
           )}
-        </div>
+        </p>
 
         {evidence.source_url && (
           <a
@@ -221,7 +215,7 @@ function OutcomeLearning({ outcomeStats, isLoading }: OutcomeLearningProps) {
   if (isLoading) {
     return (
       <div className="space-y-2">
-        <Skeleton className="h-20 w-full" />
+        <div className="h-20 rounded-lg bg-[hsl(var(--portal-bg-secondary))] animate-pulse" />
       </div>
     );
   }
@@ -263,7 +257,7 @@ function OutcomeLearning({ outcomeStats, isLoading }: OutcomeLearningProps) {
               High Performing Topic
             </p>
             <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-              This topic shows {performanceDelta > 0 ? '+' : ''}{performanceDelta.toFixed(1)}% better response than baseline
+              {performanceDelta > 0 ? '+' : ''}{performanceDelta.toFixed(1)}% better than baseline
             </p>
           </div>
         </div>
@@ -276,14 +270,14 @@ function OutcomeLearning({ outcomeStats, isLoading }: OutcomeLearningProps) {
           <p className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">
             {responseRate.toFixed(1)}%
           </p>
-          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Response Rate</p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Response</p>
         </div>
         <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center">
           <DollarSign className="h-4 w-4 mx-auto mb-1 text-[hsl(var(--portal-success))]" />
           <p className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">
             {donationRate.toFixed(1)}%
           </p>
-          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Donation Rate</p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Donation</p>
         </div>
         <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center">
           {performanceDelta >= 0 ? (
@@ -306,18 +300,14 @@ function OutcomeLearning({ outcomeStats, isLoading }: OutcomeLearningProps) {
       {/* Sample Size & Confidence */}
       <div className="flex items-center justify-between text-xs p-2 rounded bg-[hsl(var(--portal-bg-secondary))]">
         <span className="text-[hsl(var(--portal-text-muted))]">
-          Based on {actionsSent.toLocaleString()} actions • {totalDonations} donations • ${totalAmount.toLocaleString()}
+          {actionsSent.toLocaleString()} actions · {totalDonations} donations · ${totalAmount.toLocaleString()}
         </span>
-        <Badge 
-          variant="outline" 
-          className={cn(
-            "text-xs",
-            confidenceLevel === 'high' && "bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))]",
-            confidenceLevel === 'medium' && "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]"
-          )}
+        <V3Badge 
+          variant={confidenceLevel === 'high' ? 'success' : 'warning'}
+          size="sm"
         >
-          {confidenceLevel === 'high' ? 'High Confidence' : 'Building Confidence'}
-        </Badge>
+          {confidenceLevel === 'high' ? 'High Confidence' : 'Building'}
+        </V3Badge>
       </div>
 
       {/* Learning Signal */}
@@ -343,7 +333,7 @@ function SuggestedActions({ trendTitle, organizationId }: SuggestedActionsProps)
   const { data, isLoading } = useSuggestedActionsQuery(organizationId);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Filter actions related to this trend (using topic and alert entity_name)
+  // Filter actions related to this trend
   const relatedActions = data?.actions.filter(action => {
     const searchTerm = trendTitle.toLowerCase().slice(0, 20);
     const topicMatch = action.topic?.toLowerCase().includes(searchTerm);
@@ -360,8 +350,8 @@ function SuggestedActions({ trendTitle, organizationId }: SuggestedActionsProps)
   if (isLoading) {
     return (
       <div className="space-y-2">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
+        <div className="h-16 rounded-lg bg-[hsl(var(--portal-bg-secondary))] animate-pulse" />
+        <div className="h-16 rounded-lg bg-[hsl(var(--portal-bg-secondary))] animate-pulse" />
       </div>
     );
   }
@@ -389,44 +379,30 @@ function SuggestedActions({ trendTitle, organizationId }: SuggestedActionsProps)
           )}
         >
           <div className="flex items-start justify-between gap-2 mb-2">
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-xs",
-                action.tier === "act_now" && "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))]",
-                action.tier === "consider" && "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))]",
-                action.tier === "watch" && "bg-[hsl(var(--portal-bg-elevated))] text-[hsl(var(--portal-text-muted))]"
-              )}
+            <V3Badge
+              variant={
+                action.tier === "act_now" ? "red" : 
+                action.tier === "consider" ? "amber" : "muted"
+              }
+              size="sm"
             >
               {action.tier === "act_now" ? "Act Now" : action.tier === "consider" ? "Consider" : "Watch"}
-            </Badge>
-            <Button
+            </V3Badge>
+            <V3Button
               variant="ghost"
               size="sm"
               onClick={() => handleCopy(action.sms_copy, action.id)}
-              className="h-7 px-2 text-xs gap-1"
+              leftIcon={copiedId === action.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
             >
-              {copiedId === action.id ? (
-                <>
-                  <Check className="h-3 w-3" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3 w-3" />
-                  Copy
-                </>
-              )}
-            </Button>
+              {copiedId === action.id ? "Copied" : "Copy"}
+            </V3Button>
           </div>
           <p className="text-sm text-[hsl(var(--portal-text-primary))]">
             {action.sms_copy}
           </p>
-          <div className="flex items-center gap-2 mt-2 text-xs text-[hsl(var(--portal-text-muted))]">
-            <span>{action.variant_type || "safe"} variant</span>
-            <span>•</span>
-            <span>{action.decision_score || 0}% decision score</span>
-          </div>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-2">
+            {action.variant_type || "safe"} variant · {action.decision_score || 0}% score
+          </p>
         </div>
       ))}
     </div>
@@ -447,9 +423,6 @@ export function TrendDrilldownPanel({
   const [showAllEvidence, setShowAllEvidence] = useState(false);
 
   const stageInfo = getTrendStageInfo(trend.trend_stage);
-  const hoursAgo = Math.floor(
-    (Date.now() - new Date(trend.first_seen_at).getTime()) / (1000 * 60 * 60)
-  );
 
   // Calculate baseline delta
   const baselineDelta = trend.baseline_7d > 0 
@@ -466,252 +439,137 @@ export function TrendDrilldownPanel({
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap mb-2">
               {trend.is_breaking && (
-                <Badge className="bg-[hsl(var(--portal-error))] text-white gap-1">
-                  <Zap className="h-3 w-3" />
-                  Breaking
-                </Badge>
+                <V3Badge variant="red" icon={<Zap className="h-3 w-3" />}>Breaking</V3Badge>
               )}
-              <Badge variant="outline" className={cn(stageInfo.bgColor, stageInfo.color)}>
-                {stageInfo.label}
-              </Badge>
-              <Badge 
-                variant="outline" 
-                className={cn("font-mono", getConfidenceColor(trend.confidence_score))}
-              >
-                {trend.confidence_score}% confidence
-              </Badge>
+              <V3Badge variant="outline">{stageInfo.label}</V3Badge>
+              <V3Badge variant="muted" className="font-mono">
+                {trend.confidence_score}%
+              </V3Badge>
             </div>
             <h2 className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">
               {trend.event_title}
             </h2>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className="shrink-0">
+          <V3Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
-          </Button>
+          </V3Button>
         </div>
 
         {trend.top_headline && (
-          <blockquote className="border-l-4 border-[hsl(var(--portal-accent-blue))] pl-4 italic text-sm text-[hsl(var(--portal-text-secondary))]">
+          <blockquote className="border-l-2 border-[hsl(var(--portal-accent-blue))] pl-4 italic text-sm text-[hsl(var(--portal-text-secondary))]">
             "{trend.top_headline}"
           </blockquote>
         )}
       </div>
 
-      <Separator />
+      <Separator className="bg-[hsl(var(--portal-border))]" />
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center">
-          <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
-            {baselineDelta > 0 ? '+' : ''}{Math.round(baselineDelta)}%
+      {/* Key Stats */}
+      <div className="grid grid-cols-4 gap-3">
+        <div className="text-center p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+          <TrendingUp className="h-4 w-4 mx-auto mb-1 text-[hsl(var(--portal-accent-blue))]" />
+          <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
+            {Math.round(trend.velocity)}%
           </p>
-          <p className="text-xs text-[hsl(var(--portal-text-muted))]">vs 7d Baseline</p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Velocity</p>
         </div>
-        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center">
-          <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
-            {trend.source_count}
-          </p>
-          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Source Types</p>
-        </div>
-        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center">
-          <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+        <div className="text-center p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+          <Newspaper className="h-4 w-4 mx-auto mb-1 text-[hsl(var(--portal-accent-purple))]" />
+          <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
             {trend.evidence_count}
           </p>
-          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Evidence Docs</p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Sources</p>
+        </div>
+        <div className="text-center p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+          <BarChart3 className="h-4 w-4 mx-auto mb-1 text-[hsl(var(--portal-success))]" />
+          <p className={cn(
+            "text-lg font-bold",
+            baselineDelta >= 0 
+              ? "text-[hsl(var(--portal-success))]" 
+              : "text-[hsl(var(--portal-error))]"
+          )}>
+            {baselineDelta > 0 ? '+' : ''}{baselineDelta.toFixed(0)}%
+          </p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">vs 7d</p>
+        </div>
+        <div className="text-center p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+          <Clock className="h-4 w-4 mx-auto mb-1 text-[hsl(var(--portal-text-muted))]" />
+          <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
+            {formatDistanceToNow(new Date(trend.first_seen_at), { addSuffix: false }).replace(' hours', 'h').replace(' minutes', 'm').replace('about ', '')}
+          </p>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))]">Age</p>
         </div>
       </div>
 
-      {/* More Details - Collapsible */}
-      <CollapsibleSection 
-        title="Velocity & Metrics" 
-        icon={<Activity className="h-4 w-4" />}
-        defaultOpen={false}
-      >
-        {/* Velocity Metrics */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-secondary))]">
-            <div className="flex items-center gap-1 mb-1 text-xs text-[hsl(var(--portal-text-muted))]">
-              <Clock className="h-3 w-3" />
-              1h
-            </div>
-            <p className="font-semibold text-[hsl(var(--portal-text-primary))]">
-              {trend.current_1h} mentions
-            </p>
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-              {Math.round(trend.velocity_1h)}% velocity
-            </p>
-          </div>
-          <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-secondary))]">
-            <div className="flex items-center gap-1 mb-1 text-xs text-[hsl(var(--portal-text-muted))]">
-              <Clock className="h-3 w-3" />
-              6h
-            </div>
-            <p className="font-semibold text-[hsl(var(--portal-text-primary))]">
-              {trend.current_6h} mentions
-            </p>
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-              {Math.round(trend.velocity_6h)}% velocity
-            </p>
-          </div>
-          <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-secondary))]">
-            <div className="flex items-center gap-1 mb-1 text-xs text-[hsl(var(--portal-text-muted))]">
-              <Activity className="h-3 w-3" />
-              Accel
-            </div>
-            <p className="font-semibold text-[hsl(var(--portal-text-primary))]">
-              {trend.acceleration > 0 ? '+' : ''}{Math.round(trend.acceleration)}%
-            </p>
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-              {trend.acceleration > 20 ? 'Speeding up' : trend.acceleration < -20 ? 'Slowing' : 'Steady'}
-            </p>
-          </div>
-        </div>
+      <Separator className="bg-[hsl(var(--portal-border))]" />
 
+      {/* Collapsible Sections */}
+      <div className="space-y-6">
         {/* Confidence Breakdown */}
-        <ConfidenceBreakdown trend={trend} />
-      </CollapsibleSection>
+        <CollapsibleSection
+          title="Confidence Breakdown"
+          icon={<Target className="h-4 w-4 text-[hsl(var(--portal-accent-blue))]" />}
+          defaultOpen
+        >
+          <ConfidenceBreakdown trend={trend} />
+        </CollapsibleSection>
 
-      <Separator />
+        {/* Outcome Learning */}
+        <CollapsibleSection
+          title="Outcome Learning"
+          icon={<Award className="h-4 w-4 text-[hsl(var(--portal-success))]" />}
+        >
+          <OutcomeLearning outcomeStats={outcomeStats} isLoading={outcomeLoading} />
+        </CollapsibleSection>
 
-      {/* Outcome Learning Section - Collapsible */}
-      <CollapsibleSection 
-        title="Outcome Learning" 
-        icon={<Award className="h-4 w-4" />}
-        defaultOpen={outcomeStats?.isHighPerforming || false}
-      >
-        <OutcomeLearning outcomeStats={outcomeStats} isLoading={outcomeLoading} />
-      </CollapsibleSection>
+        {/* Suggested Actions */}
+        <CollapsibleSection
+          title="Suggested Actions"
+          icon={<Sparkles className="h-4 w-4 text-[hsl(var(--portal-warning))]" />}
+        >
+          <SuggestedActions 
+            trendTitle={trend.event_title} 
+            organizationId={organizationId} 
+          />
+        </CollapsibleSection>
 
-      <Separator />
-
-      {/* Evidence Timeline - Collapsible */}
-      <CollapsibleSection 
-        title={`Evidence Timeline (${evidence.length})`}
-        icon={<Newspaper className="h-4 w-4" />}
-        defaultOpen={true}
-      >
-        {evidenceLoading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}
-          </div>
-        ) : evidence.length === 0 ? (
-          <p className="text-sm text-[hsl(var(--portal-text-muted))] text-center py-4">
-            No evidence documents available
-          </p>
-        ) : (
-          <>
+        {/* Evidence Timeline */}
+        <CollapsibleSection
+          title={`Evidence (${evidence.length})`}
+          icon={<Newspaper className="h-4 w-4 text-[hsl(var(--portal-accent-purple))]" />}
+          defaultOpen
+        >
+          {evidenceLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-16 rounded-lg bg-[hsl(var(--portal-bg-secondary))] animate-pulse" />
+              ))}
+            </div>
+          ) : evidence.length === 0 ? (
+            <p className="text-sm text-[hsl(var(--portal-text-muted))] text-center py-4">
+              No evidence sources available
+            </p>
+          ) : (
             <div className="space-y-2">
               {displayedEvidence.map((e) => (
                 <EvidenceItem key={e.id} evidence={e} />
               ))}
+              {evidence.length > 5 && (
+                <V3Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllEvidence(!showAllEvidence)}
+                  className="w-full"
+                >
+                  {showAllEvidence 
+                    ? `Show less` 
+                    : `Show all ${evidence.length} sources`}
+                </V3Button>
+              )}
             </div>
-            {evidence.length > 5 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAllEvidence(!showAllEvidence)}
-                className="w-full text-xs mt-2"
-              >
-                {showAllEvidence ? (
-                  <>
-                    <ChevronUp className="h-3 w-3 mr-1" />
-                    Show less
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-3 w-3 mr-1" />
-                    Show all {evidence.length} sources
-                  </>
-                )}
-              </Button>
-            )}
-          </>
-        )}
-      </CollapsibleSection>
-
-      <Separator />
-
-      {/* Suggested Actions - Collapsible */}
-      <CollapsibleSection 
-        title="Suggested Actions"
-        icon={<Sparkles className="h-4 w-4" />}
-        defaultOpen={false}
-      >
-        <SuggestedActions 
-          trendTitle={trend.event_title} 
-          organizationId={organizationId} 
-        />
-      </CollapsibleSection>
-
-      {/* Timing Info */}
-      {(() => {
-        const lastSeenMs = Date.now() - new Date(trend.last_seen_at).getTime();
-        const lastSeenMinutes = Math.floor(lastSeenMs / (1000 * 60));
-        const lastSeenHours = Math.floor(lastSeenMs / (1000 * 60 * 60));
-        
-        const getLastSeenLabel = () => {
-          if (lastSeenMinutes < 60) return `${lastSeenMinutes} min ago`;
-          if (lastSeenHours < 24) return `${lastSeenHours} hours ago`;
-          return `${Math.floor(lastSeenHours / 24)} days ago`;
-        };
-        
-        const getFreshnessState = (): 'fresh' | 'recent' | 'aging' | 'stale' => {
-          if (trend.freshness) return trend.freshness;
-          if (lastSeenMinutes < 30) return 'fresh';
-          if (lastSeenHours < 6) return 'recent';
-          if (lastSeenHours < 24) return 'aging';
-          return 'stale';
-        };
-        
-        const freshnessState = getFreshnessState();
-        
-        const freshnessConfig = {
-          fresh: { 
-            label: 'Fresh', 
-            color: 'text-[hsl(var(--portal-success))]', 
-            bg: 'bg-[hsl(var(--portal-success)/0.1)]',
-            description: 'New evidence in last 30 minutes'
-          },
-          recent: { 
-            label: 'Recent', 
-            color: 'text-[hsl(var(--portal-accent-blue))]', 
-            bg: 'bg-[hsl(var(--portal-accent-blue)/0.1)]',
-            description: 'Updated within 6 hours'
-          },
-          aging: { 
-            label: 'Aging', 
-            color: 'text-[hsl(var(--portal-warning))]', 
-            bg: 'bg-[hsl(var(--portal-warning)/0.1)]',
-            description: 'No new evidence for 6-24 hours'
-          },
-          stale: { 
-            label: 'Stale', 
-            color: 'text-[hsl(var(--portal-text-muted))]', 
-            bg: 'bg-[hsl(var(--portal-bg-elevated))]',
-            description: 'No updates for 24+ hours'
-          },
-        };
-        
-        const config = freshnessConfig[freshnessState];
-        
-        return (
-          <div className="text-xs pt-2 border-t border-[hsl(var(--portal-border))] space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-[hsl(var(--portal-text-muted))]">
-                <Clock className="h-3 w-3" />
-                <span>First seen {hoursAgo}h ago</span>
-              </div>
-              <Badge variant="outline" className={cn("text-xs gap-1", config.bg, config.color)}>
-                {config.label}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between text-[hsl(var(--portal-text-muted))]">
-              <span>Last updated: {getLastSeenLabel()}</span>
-              <span className="text-[10px]">{config.description}</span>
-            </div>
-          </div>
-        );
-      })()}
+          )}
+        </CollapsibleSection>
+      </div>
     </div>
   );
 }
