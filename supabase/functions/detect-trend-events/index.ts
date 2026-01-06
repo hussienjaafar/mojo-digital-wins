@@ -134,14 +134,15 @@ const TOPIC_BLOCKLIST: Set<string> = new Set([
   'watch', 'video', 'photo', 'image', 'live', 'opinion', 'editorial',
 ]);
 
-// Quality thresholds
+// Quality thresholds - PHASE 2: Strengthened single-word suppression
 const QUALITY_THRESHOLDS = {
   // Minimum deduped mentions for any topic
   MIN_MENTIONS_DEFAULT: 3,
-  // Single-word topics need higher thresholds
-  MIN_MENTIONS_SINGLE_WORD: 5,
+  // PHASE 2: Single-word topics need MUCH higher thresholds
+  MIN_MENTIONS_SINGLE_WORD: 8,        // Increased from 5
   MIN_SOURCES_SINGLE_WORD: 2,
-  MIN_NEWS_SOURCES_SINGLE_WORD: 1,
+  MIN_NEWS_SOURCES_SINGLE_WORD: 2,    // Increased from 1 - require corroboration
+  MIN_TIER12_SOURCES_SINGLE_WORD: 1,  // NEW: Require at least one tier1/tier2 source
   // Source diversity requirements
   MIN_SOURCES_FOR_TRENDING: 2,
   MIN_NEWS_FOR_LOW_SOCIAL: 1,
@@ -150,8 +151,18 @@ const QUALITY_THRESHOLDS = {
   MIN_24H_MENTIONS: 5,
 };
 
+// PHASE 2: Single-word entities that are allowed (well-known acronyms, proper nouns)
+const ALLOWED_SINGLE_WORD_ENTITIES = new Set([
+  'nato', 'fbi', 'cia', 'doj', 'dhs', 'ice', 'doge', 'epa', 'fda', 'cdc',
+  'nsa', 'irs', 'sec', 'ftc', 'fcc', 'fec', 'nlrb', 'osha', 'usps',
+  'scotus', 'potus', 'flotus', 'vpotus', 'hamas', 'hezbollah', 'isis',
+  'gaza', 'ukraine', 'russia', 'china', 'israel', 'taiwan', 'iran',
+  'musk', 'bezos', 'zuckerberg', 'trump', 'biden', 'vance', 'walz',
+]);
+
 /**
  * Check if a topic passes quality gates
+ * PHASE 2: Strengthened single-word suppression with explainability
  */
 function passesQualityGates(
   topicKey: string,
@@ -161,8 +172,10 @@ function passesQualityGates(
   newsCount: number,
   socialCount: number,
   current1h: number,
-  current24h: number
-): { passes: boolean; reason?: string } {
+  current24h: number,
+  tier1Count: number = 0,
+  tier2Count: number = 0
+): { passes: boolean; reason?: string; singleWordExplain?: string } {
   // Check blocklist
   const normalizedKey = topicKey.toLowerCase();
   const normalizedTitle = topicTitle.toLowerCase();
@@ -177,22 +190,62 @@ function passesQualityGates(
     return { passes: false, reason: 'all_words_blocklisted' };
   }
   
-  // Single-word topics require higher thresholds
+  // PHASE 2: Single-word topics require MUCH higher thresholds + tier corroboration
   const isSingleWord = words.length === 1;
   
   if (isSingleWord) {
+    const isAllowedEntity = ALLOWED_SINGLE_WORD_ENTITIES.has(normalizedKey);
+    const hasTier12 = tier1Count > 0 || tier2Count > 0;
+    
+    // Build explainability string
+    const explains: string[] = [];
+    
     // Must meet higher mention threshold
     if (totalMentionsDeduped < QUALITY_THRESHOLDS.MIN_MENTIONS_SINGLE_WORD) {
-      return { passes: false, reason: 'single_word_low_volume' };
+      return { 
+        passes: false, 
+        reason: 'single_word_low_volume',
+        singleWordExplain: `Needs ${QUALITY_THRESHOLDS.MIN_MENTIONS_SINGLE_WORD}+ mentions (has ${totalMentionsDeduped})`
+      };
     }
+    explains.push(`${totalMentionsDeduped} mentions`);
+    
     // Must have source diversity
     if (sourceCount < QUALITY_THRESHOLDS.MIN_SOURCES_SINGLE_WORD) {
-      return { passes: false, reason: 'single_word_low_sources' };
+      return { 
+        passes: false, 
+        reason: 'single_word_low_sources',
+        singleWordExplain: `Needs ${QUALITY_THRESHOLDS.MIN_SOURCES_SINGLE_WORD}+ source types (has ${sourceCount})`
+      };
     }
+    explains.push(`${sourceCount} source types`);
+    
     // Must have at least one news source for credibility
     if (newsCount < QUALITY_THRESHOLDS.MIN_NEWS_SOURCES_SINGLE_WORD) {
-      return { passes: false, reason: 'single_word_no_news' };
+      return { 
+        passes: false, 
+        reason: 'single_word_low_news',
+        singleWordExplain: `Needs ${QUALITY_THRESHOLDS.MIN_NEWS_SOURCES_SINGLE_WORD}+ news sources (has ${newsCount})`
+      };
     }
+    explains.push(`${newsCount} news sources`);
+    
+    // PHASE 2: Must have tier1/tier2 corroboration OR be a known entity
+    if (!hasTier12 && !isAllowedEntity) {
+      return { 
+        passes: false, 
+        reason: 'single_word_no_tier12',
+        singleWordExplain: `Single-word "${topicTitle}" needs tier1/tier2 source or be well-known acronym`
+      };
+    }
+    
+    if (isAllowedEntity) explains.push('known entity');
+    if (hasTier12) explains.push(`tier1/2: ${tier1Count + tier2Count}`);
+    
+    // Single-word passed all gates - log why
+    console.log(`[detect-trend-events] Single-word PASSED: "${topicTitle}" (${explains.join(', ')})`);
+    
+    return { passes: true, singleWordExplain: explains.join(', ') };
   } else {
     // Multi-word topics: standard threshold
     if (totalMentionsDeduped < QUALITY_THRESHOLDS.MIN_MENTIONS_DEFAULT) {
@@ -898,7 +951,17 @@ serve(async (req) => {
                           (agg.by_source_deduped.bluesky > 0 ? 1 : 0);
       
       // ========================================
+      // PHASE 2: Get tier distribution BEFORE quality gates
+      // ========================================
+      
+      // Get tier distribution from aggregate
+      const tier1Count = agg.by_tier_deduped.tier1;
+      const tier2Count = agg.by_tier_deduped.tier2;
+      const tier3Count = agg.by_tier_deduped.tier3;
+      
+      // ========================================
       // QUALITY GATES: Filter low-quality topics
+      // PHASE 2: Now includes tier counts for single-word suppression
       // ========================================
       const qualityResult = passesQualityGates(
         key,
@@ -908,7 +971,9 @@ serve(async (req) => {
         newsCount,
         socialCount,
         current1h_deduped,
-        current24h_deduped
+        current24h_deduped,
+        tier1Count,  // PHASE 2: Pass tier counts
+        tier2Count   // PHASE 2: Pass tier counts
       );
       
       if (!qualityResult.passes) {
@@ -952,12 +1017,8 @@ serve(async (req) => {
       
       // ========================================
       // PHASE 2: TIER WEIGHTING & CORROBORATION
+      // (tier counts already defined above for quality gates)
       // ========================================
-      
-      // Get tier distribution from aggregate
-      const tier1Count = agg.by_tier_deduped.tier1;
-      const tier2Count = agg.by_tier_deduped.tier2;
-      const tier3Count = agg.by_tier_deduped.tier3;
       
       // Check if tier1/tier2 source is present (for corroboration)
       const hasTier12Corroboration = tier1Count > 0 || tier2Count > 0;
@@ -1107,12 +1168,32 @@ serve(async (req) => {
       // Determine canonical label from cluster
       const canonicalLabel = cluster?.canonicalTitle || agg.event_title;
       
-      // Build event record with clustering info + velocity-based ranking
+      // PHASE 2: Determine label_quality based on event phrase detection
+      const words = agg.event_title.split(/\s+/);
+      let labelQuality: 'event_phrase' | 'entity_only' | 'fallback_generated' = 'entity_only';
+      
+      if (agg.is_event_phrase && words.length >= 2) {
+        // Multi-word event phrase from AI extraction
+        labelQuality = 'event_phrase';
+      } else if (words.length === 1) {
+        // Single-word entity label
+        labelQuality = 'entity_only';
+      } else {
+        // Multi-word but not identified as event phrase (likely fallback)
+        labelQuality = 'fallback_generated';
+      }
+      
+      // Build related entities array from the aggregate
+      const relatedEntitiesArray = Array.from(agg.related_entities).slice(0, 10);
+      
+      // Build event record with clustering info + velocity-based ranking + PHASE 2 label quality
       const eventRecord = {
         event_key: key,
         event_title: agg.event_title,
         canonical_label: canonicalLabel, // Best label for display
         is_event_phrase: agg.is_event_phrase,
+        label_quality: labelQuality,  // PHASE 2: Track label source quality
+        related_entities: relatedEntitiesArray,  // PHASE 2: Entities contributing to this phrase
         related_phrases: relatedPhrases, // Alternate phrasings from cluster
         cluster_id: cluster && cluster.memberKeys.size > 1 ? clusterKey : null,
         first_seen_at: agg.first_seen_at.toISOString(),
@@ -1139,6 +1220,8 @@ serve(async (req) => {
           has_historical_baseline: hasHistoricalBaseline,
           meets_volume_gate: meetsVolumeGate,
           is_event_phrase: agg.is_event_phrase,
+          label_quality: labelQuality,  // PHASE 2: Include in explainability
+          single_word_explain: qualityResult.singleWordExplain || null, // PHASE 2: Why single-word passed
           related_entities_count: agg.related_entities.size,
           cluster_size: cluster?.memberKeys.size || 1,
           authority_score: agg.authority_score,

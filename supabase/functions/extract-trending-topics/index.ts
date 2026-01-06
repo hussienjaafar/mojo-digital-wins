@@ -197,41 +197,44 @@ serve(async (req) => {
         `ID: ${a.id}\nTitle: ${a.title}\nContent: ${(a.description || a.content || '').substring(0, 500)}`
       ).join('\n\n---\n\n');
 
-      // Enhanced NER + Keyphrase extraction prompt
-      const extractionPrompt = `Extract named entities AND multi-word event phrases from these headlines for Twitter-style trending.
+      // PHASE 2: Enhanced NER + Keyphrase extraction prompt - prioritizes event phrases
+      const extractionPrompt = `Extract EVENT PHRASES (primary) and named entities (secondary) from these headlines for Twitter-style trending.
 
 ${articlesText}
 
-Extract TWO types of items:
+For EACH headline, extract in ORDER OF PRIORITY:
 
-1. **ENTITIES** (WHO/WHERE/WHAT specific thing):
-   - PERSON: Full canonical names ("Donald Trump", NOT "Trump")
-   - ORG: Organizations ("Supreme Court", "FBI", "Democratic Party")
-   - GPE: Locations ("Gaza", "Texas", "Washington DC")
-   - Single-word only for acronyms: "NATO", "FBI", "DOGE", "ICE"
-
-2. **EVENT PHRASES** (2-5 word descriptive trends like Twitter):
-   Examples:
-   - "Trump Tariff Policy" (NOT just "Donald Trump")
-   - "Gaza Ceasefire Talks" (NOT just "Gaza")
-   - "FBI Director Fired"
-   - "Supreme Court Abortion Ruling"
-   - "Texas Border Crisis"
-   - "Pete Hegseth Pentagon Shake-up"
+1. **EVENT PHRASES** (PRIMARY - these become the trend labels):
+   Multi-word verb-centered phrases (2-5 words) that describe WHAT is happening:
+   - GOOD: "House Passes Border Bill", "Trump Fires FBI Director", "Gaza Ceasefire Collapses"
+   - GOOD: "Supreme Court Blocks Abortion Ban", "DOJ Indicts Senator", "Texas Sues Biden"
+   - BAD: Just names like "Donald Trump", "FBI", "Gaza" (these are entities, not events)
    
-   Event phrases capture WHAT is happening, not just WHO.
+   REQUIRE: Subject + Verb + Object pattern when possible
+   - "[Who] [Does What] [To Whom/What]"
+   
+   Mark these with type: "event_phrase"
+
+2. **ENTITIES** (SECONDARY - metadata, not primary labels):
+   - PERSON: Full canonical names ("Donald Trump", NOT "Trump")
+   - ORG: Organizations ("Supreme Court", "FBI", "Democratic Party")  
+   - GPE: Locations ("Gaza", "Texas", "Washington DC")
+   - Single-word only for well-known acronyms: "NATO", "FBI", "DOGE", "ICE"
+   
+   Mark these with appropriate type: "person", "org", "location"
 
 CRITICAL RULES:
+- PRIORITIZE event phrases over single entities as the trending topic
+- Event phrases MUST describe an action/event, not just a person or place
 - Use FULL NAMES for people: "Donald Trump" not "Trump", "Joe Biden" not "Biden"
-- Event phrases must be 2-5 words and descriptive
 - DO NOT include news publishers (CNN, Reuters, AP, BBC)
 - DO NOT extract categories ("immigration", "politics", "healthcare")
-- Prefer EVENT PHRASES over single entities when the headline describes an action
+- Each headline should ideally produce at least ONE event phrase
 
-Return JSON array with both entities AND event phrases mixed:
-[{"topic": "Trump Tariff Policy", "keywords": ["tariff", "trade", "policy"], "relevance": 0.95, "type": "event_phrase"},
+Return JSON array:
+[{"topic": "Trump Fires FBI Director", "keywords": ["trump", "fbi", "fired"], "relevance": 0.95, "type": "event_phrase"},
  {"topic": "Donald Trump", "keywords": ["trump", "president"], "relevance": 0.8, "type": "person"},
- {"topic": "Gaza", "keywords": ["gaza", "israel"], "relevance": 0.7, "type": "location"}]`;
+ {"topic": "FBI", "keywords": ["fbi", "director"], "relevance": 0.7, "type": "org"}]`;
 
       try {
         // Create timeout promise
@@ -252,7 +255,7 @@ Return JSON array with both entities AND event phrases mixed:
               messages: [
                 {
                   role: 'system',
-                  content: 'You extract ONLY proper nouns (names) from news. NOT topics, NOT themes, NOT categories - ONLY names of people, places, organizations, events, bills. Think: WHO, WHERE, WHAT specific thing. Always respond with valid JSON arrays.'
+                  content: 'You extract verb-centered event phrases (primary) and proper noun entities (secondary) from news headlines. Event phrases describe WHAT HAPPENED with Subject + Verb + Object structure. Entities are metadata. Always respond with valid JSON arrays.'
                 },
                 {
                   role: 'user',
