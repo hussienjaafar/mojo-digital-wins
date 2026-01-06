@@ -7547,6 +7547,7 @@ export type Database = {
       trend_events: {
         Row: {
           acceleration: number | null
+          alias_variants: string[] | null
           baseline_30d: number | null
           baseline_7d: number | null
           baseline_updated_at: string | null
@@ -7592,6 +7593,7 @@ export type Database = {
         }
         Insert: {
           acceleration?: number | null
+          alias_variants?: string[] | null
           baseline_30d?: number | null
           baseline_7d?: number | null
           baseline_updated_at?: string | null
@@ -7637,6 +7639,7 @@ export type Database = {
         }
         Update: {
           acceleration?: number | null
+          alias_variants?: string[] | null
           baseline_30d?: number | null
           baseline_7d?: number | null
           baseline_updated_at?: string | null
@@ -9444,9 +9447,9 @@ export type Database = {
       trend_events_active: {
         Row: {
           acceleration: number | null
+          alias_variants: string[] | null
           baseline_30d: number | null
           baseline_7d: number | null
-          baseline_delta_pct: number | null
           baseline_updated_at: string | null
           canonical_label: string | null
           cluster_id: string | null
@@ -9465,21 +9468,18 @@ export type Database = {
           event_title: string | null
           evidence_count: number | null
           first_seen_at: string | null
-          freshness: string | null
           id: string | null
           is_breaking: boolean | null
           is_event_phrase: boolean | null
           is_trending: boolean | null
           is_verified: boolean | null
           last_seen_at: string | null
-          news_evidence_count: number | null
           news_source_count: number | null
           peak_at: string | null
           related_phrases: string[] | null
           related_topics: string[] | null
           sentiment_label: string | null
           sentiment_score: number | null
-          social_evidence_count: number | null
           social_source_count: number | null
           source_count: number | null
           top_headline: string | null
@@ -9493,9 +9493,9 @@ export type Database = {
         }
         Insert: {
           acceleration?: number | null
+          alias_variants?: string[] | null
           baseline_30d?: number | null
           baseline_7d?: number | null
-          baseline_delta_pct?: never
           baseline_updated_at?: string | null
           canonical_label?: string | null
           cluster_id?: string | null
@@ -9514,21 +9514,18 @@ export type Database = {
           event_title?: string | null
           evidence_count?: number | null
           first_seen_at?: string | null
-          freshness?: never
           id?: string | null
           is_breaking?: boolean | null
           is_event_phrase?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
           last_seen_at?: string | null
-          news_evidence_count?: never
           news_source_count?: number | null
           peak_at?: string | null
           related_phrases?: string[] | null
           related_topics?: string[] | null
           sentiment_label?: string | null
           sentiment_score?: number | null
-          social_evidence_count?: never
           social_source_count?: number | null
           source_count?: number | null
           top_headline?: string | null
@@ -9542,9 +9539,9 @@ export type Database = {
         }
         Update: {
           acceleration?: number | null
+          alias_variants?: string[] | null
           baseline_30d?: number | null
           baseline_7d?: number | null
-          baseline_delta_pct?: never
           baseline_updated_at?: string | null
           canonical_label?: string | null
           cluster_id?: string | null
@@ -9563,21 +9560,18 @@ export type Database = {
           event_title?: string | null
           evidence_count?: number | null
           first_seen_at?: string | null
-          freshness?: never
           id?: string | null
           is_breaking?: boolean | null
           is_event_phrase?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
           last_seen_at?: string | null
-          news_evidence_count?: never
           news_source_count?: number | null
           peak_at?: string | null
           related_phrases?: string[] | null
           related_topics?: string[] | null
           sentiment_label?: string | null
           sentiment_score?: number | null
-          social_evidence_count?: never
           social_source_count?: number | null
           source_count?: number | null
           top_headline?: string | null
