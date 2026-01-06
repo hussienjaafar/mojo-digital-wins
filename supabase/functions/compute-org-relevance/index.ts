@@ -69,6 +69,7 @@ interface OrgProfile {
   allies?: string[];
   opponents?: string[];
   priority_lanes?: string[];
+  embedding?: number[];
 }
 
 interface InterestTopic {
@@ -95,6 +96,47 @@ interface TrendEvent {
   current_6h?: number;
   current_24h?: number;
   source_count?: number;
+  embedding?: number[] | null;
+}
+
+// Cosine similarity for semantic matching
+function cosineSimilarity(a: number[] | null, b: number[] | null): number {
+  if (!a || !b || a.length !== b.length || a.length === 0) return 0;
+  
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  
+  const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
+  if (magnitude === 0) return 0;
+  
+  return dotProduct / magnitude;
+}
+
+// Parse pgvector format to number array
+function parseEmbedding(embedding: any): number[] | null {
+  if (!embedding) return null;
+  
+  try {
+    // If already an array, return it
+    if (Array.isArray(embedding)) return embedding;
+    
+    // If string format [x,y,z,...], parse it
+    if (typeof embedding === 'string') {
+      const cleaned = embedding.replace(/^\[|\]$/g, '');
+      return cleaned.split(',').map(Number);
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 interface OrgRelevanceScore {
@@ -176,7 +218,8 @@ function calculateRelevance(
   profile: OrgProfile | null,
   interestTopics: InterestTopic[],
   interestEntities: InterestEntity[],
-  outcomeCorrelation?: OutcomeCorrelation
+  outcomeCorrelation?: OutcomeCorrelation,
+  trendEmbedding?: number[] | null
 ): OrgRelevanceScore {
   const result: OrgRelevanceScore = {
     organization_id: profile?.organization_id || '',
@@ -338,7 +381,23 @@ function calculateRelevance(
     result.explanation.reasons.push(`Multi-source: ${trendSourceCount} sources (+5)`);
   }
 
-  // 10. Outcome-based learning boost (up to 10 points)
+  // 10. Semantic similarity boost (up to 20 points)
+  // Uses embedding cosine similarity for deeper semantic matching
+  if (profile?.embedding && trendEmbedding) {
+    const similarity = cosineSimilarity(profile.embedding, trendEmbedding);
+    
+    if (similarity > 0.3) {
+      // Scale similarity (0.3 to 0.9 range) to points (5 to 20)
+      const semanticBoost = Math.min(20, Math.round((similarity - 0.3) * 33.33) + 5);
+      score += semanticBoost;
+      result.explanation.score_breakdown.semantic_match = semanticBoost;
+      result.explanation.reasons.push(
+        `Semantic match: ${(similarity * 100).toFixed(0)}% similarity (+${semanticBoost})`
+      );
+    }
+  }
+
+  // 11. Outcome-based learning boost (up to 10 points)
   // Conservative boost based on positive outcome signals
   if (outcomeCorrelation?.should_boost_relevance) {
     let outcomeBoost = 0;
@@ -414,14 +473,19 @@ serve(async (req) => {
     if (orgsError) throw orgsError;
     console.log(`📊 Processing ${orgs?.length || 0} active organizations`);
 
-    // Get all org profiles
+    // Get all org profiles WITH embeddings
     const { data: profiles } = await supabase
       .from('organization_profiles')
       .select('*');
 
     const profileMap = new Map<string, OrgProfile>();
     for (const p of profiles || []) {
-      profileMap.set(p.organization_id, p as OrgProfile);
+      // Parse embedding from pgvector format
+      const profile: OrgProfile = {
+        ...p,
+        embedding: parseEmbedding(p.embedding),
+      };
+      profileMap.set(p.organization_id, profile);
     }
 
     // Get interest topics for all orgs
@@ -450,16 +514,20 @@ serve(async (req) => {
       entitiesMap.get(e.organization_id)!.push(e as InterestEntity);
     }
 
-    // Get current trends from trend_events ONLY (no more trend_clusters fallback)
+    // Get current trends from trend_events WITH embeddings
     const { data: trendEvents } = await supabase
       .from('trend_events')
-      .select('id, event_key, event_title, velocity, is_trending, is_breaking, confidence_score, current_1h, current_6h, current_24h, source_count')
+      .select('id, event_key, event_title, velocity, is_trending, is_breaking, confidence_score, current_1h, current_6h, current_24h, source_count, embedding')
       .eq('is_trending', true)
       .gte('last_seen_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
       .order('velocity', { ascending: false })
       .limit(150);
-
-    const trends: TrendEvent[] = trendEvents || [];
+    
+    // Parse trend embeddings
+    const trends: TrendEvent[] = (trendEvents || []).map(t => ({
+      ...t,
+      embedding: parseEmbedding(t.embedding),
+    }));
     console.log(`📈 Scoring ${trends.length} trend_events for ${orgs?.length || 0} orgs`);
 
     // Fetch recent outcome correlations for learning signal (last 7 days)
@@ -488,6 +556,7 @@ serve(async (req) => {
     const scoresToUpsert: any[] = [];
     let highPriorityCount = 0;
     let outcomeBoostCount = 0;
+    let semanticMatchCount = 0;
 
     for (const org of orgs || []) {
       const profile = profileMap.get(org.id) || null;
@@ -508,11 +577,17 @@ serve(async (req) => {
           profile ? { ...profile, organization_id: org.id } : { organization_id: org.id },
           interestTopics,
           interestEntities,
-          outcomeCorrelation
+          outcomeCorrelation,
+          trend.embedding
         );
 
         if (outcomeCorrelation && relevance.explanation.score_breakdown.outcome_boost) {
           outcomeBoostCount++;
+        }
+        
+        // Track semantic match count
+        if (relevance.explanation.score_breakdown.semantic_match !== undefined) {
+          semanticMatchCount++;
         }
 
         // Only store scores above minimum threshold
@@ -542,7 +617,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`💾 Upserting ${scoresToUpsert.length} org-trend scores (${highPriorityCount} high priority, ${outcomeBoostCount} with outcome boost)`);
+    console.log(`💾 Upserting ${scoresToUpsert.length} org-trend scores (${highPriorityCount} high priority, ${outcomeBoostCount} with outcome boost, ${semanticMatchCount} with semantic match)`);
 
     // Upsert in batches
     const BATCH_SIZE = 100;
@@ -581,6 +656,7 @@ serve(async (req) => {
         scoresCreated: scoresToUpsert.length,
         highPriorityScores: highPriorityCount,
         outcomeBoosts: outcomeBoostCount,
+        semanticMatches: semanticMatchCount,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

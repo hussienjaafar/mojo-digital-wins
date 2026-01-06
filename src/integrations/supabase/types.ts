@@ -5118,6 +5118,9 @@ export type Database = {
           channels_enabled: string[] | null
           created_at: string | null
           display_name: string | null
+          embedding: string | null
+          embedding_generated_at: string | null
+          embedding_text: string | null
           focus_areas: string[] | null
           geographies: string[] | null
           id: string
@@ -5143,6 +5146,9 @@ export type Database = {
           channels_enabled?: string[] | null
           created_at?: string | null
           display_name?: string | null
+          embedding?: string | null
+          embedding_generated_at?: string | null
+          embedding_text?: string | null
           focus_areas?: string[] | null
           geographies?: string[] | null
           id?: string
@@ -5168,6 +5174,9 @@ export type Database = {
           channels_enabled?: string[] | null
           created_at?: string | null
           display_name?: string | null
+          embedding?: string | null
+          embedding_generated_at?: string | null
+          embedding_text?: string | null
           focus_areas?: string[] | null
           geographies?: string[] | null
           id?: string
@@ -7548,6 +7557,9 @@ export type Database = {
           current_1h: number | null
           current_24h: number | null
           current_6h: number | null
+          embedding: string | null
+          embedding_generated_at: string | null
+          embedding_text: string | null
           entity_type: string | null
           event_key: string
           event_title: string
@@ -7584,6 +7596,9 @@ export type Database = {
           current_1h?: number | null
           current_24h?: number | null
           current_6h?: number | null
+          embedding?: string | null
+          embedding_generated_at?: string | null
+          embedding_text?: string | null
           entity_type?: string | null
           event_key: string
           event_title: string
@@ -7620,6 +7635,9 @@ export type Database = {
           current_1h?: number | null
           current_24h?: number | null
           current_6h?: number | null
+          embedding?: string | null
+          embedding_generated_at?: string | null
+          embedding_text?: string | null
           entity_type?: string | null
           event_key?: string
           event_title?: string
@@ -9551,6 +9569,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      cosine_similarity: { Args: { a: string; b: string }; Returns: number }
       count_keyword_mentions: {
         Args: { search_keyword: string; time_window?: unknown }
         Returns: {
