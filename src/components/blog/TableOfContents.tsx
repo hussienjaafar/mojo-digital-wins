@@ -93,8 +93,8 @@ export function TableOfContents({ content, className }: TableOfContentsProps) {
                   "text-left w-full text-sm py-1.5 px-3 rounded-md transition-all duration-200",
                   heading.level === 3 && "pl-6 text-xs",
                   activeId === heading.id
-                    ? "bg-secondary/20 text-secondary font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-secondary/20 dark:bg-accent/20 text-secondary dark:text-accent font-medium border-l-2 border-secondary dark:border-accent"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/80 dark:hover:bg-muted/50"
                 )}
               >
                 {heading.text}

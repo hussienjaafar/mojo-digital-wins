@@ -12,8 +12,8 @@ export function AuthorBio({ author }: AuthorBioProps) {
       <div className="flex flex-col sm:flex-row gap-6 items-start">
         {/* Logo/Avatar */}
         <div className="shrink-0">
-          <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-            <span className="text-2xl font-bebas text-primary-foreground tracking-wider">
+          <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-secondary to-secondary/70 dark:from-accent dark:to-accent/70 flex items-center justify-center">
+            <span className="text-2xl font-bebas text-secondary-foreground dark:text-accent-foreground tracking-wider">
               M
             </span>
           </div>
@@ -22,7 +22,7 @@ export function AuthorBio({ author }: AuthorBioProps) {
         {/* Bio Content */}
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-bold text-secondary uppercase tracking-wider">
+            <span className="text-xs font-bold text-secondary dark:text-accent uppercase tracking-wider">
               About the Author
             </span>
           </div>

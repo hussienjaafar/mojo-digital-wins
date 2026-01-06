@@ -154,7 +154,7 @@ const Blog = () => {
                   <CardContent className="p-6 space-y-4">
                     {/* Category Badge */}
                     <div className="flex items-center justify-between">
-                      <span className="inline-block px-3 py-1 text-xs font-bold bg-secondary/20 text-secondary rounded-full">
+                      <span className="inline-block px-3 py-1 text-xs font-bold bg-secondary/20 dark:bg-accent/20 text-secondary dark:text-accent rounded-full">
                         {post.category}
                       </span>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -164,7 +164,7 @@ const Blog = () => {
                     </div>
 
                     {/* Title */}
-                    <h2 className="font-bebas text-2xl text-foreground leading-tight group-hover:text-secondary transition-colors duration-300 line-clamp-2">
+                    <h2 className="font-bebas text-2xl text-foreground leading-tight group-hover:text-secondary dark:group-hover:text-accent transition-colors duration-300 line-clamp-2">
                       <Link to={`/blog/${post.slug}`}>
                         {post.title}
                       </Link>
@@ -191,7 +191,7 @@ const Blog = () => {
                       {/* Read More Link */}
                       <Link 
                         to={`/blog/${post.slug}`}
-                        className="inline-flex items-center gap-2 text-secondary font-semibold text-sm group-hover:gap-3 transition-all duration-300"
+                        className="inline-flex items-center gap-2 text-secondary dark:text-accent font-semibold text-sm group-hover:gap-3 transition-all duration-300"
                       >
                         Read
                         <ArrowRight className="w-4 h-4" />

@@ -49,7 +49,7 @@ const BlogPost = () => {
       );
     },
     p: ({ children }) => (
-      <p className="text-lg leading-[1.8] text-foreground/90 mb-6">
+      <p className="text-lg leading-[1.8] text-foreground mb-6">
         {children}
       </p>
     ),
@@ -61,7 +61,7 @@ const BlogPost = () => {
         return (
           <Link 
             to={href} 
-            className="text-secondary font-medium underline underline-offset-4 decoration-secondary/40 hover:decoration-secondary transition-colors"
+            className="text-secondary dark:text-accent font-medium underline underline-offset-4 decoration-secondary/40 dark:decoration-accent/40 hover:decoration-secondary dark:hover:decoration-accent transition-colors"
           >
             {children}
           </Link>
@@ -70,7 +70,7 @@ const BlogPost = () => {
       
       if (isAnchor) {
         return (
-          <a href={href} className="text-secondary font-medium hover:underline">
+          <a href={href} className="text-secondary dark:text-accent font-medium hover:underline">
             {children}
           </a>
         );
@@ -81,7 +81,7 @@ const BlogPost = () => {
           href={href} 
           target="_blank" 
           rel="noopener noreferrer"
-          className="text-secondary font-medium underline underline-offset-4 decoration-secondary/40 hover:decoration-secondary transition-colors"
+          className="text-secondary dark:text-accent font-medium underline underline-offset-4 decoration-secondary/40 dark:decoration-accent/40 hover:decoration-secondary dark:hover:decoration-accent transition-colors"
         >
           {children}
           <span className="inline-block ml-1 text-xs">↗</span>
@@ -99,17 +99,17 @@ const BlogPost = () => {
       </ol>
     ),
     li: ({ children }) => (
-      <li className="text-lg leading-relaxed text-foreground/90 flex items-start gap-3">
-        <span className="mt-2 w-2 h-2 rounded-full bg-secondary shrink-0" />
+      <li className="text-lg leading-relaxed text-foreground flex items-start gap-3">
+        <span className="mt-2 w-2 h-2 rounded-full bg-secondary dark:bg-accent shrink-0" />
         <span className="flex-1">{children}</span>
       </li>
     ),
     blockquote: ({ children }) => (
-      <blockquote className="my-10 px-8 py-6 relative border-none bg-muted/30 rounded-xl">
-        <span className="absolute -top-3 left-6 text-6xl font-serif text-secondary/30 leading-none select-none">
+      <blockquote className="my-10 px-8 py-6 relative border-none bg-muted/50 dark:bg-muted/30 rounded-xl">
+        <span className="absolute -top-3 left-6 text-6xl font-serif text-secondary/30 dark:text-accent/30 leading-none select-none">
           "
         </span>
-        <div className="relative z-10 text-xl italic text-foreground/90 leading-relaxed">
+        <div className="relative z-10 text-xl italic text-foreground leading-relaxed">
           {children}
         </div>
       </blockquote>
@@ -137,7 +137,7 @@ const BlogPost = () => {
       </th>
     ),
     td: ({ children }) => (
-      <td className="px-4 py-3 text-foreground/80 border-b border-border/50">
+      <td className="px-4 py-3 text-foreground border-b border-border/50">
         {children}
       </td>
     ),
@@ -388,7 +388,7 @@ const BlogPost = () => {
         <section className="py-20 bg-muted/30">
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
-              <span className="text-sm font-bold text-secondary uppercase tracking-wider">Keep Reading</span>
+              <span className="text-sm font-bold text-secondary dark:text-accent uppercase tracking-wider">Keep Reading</span>
               <h2 className="font-bebas text-4xl sm:text-5xl text-foreground mt-2">
                 Related Articles
               </h2>
@@ -411,10 +411,10 @@ const BlogPost = () => {
                       />
                     </div>
                     <CardContent className="p-6 space-y-4">
-                      <span className="inline-block px-3 py-1 text-xs font-bold bg-secondary/20 text-secondary rounded-full">
+                      <span className="inline-block px-3 py-1 text-xs font-bold bg-secondary/20 dark:bg-accent/20 text-secondary dark:text-accent rounded-full">
                         {relatedPost.category}
                       </span>
-                      <h3 className="font-bebas text-xl text-foreground leading-tight group-hover:text-secondary transition-colors line-clamp-2">
+                      <h3 className="font-bebas text-xl text-foreground leading-tight group-hover:text-secondary dark:group-hover:text-accent transition-colors line-clamp-2">
                         <Link to={`/blog/${relatedPost.slug}`}>
                           {relatedPost.title}
                         </Link>
@@ -424,7 +424,7 @@ const BlogPost = () => {
                       </p>
                       <Link 
                         to={`/blog/${relatedPost.slug}`}
-                        className="inline-flex items-center gap-2 text-secondary font-semibold text-sm group-hover:gap-3 transition-all"
+                        className="inline-flex items-center gap-2 text-secondary dark:text-accent font-semibold text-sm group-hover:gap-3 transition-all"
                       >
                         Read Article
                         <ArrowRight className="w-4 h-4" />
