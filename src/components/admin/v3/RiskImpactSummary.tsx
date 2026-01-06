@@ -38,11 +38,11 @@ export function RiskImpactSummary() {
           .eq("threat_level", "high")
           .gte("published_date", today.toISOString());
 
-        // Fetch rising negative sentiment - simplified query
+        // Fetch rising negative sentiment - now using trend_events
         const negativeResult = await supabase
-          .from("trend_clusters")
+          .from("trend_events")
           .select("id", { count: "exact", head: true })
-          .gte("detected_at", today.toISOString());
+          .gte("first_seen_at", today.toISOString());
 
         // Fetch watchlist items with alerts
         const alertsResult = await supabase

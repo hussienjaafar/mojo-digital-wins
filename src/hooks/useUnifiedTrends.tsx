@@ -2,6 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useMaintenanceMode } from '@/contexts/MaintenanceContext';
 
+/**
+ * UnifiedTrend - Maps trend_events data to the legacy UnifiedTrend interface
+ * This hook now uses trend_events as the single source of truth (migrated from trend_clusters)
+ */
 export interface UnifiedTrend {
   name: string;
   normalized_name: string;
@@ -44,6 +48,9 @@ export interface UnifiedTrend {
   org_relevance_reasons?: string[];
   org_matched_topics?: string[];
   org_matched_entities?: string[];
+  // trend_events source fields
+  event_id?: string;
+  confidence_score?: number;
 }
 
 interface UseUnifiedTrendsOptions {
@@ -54,7 +61,6 @@ interface UseUnifiedTrendsOptions {
 }
 
 // Common evergreen terms that should be filtered out (only truly generic ones)
-// Allow specific orgs like FBI, DOJ, Pentagon when they have high volume
 const EVERGREEN_PATTERNS = [
   'federal government',
   'united states',
@@ -65,63 +71,6 @@ const EVERGREEN_PATTERNS = [
   'breaking news',
   'news update',
 ];
-
-// Calculate weighted unified score with source authority and volume-gated spike bonuses
-const calculateUnifiedScore = (trend: any): number => {
-  const googleCount = trend.google_news_count || 0;
-  const redditCount = trend.reddit_count || 0;
-  const blueskyCount = trend.bluesky_count || 0;
-  const rssCount = trend.rss_count || 0;
-  const totalMentions = trend.mentions_last_24h || 0;
-  const velocity = Math.min(trend.velocity_score || 0, 500);
-  
-  // Source authority weighting - news sources weighted higher
-  const weightedVolume = (googleCount * 15) + (rssCount * 12) + (redditCount * 10) + (blueskyCount * 8);
-  
-  // Count unique sources
-  const sourceCount = [googleCount > 0, redditCount > 0, blueskyCount > 0, rssCount > 0].filter(Boolean).length;
-  
-  // Strong cross-source bonus (the key quality signal)
-  const crossSourceBonus = sourceCount >= 4 ? 300 : sourceCount >= 3 ? 200 : sourceCount >= 2 ? 100 : 0;
-  
-  // Calculate spike ratio
-  const mentions1h = trend.mentions_last_hour || 0;
-  const mentions6h = trend.mentions_last_6h || 0;
-  const baselineHourly = mentions6h > 0 ? mentions6h / 6 : (totalMentions > 0 ? totalMentions / 24 : 0);
-  const spikeRatio = baselineHourly > 0 ? Math.min(5, Math.max(1, mentions1h / baselineHourly)) : 1;
-  
-  // Volume-gated spike bonus - only applies if meaningful volume
-  let spikeBonus = 0;
-  if (totalMentions >= 10 && spikeRatio >= 2) {
-    spikeBonus = spikeRatio * 25;
-  } else if (totalMentions >= 5 && spikeRatio >= 2) {
-    spikeBonus = spikeRatio * 10;
-  }
-  
-  // Velocity contribution (capped)
-  const velocityContribution = velocity * 0.3;
-  
-  return weightedVolume + crossSourceBonus + spikeBonus + velocityContribution;
-};
-
-// Determine if trend is a breakthrough (requires volume + cross-source)
-const isBreakthrough = (trend: any): boolean => {
-  const totalMentions = trend.mentions_last_24h || 0;
-  const velocity = trend.velocity_score || 0;
-  const mentions1h = trend.mentions_last_hour || 0;
-  const mentions6h = trend.mentions_last_6h || 0;
-  const baselineHourly = mentions6h > 0 ? mentions6h / 6 : (totalMentions > 0 ? totalMentions / 24 : 0);
-  const spikeRatio = baselineHourly > 0 ? Math.min(5, Math.max(1, mentions1h / baselineHourly)) : 1;
-  
-  const googleCount = trend.google_news_count || 0;
-  const redditCount = trend.reddit_count || 0;
-  const blueskyCount = trend.bluesky_count || 0;
-  const rssCount = trend.rss_count || 0;
-  const sourceCount = [googleCount > 0, redditCount > 0, blueskyCount > 0, rssCount > 0].filter(Boolean).length;
-  
-  // Requires: meaningful volume + real velocity + spike + cross-platform
-  return velocity >= 100 && spikeRatio >= 2.0 && totalMentions >= 8 && sourceCount >= 2;
-};
 
 export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
   const { limit = 30, breakthroughOnly = false, excludeEvergreen = true, organizationId } = options;
@@ -144,21 +93,17 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     setError(null);
     
     try {
-      // Build parallel queries
-      const clustersPromise = supabase.from('trend_clusters')
+      // Build parallel queries - now using trend_events as single source of truth
+      let trendEventsQuery = supabase
+        .from('trend_events')
         .select('*')
-        .gte('mentions_last_24h', 3)
-        .order('mentions_last_24h', { ascending: false })
+        .gte('last_seen_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .gte('confidence_score', 20)
+        .order('is_breaking', { ascending: false })
+        .order('confidence_score', { ascending: false })
         .limit(limit + 50);
       
       const watchlistPromise = supabase.from('entity_watchlist').select('entity_name');
-      
-      const headlinesPromise = supabase.from('articles')
-        .select('title, tags')
-        .gte('published_date', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .order('published_date', { ascending: false })
-        .limit(100);
-      
       const evergreenPromise = supabase.from('evergreen_topics').select('topic');
 
       // Fetch org relevance scores if organizationId provided
@@ -171,22 +116,20 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
             .gt('expires_at', new Date().toISOString())
         : Promise.resolve({ data: null, error: null });
 
-      const [clustersResult, watchlistResult, headlinesResult, evergreenResult, orgScoresResult] = await Promise.all([
-        clustersPromise,
+      const [eventsResult, watchlistResult, evergreenResult, orgScoresResult] = await Promise.all([
+        trendEventsQuery,
         watchlistPromise,
-        headlinesPromise,
         evergreenPromise,
         orgScoresPromise,
       ]);
 
-      if (clustersResult.error) {
-        console.error('Error fetching trend clusters:', clustersResult.error);
-        setError(clustersResult.error.message);
+      if (eventsResult.error) {
+        console.error('Error fetching trend events:', eventsResult.error);
+        setError(eventsResult.error.message);
         return;
       }
 
       const watchlistEntities = (watchlistResult.data || []).map((w: any) => w.entity_name?.toLowerCase() || '');
-      const headlines = headlinesResult.data || [];
       const dbEvergreen = (evergreenResult.data || []).map((e: any) => e.topic?.toLowerCase() || '');
       const allEvergreenPatterns = [...new Set([...EVERGREEN_PATTERNS, ...dbEvergreen])];
 
@@ -198,19 +141,14 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
         }
       }
 
-      // Transform and score trends
-      let enrichedTrends = (clustersResult.data || [])
-        .filter((trend: any) => {
+      // Transform trend_events to UnifiedTrend format
+      let enrichedTrends = (eventsResult.data || [])
+        .filter((event: any) => {
           if (!excludeEvergreen) return true;
           
-          const trendNameLower = trend.cluster_title?.toLowerCase() || '';
-          const totalMentions = trend.mentions_last_24h || 0;
-          const sourceCount = [
-            (trend.google_news_count || 0) > 0,
-            (trend.reddit_count || 0) > 0,
-            (trend.bluesky_count || 0) > 0,
-            (trend.rss_count || 0) > 0
-          ].filter(Boolean).length;
+          const eventNameLower = event.event_title?.toLowerCase() || '';
+          const totalMentions = event.current_24h || 0;
+          const sourceCount = event.source_count || 0;
           
           // Allow high-volume cross-source topics even if they match evergreen patterns
           if (totalMentions >= 20 && sourceCount >= 2) {
@@ -218,90 +156,82 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
           }
           
           const isEvergreen = allEvergreenPatterns.some(pattern => 
-            trendNameLower === pattern || 
-            (trendNameLower.includes(pattern) && trendNameLower.length < pattern.length + 5)
+            eventNameLower === pattern || 
+            (eventNameLower.includes(pattern) && eventNameLower.length < pattern.length + 5)
           );
           
           return !isEvergreen;
         })
-        .map((trend: any) => {
-          const trendNameLower = trend.cluster_title?.toLowerCase() || '';
+        .map((event: any) => {
+          const eventNameLower = event.event_title?.toLowerCase() || '';
           
-          // Calculate metrics
-          const unifiedScore = calculateUnifiedScore(trend);
-          const breakthrough = isBreakthrough(trend);
+          // Map trend_events fields to UnifiedTrend interface
+          const current1h = event.current_1h || 0;
+          const current6h = event.current_6h || 0;
+          const current24h = event.current_24h || 0;
+          const baseline7d = event.baseline_7d || 0;
+          const baselineHourly = baseline7d > 0 ? baseline7d / (7 * 24) : (current24h > 0 ? current24h / 24 : 0);
+          const spikeRatio = baselineHourly > 0 ? Math.min(5, Math.max(1, current1h / baselineHourly)) : 1;
           
-          // Calculate spike ratio for display
-          const mentions1h = trend.mentions_last_hour || 0;
-          const mentions6h = trend.mentions_last_6h || 0;
-          const totalMentions = trend.mentions_last_24h || 0;
-          const baselineHourly = mentions6h > 0 ? mentions6h / 6 : (totalMentions > 0 ? totalMentions / 24 : 0);
-          const spikeRatio = baselineHourly > 0 ? Math.min(5, Math.max(1, mentions1h / baselineHourly)) : 1;
+          // Calculate unified score from confidence and source corroboration
+          const unifiedScore = (event.confidence_score || 0) * 10 + 
+            (event.corroboration_score || 0) * 50 + 
+            (event.is_breaking ? 200 : 0) +
+            (event.source_count >= 3 ? 150 : event.source_count >= 2 ? 80 : 0);
           
           // Determine source types
           const sourceTypes: string[] = [];
-          if ((trend.google_news_count || 0) > 0 || (trend.rss_count || 0) > 0) sourceTypes.push('news');
-          if ((trend.bluesky_count || 0) > 0 || (trend.reddit_count || 0) > 0) sourceTypes.push('social');
-          
-          const sourceCount = [
-            (trend.google_news_count || 0) > 0,
-            (trend.reddit_count || 0) > 0,
-            (trend.bluesky_count || 0) > 0,
-            (trend.rss_count || 0) > 0
-          ].filter(Boolean).length;
+          if ((event.news_source_count || 0) > 0) sourceTypes.push('news');
+          if ((event.social_source_count || 0) > 0) sourceTypes.push('social');
           
           // Check watchlist match
           const matchedEntity = watchlistEntities.find((entity: string) => 
-            entity && (trendNameLower.includes(entity) || entity.includes(trendNameLower))
-          );
-          
-          // Find sample headline
-          const matchingHeadline = headlines.find((article: any) => 
-            article.title?.toLowerCase().includes(trendNameLower) ||
-            (article.tags && article.tags.some((tag: string) => tag?.toLowerCase().includes(trendNameLower)))
+            entity && (eventNameLower.includes(entity) || entity.includes(eventNameLower))
           );
 
           // Look up org relevance from map
-          const normalizedKey = trendNameLower.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+          const normalizedKey = eventNameLower.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
           const orgRelevance = orgRelevanceMap.get(normalizedKey);
 
           return {
-            name: trend.cluster_title,
-            normalized_name: trend.cluster_title?.toLowerCase() || '',
-            total_mentions_1h: mentions1h,
-            total_mentions_6h: mentions6h,
-            total_mentions_24h: totalMentions,
-            velocity: trend.velocity_score || 0,
-            avg_sentiment: trend.sentiment_score || null,
+            name: event.event_title,
+            normalized_name: eventNameLower,
+            total_mentions_1h: current1h,
+            total_mentions_6h: current6h,
+            total_mentions_24h: current24h,
+            velocity: event.velocity || 0,
+            avg_sentiment: event.sentiment_score || null,
             spike_ratio: spikeRatio,
             baseline_hourly: baselineHourly,
-            is_breakthrough: breakthrough,
+            is_breakthrough: event.is_breaking || (event.confidence_score >= 70 && event.source_count >= 2),
             source_types: sourceTypes,
-            source_count: sourceCount,
-            last_updated: trend.updated_at,
+            source_count: event.source_count || 0,
+            last_updated: event.last_seen_at,
             unified_score: unifiedScore,
             matchesWatchlist: !!matchedEntity,
             watchlistEntity: matchedEntity || null,
-            sampleHeadline: matchingHeadline?.title || null,
-            related_topics: trend.related_topics || [],
-            entity_type: trend.entity_type || 'category',
-            is_breaking: trend.is_breaking || false,
-            trend_stage: trend.trend_stage as UnifiedTrend['trend_stage'] || 'stable',
-            acceleration: trend.acceleration || 0,
-            velocity_1h: trend.velocity_1h || 0,
-            velocity_6h: trend.velocity_6h || 0,
+            sampleHeadline: event.top_headline || null,
+            related_topics: [],
+            entity_type: 'category',
+            is_breaking: event.is_breaking || false,
+            trend_stage: event.trend_stage as UnifiedTrend['trend_stage'] || 'stable',
+            acceleration: event.acceleration || 0,
+            velocity_1h: event.velocity_1h || 0,
+            velocity_6h: event.velocity_6h || 0,
             source_distribution: {
-              google_news: trend.google_news_count || 0,
-              reddit: trend.reddit_count || 0,
-              bluesky: trend.bluesky_count || 0,
-              rss: trend.rss_count || 0,
+              google_news: 0,
+              reddit: 0,
+              bluesky: event.social_source_count || 0,
+              rss: event.news_source_count || 0,
             },
-            cluster_summary: trend.cluster_summary || '',
+            cluster_summary: '',
             org_relevance_score: orgRelevance?.relevance_score,
             org_priority_bucket: orgRelevance?.priority_bucket,
             org_relevance_reasons: orgRelevance?.explanation?.reasons || [],
             org_matched_topics: orgRelevance?.matched_topics || [],
             org_matched_entities: orgRelevance?.matched_entities || [],
+            event_id: event.id,
+            confidence_score: event.confidence_score || 0,
           } as UnifiedTrend;
         })
         // Sort by unified score (or org relevance if provided)
