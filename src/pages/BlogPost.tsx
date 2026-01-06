@@ -163,16 +163,16 @@ const BlogPost = () => {
   // Calculate word count and reading time
   const wordCount = post.content.split(/\s+/).length;
 
-  // Default hero images by category
+  // Default hero images by category - abstract, professional, politically neutral
   const categoryHeroImages: Record<string, string> = {
-    "Fundraising": "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=1920&h=800&fit=crop",
-    "Campaign Strategy": "https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1920&h=800&fit=crop",
-    "Digital Advertising": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1920&h=800&fit=crop",
-    "GOTV": "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?w=1920&h=800&fit=crop",
-    "Nonprofit Strategy": "https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=1920&h=800&fit=crop",
+    "Fundraising": "https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?w=1920&h=800&fit=crop", // Abstract data visualization
+    "Campaign Strategy": "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1920&h=800&fit=crop", // Strategy meeting abstract
+    "Digital Advertising": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1920&h=800&fit=crop", // Analytics dashboard
+    "GOTV": "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=1920&h=800&fit=crop", // Team collaboration
+    "Nonprofit Strategy": "https://images.unsplash.com/photo-1552664730-d307ca884978?w=1920&h=800&fit=crop", // Whiteboard strategy
   };
 
-  const heroImage = post.heroImage || categoryHeroImages[post.category] || "https://images.unsplash.com/photo-1551836022-b06985bceb24?w=1920&h=800&fit=crop";
+  const heroImage = post.heroImage || categoryHeroImages[post.category] || "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=1920&h=800&fit=crop";
 
   // JSON-LD structured data for SEO
   const articleSchema = {
