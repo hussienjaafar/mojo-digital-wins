@@ -105,6 +105,55 @@ function TrendCard({
   const freshnessState = getFreshnessState();
   const isStale = freshnessState === 'stale' || freshnessState === 'aging';
 
+  // Priority badge logic: Breaking > High Performing > High Match
+  const getPriorityBadge = () => {
+    if (trend.is_breaking) {
+      return (
+        <Badge className="bg-[hsl(var(--portal-error))] text-white text-xs gap-1">
+          <Zap className="h-3 w-3" />
+          Breaking
+        </Badge>
+      );
+    }
+    if (outcomeStats?.isHighPerforming && outcomeStats.confidenceLevel !== 'low') {
+      return (
+        <Badge className="bg-[hsl(var(--portal-success)/0.15)] text-[hsl(var(--portal-success))] text-xs gap-1">
+          <Award className="h-3 w-3" />
+          High Performing
+        </Badge>
+      );
+    }
+    if (isRelevant && relevanceScore && relevanceScore >= 70) {
+      return (
+        <Badge className="bg-[hsl(var(--portal-accent-blue)/0.15)] text-[hsl(var(--portal-accent-blue))] text-xs gap-1">
+          <Target className="h-3 w-3" />
+          High Match
+        </Badge>
+      );
+    }
+    return null;
+  };
+
+  // Why trending context line
+  const getWhyTrending = () => {
+    if (trend.z_score_velocity && trend.z_score_velocity > 2) {
+      return `${trend.z_score_velocity.toFixed(1)}x spike vs baseline`;
+    }
+    if (trend.velocity > 100) {
+      return `${Math.round(trend.velocity)}% velocity surge`;
+    }
+    if (relevanceReasons && relevanceReasons.length > 0) {
+      return relevanceReasons[0];
+    }
+    if (trend.evidence_count >= 5) {
+      return `Corroborated across ${trend.evidence_count} sources`;
+    }
+    return null;
+  };
+
+  const priorityBadge = getPriorityBadge();
+  const whyTrending = getWhyTrending();
+
   return (
     <motion.button
       initial={{ opacity: 0, y: 8 }}
@@ -130,60 +179,40 @@ function TrendCard({
         )}
         
         <div className="flex-1 min-w-0 space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            {trend.is_breaking && (
-              <Badge className="bg-[hsl(var(--portal-error))] text-white text-xs gap-1">
-                <Zap className="h-3 w-3" />
-                Breaking
-              </Badge>
-            )}
-            {outcomeStats?.isHighPerforming && outcomeStats.confidenceLevel !== 'low' && (
-              <Badge className="bg-[hsl(var(--portal-success)/0.15)] text-[hsl(var(--portal-success))] text-xs gap-1">
-                <Award className="h-3 w-3" />
-                High Performing
-              </Badge>
-            )}
-            {isRelevant && relevanceScore && relevanceScore >= 70 && (
-              <Badge className="bg-[hsl(var(--portal-accent-blue)/0.15)] text-[hsl(var(--portal-accent-blue))] text-xs gap-1">
-                <Target className="h-3 w-3" />
-                High Match
-              </Badge>
-            )}
-          </div>
+          {/* Single priority badge */}
+          {priorityBadge && (
+            <div className="flex items-center gap-2">
+              {priorityBadge}
+            </div>
+          )}
 
           <h3 className="font-semibold text-[hsl(var(--portal-text-primary))] truncate">
-            {trend.event_title}
+            {trend.canonical_label || trend.event_title}
           </h3>
 
-          <div className="flex items-center gap-4 text-xs text-[hsl(var(--portal-text-muted))]">
+          {/* Combined meta strip: velocity + sources + last seen */}
+          <p className="text-xs text-[hsl(var(--portal-text-muted))] flex items-center gap-1.5 flex-wrap">
             <span className="flex items-center gap-1">
               <TrendingUp className="h-3 w-3" />
-              {Math.round(trend.velocity)}% velocity
+              {Math.round(trend.velocity)}%
             </span>
-            <span className="flex items-center gap-1">
-              <BarChart3 className="h-3 w-3" />
-              {trend.evidence_count} sources
-            </span>
+            <span>·</span>
+            <span>{trend.evidence_count} sources</span>
+            <span>·</span>
             <span className={cn(
               "flex items-center gap-1",
               isStale && "text-[hsl(var(--portal-warning))]"
             )}>
-              <Clock className="h-3 w-3" />
-              {getLastSeenLabel()} ago
-              {isStale && <span className="text-[10px]">⚠</span>}
+              {getLastSeenLabel()}
+              {isStale && " ⚠"}
             </span>
-          </div>
+          </p>
 
-          {relevanceReasons && relevanceReasons.length > 0 && (
+          {/* Why trending line */}
+          {whyTrending && (
             <p className="text-xs text-[hsl(var(--portal-accent-blue))] line-clamp-1">
               <Sparkles className="h-3 w-3 inline mr-1" />
-              {relevanceReasons[0]}
-            </p>
-          )}
-
-          {trend.top_headline && (
-            <p className="text-xs text-[hsl(var(--portal-text-secondary))] line-clamp-2 italic">
-              "{trend.top_headline}"
+              {whyTrending}
             </p>
           )}
         </div>

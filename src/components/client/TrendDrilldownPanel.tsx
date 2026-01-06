@@ -123,6 +123,49 @@ function EvidenceItem({ evidence }: EvidenceItemProps) {
 }
 
 // ============================================================================
+// Collapsible Section
+// ============================================================================
+
+interface CollapsibleSectionProps {
+  title: string;
+  icon: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+
+function CollapsibleSection({ title, icon, defaultOpen = false, children }: CollapsibleSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="space-y-3">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between text-sm font-medium text-[hsl(var(--portal-text-primary))] hover:text-[hsl(var(--portal-accent-blue))] transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          {icon}
+          {title}
+        </span>
+        {isOpen ? (
+          <ChevronUp className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+        )}
+      </button>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+        >
+          {children}
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // Confidence Breakdown
 // ============================================================================
 
@@ -146,27 +189,21 @@ function ConfidenceBreakdown({ trend }: ConfidenceBreakdownProps) {
   ];
 
   return (
-    <div className="space-y-3">
-      <h4 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] flex items-center gap-2">
-        <Target className="h-4 w-4" />
-        Confidence Breakdown
-      </h4>
-      <div className="space-y-2">
-        {items.map((item) => (
-          <div key={item.label} className="space-y-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-[hsl(var(--portal-text-secondary))]">{item.label}</span>
-              <span className="text-[hsl(var(--portal-text-muted))]">
-                {Math.round(item.value)}/{item.max}
-              </span>
-            </div>
-            <Progress 
-              value={(item.value / item.max) * 100} 
-              className="h-1.5"
-            />
+    <div className="space-y-2">
+      {items.map((item) => (
+        <div key={item.label} className="space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[hsl(var(--portal-text-secondary))]">{item.label}</span>
+            <span className="text-[hsl(var(--portal-text-muted))]">
+              {Math.round(item.value)}/{item.max}
+            </span>
           </div>
-        ))}
-      </div>
+          <Progress 
+            value={(item.value / item.max) * 100} 
+            className="h-1.5"
+          />
+        </div>
+      ))}
     </div>
   );
 }
@@ -484,71 +521,75 @@ export function TrendDrilldownPanel({
         </div>
       </div>
 
-      {/* Velocity Metrics */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-secondary))]">
-          <div className="flex items-center gap-1 mb-1 text-xs text-[hsl(var(--portal-text-muted))]">
-            <Clock className="h-3 w-3" />
-            1h
+      {/* More Details - Collapsible */}
+      <CollapsibleSection 
+        title="Velocity & Metrics" 
+        icon={<Activity className="h-4 w-4" />}
+        defaultOpen={false}
+      >
+        {/* Velocity Metrics */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-secondary))]">
+            <div className="flex items-center gap-1 mb-1 text-xs text-[hsl(var(--portal-text-muted))]">
+              <Clock className="h-3 w-3" />
+              1h
+            </div>
+            <p className="font-semibold text-[hsl(var(--portal-text-primary))]">
+              {trend.current_1h} mentions
+            </p>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+              {Math.round(trend.velocity_1h)}% velocity
+            </p>
           </div>
-          <p className="font-semibold text-[hsl(var(--portal-text-primary))]">
-            {trend.current_1h} mentions
-          </p>
-          <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-            {Math.round(trend.velocity_1h)}% velocity
-          </p>
-        </div>
-        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-secondary))]">
-          <div className="flex items-center gap-1 mb-1 text-xs text-[hsl(var(--portal-text-muted))]">
-            <Clock className="h-3 w-3" />
-            6h
+          <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-secondary))]">
+            <div className="flex items-center gap-1 mb-1 text-xs text-[hsl(var(--portal-text-muted))]">
+              <Clock className="h-3 w-3" />
+              6h
+            </div>
+            <p className="font-semibold text-[hsl(var(--portal-text-primary))]">
+              {trend.current_6h} mentions
+            </p>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+              {Math.round(trend.velocity_6h)}% velocity
+            </p>
           </div>
-          <p className="font-semibold text-[hsl(var(--portal-text-primary))]">
-            {trend.current_6h} mentions
-          </p>
-          <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-            {Math.round(trend.velocity_6h)}% velocity
-          </p>
-        </div>
-        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-secondary))]">
-          <div className="flex items-center gap-1 mb-1 text-xs text-[hsl(var(--portal-text-muted))]">
-            <Activity className="h-3 w-3" />
-            Accel
+          <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-secondary))]">
+            <div className="flex items-center gap-1 mb-1 text-xs text-[hsl(var(--portal-text-muted))]">
+              <Activity className="h-3 w-3" />
+              Accel
+            </div>
+            <p className="font-semibold text-[hsl(var(--portal-text-primary))]">
+              {trend.acceleration > 0 ? '+' : ''}{Math.round(trend.acceleration)}%
+            </p>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+              {trend.acceleration > 20 ? 'Speeding up' : trend.acceleration < -20 ? 'Slowing' : 'Steady'}
+            </p>
           </div>
-          <p className="font-semibold text-[hsl(var(--portal-text-primary))]">
-            {trend.acceleration > 0 ? '+' : ''}{Math.round(trend.acceleration)}%
-          </p>
-          <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-            {trend.acceleration > 20 ? 'Speeding up' : trend.acceleration < -20 ? 'Slowing' : 'Steady'}
-          </p>
         </div>
-      </div>
+
+        {/* Confidence Breakdown */}
+        <ConfidenceBreakdown trend={trend} />
+      </CollapsibleSection>
 
       <Separator />
 
-      {/* Confidence Breakdown */}
-      <ConfidenceBreakdown trend={trend} />
-
-      <Separator />
-
-      {/* Outcome Learning Section */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] flex items-center gap-2">
-          <Award className="h-4 w-4" />
-          Outcome Learning
-        </h4>
+      {/* Outcome Learning Section - Collapsible */}
+      <CollapsibleSection 
+        title="Outcome Learning" 
+        icon={<Award className="h-4 w-4" />}
+        defaultOpen={outcomeStats?.isHighPerforming || false}
+      >
         <OutcomeLearning outcomeStats={outcomeStats} isLoading={outcomeLoading} />
-      </div>
+      </CollapsibleSection>
 
       <Separator />
 
-      {/* Evidence Timeline */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] flex items-center gap-2">
-          <Newspaper className="h-4 w-4" />
-          Evidence Timeline ({evidence.length})
-        </h4>
-        
+      {/* Evidence Timeline - Collapsible */}
+      <CollapsibleSection 
+        title={`Evidence Timeline (${evidence.length})`}
+        icon={<Newspaper className="h-4 w-4" />}
+        defaultOpen={true}
+      >
         {evidenceLoading ? (
           <div className="space-y-2">
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}
@@ -569,7 +610,7 @@ export function TrendDrilldownPanel({
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowAllEvidence(!showAllEvidence)}
-                className="w-full text-xs"
+                className="w-full text-xs mt-2"
               >
                 {showAllEvidence ? (
                   <>
@@ -586,21 +627,21 @@ export function TrendDrilldownPanel({
             )}
           </>
         )}
-      </div>
+      </CollapsibleSection>
 
       <Separator />
 
-      {/* Suggested Actions */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] flex items-center gap-2">
-          <Sparkles className="h-4 w-4" />
-          Suggested Actions
-        </h4>
+      {/* Suggested Actions - Collapsible */}
+      <CollapsibleSection 
+        title="Suggested Actions"
+        icon={<Sparkles className="h-4 w-4" />}
+        defaultOpen={false}
+      >
         <SuggestedActions 
           trendTitle={trend.event_title} 
           organizationId={organizationId} 
         />
-      </div>
+      </CollapsibleSection>
 
       {/* Timing Info */}
       {(() => {
