@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Helmet } from "react-helmet";
 import { useParams, Link, Navigate } from "react-router-dom";
 import { Calendar, Clock, ArrowLeft, Tag } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
@@ -168,7 +169,6 @@ const BlogPost = () => {
           <div 
             className="prose prose-lg prose-slate dark:prose-invert max-w-none
               prose-headings:font-bebas prose-headings:tracking-wide
-              prose-h1:text-4xl prose-h1:mb-6 prose-h1:mt-12
               prose-h2:text-3xl prose-h2:mb-4 prose-h2:mt-10
               prose-h3:text-2xl prose-h3:mb-3 prose-h3:mt-8
               prose-p:leading-relaxed prose-p:mb-6
@@ -180,8 +180,9 @@ const BlogPost = () => {
               prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
               prose-blockquote:border-l-4 prose-blockquote:border-secondary 
               prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:my-6"
-            dangerouslySetInnerHTML={{ __html: post.content.replace(/\n/g, '<br />') }}
-          />
+          >
+            <ReactMarkdown>{post.content}</ReactMarkdown>
+          </div>
 
           {/* Tags */}
           <div className="mt-12 pt-8 border-t border-border">
