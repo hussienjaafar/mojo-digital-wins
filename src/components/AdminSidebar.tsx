@@ -31,6 +31,7 @@ import {
   Download,
   TrendingUp,
   HeartPulse,
+  Layers,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import {
@@ -111,6 +112,7 @@ export const navigationGroups: NavigationGroup[] = [
     collapsedByDefault: true,
     items: [
       { title: "Operations", icon: Activity, value: "scheduler", requiredRole: 'admin' },
+      { title: "Coverage Governance", icon: Layers, value: "coverage-governance", requiredRole: 'admin' },
       { title: "API & Credentials", icon: Key, value: "api-credentials", requiredRole: 'admin' },
       { title: "Audit Logs", icon: FileText, value: "audit-logs", requiredRole: 'admin' },
     ],

@@ -9238,6 +9238,41 @@ export type Database = {
         }
         Relationships: []
       }
+      source_coverage_kpis: {
+        Row: {
+          active_sources: number | null
+          failing_sources: number | null
+          google_news_count: number | null
+          healthy_sources: number | null
+          inactive_sources: number | null
+          overall_coverage_score: number | null
+          rss_count: number | null
+          stale_sources: number | null
+          tier1_count: number | null
+          tier2_count: number | null
+          tier3_count: number | null
+          total_sources: number | null
+          unclassified_count: number | null
+        }
+        Relationships: []
+      }
+      source_coverage_summary: {
+        Row: {
+          active_count: number | null
+          avg_consecutive_errors: number | null
+          avg_expected_cadence_mins: number | null
+          coverage_score: number | null
+          healthy_24h: number | null
+          inactive_count: number | null
+          source_count: number | null
+          source_type: string | null
+          sources_with_errors: number | null
+          stale_24h: number | null
+          tag: string | null
+          tier: string | null
+        }
+        Relationships: []
+      }
       source_health: {
         Row: {
           backoff_until: string | null

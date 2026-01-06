@@ -45,6 +45,7 @@ import { LiveRegionProvider } from "@/components/accessibility";
 import { NewsFilterProvider, useNewsFilters } from "@/contexts/NewsFilterContext";
 import OpsPanel from "@/components/admin/OpsPanel";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
+import { CoverageGovernancePanel } from "@/components/admin/v3";
 
 type ContactSubmission = {
   id: string;
@@ -384,6 +385,8 @@ const Admin = () => {
         return <UsageAnalytics />;
       case "client-health":
         return <ClientHealthOverview />;
+      case "coverage-governance":
+        return <CoverageGovernancePanel />;
       default:
         return <AnalyticsDashboard />;
     }
