@@ -78,62 +78,148 @@ function canonicalizeEntity(name: string): { canonical: string; type: string } {
   return { canonical: normalized, type: 'unknown' };
 }
 
+// Known entity-only patterns that should NOT be event phrases
+// PERSON: Single or double name (e.g., "Donald Trump", "Trump")
+// ORG: Single organization name (e.g., "FBI", "Supreme Court")
+// GPE: Geographic/Political entity (e.g., "Gaza", "Texas")
+const ENTITY_ONLY_PATTERNS = [
+  // Single capitalized word (likely a name or acronym)
+  /^[A-Z][a-z]*$/,
+  // Two capitalized words (likely a person's name)
+  /^[A-Z][a-z]+\s+[A-Z][a-z]+$/,
+  // Known titles + name pattern: "President Trump", "Senator Warren"
+  /^(?:President|Senator|Rep\.?|Governor|Mayor|Secretary|Director|Chief|Justice)\s+[A-Z][a-z]+$/i,
+  // Single org acronym (FBI, CIA, DOJ, etc.)
+  /^[A-Z]{2,5}$/,
+  // The + Organization pattern: "The Pentagon", "The FBI"
+  /^The\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?$/,
+];
+
+// Comprehensive action verbs list for verb-centered validation
+const ACTION_VERBS = [
+  // Legislative actions
+  'vote', 'votes', 'voted', 'voting', 'pass', 'passes', 'passed', 'passing',
+  'block', 'blocks', 'blocked', 'blocking', 'reject', 'rejects', 'rejected',
+  'approve', 'approves', 'approved', 'sign', 'signs', 'signed', 'signing',
+  'veto', 'vetoes', 'vetoed', 'filibuster', 'filibusters', 'filibustered',
+  // Executive actions
+  'fire', 'fires', 'fired', 'firing', 'resign', 'resigns', 'resigned',
+  'nominate', 'nominates', 'nominated', 'appoint', 'appoints', 'appointed',
+  'order', 'orders', 'ordered', 'ordering', 'pardon', 'pardons', 'pardoned',
+  'commute', 'commutes', 'commuted', 'revoke', 'revokes', 'revoked',
+  // Judicial actions
+  'rule', 'rules', 'ruled', 'ruling', 'overturn', 'overturns', 'overturned',
+  'uphold', 'upholds', 'upheld', 'strike', 'strikes', 'struck', 'striking',
+  'dismiss', 'dismisses', 'dismissed', 'grant', 'grants', 'granted',
+  'deny', 'denies', 'denied', 'affirm', 'affirms', 'affirmed',
+  // Law enforcement
+  'arrest', 'arrests', 'arrested', 'arresting', 'indict', 'indicts', 'indicted',
+  'sue', 'sues', 'sued', 'suing', 'charge', 'charges', 'charged', 'charging',
+  'convict', 'convicts', 'convicted', 'acquit', 'acquits', 'acquitted',
+  'sentence', 'sentences', 'sentenced', 'raid', 'raids', 'raided',
+  'seize', 'seizes', 'seized', 'deport', 'deports', 'deported',
+  'detain', 'detains', 'detained',
+  // Policy/diplomacy
+  'announce', 'announces', 'announced', 'announcing', 'launch', 'launches', 'launched',
+  'ban', 'bans', 'banned', 'banning', 'sanction', 'sanctions', 'sanctioned',
+  'threaten', 'threatens', 'threatened', 'warn', 'warns', 'warned',
+  'demand', 'demands', 'demanded', 'propose', 'proposes', 'proposed',
+  'withdraw', 'withdraws', 'withdrew', 'withdrawn', 'suspend', 'suspends', 'suspended',
+  'expand', 'expands', 'expanded', 'cut', 'cuts', 'cutting',
+  // Conflict/crisis
+  'attack', 'attacks', 'attacked', 'attacking', 'invade', 'invades', 'invaded',
+  'bomb', 'bombs', 'bombed', 'bombing', 'collapse', 'collapses', 'collapsed',
+  'halt', 'halts', 'halted', 'halting', 'escalate', 'escalates', 'escalated',
+  'cease', 'ceases', 'ceased', 'freeze', 'freezes', 'froze', 'frozen',
+  // Economic
+  'raise', 'raises', 'raised', 'raising', 'lower', 'lowers', 'lowered',
+  'surge', 'surges', 'surged', 'drop', 'drops', 'dropped',
+  // General action verbs
+  'face', 'faces', 'faced', 'facing', 'win', 'wins', 'won', 'winning',
+  'lose', 'loses', 'lost', 'losing', 'defeat', 'defeats', 'defeated',
+  'confirm', 'confirms', 'confirmed', 'confirming', 'release', 'releases', 'released',
+  'reveal', 'reveals', 'revealed', 'expose', 'exposes', 'exposed',
+  'target', 'targets', 'targeted', 'targeting', 'kill', 'kills', 'killed',
+  'end', 'ends', 'ended', 'ending', 'begin', 'begins', 'began', 'beginning',
+  'start', 'starts', 'started', 'starting', 'stop', 'stops', 'stopped',
+];
+
+// Event nouns that indicate something happened
+const EVENT_NOUNS = [
+  // Legal/judicial
+  'ruling', 'trial', 'hearing', 'verdict', 'indictment', 'conviction', 'acquittal',
+  'lawsuit', 'injunction', 'subpoena', 'testimony', 'deposition', 'sentencing',
+  // Political
+  'vote', 'bill', 'election', 'impeachment', 'nomination', 'confirmation', 'veto',
+  'filibuster', 'shutdown', 'debate', 'speech', 'summit', 'rally', 'resignation',
+  // Crisis/conflict
+  'shooting', 'protest', 'crisis', 'scandal', 'attack', 'bombing', 'strike', 'raid',
+  'ceasefire', 'invasion', 'collapse', 'evacuation', 'explosion', 'assassination',
+  // Policy
+  'sanctions', 'tariffs', 'investigation', 'probe', 'audit', 'deportation',
+  'pardon', 'ban', 'order', 'mandate', 'regulation', 'reform',
+];
+
 /**
- * Validate event phrase quality - must be 2-6 words, descriptive, verb-centered preferred
- * PHASE 2: Strengthened validation with expanded verb/noun lists
+ * Check if phrase contains at least one action verb or event noun
+ * Returns the matched verb/noun for logging purposes
+ */
+function containsActionVerb(phrase: string): { hasVerb: boolean; matched?: string } {
+  const lower = phrase.toLowerCase();
+  const words = lower.split(/\s+/);
+  
+  // Check for action verbs
+  for (const verb of ACTION_VERBS) {
+    if (words.includes(verb)) {
+      return { hasVerb: true, matched: verb };
+    }
+  }
+  
+  // Check for event nouns
+  for (const noun of EVENT_NOUNS) {
+    if (words.includes(noun)) {
+      return { hasVerb: true, matched: noun };
+    }
+  }
+  
+  return { hasVerb: false };
+}
+
+/**
+ * Check if phrase matches entity-only patterns (should be rejected as event phrase)
+ */
+function isEntityOnlyPattern(phrase: string): boolean {
+  for (const pattern of ENTITY_ONLY_PATTERNS) {
+    if (pattern.test(phrase.trim())) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Validate event phrase quality - must be 2-6 words, verb-centered, NOT entity-only
+ * Fix 1: Strictly require verb/event noun AND reject entity-only patterns
  */
 function isValidEventPhrase(phrase: string): boolean {
   const words = phrase.trim().split(/\s+/);
   if (words.length < 2 || words.length > 6) return false;
   
-  // Must contain at least one proper noun or action word
+  // CRITICAL: Reject entity-only patterns even if multi-word
+  if (isEntityOnlyPattern(phrase)) {
+    return false;
+  }
+  
+  // REQUIRE: Must contain at least one action verb or event noun
+  const verbCheck = containsActionVerb(phrase);
+  if (!verbCheck.hasVerb) {
+    return false;
+  }
+  
+  // Must have at least one proper noun (subject of the action)
   const hasProperNoun = /[A-Z][a-z]+/.test(phrase);
   
-  // PHASE 2: Expanded verb-centered action words
-  const actionVerbs = [
-    // Legislative actions
-    'vote', 'votes', 'pass', 'passes', 'block', 'blocks', 'reject', 'rejects',
-    'approve', 'approves', 'sign', 'signs', 'veto', 'vetoes', 'filibuster', 'filibusters',
-    // Executive actions
-    'fire', 'fires', 'resign', 'resigns', 'nominate', 'nominates', 'appoint', 'appoints',
-    'order', 'orders', 'pardon', 'pardons', 'commute', 'commutes', 'revoke', 'revokes',
-    // Judicial actions
-    'rule', 'rules', 'overturn', 'overturns', 'uphold', 'upholds', 'strike', 'strikes',
-    'dismiss', 'dismisses', 'grant', 'grants', 'deny', 'denies', 'affirm', 'affirms',
-    // Law enforcement
-    'arrest', 'arrests', 'indict', 'indicts', 'sue', 'sues', 'charge', 'charges',
-    'convict', 'convicts', 'acquit', 'acquits', 'sentence', 'sentences', 'raid', 'raids',
-    'seize', 'seizes', 'deport', 'deports', 'detain', 'detains',
-    // Policy/diplomacy
-    'announce', 'announces', 'launch', 'launches', 'ban', 'bans', 'sanction', 'sanctions',
-    'threaten', 'threatens', 'warn', 'warns', 'demand', 'demands', 'propose', 'proposes',
-    'withdraw', 'withdraws', 'suspend', 'suspends', 'expand', 'expands', 'cut', 'cuts',
-    // Conflict/crisis
-    'attack', 'attacks', 'invade', 'invades', 'strike', 'strikes', 'bomb', 'bombs',
-    'collapse', 'collapses', 'halt', 'halts', 'escalate', 'escalates', 'cease', 'ceases',
-    // Economic
-    'raise', 'raises', 'lower', 'lowers', 'freeze', 'freezes', 'surge', 'surges',
-  ];
-  const hasActionVerb = actionVerbs.some(v => phrase.toLowerCase().includes(v));
-  
-  // PHASE 2: Expanded event nouns
-  const eventNouns = [
-    // Legal/judicial
-    'ruling', 'trial', 'hearing', 'verdict', 'indictment', 'conviction', 'acquittal',
-    'lawsuit', 'injunction', 'subpoena', 'testimony', 'deposition',
-    // Political
-    'vote', 'bill', 'election', 'impeachment', 'nomination', 'confirmation', 'veto',
-    'filibuster', 'shutdown', 'debate', 'speech', 'summit', 'rally',
-    // Crisis/conflict
-    'shooting', 'protest', 'crisis', 'scandal', 'attack', 'bombing', 'strike', 'raid',
-    'ceasefire', 'invasion', 'collapse', 'evacuation', 'explosion',
-    // Policy
-    'resignation', 'sanctions', 'tariffs', 'investigation', 'probe', 'audit',
-    'deportation', 'pardon', 'ban', 'order', 'mandate', 'regulation',
-  ];
-  const hasEventNoun = eventNouns.some(w => phrase.toLowerCase().includes(w));
-  
-  return hasProperNoun && (hasActionVerb || hasEventNoun);
+  return hasProperNoun;
 }
 
 /**
