@@ -478,7 +478,8 @@ function isEventPhrase(topic: string): boolean {
 
 /**
  * Calculate authority score for label selection
- * Prefers: event phrases > entities, high-authority sources, higher frequency
+ * PHASE 2: Event phrases get STRONG priority (100+ boost) to ensure they always win over entity-only labels
+ * Prefers: event phrases >> entities, high-authority sources, higher frequency
  */
 function calculateAuthorityScore(
   agg: TopicAggregate,
@@ -487,9 +488,10 @@ function calculateAuthorityScore(
   // Base score from mention count
   let score = Math.log2(agg.dedupedMentions.size + 1) * 10;
   
-  // Boost for event phrases (more descriptive labels)
+  // PHASE 2: STRONG boost for event phrases - ensures they ALWAYS win canonical selection
+  // Event phrases (2+ words with action) get massive priority over single-word entities
   if (agg.is_event_phrase) {
-    score += 25;
+    score += 100; // Much higher than before (was 25) to guarantee event phrase selection
   }
   
   // Authority from source types
@@ -1341,21 +1343,43 @@ serve(async (req) => {
         ? Array.from(cluster.memberTitles).filter(t => t !== agg.event_title).slice(0, 10)
         : [];
       
-      // Determine canonical label from cluster
-      const canonicalLabel = cluster?.canonicalTitle || agg.event_title;
+      // PHASE 2: Determine canonical label from cluster - ALWAYS prefer event phrases
+      // If cluster has an event phrase as canonical, use it; otherwise check if current topic is an event phrase
+      let canonicalLabel = agg.event_title;
+      let canonicalLabelIsEventPhrase = agg.is_event_phrase;
       
-      // PHASE 2: Determine label_quality based on event phrase detection
-      const words = agg.event_title.split(/\s+/);
+      if (cluster) {
+        // Cluster's canonical is already the highest authority (which now strongly prefers event phrases)
+        canonicalLabel = cluster.canonicalTitle;
+        canonicalLabelIsEventPhrase = cluster.isEventPhrase;
+        
+        // PHASE 2 SAFETY: If cluster's canonical is NOT an event phrase but cluster contains one,
+        // override to use the best event phrase from the cluster
+        if (!cluster.isEventPhrase) {
+          const clusterEventPhrases = Array.from(cluster.memberTitles)
+            .filter(t => t.split(/\s+/).length >= 2); // Multi-word = likely event phrase
+          
+          if (clusterEventPhrases.length > 0) {
+            // Pick the most common/first event phrase
+            canonicalLabel = clusterEventPhrases[0];
+            canonicalLabelIsEventPhrase = true;
+            console.log(`[detect-trend-events] PHASE 2: Overrode entity-only canonical "${cluster.canonicalTitle}" with event phrase "${canonicalLabel}"`);
+          }
+        }
+      }
+      
+      // PHASE 2: Determine label_quality based on canonical label (not just current topic)
+      const canonicalWords = canonicalLabel.split(/\s+/);
       let labelQuality: 'event_phrase' | 'entity_only' | 'fallback_generated' = 'entity_only';
       
-      if (agg.is_event_phrase && words.length >= 2) {
+      if (canonicalLabelIsEventPhrase && canonicalWords.length >= 2) {
         // Multi-word event phrase from AI extraction
         labelQuality = 'event_phrase';
-      } else if (words.length === 1) {
-        // Single-word entity label
+      } else if (canonicalWords.length === 1) {
+        // Single-word entity label (could not find or generate an event phrase)
         labelQuality = 'entity_only';
       } else {
-        // Multi-word but not identified as event phrase (likely fallback)
+        // Multi-word but not identified as event phrase (likely fallback generated)
         labelQuality = 'fallback_generated';
       }
       
