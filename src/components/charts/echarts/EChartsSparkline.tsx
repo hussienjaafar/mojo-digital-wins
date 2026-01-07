@@ -105,6 +105,7 @@ export const EChartsSparkline: React.FC<EChartsSparklineProps> = ({
       },
       tooltip: {
         trigger: "axis",
+        confine: true,
         backgroundColor: "hsl(var(--portal-bg-tertiary))",
         borderColor: "hsl(var(--portal-border))",
         textStyle: {
@@ -134,18 +135,7 @@ export const EChartsSparkline: React.FC<EChartsSparklineProps> = ({
             width: 2,
           },
           emphasis: {
-            disabled: false,
-            focus: "series",
-            lineStyle: {
-              width: 2.5,
-            },
-            itemStyle: {
-              color,
-              borderColor: "hsl(var(--portal-bg-secondary))",
-              borderWidth: 2,
-              shadowColor: color,
-              shadowBlur: 8,
-            },
+            disabled: true,
           },
           ...(showArea && {
             areaStyle: {

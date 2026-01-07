@@ -161,7 +161,7 @@ export function buildHeroKpis({
       },
       subtitle: `${(recurringHealth?.new_recurring_donors || 0).toLocaleString()} new recurring donors in period`,
       accent: "purple" as HeroKpiAccent,
-      sparklineData: [],
+      sparklineData: sparklines?.newMrr || [],
       description: "MRR from donors who started recurring in the selected period",
       breakdown: [
         { label: "New MRR", value: formatCurrency(recurringHealth?.new_recurring_mrr || 0) },
