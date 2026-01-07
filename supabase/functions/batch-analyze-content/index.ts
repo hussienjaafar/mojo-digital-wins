@@ -79,7 +79,8 @@ function canonicalizeEntity(name: string): { canonical: string; type: string } {
 }
 
 /**
- * Validate event phrase quality - must be 2-5 words, descriptive, verb-centered preferred
+ * Validate event phrase quality - must be 2-6 words, descriptive, verb-centered preferred
+ * PHASE 2: Strengthened validation with expanded verb/noun lists
  */
 function isValidEventPhrase(phrase: string): boolean {
   const words = phrase.trim().split(/\s+/);
@@ -88,18 +89,48 @@ function isValidEventPhrase(phrase: string): boolean {
   // Must contain at least one proper noun or action word
   const hasProperNoun = /[A-Z][a-z]+/.test(phrase);
   
-  // Verb-centered action words (preferred for event phrases)
-  const actionVerbs = ['vote', 'pass', 'passes', 'block', 'blocks', 'reject', 'rejects', 
-                       'approve', 'approves', 'sign', 'signs', 'fire', 'fires', 'resign',
-                       'announce', 'announces', 'launch', 'launches', 'ban', 'bans',
-                       'arrest', 'arrests', 'indict', 'indicts', 'sue', 'sues'];
+  // PHASE 2: Expanded verb-centered action words
+  const actionVerbs = [
+    // Legislative actions
+    'vote', 'votes', 'pass', 'passes', 'block', 'blocks', 'reject', 'rejects',
+    'approve', 'approves', 'sign', 'signs', 'veto', 'vetoes', 'filibuster', 'filibusters',
+    // Executive actions
+    'fire', 'fires', 'resign', 'resigns', 'nominate', 'nominates', 'appoint', 'appoints',
+    'order', 'orders', 'pardon', 'pardons', 'commute', 'commutes', 'revoke', 'revokes',
+    // Judicial actions
+    'rule', 'rules', 'overturn', 'overturns', 'uphold', 'upholds', 'strike', 'strikes',
+    'dismiss', 'dismisses', 'grant', 'grants', 'deny', 'denies', 'affirm', 'affirms',
+    // Law enforcement
+    'arrest', 'arrests', 'indict', 'indicts', 'sue', 'sues', 'charge', 'charges',
+    'convict', 'convicts', 'acquit', 'acquits', 'sentence', 'sentences', 'raid', 'raids',
+    'seize', 'seizes', 'deport', 'deports', 'detain', 'detains',
+    // Policy/diplomacy
+    'announce', 'announces', 'launch', 'launches', 'ban', 'bans', 'sanction', 'sanctions',
+    'threaten', 'threatens', 'warn', 'warns', 'demand', 'demands', 'propose', 'proposes',
+    'withdraw', 'withdraws', 'suspend', 'suspends', 'expand', 'expands', 'cut', 'cuts',
+    // Conflict/crisis
+    'attack', 'attacks', 'invade', 'invades', 'strike', 'strikes', 'bomb', 'bombs',
+    'collapse', 'collapses', 'halt', 'halts', 'escalate', 'escalates', 'cease', 'ceases',
+    // Economic
+    'raise', 'raises', 'lower', 'lowers', 'freeze', 'freezes', 'surge', 'surges',
+  ];
   const hasActionVerb = actionVerbs.some(v => phrase.toLowerCase().includes(v));
   
-  // Event nouns (acceptable but less preferred)
-  const eventNouns = ['ruling', 'trial', 'hearing', 'shooting', 'protest', 'election', 
-                      'debate', 'speech', 'summit', 'policy', 'crisis', 'scandal',
-                      'resignation', 'nomination', 'confirmation', 'sanctions', 'tariffs',
-                      'investigation', 'indictment', 'verdict', 'vote', 'bill'];
+  // PHASE 2: Expanded event nouns
+  const eventNouns = [
+    // Legal/judicial
+    'ruling', 'trial', 'hearing', 'verdict', 'indictment', 'conviction', 'acquittal',
+    'lawsuit', 'injunction', 'subpoena', 'testimony', 'deposition',
+    // Political
+    'vote', 'bill', 'election', 'impeachment', 'nomination', 'confirmation', 'veto',
+    'filibuster', 'shutdown', 'debate', 'speech', 'summit', 'rally',
+    // Crisis/conflict
+    'shooting', 'protest', 'crisis', 'scandal', 'attack', 'bombing', 'strike', 'raid',
+    'ceasefire', 'invasion', 'collapse', 'evacuation', 'explosion',
+    // Policy
+    'resignation', 'sanctions', 'tariffs', 'investigation', 'probe', 'audit',
+    'deportation', 'pardon', 'ban', 'order', 'mandate', 'regulation',
+  ];
   const hasEventNoun = eventNouns.some(w => phrase.toLowerCase().includes(w));
   
   return hasProperNoun && (hasActionVerb || hasEventNoun);
@@ -107,44 +138,80 @@ function isValidEventPhrase(phrase: string): boolean {
 
 /**
  * Generate fallback event phrase from headline when AI only returns entities
- * Uses NLP rules to extract verb-centered phrases
+ * PHASE 2: Strengthened with more patterns and better Subject+Verb+Object extraction
  */
 function generateFallbackEventPhrase(title: string, entities: Array<{ name: string; type: string; canonical: string }>): string | null {
   if (!title || entities.length === 0) return null;
   
-  // Common headline verb patterns
+  const titleClean = title.trim();
+  
+  // PHASE 2: Expanded verb patterns for Subject + Verb + Object extraction
   const verbPatterns = [
-    /(\w+)\s+(passes?|blocks?|rejects?|approves?|signs?|fires?|resigns?|announces?|launches?|bans?|arrests?|indicts?|sues?)\s+(.+)/i,
-    /(\w+)\s+(?:to|will)\s+(\w+)\s+(.+)/i,
-    /(\w+)\s+(\w+ed)\s+(?:for|over|after|by)\s+(.+)/i,
+    // Active voice: "Trump Fires FBI Director", "House Passes Bill"
+    /^(\w+(?:\s+\w+)?)\s+(passes?|blocks?|rejects?|approves?|signs?|fires?|resigns?|announces?|launches?|bans?|arrests?|indicts?|sues?|orders?|vetoes?|strikes?|rules?|overturns?|upholds?|halts?|suspends?|expands?|cuts?|threatens?|warns?|demands?|proposes?|withdraws?|seizes?|raids?|deports?|detains?|pardons?|revokes?|nominates?|appoints?|dismisses?|grants?|denies?|charges?|convicts?|acquits?|sentences?|attacks?|invades?|bombs?|collapses?|escalates?|ceases?|freezes?|raises?|lowers?)\s+(.+)/i,
+    // With infinitive: "Biden to Sign Executive Order"
+    /^(\w+(?:\s+\w+)?)\s+(?:to|will)\s+(sign|pass|block|reject|approve|fire|ban|launch|order|halt|suspend|expand|cut|withdraw|strike|attack|invade|raid|seize|deport|pardon|revoke|nominate|appoint)\s+(.+)/i,
+    // Past tense: "Trump Fired for Ethics Violations"
+    /^(\w+(?:\s+\w+)?)\s+(fired|arrested|indicted|charged|convicted|acquitted|sentenced|raided|seized|deported|detained|pardoned|revoked|nominated|appointed|dismissed)\s+(?:for|over|after|by|in|following)\s+(.+)/i,
+    // Passive voice: "Bill Passed by House", "Director Fired by Trump"
+    /^(.+?)\s+(passed|blocked|rejected|approved|signed|fired|banned|struck|ordered|halted|suspended)\s+by\s+(\w+(?:\s+\w+)?)/i,
+    // "X faces Y" pattern: "Trump Faces Indictment"
+    /^(\w+(?:\s+\w+)?)\s+(faces?|face)\s+(.+)/i,
+    // "X wins/loses Y" pattern: "Democrats Win Senate"
+    /^(\w+(?:\s+\w+)?)\s+(wins?|loses?|won|lost)\s+(.+)/i,
   ];
   
   for (const pattern of verbPatterns) {
-    const match = title.match(pattern);
+    const match = titleClean.match(pattern);
     if (match) {
-      // Extract subject + verb + object snippet
-      const subject = match[1];
-      const verb = match[2];
-      const objectSnippet = match[3].split(/[,.\-–]/).map(s => s.trim())[0];
+      let subject = match[1];
+      let verb = match[2];
+      let objectPart = match[3];
       
-      // Build phrase: limit to 5 words
-      const phraseWords = `${subject} ${verb} ${objectSnippet}`.split(/\s+/).slice(0, 5);
-      const phrase = phraseWords.join(' ');
+      // Clean up object: take first phrase segment (before comma, dash, colon)
+      objectPart = objectPart.split(/[,.\-–:;]/).map(s => s.trim())[0];
       
-      if (phrase.split(/\s+/).length >= 2) {
-        return phrase.split(' ').map(w => 
+      // Build phrase: Subject + Verb + Object (limit to 5 words total)
+      const rawPhrase = `${subject} ${verb} ${objectPart}`;
+      const phraseWords = rawPhrase.split(/\s+/).slice(0, 5);
+      
+      if (phraseWords.length >= 2) {
+        // Title case each word
+        const phrase = phraseWords.map(w => 
           w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
         ).join(' ');
+        return phrase;
       }
     }
   }
   
-  // Fallback: Use top entity + first action word from title
-  const actionWords = title.match(/\b(vote|bill|ruling|crisis|ban|tariff|policy|probe|investigation|hearing|trial|arrest|firing|resignation)\b/i);
-  if (actionWords && entities.length > 0) {
+  // PHASE 2: Expanded event noun fallback
+  const eventNounPattern = /\b(vote|bill|ruling|crisis|ban|tariff|policy|probe|investigation|hearing|trial|arrest|firing|resignation|indictment|verdict|conviction|acquittal|sanction|ceasefire|attack|bombing|strike|raid|protest|scandal|impeachment|shutdown|veto|deportation|pardon|order|mandate|summit|election|debate)\b/i;
+  const actionMatch = title.match(eventNounPattern);
+  
+  if (actionMatch && entities.length > 0) {
+    // Use top entity + event noun
     const topEntity = entities[0].canonical || entities[0].name;
-    const action = actionWords[1];
-    return `${topEntity} ${action.charAt(0).toUpperCase() + action.slice(1).toLowerCase()}`;
+    const action = actionMatch[1];
+    const phrase = `${topEntity} ${action.charAt(0).toUpperCase() + action.slice(1).toLowerCase()}`;
+    
+    // Only return if it's at least 2 words
+    if (phrase.split(/\s+/).length >= 2) {
+      return phrase;
+    }
+  }
+  
+  // PHASE 2: Last resort - combine top 2 entities if multi-word
+  if (entities.length >= 2) {
+    const e1 = entities[0].canonical || entities[0].name;
+    const e2 = entities[1].canonical || entities[1].name;
+    // Only if they're different and result is meaningful
+    if (e1 !== e2 && e1.length > 2 && e2.length > 2) {
+      const combined = `${e1} ${e2}`;
+      if (combined.split(/\s+/).length >= 2 && combined.split(/\s+/).length <= 5) {
+        return combined;
+      }
+    }
   }
   
   return null;
