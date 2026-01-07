@@ -289,8 +289,8 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
             data={trendChartData}
             xAxisKey="name"
             series={[
-              { dataKey: "Amount", name: "Amount", color: "hsl(var(--portal-success))", valueType: "currency" },
-              { dataKey: "Donations", name: "Donations", color: "hsl(var(--portal-accent-blue))", valueType: "number" },
+              { dataKey: "Amount", name: "Amount", color: "hsl(var(--portal-success))", valueType: "currency", yAxisIndex: 0 },
+              { dataKey: "Donations", name: "Donations", color: "hsl(var(--portal-accent-blue))", valueType: "number", yAxisIndex: 1 },
             ]}
             valueType="currency"
             dualYAxis

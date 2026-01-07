@@ -60,6 +60,8 @@ export interface V3DonutChartProps {
   enableAccessibility?: boolean;
   /** Custom data processing options */
   dataOptions?: ProcessDonutDataOptions;
+  /** Disable hover emphasis to prevent visual glitches */
+  disableHoverEmphasis?: boolean;
 }
 
 export const V3DonutChart: React.FC<V3DonutChartProps> = ({
@@ -78,6 +80,7 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
   emptyDescription = "There is no data to display in this chart.",
   enableAccessibility = true,
   dataOptions,
+  disableHoverEmphasis = true,
 }) => {
   // Track selected/hovered slice for center label
   const [hoveredSlice, setHoveredSlice] = useState<{ name: string; value: number; percent: number } | null>(null);
@@ -345,16 +348,22 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
           labelLine: {
             show: false,
           },
-          // Emphasis on hover
-          emphasis: {
-            scale: true,
-            scaleSize: 6,
-            itemStyle: {
-              shadowBlur: 20,
-              shadowOffsetX: 0,
-              shadowColor: "rgba(0, 0, 0, 0.2)",
-            },
-          },
+          // Emphasis on hover - disable to prevent visual glitches
+          emphasis: disableHoverEmphasis
+            ? { disabled: true }
+            : {
+                scale: true,
+                scaleSize: 6,
+                itemStyle: {
+                  shadowBlur: 20,
+                  shadowOffsetX: 0,
+                  shadowColor: "rgba(0, 0, 0, 0.2)",
+                },
+              },
+          // Prevent blur on other slices when disabled
+          ...(disableHoverEmphasis && {
+            blur: { itemStyle: { opacity: 1 } },
+          }),
           // Dim other slices on hover
           select: {
             disabled: false,
