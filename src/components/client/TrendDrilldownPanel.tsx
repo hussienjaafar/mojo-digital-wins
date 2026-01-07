@@ -37,7 +37,14 @@ import {
   Shield,
   Layers,
   ShieldCheck,
+  FileText,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ============================================================================
 // Types
@@ -48,6 +55,74 @@ interface TrendDrilldownPanelProps {
   organizationId?: string;
   relevanceExplanation?: string;
   onClose: () => void;
+}
+
+// ============================================================================
+// Label Quality Helper
+// ============================================================================
+
+type LabelQuality = 'event_phrase' | 'fallback_generated' | 'entity_only' | 'unknown';
+
+function getLabelQualityInfo(trend: TrendEvent): { 
+  quality: LabelQuality; 
+  label: string; 
+  variant: 'success' | 'warning' | 'muted'; 
+  tooltip: string;
+} {
+  // Check confidence_factors for label_quality or infer from trend properties
+  const factors = trend.confidence_factors as Record<string, unknown> | null;
+  const labelQuality = (factors?.label_quality as LabelQuality) || 
+    (trend.is_event_phrase ? 'event_phrase' : 'unknown');
+  
+  switch (labelQuality) {
+    case 'event_phrase':
+      return {
+        quality: 'event_phrase',
+        label: 'Event phrase',
+        variant: 'success',
+        tooltip: 'Strong label describing what happened (e.g. "House passes spending bill")'
+      };
+    case 'fallback_generated':
+      return {
+        quality: 'fallback_generated',
+        label: 'Fallback label',
+        variant: 'warning',
+        tooltip: 'Auto-generated label from headline patterns. May be less descriptive.'
+      };
+    case 'entity_only':
+      return {
+        quality: 'entity_only',
+        label: 'Entity label',
+        variant: 'muted',
+        tooltip: 'Label based on entity name only. Less context about what happened.'
+      };
+    default:
+      // Infer from title structure
+      const words = trend.event_title?.split(/\s+/) || [];
+      const hasVerb = /\b(passes|blocks|signs|announces|launches|faces|wins|loses|approves|rejects)\b/i.test(trend.event_title || '');
+      
+      if (words.length >= 3 && hasVerb) {
+        return {
+          quality: 'event_phrase',
+          label: 'Event phrase',
+          variant: 'success',
+          tooltip: 'Strong label describing what happened'
+        };
+      } else if (words.length === 1) {
+        return {
+          quality: 'entity_only',
+          label: 'Entity label',
+          variant: 'muted',
+          tooltip: 'Single entity name. Less context about what happened.'
+        };
+      }
+      return {
+        quality: 'unknown',
+        label: 'Standard label',
+        variant: 'muted',
+        tooltip: 'Trend label'
+      };
+  }
 }
 
 // ============================================================================
@@ -482,6 +557,7 @@ export function TrendDrilldownPanel({
   const [showAllEvidence, setShowAllEvidence] = useState(false);
 
   const stageInfo = getTrendStageInfo(trend.trend_stage);
+  const labelQualityInfo = getLabelQualityInfo(trend);
 
   // Calculate baseline delta
   const baselineDelta = trend.baseline_7d > 0 
@@ -508,6 +584,27 @@ export function TrendDrilldownPanel({
             <h2 className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">
               {trend.event_title}
             </h2>
+            {/* Label Quality Indicator */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <FileText className="h-3 w-3 text-[hsl(var(--portal-text-muted))]" />
+                    <span className={cn(
+                      "text-xs",
+                      labelQualityInfo.variant === 'success' && "text-[hsl(var(--portal-success))]",
+                      labelQualityInfo.variant === 'warning' && "text-[hsl(var(--portal-warning))]",
+                      labelQualityInfo.variant === 'muted' && "text-[hsl(var(--portal-text-muted))]"
+                    )}>
+                      {labelQualityInfo.label}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[250px]">
+                  <p className="text-xs">{labelQualityInfo.tooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             {relevanceExplanation && (
               <p className="text-sm text-[hsl(var(--portal-accent-blue))] flex items-center gap-1.5 mt-1">
                 <Target className="h-3.5 w-3.5" />
