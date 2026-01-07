@@ -13,8 +13,8 @@ export type KpiKey =
   | 'netRevenue'
   | 'netRoi'
   | 'refundRate'
-  | 'recurringHealth'
-  | 'attributionQuality'
+  | 'currentMrr'
+  | 'newMrr'
   | 'uniqueDonors';
 
 export type SeriesKey =
@@ -52,8 +52,8 @@ export const KPI_TO_SERIES_MAP: Record<KpiKey, SeriesKey[]> = {
   netRevenue: ['netDonations'],
   netRoi: [], // Derived metric - highlighting spend series would be misleading
   refundRate: ['refunds', 'donations'],
-  recurringHealth: [], // No recurring-specific series in Fundraising chart
-  attributionQuality: [], // No attribution series in Fundraising chart
+  currentMrr: [], // No recurring-specific series in Fundraising chart
+  newMrr: [], // No recurring-specific series in Fundraising chart
   uniqueDonors: [], // No donor count series in Fundraising chart
 };
 

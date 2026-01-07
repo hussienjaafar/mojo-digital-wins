@@ -55,12 +55,12 @@ async function fetchKpiDrilldown(
       return fetchRoiDrilldown(organizationId, startDate, endDate);
     case "refundRate":
       return fetchRefundDrilldown(organizationId, startDate, endDate);
-    case "recurringHealth":
-      return fetchRecurringDrilldown(organizationId, startDate, endDate);
+    case "currentMrr":
+      return fetchCurrentMrrDrilldown(organizationId, startDate, endDate);
+    case "newMrr":
+      return fetchNewMrrDrilldown(organizationId, startDate, endDate);
     case "uniqueDonors":
       return fetchDonorsDrilldown(organizationId, startDate, endDate);
-    case "attributionQuality":
-      return fetchAttributionDrilldown(organizationId, startDate, endDate);
     default:
       return null;
   }
@@ -319,62 +319,98 @@ async function fetchRefundDrilldown(
   };
 }
 
-async function fetchRecurringDrilldown(
+interface RecurringHealthV2Response {
+  current_active_mrr: number;
+  current_active_donors: number;
+  current_paused_donors: number;
+  current_cancelled_donors: number;
+  current_failed_donors: number;
+  current_churned_donors: number;
+  new_recurring_mrr: number;
+  new_recurring_donors: number;
+  period_recurring_revenue: number;
+  period_recurring_transactions: number;
+  avg_recurring_amount: number;
+  upsell_shown: number;
+  upsell_succeeded: number;
+  upsell_rate: number;
+}
+
+async function fetchCurrentMrrDrilldown(
   organizationId: string,
   startDate: string,
   endDate: string
 ): Promise<KpiDrilldownData> {
-  // Use inclusive date range
-  const endDateInclusive = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
-
-  const { data: txData } = await (supabase as any)
-    .from("actblue_transactions_secure")
-    .select("transaction_date, amount, net_amount, is_recurring, transaction_type")
-    .eq("organization_id", organizationId)
-    .gte("transaction_date", startDate)
-    .lt("transaction_date", endDateInclusive);
-
-  const allTx = txData || [];
-
-  // Only count donations (not refunds) for recurring metrics
-  const donations = allTx.filter((tx: any) => tx.transaction_type === 'donation');
-  const recurringDonations = donations.filter((tx: any) => tx.is_recurring === true);
-  const oneTimeDonations = donations.filter((tx: any) => !tx.is_recurring);
-
-  const recurringTotal = recurringDonations.reduce((sum: number, tx: any) => sum + Number(tx.net_amount ?? tx.amount ?? 0), 0);
-  const oneTimeTotal = oneTimeDonations.reduce((sum: number, tx: any) => sum + Number(tx.net_amount ?? tx.amount ?? 0), 0);
-  const overallTotal = recurringTotal + oneTimeTotal;
-  const recurringPercentage = overallTotal > 0 ? (recurringTotal / overallTotal) * 100 : 0;
-
-  // Daily recurring revenue trend
-  const dailyMap = new Map<string, number>();
-  recurringDonations.forEach((tx: any) => {
-    const date = tx.transaction_date?.split('T')[0];
-    if (!date) return;
-    dailyMap.set(date, (dailyMap.get(date) || 0) + Number(tx.net_amount ?? tx.amount ?? 0));
+  // Fetch recurring health data using the v2 RPC
+  const { data: healthData } = await supabase.rpc('get_recurring_health_v2', {
+    _organization_id: organizationId,
+    _start_date: startDate,
+    _end_date: endDate,
   });
 
-  const trendData: KpiTrendPoint[] = Array.from(dailyMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, value]) => ({
-      date: format(parseISO(date), "MMM d"),
-      value,
-    }));
+  const health = (healthData?.[0] || {}) as RecurringHealthV2Response;
+  const currentMrr = Number(health.current_active_mrr || 0);
+  const activeDonors = Number(health.current_active_donors || 0);
+  const avgAmount = Number(health.avg_recurring_amount || 0);
+  const churnedDonors = Number(health.current_churned_donors || 0);
+  const pausedDonors = Number(health.current_paused_donors || 0);
+  const cancelledDonors = Number(health.current_cancelled_donors || 0);
+  
+  const totalDonors = activeDonors + churnedDonors + pausedDonors + cancelledDonors;
+  const activeRate = totalDonors > 0 ? (activeDonors / totalDonors) * 100 : 0;
 
   const breakdown: KpiBreakdownItem[] = [
-    { label: "Recurring Revenue", value: `$${recurringTotal.toLocaleString()}`, percentage: recurringPercentage },
-    { label: "One-time Revenue", value: `$${oneTimeTotal.toLocaleString()}`, percentage: 100 - recurringPercentage },
-    { label: "Recurring Donations", value: recurringDonations.length.toString() },
-    { label: "One-time Donations", value: oneTimeDonations.length.toString() },
+    { label: "Current Active MRR", value: `$${currentMrr.toLocaleString()}` },
+    { label: "Active Donors", value: activeDonors.toLocaleString(), percentage: activeRate },
+    { label: "Avg Recurring Amount", value: `$${avgAmount.toFixed(2)}` },
+    { label: "Churned Donors", value: churnedDonors.toLocaleString() },
+    { label: "Paused Donors", value: pausedDonors.toLocaleString() },
+    { label: "Cancelled Donors", value: cancelledDonors.toLocaleString() },
   ];
 
   return {
-    kpiKey: "recurringHealth",
-    label: "Recurring Health",
-    value: `$${recurringTotal.toLocaleString()}`,
+    kpiKey: "currentMrr",
+    label: "Current Active MRR",
+    value: `$${currentMrr.toLocaleString()}`,
     trend: { value: 0, isPositive: true },
-    description: "Active recurring donation revenue",
-    trendData,
+    description: "Expected monthly revenue from currently active recurring donors",
+    trendData: [],
+    breakdown,
+  };
+}
+
+async function fetchNewMrrDrilldown(
+  organizationId: string,
+  startDate: string,
+  endDate: string
+): Promise<KpiDrilldownData> {
+  // Fetch recurring health data using the v2 RPC
+  const { data: healthData } = await supabase.rpc('get_recurring_health_v2', {
+    _organization_id: organizationId,
+    _start_date: startDate,
+    _end_date: endDate,
+  });
+
+  const health = (healthData?.[0] || {}) as RecurringHealthV2Response;
+  const newMrr = Number(health.new_recurring_mrr || 0);
+  const newDonors = Number(health.new_recurring_donors || 0);
+  const periodRevenue = Number(health.period_recurring_revenue || 0);
+  const periodTx = Number(health.period_recurring_transactions || 0);
+
+  const breakdown: KpiBreakdownItem[] = [
+    { label: "New MRR Added", value: `$${newMrr.toLocaleString()}` },
+    { label: "New Recurring Donors", value: newDonors.toLocaleString() },
+    { label: "Period Recurring Revenue", value: `$${periodRevenue.toLocaleString()}` },
+    { label: "Period Transactions", value: periodTx.toLocaleString() },
+  ];
+
+  return {
+    kpiKey: "newMrr",
+    label: "New MRR Added",
+    value: `$${newMrr.toLocaleString()}`,
+    trend: { value: newDonors, isPositive: newDonors > 0 },
+    description: "MRR from donors who started recurring in the selected period",
+    trendData: [],
     breakdown,
   };
 }
@@ -443,109 +479,6 @@ async function fetchDonorsDrilldown(
   };
 }
 
-async function fetchAttributionDrilldown(
-  organizationId: string,
-  startDate: string,
-  endDate: string
-): Promise<KpiDrilldownData> {
-  // Use inclusive date range
-  const endDateInclusive = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
-
-  // Try to use donation_attribution view for accurate attribution data
-  const [{ data: attrData }, { data: txData }] = await Promise.all([
-    (supabase as any)
-      .from("donation_attribution")
-      .select("attribution_method, attributed_platform, transaction_type")
-      .eq("organization_id", organizationId)
-      .gte("transaction_date", startDate)
-      .lt("transaction_date", endDateInclusive)
-      .eq("transaction_type", "donation"),
-    (supabase as any)
-      .from("actblue_transactions_secure")
-      .select("refcode, source_campaign, click_id, fbclid, transaction_type")
-      .eq("organization_id", organizationId)
-      .gte("transaction_date", startDate)
-      .lt("transaction_date", endDateInclusive)
-      .eq("transaction_type", "donation"),
-  ]);
-
-  const attributions = attrData || [];
-  const donations = txData || [];
-
-  let breakdown: KpiBreakdownItem[];
-  let deterministicRate: number;
-
-  if (attributions.length > 0) {
-    // Use donation_attribution view for accurate breakdown
-    const byMethod: Record<string, number> = {};
-    attributions.forEach((a: any) => {
-      const method = a.attribution_method || 'unattributed';
-      byMethod[method] = (byMethod[method] || 0) + 1;
-    });
-
-    const total = attributions.length;
-    const deterministic = total - (byMethod['unattributed'] || 0);
-    deterministicRate = total > 0 ? (deterministic / total) * 100 : 0;
-
-    // Log attribution breakdown for observability
-    logger.debug('Attribution drilldown from donation_attribution', {
-      total,
-      byMethod,
-      deterministicRate: deterministicRate.toFixed(1) + '%',
-    });
-
-    // Warn if SMS attribution is missing when expected
-    if ((byMethod['sms_last_touch'] || 0) === 0) {
-      logger.debug('No SMS last-touch attributions found in drilldown');
-    }
-
-    breakdown = [
-      { label: "Refcode", value: (byMethod['refcode'] || 0).toString(), percentage: total > 0 ? ((byMethod['refcode'] || 0) / total) * 100 : 0 },
-      { label: "Click ID/FBCLID", value: (byMethod['click_id'] || 0).toString(), percentage: total > 0 ? ((byMethod['click_id'] || 0) / total) * 100 : 0 },
-      { label: "SMS Last-Touch", value: (byMethod['sms_last_touch'] || 0).toString(), percentage: total > 0 ? ((byMethod['sms_last_touch'] || 0) / total) * 100 : 0 },
-      { label: "Regex Match", value: (byMethod['regex'] || 0).toString(), percentage: total > 0 ? ((byMethod['regex'] || 0) / total) * 100 : 0 },
-      { label: "Unattributed", value: (byMethod['unattributed'] || 0).toString(), percentage: total > 0 ? ((byMethod['unattributed'] || 0) / total) * 100 : 0 },
-      { label: "Total Donations", value: total.toString() },
-    ];
-  } else {
-    // Fallback to transaction-level fields
-    logger.warn('Attribution drilldown fallback: donation_attribution view returned no data');
-
-    const total = donations.length;
-    const withRefcode = donations.filter((tx: any) => tx.refcode).length;
-    const withClickId = donations.filter((tx: any) => tx.click_id || tx.fbclid).length;
-    const withCampaign = donations.filter((tx: any) => tx.source_campaign && !tx.refcode && !tx.click_id && !tx.fbclid).length;
-    const deterministic = donations.filter((tx: any) => tx.refcode || tx.source_campaign || tx.click_id || tx.fbclid).length;
-    const unattributed = total - deterministic;
-    deterministicRate = total > 0 ? (deterministic / total) * 100 : 0;
-
-    logger.debug('Attribution fallback breakdown', {
-      total,
-      withRefcode,
-      withClickId,
-      withCampaign,
-      unattributed,
-    });
-
-    breakdown = [
-      { label: "With Refcode", value: withRefcode.toString(), percentage: total > 0 ? (withRefcode / total) * 100 : 0 },
-      { label: "With Click ID/FBCLID", value: withClickId.toString(), percentage: total > 0 ? (withClickId / total) * 100 : 0 },
-      { label: "With Campaign", value: withCampaign.toString(), percentage: total > 0 ? (withCampaign / total) * 100 : 0 },
-      { label: "Unattributed", value: unattributed.toString(), percentage: total > 0 ? (unattributed / total) * 100 : 0 },
-      { label: "Total Donations", value: total.toString() },
-    ];
-  }
-
-  return {
-    kpiKey: "attributionQuality",
-    label: "Attribution Quality",
-    value: `${deterministicRate.toFixed(0)}%`,
-    trend: { value: 0, isPositive: deterministicRate >= 50 },
-    description: "Percentage of donations with deterministic attribution (refcode, click_id, SMS, etc.)",
-    trendData: [], // Attribution doesn't have a meaningful daily trend
-    breakdown,
-  };
-}
 
 // ============================================================================
 // Hook
