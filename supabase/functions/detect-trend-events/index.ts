@@ -141,11 +141,17 @@ const TOPIC_BLOCKLIST: Set<string> = new Set([
 const EVERGREEN_ENTITIES: Set<string> = new Set([
   // Political figures always in news
   'trump', 'biden', 'harris', 'obama', 'pelosi', 'mcconnell', 'schumer',
+  'musk', 'putin', 'netanyahu', 'zelensky', 'xi jinping', 'vance', 'walz',
   // Government bodies
   'white house', 'pentagon', 'state department', 'justice department',
+  'congress', 'senate', 'house', 'supreme court', 'capitol',
+  // Geopolitical hotspots (always in news)
+  'gaza', 'israel', 'ukraine', 'russia', 'china', 'taiwan', 'iran',
+  'greenland', 'nato', 'eu', 'european union', 'middle east', 'west bank',
   // Recurring topics
   'immigration', 'border', 'economy', 'inflation', 'healthcare', 'climate',
   'taxes', 'election', 'campaign', 'poll', 'polls', 'voter', 'voting',
+  'tariffs', 'trade', 'democracy', 'freedom', 'abortion', 'gun', 'guns',
 ]);
 
 // Evergreen detection: check if topic is typically always-on
@@ -155,6 +161,9 @@ function isEvergreenTopic(topicKey: string, baseline7d: number, baseline30d: num
   // Check explicit evergreen list
   if (EVERGREEN_ENTITIES.has(normalizedKey)) return true;
   
+  // PHASE A: Single-word topics that match common geo/political patterns are pseudo-evergreen
+  const isSingleWord = normalizedKey.split(/\s+/).length === 1;
+  
   // Heuristic: if 30d baseline is high and relatively stable, it's evergreen
   // A topic with consistent high volume (baseline30d > 2/hour) is likely evergreen
   if (baseline30d >= 2 && baseline7d >= 1.5) {
@@ -163,24 +172,37 @@ function isEvergreenTopic(topicKey: string, baseline7d: number, baseline30d: num
     if (stabilityRatio < 0.3) return true; // Less than 30% variance = stable/evergreen
   }
   
+  // PHASE A: Lower threshold for single-word entities (more aggressive evergreen detection)
+  if (isSingleWord && baseline30d >= 1 && baseline7d >= 0.8) {
+    const stabilityRatio = Math.abs(baseline7d - baseline30d) / Math.max(baseline30d, 0.1);
+    if (stabilityRatio < 0.5) return true; // 50% variance tolerance for single-word
+  }
+  
   return false;
 }
 
-// Calculate evergreen penalty (0.3-1.0): lower for evergreen unless spiking
+// Calculate evergreen penalty (0.15-1.0): lower for evergreen unless spiking
+// PHASE A: Strengthened penalties + single-word entity penalty
 function calculateEvergreenPenalty(
   isEvergreen: boolean, 
   zScoreVelocity: number, 
-  hasHistoricalBaseline: boolean
+  hasHistoricalBaseline: boolean,
+  isSingleWordEntity: boolean = false
 ): number {
-  if (!isEvergreen) return 1.0; // No penalty for non-evergreen
+  // PHASE A: Single-word entities get base penalty even if not in evergreen list
+  // This suppresses vague single-word labels like "Gaza", "Greenland"
+  const baseEntityPenalty = isSingleWordEntity ? 0.6 : 1.0;
   
-  // If evergreen but genuinely spiking (z-score > 3), reduce penalty
-  if (zScoreVelocity > 4) return 0.9;  // Massive spike overcomes most penalty
-  if (zScoreVelocity > 3) return 0.7;  // Strong spike reduces penalty
-  if (zScoreVelocity > 2) return 0.5;  // Moderate spike gets moderate penalty
+  if (!isEvergreen) return baseEntityPenalty;
   
-  // Evergreen with no significant spike gets heavy penalty
-  return hasHistoricalBaseline ? 0.3 : 0.4;
+  // PHASE A: Strengthened - require MUCH higher z-score to overcome penalty
+  if (zScoreVelocity > 6) return 0.85 * baseEntityPenalty;  // Extreme spike
+  if (zScoreVelocity > 5) return 0.65 * baseEntityPenalty;  // Very strong spike  
+  if (zScoreVelocity > 4) return 0.45 * baseEntityPenalty;  // Strong spike
+  if (zScoreVelocity > 3) return 0.30 * baseEntityPenalty;  // Moderate spike
+  
+  // Evergreen with no significant spike gets HEAVY penalty
+  return hasHistoricalBaseline ? 0.15 * baseEntityPenalty : 0.20 * baseEntityPenalty;
 }
 
 // ============================================================================
@@ -225,6 +247,7 @@ function calculateRankScore(params: {
   baselineQuality: number;
   current1h: number;
   current24h: number;
+  labelQuality: 'event_phrase' | 'entity_only' | 'fallback_generated';
 }): number {
   const {
     zScoreVelocity,
@@ -238,6 +261,7 @@ function calculateRankScore(params: {
     baselineQuality,
     current1h,
     current24h,
+    labelQuality,
   } = params;
   
   // Component 1: Velocity Score (0-50) - PRIMARY FACTOR
@@ -269,12 +293,22 @@ function calculateRankScore(params: {
     Math.log2(current1h + 1) * 4 + Math.log2(current24h + 1) * 2
   );
   
+  // PHASE A: Label quality modifier
+  // Event phrases get full score, entity-only gets penalized unless high corroboration
+  let labelQualityModifier = 1.0;
+  if (labelQuality === 'entity_only') {
+    // Heavy penalty for entity-only labels - reduces score by 40-60%
+    labelQualityModifier = hasTier12Corroboration ? 0.6 : 0.4;
+  } else if (labelQuality === 'fallback_generated') {
+    // Slight penalty for fallback-generated labels
+    labelQualityModifier = 0.85;
+  }
+  
   // Calculate raw rank score
   const rawScore = velocityComponent + corroborationComponent + activityComponent;
   
-  // Apply modifiers: recency decay and evergreen penalty
-  // These multiplicatively reduce the score
-  const finalScore = rawScore * recencyDecay * evergreenPenalty;
+  // Apply modifiers: recency decay, evergreen penalty, AND label quality
+  const finalScore = rawScore * recencyDecay * evergreenPenalty * labelQualityModifier;
   
   return Math.round(finalScore * 10) / 10;
 }
@@ -1215,15 +1249,61 @@ serve(async (req) => {
       const meetsVolumeGate = current1h_deduped >= 2 || current24h_deduped >= 5 || sourceCount >= 2;
       
       // ========================================
-      // PHASE 3: EVERGREEN PENALTY CALCULATION
+      // PHASE A: Determine label quality EARLY for use in ranking
+      // (This needs to happen before rank score calculation)
       // ========================================
-      const evergreenPenalty = calculateEvergreenPenalty(isEvergreen, zScoreVelocity, hasHistoricalBaseline);
+      const isSingleWordEntity = agg.event_title.split(/\s+/).length === 1;
+      
+      // Get cluster info for determining canonical label quality
+      const clusterKeyForLabel = keyToCluster.get(key) || key;
+      const clusterForLabel = clusters.get(clusterKeyForLabel);
+      
+      // Determine canonical label from cluster for label quality assessment
+      let canonicalLabelForRanking = agg.event_title;
+      let canonicalLabelIsEventPhraseForRanking = agg.is_event_phrase;
+      
+      if (clusterForLabel) {
+        canonicalLabelForRanking = clusterForLabel.canonicalTitle;
+        canonicalLabelIsEventPhraseForRanking = clusterForLabel.isEventPhrase;
+        
+        if (!clusterForLabel.isEventPhrase) {
+          const clusterEventPhrasesForLabel = Array.from(clusterForLabel.memberTitles)
+            .filter(t => t.split(/\s+/).length >= 2);
+          if (clusterEventPhrasesForLabel.length > 0) {
+            canonicalLabelForRanking = clusterEventPhrasesForLabel[0];
+            canonicalLabelIsEventPhraseForRanking = true;
+          }
+        }
+      }
+      
+      // Determine label quality for ranking
+      const canonicalWordsForRanking = canonicalLabelForRanking.split(/\s+/);
+      let labelQualityForRanking: 'event_phrase' | 'entity_only' | 'fallback_generated' = 'entity_only';
+      
+      if (canonicalLabelIsEventPhraseForRanking && canonicalWordsForRanking.length >= 2) {
+        labelQualityForRanking = 'event_phrase';
+      } else if (canonicalWordsForRanking.length === 1) {
+        labelQualityForRanking = 'entity_only';
+      } else {
+        labelQualityForRanking = 'fallback_generated';
+      }
+      
+      // ========================================
+      // PHASE 3: EVERGREEN PENALTY CALCULATION
+      // PHASE A: Now includes single-word entity penalty
+      // ========================================
+      const evergreenPenalty = calculateEvergreenPenalty(
+        isEvergreen, 
+        zScoreVelocity, 
+        hasHistoricalBaseline,
+        isSingleWordEntity && labelQualityForRanking === 'entity_only'  // Only penalize single-word entity-only labels
+      );
       
       // ========================================
       // PHASE 3: RANK SCORE - Twitter-like trending formula
       // Primary: z-score (burst above baseline)
       // Secondary: corroboration (cross-source)
-      // Modifiers: recency, evergreen suppression
+      // Modifiers: recency, evergreen suppression, label quality
       // ========================================
       const rankScore = calculateRankScore({
         zScoreVelocity,
@@ -1237,6 +1317,7 @@ serve(async (req) => {
         baselineQuality,
         current1h: current1h_deduped,
         current24h: current24h_deduped,
+        labelQuality: labelQualityForRanking,
       });
       
       // LEGACY TREND_SCORE: Keep for backwards compatibility
@@ -1368,27 +1449,19 @@ serve(async (req) => {
         }
       }
       
-      // PHASE 2: Determine label_quality based on canonical label (not just current topic)
-      const canonicalWords = canonicalLabel.split(/\s+/);
-      let labelQuality: 'event_phrase' | 'entity_only' | 'fallback_generated' = 'entity_only';
-      
-      if (canonicalLabelIsEventPhrase && canonicalWords.length >= 2) {
-        // Multi-word event phrase from AI extraction
-        labelQuality = 'event_phrase';
-      } else if (canonicalWords.length === 1) {
-        // Single-word entity label (could not find or generate an event phrase)
-        labelQuality = 'entity_only';
-      } else {
-        // Multi-word but not identified as event phrase (likely fallback generated)
-        labelQuality = 'fallback_generated';
-      }
+      // PHASE 2/A: labelQuality already computed earlier for ranking - reuse it
+      // Use labelQualityForRanking which was computed before rankScore calculation
+      const labelQuality = labelQualityForRanking;
       
       // Build related entities array from the aggregate
       const relatedEntitiesArray = Array.from(agg.related_entities).slice(0, 10);
       
-      // Log evergreen suppression for monitoring
-      if (isEvergreen && evergreenPenalty < 1.0) {
-        console.log(`[detect-trend-events] Evergreen suppressed: "${agg.event_title}" (penalty: ${evergreenPenalty.toFixed(2)}, z-score: ${zScoreVelocity.toFixed(2)})`);
+      // PHASE A: Enhanced logging for evergreen + label quality suppression
+      if (evergreenPenalty < 1.0) {
+        const penaltyReasons: string[] = [];
+        if (isEvergreen) penaltyReasons.push('evergreen');
+        if (isSingleWordEntity && labelQuality === 'entity_only') penaltyReasons.push('single-word-entity');
+        console.log(`[detect-trend-events] Suppressed "${agg.event_title}" (reasons: ${penaltyReasons.join(', ')}, penalty: ${evergreenPenalty.toFixed(2)}, z-score: ${zScoreVelocity.toFixed(2)}, label: ${labelQuality})`);
       }
       
       // Build event record with clustering info + velocity-based ranking + PHASE 2 label quality + PHASE 3 rank score

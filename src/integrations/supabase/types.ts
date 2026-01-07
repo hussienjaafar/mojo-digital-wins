@@ -9686,6 +9686,7 @@ export type Database = {
           entity_type: string | null
           event_key: string | null
           event_title: string | null
+          evergreen_penalty: number | null
           evidence_count: number | null
           first_seen_at: string | null
           has_tier12_corroboration: boolean | null
@@ -9695,9 +9696,13 @@ export type Database = {
           is_tier3_only: boolean | null
           is_trending: boolean | null
           is_verified: boolean | null
+          label_quality: string | null
           last_seen_at: string | null
           news_source_count: number | null
           peak_at: string | null
+          rank_score: number | null
+          recency_decay: number | null
+          related_entities: string[] | null
           related_phrases: string[] | null
           related_topics: string[] | null
           sentiment_label: string | null
@@ -9732,6 +9737,7 @@ export type Database = {
           entity_type?: string | null
           event_key?: string | null
           event_title?: string | null
+          evergreen_penalty?: number | null
           evidence_count?: number | null
           first_seen_at?: string | null
           has_tier12_corroboration?: boolean | null
@@ -9741,9 +9747,13 @@ export type Database = {
           is_tier3_only?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
+          label_quality?: string | null
           last_seen_at?: string | null
           news_source_count?: number | null
           peak_at?: string | null
+          rank_score?: number | null
+          recency_decay?: number | null
+          related_entities?: string[] | null
           related_phrases?: string[] | null
           related_topics?: string[] | null
           sentiment_label?: string | null
@@ -9778,6 +9788,7 @@ export type Database = {
           entity_type?: string | null
           event_key?: string | null
           event_title?: string | null
+          evergreen_penalty?: number | null
           evidence_count?: number | null
           first_seen_at?: string | null
           has_tier12_corroboration?: boolean | null
@@ -9787,9 +9798,13 @@ export type Database = {
           is_tier3_only?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
+          label_quality?: string | null
           last_seen_at?: string | null
           news_source_count?: number | null
           peak_at?: string | null
+          rank_score?: number | null
+          recency_decay?: number | null
+          related_entities?: string[] | null
           related_phrases?: string[] | null
           related_topics?: string[] | null
           sentiment_label?: string | null
