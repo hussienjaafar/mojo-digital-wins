@@ -10079,6 +10079,29 @@ export type Database = {
           upsell_succeeded: number
         }[]
       }
+      get_recurring_health_v2: {
+        Args: {
+          _end_date: string
+          _organization_id: string
+          _start_date: string
+        }
+        Returns: {
+          avg_recurring_amount: number
+          current_active_donors: number
+          current_active_mrr: number
+          current_cancelled_donors: number
+          current_churned_donors: number
+          current_failed_donors: number
+          current_paused_donors: number
+          new_recurring_donors: number
+          new_recurring_mrr: number
+          period_recurring_revenue: number
+          period_recurring_transactions: number
+          upsell_rate: number
+          upsell_shown: number
+          upsell_succeeded: number
+        }[]
+      }
       get_state_city_breakdown: {
         Args: { _organization_id: string; _state_abbr: string }
         Returns: Json

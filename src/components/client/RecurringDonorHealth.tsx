@@ -12,21 +12,32 @@ import {
   TrendingUp, 
   DollarSign,
   Users,
-  ArrowUpCircle
+  ArrowUpCircle,
+  Calendar,
+  PlusCircle,
+  AlertTriangle
 } from "lucide-react";
 
 interface RecurringHealthData {
-  active_recurring: number;
-  paused_recurring: number;
-  cancelled_recurring: number;
-  failed_recurring: number;
-  mrr: number;
+  // Current state (point-in-time)
+  current_active_mrr: number;
+  current_active_donors: number;
+  current_paused_donors: number;
+  current_cancelled_donors: number;
+  current_failed_donors: number;
+  current_churned_donors: number;
+  
+  // Period metrics
+  new_recurring_mrr: number;
+  new_recurring_donors: number;
+  period_recurring_revenue: number;
+  period_recurring_transactions: number;
+  
+  // Derived
+  avg_recurring_amount: number;
   upsell_shown: number;
   upsell_succeeded: number;
   upsell_rate: number;
-  avg_recurring_amount: number;
-  recurring_donor_count: number;
-  total_recurring_revenue: number;
 }
 
 interface RecurringDonorHealthProps {
@@ -37,9 +48,9 @@ interface RecurringDonorHealthProps {
 
 export function RecurringDonorHealth({ organizationId, startDate, endDate }: RecurringDonorHealthProps) {
   const { data: healthData, isLoading, error } = useQuery({
-    queryKey: ['recurring-health', organizationId, startDate, endDate],
+    queryKey: ['recurring-health-v2', organizationId, startDate, endDate],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_recurring_health', {
+      const { data, error } = await supabase.rpc('get_recurring_health_v2', {
         _organization_id: organizationId,
         _start_date: startDate,
         _end_date: endDate,
@@ -55,8 +66,8 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
             <Skeleton key={i} className="h-32" />
           ))}
         </div>
@@ -84,14 +95,15 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
     );
   }
 
-  const totalRecurring = 
-    healthData.active_recurring + 
-    healthData.paused_recurring + 
-    healthData.cancelled_recurring + 
-    healthData.failed_recurring;
+  const totalDonors = 
+    healthData.current_active_donors + 
+    healthData.current_paused_donors + 
+    healthData.current_cancelled_donors + 
+    healthData.current_failed_donors +
+    healthData.current_churned_donors;
 
-  const activeRate = totalRecurring > 0 ? healthData.active_recurring / totalRecurring : 0;
-  const churnRate = totalRecurring > 0 ? (healthData.cancelled_recurring + healthData.failed_recurring) / totalRecurring : 0;
+  const activeRate = totalDonors > 0 ? healthData.current_active_donors / totalDonors : 0;
+  const churnRate = totalDonors > 0 ? (healthData.current_cancelled_donors + healthData.current_failed_donors + healthData.current_churned_donors) / totalDonors : 0;
 
   // Health score based on active rate and churn
   const healthScore = Math.round((activeRate * 0.7 + (1 - churnRate) * 0.3) * 100);
@@ -99,10 +111,11 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
 
   // Pie chart data for status breakdown with colors embedded
   const statusBreakdownData = [
-    { name: 'Active', value: healthData.active_recurring, color: 'hsl(var(--portal-success))' },
-    { name: 'Paused', value: healthData.paused_recurring, color: 'hsl(var(--portal-warning))' },
-    { name: 'Cancelled', value: healthData.cancelled_recurring, color: 'hsl(var(--portal-error))' },
-    { name: 'Failed', value: healthData.failed_recurring, color: 'hsl(var(--portal-accent-amber))' },
+    { name: 'Active', value: healthData.current_active_donors, color: 'hsl(var(--portal-success))' },
+    { name: 'Paused', value: healthData.current_paused_donors, color: 'hsl(var(--portal-warning))' },
+    { name: 'Cancelled', value: healthData.current_cancelled_donors, color: 'hsl(var(--portal-error))' },
+    { name: 'Failed', value: healthData.current_failed_donors, color: 'hsl(var(--portal-accent-amber))' },
+    { name: 'Churned', value: healthData.current_churned_donors, color: 'hsl(var(--portal-text-muted))' },
   ];
 
   return (
@@ -120,70 +133,119 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
         </Badge>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <V3Card accent="green">
-          <V3CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[hsl(var(--portal-text-muted))]">Monthly Recurring Revenue</p>
-                <p className="text-2xl font-bold text-[hsl(var(--portal-success))]">
-                  {formatCurrency(healthData.mrr || 0)}
-                </p>
+      {/* Current State Section */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <DollarSign className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+          <h3 className="text-sm font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wide">Current State</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <V3Card accent="green">
+            <V3CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Current Active MRR</p>
+                  <p className="text-2xl font-bold text-[hsl(var(--portal-success))]">
+                    {formatCurrency(healthData.current_active_mrr || 0)}
+                  </p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Expected monthly revenue</p>
+                </div>
+                <DollarSign className="h-10 w-10 text-[hsl(var(--portal-success)/0.2)]" />
               </div>
-              <DollarSign className="h-10 w-10 text-[hsl(var(--portal-success)/0.2)]" />
-            </div>
-          </V3CardContent>
-        </V3Card>
+            </V3CardContent>
+          </V3Card>
 
-        <V3Card accent="blue">
-          <V3CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[hsl(var(--portal-text-muted))]">Recurring Donors</p>
-                <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
-                  {formatNumber(healthData.recurring_donor_count || 0)}
-                </p>
+          <V3Card accent="blue">
+            <V3CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Active Recurring Donors</p>
+                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+                    {formatNumber(healthData.current_active_donors || 0)}
+                  </p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Currently active subscriptions</p>
+                </div>
+                <Users className="h-10 w-10 text-[hsl(var(--portal-accent-blue)/0.2)]" />
               </div>
-              <Users className="h-10 w-10 text-[hsl(var(--portal-accent-blue)/0.2)]" />
-            </div>
-          </V3CardContent>
-        </V3Card>
+            </V3CardContent>
+          </V3Card>
 
-        <V3Card accent="purple">
-          <V3CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[hsl(var(--portal-text-muted))]">Avg Recurring Amount</p>
-                <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
-                  {formatCurrency(healthData.avg_recurring_amount || 0)}
-                </p>
+          <V3Card accent="purple">
+            <V3CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Avg Recurring Amount</p>
+                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+                    {formatCurrency(healthData.avg_recurring_amount || 0)}
+                  </p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Per active donor</p>
+                </div>
+                <TrendingUp className="h-10 w-10 text-[hsl(var(--portal-accent-purple)/0.2)]" />
               </div>
-              <TrendingUp className="h-10 w-10 text-[hsl(var(--portal-accent-purple)/0.2)]" />
-            </div>
-          </V3CardContent>
-        </V3Card>
+            </V3CardContent>
+          </V3Card>
+        </div>
+      </div>
 
-        <V3Card accent="amber">
-          <V3CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[hsl(var(--portal-text-muted))]">Total Recurring Revenue</p>
-                <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
-                  {formatCurrency(healthData.total_recurring_revenue || 0)}
-                </p>
+      {/* Period Performance Section */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+          <h3 className="text-sm font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wide">Period Performance</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <V3Card accent="green">
+            <V3CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">New MRR Added</p>
+                  <p className="text-2xl font-bold text-[hsl(var(--portal-success))]">
+                    {formatCurrency(healthData.new_recurring_mrr || 0)}
+                  </p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">From new recurring donors</p>
+                </div>
+                <PlusCircle className="h-10 w-10 text-[hsl(var(--portal-success)/0.2)]" />
               </div>
-              <DollarSign className="h-10 w-10 text-[hsl(var(--portal-accent-amber)/0.2)]" />
-            </div>
-          </V3CardContent>
-        </V3Card>
+            </V3CardContent>
+          </V3Card>
+
+          <V3Card accent="blue">
+            <V3CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">New Recurring Donors</p>
+                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+                    {formatNumber(healthData.new_recurring_donors || 0)}
+                  </p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">First recurring in period</p>
+                </div>
+                <Users className="h-10 w-10 text-[hsl(var(--portal-accent-blue)/0.2)]" />
+              </div>
+            </V3CardContent>
+          </V3Card>
+
+          <V3Card accent="amber">
+            <V3CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Period Recurring Revenue</p>
+                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+                    {formatCurrency(healthData.period_recurring_revenue || 0)}
+                  </p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">{formatNumber(healthData.period_recurring_transactions || 0)} transactions</p>
+                </div>
+                <DollarSign className="h-10 w-10 text-[hsl(var(--portal-accent-amber)/0.2)]" />
+              </div>
+            </V3CardContent>
+          </V3Card>
+        </div>
       </div>
 
       {/* Status Breakdown with ECharts Pie */}
       <V3Card>
         <V3CardHeader>
-          <V3CardTitle>Recurring Status Breakdown</V3CardTitle>
-          <V3CardDescription>Distribution of recurring donations by status</V3CardDescription>
+          <V3CardTitle>Donor Status Breakdown</V3CardTitle>
+          <V3CardDescription>Current distribution of all recurring donors by status</V3CardDescription>
         </V3CardHeader>
         <V3CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -193,7 +255,7 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
                 data={statusBreakdownData}
                 height={280}
                 valueType="number"
-                centerLabel="Total Recurring"
+                centerLabel="Total Donors"
                 showLegend={true}
                 legendPosition="bottom"
               />
@@ -204,7 +266,7 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
               <div className="p-4 rounded-lg bg-[hsl(var(--portal-success)/0.1)] border border-[hsl(var(--portal-success)/0.3)]">
                 <span className="font-medium text-[hsl(var(--portal-success))]">Active</span>
                 <p className="text-2xl font-bold text-[hsl(var(--portal-success))] mt-1">
-                  {formatNumber(healthData.active_recurring)}
+                  {formatNumber(healthData.current_active_donors)}
                 </p>
                 <p className="text-sm text-[hsl(var(--portal-success)/0.8)] mt-1">
                   {formatPercent(activeRate)} of total
@@ -214,30 +276,33 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
               <div className="p-4 rounded-lg bg-[hsl(var(--portal-warning)/0.1)] border border-[hsl(var(--portal-warning)/0.3)]">
                 <span className="font-medium text-[hsl(var(--portal-warning))]">Paused</span>
                 <p className="text-2xl font-bold text-[hsl(var(--portal-warning))] mt-1">
-                  {formatNumber(healthData.paused_recurring)}
+                  {formatNumber(healthData.current_paused_donors)}
                 </p>
                 <p className="text-sm text-[hsl(var(--portal-warning)/0.8)] mt-1">
-                  {formatPercent(healthData.paused_recurring / totalRecurring)} of total
+                  {totalDonors > 0 ? formatPercent(healthData.current_paused_donors / totalDonors) : '0%'} of total
                 </p>
               </div>
 
               <div className="p-4 rounded-lg bg-[hsl(var(--portal-error)/0.1)] border border-[hsl(var(--portal-error)/0.3)]">
                 <span className="font-medium text-[hsl(var(--portal-error))]">Cancelled</span>
                 <p className="text-2xl font-bold text-[hsl(var(--portal-error))] mt-1">
-                  {formatNumber(healthData.cancelled_recurring)}
+                  {formatNumber(healthData.current_cancelled_donors)}
                 </p>
                 <p className="text-sm text-[hsl(var(--portal-error)/0.8)] mt-1">
-                  {formatPercent(healthData.cancelled_recurring / totalRecurring)} of total
+                  {totalDonors > 0 ? formatPercent(healthData.current_cancelled_donors / totalDonors) : '0%'} of total
                 </p>
               </div>
 
-              <div className="p-4 rounded-lg bg-[hsl(var(--portal-accent-amber)/0.1)] border border-[hsl(var(--portal-accent-amber)/0.3)]">
-                <span className="font-medium text-[hsl(var(--portal-accent-amber))]">Failed</span>
-                <p className="text-2xl font-bold text-[hsl(var(--portal-accent-amber))] mt-1">
-                  {formatNumber(healthData.failed_recurring)}
+              <div className="p-4 rounded-lg bg-[hsl(var(--muted)/0.5)] border border-[hsl(var(--border))]">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-medium text-[hsl(var(--portal-text-muted))]">Churned</span>
+                  <AlertTriangle className="h-3.5 w-3.5 text-[hsl(var(--portal-text-muted))]" />
+                </div>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-text-muted))] mt-1">
+                  {formatNumber(healthData.current_churned_donors)}
                 </p>
-                <p className="text-sm text-[hsl(var(--portal-accent-amber)/0.8)] mt-1">
-                  {formatPercent(healthData.failed_recurring / totalRecurring)} of total
+                <p className="text-xs text-[hsl(var(--portal-text-muted)/0.8)] mt-1">
+                  Inactive 35+ days
                 </p>
               </div>
             </div>
@@ -275,7 +340,7 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
             Recurring Upsell Performance
           </V3CardTitle>
           <V3CardDescription>
-            Conversion rate for recurring donation upsell prompts
+            Conversion rate for recurring donation upsell prompts (in selected period)
           </V3CardDescription>
         </V3CardHeader>
         <V3CardContent>
