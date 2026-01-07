@@ -564,6 +564,58 @@ serve(async (req) => {
             itemsProcessed = smsProcessed;
             break;
 
+          case 'batch_analyze_content':
+            console.log('[SCHEDULER] Running batch content analysis');
+            const batchAnalyzeResponse = await supabase.functions.invoke('batch-analyze-content', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (batchAnalyzeResponse.error) throw new Error(batchAnalyzeResponse.error.message);
+            result = batchAnalyzeResponse.data;
+            itemsProcessed = result?.articles_processed || result?.processed || 0;
+            itemsCreated = result?.articles_analyzed || result?.analyzed || 0;
+            console.log(`[SCHEDULER] batch_analyze_content completed: ${itemsProcessed} processed, ${itemsCreated} analyzed`);
+            break;
+
+          case 'check_data_freshness':
+            console.log('[SCHEDULER] Checking data freshness');
+            const freshnessResponse = await supabase.functions.invoke('check-data-freshness', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (freshnessResponse.error) throw new Error(freshnessResponse.error.message);
+            result = freshnessResponse.data;
+            itemsProcessed = result?.sources_checked || result?.tables_checked || 0;
+            itemsCreated = result?.alerts_created || 0;
+            console.log(`[SCHEDULER] check_data_freshness completed: ${itemsProcessed} sources checked`);
+            break;
+
+          case 'generate_embeddings':
+            console.log('[SCHEDULER] Generating embeddings');
+            const embeddingsResponse = await supabase.functions.invoke('generate-embeddings', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (embeddingsResponse.error) throw new Error(embeddingsResponse.error.message);
+            result = embeddingsResponse.data;
+            itemsProcessed = result?.items_processed || result?.processed || 0;
+            itemsCreated = result?.embeddings_created || result?.created || 0;
+            console.log(`[SCHEDULER] generate_embeddings completed: ${itemsProcessed} processed, ${itemsCreated} embeddings created`);
+            break;
+
+          case 'calculate_creative_learnings':
+            console.log('[SCHEDULER] Calculating creative learnings');
+            const learningsResponse = await supabase.functions.invoke('calculate-creative-learnings', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (learningsResponse.error) throw new Error(learningsResponse.error.message);
+            result = learningsResponse.data;
+            itemsProcessed = result?.creatives_analyzed || result?.processed || 0;
+            itemsCreated = result?.learnings_created || result?.insights || 0;
+            console.log(`[SCHEDULER] calculate_creative_learnings completed: ${itemsProcessed} creatives analyzed`);
+            break;
+
           default:
             console.log(`[SCHEDULER] Unknown job type: ${job.job_type}`);
             result = { skipped: true, reason: 'Unknown job type' };
