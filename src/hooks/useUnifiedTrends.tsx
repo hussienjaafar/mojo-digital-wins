@@ -98,15 +98,16 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     
     try {
       // Build parallel queries - now using trend_events as single source of truth
-      // PHASE 3: Order by rank_score (Twitter-like ranking) instead of just confidence
+      // Order by is_breaking first, then rank_score (Twitter-like), then confidence_score, fallback to trend_score
       let trendEventsQuery = supabase
         .from('trend_events')
         .select('*')
         .gte('last_seen_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
         .gte('confidence_score', 20)
-        .order('rank_score', { ascending: false, nullsFirst: false })
         .order('is_breaking', { ascending: false })
+        .order('rank_score', { ascending: false, nullsFirst: false })
         .order('confidence_score', { ascending: false })
+        .order('trend_score', { ascending: false, nullsFirst: false })
         .limit(limit + 50);
       
       const watchlistPromise = supabase.from('entity_watchlist').select('entity_name');
