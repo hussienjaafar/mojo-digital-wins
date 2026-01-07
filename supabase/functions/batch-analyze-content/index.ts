@@ -547,13 +547,16 @@ serve(async (req) => {
     let fallbackGeneratedCount = 0;
     
     // Process Google News with AI NER
+    // Note: google_news_articles uses ai_processed flag
     if (!source_type || source_type === 'google_news') {
-      const { data: newsItems } = await supabase
+      const { data: newsItems, error: newsError } = await supabase
         .from('google_news_articles')
         .select('id, title, description')
         .eq('ai_processed', false)
         .order('published_at', { ascending: false })
         .limit(batch_size);
+      
+      console.log(`[BATCH] Google News query: found ${newsItems?.length || 0} unprocessed items${newsError ? `, error: ${newsError.message}` : ''}`);
       
       if (newsItems && newsItems.length > 0) {
         console.log(`Processing ${newsItems.length} Google News items with NER...`);
@@ -637,13 +640,16 @@ serve(async (req) => {
     }
     
     // Process Reddit posts with AI NER
+    // Note: reddit_posts uses ai_processed flag
     if (!source_type || source_type === 'reddit') {
-      const { data: redditItems } = await supabase
+      const { data: redditItems, error: redditError } = await supabase
         .from('reddit_posts')
         .select('id, title, selftext')
         .eq('ai_processed', false)
         .order('created_utc', { ascending: false })
         .limit(batch_size);
+      
+      console.log(`[BATCH] Reddit query: found ${redditItems?.length || 0} unprocessed items${redditError ? `, error: ${redditError.message}` : ''}`);
       
       if (redditItems && redditItems.length > 0) {
         console.log(`Processing ${redditItems.length} Reddit posts with NER...`);
@@ -716,13 +722,17 @@ serve(async (req) => {
     }
     
     // Process RSS articles with AI NER
+    // FIX: Use topics_extracted = false instead of extracted_topics IS NULL
+    // because articles may have an empty array [] which is NOT NULL
     if (!source_type || source_type === 'rss') {
-      const { data: rssItems } = await supabase
+      const { data: rssItems, error: rssError } = await supabase
         .from('articles')
         .select('id, title, description')
-        .is('extracted_topics', null)
+        .or('topics_extracted.eq.false,topics_extracted.is.null')
         .order('published_date', { ascending: false })
         .limit(batch_size);
+      
+      console.log(`[BATCH] RSS query: found ${rssItems?.length || 0} unprocessed items${rssError ? `, error: ${rssError.message}` : ''}`);
       
       if (rssItems && rssItems.length > 0) {
         console.log(`Processing ${rssItems.length} RSS articles with NER...`);
