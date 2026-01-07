@@ -1575,8 +1575,25 @@ serve(async (req) => {
       
       // Use current_1h for new topics even without baseline
       // For new topics, current_1h itself indicates breaking potential
-      const effectiveCurrent1h = current1h_deduped > 0 ? current1h_deduped : 
-        (sourceCount >= 3 && hoursOld < 2 ? 3 : 0); // Proxy for very new fast-moving topics
+      // FIX 5: Improved proxy calculation for topics with stale mentions but high activity
+      let effectiveCurrent1h = current1h_deduped;
+      
+      // If current_1h is 0 but we have significant recent activity, use a proxy
+      if (effectiveCurrent1h === 0) {
+        // Proxy based on 6h activity + source diversity (more generous than before)
+        if (current6h_deduped >= 5 && sourceCount >= 2 && hoursOld < 4) {
+          effectiveCurrent1h = Math.ceil(current6h_deduped / 2); // Half of 6h as proxy
+          console.log(`[detect-trend-events] current_1h proxy: "${agg.event_title}" 0 → ${effectiveCurrent1h} (from 6h: ${current6h_deduped})`);
+        } else if (sourceCount >= 3 && hoursOld < 2) {
+          effectiveCurrent1h = Math.min(5, sourceCount + newsCount); // Based on source diversity
+          console.log(`[detect-trend-events] current_1h proxy: "${agg.event_title}" 0 → ${effectiveCurrent1h} (from sources: ${sourceCount})`);
+        }
+      }
+      
+      // FIX 5: Sanity check log for breaking-candidate topics with null/zero effective current_1h
+      if (hasTier12Corroboration && zScoreVelocity >= 2 && effectiveCurrent1h === 0) {
+        console.log(`[detect-trend-events] ⚠️ SANITY: Breaking-candidate "${agg.event_title}" has effectiveCurrent1h=0 (raw=${current1h_deduped}, 6h=${current6h_deduped}, 24h=${current24h_deduped})`);
+      }
       
       // Check each breaking path
       if (hasTier12Corroboration && meetsVolumeGate) {
