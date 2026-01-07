@@ -1972,6 +1972,13 @@ export type Database = {
             foreignKeyName: "client_entity_alerts_trend_event_id_fkey"
             columns: ["trend_event_id"]
             isOneToOne: false
+            referencedRelation: "label_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+          {
+            foreignKeyName: "client_entity_alerts_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
             referencedRelation: "trend_events"
             referencedColumns: ["id"]
           },
@@ -5075,6 +5082,13 @@ export type Database = {
             foreignKeyName: "org_trend_scores_trend_event_id_fkey"
             columns: ["trend_event_id"]
             isOneToOne: false
+            referencedRelation: "label_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+          {
+            foreignKeyName: "org_trend_scores_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
             referencedRelation: "trend_events"
             referencedColumns: ["id"]
           },
@@ -7870,6 +7884,13 @@ export type Database = {
             foreignKeyName: "trend_evidence_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "label_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+          {
+            foreignKeyName: "trend_evidence_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
             referencedRelation: "trend_events"
             referencedColumns: ["id"]
           },
@@ -8039,6 +8060,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "trend_phrase_clusters_canonical_event_id_fkey"
+            columns: ["canonical_event_id"]
+            isOneToOne: false
+            referencedRelation: "label_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
           {
             foreignKeyName: "trend_phrase_clusters_canonical_event_id_fkey"
             columns: ["canonical_event_id"]
@@ -9162,6 +9190,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      label_quality_flags: {
+        Row: {
+          canonical_label: string | null
+          confidence_score: number | null
+          event_title: string | null
+          evidence_count: number | null
+          first_seen_at: string | null
+          is_breaking: boolean | null
+          label_quality: string | null
+          last_seen_at: string | null
+          needs_attention: boolean | null
+          rank_score: number | null
+          source_count: number | null
+          trend_id: string | null
+          trend_score: number | null
+          word_count: number | null
+        }
+        Relationships: []
+      }
+      label_quality_kpis: {
+        Row: {
+          calculated_at: string | null
+          entity_only_count: number | null
+          entity_only_pct: number | null
+          event_phrase_count: number | null
+          event_phrase_pct: number | null
+          fallback_count: number | null
+          fallback_pct: number | null
+          quality_score: number | null
+          total_trends_24h: number | null
+        }
+        Relationships: []
       }
       login_history_secure: {
         Row: {
