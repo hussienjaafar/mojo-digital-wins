@@ -602,7 +602,7 @@ function matchesEntityOnlyPattern(topic: string): boolean {
 
 /**
  * Check if a topic is a TRUE event phrase:
- * - Multi-word (2-5 words)
+ * - Multi-word (3-6 words) - FIXED: 2-word entities like "Joe Biden" are NOT event phrases
  * - Contains at least one verb or event noun
  * - Does NOT match entity-only patterns
  * Fix 1: Verb-required heuristic to prevent entity names from being classified as events
@@ -610,8 +610,10 @@ function matchesEntityOnlyPattern(topic: string): boolean {
 function isEventPhrase(topic: string): boolean {
   const words = topic.trim().split(/\s+/);
   
-  // Must be 2-6 words (FIX: align with batch-analyze-content which allows 2-6)
-  if (words.length < 2 || words.length > 6) return false;
+  // CRITICAL FIX: Require 3+ words - 2-word phrases are almost always person/org names
+  // Examples that should FAIL: "Joe Biden", "Chuck Schumer", "White House"
+  // Examples that should PASS: "Trump Fires Director", "House Passes Bill"
+  if (words.length < 3 || words.length > 6) return false;
   
   // CRITICAL: Reject entity-only patterns
   if (matchesEntityOnlyPattern(topic)) return false;
@@ -625,24 +627,54 @@ function isEventPhrase(topic: string): boolean {
 /**
  * Validate and potentially downgrade is_event_phrase labels
  * Returns the corrected label_quality
+ * 
+ * CRITICAL FIX: Now properly handles:
+ * - fallback_generated hints from batch-analyze
+ * - event_phrase hints from both old and new format
+ * - Generates fallback labels for high-volume entity-only topics
  */
 function validateEventPhraseLabel(
   topic: string, 
   claimedIsEventPhrase: boolean,
-  labelQualityHint?: 'event_phrase' | 'fallback_generated' | 'entity_only' | null
-): { is_event_phrase: boolean; label_quality: 'event_phrase' | 'entity_only' | 'fallback_generated'; downgraded: boolean; label_source: string } {
+  labelQualityHint?: 'event_phrase' | 'fallback_generated' | 'entity_only' | null,
+  topHeadline?: string // NEW: For fallback generation
+): { is_event_phrase: boolean; label_quality: 'event_phrase' | 'entity_only' | 'fallback_generated'; downgraded: boolean; label_source: string; fallbackLabel?: string } {
+  
   // FIX: If we have metadata hint of fallback_generated and it passes verb check, preserve it
   if (labelQualityHint === 'fallback_generated') {
     const passesVerbCheck = isEventPhrase(topic);
     if (passesVerbCheck) {
       return { is_event_phrase: true, label_quality: 'fallback_generated', downgraded: false, label_source: 'fallback_generated' };
     }
-    // Fallback didn't pass verb check - downgrade to entity_only
-    return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true, label_source: 'fallback_downgraded' };
+    // Fallback didn't pass verb check - still mark as fallback_generated but is_event_phrase=false
+    return { is_event_phrase: false, label_quality: 'fallback_generated', downgraded: false, label_source: 'fallback_attempted' };
   }
   
-  // If not claimed as event phrase, keep as entity_only
+  // FIX: If metadata says event_phrase, validate it
+  if (labelQualityHint === 'event_phrase') {
+    const passesVerbCheck = isEventPhrase(topic);
+    if (passesVerbCheck) {
+      return { is_event_phrase: true, label_quality: 'event_phrase', downgraded: false, label_source: 'metadata_event_phrase' };
+    }
+    // Claimed event_phrase but doesn't pass validation - downgrade
+    return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true, label_source: 'event_phrase_downgraded' };
+  }
+  
+  // If not claimed as event phrase, try to generate fallback from headline
   if (!claimedIsEventPhrase) {
+    // NEW: Try to generate fallback event phrase from top headline
+    if (topHeadline) {
+      const fallbackLabel = tryGenerateFallbackFromHeadline(topHeadline, topic);
+      if (fallbackLabel) {
+        return { 
+          is_event_phrase: true, 
+          label_quality: 'fallback_generated', 
+          downgraded: false, 
+          label_source: 'detect_fallback',
+          fallbackLabel 
+        };
+      }
+    }
     return { is_event_phrase: false, label_quality: 'entity_only', downgraded: false, label_source: 'entity_only' };
   }
   
@@ -653,8 +685,71 @@ function validateEventPhraseLabel(
     return { is_event_phrase: true, label_quality: 'event_phrase', downgraded: false, label_source: 'event_phrase' };
   } else {
     // DOWNGRADE: Claimed event_phrase but doesn't pass validation
+    // Try fallback generation from headline
+    if (topHeadline) {
+      const fallbackLabel = tryGenerateFallbackFromHeadline(topHeadline, topic);
+      if (fallbackLabel) {
+        return { 
+          is_event_phrase: true, 
+          label_quality: 'fallback_generated', 
+          downgraded: true, 
+          label_source: 'detect_fallback_after_downgrade',
+          fallbackLabel 
+        };
+      }
+    }
     return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true, label_source: 'event_phrase_downgraded' };
   }
+}
+
+/**
+ * Try to generate a fallback event phrase from headline when entity is detected
+ * CRITICAL: This is the fallback generation that was missing in detect-trend-events
+ */
+function tryGenerateFallbackFromHeadline(headline: string, entityName: string): string | null {
+  if (!headline || headline.length < 10) return null;
+  
+  // Action verbs to look for in headline
+  const verbPatterns = [
+    // Active voice: "Trump Fires FBI Director", "House Passes Bill"
+    new RegExp(`(${entityName})\\s+(passes?|blocks?|rejects?|approves?|signs?|fires?|resigns?|announces?|launches?|bans?|arrests?|indicts?|sues?|orders?|vetoes?|strikes?|rules?|overturns?|upholds?|halts?|suspends?|expands?|cuts?|threatens?|warns?|demands?|proposes?|withdraws?|seizes?|raids?|deports?|detains?|pardons?|revokes?|nominates?|appoints?|dismisses?|grants?|denies?|charges?|convicts?|acquits?|sentences?|attacks?|invades?|bombs?|wins?|loses?|faces?|confirms?|targets?)\\s+(.+)`, 'i'),
+    // Subject + Verb pattern anywhere
+    new RegExp(`\\b(${entityName})\\b.*?\\b(passes?|blocks?|fires?|signs?|bans?|wins?|loses?|faces?|arrests?|indicts?|sues?|orders?)\\b`, 'i'),
+    // Verb + Subject pattern
+    new RegExp(`\\b(passes?|blocks?|fires?|signs?|bans?|wins?|loses?|arrests?|indicts?|sues?)\\b.*?\\b(${entityName})\\b`, 'i'),
+  ];
+  
+  for (const pattern of verbPatterns) {
+    const match = headline.match(pattern);
+    if (match) {
+      // Build phrase: Subject + Verb + Object (limit to 5 words)
+      let phrase = match[0];
+      const words = phrase.split(/\s+/).slice(0, 5);
+      if (words.length >= 3) {
+        const result = words.map(w => 
+          w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+        ).join(' ');
+        // Validate the generated phrase
+        if (isEventPhrase(result)) {
+          return result;
+        }
+      }
+    }
+  }
+  
+  // Look for event nouns in headline that could form a phrase
+  const eventNounPattern = /\b(vote|bill|ruling|crisis|ban|tariff|policy|probe|investigation|hearing|trial|arrest|firing|resignation|indictment|verdict|conviction|acquittal|sanction|ceasefire|attack|bombing|strike|raid|protest|scandal|impeachment|shutdown|veto|deportation|pardon|order|mandate|summit|election|debate)\b/i;
+  const actionMatch = headline.match(eventNounPattern);
+  
+  if (actionMatch) {
+    const action = actionMatch[1];
+    const phrase = `${entityName} ${action.charAt(0).toUpperCase() + action.slice(1).toLowerCase()}`;
+    if (phrase.split(/\s+/).length >= 3) {
+      return phrase;
+    }
+  }
+  
+  return null;
 }
 
 /**
@@ -1012,7 +1107,7 @@ serve(async (req) => {
     console.log(`[detect-trend-events] Fetched ${articles?.length || 0} RSS articles (limit: ${PERF_LIMITS.MAX_RSS_ARTICLES})`);
     if (shouldExitEarly()) throw new Error('Timeout guard triggered during RSS fetch');
     
-    // FIX: Track topic metadata from extracted_topics for label quality propagation
+// FIX: Track topic metadata from extracted_topics for label quality propagation
     const topicMetadataMap = new Map<string, { is_event_phrase: boolean; label_quality: string }>();
     
     for (const article of articles || []) {
@@ -1025,17 +1120,28 @@ serve(async (req) => {
       }
       
       // Add extracted_topics with event phrases (new NER output) - PRESERVE METADATA
+      // CRITICAL FIX: Handle BOTH old format {topic, type, relevance} AND new format {topic, entity_type, is_event_phrase, label_quality}
       if (article.extracted_topics && Array.isArray(article.extracted_topics)) {
         for (const extracted of article.extracted_topics) {
           if (typeof extracted === 'object' && extracted.topic) {
             allTopics.push(extracted.topic);
-            // FIX: Store metadata for this topic if available
-            if (extracted.is_event_phrase !== undefined || extracted.label_quality) {
-              const key = normalizeTopicKey(extracted.topic);
-              if (key && !topicMetadataMap.has(key)) {
+            
+            // FIX: Store metadata - handle BOTH formats
+            const key = normalizeTopicKey(extracted.topic);
+            if (key && !topicMetadataMap.has(key)) {
+              // NEW FORMAT: has explicit is_event_phrase and label_quality
+              if (extracted.is_event_phrase !== undefined || extracted.label_quality) {
                 topicMetadataMap.set(key, {
                   is_event_phrase: extracted.is_event_phrase === true,
                   label_quality: extracted.label_quality || 'entity_only'
+                });
+              }
+              // OLD FORMAT: has type field - "event_phrase" type means is_event_phrase=true
+              else if (extracted.type) {
+                const isEventPhraseType = extracted.type === 'event_phrase' || extracted.entity_type === 'EVENT_PHRASE';
+                topicMetadataMap.set(key, {
+                  is_event_phrase: isEventPhraseType,
+                  label_quality: isEventPhraseType ? 'event_phrase' : 'entity_only'
                 });
               }
             }
@@ -1541,20 +1647,39 @@ serve(async (req) => {
       }
       
       // ========================================
+      // MOVED: Get top headline EARLY for fallback generation
+      // (dedupedMentions is already computed at line ~1486)
+      // ========================================
+      const sortedMentionsEarly = [...dedupedMentions].sort((a, b) => {
+        if (a.source_type !== 'bluesky' && b.source_type === 'bluesky') return -1;
+        if (a.source_type === 'bluesky' && b.source_type !== 'bluesky') return 1;
+        return new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
+      });
+      const topHeadlineEarly = sortedMentionsEarly[0]?.title?.substring(0, 200) || '';
+      
+      // ========================================
       // FIX 1: Validate event phrase labels using verb-required heuristic
       // Downgrade "event phrases" that are actually entity-only patterns
-      // FIX: Now includes label_quality_hint from extracted_topics metadata
+      // FIX: Now includes label_quality_hint AND topHeadline for fallback generation
       // ========================================
       const validationResult = validateEventPhraseLabel(
         canonicalLabelForRanking, 
         canonicalLabelIsEventPhraseForRanking,
-        agg.label_quality_hint // FIX: Pass the hint from extracted_topics metadata
+        agg.label_quality_hint, // FIX: Pass the hint from extracted_topics metadata
+        topHeadlineEarly // NEW: Pass headline for fallback generation
       );
       
       // Update the canonical flag if downgraded
       if (validationResult.downgraded) {
         labelDowngradedCount++;
         console.log(`[detect-trend-events] ⚠️ DOWNGRADED: "${canonicalLabelForRanking}" from event_phrase → entity_only (no verb/event-noun found)`);
+      }
+      
+      // NEW: If fallback was generated, log it and use the fallback label
+      let effectiveCanonicalLabel = canonicalLabelForRanking;
+      if (validationResult.fallbackLabel) {
+        effectiveCanonicalLabel = validationResult.fallbackLabel;
+        console.log(`[detect-trend-events] ✅ FALLBACK GENERATED: "${validationResult.fallbackLabel}" for entity "${canonicalLabelForRanking}" from headline`);
       }
       
       // Use the validated label quality for ranking
@@ -1749,13 +1874,9 @@ serve(async (req) => {
         else if (avgSentiment < -0.2) sentimentLabel = 'negative';
       }
       
-      // Get top headline (prefer news sources, use deduped list)
-      const sortedMentions = [...dedupedMentions].sort((a, b) => {
-        if (a.source_type !== 'bluesky' && b.source_type === 'bluesky') return -1;
-        if (a.source_type === 'bluesky' && b.source_type !== 'bluesky') return 1;
-        return new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
-      });
-      const topHeadline = sortedMentions[0]?.title?.substring(0, 200) || '';
+      // Use sortedMentionsEarly computed earlier for consistency
+      const sortedMentions = sortedMentionsEarly;
+      const topHeadline = topHeadlineEarly;
       
       // Get cluster info for this topic
       const clusterKey = keyToCluster.get(key) || key;
@@ -1768,12 +1889,16 @@ serve(async (req) => {
       
       // PHASE 2: Determine canonical label from cluster - ALWAYS prefer event phrases
       // If cluster has an event phrase as canonical, use it; otherwise check if current topic is an event phrase
-      let canonicalLabel = agg.event_title;
+      // NEW: Also consider effectiveCanonicalLabel from fallback generation
+      let canonicalLabel = effectiveCanonicalLabel; // Start with the fallback-enhanced label if available
       let canonicalLabelIsEventPhrase = validatedIsEventPhrase; // Use validated value from Fix 1
       
       if (cluster) {
         // Cluster's canonical is already the highest authority (which now strongly prefers event phrases)
-        canonicalLabel = cluster.canonicalTitle;
+        // Only override if we don't have a fallback-generated label
+        if (!validationResult.fallbackLabel) {
+          canonicalLabel = cluster.canonicalTitle;
+        }
         
         // Validate the cluster's is_event_phrase claim using verb-required heuristic
         const clusterValidation = validateEventPhraseLabel(cluster.canonicalTitle, cluster.isEventPhrase, null);
@@ -1785,7 +1910,8 @@ serve(async (req) => {
         
         // PHASE 2 SAFETY: If cluster's canonical is NOT an event phrase but cluster contains one,
         // override to use the best event phrase from the cluster
-        if (!canonicalLabelIsEventPhrase) {
+        // But prefer our fallback label if we have one
+        if (!canonicalLabelIsEventPhrase && !validationResult.fallbackLabel) {
           const clusterEventPhrases = Array.from(cluster.memberTitles)
             .filter(t => {
               // Only include phrases that pass the verb-required validation
@@ -1799,6 +1925,12 @@ serve(async (req) => {
             canonicalLabelIsEventPhrase = true;
             console.log(`[detect-trend-events] PHASE 2: Overrode entity-only canonical "${cluster.canonicalTitle}" with validated event phrase "${canonicalLabel}"`);
           }
+        }
+        
+        // If we had a fallback label, ensure it's used as canonical
+        if (validationResult.fallbackLabel) {
+          canonicalLabel = validationResult.fallbackLabel;
+          canonicalLabelIsEventPhrase = true;
         }
       }
       
@@ -1830,6 +1962,7 @@ serve(async (req) => {
         canonical_label: canonicalLabel, // Best label for display
         is_event_phrase: validatedIsEventPhrase, // FIX 1: Use validated value, not raw claim
         label_quality: labelQuality,  // PHASE 2: Track label source quality
+        label_source: labelSource,  // NEW: Top-level field for audit queries
         related_entities: relatedEntitiesArray,  // PHASE 2: Entities contributing to this phrase
         related_phrases: relatedPhrases, // Alternate phrasings from cluster
         cluster_id: cluster && cluster.memberKeys.size > 1 ? clusterKey : null,
