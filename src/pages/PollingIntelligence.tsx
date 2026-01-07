@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { TrendingUp, TrendingDown, AlertTriangle, Target, Users, BarChart3 } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
@@ -28,27 +27,15 @@ type PollingData = Database['public']['Tables']['polling_data']['Row'];
 type PollingAlert = Database['public']['Tables']['polling_alerts']['Row'];
 
 export default function PollingIntelligence() {
-  const navigate = useNavigate();
-  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [pollingData, setPollingData] = useState<PollingData[]>([]);
   const [pollingAlerts, setPollingAlerts] = useState<PollingAlert[]>([]);
   const [selectedRaceType, setSelectedRaceType] = useState<string>("all");
 
   useEffect(() => {
-    checkAuth();
     fetchPollingData();
     fetchPollingAlerts();
   }, []);
-
-  const checkAuth = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate("/client/login");
-      return;
-    }
-    setUser(user);
-  };
 
   const fetchPollingData = async () => {
     try {

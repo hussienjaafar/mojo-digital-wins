@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { V3Card, V3CardContent, V3CardDescription, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
+import { V3Button } from "@/components/v3/V3Button";
+import { V3Badge } from "@/components/v3/V3Badge";
+import { V3LoadingState } from "@/components/v3/V3LoadingState";
+import { V3EmptyState } from "@/components/v3/V3EmptyState";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Bell, Plus, Trash2, TrendingUp } from "lucide-react";
 
@@ -183,34 +185,27 @@ export default function PollingAlertSettings() {
   ];
 
   if (loading) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-sm text-muted-foreground">Loading settings...</p>
-        </CardContent>
-      </Card>
-    );
+    return <V3LoadingState variant="card" height={200} />;
   }
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5" />
-            Polling Alert Settings
-          </CardTitle>
-          <CardDescription>
+      <V3Card>
+        <V3CardHeader>
+          <V3CardTitle className="flex items-center gap-2 text-[hsl(var(--portal-text-primary))]">
+            <Bell className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
+            Create New Alert
+          </V3CardTitle>
+          <V3CardDescription>
             Get notified when poll numbers change significantly in races you're tracking
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+          </V3CardDescription>
+        </V3CardHeader>
+        <V3CardContent className="space-y-6">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
-              <Label>State</Label>
+              <Label className="text-[hsl(var(--portal-text-primary))]">State</Label>
               <Select value={newConfig.state} onValueChange={(v) => setNewConfig({...newConfig, state: v})}>
-                <SelectTrigger>
+                <SelectTrigger className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
                   <SelectValue placeholder="Select state" />
                 </SelectTrigger>
                 <SelectContent>
@@ -222,9 +217,9 @@ export default function PollingAlertSettings() {
             </div>
 
             <div className="space-y-2">
-              <Label>Race Type</Label>
+              <Label className="text-[hsl(var(--portal-text-primary))]">Race Type</Label>
               <Select value={newConfig.poll_type} onValueChange={(v) => setNewConfig({...newConfig, poll_type: v})}>
-                <SelectTrigger>
+                <SelectTrigger className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -237,7 +232,7 @@ export default function PollingAlertSettings() {
             </div>
 
             <div className="space-y-2">
-              <Label>Alert Threshold</Label>
+              <Label className="text-[hsl(var(--portal-text-primary))]">Alert Threshold</Label>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -245,38 +240,39 @@ export default function PollingAlertSettings() {
                   max="20"
                   value={newConfig.threshold_percentage}
                   onChange={(e) => setNewConfig({...newConfig, threshold_percentage: parseInt(e.target.value) || 5})}
-                  className="flex-1"
+                  className="flex-1 border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]"
                 />
-                <span className="flex items-center text-sm text-muted-foreground">%</span>
+                <span className="flex items-center text-sm text-[hsl(var(--portal-text-muted))]">%</span>
               </div>
             </div>
           </div>
 
-          <Button onClick={addConfig} disabled={adding} className="w-full">
+          <V3Button onClick={addConfig} disabled={adding} className="w-full">
             <Plus className="h-4 w-4 mr-2" />
             Add Alert
-          </Button>
-        </CardContent>
-      </Card>
+          </V3Button>
+        </V3CardContent>
+      </V3Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Active Alerts</CardTitle>
-          <CardDescription>
+      <V3Card>
+        <V3CardHeader>
+          <V3CardTitle className="text-[hsl(var(--portal-text-primary))]">Active Alerts</V3CardTitle>
+          <V3CardDescription>
             Manage your polling alert subscriptions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </V3CardDescription>
+        </V3CardHeader>
+        <V3CardContent>
           {configs.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No polling alerts configured</p>
-              <p className="text-sm mt-2">Add your first alert above to get started</p>
-            </div>
+            <V3EmptyState
+              icon={TrendingUp}
+              title="No Polling Alerts Configured"
+              description="Add your first alert above to get started tracking poll changes"
+              accent="amber"
+            />
           ) : (
             <div className="space-y-3">
               {configs.map((config) => (
-                <div key={config.id} className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/50">
+                <div key={config.id} className="flex items-center justify-between p-4 rounded-lg border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
                   <div className="flex items-center gap-4">
                     <Switch
                       checked={config.is_active}
@@ -284,31 +280,31 @@ export default function PollingAlertSettings() {
                     />
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-foreground">
+                        <p className="font-medium text-[hsl(var(--portal-text-primary))]">
                           {config.state} {config.poll_type}
                         </p>
-                        <Badge variant={config.is_active ? "default" : "outline"}>
+                        <V3Badge variant={config.is_active ? "success" : "muted"}>
                           {config.is_active ? "Active" : "Paused"}
-                        </Badge>
+                        </V3Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-[hsl(var(--portal-text-muted))]">
                         Alert when lead changes by ≥{config.threshold_percentage}%
                       </p>
                     </div>
                   </div>
-                  <Button
+                  <V3Button
                     variant="ghost"
                     size="icon"
                     onClick={() => deleteConfig(config.id)}
                   >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                    <Trash2 className="h-4 w-4 text-[hsl(var(--portal-error))]" />
+                  </V3Button>
                 </div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </V3CardContent>
+      </V3Card>
     </div>
   );
 }

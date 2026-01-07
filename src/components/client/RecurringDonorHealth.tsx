@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3CardDescription } from "@/components/v3/V3Card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { V3Badge } from "@/components/v3/V3Badge";
+import { V3LoadingState } from "@/components/v3/V3LoadingState";
+import { V3SectionHeader } from "@/components/v3/V3SectionHeader";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 import { V3EmptyState } from "@/components/v3/V3EmptyState";
@@ -65,12 +66,7 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <Skeleton key={i} className="h-32" />
-          ))}
-        </div>
+        <V3LoadingState variant="kpi-grid" count={6} />
       </div>
     );
   }
@@ -79,7 +75,7 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
     return (
       <V3Card accent="red">
         <V3CardContent className="pt-6">
-          <p className="text-destructive">Error loading recurring health data: {error.message}</p>
+          <p className="text-[hsl(var(--portal-error))]">Error loading recurring health data: {error.message}</p>
         </V3CardContent>
       </V3Card>
     );
@@ -120,18 +116,20 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <RefreshCw className="h-6 w-6 text-[hsl(var(--portal-accent-blue))]" />
-          <h2 className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">Recurring Donor Health</h2>
-        </div>
-        <Badge 
-          variant={healthStatus === 'excellent' ? 'default' : healthStatus === 'good' ? 'secondary' : 'destructive'}
-          className="text-sm px-3 py-1"
-        >
-          Health Score: {healthScore}%
-        </Badge>
-      </div>
+      <V3SectionHeader
+        title="Recurring Donor Health"
+        subtitle="Monitor MRR, churn rates, and recurring donation performance"
+        icon={RefreshCw}
+        variant="premium"
+        badges={[
+          <V3Badge 
+            key="health" 
+            variant={healthStatus === 'excellent' ? 'success' : healthStatus === 'good' ? 'info' : 'error'}
+          >
+            Health Score: {healthScore}%
+          </V3Badge>
+        ]}
+      />
 
       {/* Current State Section */}
       <div className="space-y-3">

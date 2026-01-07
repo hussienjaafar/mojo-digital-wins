@@ -1,35 +1,25 @@
-import { ClientLayout } from "@/components/client/ClientLayout";
+import { ClientShell } from "@/components/client/ClientShell";
 import { ABTestAnalytics } from "@/components/client/ABTestAnalytics";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
-import { Skeleton } from "@/components/ui/skeleton";
+import { V3LoadingState } from "@/components/v3";
 
 const ClientABTests = () => {
   const { organizationId, isLoading } = useClientOrganization();
 
   if (isLoading) {
     return (
-      <ClientLayout>
+      <ClientShell pageTitle="A/B Test Analytics" showDateControls={false}>
         <div className="space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-64" />
+          <V3LoadingState variant="kpi-grid" count={3} />
         </div>
-      </ClientLayout>
+      </ClientShell>
     );
   }
 
   return (
-    <ClientLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">A/B Test Analytics</h1>
-          <p className="text-muted-foreground mt-1">
-            Compare performance across ActBlue A/B test variations
-          </p>
-        </div>
-        
-        {organizationId && <ABTestAnalytics organizationId={organizationId} />}
-      </div>
-    </ClientLayout>
+    <ClientShell pageTitle="A/B Test Analytics" showDateControls={false}>
+      {organizationId && <ABTestAnalytics organizationId={organizationId} />}
+    </ClientShell>
   );
 };
 
