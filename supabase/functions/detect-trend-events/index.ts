@@ -1415,13 +1415,36 @@ serve(async (req) => {
       // unless they have very high velocity to overcome the penalty
       const isTrending = trendScore >= 20 && meetsVolumeGate;
       
-      // Determine if breaking: high velocity spike + corroboration + recency
-      // NEW: Breaking requires tier1/tier2 source for higher confidence
-      const isBreaking = hasHistoricalBaseline && meetsVolumeGate && hasTier12Corroboration && (
-        (zScoreVelocity > 4 && sourceCount >= 2 && newsCount >= 1 && hoursOld < 6) ||
-        (zScoreVelocity > 6 && newsCount >= 1) ||
-        (baselineDelta > 5 && sourceCount >= 2 && hoursOld < 12)
+      // PHASE C: Breaking detection - adjusted thresholds for real-world cycles
+      // Breaking requires: tier1/tier2 corroboration + one of several criteria
+      // Relaxed from Phase A/B while maintaining quality via tier requirement
+      
+      // Breaking criteria - any of these triggers breaking status:
+      // 1. High velocity spike (z > 3) + recent + tier1/2 source
+      // 2. Extreme velocity spike (z > 5) + any news source (even without full history)
+      // 3. High rank_score (top-tier event) + moderate spike + recent
+      // 4. Strong baseline delta + multi-source confirmation
+      
+      const isBreakingCandidate = hasTier12Corroboration && meetsVolumeGate && (
+        // Criterion 1: Strong spike, recent, corroborated
+        (zScoreVelocity > 3 && newsCount >= 1 && hoursOld < 8) ||
+        // Criterion 2: Extreme spike - lower source requirement
+        (zScoreVelocity > 5 && newsCount >= 1) ||
+        // Criterion 3: High rank score + moderate spike + very recent
+        (rankScore >= 60 && zScoreVelocity > 2 && hoursOld < 4) ||
+        // Criterion 4: Baseline comparison - sustained surge
+        (hasHistoricalBaseline && baselineDelta > 4 && sourceCount >= 2 && hoursOld < 12) ||
+        // Criterion 5: Very high corroboration + activity (multiple quality sources)
+        (corroborationScore >= 6 && current1h_deduped >= 5 && hoursOld < 6)
       );
+      
+      // Additional guard: breaking must also be trending (prevents edge cases)
+      const isBreaking = isBreakingCandidate && isTrending;
+      
+      // Log breaking events for monitoring
+      if (isBreaking) {
+        console.log(`[detect-trend-events] 🚨 BREAKING: "${agg.event_title}" (z=${zScoreVelocity.toFixed(2)}, rank=${rankScore.toFixed(1)}, tier1/2=${hasTier12Corroboration}, age=${hoursOld.toFixed(1)}h)`);
+      }
       
       if (isTrending) trendingCount++;
       if (isBreaking) breakingCount++;
@@ -1548,6 +1571,16 @@ serve(async (req) => {
             evergreen_penalty: evergreenPenalty,
             is_evergreen: isEvergreen,
           },
+          // Phase C: Breaking criteria explainability
+          breaking_criteria: isBreaking ? {
+            has_tier12: hasTier12Corroboration,
+            z_score: zScoreVelocity,
+            rank_score: rankScore,
+            hours_old: Math.round(hoursOld * 10) / 10,
+            news_count: newsCount,
+            corroboration_score: corroborationScore,
+            current_1h: current1h_deduped,
+          } : null,
         },
         is_trending: isTrending,
         is_breaking: isBreaking,
@@ -1730,6 +1763,13 @@ serve(async (req) => {
     };
     
     console.log('[detect-trend-events] Complete:', result);
+    
+    // Phase C: Alert when no breaking events detected during active news cycle
+    if (breakingCount === 0 && trendingCount >= 5) {
+      console.warn(`[detect-trend-events] ⚠️ No breaking events detected despite ${trendingCount} trending topics - may need threshold review`);
+    } else if (breakingCount > 0) {
+      console.log(`[detect-trend-events] ✅ ${breakingCount} breaking events detected`);
+    }
     
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
