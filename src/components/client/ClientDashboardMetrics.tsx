@@ -13,12 +13,12 @@ import { HeroKpiGrid, type HeroKpiData } from "@/components/client/HeroKpiGrid";
 import type { HeroKpiAccent } from "@/components/client/HeroKpiCard";
 import { EChartsLineChart, type LineSeriesConfig } from "@/components/charts/echarts";
 import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
-import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, CopyMinus, SlidersHorizontal, ZoomIn } from "lucide-react";
+import { DollarSign, Users, TrendingUp, Repeat, Target, MessageSquare, Wifi, WifiOff, Wallet, SlidersHorizontal, ZoomIn, PlusCircle, GitCompare } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useClientDashboardMetricsQuery } from "@/queries";
+import { useClientDashboardMetricsQuery, useRecurringHealthQuery } from "@/queries";
 import { useHoveredDataPoint } from "@/stores/chartInteractionStore";
 import type { KpiKey, SeriesKey } from "@/stores/dashboardStore";
 import { cssVar, colors } from "@/lib/design-tokens";
@@ -53,8 +53,9 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
   // Cross-highlighting state from store
   const hoveredDataPoint = useHoveredDataPoint();
 
-  // Use TanStack Query hook
+  // Use TanStack Query hooks
   const { data, isLoading, error, refetch } = useClientDashboardMetricsQuery(organizationId);
+  const { data: recurringHealthData } = useRecurringHealthQuery(organizationId);
 
   const kpis = data?.kpis;
   const prevKpis = data?.prevKpis || {};
@@ -244,46 +245,45 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         ],
       },
       {
-        kpiKey: "recurringHealth" as KpiKey,
-        label: "Recurring Health",
-        value: formatCurrency(kpis.recurringRaised),
+        kpiKey: "currentMrr" as KpiKey,
+        label: "Current Active MRR",
+        value: formatCurrency(recurringHealthData?.current_active_mrr || 0),
         icon: Repeat,
         trend: {
-          value: Math.round(calcChange(kpis.recurringChurnRate, prevKpis.recurringChurnRate)),
-          isPositive: kpis.recurringChurnRate <= (prevKpis.recurringChurnRate || 0),
-          label: "churn",
+          value: 0,
+          isPositive: true,
+          label: "active",
         },
-        previousValue: prevKpis.recurringRaised ? formatCurrency(prevKpis.recurringRaised) : undefined,
-        subtitle: `${kpis.recurringDonations} recurring tx • Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
+        subtitle: `${(recurringHealthData?.current_active_donors || 0).toLocaleString()} active recurring donors`,
         accent: "amber" as HeroKpiAccent,
         sparklineData: sparklines?.recurringHealth || [],
-        description: "Active recurring donation revenue",
-        // Drilldown data
-        trendData: buildTrendData("donations"),
-        trendXAxisKey: "date",
+        description: "Expected monthly revenue from currently active recurring donors",
         breakdown: [
-          { label: "Recurring Revenue", value: formatCurrency(kpis.recurringRaised) },
-          { label: "Recurring Transactions", value: kpis.recurringDonations.toLocaleString() },
-          { label: "Recurring %", value: `${kpis.recurringPercentage.toFixed(1)}%` },
-          { label: "Churn Rate", value: `${kpis.recurringChurnRate.toFixed(1)}%` },
+          { label: "Active MRR", value: formatCurrency(recurringHealthData?.current_active_mrr || 0) },
+          { label: "Active Donors", value: (recurringHealthData?.current_active_donors || 0).toLocaleString() },
+          { label: "Avg Amount", value: formatCurrency(recurringHealthData?.avg_recurring_amount || 0) },
+          { label: "Churned Donors", value: (recurringHealthData?.current_churned_donors || 0).toLocaleString() },
         ],
       },
       {
-        kpiKey: "attributionQuality" as KpiKey,
-        label: "Attribution Quality",
-        value: `${kpis.deterministicRate.toFixed(0)}%`,
-        icon: CopyMinus,
-        trend: { value: 0, isPositive: true },
-        subtitle: "Deterministic (refcode/click)",
+        kpiKey: "newMrr" as KpiKey,
+        label: "New MRR Added",
+        value: formatCurrency(recurringHealthData?.new_recurring_mrr || 0),
+        icon: PlusCircle,
+        trend: {
+          value: recurringHealthData?.new_recurring_donors || 0,
+          isPositive: (recurringHealthData?.new_recurring_donors || 0) > 0,
+          label: "new donors",
+        },
+        subtitle: `${(recurringHealthData?.new_recurring_donors || 0).toLocaleString()} new recurring donors in period`,
         accent: "purple" as HeroKpiAccent,
-        sparklineData: sparklines?.attributionQuality || [],
-        description: "Percentage of donations with deterministic attribution",
-        // Drilldown data
+        sparklineData: [],
+        description: "MRR from donors who started recurring in the selected period",
         breakdown: [
-          { label: "Deterministic Rate", value: `${kpis.deterministicRate.toFixed(1)}%` },
-          { label: "Meta Conversions", value: (data?.metaConversions || 0).toLocaleString() },
-          { label: "SMS Conversions", value: (data?.smsConversions || 0).toLocaleString() },
-          { label: "Direct Donations", value: (data?.directDonations || 0).toLocaleString() },
+          { label: "New MRR", value: formatCurrency(recurringHealthData?.new_recurring_mrr || 0) },
+          { label: "New Recurring Donors", value: (recurringHealthData?.new_recurring_donors || 0).toLocaleString() },
+          { label: "Period Revenue", value: formatCurrency(recurringHealthData?.period_recurring_revenue || 0) },
+          { label: "Period Transactions", value: (recurringHealthData?.period_recurring_transactions || 0).toLocaleString() },
         ],
       },
       {
@@ -312,7 +312,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         ],
       },
     ];
-  }, [kpis, prevKpis, calcChange, formatCurrency, sparklines, buildTrendData, data]);
+  }, [kpis, prevKpis, calcChange, formatCurrency, sparklines, buildTrendData, data, recurringHealthData]);
 
   if (isLoading) {
     return (
@@ -428,7 +428,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
                 )}
                 aria-pressed={showCompare}
               >
-                <CopyMinus className="h-3.5 w-3.5" />
+                <GitCompare className="h-3.5 w-3.5" />
                 {showCompare ? "Hide compare" : "Compare prev period"}
               </button>
               <button

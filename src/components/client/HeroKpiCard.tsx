@@ -27,8 +27,8 @@ const KPI_VALUE_TYPE_MAP: Partial<Record<KpiKey, ValueType>> = {
   netRevenue: "currency",
   netRoi: "multiplier", // ROI multiplier like 2.5x
   refundRate: "percent",
-  recurringHealth: "currency",
-  attributionQuality: "percent",
+  currentMrr: "currency",
+  newMrr: "currency",
   uniqueDonors: "number",
 };
 

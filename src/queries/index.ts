@@ -170,3 +170,9 @@ export {
   type DonorJourneyData,
   type DonorJourneyQueryResult,
 } from "./useDonorJourneyQuery";
+
+// Recurring Health V2 queries
+export {
+  useRecurringHealthQuery,
+  type RecurringHealthV2Data,
+} from "./useRecurringHealthQuery";
