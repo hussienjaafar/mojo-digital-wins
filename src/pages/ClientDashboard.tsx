@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { parseISO, parse, isValid, startOfDay, endOfDay, isWithinInterval } from "date-fns";
-import { ChevronRight, BarChart3, Brain, LayoutDashboard, Layers, Clock, Info } from "lucide-react";
+import { ChevronRight, BarChart3, LayoutDashboard, Layers, Clock, Info, LucideIcon } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { OnboardingWizard } from "@/components/client/OnboardingWizard";
@@ -28,12 +28,8 @@ import { buildHeroKpis } from "@/utils/buildHeroKpis";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 
-// Lazy load Advanced Analytics and Heatmap for performance
-const AdvancedAnalytics = lazy(() => import("@/components/analytics/AdvancedAnalytics"));
+// Lazy load Heatmap for performance
 const DonationHeatmap = lazy(() => import("@/components/client/DonationHeatmap"));
-
-// Import Summary widget (lightweight, no need for lazy load)
-import { DonorIntelligenceSummary } from "@/components/client/DonorIntelligenceSummary";
 
 // Animation variants for page sections
 const containerVariants = {
@@ -91,7 +87,7 @@ const V3SectionSkeleton = () => (
 interface CollapsibleSectionProps {
   title: string;
   subtitle: string;
-  icon: typeof Brain;
+  icon: LucideIcon;
   accent: "blue" | "green" | "purple";
   isExpanded: boolean;
   onToggle: () => void;
@@ -235,7 +231,6 @@ const CollapsibleSection = ({
 const ClientDashboard = () => {
   const { organizationId, isLoading: orgLoading } = useClientOrganization();
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
   const [showTimeAnalysis, setShowTimeAnalysis] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
@@ -478,35 +473,6 @@ const ClientDashboard = () => {
                 >
                   <Suspense fallback={<V3SectionSkeleton />}>
                     <DonationHeatmap
-                      organizationId={organizationId}
-                      startDate={dateRange.startDate}
-                      endDate={dateRange.endDate}
-                    />
-                  </Suspense>
-                </CollapsibleSection>
-              </motion.section>
-
-              {/* DONOR INTELLIGENCE SUMMARY: Quick overview with link to full page */}
-              <motion.section variants={sectionVariants}>
-                <DonorIntelligenceSummary
-                  organizationId={organizationId}
-                  startDate={dateRange.startDate}
-                  endDate={dateRange.endDate}
-                />
-              </motion.section>
-
-              {/* ADVANCED: Attribution, Forecasting, LTV/CAC */}
-              <motion.section variants={sectionVariants}>
-                <CollapsibleSection
-                  title="Advanced Analytics"
-                  subtitle="Attribution models, LTV/CAC, forecasting & comparisons"
-                  icon={BarChart3}
-                  accent="purple"
-                  isExpanded={showAdvancedAnalytics}
-                  onToggle={() => setShowAdvancedAnalytics(!showAdvancedAnalytics)}
-                >
-                  <Suspense fallback={<V3SectionSkeleton />}>
-                    <AdvancedAnalytics
                       organizationId={organizationId}
                       startDate={dateRange.startDate}
                       endDate={dateRange.endDate}
