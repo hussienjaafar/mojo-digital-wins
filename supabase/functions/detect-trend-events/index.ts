@@ -737,6 +737,19 @@ function extractDomain(url?: string): string {
   return extractDomainUtil(url);
 }
 
+// ============================================================================
+// PERFORMANCE LIMITS - Prevent CPU timeout
+// ============================================================================
+const PERF_LIMITS = {
+  TIME_WINDOW_HOURS: 12,        // Reduced from 24h to limit data volume
+  MAX_RSS_ARTICLES: 1000,       // Limit RSS articles per run
+  MAX_GOOGLE_NEWS: 800,         // Limit Google News articles  
+  MAX_BLUESKY_POSTS: 2000,      // Limit Bluesky posts (was 5000)
+  MAX_EXISTING_EVENTS: 300,     // Limit embedding index (was 500)
+  UPSERT_BATCH_SIZE: 100,       // Batch upserts to avoid large payloads
+  TIMEOUT_GUARD_MS: 45000,      // Exit early if nearing 50s CPU limit
+};
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders();
   
@@ -745,6 +758,18 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
+  let currentPhase = 'init';
+  
+  // Helper to check if we should exit early
+  const shouldExitEarly = () => {
+    const elapsed = Date.now() - startTime;
+    if (elapsed > PERF_LIMITS.TIMEOUT_GUARD_MS) {
+      console.warn(`[detect-trend-events] ⚠️ TIMEOUT GUARD: Exiting early at phase "${currentPhase}" after ${elapsed}ms`);
+      return true;
+    }
+    return false;
+  };
+  
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -769,7 +794,8 @@ serve(async (req) => {
       );
     }
 
-    console.log('[detect-trend-events] Starting evidence-based trend detection v3 (NER + keyphrases + dedupe)...');
+    console.log(`[detect-trend-events] Starting v4 with perf limits: window=${PERF_LIMITS.TIME_WINDOW_HOURS}h, rss=${PERF_LIMITS.MAX_RSS_ARTICLES}, gn=${PERF_LIMITS.MAX_GOOGLE_NEWS}, bsky=${PERF_LIMITS.MAX_BLUESKY_POSTS}`);
+    currentPhase = 'load_aliases';
     
     // Load entity aliases for canonicalization
     await loadEntityAliases(supabase);
@@ -777,7 +803,8 @@ serve(async (req) => {
     const now = new Date();
     const hour1Ago = new Date(now.getTime() - 60 * 60 * 1000);
     const hours6Ago = new Date(now.getTime() - 6 * 60 * 60 * 1000);
-    const hours24Ago = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    // PERF: Use reduced time window
+    const hoursWindowAgo = new Date(now.getTime() - PERF_LIMITS.TIME_WINDOW_HOURS * 60 * 60 * 1000);
     const days7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const days30Ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     
@@ -973,11 +1000,17 @@ serve(async (req) => {
     };
     
     // 1. Fetch articles with topics (RSS) - includes extracted_topics with event phrases
+    currentPhase = 'fetch_rss';
     const { data: articles } = await supabase
       .from('articles')
       .select('id, title, source_url, canonical_url, content_hash, published_date, sentiment_score, sentiment_label, tags, extracted_topics')
-      .gte('published_date', hours24Ago.toISOString())
-      .eq('is_duplicate', false);
+      .gte('published_date', hoursWindowAgo.toISOString())
+      .eq('is_duplicate', false)
+      .order('published_date', { ascending: false })
+      .limit(PERF_LIMITS.MAX_RSS_ARTICLES);
+    
+    console.log(`[detect-trend-events] Fetched ${articles?.length || 0} RSS articles (limit: ${PERF_LIMITS.MAX_RSS_ARTICLES})`);
+    if (shouldExitEarly()) throw new Error('Timeout guard triggered during RSS fetch');
     
     // FIX: Track topic metadata from extracted_topics for label quality propagation
     const topicMetadataMap = new Map<string, { is_event_phrase: boolean; label_quality: string }>();
@@ -1048,13 +1081,20 @@ serve(async (req) => {
     }
     
     // 2. Fetch Google News with topics
+    currentPhase = 'fetch_google_news';
+    if (shouldExitEarly()) throw new Error('Timeout guard triggered before Google News fetch');
+    
     const { data: googleNews } = await supabase
       .from('google_news_articles')
       .select('id, title, url, canonical_url, content_hash, published_at, ai_sentiment, ai_sentiment_label, ai_topics')
       .eq('ai_processed', true)
       .eq('is_duplicate', false)
-      .gte('published_at', hours24Ago.toISOString())
-      .not('ai_topics', 'is', null);
+      .gte('published_at', hoursWindowAgo.toISOString())
+      .not('ai_topics', 'is', null)
+      .order('published_at', { ascending: false })
+      .limit(PERF_LIMITS.MAX_GOOGLE_NEWS);
+    
+    console.log(`[detect-trend-events] Fetched ${googleNews?.length || 0} Google News articles (limit: ${PERF_LIMITS.MAX_GOOGLE_NEWS})`);
     
     for (const item of googleNews || []) {
       // Look up tier from source_tiers table by domain (Google News articles come from various sources)
@@ -1093,13 +1133,19 @@ serve(async (req) => {
     }
     
     // 3. Fetch Bluesky posts with topics
+    currentPhase = 'fetch_bluesky';
+    if (shouldExitEarly()) throw new Error('Timeout guard triggered before Bluesky fetch');
+    
     const { data: blueskyPosts } = await supabase
       .from('bluesky_posts')
       .select('id, text, post_uri, created_at, ai_sentiment, ai_sentiment_label, ai_topics')
       .eq('ai_processed', true)
-      .gte('created_at', hours24Ago.toISOString())
+      .gte('created_at', hoursWindowAgo.toISOString())
       .not('ai_topics', 'is', null)
-      .limit(5000); // Limit to avoid massive queries
+      .order('created_at', { ascending: false })
+      .limit(PERF_LIMITS.MAX_BLUESKY_POSTS);
+    
+    console.log(`[detect-trend-events] Fetched ${blueskyPosts?.length || 0} Bluesky posts (limit: ${PERF_LIMITS.MAX_BLUESKY_POSTS})`);
     
     for (const post of blueskyPosts || []) {
       const mention: SourceMention = {
@@ -1129,13 +1175,18 @@ serve(async (req) => {
     // ========================================
     // STEP 2.5: Load existing trend events with embeddings for clustering
     // ========================================
+    currentPhase = 'load_existing_events';
+    if (shouldExitEarly()) throw new Error('Timeout guard triggered before existing events fetch');
+    
     const { data: existingEvents } = await supabase
       .from('trend_events')
       .select('id, event_key, event_title, embedding, related_phrases, current_24h')
       .not('embedding', 'is', null)
       .gte('last_seen_at', days7Ago.toISOString())
       .order('current_24h', { ascending: false })
-      .limit(500);
+      .limit(PERF_LIMITS.MAX_EXISTING_EVENTS);
+    
+    console.log(`[detect-trend-events] Loaded ${existingEvents?.length || 0} existing events with embeddings (limit: ${PERF_LIMITS.MAX_EXISTING_EVENTS})`);
     
     const existingEventsMap = new Map<string, ExistingTrendEvent>();
     const embeddingsIndex: { key: string; embedding: number[]; title: string; mentions: number }[] = [];
@@ -1303,6 +1354,9 @@ serve(async (req) => {
     // ========================================
     // STEP 3: Process topics with deduped counts + rolling baselines
     // ========================================
+    currentPhase = 'process_topics';
+    if (shouldExitEarly()) throw new Error('Timeout guard triggered before topic processing');
+    
     const eventsToUpsert: any[] = [];
     const evidenceToInsert: any[] = [];
     const clustersToUpsert: any[] = [];
@@ -1895,74 +1949,104 @@ serve(async (req) => {
     console.log(`[detect-trend-events] LABEL AUDIT: event_phrase=${labelAudit.event_phrase} fallback_generated=${labelAudit.fallback_generated} entity_only=${labelAudit.entity_only} (with_metadata_hint=${labelAudit.with_metadata_hint})`);
     
     // ========================================
-    // STEP 4: Upsert trend events and evidence
+    // STEP 4: Upsert trend events and evidence in BATCHES
     // ========================================
+    currentPhase = 'upsert_events';
+    if (shouldExitEarly()) {
+      console.warn(`[detect-trend-events] ⚠️ Timeout guard before upsert - ${eventsToUpsert.length} events will NOT be persisted`);
+      throw new Error('Timeout guard triggered before upsert');
+    }
+    
+    const eventIdMap = new Map<string, string>();
+    let totalUpserted = 0;
+    
     if (eventsToUpsert.length > 0) {
-      const { data: upsertedEvents, error: upsertError } = await supabase
-        .from('trend_events')
-        .upsert(eventsToUpsert, { onConflict: 'event_key' })
-        .select('id, event_key');
-      
-      if (upsertError) {
-        console.error('[detect-trend-events] Error upserting events:', upsertError.message);
-      } else {
-        console.log(`[detect-trend-events] Upserted ${upsertedEvents?.length || 0} trend events`);
+      // BATCH UPSERT: Process events in chunks to avoid payload limits and reduce CPU
+      for (let i = 0; i < eventsToUpsert.length; i += PERF_LIMITS.UPSERT_BATCH_SIZE) {
+        const batch = eventsToUpsert.slice(i, i + PERF_LIMITS.UPSERT_BATCH_SIZE);
         
-        // Build event key to ID map
-        const eventIdMap = new Map<string, string>();
-        for (const e of upsertedEvents || []) {
-          eventIdMap.set(e.event_key, e.id);
+        const { data: upsertedEvents, error: upsertError } = await supabase
+          .from('trend_events')
+          .upsert(batch, { onConflict: 'event_key' })
+          .select('id, event_key');
+        
+        if (upsertError) {
+          console.error(`[detect-trend-events] Error upserting batch ${i / PERF_LIMITS.UPSERT_BATCH_SIZE + 1}:`, upsertError.message);
+        } else {
+          totalUpserted += upsertedEvents?.length || 0;
+          for (const e of upsertedEvents || []) {
+            eventIdMap.set(e.event_key, e.id);
+          }
         }
         
-        // Insert evidence with resolved event IDs
-        const resolvedEvidence = evidenceToInsert
-          .filter(e => eventIdMap.has(e.event_key))
-          .map(e => ({
-            event_id: eventIdMap.get(e.event_key),
-            source_type: e.source_type,
-            source_id: e.source_id,
-            source_url: e.source_url,
-            source_title: e.source_title,
-            source_domain: e.source_domain,
-            published_at: e.published_at,
-            contribution_score: e.contribution_score,
-            is_primary: e.is_primary,
-            canonical_url: e.canonical_url,
-            content_hash: e.content_hash,
-            sentiment_score: e.sentiment_score,
-            sentiment_label: e.sentiment_label,
-            // Phase 4: Include source tier for explainability
-            source_tier: e.source_tier,
-          }));
+        // Check timeout after each batch
+        if (shouldExitEarly()) {
+          console.warn(`[detect-trend-events] ⚠️ Timeout guard during upsert - ${totalUpserted} events persisted, ${eventsToUpsert.length - i - batch.length} remaining`);
+          break;
+        }
+      }
+      
+      console.log(`[detect-trend-events] Upserted ${totalUpserted} trend events in batches of ${PERF_LIMITS.UPSERT_BATCH_SIZE}`);
+      
+      // BATCH INSERT EVIDENCE
+      currentPhase = 'insert_evidence';
+      const resolvedEvidence = evidenceToInsert
+        .filter(e => eventIdMap.has(e.event_key))
+        .map(e => ({
+          event_id: eventIdMap.get(e.event_key),
+          source_type: e.source_type,
+          source_id: e.source_id,
+          source_url: e.source_url,
+          source_title: e.source_title,
+          source_domain: e.source_domain,
+          published_at: e.published_at,
+          contribution_score: e.contribution_score,
+          is_primary: e.is_primary,
+          canonical_url: e.canonical_url,
+          content_hash: e.content_hash,
+          sentiment_score: e.sentiment_score,
+          sentiment_label: e.sentiment_label,
+          source_tier: e.source_tier,
+        }));
+      
+      if (resolvedEvidence.length > 0 && !shouldExitEarly()) {
+        // Delete old evidence for these events first
+        const eventIds = Array.from(new Set(resolvedEvidence.map(e => e.event_id)));
         
-        if (resolvedEvidence.length > 0) {
-          // Delete old evidence for these events first
-          const eventIds = Array.from(new Set(resolvedEvidence.map(e => e.event_id)));
+        // Delete in batches to avoid too large IN clause
+        for (let i = 0; i < eventIds.length; i += 100) {
+          const batchIds = eventIds.slice(i, i + 100);
           await supabase
             .from('trend_evidence')
             .delete()
-            .in('event_id', eventIds);
-          
-          // Insert fresh evidence
+            .in('event_id', batchIds);
+        }
+        
+        // Insert evidence in batches
+        for (let i = 0; i < resolvedEvidence.length; i += 200) {
+          const batch = resolvedEvidence.slice(i, i + 200);
           const { error: evidenceError } = await supabase
             .from('trend_evidence')
-            .insert(resolvedEvidence);
+            .insert(batch);
           
           if (evidenceError) {
-            console.error('[detect-trend-events] Error inserting evidence:', evidenceError.message);
-          } else {
-            console.log(`[detect-trend-events] Inserted ${resolvedEvidence.length} evidence records with canonical_url/content_hash`);
+            console.error(`[detect-trend-events] Error inserting evidence batch:`, evidenceError.message);
           }
+          
+          if (shouldExitEarly()) break;
         }
+        
+        console.log(`[detect-trend-events] Inserted ${resolvedEvidence.length} evidence records in batches`);
       }
     }
     
     // ========================================
-    // STEP 4.5: Upsert phrase clusters
+    // STEP 4.5: Upsert phrase clusters (skip if near timeout)
     // ========================================
+    currentPhase = 'upsert_clusters';
     const multiMemberClusters = Array.from(clusters.values()).filter(c => c.memberKeys.size > 1);
     
-    if (multiMemberClusters.length > 0) {
+    if (!shouldExitEarly() && multiMemberClusters.length > 0) {
       const clusterRecords = multiMemberClusters.map(c => ({
         canonical_phrase: c.canonicalTitle,
         member_phrases: Array.from(c.memberTitles),
@@ -1982,35 +2066,43 @@ serve(async (req) => {
       } else {
         console.log(`[detect-trend-events] Upserted ${clusterRecords.length} phrase clusters`);
       }
+    } else if (shouldExitEarly()) {
+      console.warn('[detect-trend-events] ⚠️ Skipping cluster upsert due to timeout guard');
     }
     
     // ========================================
-    // STEP 5: Update baselines for today
+    // STEP 5: Update baselines for today (skip if near timeout)
     // ========================================
-    const baselineUpdates = eventsToUpsert.slice(0, 200).map(e => ({
-      event_key: e.event_key,
-      baseline_date: today,
-      mentions_count: e.current_24h,
-      hourly_average: e.current_24h / 24,
-      news_mentions: (topicMap.get(e.event_key)?.by_source_deduped.rss || 0) + 
-                     (topicMap.get(e.event_key)?.by_source_deduped.google_news || 0),
-      social_mentions: topicMap.get(e.event_key)?.by_source_deduped.bluesky || 0,
-    }));
-    
-    if (baselineUpdates.length > 0) {
-      await supabase
-        .from('trend_baselines')
-        .upsert(baselineUpdates, { onConflict: 'event_key,baseline_date' });
+    currentPhase = 'update_baselines';
+    if (!shouldExitEarly()) {
+      const baselineUpdates = eventsToUpsert.slice(0, 200).map(e => ({
+        event_key: e.event_key,
+        baseline_date: today,
+        mentions_count: e.current_24h,
+        hourly_average: e.current_24h / PERF_LIMITS.TIME_WINDOW_HOURS, // Use actual time window
+        news_mentions: (topicMap.get(e.event_key)?.by_source_deduped.rss || 0) + 
+                       (topicMap.get(e.event_key)?.by_source_deduped.google_news || 0),
+        social_mentions: topicMap.get(e.event_key)?.by_source_deduped.bluesky || 0,
+      }));
       
-      console.log(`[detect-trend-events] Updated ${baselineUpdates.length} baseline records for ${today}`);
+      if (baselineUpdates.length > 0) {
+        await supabase
+          .from('trend_baselines')
+          .upsert(baselineUpdates, { onConflict: 'event_key,baseline_date' });
+        
+        console.log(`[detect-trend-events] Updated ${baselineUpdates.length} baseline records for ${today}`);
+      }
+    } else {
+      console.warn('[detect-trend-events] ⚠️ Skipping baseline update due to timeout guard');
     }
     
+    currentPhase = 'complete';
     const duration = Date.now() - startTime;
     
     const result = {
       success: true,
       topics_processed: topicMap.size,
-      events_upserted: eventsToUpsert.length,
+      events_upserted: totalUpserted,  // Use actual count, not array length
       trending_count: trendingCount,
       breaking_count: breakingCount,
       quality_gate_filtered: qualityGateFiltered,
@@ -2019,9 +2111,10 @@ serve(async (req) => {
       deduped_savings: dedupedSavings,
       baselines_loaded: rollingBaselines.size,
       duration_ms: duration,
+      perf_limits: PERF_LIMITS, // Include limits in response for monitoring
     };
     
-    console.log('[detect-trend-events] Complete:', result);
+    console.log('[detect-trend-events] ✅ Complete:', JSON.stringify(result));
     
     // Phase C: Alert when no breaking events detected during active news cycle
     if (breakingCount === 0 && trendingCount >= 5) {
@@ -2035,10 +2128,15 @@ serve(async (req) => {
     });
     
   } catch (error: any) {
-    console.error('[detect-trend-events] Error:', error);
-    await logJobFailure(supabase, 'detect-trend-events', error.message);
+    const duration = Date.now() - startTime;
+    console.error(`[detect-trend-events] ❌ Error at phase "${currentPhase}" after ${duration}ms:`, error.message);
+    await logJobFailure(supabase, 'detect-trend-events', `${currentPhase}: ${error.message}`);
     
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message, 
+      phase: currentPhase,
+      duration_ms: duration 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
