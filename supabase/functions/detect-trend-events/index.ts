@@ -2085,18 +2085,33 @@ serve(async (req) => {
     // STEP 4: Upsert trend events and evidence in BATCHES
     // ========================================
     currentPhase = 'upsert_events';
+    
+    // Emergency flush: if near timeout, flush a smaller priority batch (breaking + high rank_score first)
+    let eventsToProcess = eventsToUpsert;
     if (shouldExitEarly()) {
-      console.warn(`[detect-trend-events] ⚠️ Timeout guard before upsert - ${eventsToUpsert.length} events will NOT be persisted`);
-      throw new Error('Timeout guard triggered before upsert');
+      console.warn(`[detect-trend-events] ⚠️ Near timeout before upsert - triggering emergency flush`);
+      // Prioritize breaking events and top rank_score events
+      const priorityEvents = eventsToUpsert
+        .sort((a, b) => {
+          // Breaking first
+          if (a.is_breaking && !b.is_breaking) return -1;
+          if (!a.is_breaking && b.is_breaking) return 1;
+          // Then by rank_score descending
+          return (b.rank_score || 0) - (a.rank_score || 0);
+        })
+        .slice(0, 50); // Flush top 50 priority events
+      
+      console.log(`[detect-trend-events] 🚨 Emergency flush: ${priorityEvents.length} priority events (${priorityEvents.filter(e => e.is_breaking).length} breaking)`);
+      eventsToProcess = priorityEvents;
     }
     
     const eventIdMap = new Map<string, string>();
     let totalUpserted = 0;
     
-    if (eventsToUpsert.length > 0) {
+    if (eventsToProcess.length > 0) {
       // BATCH UPSERT: Process events in chunks to avoid payload limits and reduce CPU
-      for (let i = 0; i < eventsToUpsert.length; i += PERF_LIMITS.UPSERT_BATCH_SIZE) {
-        const batch = eventsToUpsert.slice(i, i + PERF_LIMITS.UPSERT_BATCH_SIZE);
+      for (let i = 0; i < eventsToProcess.length; i += PERF_LIMITS.UPSERT_BATCH_SIZE) {
+        const batch = eventsToProcess.slice(i, i + PERF_LIMITS.UPSERT_BATCH_SIZE);
         
         const { data: upsertedEvents, error: upsertError } = await supabase
           .from('trend_events')
@@ -2107,6 +2122,11 @@ serve(async (req) => {
           console.error(`[detect-trend-events] Error upserting batch ${i / PERF_LIMITS.UPSERT_BATCH_SIZE + 1}:`, upsertError.message);
         } else {
           totalUpserted += upsertedEvents?.length || 0;
+          // Count breaking events in this batch for verification
+          const breakingInBatch = batch.filter(e => e.is_breaking === true).length;
+          if (breakingInBatch > 0) {
+            console.log(`[detect-trend-events] ✅ BREAKING PERSISTED: ${breakingInBatch} breaking events in batch ${Math.floor(i / PERF_LIMITS.UPSERT_BATCH_SIZE) + 1}`);
+          }
           for (const e of upsertedEvents || []) {
             eventIdMap.set(e.event_key, e.id);
           }
@@ -2114,12 +2134,15 @@ serve(async (req) => {
         
         // Check timeout after each batch
         if (shouldExitEarly()) {
-          console.warn(`[detect-trend-events] ⚠️ Timeout guard during upsert - ${totalUpserted} events persisted, ${eventsToUpsert.length - i - batch.length} remaining`);
+          console.warn(`[detect-trend-events] ⚠️ Timeout guard during upsert - ${totalUpserted} events persisted, ${eventsToProcess.length - i - batch.length} remaining`);
           break;
         }
       }
       
+      // Post-upsert verification: count breaking events saved
+      const totalBreakingSaved = eventsToProcess.slice(0, totalUpserted).filter(e => e.is_breaking === true).length;
       console.log(`[detect-trend-events] Upserted ${totalUpserted} trend events in batches of ${PERF_LIMITS.UPSERT_BATCH_SIZE}`);
+      console.log(`[detect-trend-events] ✅ BREAKING VERIFICATION: ${totalBreakingSaved} breaking events persisted to DB`);
       
       // BATCH INSERT EVIDENCE
       currentPhase = 'insert_evidence';
