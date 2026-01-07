@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { useDashboardStore, useDateRange, useSelectedCampaignId, useSelectedCreativeId } from "@/stores/dashboardStore";
 import { DashboardTopSection } from "@/components/client/DashboardTopSection";
 import { useFilterOptions } from "@/hooks/useFilterOptions";
-import { useClientDashboardMetricsQuery } from "@/queries";
+import { useClientDashboardMetricsQuery, useRecurringHealthQuery } from "@/queries";
 import { buildHeroKpis } from "@/utils/buildHeroKpis";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
@@ -242,6 +242,7 @@ const ClientDashboard = () => {
 
   // Data fetching with TanStack Query
   const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useClientDashboardMetricsQuery(organizationId);
+  const { data: recurringHealthData } = useRecurringHealthQuery(organizationId);
 
   // Fetch filter options for campaigns and creatives
   const { data: filterOptions } = useFilterOptions(
@@ -264,8 +265,9 @@ const ClientDashboard = () => {
       smsConversions: data.smsConversions,
       directDonations: data.directDonations,
       attributionFallbackMode: data.attributionFallbackMode,
+      recurringHealth: recurringHealthData,
     });
-  }, [data]);
+  }, [data, recurringHealthData]);
 
   // Real-time subscription for live donation updates
   useEffect(() => {

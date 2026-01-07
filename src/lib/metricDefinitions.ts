@@ -30,6 +30,16 @@ export const metricDefinitions: Record<string, MetricDefinition> = {
     description: "Total value from recurring donations. Lower churn indicates healthier recurring program.",
     calculation: "Sum of recurring transaction amounts",
   },
+  "Current Active MRR": {
+    title: "Current Active MRR",
+    description: "Expected monthly revenue from currently active recurring donors",
+    calculation: "Sum of active recurring amounts (monthly run-rate)",
+  },
+  "New MRR Added": {
+    title: "New MRR Added",
+    description: "Monthly run-rate added by donors who started recurring in the selected period",
+    calculation: "Sum of new recurring amounts (monthly run-rate)",
+  },
   "Attribution Quality": {
     title: "Refcode Match Rate",
     description: "Percentage of donations with a traceable refcode or click ID linking to a campaign",
