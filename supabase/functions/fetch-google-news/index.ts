@@ -204,19 +204,24 @@ serve(async (req) => {
 
     console.log('Fetching Google News sources from database...');
     
+    // Limit sources per run to prevent CPU timeout (edge functions have ~30s limit)
+    const MAX_SOURCES_PER_RUN = 6;
+    
     // Fetch sources from DB (not hardcoded) - skip those in backoff
-    const { data: sources, error: sourcesError } = await supabase
+    // Order by last_fetched_at to ensure round-robin processing
+    const { data: allSources, error: sourcesError } = await supabase
       .from('google_news_sources')
       .select('*')
       .eq('is_active', true)
       .or('backoff_until.is.null,backoff_until.lt.now()')
-      .order('last_fetched_at', { ascending: true, nullsFirst: true });
+      .order('last_fetched_at', { ascending: true, nullsFirst: true })
+      .limit(MAX_SOURCES_PER_RUN);
 
     if (sourcesError) {
       throw new Error(`Failed to fetch sources: ${sourcesError.message}`);
     }
 
-    if (!sources || sources.length === 0) {
+    if (!allSources || allSources.length === 0) {
       console.log('No active Google News sources found');
       return new Response(
         JSON.stringify({ success: true, message: 'No active sources', fetched: 0 }),
@@ -224,7 +229,8 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Processing ${sources.length} Google News sources...`);
+    const sources = allSources;
+    console.log(`Processing ${sources.length} Google News sources (max ${MAX_SOURCES_PER_RUN} per run)...`);
     
     let totalFetched = 0;
     let totalInserted = 0;

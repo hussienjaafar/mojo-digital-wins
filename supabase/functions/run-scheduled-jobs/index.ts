@@ -616,6 +616,19 @@ serve(async (req) => {
             console.log(`[SCHEDULER] calculate_creative_learnings completed: ${itemsProcessed} creatives analyzed`);
             break;
 
+          case 'fetch_google_news':
+            console.log('[SCHEDULER] Fetching Google News');
+            const googleNewsResponse = await supabase.functions.invoke('fetch-google-news', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (googleNewsResponse.error) throw new Error(googleNewsResponse.error.message);
+            result = googleNewsResponse.data;
+            itemsProcessed = result?.fetched || result?.sources_processed || 0;
+            itemsCreated = result?.inserted || 0;
+            console.log(`[SCHEDULER] fetch_google_news completed: ${itemsProcessed} fetched, ${itemsCreated} inserted`);
+            break;
+
           default:
             console.log(`[SCHEDULER] Unknown job type: ${job.job_type}`);
             result = { skipped: true, reason: 'Unknown job type' };
