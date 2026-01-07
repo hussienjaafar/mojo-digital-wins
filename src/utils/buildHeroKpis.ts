@@ -1,8 +1,13 @@
-import { Users, TrendingUp, Repeat, Target, CopyMinus, Wallet } from "lucide-react";
+import { Users, TrendingUp, Repeat, Target, PlusCircle, Wallet } from "lucide-react";
 import type { HeroKpiData } from "@/components/client/HeroKpiGrid";
 import type { HeroKpiAccent } from "@/components/client/HeroKpiCard";
 import type { KpiKey } from "@/stores/dashboardStore";
-import type { DashboardKPIs, SparklineData, DashboardTimeSeriesPoint } from "@/queries/useClientDashboardMetricsQuery";
+import type {
+  DashboardKPIs,
+  SparklineData,
+  DashboardTimeSeriesPoint,
+} from "@/queries/useClientDashboardMetricsQuery";
+import type { RecurringHealthV2Data } from "@/queries/useRecurringHealthQuery";
 
 interface BuildHeroKpisParams {
   kpis: DashboardKPIs;
@@ -16,6 +21,8 @@ interface BuildHeroKpisParams {
   directDonations?: number;
   /** When true, attribution is calculated from fallback transaction fields, not full attribution view */
   attributionFallbackMode?: boolean;
+  /** Recurring health v2 (used for Current Active MRR + New MRR Added cards) */
+  recurringHealth?: RecurringHealthV2Data;
 }
 
 /**
@@ -49,7 +56,8 @@ export function buildHeroKpis({
   metaConversions = 0,
   smsConversions = 0,
   directDonations = 0,
-  attributionFallbackMode = false,
+  attributionFallbackMode: _attributionFallbackMode = false,
+  recurringHealth,
 }: BuildHeroKpisParams): HeroKpiData[] {
   return [
     {
@@ -125,64 +133,42 @@ export function buildHeroKpis({
       ],
     },
     {
-      kpiKey: "recurringHealth" as KpiKey,
-      label: "Recurring Health",
-      value: formatCurrency(kpis.recurringRaised),
+      kpiKey: "currentMrr" as KpiKey,
+      label: "Current Active MRR",
+      value: formatCurrency(recurringHealth?.current_active_mrr || 0),
       icon: Repeat,
-      trend: {
-        value: Math.round(calcChange(kpis.recurringRaised, prevKpis.recurringRaised)),
-        isPositive: kpis.recurringRaised >= (prevKpis.recurringRaised || 0),
-        label: "vs prev",
-      },
-      previousValue: prevKpis.recurringRaised ? formatCurrency(prevKpis.recurringRaised) : undefined,
-      subtitle: `${kpis.recurringDonations} recurring tx | Churn ${kpis.recurringChurnRate.toFixed(1)}%`,
+      trend: { value: 0, isPositive: true, label: "active" },
+      subtitle: `${(recurringHealth?.current_active_donors || 0).toLocaleString()} active recurring donors`,
       accent: "amber" as HeroKpiAccent,
       sparklineData: sparklines?.recurringHealth || [],
-      description: "Active recurring donation revenue",
-      trendData: sparklines?.recurringHealth,
-      trendXAxisKey: "date",
+      description: "Expected monthly revenue from currently active recurring donors",
       breakdown: [
-        { label: "Recurring Revenue", value: formatCurrency(kpis.recurringRaised) },
-        { label: "Recurring Transactions", value: kpis.recurringDonations.toLocaleString() },
-        { label: "Recurring %", value: `${kpis.recurringPercentage.toFixed(1)}%` },
-        { label: "Churn Rate", value: `${kpis.recurringChurnRate.toFixed(1)}%` },
+        { label: "Active MRR", value: formatCurrency(recurringHealth?.current_active_mrr || 0) },
+        { label: "Active Donors", value: (recurringHealth?.current_active_donors || 0).toLocaleString() },
+        { label: "Avg Amount", value: formatCurrency(recurringHealth?.avg_recurring_amount || 0) },
+        { label: "Churned Donors", value: (recurringHealth?.current_churned_donors || 0).toLocaleString() },
       ],
     },
     {
-      kpiKey: "attributionQuality" as KpiKey,
-      label: "Attribution Quality",
-      value: `${kpis.deterministicRate.toFixed(0)}%`,
-      icon: CopyMinus,
-      trend: prevKpis.deterministicRate !== undefined
-        ? {
-            value: Math.round(calcChange(kpis.deterministicRate, prevKpis.deterministicRate)),
-            isPositive: kpis.deterministicRate >= (prevKpis.deterministicRate || 0),
-            label: "vs prev",
-          }
-        : undefined,
-      previousValue: prevKpis.deterministicRate !== undefined ? `${prevKpis.deterministicRate.toFixed(0)}%` : undefined,
-      subtitle: attributionFallbackMode 
-        ? "⚠️ Limited data (fallback mode)" 
-        : "Deterministic (refcode/click)",
-      accent: attributionFallbackMode ? "orange" as HeroKpiAccent : "purple" as HeroKpiAccent,
-      sparklineData: sparklines?.attributionQuality || [],
-      description: attributionFallbackMode 
-        ? "Attribution data unavailable. Using fallback: refcode, click_id, fbclid from transactions. SMS attribution excluded."
-        : "Percentage of donations with deterministic attribution",
-      trendData: sparklines?.attributionQuality,
-      trendXAxisKey: "date",
-      breakdown: attributionFallbackMode 
-        ? [
-            { label: "⚠️ Fallback Mode", value: "Limited Attribution" },
-            { label: "Deterministic Rate", value: `${kpis.deterministicRate.toFixed(1)}%` },
-            { label: "Why?", value: "Run attribution sync" },
-          ]
-        : [
-            { label: "Deterministic Rate", value: `${kpis.deterministicRate.toFixed(1)}%` },
-            { label: "Meta Conversions", value: metaConversions.toLocaleString() },
-            { label: "SMS Conversions", value: smsConversions.toLocaleString() },
-            { label: "Direct Donations", value: directDonations.toLocaleString() },
-          ],
+      kpiKey: "newMrr" as KpiKey,
+      label: "New MRR Added",
+      value: formatCurrency(recurringHealth?.new_recurring_mrr || 0),
+      icon: PlusCircle,
+      trend: {
+        value: recurringHealth?.new_recurring_donors || 0,
+        isPositive: (recurringHealth?.new_recurring_donors || 0) > 0,
+        label: "new donors",
+      },
+      subtitle: `${(recurringHealth?.new_recurring_donors || 0).toLocaleString()} new recurring donors in period`,
+      accent: "purple" as HeroKpiAccent,
+      sparklineData: [],
+      description: "MRR from donors who started recurring in the selected period",
+      breakdown: [
+        { label: "New MRR", value: formatCurrency(recurringHealth?.new_recurring_mrr || 0) },
+        { label: "New Recurring Donors", value: (recurringHealth?.new_recurring_donors || 0).toLocaleString() },
+        { label: "Period Revenue", value: formatCurrency(recurringHealth?.period_recurring_revenue || 0) },
+        { label: "Period Transactions", value: (recurringHealth?.period_recurring_transactions || 0).toLocaleString() },
+      ],
     },
     {
       kpiKey: "uniqueDonors" as KpiKey,
@@ -198,7 +184,7 @@ export function buildHeroKpis({
       subtitle: `New ${kpis.newDonors} / Returning ${kpis.returningDonors}`,
       accent: "blue" as HeroKpiAccent,
       sparklineData: sparklines?.uniqueDonors || [],
-      description: "Number of unique donors in period",
+      description: "Number of unique donors in the selected period",
       trendData: sparklines?.uniqueDonors,
       trendXAxisKey: "date",
       breakdown: [
