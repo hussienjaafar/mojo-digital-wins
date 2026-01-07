@@ -502,12 +502,147 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return magnitude > 0 ? dotProduct / magnitude : 0;
 }
 
+// Comprehensive action verbs list for verb-centered validation
+const VERB_DETECTION_LIST = [
+  // Legislative actions
+  'vote', 'votes', 'voted', 'voting', 'pass', 'passes', 'passed', 'passing',
+  'block', 'blocks', 'blocked', 'blocking', 'reject', 'rejects', 'rejected',
+  'approve', 'approves', 'approved', 'sign', 'signs', 'signed', 'signing',
+  'veto', 'vetoes', 'vetoed', 'filibuster', 'filibusters', 'filibustered',
+  // Executive actions
+  'fire', 'fires', 'fired', 'firing', 'resign', 'resigns', 'resigned',
+  'nominate', 'nominates', 'nominated', 'appoint', 'appoints', 'appointed',
+  'order', 'orders', 'ordered', 'ordering', 'pardon', 'pardons', 'pardoned',
+  'commute', 'commutes', 'commuted', 'revoke', 'revokes', 'revoked',
+  // Judicial actions
+  'rule', 'rules', 'ruled', 'ruling', 'overturn', 'overturns', 'overturned',
+  'uphold', 'upholds', 'upheld', 'strike', 'strikes', 'struck', 'striking',
+  'dismiss', 'dismisses', 'dismissed', 'grant', 'grants', 'granted',
+  'deny', 'denies', 'denied', 'affirm', 'affirms', 'affirmed',
+  // Law enforcement
+  'arrest', 'arrests', 'arrested', 'arresting', 'indict', 'indicts', 'indicted',
+  'sue', 'sues', 'sued', 'suing', 'charge', 'charges', 'charged', 'charging',
+  'convict', 'convicts', 'convicted', 'acquit', 'acquits', 'acquitted',
+  'sentence', 'sentences', 'sentenced', 'raid', 'raids', 'raided',
+  'seize', 'seizes', 'seized', 'deport', 'deports', 'deported',
+  'detain', 'detains', 'detained',
+  // Policy/diplomacy
+  'announce', 'announces', 'announced', 'announcing', 'launch', 'launches', 'launched',
+  'ban', 'bans', 'banned', 'banning', 'sanction', 'sanctions', 'sanctioned',
+  'threaten', 'threatens', 'threatened', 'warn', 'warns', 'warned',
+  'demand', 'demands', 'demanded', 'propose', 'proposes', 'proposed',
+  'withdraw', 'withdraws', 'withdrew', 'withdrawn', 'suspend', 'suspends', 'suspended',
+  'expand', 'expands', 'expanded', 'cut', 'cuts', 'cutting',
+  // Conflict/crisis
+  'attack', 'attacks', 'attacked', 'attacking', 'invade', 'invades', 'invaded',
+  'bomb', 'bombs', 'bombed', 'bombing', 'collapse', 'collapses', 'collapsed',
+  'halt', 'halts', 'halted', 'halting', 'escalate', 'escalates', 'escalated',
+  'cease', 'ceases', 'ceased', 'freeze', 'freezes', 'froze', 'frozen',
+  // Economic
+  'raise', 'raises', 'raised', 'raising', 'lower', 'lowers', 'lowered',
+  'surge', 'surges', 'surged', 'drop', 'drops', 'dropped',
+  // General action verbs
+  'face', 'faces', 'faced', 'facing', 'win', 'wins', 'won', 'winning',
+  'lose', 'loses', 'lost', 'losing', 'defeat', 'defeats', 'defeated',
+  'confirm', 'confirms', 'confirmed', 'confirming', 'release', 'releases', 'released',
+  'reveal', 'reveals', 'revealed', 'expose', 'exposes', 'exposed',
+  'target', 'targets', 'targeted', 'targeting', 'kill', 'kills', 'killed',
+  'end', 'ends', 'ended', 'ending', 'begin', 'begins', 'began', 'beginning',
+  'start', 'starts', 'started', 'starting', 'stop', 'stops', 'stopped',
+];
+
+// Event nouns that indicate something happened
+const EVENT_NOUN_LIST = [
+  'ruling', 'trial', 'hearing', 'verdict', 'indictment', 'conviction', 'acquittal',
+  'lawsuit', 'injunction', 'subpoena', 'testimony', 'deposition', 'sentencing',
+  'vote', 'bill', 'election', 'impeachment', 'nomination', 'confirmation', 'veto',
+  'filibuster', 'shutdown', 'debate', 'speech', 'summit', 'rally', 'resignation',
+  'shooting', 'protest', 'crisis', 'scandal', 'attack', 'bombing', 'strike', 'raid',
+  'ceasefire', 'invasion', 'collapse', 'evacuation', 'explosion', 'assassination',
+  'sanctions', 'tariffs', 'investigation', 'probe', 'audit', 'deportation',
+  'pardon', 'ban', 'order', 'mandate', 'regulation', 'reform',
+];
+
+// Known entity-only patterns that should NOT be event phrases
+const ENTITY_ONLY_PATTERNS = [
+  /^[A-Z][a-z]*$/,                                     // Single capitalized word
+  /^[A-Z][a-z]+\s+[A-Z][a-z]+$/,                      // Two capitalized words (likely person name)
+  /^(?:President|Senator|Rep\.?|Governor|Mayor|Secretary|Director|Chief|Justice)\s+[A-Z][a-z]+$/i,
+  /^[A-Z]{2,5}$/,                                      // Single acronym
+  /^The\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?$/,           // The + Organization
+];
+
 /**
- * Check if a topic is an event phrase (multi-word descriptive)
+ * Check if phrase contains at least one action verb or event noun
+ * Returns true only if a verb/event-noun is found
+ */
+function containsVerbOrEventNoun(topic: string): boolean {
+  const lower = topic.toLowerCase();
+  const words = lower.split(/\s+/);
+  
+  for (const verb of VERB_DETECTION_LIST) {
+    if (words.includes(verb)) return true;
+  }
+  for (const noun of EVENT_NOUN_LIST) {
+    if (words.includes(noun)) return true;
+  }
+  return false;
+}
+
+/**
+ * Check if phrase matches entity-only patterns
+ */
+function matchesEntityOnlyPattern(topic: string): boolean {
+  for (const pattern of ENTITY_ONLY_PATTERNS) {
+    if (pattern.test(topic.trim())) return true;
+  }
+  return false;
+}
+
+/**
+ * Check if a topic is a TRUE event phrase:
+ * - Multi-word (2-5 words)
+ * - Contains at least one verb or event noun
+ * - Does NOT match entity-only patterns
+ * Fix 1: Verb-required heuristic to prevent entity names from being classified as events
  */
 function isEventPhrase(topic: string): boolean {
   const words = topic.trim().split(/\s+/);
-  return words.length >= 2 && words.length <= 5;
+  
+  // Must be 2-5 words
+  if (words.length < 2 || words.length > 5) return false;
+  
+  // CRITICAL: Reject entity-only patterns
+  if (matchesEntityOnlyPattern(topic)) return false;
+  
+  // REQUIRE: Must contain verb or event noun
+  if (!containsVerbOrEventNoun(topic)) return false;
+  
+  return true;
+}
+
+/**
+ * Validate and potentially downgrade is_event_phrase labels
+ * Returns the corrected label_quality
+ */
+function validateEventPhraseLabel(
+  topic: string, 
+  claimedIsEventPhrase: boolean
+): { is_event_phrase: boolean; label_quality: 'event_phrase' | 'entity_only' | 'fallback_generated'; downgraded: boolean } {
+  // If not claimed as event phrase, keep as entity_only
+  if (!claimedIsEventPhrase) {
+    return { is_event_phrase: false, label_quality: 'entity_only', downgraded: false };
+  }
+  
+  // Validate the claim: does it actually contain a verb/event noun?
+  const isActuallyEventPhrase = isEventPhrase(topic);
+  
+  if (isActuallyEventPhrase) {
+    return { is_event_phrase: true, label_quality: 'event_phrase', downgraded: false };
+  } else {
+    // DOWNGRADE: Claimed event_phrase but doesn't pass validation
+    return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true };
+  }
 }
 
 /**
@@ -1142,6 +1277,7 @@ serve(async (req) => {
     let dedupedSavings = 0;
     
     let qualityGateFiltered = 0;
+    let labelDowngradedCount = 0; // FIX 1: Count downgrades from event_phrase → entity_only
     
     for (const [key, agg] of topicMap) {
       // Use DEDUPED counts for all calculations
@@ -1308,17 +1444,24 @@ serve(async (req) => {
         }
       }
       
-      // Determine label quality for ranking
-      const canonicalWordsForRanking = canonicalLabelForRanking.split(/\s+/);
-      let labelQualityForRanking: 'event_phrase' | 'entity_only' | 'fallback_generated' = 'entity_only';
+      // ========================================
+      // FIX 1: Validate event phrase labels using verb-required heuristic
+      // Downgrade "event phrases" that are actually entity-only patterns
+      // ========================================
+      const validationResult = validateEventPhraseLabel(
+        canonicalLabelForRanking, 
+        canonicalLabelIsEventPhraseForRanking
+      );
       
-      if (canonicalLabelIsEventPhraseForRanking && canonicalWordsForRanking.length >= 2) {
-        labelQualityForRanking = 'event_phrase';
-      } else if (canonicalWordsForRanking.length === 1) {
-        labelQualityForRanking = 'entity_only';
-      } else {
-        labelQualityForRanking = 'fallback_generated';
+      // Update the canonical flag if downgraded
+      if (validationResult.downgraded) {
+        labelDowngradedCount++;
+        console.log(`[detect-trend-events] ⚠️ DOWNGRADED: "${canonicalLabelForRanking}" from event_phrase → entity_only (no verb/event-noun found)`);
       }
+      
+      // Use the validated label quality for ranking
+      const labelQualityForRanking = validationResult.label_quality;
+      const validatedIsEventPhrase = validationResult.is_event_phrase;
       
       // ========================================
       // PHASE 3: EVERGREEN PENALTY CALCULATION
@@ -1482,24 +1625,35 @@ serve(async (req) => {
       // PHASE 2: Determine canonical label from cluster - ALWAYS prefer event phrases
       // If cluster has an event phrase as canonical, use it; otherwise check if current topic is an event phrase
       let canonicalLabel = agg.event_title;
-      let canonicalLabelIsEventPhrase = agg.is_event_phrase;
+      let canonicalLabelIsEventPhrase = validatedIsEventPhrase; // Use validated value from Fix 1
       
       if (cluster) {
         // Cluster's canonical is already the highest authority (which now strongly prefers event phrases)
         canonicalLabel = cluster.canonicalTitle;
-        canonicalLabelIsEventPhrase = cluster.isEventPhrase;
+        
+        // Validate the cluster's is_event_phrase claim using verb-required heuristic
+        const clusterValidation = validateEventPhraseLabel(cluster.canonicalTitle, cluster.isEventPhrase);
+        canonicalLabelIsEventPhrase = clusterValidation.is_event_phrase;
+        
+        if (clusterValidation.downgraded) {
+          console.log(`[detect-trend-events] ⚠️ Cluster canonical downgraded: "${cluster.canonicalTitle}" from event_phrase → entity_only`);
+        }
         
         // PHASE 2 SAFETY: If cluster's canonical is NOT an event phrase but cluster contains one,
         // override to use the best event phrase from the cluster
-        if (!cluster.isEventPhrase) {
+        if (!canonicalLabelIsEventPhrase) {
           const clusterEventPhrases = Array.from(cluster.memberTitles)
-            .filter(t => t.split(/\s+/).length >= 2); // Multi-word = likely event phrase
+            .filter(t => {
+              // Only include phrases that pass the verb-required validation
+              const validation = validateEventPhraseLabel(t, isEventPhrase(t));
+              return validation.is_event_phrase;
+            });
           
           if (clusterEventPhrases.length > 0) {
-            // Pick the most common/first event phrase
+            // Pick the first valid event phrase
             canonicalLabel = clusterEventPhrases[0];
             canonicalLabelIsEventPhrase = true;
-            console.log(`[detect-trend-events] PHASE 2: Overrode entity-only canonical "${cluster.canonicalTitle}" with event phrase "${canonicalLabel}"`);
+            console.log(`[detect-trend-events] PHASE 2: Overrode entity-only canonical "${cluster.canonicalTitle}" with validated event phrase "${canonicalLabel}"`);
           }
         }
       }
@@ -1524,7 +1678,7 @@ serve(async (req) => {
         event_key: key,
         event_title: agg.event_title,
         canonical_label: canonicalLabel, // Best label for display
-        is_event_phrase: agg.is_event_phrase,
+        is_event_phrase: validatedIsEventPhrase, // FIX 1: Use validated value, not raw claim
         label_quality: labelQuality,  // PHASE 2: Track label source quality
         related_entities: relatedEntitiesArray,  // PHASE 2: Entities contributing to this phrase
         related_phrases: relatedPhrases, // Alternate phrasings from cluster
@@ -1556,7 +1710,7 @@ serve(async (req) => {
           baseline_delta_pct: Math.round(baselineDeltaPct * 10) / 10,
           has_historical_baseline: hasHistoricalBaseline,
           meets_volume_gate: meetsVolumeGate,
-          is_event_phrase: agg.is_event_phrase,
+          is_event_phrase: validatedIsEventPhrase, // FIX 1: Use validated value
           label_quality: labelQuality,  // PHASE 2: Include in explainability
           single_word_explain: qualityResult.singleWordExplain || null, // PHASE 2: Why single-word passed
           related_entities_count: agg.related_entities.size,
@@ -1634,6 +1788,7 @@ serve(async (req) => {
     console.log(`[detect-trend-events] Processing ${eventsToUpsert.length} topics, ${trendingCount} trending, ${breakingCount} breaking`);
     console.log(`[detect-trend-events] Quality gates filtered ${qualityGateFiltered} low-quality topics`);
     console.log(`[detect-trend-events] Deduplication removed ${dedupedSavings} duplicate mentions`);
+    console.log(`[detect-trend-events] FIX 1: Downgraded ${labelDowngradedCount} entity-only labels from is_event_phrase=true → false`);
     
     // ========================================
     // STEP 4: Upsert trend events and evidence
