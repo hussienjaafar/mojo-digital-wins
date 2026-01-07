@@ -455,6 +455,11 @@ serve(async (req) => {
     let entitiesExtracted = 0;
     let phrasesExtracted = 0;
     
+    // Track label quality for Phase F fallback metrics
+    let eventPhraseCount = 0;
+    let entityOnlyCount = 0;
+    let fallbackGeneratedCount = 0;
+    
     // Process Google News with AI NER
     if (!source_type || source_type === 'google_news') {
       const { data: newsItems } = await supabase
@@ -480,7 +485,30 @@ serve(async (req) => {
         
         for (const item of newsItems) {
           // Get AI result or fallback to basic extraction
-          const nerResult = nerResults.get(item.id) || extractBasicEntities(item.title, item.description);
+          let nerResult = nerResults.get(item.id);
+          
+          // If AI didn't process this item, use basic extraction
+          if (!nerResult) {
+            nerResult = extractBasicEntities(item.title, item.description);
+          }
+          
+          // PHASE F: If AI returned entities but no event phrases, trigger fallback
+          if (nerResult.label_quality === 'entity_only' && nerResult.entities.length > 0 && nerResult.event_phrases.length === 0) {
+            const fallbackPhrase = generateFallbackEventPhrase(item.title, nerResult.entities);
+            if (fallbackPhrase) {
+              nerResult = {
+                ...nerResult,
+                event_phrases: [fallbackPhrase],
+                label_quality: 'fallback_generated'
+              };
+              console.log(`[FALLBACK] Google News: Generated "${fallbackPhrase}" from "${item.title.substring(0, 60)}..."`);
+            }
+          }
+          
+          // Track label quality metrics
+          if (nerResult.label_quality === 'event_phrase') eventPhraseCount++;
+          else if (nerResult.label_quality === 'fallback_generated') fallbackGeneratedCount++;
+          else entityOnlyCount++;
           
           // Build topics array from entities + event phrases
           const topics: string[] = [];
@@ -545,7 +573,29 @@ serve(async (req) => {
         }
         
         for (const item of redditItems) {
-          const nerResult = nerResults.get(item.id) || extractBasicEntities(item.title, item.selftext);
+          let nerResult = nerResults.get(item.id);
+          
+          if (!nerResult) {
+            nerResult = extractBasicEntities(item.title, item.selftext);
+          }
+          
+          // PHASE F: If AI returned entities but no event phrases, trigger fallback
+          if (nerResult.label_quality === 'entity_only' && nerResult.entities.length > 0 && nerResult.event_phrases.length === 0) {
+            const fallbackPhrase = generateFallbackEventPhrase(item.title, nerResult.entities);
+            if (fallbackPhrase) {
+              nerResult = {
+                ...nerResult,
+                event_phrases: [fallbackPhrase],
+                label_quality: 'fallback_generated'
+              };
+              console.log(`[FALLBACK] Reddit: Generated "${fallbackPhrase}" from "${item.title.substring(0, 60)}..."`);
+            }
+          }
+          
+          // Track label quality metrics
+          if (nerResult.label_quality === 'event_phrase') eventPhraseCount++;
+          else if (nerResult.label_quality === 'fallback_generated') fallbackGeneratedCount++;
+          else entityOnlyCount++;
           
           const topics: string[] = [];
           for (const entity of nerResult.entities) {
@@ -602,19 +652,43 @@ serve(async (req) => {
         }
         
         for (const item of rssItems) {
-          const nerResult = nerResults.get(item.id) || extractBasicEntities(item.title, item.description);
+          let nerResult = nerResults.get(item.id);
           
-          // Build extracted_topics with entity types
+          if (!nerResult) {
+            nerResult = extractBasicEntities(item.title, item.description);
+          }
+          
+          // PHASE F: If AI returned entities but no event phrases, trigger fallback
+          if (nerResult.label_quality === 'entity_only' && nerResult.entities.length > 0 && nerResult.event_phrases.length === 0) {
+            const fallbackPhrase = generateFallbackEventPhrase(item.title, nerResult.entities);
+            if (fallbackPhrase) {
+              nerResult = {
+                ...nerResult,
+                event_phrases: [fallbackPhrase],
+                label_quality: 'fallback_generated'
+              };
+              console.log(`[FALLBACK] RSS: Generated "${fallbackPhrase}" from "${item.title.substring(0, 60)}..."`);
+            }
+          }
+          
+          // Track label quality metrics
+          if (nerResult.label_quality === 'event_phrase') eventPhraseCount++;
+          else if (nerResult.label_quality === 'fallback_generated') fallbackGeneratedCount++;
+          else entityOnlyCount++;
+          
+          // Build extracted_topics with entity types and label_quality
           const extractedTopics = [
             ...nerResult.entities.map(e => ({
               topic: e.canonical,
               entity_type: e.type,
-              is_event_phrase: false
+              is_event_phrase: false,
+              label_quality: nerResult.label_quality
             })),
             ...nerResult.event_phrases.map(p => ({
               topic: p,
               entity_type: 'EVENT_PHRASE',
-              is_event_phrase: true
+              is_event_phrase: true,
+              label_quality: nerResult.label_quality
             }))
           ];
           
@@ -638,6 +712,20 @@ serve(async (req) => {
       }
     }
     
+    // PHASE F: Log label quality metrics for verification
+    const totalLabeled = eventPhraseCount + entityOnlyCount + fallbackGeneratedCount;
+    const fallbackPct = totalLabeled > 0 ? ((fallbackGeneratedCount / totalLabeled) * 100).toFixed(1) : '0';
+    const eventPhrasePct = totalLabeled > 0 ? ((eventPhraseCount / totalLabeled) * 100).toFixed(1) : '0';
+    const entityOnlyPct = totalLabeled > 0 ? ((entityOnlyCount / totalLabeled) * 100).toFixed(1) : '0';
+    
+    console.log(`[LABEL QUALITY] event_phrase: ${eventPhraseCount} (${eventPhrasePct}%), entity_only: ${entityOnlyCount} (${entityOnlyPct}%), fallback_generated: ${fallbackGeneratedCount} (${fallbackPct}%)`);
+    
+    if (fallbackGeneratedCount > 0) {
+      console.log(`[FALLBACK SUCCESS] Generated ${fallbackGeneratedCount} fallback phrases from entity-only results`);
+    } else if (entityOnlyCount > 5) {
+      console.warn(`[FALLBACK WARNING] ${entityOnlyCount} entity-only results without fallback generation - check generateFallbackEventPhrase patterns`);
+    }
+    
     // Log batch stats
     await supabase.from('processing_batches').insert({
       batch_type: source_type || 'batch_analyze_ner',
@@ -655,6 +743,12 @@ serve(async (req) => {
       processed: processedCount,
       entities_extracted: entitiesExtracted,
       event_phrases_extracted: phrasesExtracted,
+      label_quality: {
+        event_phrase: eventPhraseCount,
+        entity_only: entityOnlyCount,
+        fallback_generated: fallbackGeneratedCount,
+        fallback_pct: parseFloat(fallbackPct)
+      },
       ai_used: use_ai && !!LOVABLE_API_KEY,
       duration_ms: Date.now() - startTime
     };
