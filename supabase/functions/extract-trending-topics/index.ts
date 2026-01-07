@@ -298,11 +298,33 @@ Return JSON array:
           continue;
         }
 
-        // VALIDATION: Filter out non-proper-nouns
-        const forbiddenWords = [
-          'administration', 'debate', 'reform', 'policy', 'crisis', 'issues', 'tensions',
-          'investigation', 'controversy', 'legislation', 'announcement', 'campaign',
-          'election', 'politics', 'government', 'movement', 'strategy', 'approach'
+        // =================================================================
+        // VALIDATION: Event-Phrase-Only Filter (Phase 2 migration)
+        // =================================================================
+        // This filter now REQUIRES event phrases (2-6 words with action verbs)
+        // and REJECTS single-word proper nouns to provide descriptive trend labels.
+        
+        // Action verbs that indicate an event (Subject + Verb + Object pattern)
+        const actionVerbs = [
+          'passes', 'pass', 'blocks', 'block', 'rejects', 'reject', 'approves', 'approve',
+          'signs', 'sign', 'fires', 'fire', 'resigns', 'resign', 'announces', 'announce',
+          'launches', 'launch', 'bans', 'ban', 'arrests', 'arrest', 'indicts', 'indict',
+          'sues', 'sue', 'votes', 'vote', 'confirms', 'confirm', 'nominates', 'nominate',
+          'withdraws', 'withdraw', 'expands', 'expand', 'cuts', 'cut', 'raises', 'raise',
+          'drops', 'drop', 'ends', 'end', 'starts', 'start', 'wins', 'win', 'loses', 'lose',
+          'threatens', 'threaten', 'warns', 'warn', 'demands', 'demand', 'orders', 'order',
+          'halts', 'halt', 'suspends', 'suspend', 'reverses', 'reverse', 'overturns', 'overturn',
+          'strikes', 'strike', 'attacks', 'attack', 'invades', 'invade', 'sanctions', 'sanction',
+          'targets', 'target', 'seizes', 'seize', 'raids', 'raid', 'collapses', 'collapse'
+        ];
+        
+        // Event nouns that indicate something happened
+        const eventNouns = [
+          'ruling', 'trial', 'hearing', 'shooting', 'protest', 'debate', 'speech', 'summit',
+          'crisis', 'scandal', 'resignation', 'nomination', 'confirmation', 'sanctions',
+          'tariffs', 'investigation', 'indictment', 'verdict', 'vote', 'bill', 'ceasefire',
+          'bombing', 'strike', 'raid', 'attack', 'collapse', 'shutdown', 'impeachment',
+          'acquittal', 'conviction', 'deportation', 'pardon', 'veto', 'filibuster'
         ];
 
         // News sources that should NOT be trending topics (they're publishers, not news)
@@ -316,43 +338,31 @@ Return JSON array:
           'nbc news', 'cbs news', 'world of travel'
         ];
 
-        // Overly generic standalone terms (too broad to be useful trending topics)
-        const genericTerms = [
-          'us', 'uk', 'eu', 'dc', 'u.s.', 'u.k.',  // Country codes (with/without periods)
-          'trump', 'biden', 'vance', 'netanyahu',   // Last names without first names
-          'house', 'senate', 'congress'             // Institutions without context
-        ];
-
         const beforeFilter = extractedTopics.length;
         extractedTopics = extractedTopics.filter(topic => {
           const topicLower = topic.topic.toLowerCase();
           const words = topicLower.split(/\s+/);
 
-          // Must be 1-3 words
-          if (words.length > 3) {
-            console.log(`❌ Filtered "${topic.topic}": too many words`);
+          // CRITICAL: Require 2-6 words (event phrases, NOT single-word entities)
+          if (words.length < 2) {
+            console.log(`❌ Filtered "${topic.topic}": single-word entity (not an event phrase)`);
+            return false;
+          }
+          if (words.length > 6) {
+            console.log(`❌ Filtered "${topic.topic}": too many words (>6)`);
             return false;
           }
 
-          // Must start with capital letter
+          // Must start with capital letter (proper noun or title case)
           if (topic.topic[0] !== topic.topic[0].toUpperCase()) {
             console.log(`❌ Filtered "${topic.topic}": doesn't start with capital`);
             return false;
           }
 
-          // Must not be an overly generic standalone term
-          if (words.length === 1 && genericTerms.includes(topicLower)) {
-            console.log(`❌ Filtered "${topic.topic}": overly generic standalone term`);
-            return false;
-          }
-
-          // Must not be a news source (use partial matching to catch variations)
-          // Check if topic contains any news source name OR if any news source contains the topic
+          // Must not be a news source
           const isNewsSource = newsSources.some(source => {
-            // Remove punctuation for comparison
             const cleanTopic = topicLower.replace(/[!?.,'"-]/g, '').trim();
             const cleanSource = source.replace(/[!?.,'"-]/g, '').trim();
-
             return cleanTopic.includes(cleanSource) || cleanSource.includes(cleanTopic);
           });
 
@@ -361,25 +371,39 @@ Return JSON array:
             return false;
           }
 
-          // Must not contain forbidden words
-          const hasForbidden = words.find(word => forbiddenWords.includes(word));
-          if (hasForbidden) {
-            console.log(`❌ Filtered "${topic.topic}": contains forbidden word "${hasForbidden}"`);
-            return false;
+          // Check for action verb OR event noun (what makes it an "event phrase")
+          const hasActionVerb = actionVerbs.some(v => words.includes(v));
+          const hasEventNoun = eventNouns.some(n => words.includes(n));
+          
+          // If it has type "event_phrase" from AI, trust it
+          const isMarkedEventPhrase = (topic as any).type === 'event_phrase';
+          
+          // Accept if: marked as event_phrase OR has action verb OR has event noun
+          if (!isMarkedEventPhrase && !hasActionVerb && !hasEventNoun) {
+            // Last chance: check if it looks like Subject + Verb pattern
+            // (2+ words with at least one ending in -s, -ed, -ing which suggests a verb)
+            const hasVerbPattern = words.some(w => 
+              /(?:s|ed|ing)$/.test(w) && w.length > 3 && !['news', 'states', 'united'].includes(w)
+            );
+            
+            if (!hasVerbPattern) {
+              console.log(`❌ Filtered "${topic.topic}": no action verb/event noun (not descriptive)`);
+              return false;
+            }
           }
 
           // Must not be just common words
-          const commonWords = ['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'new', 'old'];
+          const commonWords = ['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'new', 'old', 'and', 'or'];
           if (words.every(word => commonWords.includes(word))) {
             console.log(`❌ Filtered "${topic.topic}": only common words`);
             return false;
           }
 
-          console.log(`✅ Keeping proper noun: "${topic.topic}"`);
+          console.log(`✅ Keeping event phrase: "${topic.topic}"`);
           return true;
         });
 
-        console.log(`Validation: ${beforeFilter} extracted → ${extractedTopics.length} valid proper nouns`);
+        console.log(`Validation: ${beforeFilter} extracted → ${extractedTopics.length} valid event phrases`);
 
         // Aggregate topics
         for (const extracted of extractedTopics) {
