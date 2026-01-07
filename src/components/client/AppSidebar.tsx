@@ -6,7 +6,6 @@ import {
   Bell,
   Eye,
   Target,
-  TrendingUp,
   BarChart3,
   Users,
   Settings,
@@ -15,6 +14,9 @@ import {
   Sparkles,
   Brain,
   User,
+  RefreshCw,
+  FlaskConical,
+  Newspaper,
 } from "lucide-react";
 import {
   Sidebar,
@@ -106,18 +108,22 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
         { title: "Demographics", url: "/client/demographics", icon: Users },
         { title: "Attribution & Performance", url: "/client/journey", icon: GitBranch },
         { title: "Donor Intelligence", url: "/client/donor-intelligence", icon: Brain },
+        { title: "Recurring Health", url: "/client/recurring-health", icon: RefreshCw },
       ],
     },
     {
       label: "Creative Intelligence",
       items: [
         { title: "Creative Analysis", url: "/client/creative-intelligence", icon: Sparkles },
+        { title: "A/B Test Analytics", url: "/client/ab-tests", icon: FlaskConical },
       ],
     },
     {
       label: "Media & News",
       items: [
         { title: "Media Intelligence", url: "/client/media-intelligence", icon: Eye },
+        { title: "News & Trends", url: "/client/news-trends", icon: Newspaper },
+        { title: "Polling Intelligence", url: "/client/polling", icon: BarChart3 },
       ],
     },
     {

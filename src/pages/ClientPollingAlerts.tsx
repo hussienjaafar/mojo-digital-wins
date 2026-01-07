@@ -1,16 +1,18 @@
-import { ClientLayout } from "@/components/client/ClientLayout";
+import { ClientShell } from "@/components/client/ClientShell";
+import { V3PageContainer } from "@/components/v3";
 import PollingAlertSettings from "@/components/client/PollingAlertSettings";
+import { Bell } from "lucide-react";
 
 export default function ClientPollingAlerts() {
   return (
-    <ClientLayout showDateControls={false}>
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Polling Alert Settings</h1>
-          <p className="text-sm text-muted-foreground">Configure notifications for polling changes</p>
-        </div>
+    <ClientShell pageTitle="Polling Alerts" showDateControls={false}>
+      <V3PageContainer
+        title="Polling Alert Settings"
+        description="Configure notifications for significant polling changes"
+        icon={Bell}
+      >
         <PollingAlertSettings />
-      </div>
-    </ClientLayout>
+      </V3PageContainer>
+    </ClientShell>
   );
 }

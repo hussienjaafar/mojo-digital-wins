@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { V3Card, V3CardContent, V3CardDescription, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
-import { V3KPICard } from "@/components/v3/V3KPICard";
 import { V3ChartWrapper } from "@/components/v3/V3ChartWrapper";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { V3Badge } from "@/components/v3/V3Badge";
+import { V3LoadingState } from "@/components/v3/V3LoadingState";
+import { V3ErrorState } from "@/components/v3/V3ErrorState";
+import { V3SectionHeader } from "@/components/v3/V3SectionHeader";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 import { EChartsBarChart } from "@/components/charts/echarts/EChartsBarChart";
 import { V3EmptyState } from "@/components/v3/V3EmptyState";
@@ -28,7 +29,7 @@ interface ABTestAnalyticsProps {
 }
 
 export function ABTestAnalytics({ organizationId }: ABTestAnalyticsProps) {
-  const { data: abTests, isLoading, error } = useQuery({
+  const { data: abTests, isLoading, error, refetch } = useQuery({
     queryKey: ['ab-test-performance', organizationId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -45,23 +46,18 @@ export function ABTestAnalytics({ organizationId }: ABTestAnalyticsProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
-            <Skeleton key={i} className="h-64" />
-          ))}
-        </div>
+        <V3LoadingState variant="kpi-grid" count={3} />
       </div>
     );
   }
 
   if (error) {
     return (
-      <V3Card className="border-destructive">
-        <V3CardContent className="pt-6">
-          <p className="text-destructive">Error loading A/B test data: {error.message}</p>
-        </V3CardContent>
-      </V3Card>
+      <V3ErrorState
+        title="Failed to load A/B test data"
+        message={error.message}
+        onRetry={() => refetch()}
+      />
     );
   }
 
@@ -86,11 +82,15 @@ export function ABTestAnalytics({ organizationId }: ABTestAnalyticsProps) {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-2">
-        <FlaskConical className="h-6 w-6 text-primary" />
-        <h2 className="text-2xl font-bold">A/B Test Performance</h2>
-        <Badge variant="secondary">{Object.keys(testGroups).length} tests</Badge>
-      </div>
+      <V3SectionHeader
+        title="A/B Test Performance"
+        subtitle={`Compare performance across ${Object.keys(testGroups).length} active tests`}
+        icon={FlaskConical}
+        variant="premium"
+        badges={[
+          <V3Badge key="count" variant="muted">{Object.keys(testGroups).length} tests</V3Badge>
+        ]}
+      />
 
       {Object.entries(testGroups).map(([testName, variations]) => {
         const chartData = variations.map(v => ({
@@ -108,42 +108,42 @@ export function ABTestAnalytics({ organizationId }: ABTestAnalyticsProps) {
 
         return (
           <V3Card key={testName} className="overflow-hidden">
-            <V3CardHeader className="bg-muted/30">
+            <V3CardHeader className="bg-[hsl(var(--portal-bg-elevated))]">
               <div className="flex items-center justify-between">
                 <div>
-                  <V3CardTitle className="text-lg">{testName}</V3CardTitle>
+                  <V3CardTitle className="text-lg text-[hsl(var(--portal-text-primary))]">{testName}</V3CardTitle>
                   <V3CardDescription>
                     {variations.length} variations • {formatNumber(totalDonations)} total donations
                   </V3CardDescription>
                 </div>
-                <Badge variant="default" className="text-sm">
+                <V3Badge variant="success">
                   Winner: {bestVariation.ab_test_variation || 'Control'}
-                </Badge>
+                </V3Badge>
               </div>
             </V3CardHeader>
             <V3CardContent className="pt-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Summary Stats */}
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                    <DollarSign className="h-8 w-8 text-green-600" />
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                    <DollarSign className="h-8 w-8 text-[hsl(var(--portal-success))]" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Total Raised</p>
-                      <p className="text-xl font-bold">{formatCurrency(totalRaised)}</p>
+                      <p className="text-sm text-[hsl(var(--portal-text-muted))]">Total Raised</p>
+                      <p className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">{formatCurrency(totalRaised)}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                    <Users className="h-8 w-8 text-blue-600" />
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                    <Users className="h-8 w-8 text-[hsl(var(--portal-accent-blue))]" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Total Donations</p>
-                      <p className="text-xl font-bold">{formatNumber(totalDonations)}</p>
+                      <p className="text-sm text-[hsl(var(--portal-text-muted))]">Total Donations</p>
+                      <p className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">{formatNumber(totalDonations)}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                    <TrendingUp className="h-8 w-8 text-purple-600" />
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+                    <TrendingUp className="h-8 w-8 text-[hsl(var(--portal-accent-purple))]" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Best Avg Donation</p>
-                      <p className="text-xl font-bold">{formatCurrency(bestVariation.avg_donation)}</p>
+                      <p className="text-sm text-[hsl(var(--portal-text-muted))]">Best Avg Donation</p>
+                      <p className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">{formatCurrency(bestVariation.avg_donation)}</p>
                     </div>
                   </div>
                 </div>
@@ -153,7 +153,7 @@ export function ABTestAnalytics({ organizationId }: ABTestAnalyticsProps) {
                   <EChartsBarChart
                     data={chartData}
                     xAxisKey="name"
-                    series={[{ dataKey: 'value', name: 'Revenue', color: 'hsl(var(--primary))' }]}
+                    series={[{ dataKey: 'value', name: 'Revenue', color: 'hsl(var(--portal-accent-blue))' }]}
                     height={250}
                     valueType="currency"
                   />
@@ -161,36 +161,36 @@ export function ABTestAnalytics({ organizationId }: ABTestAnalyticsProps) {
               </div>
 
               {/* Variation Details */}
-              <div className="mt-6 border-t pt-4">
-                <h4 className="text-sm font-medium mb-3">Variation Breakdown</h4>
+              <div className="mt-6 border-t border-[hsl(var(--portal-border))] pt-4">
+                <h4 className="text-sm font-medium mb-3 text-[hsl(var(--portal-text-primary))]">Variation Breakdown</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {variations.map(v => (
                     <div 
                       key={v.ab_test_variation} 
-                      className={`p-3 rounded-lg border ${v === bestVariation ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}
+                      className={`p-3 rounded-lg border ${v === bestVariation ? 'border-[hsl(var(--portal-accent-blue))] bg-[hsl(var(--portal-accent-blue)/0.05)]' : 'border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]'}`}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">{v.ab_test_variation || 'Control'}</span>
+                        <span className="font-medium text-[hsl(var(--portal-text-primary))]">{v.ab_test_variation || 'Control'}</span>
                         {v === bestVariation && (
-                          <Badge variant="default" className="text-xs">Best</Badge>
+                          <V3Badge variant="success">Best</V3Badge>
                         )}
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
-                          <span className="text-muted-foreground">Donations:</span>
-                          <span className="ml-1 font-medium">{formatNumber(v.donations)}</span>
+                          <span className="text-[hsl(var(--portal-text-muted))]">Donations:</span>
+                          <span className="ml-1 font-medium text-[hsl(var(--portal-text-primary))]">{formatNumber(v.donations)}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Avg:</span>
-                          <span className="ml-1 font-medium">{formatCurrency(v.avg_donation)}</span>
+                          <span className="text-[hsl(var(--portal-text-muted))]">Avg:</span>
+                          <span className="ml-1 font-medium text-[hsl(var(--portal-text-primary))]">{formatCurrency(v.avg_donation)}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Total:</span>
-                          <span className="ml-1 font-medium">{formatCurrency(v.total_raised)}</span>
+                          <span className="text-[hsl(var(--portal-text-muted))]">Total:</span>
+                          <span className="ml-1 font-medium text-[hsl(var(--portal-text-primary))]">{formatCurrency(v.total_raised)}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Recurring:</span>
-                          <span className="ml-1 font-medium">{formatPercent(v.recurring_donations / v.donations)}</span>
+                          <span className="text-[hsl(var(--portal-text-muted))]">Recurring:</span>
+                          <span className="ml-1 font-medium text-[hsl(var(--portal-text-primary))]">{formatPercent(v.recurring_donations / v.donations)}</span>
                         </div>
                       </div>
                     </div>
