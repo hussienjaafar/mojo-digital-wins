@@ -463,24 +463,28 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
                 const key = normalizeKey(p.seriesName);
                 const prev = prevMap.get(key);
 
+                // For time-axis charts, p.value is [timestamp, value] array - extract numeric value
+                const currentValue = Array.isArray(p.value) ? p.value[1] : p.value;
+
                 // Primary row: current value (use shortened display name and per-series valueType)
                 let html = `<div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
                   <span style="width: 8px; height: 8px; border-radius: 50%; background: ${p.color}; flex-shrink: 0;"></span>
                   <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 12px;">${formatSeriesDisplayName(p.seriesName)}</span>
-                  <span style="font-weight: 600; color: hsl(var(--portal-text-primary)); font-size: 13px;">${formatTooltipValue(p.value, p.seriesName)}</span>
+                  <span style="font-weight: 600; color: hsl(var(--portal-text-primary)); font-size: 13px;">${formatTooltipValue(currentValue, p.seriesName)}</span>
                 </div>`;
 
                 // If paired prev exists, add secondary row with Prev + Delta
-                if (prev && typeof prev.value === "number" && typeof p.value === "number") {
-                  const delta = p.value - prev.value;
+                const prevValue = prev ? (Array.isArray(prev.value) ? prev.value[1] : prev.value) : undefined;
+                if (prev && typeof prevValue === "number" && typeof currentValue === "number") {
+                  const delta = currentValue - prevValue;
                   const deltaFormatted = formatTooltipValue(delta, p.seriesName);
                   const deltaDisplay = delta > 0 ? `+${deltaFormatted}` : deltaFormatted;
-                  const pct = (delta / prev.value) * 100;
-                  const pctText = prev.value !== 0 ? ` (${pct > 0 ? '+' : ''}${pct.toFixed(1)}%)` : '';
+                  const pct = (delta / prevValue) * 100;
+                  const pctText = prevValue !== 0 ? ` (${pct > 0 ? '+' : ''}${pct.toFixed(1)}%)` : '';
 
                   html += `<div style="display: flex; align-items: center; gap: 8px; margin: 2px 0 6px 16px;">
                     <span style="width: 8px; height: 8px; border-radius: 50%; background: ${prev.color}; flex-shrink: 0; opacity: 0.6;"></span>
-                    <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 11px;">Prev: ${formatTooltipValue(prev.value, p.seriesName)}</span>
+                    <span style="flex: 1; color: hsl(var(--portal-text-muted)); font-size: 11px;">Prev: ${formatTooltipValue(prevValue, p.seriesName)}</span>
                     <span style="font-weight: 500; color: hsl(var(--portal-text-secondary)); font-size: 11px;">Change: ${deltaDisplay}${pctText}</span>
                   </div>`;
                 }
