@@ -60,6 +60,7 @@ export interface SparklineData {
   recurringHealth: SparklineDataPoint[];
   uniqueDonors: SparklineDataPoint[];
   attributionQuality: SparklineDataPoint[];
+  newMrr: SparklineDataPoint[];
 }
 
 interface DashboardMetricsResult {
@@ -615,6 +616,30 @@ async function fetchDashboardMetrics(
         value: dayDonationsOnly.length > 0 ? (attributed / dayDonationsOnly.length) * 100 : 0,
       };
     }),
+    newMrr: (() => {
+      // Calculate daily new recurring MRR by finding first recurring transaction per donor
+      const firstRecurringByDonor = new Map<string, { date: string; amount: number }>();
+      for (const don of donations.filter((d: any) => d.is_recurring)) {
+        const email = don.donor_id_hash || don.donor_email;
+        if (!email) continue;
+        const txnDate = don.transaction_date;
+        const existing = firstRecurringByDonor.get(email);
+        if (!existing || txnDate < existing.date) {
+          firstRecurringByDonor.set(email, { date: txnDate, amount: Number(don.net_amount ?? don.amount ?? 0) });
+        }
+      }
+      // Bucket by day within the selected period
+      return days.map((day) => {
+        const dayStr = format(day, 'yyyy-MM-dd');
+        let dayTotal = 0;
+        for (const [, { date, amount }] of firstRecurringByDonor) {
+          if (extractDayKey(date) === dayStr) {
+            dayTotal += amount;
+          }
+        }
+        return { date: format(day, 'MMM d'), value: dayTotal };
+      });
+    })(),
   };
 
   return {
