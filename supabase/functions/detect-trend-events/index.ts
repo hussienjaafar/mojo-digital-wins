@@ -1562,31 +1562,59 @@ serve(async (req) => {
       // Breaking requires: tier1/tier2 corroboration + one of several criteria
       // Relaxed from Phase A/B while maintaining quality via tier requirement
       
-      // Breaking criteria - any of these triggers breaking status:
-      // 1. High velocity spike (z > 3) + recent + tier1/2 source
-      // 2. Extreme velocity spike (z > 5) + any news source (even without full history)
-      // 3. High rank_score (top-tier event) + moderate spike + recent
-      // 4. Strong baseline delta + multi-source confirmation
+      // ========== BREAKING DETECTION (Fix 3) ==========
+      // Breaking criteria with explainability - tracks which path triggered
+      // Path A: Fresh high-confidence (≤8h, z>3, tier1/2)
+      // Path B: Extreme z-score regardless of age (≤24h, z≥4, tier1/2)
+      // Path C: High rank + moderate spike + very fresh
+      // Path D: Baseline surge (historical data required)
+      // Path E: High corroboration volume
+      // Path F: Extreme fresh activity (high current_1h even for new topics)
       
-      const isBreakingCandidate = hasTier12Corroboration && meetsVolumeGate && (
-        // Criterion 1: Strong spike, recent, corroborated
-        (zScoreVelocity > 3 && newsCount >= 1 && hoursOld < 8) ||
-        // Criterion 2: Extreme spike - lower source requirement
-        (zScoreVelocity > 5 && newsCount >= 1) ||
-        // Criterion 3: High rank score + moderate spike + very recent
-        (rankScore >= 60 && zScoreVelocity > 2 && hoursOld < 4) ||
-        // Criterion 4: Baseline comparison - sustained surge
-        (hasHistoricalBaseline && baselineDelta > 4 && sourceCount >= 2 && hoursOld < 12) ||
-        // Criterion 5: Very high corroboration + activity (multiple quality sources)
-        (corroborationScore >= 6 && current1h_deduped >= 5 && hoursOld < 6)
-      );
+      let breakingPath: string | null = null;
+      
+      // Use current_1h for new topics even without baseline
+      // For new topics, current_1h itself indicates breaking potential
+      const effectiveCurrent1h = current1h_deduped > 0 ? current1h_deduped : 
+        (sourceCount >= 3 && hoursOld < 2 ? 3 : 0); // Proxy for very new fast-moving topics
+      
+      // Check each breaking path
+      if (hasTier12Corroboration && meetsVolumeGate) {
+        if (zScoreVelocity > 3 && newsCount >= 1 && hoursOld < 8) {
+          // Path A: Fresh high-confidence spike (original strict path)
+          breakingPath = 'A:fresh_spike';
+        } else if (zScoreVelocity >= 4 && newsCount >= 1 && hoursOld < 24) {
+          // Path B: Extreme z-score with tier1/2 - allow up to 24h for major events
+          // This catches real breaking news that takes time to build but is clearly abnormal
+          breakingPath = 'B:extreme_zscore';
+        } else if (rankScore >= 60 && zScoreVelocity > 2 && hoursOld < 4) {
+          // Path C: High rank score + moderate spike + very recent
+          breakingPath = 'C:high_rank_fresh';
+        } else if (hasHistoricalBaseline && baselineDelta > 4 && sourceCount >= 2 && hoursOld < 12) {
+          // Path D: Baseline comparison - sustained surge
+          breakingPath = 'D:baseline_surge';
+        } else if (corroborationScore >= 6 && effectiveCurrent1h >= 5 && hoursOld < 6) {
+          // Path E: Very high corroboration + activity (multiple quality sources)
+          // Now uses effectiveCurrent1h to support new topics
+          breakingPath = 'E:high_corroboration';
+        } else if (effectiveCurrent1h >= 8 && newsCount >= 2 && hoursOld < 3) {
+          // Path F: Extreme fresh activity - new topics with rapid growth
+          // High current_1h with multiple news sources = definitely breaking
+          breakingPath = 'F:extreme_activity';
+        }
+      }
+      
+      const isBreakingCandidate = breakingPath !== null;
       
       // Additional guard: breaking must also be trending (prevents edge cases)
       const isBreaking = isBreakingCandidate && isTrending;
       
-      // Log breaking events for monitoring
+      // Log breaking events with path for monitoring
       if (isBreaking) {
-        console.log(`[detect-trend-events] 🚨 BREAKING: "${agg.event_title}" (z=${zScoreVelocity.toFixed(2)}, rank=${rankScore.toFixed(1)}, tier1/2=${hasTier12Corroboration}, age=${hoursOld.toFixed(1)}h)`);
+        console.log(`[detect-trend-events] 🚨 BREAKING [${breakingPath}]: "${agg.event_title}" (z=${zScoreVelocity.toFixed(2)}, rank=${rankScore.toFixed(1)}, tier1/2=${hasTier12Corroboration}, age=${hoursOld.toFixed(1)}h, current_1h=${effectiveCurrent1h})`);
+      } else if (hasTier12Corroboration && zScoreVelocity >= 3 && !isBreaking) {
+        // Log near-misses for debugging
+        console.log(`[detect-trend-events] ⚠️ NEAR-BREAKING: "${agg.event_title}" (z=${zScoreVelocity.toFixed(2)}, age=${hoursOld.toFixed(1)}h, trending=${isTrending}, volumeGate=${meetsVolumeGate})`);
       }
       
       if (isTrending) trendingCount++;
@@ -1725,8 +1753,9 @@ serve(async (req) => {
             evergreen_penalty: evergreenPenalty,
             is_evergreen: isEvergreen,
           },
-          // Phase C: Breaking criteria explainability
+          // Phase C: Breaking criteria explainability (Fix 3: added breaking_path)
           breaking_criteria: isBreaking ? {
+            breaking_path: breakingPath,
             has_tier12: hasTier12Corroboration,
             z_score: zScoreVelocity,
             rank_score: rankScore,
@@ -1734,6 +1763,9 @@ serve(async (req) => {
             news_count: newsCount,
             corroboration_score: corroborationScore,
             current_1h: current1h_deduped,
+            effective_current_1h: effectiveCurrent1h,
+            baseline_delta: baselineDelta,
+            has_historical_baseline: hasHistoricalBaseline,
           } : null,
         },
         is_trending: isTrending,
