@@ -645,33 +645,46 @@ serve(async (req) => {
     }
     
     // Load RSS source tiers by URL domain (Phase 2: tier weighting)
+    // Maps domain -> normalized tier (tier1/tier2/tier3)
     const { data: rssSourceTiers } = await supabase
       .from('rss_sources')
       .select('url, tier')
       .not('tier', 'is', null);
     
-    const rssTiersByDomain = new Map<string, string>();
+    const rssTiersByDomain = new Map<string, 'tier1' | 'tier2' | 'tier3'>();
     for (const s of rssSourceTiers || []) {
       const domain = extractDomainUtil(s.url);
       if (domain && s.tier) {
-        rssTiersByDomain.set(domain, s.tier);
+        // Normalize tier values: 'specialized', 'national' -> 'tier2'
+        let normalizedTier: 'tier1' | 'tier2' | 'tier3' = 'tier3';
+        if (s.tier === 'tier1') normalizedTier = 'tier1';
+        else if (s.tier === 'tier2' || s.tier === 'national' || s.tier === 'specialized') normalizedTier = 'tier2';
+        else if (s.tier === 'tier3') normalizedTier = 'tier3';
+        rssTiersByDomain.set(domain, normalizedTier);
       }
     }
     
-    // Load Google News source tiers
+    // Load Google News source tiers by name
+    // Note: Google News articles come from various domains, so we match by source name when possible
     const { data: gnSourceTiers } = await supabase
       .from('google_news_sources')
       .select('name, tier')
       .not('tier', 'is', null);
     
-    const gnTiersByName = new Map<string, string>();
+    const gnTiersByName = new Map<string, 'tier1' | 'tier2' | 'tier3'>();
     for (const s of gnSourceTiers || []) {
       if (s.name && s.tier) {
-        gnTiersByName.set(s.name.toLowerCase(), s.tier);
+        // Normalize tier values
+        let normalizedTier: 'tier1' | 'tier2' | 'tier3' = 'tier2';
+        if (s.tier === 'tier1') normalizedTier = 'tier1';
+        else if (s.tier === 'national') normalizedTier = 'tier2'; // National topics are tier2
+        else if (s.tier === 'tier2') normalizedTier = 'tier2';
+        else normalizedTier = 'tier3';
+        gnTiersByName.set(s.name.toLowerCase(), normalizedTier);
       }
     }
     
-    console.log(`[detect-trend-events] Loaded ${rssTiersByDomain.size} RSS source tiers, ${gnTiersByName.size} Google News source tiers`);
+    console.log(`[detect-trend-events] Loaded ${rssTiersByDomain.size} RSS source tiers, ${gnTiersByName.size} Google News source tiers, ${sourceTiers.size} canonical source tiers`);
     
     // ========================================
     // STEP 1: Load rolling baselines from trend_baselines
@@ -833,9 +846,17 @@ serve(async (req) => {
       // Skip if no topics
       if (allTopics.length === 0) continue;
       
-      // Look up tier from RSS source by domain
+      // Look up tier from RSS source by domain, then fall back to source_tiers canonical table
       const articleDomain = extractDomain(article.source_url);
-      const articleTier = rssTiersByDomain.get(articleDomain) as 'tier1' | 'tier2' | 'tier3' | undefined;
+      let articleTier: 'tier1' | 'tier2' | 'tier3' | undefined = rssTiersByDomain.get(articleDomain);
+      
+      // Fall back to source_tiers table (canonical tier mapping by domain)
+      if (!articleTier) {
+        const canonicalTierInfo = sourceTiers.get(articleDomain);
+        if (canonicalTierInfo?.tier) {
+          articleTier = canonicalTierInfo.tier as 'tier1' | 'tier2' | 'tier3';
+        }
+      }
       
       const mention: SourceMention = {
         id: article.id,
@@ -849,7 +870,7 @@ serve(async (req) => {
         sentiment_label: article.sentiment_label,
         topics: allTopics,
         domain: articleDomain,
-        tier: articleTier || null, // Phase 2: attach tier for weighting
+        tier: articleTier || 'tier3', // Default to tier3 if no tier found
       };
       
       for (const topic of mention.topics) {
@@ -867,9 +888,20 @@ serve(async (req) => {
       .not('ai_topics', 'is', null);
     
     for (const item of googleNews || []) {
-      // Look up tier from Google News source by domain
+      // Look up tier from source_tiers table by domain (Google News articles come from various sources)
       const gnDomain = extractDomain(item.url);
-      const gnTier = rssTiersByDomain.get(gnDomain) as 'tier1' | 'tier2' | 'tier3' | undefined;
+      let gnTier: 'tier1' | 'tier2' | 'tier3' | undefined;
+      
+      // First check canonical source_tiers table
+      const canonicalTierInfo = sourceTiers.get(gnDomain);
+      if (canonicalTierInfo?.tier) {
+        gnTier = canonicalTierInfo.tier as 'tier1' | 'tier2' | 'tier3';
+      }
+      
+      // Fall back to rss_sources tiers by domain
+      if (!gnTier) {
+        gnTier = rssTiersByDomain.get(gnDomain);
+      }
       
       const mention: SourceMention = {
         id: item.id,
@@ -883,7 +915,7 @@ serve(async (req) => {
         sentiment_label: item.ai_sentiment_label,
         topics: item.ai_topics || [],
         domain: gnDomain,
-        tier: gnTier || null, // Phase 2: attach tier for weighting
+        tier: gnTier || 'tier3', // Default to tier3 if no tier found
       };
       
       for (const topic of mention.topics) {
