@@ -33,6 +33,7 @@ interface TopicAggregate {
   event_key: string;
   event_title: string;
   is_event_phrase: boolean; // True if multi-word descriptive phrase
+  label_quality_hint: 'event_phrase' | 'fallback_generated' | 'entity_only' | null; // FIX: From extracted_topics metadata
   related_entities: Set<string>; // Single entities that contributed to this phrase
   mentions: SourceMention[];
   dedupedMentions: Map<string, SourceMention>; // key = content_hash
@@ -609,8 +610,8 @@ function matchesEntityOnlyPattern(topic: string): boolean {
 function isEventPhrase(topic: string): boolean {
   const words = topic.trim().split(/\s+/);
   
-  // Must be 2-5 words
-  if (words.length < 2 || words.length > 5) return false;
+  // Must be 2-6 words (FIX: align with batch-analyze-content which allows 2-6)
+  if (words.length < 2 || words.length > 6) return false;
   
   // CRITICAL: Reject entity-only patterns
   if (matchesEntityOnlyPattern(topic)) return false;
@@ -627,21 +628,32 @@ function isEventPhrase(topic: string): boolean {
  */
 function validateEventPhraseLabel(
   topic: string, 
-  claimedIsEventPhrase: boolean
-): { is_event_phrase: boolean; label_quality: 'event_phrase' | 'entity_only' | 'fallback_generated'; downgraded: boolean } {
+  claimedIsEventPhrase: boolean,
+  labelQualityHint?: 'event_phrase' | 'fallback_generated' | 'entity_only' | null
+): { is_event_phrase: boolean; label_quality: 'event_phrase' | 'entity_only' | 'fallback_generated'; downgraded: boolean; label_source: string } {
+  // FIX: If we have metadata hint of fallback_generated and it passes verb check, preserve it
+  if (labelQualityHint === 'fallback_generated') {
+    const passesVerbCheck = isEventPhrase(topic);
+    if (passesVerbCheck) {
+      return { is_event_phrase: true, label_quality: 'fallback_generated', downgraded: false, label_source: 'fallback_generated' };
+    }
+    // Fallback didn't pass verb check - downgrade to entity_only
+    return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true, label_source: 'fallback_downgraded' };
+  }
+  
   // If not claimed as event phrase, keep as entity_only
   if (!claimedIsEventPhrase) {
-    return { is_event_phrase: false, label_quality: 'entity_only', downgraded: false };
+    return { is_event_phrase: false, label_quality: 'entity_only', downgraded: false, label_source: 'entity_only' };
   }
   
   // Validate the claim: does it actually contain a verb/event noun?
   const isActuallyEventPhrase = isEventPhrase(topic);
   
   if (isActuallyEventPhrase) {
-    return { is_event_phrase: true, label_quality: 'event_phrase', downgraded: false };
+    return { is_event_phrase: true, label_quality: 'event_phrase', downgraded: false, label_source: 'event_phrase' };
   } else {
     // DOWNGRADE: Claimed event_phrase but doesn't pass validation
-    return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true };
+    return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true, label_source: 'event_phrase_downgraded' };
   }
 }
 
@@ -905,10 +917,19 @@ serve(async (req) => {
       }
       
       if (!topicMap.has(key)) {
+        // FIX: Check for metadata from extracted_topics (RSS articles)
+        const metadata = topicMetadataMap?.get(key);
+        const isEventPhraseFromMetadata = metadata?.is_event_phrase === true;
+        const labelQualityHint = metadata?.label_quality as 'event_phrase' | 'fallback_generated' | 'entity_only' | undefined;
+        
+        // Use metadata if available, otherwise fall back to local heuristic
+        const computedIsEventPhrase = isEventPhraseFromMetadata || isEventPhrase(topic);
+        
         topicMap.set(key, {
           event_key: key,
           event_title: normalizeTopicTitle(topic),
-          is_event_phrase: isEventPhrase(topic),
+          is_event_phrase: computedIsEventPhrase,
+          label_quality_hint: labelQualityHint || null, // FIX: Preserve hint for later use
           related_entities: new Set(),
           mentions: [],
           dedupedMentions: new Map(),
@@ -958,20 +979,33 @@ serve(async (req) => {
       .gte('published_date', hours24Ago.toISOString())
       .eq('is_duplicate', false);
     
+    // FIX: Track topic metadata from extracted_topics for label quality propagation
+    const topicMetadataMap = new Map<string, { is_event_phrase: boolean; label_quality: string }>();
+    
     for (const article of articles || []) {
       // Build topics list from both tags and extracted_topics
       let allTopics: string[] = [];
       
-      // Add tags (legacy)
+      // Add tags (legacy) - no metadata available
       if (article.tags && Array.isArray(article.tags)) {
         allTopics.push(...article.tags);
       }
       
-      // Add extracted_topics with event phrases (new NER output)
+      // Add extracted_topics with event phrases (new NER output) - PRESERVE METADATA
       if (article.extracted_topics && Array.isArray(article.extracted_topics)) {
         for (const extracted of article.extracted_topics) {
           if (typeof extracted === 'object' && extracted.topic) {
             allTopics.push(extracted.topic);
+            // FIX: Store metadata for this topic if available
+            if (extracted.is_event_phrase !== undefined || extracted.label_quality) {
+              const key = normalizeTopicKey(extracted.topic);
+              if (key && !topicMetadataMap.has(key)) {
+                topicMetadataMap.set(key, {
+                  is_event_phrase: extracted.is_event_phrase === true,
+                  label_quality: extracted.label_quality || 'entity_only'
+                });
+              }
+            }
           } else if (typeof extracted === 'string') {
             allTopics.push(extracted);
           }
@@ -1279,6 +1313,14 @@ serve(async (req) => {
     let qualityGateFiltered = 0;
     let labelDowngradedCount = 0; // FIX 1: Count downgrades from event_phrase → entity_only
     
+    // FIX: Label quality audit counters
+    let labelAudit = {
+      event_phrase: 0,
+      fallback_generated: 0,
+      entity_only: 0,
+      with_metadata_hint: 0, // Topics that had label_quality_hint from extracted_topics
+    };
+    
     for (const [key, agg] of topicMap) {
       // Use DEDUPED counts for all calculations
       const dedupedMentions = Array.from(agg.dedupedMentions.values());
@@ -1447,10 +1489,12 @@ serve(async (req) => {
       // ========================================
       // FIX 1: Validate event phrase labels using verb-required heuristic
       // Downgrade "event phrases" that are actually entity-only patterns
+      // FIX: Now includes label_quality_hint from extracted_topics metadata
       // ========================================
       const validationResult = validateEventPhraseLabel(
         canonicalLabelForRanking, 
-        canonicalLabelIsEventPhraseForRanking
+        canonicalLabelIsEventPhraseForRanking,
+        agg.label_quality_hint // FIX: Pass the hint from extracted_topics metadata
       );
       
       // Update the canonical flag if downgraded
@@ -1462,6 +1506,7 @@ serve(async (req) => {
       // Use the validated label quality for ranking
       const labelQualityForRanking = validationResult.label_quality;
       const validatedIsEventPhrase = validationResult.is_event_phrase;
+      const labelSource = validationResult.label_source; // FIX: Track label source for explainability
       
       // ========================================
       // PHASE 3: EVERGREEN PENALTY CALCULATION
@@ -1677,7 +1722,7 @@ serve(async (req) => {
         canonicalLabel = cluster.canonicalTitle;
         
         // Validate the cluster's is_event_phrase claim using verb-required heuristic
-        const clusterValidation = validateEventPhraseLabel(cluster.canonicalTitle, cluster.isEventPhrase);
+        const clusterValidation = validateEventPhraseLabel(cluster.canonicalTitle, cluster.isEventPhrase, null);
         canonicalLabelIsEventPhrase = clusterValidation.is_event_phrase;
         
         if (clusterValidation.downgraded) {
@@ -1690,7 +1735,7 @@ serve(async (req) => {
           const clusterEventPhrases = Array.from(cluster.memberTitles)
             .filter(t => {
               // Only include phrases that pass the verb-required validation
-              const validation = validateEventPhraseLabel(t, isEventPhrase(t));
+              const validation = validateEventPhraseLabel(t, isEventPhrase(t), null);
               return validation.is_event_phrase;
             });
           
@@ -1706,6 +1751,12 @@ serve(async (req) => {
       // PHASE 2/A: labelQuality already computed earlier for ranking - reuse it
       // Use labelQualityForRanking which was computed before rankScore calculation
       const labelQuality = labelQualityForRanking;
+      
+      // FIX: Track label quality for audit
+      if (labelQuality === 'event_phrase') labelAudit.event_phrase++;
+      else if (labelQuality === 'fallback_generated') labelAudit.fallback_generated++;
+      else labelAudit.entity_only++;
+      if (agg.label_quality_hint) labelAudit.with_metadata_hint++;
       
       // Build related entities array from the aggregate
       const relatedEntitiesArray = Array.from(agg.related_entities).slice(0, 10);
@@ -1757,6 +1808,8 @@ serve(async (req) => {
           meets_volume_gate: meetsVolumeGate,
           is_event_phrase: validatedIsEventPhrase, // FIX 1: Use validated value
           label_quality: labelQuality,  // PHASE 2: Include in explainability
+          label_source: labelSource,  // FIX: Explicit label source for audit
+          label_quality_hint: agg.label_quality_hint || null, // FIX: Original hint from extraction
           single_word_explain: qualityResult.singleWordExplain || null, // PHASE 2: Why single-word passed
           related_entities_count: agg.related_entities.size,
           cluster_size: cluster?.memberKeys.size || 1,
@@ -1838,6 +1891,8 @@ serve(async (req) => {
     console.log(`[detect-trend-events] Quality gates filtered ${qualityGateFiltered} low-quality topics`);
     console.log(`[detect-trend-events] Deduplication removed ${dedupedSavings} duplicate mentions`);
     console.log(`[detect-trend-events] FIX 1: Downgraded ${labelDowngradedCount} entity-only labels from is_event_phrase=true → false`);
+    // FIX: Label quality audit log
+    console.log(`[detect-trend-events] LABEL AUDIT: event_phrase=${labelAudit.event_phrase} fallback_generated=${labelAudit.fallback_generated} entity_only=${labelAudit.entity_only} (with_metadata_hint=${labelAudit.with_metadata_hint})`);
     
     // ========================================
     // STEP 4: Upsert trend events and evidence
