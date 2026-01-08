@@ -1,29 +1,36 @@
 import { useState, useCallback } from "react";
-import { TrendingUp, Newspaper, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingUp, Newspaper, Users, Globe } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   TrendsConsole,
   AdminPageHeader,
-  DeltaSinceLoginCard,
-  RiskImpactSummary,
+  BriefingStrip,
+  BriefingDrawer,
+  AlertsDrawer,
+  PersonalizationBanner,
 } from "@/components/admin/v3";
-import { DataStatusBar } from "@/components/admin/v3/DataStatusBar";
 import { PipelineHealthDrawer } from "@/components/admin/v3/PipelineHealthDrawer";
 import { NewsInvestigationTable } from "@/components/admin/v3/NewsInvestigationTable";
 import { TrendEventDrilldownView } from "@/components/admin/v3/TrendEventDrilldownView";
-import { useTrendsKeyboard } from "@/hooks/useTrendsKeyboard";
 
 type ViewMode = "trends" | "feed" | "trend_detail";
+type ClientMode = "for_you" | "global";
+type TabMode = "for_you" | "explore";
 
 export function NewsTrendsPage() {
   const [mode, setMode] = useState<ViewMode>("trends");
   const [selectedTrendId, setSelectedTrendId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
+  const [briefingDrawerOpen, setBriefingDrawerOpen] = useState(false);
+  const [alertsDrawerOpen, setAlertsDrawerOpen] = useState(false);
+  const [clientMode, setClientMode] = useState<ClientMode>("for_you");
+  const [activeTab, setActiveTab] = useState<TabMode>("for_you");
+  const [showPersonalizationBanner, setShowPersonalizationBanner] = useState(true);
+
+  // Placeholder personalization data - in production from org profile
+  const personalizationPriorities = ["Middle East policy", "Civil rights", "Michigan"];
 
   // Handle drilldown to trend_events detail view
   const handleTrendDrilldown = useCallback((trendId: string) => {
@@ -37,8 +44,9 @@ export function NewsTrendsPage() {
   }, []);
 
   const handleTabChange = useCallback((value: string) => {
-    if (value === "trends" || value === "feed") {
-      setMode(value);
+    if (value === "for_you" || value === "explore") {
+      setActiveTab(value);
+      setMode("trends");
       setSelectedTrendId(null);
     }
   }, []);
@@ -55,66 +63,66 @@ export function NewsTrendsPage() {
         description="Real-time political intelligence monitoring and evidence-based trend analysis"
       />
 
-      {/* Data Status Bar - Compact pipeline health indicator */}
-      <DataStatusBar onOpenDetails={() => setDrawerOpen(true)} />
+      {/* Layer 1: Briefing Strip - Calm, minimal status bar */}
+      <BriefingStrip
+        onOpenBriefing={() => setBriefingDrawerOpen(true)}
+        onOpenAlerts={() => setAlertsDrawerOpen(true)}
+        onOpenDetails={() => setDetailsDrawerOpen(true)}
+        alertCount={3}
+        clientMode={clientMode}
+        onClientModeChange={setClientMode}
+      />
 
-      {/* Collapsible Executive Summary */}
-      {mode !== "trend_detail" && (
-        <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="w-full justify-between h-9 px-3 text-xs text-muted-foreground hover:text-foreground border border-border/50 rounded-lg"
-            >
-              <span className="flex items-center gap-2">
-                <span className="font-medium">Executive Summary</span>
-                <span className="text-muted-foreground/70">• Activity since last login & risk overview</span>
-              </span>
-              {summaryOpen ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <motion.div 
-              className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-3"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <DeltaSinceLoginCard />
-              <RiskImpactSummary />
-            </motion.div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-
-      {/* Mode Tabs - V3 styled */}
+      {/* Layer 2: Main Workspace with Tabs */}
       {mode !== "trend_detail" ? (
-        <Tabs value={mode} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 h-10">
-            <TabsTrigger value="trends" className="gap-2 text-sm">
-              <TrendingUp className="h-4 w-4" />
-              Trends Console
-            </TabsTrigger>
-            <TabsTrigger value="feed" className="gap-2 text-sm">
-              <Newspaper className="h-4 w-4" />
-              News Feed
-            </TabsTrigger>
-          </TabsList>
+        <>
+          {/* For You / Explore Tabs */}
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+            <div className="flex items-center justify-between">
+              <TabsList className="grid w-full max-w-xs grid-cols-2 h-10">
+                <TabsTrigger value="for_you" className="gap-2 text-sm">
+                  <Users className="h-4 w-4" />
+                  For You
+                </TabsTrigger>
+                <TabsTrigger value="explore" className="gap-2 text-sm">
+                  <Globe className="h-4 w-4" />
+                  Explore
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-          <TabsContent value="trends" className="mt-4">
-            <TrendsConsole onDrilldown={handleTrendDrilldown} />
-          </TabsContent>
-          
-          <TabsContent value="feed" className="mt-4">
-            <NewsInvestigationTable />
-          </TabsContent>
-        </Tabs>
+            {/* Personalization Banner - Only in For You tab */}
+            {activeTab === "for_you" && showPersonalizationBanner && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-3"
+              >
+                <PersonalizationBanner
+                  clientName="Democracy Forward"
+                  priorities={personalizationPriorities}
+                  onEditPreferences={() => console.log("Edit preferences")}
+                  onDismiss={() => setShowPersonalizationBanner(false)}
+                />
+              </motion.div>
+            )}
+
+            <TabsContent value="for_you" className="mt-4">
+              <TrendsConsole 
+                onDrilldown={handleTrendDrilldown}
+                viewMode="for_you"
+              />
+            </TabsContent>
+            
+            <TabsContent value="explore" className="mt-4">
+              <TrendsConsole 
+                onDrilldown={handleTrendDrilldown}
+                viewMode="explore"
+              />
+            </TabsContent>
+          </Tabs>
+        </>
       ) : (
         <AnimatePresence mode="wait">
           <motion.div
@@ -134,8 +142,24 @@ export function NewsTrendsPage() {
         </AnimatePresence>
       )}
 
-      {/* Pipeline Health Drawer */}
-      <PipelineHealthDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+      {/* Drawers */}
+      <PipelineHealthDrawer open={detailsDrawerOpen} onOpenChange={setDetailsDrawerOpen} />
+      <BriefingDrawer 
+        open={briefingDrawerOpen} 
+        onOpenChange={setBriefingDrawerOpen}
+        onViewTrend={(trendId) => {
+          setBriefingDrawerOpen(false);
+          handleTrendDrilldown(trendId);
+        }}
+      />
+      <AlertsDrawer 
+        open={alertsDrawerOpen} 
+        onOpenChange={setAlertsDrawerOpen}
+        onViewTrend={(trendId) => {
+          setAlertsDrawerOpen(false);
+          handleTrendDrilldown(trendId);
+        }}
+      />
     </motion.div>
   );
 }
