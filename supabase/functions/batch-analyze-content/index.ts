@@ -198,12 +198,16 @@ function isEntityOnlyPattern(phrase: string): boolean {
 }
 
 /**
- * Validate event phrase quality - must be 2-6 words, verb-centered, NOT entity-only
- * Fix 1: Strictly require verb/event noun AND reject entity-only patterns
+ * Validate event phrase quality - must be 3-6 words, verb-centered, NOT entity-only
+ * FIX: Require 3+ words to prevent 2-word entity names like "Joe Biden" from being event phrases
  */
 function isValidEventPhrase(phrase: string): boolean {
   const words = phrase.trim().split(/\s+/);
-  if (words.length < 2 || words.length > 6) return false;
+  
+  // CRITICAL FIX: Require 3+ words - 2-word phrases are almost always person/org names
+  // Examples that should FAIL: "Joe Biden", "Chuck Schumer", "White House"
+  // Examples that should PASS: "Trump Fires Director", "House Passes Bill"
+  if (words.length < 3 || words.length > 6) return false;
   
   // CRITICAL: Reject entity-only patterns even if multi-word
   if (isEntityOnlyPattern(phrase)) {

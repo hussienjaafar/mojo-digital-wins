@@ -416,15 +416,31 @@ function calculateRankScore(params: {
   const contextComponent = Math.min(15, contextBurstScore * 3);
   
   // ========================================
-  // Label Quality Modifier
+  // Label Quality Modifier - FIX: Entity-only requires BOTH context AND burst
   // Event phrases get full score, entity-only needs context to rank
   // ========================================
   let labelQualityModifier = 1.0;
   if (labelQuality === 'entity_only') {
-    // Entity-only with no context: heavy penalty
-    // Entity-only with context: moderate penalty
+    // FIX: Entity-only trends require BOTH context AND burst to rank well
+    // This prevents generic entity names from dominating the top trends
     const hasContext = contextBurstScore >= 1.0;
-    labelQualityModifier = hasContext ? 0.65 : 0.35;
+    const hasBurst = trueZScore >= 2.5; // Require statistical burst
+    const contextTermsCount = 0; // Will be passed via params in future
+    const contextPhrasesCount = 0;
+    
+    // Entity-only without BOTH context AND burst gets HEAVY suppression
+    if (!hasContext && !hasBurst) {
+      labelQualityModifier = 0.15; // Very heavy suppression (was 0.35)
+    } else if (!hasContext) {
+      // Has burst but no context - still suppress but allow some ranking
+      labelQualityModifier = 0.30;
+    } else if (!hasBurst) {
+      // Has context but no burst - moderate suppression
+      labelQualityModifier = 0.40;
+    } else {
+      // Has BOTH context AND burst - allow higher ranking
+      labelQualityModifier = 0.70;
+    }
   } else if (labelQuality === 'fallback_generated') {
     // Fallback-generated labels get slight penalty
     labelQualityModifier = 0.90;
@@ -2342,22 +2358,30 @@ serve(async (req) => {
         console.log(`[detect-trend-events] 📊 CONTEXT: "${agg.event_title}" terms=[${contextBundle.context_terms.join(', ')}] phrases=[${contextBundle.context_phrases.join(', ')}] burst=${contextBundle.burst_score}`);
       }
       
-      // NEW: Boost entity-only trends if they have strong context
-      // This allows location/person trends like "Minneapolis" to rank IF they have clear context
+      // FIX: Entity-only trends require BOTH z-score burst AND context to rank well
+      // This allows location/person trends like "Minneapolis" to rank ONLY IF they have:
+      // 1. Statistical burst (true_z_score >= 2.5) proving something unusual is happening
+      // 2. Context terms/phrases explaining WHY they're trending
       let contextBoostMultiplier = 1.0;
       if (labelQuality === 'entity_only') {
         const hasStrongContext = contextBundle.context_terms.length >= 2 || contextBundle.context_phrases.length >= 1;
-        const hasBurst = contextBundle.burst_score >= 1.0;
+        const hasBurstContext = contextBundle.burst_score >= 1.0;
+        const hasZScoreBurst = trueZScore >= 2.5; // Require statistical burst
         
-        if (hasStrongContext && hasBurst) {
-          // Strong context + bursting = allow entity-only to rank higher
-          contextBoostMultiplier = 1.3; // 30% boost
-          console.log(`[detect-trend-events] ✅ CONTEXT BOOST: "${agg.event_title}" (burst=${contextBundle.burst_score.toFixed(2)}, terms=${contextBundle.context_terms.length}, phrases=${contextBundle.context_phrases.length})`);
-        } else if (hasStrongContext) {
-          // Has context but not bursting = slight boost
-          contextBoostMultiplier = 1.1;
+        if (hasStrongContext && hasBurstContext && hasZScoreBurst) {
+          // Strong context + context burst + z-score burst = allow entity-only to rank higher
+          contextBoostMultiplier = 1.4; // 40% boost
+          console.log(`[detect-trend-events] ✅ ENTITY CONTEXT+BURST: "${agg.event_title}" (z=${trueZScore.toFixed(2)}, burst=${contextBundle.burst_score.toFixed(2)}, terms=${contextBundle.context_terms.length}, phrases=${contextBundle.context_phrases.length})`);
+        } else if (hasStrongContext && hasZScoreBurst) {
+          // Has context + z-score burst but not context burst = moderate boost
+          contextBoostMultiplier = 1.2;
+          console.log(`[detect-trend-events] ✅ ENTITY CONTEXT: "${agg.event_title}" (z=${trueZScore.toFixed(2)}, terms=${contextBundle.context_terms.length})`);
+        } else if (!hasStrongContext && !hasZScoreBurst) {
+          // No context AND no burst = SUPPRESS (already penalized in rankScore, but add extra)
+          contextBoostMultiplier = 0.7; // Additional suppression
+          console.log(`[detect-trend-events] ⚠️ ENTITY SUPPRESSED: "${agg.event_title}" (no context, no burst, z=${trueZScore.toFixed(2)})`);
         }
-        // No context = keep the heavy entity-only penalty from rankScore
+        // Otherwise keep multiplier at 1.0 (neutral)
       }
       
       // Apply context boost to rank score
