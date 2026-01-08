@@ -90,13 +90,7 @@ export interface TrendEvent {
   rank_score?: number;
   recency_decay?: number;
   evergreen_penalty?: number;
-  
-  // NEW: Context bundle fields for Twitter-grade understanding
-  context_terms?: string[];       // Top 3-5 co-occurring entities
-  context_phrases?: string[];     // Top 2-3 verb-centered event phrases  
-  context_summary?: string | null; // One-line summary from headlines
   burst_score?: number;           // Co-occurrence strength score
-  label_quality?: 'event_phrase' | 'entity_only' | 'fallback_generated';
 }
 
 /**
