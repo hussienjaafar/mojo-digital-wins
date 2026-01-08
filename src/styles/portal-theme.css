@@ -34,6 +34,9 @@
   --portal-accent-purple: 270 70% 55%;       /* #8B5CF6 - Vibrant purple */
   --portal-accent-purple-hover: 270 70% 48%; /* Darker on hover */
   
+  /* Sky accent - for social/secondary indicators */
+  --portal-accent-sky: 199 89% 48%;          /* #0EA5E9 - Sky blue */
+  
   /* Success/Error/Warning - WCAG compliant for light mode */
   --portal-success: 150 60% 35%;             /* Darker green for contrast */
   --portal-error: 0 72% 45%;                 /* Darker red for contrast */
