@@ -1239,24 +1239,36 @@ serve(async (req) => {
     const today = now.toISOString().split('T')[0];
     const date7dAgo = days7Ago.toISOString().split('T')[0];
     
+    // Track baseline quality stats for logging
+    let baselinesWithStdDev = 0;
+    let baselinesWithFallback = 0;
+    
     for (const [key, baselines] of baselinesByKey) {
-      // Filter to 7d and 30d windows (excluding today to avoid counting current data)
+      // Filter to 7d and 30d windows (excluding today to avoid counting current data twice)
       const last7d = baselines.filter(b => b.date >= date7dAgo && b.date < today);
       const last30d = baselines.filter(b => b.date < today);
       
-      const avg7d = last7d.length > 0 
-        ? last7d.reduce((sum, b) => sum + b.hourly_avg, 0) / last7d.length 
+      // FIX: If no historical data, fallback to include today's baseline
+      // This prevents the "today-only baseline is excluded" problem
+      const useBaselines = last7d.length > 0 ? last7d : baselines.filter(b => b.date === today);
+      const usedFallback = last7d.length === 0 && useBaselines.length > 0;
+      
+      const avg7d = useBaselines.length > 0 
+        ? useBaselines.reduce((sum, b) => sum + b.hourly_avg, 0) / useBaselines.length 
         : 0;
       const avg30d = last30d.length > 0 
         ? last30d.reduce((sum, b) => sum + b.hourly_avg, 0) / last30d.length 
-        : 0;
+        : avg7d; // Fallback to 7d if no 30d
       
       // PHASE 1: Calculate pooled standard deviation from daily std devs
       // Using root-mean-square of daily std devs as approximation
-      const stdDevValues = last7d.filter(b => b.hourly_std_dev > 0).map(b => b.hourly_std_dev);
+      const stdDevValues = useBaselines.filter(b => b.hourly_std_dev > 0).map(b => b.hourly_std_dev);
       const pooledStdDev = stdDevValues.length > 0
         ? Math.sqrt(stdDevValues.reduce((sum, s) => sum + s * s, 0) / stdDevValues.length)
         : avg7d * 0.5; // Fallback: assume 50% volatility
+      
+      if (stdDevValues.length > 0) baselinesWithStdDev++;
+      if (usedFallback) baselinesWithFallback++;
       
       // Calculate relative standard deviation (coefficient of variation)
       const rsd = avg7d > 0 ? pooledStdDev / avg7d : 1;
@@ -1265,17 +1277,17 @@ serve(async (req) => {
       const isStable = rsd < 0.4 && avg7d >= 1;
       
       // Get min/max from readings
-      const minHourly = last7d.length > 0 
-        ? Math.min(...last7d.map(b => b.min_hourly || b.hourly_avg))
+      const minHourly = useBaselines.length > 0 
+        ? Math.min(...useBaselines.map(b => b.min_hourly || b.hourly_avg))
         : 0;
-      const maxHourly = last7d.length > 0
-        ? Math.max(...last7d.map(b => b.max_hourly || b.hourly_avg))
+      const maxHourly = useBaselines.length > 0
+        ? Math.max(...useBaselines.map(b => b.max_hourly || b.hourly_avg))
         : avg7d * 2;
       
       rollingBaselines.set(key, {
         baseline_7d: avg7d,
         baseline_30d: avg30d,
-        data_points_7d: last7d.length,
+        data_points_7d: useBaselines.length,
         data_points_30d: last30d.length,
         hourly_std_dev: pooledStdDev,
         relative_std_dev: rsd,
@@ -1285,7 +1297,7 @@ serve(async (req) => {
       });
     }
     
-    console.log(`[detect-trend-events] Loaded rolling baselines for ${rollingBaselines.size} topics (with std dev)`);
+    console.log(`[detect-trend-events] Loaded rolling baselines for ${rollingBaselines.size} topics (${baselinesWithStdDev} with std dev, ${baselinesWithFallback} using today fallback)`);
     
     // ========================================
     // STEP 2: Aggregate topics with deduplication
