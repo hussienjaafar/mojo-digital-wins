@@ -17,6 +17,7 @@ const JOB_DEPENDENCIES: Record<string, string[]> = {
   'detect_anomalies': ['calculate_bluesky_trends', 'calculate_news_trends'],
   'detect_fundraising_opportunities': ['correlate_social_news'],
   'smart_alerting': ['analyze_articles', 'detect_anomalies'],
+  'detect_trend_events': ['update_baselines'],  // Baselines must run before trend detection
 };
 
 // Jobs that can be skipped if no new data
@@ -415,6 +416,19 @@ serve(async (req) => {
             if (impactResponse.error) throw new Error(impactResponse.error.message);
             result = impactResponse.data;
             itemsProcessed = result?.events_tracked || 0;
+            break;
+
+          case 'update_baselines':
+            console.log('[SCHEDULER] Running baseline computation for trends');
+            const cronSecretForBaselines = Deno.env.get('CRON_SECRET');
+            const baselineResponse = await supabase.functions.invoke('update-trend-baselines', { 
+              body: {},
+              headers: cronSecretForBaselines ? { 'x-cron-secret': cronSecretForBaselines } : {}
+            });
+            if (baselineResponse.error) throw new Error(baselineResponse.error.message);
+            result = baselineResponse.data;
+            itemsProcessed = result?.uniqueTopics || 0;
+            itemsCreated = result?.baselinesUpserted || 0;
             break;
 
           case 'detect_trend_events':

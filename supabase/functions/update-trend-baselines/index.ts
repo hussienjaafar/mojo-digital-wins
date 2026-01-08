@@ -183,10 +183,24 @@ serve(async (req) => {
       const total = readings.reduce((a, b) => a + b, 0);
       const avg = total / readings.length;
       
-      // Standard deviation
-      const squaredDiffs = readings.map(r => Math.pow(r - avg, 2));
-      const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / readings.length;
-      const stdDev = Math.sqrt(avgSquaredDiff);
+      // Standard deviation - handle sparse data correctly
+      const nonZeroReadings = readings.filter(r => r > 0);
+      let stdDev: number;
+      
+      if (nonZeroReadings.length >= 3) {
+        // Population standard deviation across all 168 hour buckets
+        const squaredDiffs = readings.map(r => Math.pow(r - avg, 2));
+        const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / readings.length;
+        stdDev = Math.sqrt(avgSquaredDiff);
+      } else if (nonZeroReadings.length >= 1) {
+        // Sparse data: estimate volatility based on max spike vs avg
+        // This gives us a reasonable std dev even with few data points
+        const maxReading = Math.max(...readings);
+        stdDev = Math.max(avg * 0.5, (maxReading - avg) / 2);
+      } else {
+        // No data at all
+        stdDev = 0;
+      }
       
       // Relative standard deviation (coefficient of variation)
       const rsd = avg > 0 ? stdDev / avg : 0;
@@ -228,17 +242,17 @@ serve(async (req) => {
       const upsertData = batch.map(b => ({
         event_key: b.event_key,
         baseline_date: today,
-        avg_daily_mentions: b.avg_hourly * 24,
-        avg_hourly_mentions: b.avg_hourly,
-        baseline_7d: b.avg_hourly,
-        baseline_30d: b.avg_hourly, // Will be enhanced when we have more data
+        mentions_count: Math.round(b.avg_hourly * 24),  // daily mentions
+        hourly_average: b.avg_hourly,
+        news_mentions: 0,  // Will be populated separately if needed
+        social_mentions: 0, // Will be populated separately if needed  
+        avg_sentiment: 0,
         hourly_std_dev: b.hourly_std_dev,
         relative_std_dev: b.relative_std_dev,
         hourly_readings: b.hourly_readings,
         min_hourly: b.min_hourly,
         max_hourly: b.max_hourly,
-        is_stable: b.is_stable,
-        updated_at: new Date().toISOString()
+        is_stable: b.is_stable
       }));
 
       const { error: upsertError } = await supabase
