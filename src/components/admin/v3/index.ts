@@ -25,3 +25,11 @@ export { SuggestedActionsPanel, SuggestedActionsCompact } from "./SuggestedActio
 export { DeltaSinceLoginCard } from "./DeltaSinceLoginCard";
 export { RiskImpactSummary } from "./RiskImpactSummary";
 export { CoverageGovernancePanel } from "./CoverageGovernancePanel";
+
+// New V3 Redesign Components
+export { BriefingStrip } from "./BriefingStrip";
+export { BriefingDrawer } from "./BriefingDrawer";
+export { AlertsDrawer } from "./AlertsDrawer";
+export { TrendsFilterRail, type FilterState } from "./TrendsFilterRail";
+export { PersonalizationBanner } from "./PersonalizationBanner";
+export { TrendCardCompact } from "./TrendCardCompact";
