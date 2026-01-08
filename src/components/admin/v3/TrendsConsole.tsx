@@ -12,7 +12,9 @@ import {
   RefreshCw,
   Info,
   Target,
-  X
+  X,
+  LayoutGrid,
+  LayoutList
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -25,10 +27,12 @@ import { DataFreshnessIndicator } from './DataFreshnessIndicator';
 import { TrendExplainabilityCompact } from './TrendEventExplainability';
 import { TrendFeedback } from './TrendFeedback';
 import { TrendsQuickFilters, type TrendFilter, type TrendSort } from './TrendsQuickFilters';
+import { TrendCardCompact } from './TrendCardCompact';
 import { cn } from '@/lib/utils';
 
 interface TrendsConsoleProps {
   onDrilldown?: (trendId: string) => void;
+  viewMode?: 'for_you' | 'explore';
   className?: string;
 }
 
@@ -375,13 +379,14 @@ function TrendEventCard({
   );
 }
 
-export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
+export function TrendsConsole({ onDrilldown, viewMode = 'for_you', className }: TrendsConsoleProps) {
   const { events, isLoading, stats, refresh } = useTrendEvents({ limit: 50, minConfidence: 30 });
   const [activeFilter, setActiveFilter] = useState<TrendFilter>('all');
-  const [activeSort, setActiveSort] = useState<TrendSort>('confidence');
+  const [activeSort, setActiveSort] = useState<TrendSort>(viewMode === 'for_you' ? 'confidence' : 'velocity');
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const freshBreaking = useMemo(
@@ -464,13 +469,48 @@ export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
             <TrendingUp className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="font-semibold text-lg text-foreground">Trends Console</h2>
+            <h2 className="font-semibold text-lg text-foreground">
+              {viewMode === 'for_you' ? 'Trends For You' : 'Explore All Trends'}
+            </h2>
             <p className="text-xs text-muted-foreground">
-              {stats.totalEvents} trending • {freshBreaking.length} breaking • {stats.highConfidenceCount} high confidence
+              {viewMode === 'for_you' 
+                ? `Ranked by relevance • ${stats.totalEvents} trending`
+                : `Ranked by momentum • ${stats.totalEvents} trending`
+              }
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Density Toggle */}
+          <div className="flex items-center bg-muted/50 rounded-md p-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={density === 'comfortable' ? 'secondary' : 'ghost'}
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setDensity('comfortable')}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Comfortable view</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={density === 'compact' ? 'secondary' : 'ghost'}
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setDensity('compact')}
+                >
+                  <LayoutList className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Compact view</TooltipContent>
+            </Tooltip>
+          </div>
+          
           <DataFreshnessIndicator 
             lastUpdated={latestUpdate}
             expectedMaxAgeMinutes={30}
@@ -545,12 +585,13 @@ export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
             </motion.div>
           ) : (
             filteredTrends.map((trend, index) => (
-              <TrendEventCard
+              <TrendCardCompact
                 key={trend.id}
                 trend={trend}
                 rank={index + 1}
-                showBreakingBadge={breakingBadgeIds.has(trend.id)}
-                onDrilldown={() => onDrilldown?.(trend.id)}
+                isBreaking={breakingBadgeIds.has(trend.id)}
+                density={density}
+                onOpen={() => onDrilldown?.(trend.id)}
                 onDismiss={() => handleDismiss(trend.id)}
               />
             ))
