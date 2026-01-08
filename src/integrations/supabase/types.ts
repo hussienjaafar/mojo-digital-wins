@@ -7412,9 +7412,15 @@ export type Database = {
           created_at: string | null
           event_key: string
           hourly_average: number | null
+          hourly_readings: number[] | null
+          hourly_std_dev: number | null
           id: string
+          is_stable: boolean | null
+          max_hourly: number | null
           mentions_count: number | null
+          min_hourly: number | null
           news_mentions: number | null
+          relative_std_dev: number | null
           social_mentions: number | null
         }
         Insert: {
@@ -7423,9 +7429,15 @@ export type Database = {
           created_at?: string | null
           event_key: string
           hourly_average?: number | null
+          hourly_readings?: number[] | null
+          hourly_std_dev?: number | null
           id?: string
+          is_stable?: boolean | null
+          max_hourly?: number | null
           mentions_count?: number | null
+          min_hourly?: number | null
           news_mentions?: number | null
+          relative_std_dev?: number | null
           social_mentions?: number | null
         }
         Update: {
@@ -7434,9 +7446,15 @@ export type Database = {
           created_at?: string | null
           event_key?: string
           hourly_average?: number | null
+          hourly_readings?: number[] | null
+          hourly_std_dev?: number | null
           id?: string
+          is_stable?: boolean | null
+          max_hourly?: number | null
           mentions_count?: number | null
+          min_hourly?: number | null
           news_mentions?: number | null
+          relative_std_dev?: number | null
           social_mentions?: number | null
         }
         Relationships: []
@@ -7653,10 +7671,13 @@ export type Database = {
           alias_variants: string[] | null
           baseline_30d: number | null
           baseline_7d: number | null
+          baseline_std_dev: number | null
           baseline_updated_at: string | null
+          burst_normalized_score: number | null
           burst_score: number | null
           canonical_label: string | null
           cluster_id: string | null
+          co_occurrence_anomaly_score: number | null
           confidence_factors: Json | null
           confidence_score: number | null
           context_phrases: string[] | null
@@ -7680,6 +7701,7 @@ export type Database = {
           id: string
           is_breaking: boolean | null
           is_event_phrase: boolean | null
+          is_evergreen_detected: boolean | null
           is_tier3_only: boolean | null
           is_trending: boolean | null
           is_verified: boolean | null
@@ -7687,6 +7709,7 @@ export type Database = {
           last_seen_at: string
           news_source_count: number | null
           peak_at: string | null
+          poisson_surprise: number | null
           rank_score: number | null
           recency_decay: number | null
           related_entities: string[] | null
@@ -7702,6 +7725,7 @@ export type Database = {
           top_headline: string | null
           trend_score: number | null
           trend_stage: string | null
+          true_z_score: number | null
           updated_at: string | null
           velocity: number | null
           velocity_1h: number | null
@@ -7714,10 +7738,13 @@ export type Database = {
           alias_variants?: string[] | null
           baseline_30d?: number | null
           baseline_7d?: number | null
+          baseline_std_dev?: number | null
           baseline_updated_at?: string | null
+          burst_normalized_score?: number | null
           burst_score?: number | null
           canonical_label?: string | null
           cluster_id?: string | null
+          co_occurrence_anomaly_score?: number | null
           confidence_factors?: Json | null
           confidence_score?: number | null
           context_phrases?: string[] | null
@@ -7741,6 +7768,7 @@ export type Database = {
           id?: string
           is_breaking?: boolean | null
           is_event_phrase?: boolean | null
+          is_evergreen_detected?: boolean | null
           is_tier3_only?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
@@ -7748,6 +7776,7 @@ export type Database = {
           last_seen_at?: string
           news_source_count?: number | null
           peak_at?: string | null
+          poisson_surprise?: number | null
           rank_score?: number | null
           recency_decay?: number | null
           related_entities?: string[] | null
@@ -7763,6 +7792,7 @@ export type Database = {
           top_headline?: string | null
           trend_score?: number | null
           trend_stage?: string | null
+          true_z_score?: number | null
           updated_at?: string | null
           velocity?: number | null
           velocity_1h?: number | null
@@ -7775,10 +7805,13 @@ export type Database = {
           alias_variants?: string[] | null
           baseline_30d?: number | null
           baseline_7d?: number | null
+          baseline_std_dev?: number | null
           baseline_updated_at?: string | null
+          burst_normalized_score?: number | null
           burst_score?: number | null
           canonical_label?: string | null
           cluster_id?: string | null
+          co_occurrence_anomaly_score?: number | null
           confidence_factors?: Json | null
           confidence_score?: number | null
           context_phrases?: string[] | null
@@ -7802,6 +7835,7 @@ export type Database = {
           id?: string
           is_breaking?: boolean | null
           is_event_phrase?: boolean | null
+          is_evergreen_detected?: boolean | null
           is_tier3_only?: boolean | null
           is_trending?: boolean | null
           is_verified?: boolean | null
@@ -7809,6 +7843,7 @@ export type Database = {
           last_seen_at?: string
           news_source_count?: number | null
           peak_at?: string | null
+          poisson_surprise?: number | null
           rank_score?: number | null
           recency_decay?: number | null
           related_entities?: string[] | null
@@ -7824,6 +7859,7 @@ export type Database = {
           top_headline?: string | null
           trend_score?: number | null
           trend_stage?: string | null
+          true_z_score?: number | null
           updated_at?: string | null
           velocity?: number | null
           velocity_1h?: number | null

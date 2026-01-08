@@ -68,6 +68,12 @@ interface RollingBaseline {
   baseline_30d: number;
   data_points_7d: number;
   data_points_30d: number;
+  // Phase 1: Enhanced fields for true z-score
+  hourly_std_dev: number;      // Standard deviation of hourly readings
+  relative_std_dev: number;    // Coefficient of variation (std/mean)
+  is_stable: boolean;          // True if RSD < 0.4 (evergreen indicator)
+  min_hourly: number;          // Minimum hourly reading in baseline period
+  max_hourly: number;          // Maximum hourly reading in baseline period
 }
 
 interface ExistingTrendEvent {
@@ -159,14 +165,35 @@ const EVERGREEN_ENTITIES: Set<string> = new Set([
 ]);
 
 // Evergreen detection: check if topic is typically always-on
-function isEvergreenTopic(topicKey: string, baseline7d: number, baseline30d: number): boolean {
+// PHASE 2 FIX: Now uses stability metrics and proper entity key matching
+function isEvergreenTopic(
+  topicKey: string, 
+  baseline7d: number, 
+  baseline30d: number,
+  rolling?: RollingBaseline
+): boolean {
   const normalizedKey = topicKey.toLowerCase();
   
-  // Check explicit evergreen list
+  // FIX: Check explicit evergreen list with PARTIAL matching
+  // This fixes the bug where "donald_trump" didn't match "trump"
   if (EVERGREEN_ENTITIES.has(normalizedKey)) return true;
   
-  // PHASE A: Single-word topics that match common geo/political patterns are pseudo-evergreen
-  const isSingleWord = normalizedKey.split(/\s+/).length === 1;
+  // PHASE 2 FIX: Check individual words in the key against evergreen list
+  const keyWords = normalizedKey.split('_');
+  for (const word of keyWords) {
+    if (EVERGREEN_ENTITIES.has(word)) return true;
+  }
+  
+  // PHASE 1: Use stability metrics from baseline if available
+  if (rolling && rolling.is_stable) {
+    // Low relative std dev + high baseline = always-on topic
+    return true;
+  }
+  
+  // PHASE 1: Stability-based detection using RSD
+  if (rolling && rolling.relative_std_dev < 0.4 && rolling.baseline_7d >= 1.5) {
+    return true;
+  }
   
   // Heuristic: if 30d baseline is high and relatively stable, it's evergreen
   // A topic with consistent high volume (baseline30d > 2/hour) is likely evergreen
@@ -176,7 +203,8 @@ function isEvergreenTopic(topicKey: string, baseline7d: number, baseline30d: num
     if (stabilityRatio < 0.3) return true; // Less than 30% variance = stable/evergreen
   }
   
-  // PHASE A: Lower threshold for single-word entities (more aggressive evergreen detection)
+  // Single-word entities with high baseline are pseudo-evergreen
+  const isSingleWord = normalizedKey.split(/\s+/).length === 1 && !normalizedKey.includes('_');
   if (isSingleWord && baseline30d >= 1 && baseline7d >= 0.8) {
     const stabilityRatio = Math.abs(baseline7d - baseline30d) / Math.max(baseline30d, 0.1);
     if (stabilityRatio < 0.5) return true; // 50% variance tolerance for single-word
@@ -185,28 +213,102 @@ function isEvergreenTopic(topicKey: string, baseline7d: number, baseline30d: num
   return false;
 }
 
-// Calculate evergreen penalty (0.15-1.0): lower for evergreen unless spiking
-// PHASE A: Strengthened penalties + single-word entity penalty
+// Calculate evergreen penalty (0.10-1.0): lower for evergreen unless spiking
+// PHASE 1: Now uses true z-score thresholds
 function calculateEvergreenPenalty(
   isEvergreen: boolean, 
-  zScoreVelocity: number, 
+  trueZScore: number,  // CHANGED: Use true z-score, not simplified
   hasHistoricalBaseline: boolean,
-  isSingleWordEntity: boolean = false
+  isSingleWordEntity: boolean = false,
+  relativeStdDev: number = 1.0  // PHASE 1: Use RSD for calibration
 ): number {
-  // PHASE A: Single-word entities get base penalty even if not in evergreen list
-  // This suppresses vague single-word labels like "Gaza", "Greenland"
-  const baseEntityPenalty = isSingleWordEntity ? 0.6 : 1.0;
+  // Single-word entities get base penalty even if not in evergreen list
+  const baseEntityPenalty = isSingleWordEntity ? 0.5 : 1.0;
   
   if (!isEvergreen) return baseEntityPenalty;
   
-  // PHASE A: Strengthened - require MUCH higher z-score to overcome penalty
-  if (zScoreVelocity > 6) return 0.85 * baseEntityPenalty;  // Extreme spike
-  if (zScoreVelocity > 5) return 0.65 * baseEntityPenalty;  // Very strong spike  
-  if (zScoreVelocity > 4) return 0.45 * baseEntityPenalty;  // Strong spike
-  if (zScoreVelocity > 3) return 0.30 * baseEntityPenalty;  // Moderate spike
+  // PHASE 1: Calibrate threshold based on topic volatility
+  // Stable topics (low RSD) need MUCH higher z-score to overcome penalty
+  // Volatile topics (high RSD) need only moderately high z-score
+  const volatilityMultiplier = Math.max(0.5, Math.min(1.5, relativeStdDev));
+  const effectiveZScore = trueZScore * volatilityMultiplier;
+  
+  // PHASE 1: Require EXTREME z-scores for evergreen topics
+  if (effectiveZScore > 5) return 0.80 * baseEntityPenalty;  // Extreme spike: 5+ std devs
+  if (effectiveZScore > 4) return 0.55 * baseEntityPenalty;  // Very strong spike: 4+ std devs
+  if (effectiveZScore > 3) return 0.35 * baseEntityPenalty;  // Strong spike: 3+ std devs
+  if (effectiveZScore > 2.5) return 0.20 * baseEntityPenalty;  // Moderate spike
   
   // Evergreen with no significant spike gets HEAVY penalty
-  return hasHistoricalBaseline ? 0.15 * baseEntityPenalty : 0.20 * baseEntityPenalty;
+  return hasHistoricalBaseline ? 0.10 * baseEntityPenalty : 0.15 * baseEntityPenalty;
+}
+
+// ============================================================================
+// PHASE 1: TRUE Z-SCORE CALCULATION
+// Proper statistical z-score: (current - mean) / standard_deviation
+// ============================================================================
+function calculateTrueZScore(
+  currentValue: number,
+  baselineMean: number,
+  baselineStdDev: number,
+  hasHistoricalBaseline: boolean
+): number {
+  // If we have proper baseline with std dev, use true z-score
+  if (hasHistoricalBaseline && baselineStdDev > 0) {
+    const zScore = (currentValue - baselineMean) / baselineStdDev;
+    // Cap at reasonable bounds to prevent extreme outliers
+    return Math.max(-3, Math.min(10, zScore));
+  }
+  
+  // Fallback for new topics: estimate std dev as 50% of mean
+  const estimatedStdDev = Math.max(0.5, baselineMean * 0.5);
+  const fallbackZScore = (currentValue - baselineMean) / estimatedStdDev;
+  
+  // New topics get dampened z-score to avoid false positives
+  return Math.max(-2, Math.min(5, fallbackZScore * 0.6));
+}
+
+// ============================================================================
+// PHASE 1: POISSON SURPRISE SCORE
+// Measures how unlikely the observed count is given the expected rate
+// Based on: -log(P(X >= observed | lambda = expected))
+// ============================================================================
+function calculatePoissonSurprise(
+  observed: number,
+  expected: number
+): number {
+  if (observed <= expected || expected <= 0) return 0;
+  
+  // Poisson surprise approximation using Stirling's formula
+  // For large values: surprise ≈ observed * ln(observed/expected) - (observed - expected)
+  const ratio = observed / expected;
+  if (ratio <= 1) return 0;
+  
+  // G-test statistic (log-likelihood ratio) as surprise measure
+  const surprise = observed * Math.log(ratio) - (observed - expected);
+  
+  // Normalize to 0-10 scale
+  return Math.min(10, Math.max(0, surprise / 2));
+}
+
+// ============================================================================
+// PHASE 1: BURST NORMALIZATION
+// Volume-adjusted burst score that accounts for baseline scale
+// ============================================================================
+function calculateBurstNormalizedScore(
+  trueZScore: number,
+  poissonSurprise: number,
+  baselineMean: number
+): number {
+  // Kleinberg-inspired: cost to enter burst state increases with baseline
+  // High-volume topics need more extreme spikes to be considered "bursting"
+  const burstCost = Math.log(baselineMean + 2); // +2 to handle zero baseline
+  
+  // Combine z-score and Poisson surprise, normalized by burst cost
+  const rawBurst = (trueZScore * 0.6 + poissonSurprise * 0.4);
+  const normalizedBurst = rawBurst / Math.max(1, burstCost);
+  
+  return Math.max(0, normalizedBurst);
 }
 
 // ============================================================================
@@ -234,13 +336,16 @@ function calculateRecencyDecay(lastSeenAt: Date, now: Date): number {
 }
 
 // ============================================================================
-// PHASE 3: RANK SCORE CALCULATION - Twitter-like trending formula
-// Primary: z-score velocity (burst above baseline)
-// Secondary: corroboration (cross-source verification)  
-// Modifiers: recency decay, evergreen penalty
+// PHASE 1: RANK SCORE CALCULATION - Twitter-grade trending formula
+// Primary: TRUE z-score (statistical burst above baseline)
+// Secondary: Poisson surprise (how unlikely is this count?)
+// Tertiary: corroboration (cross-source verification)
+// Modifiers: recency decay, evergreen penalty, label quality
 // ============================================================================
 function calculateRankScore(params: {
-  zScoreVelocity: number;
+  trueZScore: number;           // PHASE 1: True statistical z-score
+  poissonSurprise: number;      // PHASE 1: Poisson surprise score
+  burstNormalizedScore: number; // PHASE 1: Volume-adjusted burst
   corroborationScore: number;
   sourceCount: number;
   hasTier12Corroboration: boolean;
@@ -252,9 +357,12 @@ function calculateRankScore(params: {
   current1h: number;
   current24h: number;
   labelQuality: 'event_phrase' | 'entity_only' | 'fallback_generated';
+  contextBurstScore: number;    // PHASE 1: Co-occurrence context strength
 }): number {
   const {
-    zScoreVelocity,
+    trueZScore,
+    poissonSurprise,
+    burstNormalizedScore,
     corroborationScore,
     sourceCount,
     hasTier12Corroboration,
@@ -266,50 +374,66 @@ function calculateRankScore(params: {
     current1h,
     current24h,
     labelQuality,
+    contextBurstScore,
   } = params;
   
-  // Component 1: Velocity Score (0-50) - PRIMARY FACTOR
-  // z-score measures how many standard deviations above baseline
-  // Capped at 10 to prevent extreme outliers from dominating
-  const velocityComponent = Math.min(50, Math.max(0, zScoreVelocity * 5)) * baselineQuality;
+  // ========================================
+  // Component 1: Z-Score Component (0-40) - PRIMARY
+  // True statistical z-score with quality adjustment
+  // ========================================
+  const zScoreComponent = Math.min(40, Math.max(0, trueZScore * 8)) * baselineQuality;
   
-  // Component 2: Corroboration Boost (0-30)
+  // ========================================
+  // Component 2: Poisson Surprise (0-25) - SECONDARY
+  // How unlikely is this volume given the baseline rate?
+  // ========================================
+  const surpriseComponent = Math.min(25, poissonSurprise * 5);
+  
+  // ========================================
+  // Component 3: Corroboration (0-20)
   // Cross-source verification is critical for credibility
+  // ========================================
   let corroborationComponent = 0;
   if (sourceCount >= 3) {
-    corroborationComponent = 25; // Multi-platform coverage
+    corroborationComponent = 15; // Multi-platform coverage
   } else if (sourceCount >= 2) {
-    corroborationComponent = 15; // Two platforms
+    corroborationComponent = 10; // Two platforms
   }
   // Bonus for news+social combo (validates social buzz with journalism)
   if (newsCount > 0 && socialCount > 0) {
-    corroborationComponent += 10;
+    corroborationComponent += 5;
   }
   // Bonus for tier1/tier2 sources (authoritative corroboration)
   if (hasTier12Corroboration) {
     corroborationComponent += 5;
   }
-  corroborationComponent = Math.min(30, corroborationComponent);
+  corroborationComponent = Math.min(20, corroborationComponent);
   
-  // Component 3: Activity Level (0-20) - SECONDARY
-  // Logarithmic scaling to prevent volume from dominating
-  const activityComponent = Math.min(20, 
-    Math.log2(current1h + 1) * 4 + Math.log2(current24h + 1) * 2
-  );
+  // ========================================
+  // Component 4: Context/Co-occurrence Bonus (0-15)
+  // Entity trends with strong context rank higher
+  // ========================================
+  const contextComponent = Math.min(15, contextBurstScore * 3);
   
-  // PHASE A: Label quality modifier
-  // Event phrases get full score, entity-only gets penalized unless high corroboration
+  // ========================================
+  // Label Quality Modifier
+  // Event phrases get full score, entity-only needs context to rank
+  // ========================================
   let labelQualityModifier = 1.0;
   if (labelQuality === 'entity_only') {
-    // Heavy penalty for entity-only labels - reduces score by 40-60%
-    labelQualityModifier = hasTier12Corroboration ? 0.6 : 0.4;
+    // Entity-only with no context: heavy penalty
+    // Entity-only with context: moderate penalty
+    const hasContext = contextBurstScore >= 1.0;
+    labelQualityModifier = hasContext ? 0.65 : 0.35;
   } else if (labelQuality === 'fallback_generated') {
-    // Slight penalty for fallback-generated labels
-    labelQualityModifier = 0.85;
+    // Fallback-generated labels get slight penalty
+    labelQualityModifier = 0.90;
   }
   
-  // Calculate raw rank score
-  const rawScore = velocityComponent + corroborationComponent + activityComponent;
+  // ========================================
+  // Calculate Final Score
+  // ========================================
+  const rawScore = zScoreComponent + surpriseComponent + corroborationComponent + contextComponent;
   
   // Apply modifiers: recency decay, evergreen penalty, AND label quality
   const finalScore = rawScore * recencyDecay * evergreenPenalty * labelQualityModifier;
@@ -1075,18 +1199,27 @@ serve(async (req) => {
     
     // ========================================
     // STEP 1: Load rolling baselines from trend_baselines
+    // PHASE 1: Enhanced with standard deviation for true z-score
     // ========================================
-    console.log('[detect-trend-events] Loading rolling baselines...');
+    console.log('[detect-trend-events] Loading rolling baselines with std dev...');
     
     const { data: baselineData } = await supabase
       .from('trend_baselines')
-      .select('event_key, baseline_date, hourly_average')
+      .select('event_key, baseline_date, hourly_average, hourly_std_dev, relative_std_dev, is_stable, min_hourly, max_hourly')
       .gte('baseline_date', days30Ago.toISOString().split('T')[0])
       .order('baseline_date', { ascending: false });
     
-    // Compute rolling averages per event_key
+    // Compute rolling averages per event_key with enhanced statistics
     const rollingBaselines = new Map<string, RollingBaseline>();
-    const baselinesByKey = new Map<string, { date: string; hourly_avg: number }[]>();
+    const baselinesByKey = new Map<string, { 
+      date: string; 
+      hourly_avg: number; 
+      hourly_std_dev: number;
+      relative_std_dev: number;
+      is_stable: boolean;
+      min_hourly: number;
+      max_hourly: number;
+    }[]>();
     
     for (const b of baselineData || []) {
       if (!baselinesByKey.has(b.event_key)) {
@@ -1095,6 +1228,11 @@ serve(async (req) => {
       baselinesByKey.get(b.event_key)!.push({
         date: b.baseline_date,
         hourly_avg: Number(b.hourly_average) || 0,
+        hourly_std_dev: Number(b.hourly_std_dev) || 0,
+        relative_std_dev: Number(b.relative_std_dev) || 0,
+        is_stable: b.is_stable || false,
+        min_hourly: Number(b.min_hourly) || 0,
+        max_hourly: Number(b.max_hourly) || 0,
       });
     }
     
@@ -1113,15 +1251,41 @@ serve(async (req) => {
         ? last30d.reduce((sum, b) => sum + b.hourly_avg, 0) / last30d.length 
         : 0;
       
+      // PHASE 1: Calculate pooled standard deviation from daily std devs
+      // Using root-mean-square of daily std devs as approximation
+      const stdDevValues = last7d.filter(b => b.hourly_std_dev > 0).map(b => b.hourly_std_dev);
+      const pooledStdDev = stdDevValues.length > 0
+        ? Math.sqrt(stdDevValues.reduce((sum, s) => sum + s * s, 0) / stdDevValues.length)
+        : avg7d * 0.5; // Fallback: assume 50% volatility
+      
+      // Calculate relative standard deviation (coefficient of variation)
+      const rsd = avg7d > 0 ? pooledStdDev / avg7d : 1;
+      
+      // Determine stability: low RSD = evergreen/stable topic
+      const isStable = rsd < 0.4 && avg7d >= 1;
+      
+      // Get min/max from readings
+      const minHourly = last7d.length > 0 
+        ? Math.min(...last7d.map(b => b.min_hourly || b.hourly_avg))
+        : 0;
+      const maxHourly = last7d.length > 0
+        ? Math.max(...last7d.map(b => b.max_hourly || b.hourly_avg))
+        : avg7d * 2;
+      
       rollingBaselines.set(key, {
         baseline_7d: avg7d,
         baseline_30d: avg30d,
         data_points_7d: last7d.length,
         data_points_30d: last30d.length,
+        hourly_std_dev: pooledStdDev,
+        relative_std_dev: rsd,
+        is_stable: isStable,
+        min_hourly: minHourly,
+        max_hourly: maxHourly,
       });
     }
     
-    console.log(`[detect-trend-events] Loaded rolling baselines for ${rollingBaselines.size} topics`);
+    console.log(`[detect-trend-events] Loaded rolling baselines for ${rollingBaselines.size} topics (with std dev)`);
     
     // ========================================
     // STEP 2: Aggregate topics with deduplication
@@ -1754,9 +1918,9 @@ serve(async (req) => {
       const baselineDeltaPct = baselineDelta * 100;
       
       // ========================================
-      // PHASE 3: EVERGREEN DETECTION & RECENCY DECAY
+      // PHASE 3: RECENCY DECAY
+      // (isEvergreen is now computed in the Phase 1 section below)
       // ========================================
-      const isEvergreen = isEvergreenTopic(key, baseline7d, baseline30d);
       const recencyDecay = calculateRecencyDecay(agg.last_seen_at, now);
       
       // ========================================
@@ -1780,29 +1944,46 @@ serve(async (req) => {
       weightedEvidenceScore = Math.min(100, (weightedEvidenceScore / 10) * 100);
       
       // ========================================
-      // TWITTER-LIKE RANKING: Velocity vs Baseline (z-score approach)
-      // Primary: spike velocity relative to baseline
-      // Secondary: corroboration + volume gate
-      // Now includes: tier weighting + cross-tier corroboration
+      // PHASE 1: TRUE Z-SCORE & POISSON SURPRISE CALCULATION
+      // Using statistical approach with standard deviation
       // ========================================
       
       // Baseline quality factor
       const baselineQuality = hasHistoricalBaseline ? 1.0 : 0.6;
       
-      // Calculate z-score for velocity (how many standard deviations above normal)
-      // Using simplified z-score: (current - baseline) / max(baseline, 1)
-      // Capped to avoid extreme outliers dominating
+      // Get enhanced baseline data
+      const baselineStdDev = rolling?.hourly_std_dev || baseline7d * 0.5;
+      const relativeStdDev = rolling?.relative_std_dev || 1.0;
+      
+      // PHASE 1: Calculate TRUE z-score (statistical)
+      const trueZScore = calculateTrueZScore(
+        currentHourlyRate,
+        baseline7d,
+        baselineStdDev,
+        hasHistoricalBaseline
+      );
+      
+      // PHASE 1: Calculate Poisson surprise score
+      const poissonSurprise = calculatePoissonSurprise(
+        current1h_deduped,
+        baseline7d
+      );
+      
+      // PHASE 1: Calculate burst-normalized score
+      const burstNormalizedScore = calculateBurstNormalizedScore(
+        trueZScore,
+        poissonSurprise,
+        baseline7d
+      );
+      
+      // LEGACY: Keep zScoreVelocity for backwards compatibility
       const zScoreVelocity = Math.min(10, Math.max(-2, 
         baseline7d > 0.5 
           ? (currentHourlyRate - baseline7d) / Math.max(baseline7d, 0.5)
-          : Math.min(currentHourlyRate * 0.5, 5) // New topics get modest score
+          : Math.min(currentHourlyRate * 0.5, 5)
       ));
       
       // Volume gate: minimum thresholds to prevent low-volume spikes
-      // Require either:
-      // - 2+ mentions in 1h (recent activity), OR
-      // - 5+ mentions in 24h (sustained interest), OR
-      // - 2+ sources (corroboration)
       const meetsVolumeGate = current1h_deduped >= 2 || current24h_deduped >= 5 || sourceCount >= 2;
       
       // ========================================
@@ -1835,7 +2016,6 @@ serve(async (req) => {
       
       // ========================================
       // MOVED: Get top headline EARLY for fallback generation
-      // (dedupedMentions is already computed at line ~1486)
       // ========================================
       const sortedMentionsEarly = [...dedupedMentions].sort((a, b) => {
         if (a.source_type !== 'bluesky' && b.source_type === 'bluesky') return -1;
@@ -1846,14 +2026,12 @@ serve(async (req) => {
       
       // ========================================
       // FIX 1: Validate event phrase labels using verb-required heuristic
-      // Downgrade "event phrases" that are actually entity-only patterns
-      // FIX: Now includes label_quality_hint AND topHeadline for fallback generation
       // ========================================
       const validationResult = validateEventPhraseLabel(
         canonicalLabelForRanking, 
         canonicalLabelIsEventPhraseForRanking,
-        agg.label_quality_hint, // FIX: Pass the hint from extracted_topics metadata
-        topHeadlineEarly // NEW: Pass headline for fallback generation
+        agg.label_quality_hint,
+        topHeadlineEarly
       );
       
       // Update the canonical flag if downgraded
@@ -1872,27 +2050,39 @@ serve(async (req) => {
       // Use the validated label quality for ranking
       const labelQualityForRanking = validationResult.label_quality;
       const validatedIsEventPhrase = validationResult.is_event_phrase;
-      const labelSource = validationResult.label_source; // FIX: Track label source for explainability
+      const labelSource = validationResult.label_source;
       
       // ========================================
-      // PHASE 3: EVERGREEN PENALTY CALCULATION
-      // PHASE A: Now includes single-word entity penalty
+      // PHASE 2: EVERGREEN DETECTION (fixed matching)
+      // ========================================
+      const isEvergreen = isEvergreenTopic(key, baseline7d, baseline30d, rolling);
+      
+      // ========================================
+      // PHASE 1: EVERGREEN PENALTY with TRUE z-score
       // ========================================
       const evergreenPenalty = calculateEvergreenPenalty(
         isEvergreen, 
-        zScoreVelocity, 
+        trueZScore,  // PHASE 1: Use true z-score
         hasHistoricalBaseline,
-        isSingleWordEntity && labelQualityForRanking === 'entity_only'  // Only penalize single-word entity-only labels
+        isSingleWordEntity && labelQualityForRanking === 'entity_only',
+        relativeStdDev  // PHASE 1: Pass RSD for volatility calibration
       );
       
       // ========================================
-      // PHASE 3: RANK SCORE - Twitter-like trending formula
-      // Primary: z-score (burst above baseline)
-      // Secondary: corroboration (cross-source)
-      // Modifiers: recency, evergreen suppression, label quality
+      // NEW: Compute context bundle EARLY for ranking
+      // ========================================
+      const contextBundle = computeContextBundle(agg, topicMap, baseline7d, current1h_deduped);
+      
+      // ========================================
+      // PHASE 1: RANK SCORE - Twitter-grade trending formula
+      // Primary: TRUE z-score + Poisson surprise
+      // Secondary: corroboration
+      // Modifiers: recency, evergreen, label quality, context
       // ========================================
       const rankScore = calculateRankScore({
-        zScoreVelocity,
+        trueZScore,
+        poissonSurprise,
+        burstNormalizedScore,
         corroborationScore,
         sourceCount,
         hasTier12Corroboration,
@@ -1904,6 +2094,7 @@ serve(async (req) => {
         current1h: current1h_deduped,
         current24h: current24h_deduped,
         labelQuality: labelQualityForRanking,
+        contextBurstScore: contextBundle.burst_score,
       });
       
       // LEGACY TREND_SCORE: Keep for backwards compatibility
@@ -2134,11 +2325,7 @@ serve(async (req) => {
       // Build related entities array from the aggregate
       const relatedEntitiesArray = Array.from(agg.related_entities).slice(0, 10);
       
-      // NEW: Compute context bundle for entity-only trends
-      // This provides Twitter-grade context: who/what else is involved
-      const contextBundle = computeContextBundle(agg, topicMap, baseline7d, current1h_deduped);
-      
-      // DEBUG: Log context bundle for high-ranking topics
+      // DEBUG: Log context bundle for high-ranking topics (contextBundle computed earlier)
       if (contextBundle.context_terms.length > 0 || contextBundle.context_phrases.length > 0) {
         console.log(`[detect-trend-events] 📊 CONTEXT: "${agg.event_title}" terms=[${contextBundle.context_terms.join(', ')}] phrases=[${contextBundle.context_phrases.join(', ')}] burst=${contextBundle.burst_score}`);
       }
@@ -2198,13 +2385,18 @@ serve(async (req) => {
         acceleration,
         // Velocity-based ranking fields
         trend_score: Math.round(trendScore * 10) / 10, // Legacy ranking metric
-        z_score_velocity: Math.round(zScoreVelocity * 100) / 100, // For explainability
+        z_score_velocity: Math.round(zScoreVelocity * 100) / 100, // Legacy for backwards compat
+        true_z_score: Math.round(trueZScore * 100) / 100, // PHASE 1: True statistical z-score
+        poisson_surprise: Math.round(poissonSurprise * 100) / 100, // PHASE 1: How unlikely is this?
+        baseline_std_dev: Math.round(baselineStdDev * 1000) / 1000, // PHASE 1: For explainability
+        is_evergreen_detected: isEvergreen, // PHASE 1: Stability-based detection
+        burst_normalized_score: Math.round(burstNormalizedScore * 100) / 100, // PHASE 1
         confidence_score: Math.round(confidenceScore),
-        // PHASE 3: New rank_score for Twitter-like ranking (with context boost)
+        // PHASE 1: New rank_score with true z-score (with context boost)
         rank_score: contextBoostedRankScore,
         recency_decay: Math.round(recencyDecay * 1000) / 1000,
         evergreen_penalty: Math.round(evergreenPenalty * 1000) / 1000,
-        // NEW: Context bundle fields for Twitter-grade understanding
+        // Context bundle fields for Twitter-grade understanding
         context_terms: contextBundle.context_terms,
         context_phrases: contextBundle.context_phrases,
         context_summary: contextBundle.context_summary,
