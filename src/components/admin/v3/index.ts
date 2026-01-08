@@ -37,3 +37,10 @@ export { DrilldownSection } from "./DrilldownSection";
 export { SavedViewsSelector } from "./SavedViewsSelector";
 export { MobileBottomNav } from "./MobileBottomNav";
 export { SwipeableCard } from "./SwipeableCard";
+
+// Phase 1: UX Clarity Components
+export { ExecutiveSignalBar } from "./ExecutiveSignalBar";
+export { ExecutiveSummary } from "./ExecutiveSummary";
+export { PrimarySignalCard } from "./PrimarySignalCard";
+export { SecondaryExplorer } from "./SecondaryExplorer";
+export { CommandPaletteFilter } from "./CommandPaletteFilter";
