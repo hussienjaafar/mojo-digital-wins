@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
-import { TrendingUp, Newspaper, Users, Globe } from "lucide-react";
+import { Users, Globe, PanelLeftClose, PanelLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -10,14 +12,23 @@ import {
   BriefingDrawer,
   AlertsDrawer,
   PersonalizationBanner,
+  TrendsFilterRail,
+  type FilterState,
 } from "@/components/admin/v3";
 import { PipelineHealthDrawer } from "@/components/admin/v3/PipelineHealthDrawer";
-import { NewsInvestigationTable } from "@/components/admin/v3/NewsInvestigationTable";
 import { TrendEventDrilldownView } from "@/components/admin/v3/TrendEventDrilldownView";
 
 type ViewMode = "trends" | "feed" | "trend_detail";
 type ClientMode = "for_you" | "global";
 type TabMode = "for_you" | "explore";
+
+const DEFAULT_FILTERS: FilterState = {
+  timeWindow: '24h',
+  sources: { news: true, social: true },
+  highConfidenceOnly: false,
+  geography: 'all',
+  topics: [],
+};
 
 export function NewsTrendsPage() {
   const [mode, setMode] = useState<ViewMode>("trends");
@@ -28,9 +39,15 @@ export function NewsTrendsPage() {
   const [clientMode, setClientMode] = useState<ClientMode>("for_you");
   const [activeTab, setActiveTab] = useState<TabMode>("for_you");
   const [showPersonalizationBanner, setShowPersonalizationBanner] = useState(true);
+  
+  // Filter rail state
+  const [filterRailCollapsed, setFilterRailCollapsed] = useState(false);
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Placeholder personalization data - in production from org profile
   const personalizationPriorities = ["Middle East policy", "Civil rights", "Michigan"];
+  const availableTopics = ["Middle East", "Civil Rights", "Healthcare", "Education", "Climate", "Immigration"];
 
   // Handle drilldown to trend_events detail view
   const handleTrendDrilldown = useCallback((trendId: string) => {
@@ -89,6 +106,27 @@ export function NewsTrendsPage() {
                   Explore
                 </TabsTrigger>
               </TabsList>
+              
+              {/* Filter Rail Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setFilterRailCollapsed(!filterRailCollapsed)}
+                  >
+                    {filterRailCollapsed ? (
+                      <PanelLeft className="h-4 w-4" />
+                    ) : (
+                      <PanelLeftClose className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {filterRailCollapsed ? "Show filters" : "Hide filters"}
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             {/* Personalization Banner - Only in For You tab */}
@@ -108,19 +146,40 @@ export function NewsTrendsPage() {
               </motion.div>
             )}
 
-            <TabsContent value="for_you" className="mt-4">
-              <TrendsConsole 
-                onDrilldown={handleTrendDrilldown}
-                viewMode="for_you"
+            {/* Main Content Area with Filter Rail */}
+            <div className="flex gap-4 mt-4">
+              {/* Filter Rail - Collapsible sidebar */}
+              <TrendsFilterRail
+                filters={filters}
+                onFiltersChange={setFilters}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                isCollapsed={filterRailCollapsed}
+                onToggleCollapse={() => setFilterRailCollapsed(!filterRailCollapsed)}
+                availableTopics={availableTopics}
               />
-            </TabsContent>
-            
-            <TabsContent value="explore" className="mt-4">
-              <TrendsConsole 
-                onDrilldown={handleTrendDrilldown}
-                viewMode="explore"
-              />
-            </TabsContent>
+
+              {/* Trends Console - Main workspace */}
+              <div className="flex-1 min-w-0">
+                <TabsContent value="for_you" className="mt-0">
+                  <TrendsConsole 
+                    onDrilldown={handleTrendDrilldown}
+                    viewMode="for_you"
+                    filters={filters}
+                    searchQuery={searchQuery}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="explore" className="mt-0">
+                  <TrendsConsole 
+                    onDrilldown={handleTrendDrilldown}
+                    viewMode="explore"
+                    filters={filters}
+                    searchQuery={searchQuery}
+                  />
+                </TabsContent>
+              </div>
+            </div>
           </Tabs>
         </>
       ) : (
