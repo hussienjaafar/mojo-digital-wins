@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Users, Globe, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Users, Globe, Newspaper, PanelLeftClose, PanelLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,11 +18,12 @@ import {
 } from "@/components/admin/v3";
 import { PipelineHealthDrawer } from "@/components/admin/v3/PipelineHealthDrawer";
 import { TrendEventDrilldownView } from "@/components/admin/v3/TrendEventDrilldownView";
+import { NewsFeed } from "@/components/news/NewsFeed";
 import { useSavedViews } from "@/hooks/useSavedViews";
 
 type ViewMode = "trends" | "feed" | "trend_detail";
 type ClientMode = "for_you" | "global";
-type TabMode = "for_you" | "explore";
+type TabMode = "for_you" | "explore" | "feed";
 
 const DEFAULT_FILTERS: FilterState = {
   timeWindow: '24h',
@@ -73,7 +74,7 @@ export function NewsTrendsPage() {
   }, []);
 
   const handleTabChange = useCallback((value: string) => {
-    if (value === "for_you" || value === "explore") {
+    if (value === "for_you" || value === "explore" || value === "feed") {
       setActiveTab(value);
       setMode("trends");
       setSelectedTrendId(null);
@@ -109,7 +110,7 @@ export function NewsTrendsPage() {
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <TabsList className="grid w-full max-w-xs grid-cols-2 h-10">
+                <TabsList className="grid w-full max-w-md grid-cols-3 h-10">
                   <TabsTrigger value="for_you" className="gap-2 text-sm">
                     <Users className="h-4 w-4" />
                     For You
@@ -117,6 +118,10 @@ export function NewsTrendsPage() {
                   <TabsTrigger value="explore" className="gap-2 text-sm">
                     <Globe className="h-4 w-4" />
                     Explore
+                  </TabsTrigger>
+                  <TabsTrigger value="feed" className="gap-2 text-sm">
+                    <Newspaper className="h-4 w-4" />
+                    News Feed
                   </TabsTrigger>
                 </TabsList>
                 
@@ -203,6 +208,10 @@ export function NewsTrendsPage() {
                     filters={filters}
                     searchQuery={searchQuery}
                   />
+                </TabsContent>
+                
+                <TabsContent value="feed" className="mt-0">
+                  <NewsFeed />
                 </TabsContent>
               </div>
             </div>
