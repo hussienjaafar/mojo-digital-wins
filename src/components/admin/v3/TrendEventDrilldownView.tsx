@@ -40,7 +40,7 @@ import { TrendExplainability } from './TrendEventExplainability';
 import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3CardDescription, type V3CardAccent } from '@/components/v3/V3Card';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, differenceInMinutes, differenceInHours } from 'date-fns';
-import { ProvenancePanel, RelevanceExplanation, SuggestedActionsPanel } from '@/components/admin/v3';
+import { ProvenancePanel, RelevanceExplanation, SuggestedActionsPanel, CampaignLaunchPanel } from '@/components/admin/v3';
 import type { TrendEvent, TrendEvidence } from '@/hooks/useTrendEvents';
 import { generateWhyTrendingSummary, getTierLabel } from '@/hooks/useTrendEvents';
 import { useTrendActionTracking } from '@/hooks/useTrendActionTracking';
@@ -742,69 +742,13 @@ export function TrendEventDrilldownView({
               </V3CardContent>
             </V3Card>
 
-            {/* Message Generator */}
-            <V3Card>
-              <V3CardHeader>
-                <V3CardTitle className="text-base flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Quick Message Generator
-                </V3CardTitle>
-                <V3CardDescription>
-                  Generate SMS, email, or social content for this trend
-                </V3CardDescription>
-              </V3CardHeader>
-              <V3CardContent className="pt-0 space-y-4">
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    <Send className="h-3.5 w-3.5" />
-                    SMS
-                  </Button>
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    Email
-                  </Button>
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    <Radio className="h-3.5 w-3.5" />
-                    Social
-                  </Button>
-                </div>
-                
-                <Textarea 
-                  placeholder="Generated message will appear here..."
-                  value={generatedMessage}
-                  onChange={(e) => setGeneratedMessage(e.target.value)}
-                  className="min-h-[120px]"
-                />
-                
-                <div className="flex items-center justify-between">
-                  <Button variant="default" className="gap-1.5">
-                    <Zap className="h-4 w-4" />
-                    Generate Message
-                  </Button>
-                  
-                  {generatedMessage && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleCopyMessage}
-                      className="gap-1.5"
-                    >
-                      {isCopied ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 text-[hsl(var(--portal-success))]" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          Copy
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </V3CardContent>
-            </V3Card>
+            {/* Campaign Launcher */}
+            <CampaignLaunchPanel
+              trendId={trend.id}
+              trendTitle={trend.event_title}
+              organizationId={organizationId}
+              opportunityContext={trend.top_headline || `Breaking trend: ${trend.event_title}`}
+            />
 
             {/* Risk Warning (if applicable) */}
             {trend.is_breaking && (
