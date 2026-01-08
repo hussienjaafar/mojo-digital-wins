@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Users, Globe, PanelLeftClose, PanelLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,12 @@ import {
   AlertsDrawer,
   PersonalizationBanner,
   TrendsFilterRail,
+  SavedViewsSelector,
   type FilterState,
 } from "@/components/admin/v3";
 import { PipelineHealthDrawer } from "@/components/admin/v3/PipelineHealthDrawer";
 import { TrendEventDrilldownView } from "@/components/admin/v3/TrendEventDrilldownView";
+import { useSavedViews } from "@/hooks/useSavedViews";
 
 type ViewMode = "trends" | "feed" | "trend_detail";
 type ClientMode = "for_you" | "global";
@@ -44,6 +46,16 @@ export function NewsTrendsPage() {
   const [filterRailCollapsed, setFilterRailCollapsed] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Saved views
+  const { views, activeView, activeViewId, selectView, createView, deleteView } = useSavedViews();
+  
+  // Sync filters when saved view changes
+  useEffect(() => {
+    if (activeView) {
+      setFilters(activeView.filters);
+    }
+  }, [activeView]);
 
   // Placeholder personalization data - in production from org profile
   const personalizationPriorities = ["Middle East policy", "Civil rights", "Michigan"];
@@ -96,16 +108,30 @@ export function NewsTrendsPage() {
           {/* For You / Explore Tabs */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <div className="flex items-center justify-between">
-              <TabsList className="grid w-full max-w-xs grid-cols-2 h-10">
-                <TabsTrigger value="for_you" className="gap-2 text-sm">
-                  <Users className="h-4 w-4" />
-                  For You
-                </TabsTrigger>
-                <TabsTrigger value="explore" className="gap-2 text-sm">
-                  <Globe className="h-4 w-4" />
-                  Explore
-                </TabsTrigger>
-              </TabsList>
+              <div className="flex items-center gap-3">
+                <TabsList className="grid w-full max-w-xs grid-cols-2 h-10">
+                  <TabsTrigger value="for_you" className="gap-2 text-sm">
+                    <Users className="h-4 w-4" />
+                    For You
+                  </TabsTrigger>
+                  <TabsTrigger value="explore" className="gap-2 text-sm">
+                    <Globe className="h-4 w-4" />
+                    Explore
+                  </TabsTrigger>
+                </TabsList>
+                
+                {/* Saved Views Selector */}
+                {activeTab === "for_you" && (
+                  <SavedViewsSelector
+                    views={views}
+                    activeViewId={activeViewId}
+                    onSelectView={selectView}
+                    onCreateView={createView}
+                    onDeleteView={deleteView}
+                    currentFilters={filters}
+                  />
+                )}
+              </div>
               
               {/* Filter Rail Toggle */}
               <Tooltip>

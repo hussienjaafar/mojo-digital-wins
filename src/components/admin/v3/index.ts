@@ -33,3 +33,5 @@ export { AlertsDrawer } from "./AlertsDrawer";
 export { TrendsFilterRail, type FilterState } from "./TrendsFilterRail";
 export { PersonalizationBanner } from "./PersonalizationBanner";
 export { TrendCardCompact } from "./TrendCardCompact";
+export { DrilldownSection } from "./DrilldownSection";
+export { SavedViewsSelector } from "./SavedViewsSelector";
