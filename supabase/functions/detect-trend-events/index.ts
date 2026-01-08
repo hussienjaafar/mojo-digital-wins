@@ -1159,17 +1159,22 @@ serve(async (req) => {
       if (!topicMap.has(key)) {
         // FIX: Check for metadata from extracted_topics (RSS articles)
         const metadata = topicMetadataMap?.get(key);
-        const isEventPhraseFromMetadata = metadata?.is_event_phrase === true;
         const labelQualityHint = metadata?.label_quality as 'event_phrase' | 'fallback_generated' | 'entity_only' | undefined;
         
-        // Use metadata if available, otherwise fall back to local heuristic
-        const computedIsEventPhrase = isEventPhraseFromMetadata || isEventPhrase(topic);
+        // CRITICAL FIX: ALWAYS validate with verb check - metadata can be wrong
+        // The isEventPhrase() function requires 3+ words AND a verb/event noun
+        // 2-word person names like "Joe Biden" will correctly return false
+        const passesVerbCheck = isEventPhrase(topic);
+        
+        // Only accept is_event_phrase=true if it passes our strict verb check
+        // This prevents upstream tagging errors from propagating
+        const computedIsEventPhrase = passesVerbCheck;
         
         topicMap.set(key, {
           event_key: key,
           event_title: normalizeTopicTitle(topic),
           is_event_phrase: computedIsEventPhrase,
-          label_quality_hint: labelQualityHint || null, // FIX: Preserve hint for later use
+          label_quality_hint: labelQualityHint || null, // Preserve hint for audit
           related_entities: new Set(),
           mentions: [],
           dedupedMentions: new Map(),
@@ -1222,24 +1227,43 @@ serve(async (req) => {
     
     // NEW: Track co-occurrences - topics that appear in the same mention
     // This builds a graph of topic relationships for context bundles
-    const trackCoOccurrences = (topics: string[], sourceTitle: string) => {
-      const normalizedKeys = topics
-        .map(t => normalizeTopicKey(t))
-        .filter(k => k && k.length >= 2);
+    // CRITICAL FIX: Track pending co-occurrences during mention processing,
+    // then apply them in a second pass after all topics exist in topicMap
+    const pendingCoOccurrences: { topics: string[] }[] = [];
+    
+    const trackCoOccurrences = (topics: string[]) => {
+      // Store for later processing - topics might not all exist in topicMap yet
+      pendingCoOccurrences.push({ topics });
+    };
+    
+    // Second pass to apply co-occurrences after all topics exist
+    const applyPendingCoOccurrences = () => {
+      console.log(`[detect-trend-events] Applying ${pendingCoOccurrences.length} pending co-occurrence groups...`);
+      let totalCoOccurrences = 0;
       
-      // For each pair of topics in the same mention, increment co-occurrence
-      for (let i = 0; i < normalizedKeys.length; i++) {
-        const keyA = normalizedKeys[i];
-        const aggA = topicMap.get(keyA);
-        if (!aggA) continue;
+      for (const { topics } of pendingCoOccurrences) {
+        const normalizedKeys = topics
+          .map(t => normalizeTopicKey(t))
+          .filter(k => k && k.length >= 2 && topicMap.has(k)); // Only existing keys
         
-        for (let j = 0; j < normalizedKeys.length; j++) {
-          if (i === j) continue;
-          const keyB = normalizedKeys[j];
-          const count = aggA.coOccurringTopics.get(keyB) || 0;
-          aggA.coOccurringTopics.set(keyB, count + 1);
+        if (normalizedKeys.length < 2) continue;
+        
+        // For each pair of topics in the same mention, increment co-occurrence
+        for (let i = 0; i < normalizedKeys.length; i++) {
+          const keyA = normalizedKeys[i];
+          const aggA = topicMap.get(keyA)!;
+          
+          for (let j = 0; j < normalizedKeys.length; j++) {
+            if (i === j) continue;
+            const keyB = normalizedKeys[j];
+            const count = aggA.coOccurringTopics.get(keyB) || 0;
+            aggA.coOccurringTopics.set(keyB, count + 1);
+            totalCoOccurrences++;
+          }
         }
       }
+      
+      console.log(`[detect-trend-events] ✅ Applied ${totalCoOccurrences} co-occurrence links across ${pendingCoOccurrences.length} documents`);
     };
     
     // 1. Fetch articles with topics (RSS) - includes extracted_topics with event phrases
@@ -1334,7 +1358,7 @@ serve(async (req) => {
       }
       // NEW: Track co-occurrences for context bundles
       if (allTopics.length >= 2) {
-        trackCoOccurrences(allTopics, article.title);
+        trackCoOccurrences(allTopics);
       }
     }
     
@@ -1390,7 +1414,7 @@ serve(async (req) => {
       }
       // NEW: Track co-occurrences for context bundles
       if (mention.topics.length >= 2) {
-        trackCoOccurrences(mention.topics, item.title);
+        trackCoOccurrences(mention.topics);
       }
     }
     
@@ -1427,9 +1451,12 @@ serve(async (req) => {
       }
       // NEW: Track co-occurrences for context bundles (Bluesky)
       if (mention.topics.length >= 2) {
-        trackCoOccurrences(mention.topics, '');
+        trackCoOccurrences(mention.topics);
       }
     }
+    
+    // CRITICAL: Apply pending co-occurrences NOW - after all topics exist in topicMap
+    applyPendingCoOccurrences();
     
     console.log(`[detect-trend-events] Aggregated ${topicMap.size} unique topics from sources`);
     
@@ -2110,6 +2137,11 @@ serve(async (req) => {
       // NEW: Compute context bundle for entity-only trends
       // This provides Twitter-grade context: who/what else is involved
       const contextBundle = computeContextBundle(agg, topicMap, baseline7d, current1h_deduped);
+      
+      // DEBUG: Log context bundle for high-ranking topics
+      if (contextBundle.context_terms.length > 0 || contextBundle.context_phrases.length > 0) {
+        console.log(`[detect-trend-events] 📊 CONTEXT: "${agg.event_title}" terms=[${contextBundle.context_terms.join(', ')}] phrases=[${contextBundle.context_phrases.join(', ')}] burst=${contextBundle.burst_score}`);
+      }
       
       // NEW: Boost entity-only trends if they have strong context
       // This allows location/person trends like "Minneapolis" to rank IF they have clear context
