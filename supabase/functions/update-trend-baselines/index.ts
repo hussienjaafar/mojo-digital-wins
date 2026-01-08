@@ -86,6 +86,9 @@ serve(async (req) => {
     // Build hourly counts per topic
     const hourlyCountsMap = new Map<string, Map<string, number>>();
 
+    const normalizeEventKey = (topicName: string): string =>
+      topicName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+
     for (const article of articles || []) {
       if (!article.extracted_topics) continue;
 
@@ -102,10 +105,12 @@ serve(async (req) => {
         : [];
 
       for (const topic of topics) {
-        const topicName = typeof topic === 'string' ? topic : topic?.name;
+        const topicName = typeof topic === 'string'
+          ? topic
+          : topic?.topic || topic?.name;
         if (!topicName) continue;
 
-        const eventKey = topicName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+        const eventKey = normalizeEventKey(topicName);
         
         if (!hourlyCountsMap.has(eventKey)) {
           hourlyCountsMap.set(eventKey, new Map());
@@ -117,6 +122,46 @@ serve(async (req) => {
     }
 
     console.log(`[update-trend-baselines] Found ${hourlyCountsMap.size} unique topics...`);
+
+    // Also get Google News article counts
+    const { data: googleNews, error: googleNewsError } = await supabase
+      .from('google_news_articles')
+      .select('id, published_at, ai_topics')
+      .gte('published_at', sevenDaysAgo)
+      .not('ai_topics', 'is', null)
+      .order('published_at', { ascending: true });
+
+    if (!googleNewsError && googleNews) {
+      console.log(`[update-trend-baselines] Processing ${googleNews.length} Google News articles...`);
+      
+      for (const item of googleNews) {
+        if (!item.ai_topics) continue;
+
+        const publishedAt = new Date(item.published_at);
+        const hourBucket = new Date(
+          publishedAt.getFullYear(),
+          publishedAt.getMonth(),
+          publishedAt.getDate(),
+          publishedAt.getHours()
+        ).toISOString();
+
+        const topics = Array.isArray(item.ai_topics) ? item.ai_topics : [];
+
+        for (const topic of topics) {
+          const topicName = typeof topic === 'string' ? topic : String(topic);
+          if (!topicName) continue;
+
+          const eventKey = normalizeEventKey(topicName);
+          
+          if (!hourlyCountsMap.has(eventKey)) {
+            hourlyCountsMap.set(eventKey, new Map());
+          }
+          
+          const topicHours = hourlyCountsMap.get(eventKey)!;
+          topicHours.set(hourBucket, (topicHours.get(hourBucket) || 0) + 1);
+        }
+      }
+    }
 
     // Also get Bluesky post counts
     const { data: posts, error: postsError } = await supabase

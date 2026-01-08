@@ -1143,7 +1143,7 @@ serve(async (req) => {
       const contextTerms: string[] = [];
       const contextPhrases: string[] = [];
       for (const [key, count] of entries) {
-        if (count < 2) continue;
+        if (count < 1) continue;
         const related = topicMap.get(key);
         if (!related) continue;
         const label = related.event_title;
