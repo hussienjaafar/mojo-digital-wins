@@ -17,6 +17,7 @@ import {
   PrimarySignalCard,
   SecondaryExplorer,
   CommandPaletteFilter,
+  LearningInsightsPanel,
   type FilterState,
 } from "@/components/admin/v3";
 import { PipelineHealthDrawer } from "@/components/admin/v3/PipelineHealthDrawer";
@@ -293,12 +294,20 @@ export function NewsTrendsPage() {
                 onOpenFilters={() => setCommandPaletteOpen(true)}
                 newsFeedContent={<NewsFeed />}
               >
-                <TrendsConsole 
-                  onDrilldown={handleTrendDrilldown}
-                  viewMode="for_you"
-                  filters={filters}
-                  searchQuery={searchQuery}
-                />
+                <div className="flex gap-4">
+                  <div className="flex-1 min-w-0">
+                    <TrendsConsole 
+                      onDrilldown={handleTrendDrilldown}
+                      viewMode="for_you"
+                      filters={filters}
+                      searchQuery={searchQuery}
+                    />
+                  </div>
+                  {/* Phase 7: Learning Insights Panel */}
+                  <div className="hidden lg:block w-72 shrink-0">
+                    <LearningInsightsPanel />
+                  </div>
+                </div>
               </SecondaryExplorer>
             </TabsContent>
             
