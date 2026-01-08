@@ -29,10 +29,13 @@ import { TrendFeedback } from './TrendFeedback';
 import { TrendsQuickFilters, type TrendFilter, type TrendSort } from './TrendsQuickFilters';
 import { TrendCardCompact } from './TrendCardCompact';
 import { cn } from '@/lib/utils';
+import type { FilterState } from './TrendsFilterRail';
 
 interface TrendsConsoleProps {
   onDrilldown?: (trendId: string) => void;
   viewMode?: 'for_you' | 'explore';
+  filters?: FilterState;
+  searchQuery?: string;
   className?: string;
 }
 
@@ -379,15 +382,25 @@ function TrendEventCard({
   );
 }
 
-export function TrendsConsole({ onDrilldown, viewMode = 'for_you', className }: TrendsConsoleProps) {
+export function TrendsConsole({ 
+  onDrilldown, 
+  viewMode = 'for_you', 
+  filters: externalFilters,
+  searchQuery: externalSearchQuery,
+  className 
+}: TrendsConsoleProps) {
   const { events, isLoading, stats, refresh } = useTrendEvents({ limit: 50, minConfidence: 30 });
   const [activeFilter, setActiveFilter] = useState<TrendFilter>('all');
   const [activeSort, setActiveSort] = useState<TrendSort>(viewMode === 'for_you' ? 'confidence' : 'velocity');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [internalSearchQuery, setInternalSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Use external search query if provided, otherwise use internal
+  const searchQuery = externalSearchQuery ?? internalSearchQuery;
+  const setSearchQuery = externalSearchQuery !== undefined ? () => {} : setInternalSearchQuery;
 
   const freshBreaking = useMemo(
     () => events.filter((t) => t.is_breaking && isFreshTrend(t)),
@@ -423,7 +436,38 @@ export function TrendsConsole({ onDrilldown, viewMode = 'for_you', className }: 
       );
     }
     
-    // Apply filter
+    // Apply external filters from filter rail
+    if (externalFilters) {
+      // High confidence filter
+      if (externalFilters.highConfidenceOnly) {
+        filtered = filtered.filter(t => t.confidence_score >= 70);
+      }
+      
+      // Source type filter
+      if (!externalFilters.sources.news || !externalFilters.sources.social) {
+        filtered = filtered.filter(t => {
+          if (externalFilters.sources.news && !externalFilters.sources.social) {
+            return (t.news_source_count || 0) > 0;
+          }
+          if (externalFilters.sources.social && !externalFilters.sources.news) {
+            return (t.social_source_count || 0) > 0;
+          }
+          return true;
+        });
+      }
+      
+      // Topic filter
+      if (externalFilters.topics.length > 0) {
+        filtered = filtered.filter(t => {
+          const trendTopics = t.context_terms || [];
+          return externalFilters.topics.some(topic => 
+            trendTopics.some(tt => tt.toLowerCase().includes(topic.toLowerCase()))
+          );
+        });
+      }
+    }
+    
+    // Apply quick filter
     switch (activeFilter) {
       case 'breaking':
         filtered = filtered.filter(t => t.is_breaking && isFreshTrend(t));
@@ -450,7 +494,7 @@ export function TrendsConsole({ onDrilldown, viewMode = 'for_you', className }: 
     }
     
     return filtered;
-  }, [events, activeFilter, activeSort, searchQuery, dismissedIds]);
+  }, [events, activeFilter, activeSort, searchQuery, dismissedIds, externalFilters]);
 
   // Get latest update time from events
   const latestUpdate = events.length > 0 
