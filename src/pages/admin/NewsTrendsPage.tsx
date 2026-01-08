@@ -24,6 +24,7 @@ import { TrendEventDrilldownView } from "@/components/admin/v3/TrendEventDrilldo
 import { NewsFeed } from "@/components/news/NewsFeed";
 import { useSavedViews } from "@/hooks/useSavedViews";
 import { useTrendEvents } from "@/hooks/useTrendEvents";
+import { useOrgTrendScores, getWhyItMattersText, getMatchedReasonTags } from "@/hooks/useOrgTrendScores";
 
 type ViewMode = "trends" | "feed" | "trend_detail";
 type ClientMode = "for_you" | "global";
@@ -59,6 +60,10 @@ export function NewsTrendsPage() {
   // Fetch trends for primary signals
   const { events: trends, isLoading: trendsLoading, stats } = useTrendEvents({ limit: 50, minConfidence: 30 });
   
+  // Fetch org-specific relevance scores for personalization (Phase 2)
+  const trendIds = useMemo(() => trends.map(t => t.id), [trends]);
+  const { scores: orgScores } = useOrgTrendScores({ trendEventIds: trendIds });
+  
   // Sync filters when saved view changes
   useEffect(() => {
     if (activeView) {
@@ -69,26 +74,38 @@ export function NewsTrendsPage() {
   // Available topics for filtering
   const availableTopics = ["Middle East", "Civil Rights", "Healthcare", "Education", "Climate", "Immigration"];
 
-  // Compute primary signals (top 5 for "Monitor Mode")
+  // Compute primary signals (top 5 for "Monitor Mode") with org relevance
   const primarySignals = useMemo(() => {
     if (!trends) return [];
     
-    // Filter for high-confidence or breaking trends
-    const actionable = trends.filter(t => 
-      t.is_breaking || 
-      t.confidence_score >= 70 ||
-      (t.z_score_velocity && t.z_score_velocity >= 2)
-    );
+    // Filter for high-confidence or breaking trends, or high org relevance
+    const actionable = trends.filter(t => {
+      const orgScore = orgScores.get(t.id);
+      const hasHighRelevance = orgScore && orgScore.relevance_score >= 30;
+      
+      return t.is_breaking || 
+        t.confidence_score >= 70 ||
+        (t.z_score_velocity && t.z_score_velocity >= 2) ||
+        hasHighRelevance;
+    });
     
-    // Sort by importance (breaking first, then by confidence)
+    // Sort by importance: breaking first, then org relevance, then confidence
     return actionable
       .sort((a, b) => {
+        // Breaking always first
         if (a.is_breaking && !b.is_breaking) return -1;
         if (!a.is_breaking && b.is_breaking) return 1;
+        
+        // Then by org relevance score (personalized ranking)
+        const aRelevance = orgScores.get(a.id)?.relevance_score || 0;
+        const bRelevance = orgScores.get(b.id)?.relevance_score || 0;
+        if (aRelevance !== bRelevance) return bRelevance - aRelevance;
+        
+        // Finally by confidence
         return b.confidence_score - a.confidence_score;
       })
       .slice(0, 5);
-  }, [trends]);
+  }, [trends, orgScores]);
 
   // Executive summary data
   const executiveSummaryData = useMemo(() => {
@@ -237,21 +254,29 @@ export function NewsTrendsPage() {
             <TabsContent value="for_you" className="mt-4 space-y-4">
               {/* Layer 3: Primary Signal List (3-5 max) */}
               <div className="space-y-3">
-                {primarySignals.map((trend, index) => (
-                  <PrimarySignalCard
-                    key={trend.id}
-                    trend={trend}
-                    rank={index + 1}
-                    whyItMatters={trend.context_summary || `This trend is ${trend.trend_stage || 'active'} and may affect your organization's priorities.`}
-                    matchedReasons={trend.context_terms?.slice(0, 3) || []}
-                    evidencePreview={trend.top_headline ? [
-                      { headline: trend.top_headline, source: 'News' }
-                    ] : []}
-                    onInvestigate={() => handleTrendDrilldown(trend.id)}
-                    onAct={() => handleTrendDrilldown(trend.id)}
-                    onCreateAlert={() => console.log('Create alert for', trend.id)}
-                  />
-                ))}
+                {primarySignals.map((trend, index) => {
+                  const orgScore = orgScores.get(trend.id);
+                  const whyItMatters = getWhyItMattersText(orgScore, 'Your Organization') 
+                    || trend.context_summary 
+                    || `This trend is ${trend.trend_stage || 'active'} and may affect your organization's priorities.`;
+                  const matchedReasons = getMatchedReasonTags(orgScore);
+                  
+                  return (
+                    <PrimarySignalCard
+                      key={trend.id}
+                      trend={trend}
+                      rank={index + 1}
+                      whyItMatters={whyItMatters}
+                      matchedReasons={matchedReasons.length > 0 ? matchedReasons : (trend.context_terms?.slice(0, 3) || [])}
+                      evidencePreview={trend.top_headline ? [
+                        { headline: trend.top_headline, source: 'News' }
+                      ] : []}
+                      onInvestigate={() => handleTrendDrilldown(trend.id)}
+                      onAct={() => handleTrendDrilldown(trend.id)}
+                      onCreateAlert={() => console.log('Create alert for', trend.id)}
+                    />
+                  );
+                })}
                 
                 {primarySignals.length === 0 && !trendsLoading && (
                   <div className="text-center py-12 text-muted-foreground">

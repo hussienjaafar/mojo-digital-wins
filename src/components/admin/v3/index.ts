@@ -44,3 +44,6 @@ export { ExecutiveSummary } from "./ExecutiveSummary";
 export { PrimarySignalCard } from "./PrimarySignalCard";
 export { SecondaryExplorer } from "./SecondaryExplorer";
 export { CommandPaletteFilter } from "./CommandPaletteFilter";
+
+// Phase 2: Personalization Components
+export { RelevanceExplainerInline } from "./RelevanceExplainerInline";
