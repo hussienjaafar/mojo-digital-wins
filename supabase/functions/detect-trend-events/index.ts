@@ -58,6 +58,9 @@ interface TopicAggregate {
   sentiment_sum: number;
   sentiment_count: number;
   authority_score: number; // For label selection
+  // NEW: Co-occurrence tracking for context bundles
+  coOccurringTopics: Map<string, number>; // topic_key -> co-occurrence count
+  headlines: string[]; // All headlines for context summary generation
 }
 
 interface RollingBaseline {
@@ -312,6 +315,121 @@ function calculateRankScore(params: {
   const finalScore = rawScore * recencyDecay * evergreenPenalty * labelQualityModifier;
   
   return Math.round(finalScore * 10) / 10;
+}
+
+// ============================================================================
+// CONTEXT BUNDLE COMPUTATION - Twitter-grade contextual understanding
+// For entity-only trends, compute co-occurring context to explain WHY trending
+// ============================================================================
+
+interface ContextBundle {
+  context_terms: string[];        // Top 3-5 co-occurring entities
+  context_phrases: string[];      // Top 2-3 verb-centered event phrases
+  context_summary: string | null; // One-line summary from headlines
+  burst_score: number;            // Co-occurrence strength × burst factor
+}
+
+/**
+ * Compute context bundle for a topic aggregate
+ * Uses co-occurrence data and headlines to build contextual understanding
+ */
+function computeContextBundle(
+  agg: TopicAggregate,
+  topicMap: Map<string, TopicAggregate>,
+  baseline7d: number,
+  current1h: number
+): ContextBundle {
+  const result: ContextBundle = {
+    context_terms: [],
+    context_phrases: [],
+    context_summary: null,
+    burst_score: 0,
+  };
+  
+  // Skip if no co-occurring topics
+  if (agg.coOccurringTopics.size === 0) {
+    return result;
+  }
+  
+  // Sort co-occurring topics by frequency
+  const sortedCoOccurrences = Array.from(agg.coOccurringTopics.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15); // Top 15 candidates
+  
+  // Separate into entities (context_terms) and event phrases (context_phrases)
+  const contextTerms: { key: string; title: string; count: number; isEventPhrase: boolean }[] = [];
+  const contextPhrases: { key: string; title: string; count: number }[] = [];
+  
+  for (const [coKey, coCount] of sortedCoOccurrences) {
+    const coAgg = topicMap.get(coKey);
+    if (!coAgg) continue;
+    
+    // Skip self-references
+    if (coKey === agg.event_key) continue;
+    
+    // Check if it's an event phrase (has verb)
+    const coIsEventPhrase = isEventPhrase(coAgg.event_title);
+    
+    if (coIsEventPhrase) {
+      contextPhrases.push({
+        key: coKey,
+        title: coAgg.event_title,
+        count: coCount,
+      });
+    } else {
+      contextTerms.push({
+        key: coKey,
+        title: coAgg.event_title,
+        count: coCount,
+        isEventPhrase: false,
+      });
+    }
+  }
+  
+  // Take top 5 context terms and top 3 context phrases
+  result.context_terms = contextTerms
+    .slice(0, 5)
+    .map(t => t.title);
+  
+  result.context_phrases = contextPhrases
+    .slice(0, 3)
+    .map(p => p.title);
+  
+  // Calculate burst score: P(co-occurrence | trend) × burst factor
+  // Higher score means entity is bursting WITH strong contextual evidence
+  const totalCoOccurrences = sortedCoOccurrences.reduce((sum, [_, count]) => sum + count, 0);
+  const avgCoOccurrence = totalCoOccurrences / Math.max(1, sortedCoOccurrences.length);
+  
+  // Burst factor: how much above baseline
+  const burstFactor = baseline7d > 0 
+    ? Math.min(5, current1h / baseline7d)
+    : Math.min(3, current1h * 0.5);
+  
+  // Context strength: more co-occurring topics with event phrases = higher confidence
+  const contextStrength = (result.context_terms.length + result.context_phrases.length * 2) / 10;
+  
+  result.burst_score = Math.round((avgCoOccurrence * burstFactor * contextStrength) * 100) / 100;
+  
+  // Generate context summary from headlines
+  if (agg.headlines.length > 0) {
+    // Pick the most representative headline (shortest that contains the entity name)
+    const entityWords = agg.event_title.toLowerCase().split(/\s+/);
+    
+    const relevantHeadlines = agg.headlines
+      .filter(h => entityWords.some(w => h.toLowerCase().includes(w)))
+      .slice(0, 5);
+    
+    if (relevantHeadlines.length > 0) {
+      // Pick the shortest headline as summary (usually most focused)
+      const shortest = relevantHeadlines.sort((a, b) => a.length - b.length)[0];
+      result.context_summary = shortest.substring(0, 150);
+    } else if (agg.headlines.length > 0) {
+      // Fallback: use first headline
+      result.context_summary = agg.headlines[0].substring(0, 150);
+    }
+  }
+  
+  return result;
 }
 
 // Quality thresholds - PHASE 2: Strengthened single-word suppression
@@ -1063,6 +1181,9 @@ serve(async (req) => {
           sentiment_sum: 0,
           sentiment_count: 0,
           authority_score: 0,
+          // NEW: Context bundle tracking
+          coOccurringTopics: new Map(),
+          headlines: [],
         });
       }
       
@@ -1091,6 +1212,33 @@ serve(async (req) => {
       if (mention.sentiment_score !== undefined && mention.sentiment_score !== null) {
         agg.sentiment_sum += mention.sentiment_score;
         agg.sentiment_count++;
+      }
+      
+      // NEW: Track headline for context summary
+      if (mention.title && mention.title.length > 10 && mention.source_type !== 'bluesky') {
+        agg.headlines.push(mention.title);
+      }
+    };
+    
+    // NEW: Track co-occurrences - topics that appear in the same mention
+    // This builds a graph of topic relationships for context bundles
+    const trackCoOccurrences = (topics: string[], sourceTitle: string) => {
+      const normalizedKeys = topics
+        .map(t => normalizeTopicKey(t))
+        .filter(k => k && k.length >= 2);
+      
+      // For each pair of topics in the same mention, increment co-occurrence
+      for (let i = 0; i < normalizedKeys.length; i++) {
+        const keyA = normalizedKeys[i];
+        const aggA = topicMap.get(keyA);
+        if (!aggA) continue;
+        
+        for (let j = 0; j < normalizedKeys.length; j++) {
+          if (i === j) continue;
+          const keyB = normalizedKeys[j];
+          const count = aggA.coOccurringTopics.get(keyB) || 0;
+          aggA.coOccurringTopics.set(keyB, count + 1);
+        }
       }
     };
     
@@ -1184,6 +1332,10 @@ serve(async (req) => {
       for (const topic of mention.topics) {
         addMention(topic, mention);
       }
+      // NEW: Track co-occurrences for context bundles
+      if (allTopics.length >= 2) {
+        trackCoOccurrences(allTopics, article.title);
+      }
     }
     
     // 2. Fetch Google News with topics
@@ -1236,6 +1388,10 @@ serve(async (req) => {
       for (const topic of mention.topics) {
         addMention(topic, mention);
       }
+      // NEW: Track co-occurrences for context bundles
+      if (mention.topics.length >= 2) {
+        trackCoOccurrences(mention.topics, item.title);
+      }
     }
     
     // 3. Fetch Bluesky posts with topics
@@ -1268,6 +1424,10 @@ serve(async (req) => {
       
       for (const topic of mention.topics) {
         addMention(topic, mention);
+      }
+      // NEW: Track co-occurrences for context bundles (Bluesky)
+      if (mention.topics.length >= 2) {
+        trackCoOccurrences(mention.topics, '');
       }
     }
     
@@ -1947,6 +2107,31 @@ serve(async (req) => {
       // Build related entities array from the aggregate
       const relatedEntitiesArray = Array.from(agg.related_entities).slice(0, 10);
       
+      // NEW: Compute context bundle for entity-only trends
+      // This provides Twitter-grade context: who/what else is involved
+      const contextBundle = computeContextBundle(agg, topicMap, baseline7d, current1h_deduped);
+      
+      // NEW: Boost entity-only trends if they have strong context
+      // This allows location/person trends like "Minneapolis" to rank IF they have clear context
+      let contextBoostMultiplier = 1.0;
+      if (labelQuality === 'entity_only') {
+        const hasStrongContext = contextBundle.context_terms.length >= 2 || contextBundle.context_phrases.length >= 1;
+        const hasBurst = contextBundle.burst_score >= 1.0;
+        
+        if (hasStrongContext && hasBurst) {
+          // Strong context + bursting = allow entity-only to rank higher
+          contextBoostMultiplier = 1.3; // 30% boost
+          console.log(`[detect-trend-events] ✅ CONTEXT BOOST: "${agg.event_title}" (burst=${contextBundle.burst_score.toFixed(2)}, terms=${contextBundle.context_terms.length}, phrases=${contextBundle.context_phrases.length})`);
+        } else if (hasStrongContext) {
+          // Has context but not bursting = slight boost
+          contextBoostMultiplier = 1.1;
+        }
+        // No context = keep the heavy entity-only penalty from rankScore
+      }
+      
+      // Apply context boost to rank score
+      const contextBoostedRankScore = Math.round(rankScore * contextBoostMultiplier * 10) / 10;
+      
       // PHASE A: Enhanced logging for evergreen + label quality suppression
       if (evergreenPenalty < 1.0) {
         const penaltyReasons: string[] = [];
@@ -1983,10 +2168,15 @@ serve(async (req) => {
         trend_score: Math.round(trendScore * 10) / 10, // Legacy ranking metric
         z_score_velocity: Math.round(zScoreVelocity * 100) / 100, // For explainability
         confidence_score: Math.round(confidenceScore),
-        // PHASE 3: New rank_score for Twitter-like ranking
-        rank_score: rankScore,
+        // PHASE 3: New rank_score for Twitter-like ranking (with context boost)
+        rank_score: contextBoostedRankScore,
         recency_decay: Math.round(recencyDecay * 1000) / 1000,
         evergreen_penalty: Math.round(evergreenPenalty * 1000) / 1000,
+        // NEW: Context bundle fields for Twitter-grade understanding
+        context_terms: contextBundle.context_terms,
+        context_phrases: contextBundle.context_phrases,
+        context_summary: contextBundle.context_summary,
+        burst_score: contextBundle.burst_score,
         confidence_factors: {
           ...confidenceFactors,
           baseline_quality: baselineQuality,

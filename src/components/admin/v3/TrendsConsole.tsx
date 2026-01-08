@@ -126,6 +126,29 @@ function TrendEventCard({
               </Badge>
             )}
           </div>
+          
+          {/* NEW: Context chips for entity-only trends */}
+          {trend.label_quality === 'entity_only' && trend.context_terms && trend.context_terms.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              {trend.context_terms.slice(0, 4).map((term, i) => (
+                <Badge key={i} variant="secondary" className="text-[10px] py-0 px-1.5 bg-muted/50">
+                  {term}
+                </Badge>
+              ))}
+              {trend.context_phrases && trend.context_phrases.length > 0 && (
+                <Badge variant="outline" className="text-[10px] py-0 px-1.5 text-primary border-primary/30">
+                  {trend.context_phrases[0]}
+                </Badge>
+              )}
+            </div>
+          )}
+          
+          {/* Why Trending summary for entity-only trends */}
+          {trend.label_quality === 'entity_only' && trend.context_summary && (
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-1 italic">
+              "{trend.context_summary}"
+            </p>
+          )}
 
           {/* Metrics Row with Confidence */}
           <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">

@@ -7654,10 +7654,14 @@ export type Database = {
           baseline_30d: number | null
           baseline_7d: number | null
           baseline_updated_at: string | null
+          burst_score: number | null
           canonical_label: string | null
           cluster_id: string | null
           confidence_factors: Json | null
           confidence_score: number | null
+          context_phrases: string[] | null
+          context_summary: string | null
+          context_terms: string[] | null
           corroboration_score: number | null
           created_at: string | null
           current_1h: number | null
@@ -7711,10 +7715,14 @@ export type Database = {
           baseline_30d?: number | null
           baseline_7d?: number | null
           baseline_updated_at?: string | null
+          burst_score?: number | null
           canonical_label?: string | null
           cluster_id?: string | null
           confidence_factors?: Json | null
           confidence_score?: number | null
+          context_phrases?: string[] | null
+          context_summary?: string | null
+          context_terms?: string[] | null
           corroboration_score?: number | null
           created_at?: string | null
           current_1h?: number | null
@@ -7768,10 +7776,14 @@ export type Database = {
           baseline_30d?: number | null
           baseline_7d?: number | null
           baseline_updated_at?: string | null
+          burst_score?: number | null
           canonical_label?: string | null
           cluster_id?: string | null
           confidence_factors?: Json | null
           confidence_score?: number | null
+          context_phrases?: string[] | null
+          context_summary?: string | null
+          context_terms?: string[] | null
           corroboration_score?: number | null
           created_at?: string | null
           current_1h?: number | null
