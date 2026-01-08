@@ -37,40 +37,42 @@ const STAGE_CONFIG = {
   stable: { label: 'Stable', color: 'bg-muted text-muted-foreground border-border', icon: BarChart3 },
 };
 
-/**
- * Calculate spike ratio from baseline comparison
- */
-function getSpikeRatio(trend: TrendEvent): number {
-  if (trend.baseline_7d <= 0) return 1;
-  return Math.min(5, Math.max(1, trend.current_1h / trend.baseline_7d));
+const MAX_BREAKING_BADGES = 5;
+
+function isFreshTrend(trend: TrendEvent): boolean {
+  return trend.freshness === 'fresh' || trend.freshness === 'recent';
 }
 
-/**
- * Get color for spike ratio display
- */
-function getSpikeRatioColor(spikeRatio: number): string {
-  if (spikeRatio >= 4) return 'text-destructive';
-  if (spikeRatio >= 3) return 'text-orange-500';
-  if (spikeRatio >= 2) return 'text-yellow-500';
-  return 'text-muted-foreground';
+function getBaselineDeltaLabel(trend: TrendEvent): string | null {
+  if (typeof trend.baseline_delta_pct === 'number') {
+    const sign = trend.baseline_delta_pct >= 0 ? '+' : '';
+    return `${sign}${trend.baseline_delta_pct.toFixed(1)}% vs baseline`;
+  }
+  if (typeof trend.z_score_velocity === 'number') {
+    const sign = trend.z_score_velocity >= 0 ? '+' : '';
+    return `${sign}${trend.z_score_velocity.toFixed(1)}σ spike`;
+  }
+  return null;
 }
 
 function TrendEventCard({ 
   trend, 
   rank, 
+  showBreakingBadge,
   onDrilldown,
   onAddToWatchlist,
   onCreateAlert 
 }: { 
   trend: TrendEvent; 
   rank: number;
+  showBreakingBadge: boolean;
   onDrilldown?: () => void;
   onAddToWatchlist?: () => void;
   onCreateAlert?: () => void;
 }) {
   const stageConfig = STAGE_CONFIG[trend.trend_stage || 'stable'];
   const StageIcon = stageConfig.icon;
-  const spikeRatio = getSpikeRatio(trend);
+  const baselineDeltaLabel = getBaselineDeltaLabel(trend);
 
   // Calculate source breakdown for visualization
   const newsCount = trend.news_source_count || 0;
@@ -87,7 +89,7 @@ function TrendEventCard({
       className={cn(
         "group relative rounded-lg border p-4 transition-all hover:shadow-md cursor-pointer",
         "bg-card hover:bg-card/80",
-        trend.is_breaking && "ring-2 ring-destructive/50 bg-destructive/5",
+        showBreakingBadge && "ring-2 ring-destructive/50 bg-destructive/5",
         !trend.is_breaking && trend.confidence_score >= 70 && "ring-1 ring-orange-500/30 bg-orange-500/5"
       )}
       onClick={onDrilldown}
@@ -106,7 +108,7 @@ function TrendEventCard({
           "p-2 rounded-lg flex-shrink-0",
           stageConfig.color.split(' ')[0] // bg color only
         )}>
-          {trend.is_breaking ? (
+          {showBreakingBadge ? (
             <Zap className="h-5 w-5 text-destructive animate-pulse" />
           ) : (
             <StageIcon className={cn("h-5 w-5", stageConfig.color.split(' ')[1])} />
@@ -117,7 +119,7 @@ function TrendEventCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="font-semibold text-foreground truncate">{trend.canonical_label || trend.event_title}</h4>
-            {trend.is_breaking && (
+            {showBreakingBadge && (
               <Badge variant="destructive" className="text-[10px]">BREAKING</Badge>
             )}
             {trend.trend_stage && trend.trend_stage !== 'stable' && !trend.is_breaking && (
@@ -127,8 +129,8 @@ function TrendEventCard({
             )}
           </div>
           
-          {/* NEW: Context chips for entity-only trends */}
-          {trend.label_quality === 'entity_only' && trend.context_terms && trend.context_terms.length > 0 && (
+          {/* Context chips for entity-only or missing-label trends */}
+          {trend.context_terms && trend.context_terms.length > 0 && (
             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
               {trend.context_terms.slice(0, 4).map((term, i) => (
                 <Badge key={i} variant="secondary" className="text-[10px] py-0 px-1.5 bg-muted/50">
@@ -153,9 +155,9 @@ function TrendEventCard({
           {/* Metrics Row with Confidence */}
           <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
             <span className="font-medium">{trend.current_24h.toLocaleString()} mentions</span>
-            {spikeRatio > 1 && (
-              <span className={cn("font-medium", getSpikeRatioColor(spikeRatio))}>
-                {spikeRatio.toFixed(1)}x baseline
+            {baselineDeltaLabel && (
+              <span className="font-medium text-primary">
+                {baselineDeltaLabel}
               </span>
             )}
             {trend.source_count >= 2 && (
@@ -283,6 +285,15 @@ export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
   const [activeFilter, setActiveFilter] = useState<'all' | 'breaking' | 'high_confidence'>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const freshBreaking = useMemo(
+    () => events.filter((t) => t.is_breaking && isFreshTrend(t)),
+    [events]
+  );
+  const breakingBadgeIds = useMemo(
+    () => new Set(freshBreaking.slice(0, MAX_BREAKING_BADGES).map((t) => t.id)),
+    [freshBreaking]
+  );
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refresh();
@@ -292,13 +303,13 @@ export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
   const filteredTrends = useMemo(() => {
     switch (activeFilter) {
       case 'breaking':
-        return events.filter(t => t.is_breaking);
+        return freshBreaking;
       case 'high_confidence':
-        return events.filter(t => t.confidence_score >= 70);
+        return events.filter(t => t.confidence_score >= 70 && t.source_count >= 2);
       default:
         return events;
     }
-  }, [events, activeFilter]);
+  }, [events, activeFilter, freshBreaking]);
 
   // Get latest update time from events
   const latestUpdate = events.length > 0 
@@ -319,7 +330,7 @@ export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
           <div>
             <h2 className="font-semibold text-lg">Trends Console</h2>
             <p className="text-xs text-muted-foreground">
-              {stats.totalEvents} trending • {stats.breakingCount} breaking • {stats.highConfidenceCount} high confidence
+              {stats.totalEvents} trending • {freshBreaking.length} breaking • {stats.highConfidenceCount} high confidence
             </p>
           </div>
         </div>
@@ -386,6 +397,7 @@ export function TrendsConsole({ onDrilldown, className }: TrendsConsoleProps) {
                 key={trend.id}
                 trend={trend}
                 rank={index + 1}
+                showBreakingBadge={breakingBadgeIds.has(trend.id)}
                 onDrilldown={() => onDrilldown?.(trend.id)}
               />
             ))
