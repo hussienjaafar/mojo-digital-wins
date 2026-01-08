@@ -35,3 +35,5 @@ export { PersonalizationBanner } from "./PersonalizationBanner";
 export { TrendCardCompact } from "./TrendCardCompact";
 export { DrilldownSection } from "./DrilldownSection";
 export { SavedViewsSelector } from "./SavedViewsSelector";
+export { MobileBottomNav } from "./MobileBottomNav";
+export { SwipeableCard } from "./SwipeableCard";
