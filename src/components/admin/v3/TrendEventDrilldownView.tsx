@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
 import { 
   ArrowLeft,
   TrendingUp,
@@ -14,21 +15,22 @@ import {
   Eye,
   ExternalLink,
   BarChart3,
-  Users,
   Calendar,
   Activity,
   Radio,
-  Target
+  Target,
+  Timer
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { TrendExplainability } from './TrendEventExplainability';
+import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3CardDescription, type V3CardAccent } from '@/components/v3/V3Card';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, differenceInMinutes, differenceInHours } from 'date-fns';
 import { ProvenancePanel, RelevanceExplanation, SuggestedActionsPanel } from '@/components/admin/v3';
 import type { TrendEvent, TrendEvidence } from '@/hooks/useTrendEvents';
 import { generateWhyTrendingSummary, getTierLabel } from '@/hooks/useTrendEvents';
@@ -125,18 +127,35 @@ async function fetchTrendEventData(trendId: string): Promise<{
   return { trend, evidence, suggestedActions };
 }
 
-const STAGE_CONFIG = {
-  emerging: { label: 'Emerging', color: 'text-green-400', bgColor: 'bg-green-500/10', icon: TrendingUp },
-  surging: { label: 'Surging', color: 'text-orange-400', bgColor: 'bg-orange-500/10', icon: TrendingUp },
-  peaking: { label: 'Peaking', color: 'text-red-400', bgColor: 'bg-red-500/10', icon: TrendingUp },
-  declining: { label: 'Declining', color: 'text-gray-400', bgColor: 'bg-gray-500/10', icon: TrendingDown },
-  stable: { label: 'Stable', color: 'text-muted-foreground', bgColor: 'bg-muted', icon: Minus },
+const STAGE_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: typeof TrendingUp; accent: V3CardAccent }> = {
+  emerging: { label: 'Emerging', color: 'text-[hsl(var(--portal-success))]', bgColor: 'bg-[hsl(var(--portal-success))]/10', icon: TrendingUp, accent: 'green' },
+  surging: { label: 'Surging', color: 'text-[hsl(var(--portal-warning))]', bgColor: 'bg-[hsl(var(--portal-warning))]/10', icon: TrendingUp, accent: 'amber' },
+  peaking: { label: 'Peaking', color: 'text-[hsl(var(--portal-error))]', bgColor: 'bg-[hsl(var(--portal-error))]/10', icon: TrendingUp, accent: 'red' },
+  declining: { label: 'Declining', color: 'text-[hsl(var(--portal-text-tertiary))]', bgColor: 'bg-[hsl(var(--portal-bg-elevated))]', icon: TrendingDown, accent: 'default' },
+  stable: { label: 'Stable', color: 'text-[hsl(var(--portal-text-secondary))]', bgColor: 'bg-[hsl(var(--portal-bg-elevated))]', icon: Minus, accent: 'default' },
 };
 
 function formatTimeAgo(dateString: string | null): string {
   if (!dateString) return 'Unknown';
   try {
     return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+  } catch {
+    return 'Unknown';
+  }
+}
+
+function formatTrendingDuration(firstSeenAt: string | null): string {
+  if (!firstSeenAt) return 'Unknown duration';
+  try {
+    const start = new Date(firstSeenAt);
+    const now = new Date();
+    const mins = differenceInMinutes(now, start);
+    const hrs = differenceInHours(now, start);
+    
+    if (mins < 60) return `${mins}m`;
+    if (hrs < 24) return `${hrs}h ${mins % 60}m`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ${hrs % 24}h`;
   } catch {
     return 'Unknown';
   }
@@ -233,21 +252,26 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
         <Button variant="ghost" onClick={onBack} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Back to Trends
         </Button>
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Eye className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-            <p className="font-medium text-muted-foreground">Trend not found</p>
-            <p className="text-sm text-muted-foreground mt-1">
+        <V3Card>
+          <V3CardContent className="py-12 text-center">
+            <Eye className="h-12 w-12 mx-auto mb-3 text-[hsl(var(--portal-text-tertiary))] opacity-30" />
+            <p className="font-medium text-[hsl(var(--portal-text-secondary))]">Trend not found</p>
+            <p className="text-sm text-[hsl(var(--portal-text-tertiary))] mt-1">
               The trend could not be found or has expired.
             </p>
-          </CardContent>
-        </Card>
+          </V3CardContent>
+        </V3Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <motion.div 
+      className="space-y-4"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack} className="gap-2">
@@ -270,65 +294,87 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
       </div>
 
       {/* Title & Status */}
-      <div className="flex items-start gap-4">
-        <div className={cn("p-3 rounded-lg", stageConfig.bgColor)}>
-          {trend.is_breaking ? (
-            <Zap className="h-6 w-6 text-status-error animate-pulse" />
-          ) : (
-            <StageIcon className={cn("h-6 w-6", stageConfig.color)} />
-          )}
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{trend.event_title}</h1>
-            {trend.is_breaking && (
-              <Badge variant="destructive">BREAKING</Badge>
-            )}
-            {trend.is_trending && !trend.is_breaking && (
-              <Badge variant="outline" className={cn(stageConfig.bgColor, stageConfig.color)}>
-                {stageConfig.label}
-              </Badge>
-            )}
-          </div>
-          {trend.top_headline && (
-            <p className="text-muted-foreground mt-1 line-clamp-2">{trend.top_headline}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Key Metrics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-4">
-            <div className="text-2xl font-bold">{trend.current_24h.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Mentions (24h)</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className={cn(
-              "text-2xl font-bold",
-              baselineDelta > 0 ? "text-status-success" : 
-              baselineDelta < 0 ? "text-status-error" : ""
-            )}>
-              {baselineDelta > 0 ? '+' : ''}{Math.round(baselineDelta)}%
+      <V3Card accent={trend.is_breaking ? 'red' : stageConfig.accent}>
+        <V3CardHeader className="pb-0">
+          <div className="flex items-start gap-4">
+            <div className={cn("p-3 rounded-lg", stageConfig.bgColor)}>
+              {trend.is_breaking ? (
+                <Zap className="h-6 w-6 text-[hsl(var(--portal-error))] animate-pulse" />
+              ) : (
+                <StageIcon className={cn("h-6 w-6", stageConfig.color)} />
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">vs 7d Baseline</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="text-2xl font-bold">{trend.confidence_score}%</div>
-            <p className="text-xs text-muted-foreground">Confidence</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="text-2xl font-bold">{trend.source_count}</div>
-            <p className="text-xs text-muted-foreground">Source Types</p>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{trend.event_title}</h1>
+                {trend.is_breaking && (
+                  <Badge className="bg-[hsl(var(--portal-error))] text-white">BREAKING</Badge>
+                )}
+                {trend.is_trending && !trend.is_breaking && (
+                  <Badge variant="outline" className={cn(stageConfig.bgColor, stageConfig.color, "border-0")}>
+                    {stageConfig.label}
+                  </Badge>
+                )}
+                {/* Trending Duration Indicator */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="outline" className="gap-1 text-[hsl(var(--portal-text-secondary))] border-[hsl(var(--portal-border))]">
+                        <Timer className="h-3 w-3" />
+                        {formatTrendingDuration(trend.first_seen_at)}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Trending for {formatTrendingDuration(trend.first_seen_at)}</p>
+                      <p className="text-xs text-muted-foreground">First seen: {formatTimeAgo(trend.first_seen_at)}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              {trend.top_headline && (
+                <p className="text-[hsl(var(--portal-text-secondary))] mt-2 line-clamp-2">{trend.top_headline}</p>
+              )}
+            </div>
+          </div>
+        </V3CardHeader>
+        <V3CardContent className="pt-4">
+          {/* Key Metrics Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))]">
+              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{trend.current_24h.toLocaleString()}</div>
+              <p className="text-xs text-[hsl(var(--portal-text-tertiary))]">Mentions (24h)</p>
+            </div>
+            <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))]">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className={cn(
+                      "text-2xl font-bold cursor-help",
+                      baselineDelta > 0 ? "text-[hsl(var(--portal-success))]" : 
+                      baselineDelta < 0 ? "text-[hsl(var(--portal-error))]" : "text-[hsl(var(--portal-text-primary))]"
+                    )}>
+                      {baselineDelta > 0 ? '+' : ''}{Math.round(baselineDelta)}%
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Current: {trend.current_1h}/hr</p>
+                    <p>Baseline: {trend.baseline_7d.toFixed(1)}/hr</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <p className="text-xs text-[hsl(var(--portal-text-tertiary))]">vs 7d Baseline</p>
+            </div>
+            <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))]">
+              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{trend.confidence_score}%</div>
+              <p className="text-xs text-[hsl(var(--portal-text-tertiary))]">Confidence</p>
+            </div>
+            <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))]">
+              <div className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{trend.source_count}</div>
+              <p className="text-xs text-[hsl(var(--portal-text-tertiary))]">Source Types</p>
+            </div>
+          </div>
+        </V3CardContent>
+      </V3Card>
 
       <Tabs defaultValue="explainability" className="w-full">
         <TabsList>
@@ -339,21 +385,21 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
         </TabsList>
 
         <TabsContent value="explainability" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Decision Context</CardTitle>
-              <CardDescription>
+          <V3Card>
+            <V3CardHeader>
+              <V3CardTitle className="text-base">Decision Context</V3CardTitle>
+              <V3CardDescription>
                 Evidence-based explainability for this trend event
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Why Trending Summary - Phase 4 */}
-              <div className="mb-6 p-4 rounded-lg bg-primary/5 border border-primary/20">
+              </V3CardDescription>
+            </V3CardHeader>
+            <V3CardContent className="pt-0">
+              {/* Why Trending Summary */}
+              <div className="mb-6 p-4 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10 border border-[hsl(var(--portal-accent-blue))]/20">
                 <div className="flex items-start gap-3">
-                  <Target className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <Target className="h-5 w-5 text-[hsl(var(--portal-accent-blue))] shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium">Why This Is Trending</p>
-                    <p className="text-sm text-muted-foreground mt-1">{generateWhyTrendingSummary(trend)}</p>
+                    <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Why This Is Trending</p>
+                    <p className="text-sm text-[hsl(var(--portal-text-secondary))] mt-1">{generateWhyTrendingSummary(trend)}</p>
                   </div>
                 </div>
               </div>
@@ -382,21 +428,21 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
               <div className="mt-6">
                 <SuggestedActionsPanel actions={suggestedActions} />
               </div>
-            </CardContent>
-          </Card>
+            </V3CardContent>
+          </V3Card>
         </TabsContent>
 
         <TabsContent value="evidence" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Evidence Documents</CardTitle>
-              <CardDescription>
+          <V3Card>
+            <V3CardHeader>
+              <V3CardTitle className="text-base">Evidence Documents</V3CardTitle>
+              <V3CardDescription>
                 Sources that contributed to this trend's detection
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </V3CardDescription>
+            </V3CardHeader>
+            <V3CardContent className="pt-0">
               {evidence.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-8 text-[hsl(var(--portal-text-secondary))]">
                   <Newspaper className="h-12 w-12 mx-auto mb-3 opacity-30" />
                   <p>No evidence documents found</p>
                 </div>
@@ -410,31 +456,31 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
                         <div 
                           key={e.id} 
                           className={cn(
-                            "flex items-start gap-3 p-3 rounded-lg border",
-                            e.is_primary && "bg-primary/5 border-primary/20"
+                            "flex items-start gap-3 p-3 rounded-lg border border-[hsl(var(--portal-border))]",
+                            e.is_primary && "bg-[hsl(var(--portal-accent-blue))]/5 border-[hsl(var(--portal-accent-blue))]/20"
                           )}
                         >
                           <div className={cn(
                             "p-2 rounded-lg",
-                            e.is_primary ? "bg-primary/10" : "bg-muted"
+                            e.is_primary ? "bg-[hsl(var(--portal-accent-blue))]/10" : "bg-[hsl(var(--portal-bg-elevated))]"
                           )}>
-                            <SourceIcon className="h-4 w-4" />
+                            <SourceIcon className="h-4 w-4 text-[hsl(var(--portal-text-secondary))]" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="font-medium text-sm truncate">{e.source_title || 'Untitled'}</p>
+                              <p className="font-medium text-sm truncate text-[hsl(var(--portal-text-primary))]">{e.source_title || 'Untitled'}</p>
                               {e.source_tier && (
                                 <Badge variant="outline" className={cn("text-[10px]", tierInfo.color)}>
                                   {tierInfo.label}
                                 </Badge>
                               )}
                               {e.is_primary && (
-                                <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary">
+                                <Badge variant="outline" className="text-[10px] bg-[hsl(var(--portal-accent-blue))]/10 text-[hsl(var(--portal-accent-blue))] border-0">
                                   Primary
                                 </Badge>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2 mt-1 text-xs text-[hsl(var(--portal-text-tertiary))]">
                               <span>{e.source_domain || formatSourceType(e.source_type)}</span>
                               {e.published_at && (
                                 <>
@@ -455,9 +501,9 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
                               href={e.canonical_url || e.source_url || ''} 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="shrink-0 p-2 hover:bg-muted rounded-lg"
+                              className="shrink-0 p-2 hover:bg-[hsl(var(--portal-bg-elevated))] rounded-lg transition-colors"
                             >
-                              <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                              <ExternalLink className="h-4 w-4 text-[hsl(var(--portal-text-tertiary))] hover:text-[hsl(var(--portal-text-primary))]" />
                             </a>
                           )}
                         </div>
@@ -466,63 +512,63 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
                   </div>
                 </ScrollArea>
               )}
-            </CardContent>
-          </Card>
+            </V3CardContent>
+          </V3Card>
         </TabsContent>
 
         <TabsContent value="velocity" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Velocity Analysis</CardTitle>
-              <CardDescription>
+          <V3Card>
+            <V3CardHeader>
+              <V3CardTitle className="text-base">Velocity Analysis</V3CardTitle>
+              <V3CardDescription>
                 Trend momentum and acceleration metrics
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </V3CardDescription>
+            </V3CardHeader>
+            <V3CardContent className="pt-0">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 rounded-lg bg-muted/30 text-center">
-                  <Activity className="h-5 w-5 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-2xl font-bold">{trend.current_1h}</p>
-                  <p className="text-xs text-muted-foreground">Last Hour</p>
+                <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center border border-[hsl(var(--portal-border))]">
+                  <Activity className="h-5 w-5 mx-auto mb-2 text-[hsl(var(--portal-text-secondary))]" />
+                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{trend.current_1h}</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-tertiary))]">Last Hour</p>
                 </div>
-                <div className="p-4 rounded-lg bg-muted/30 text-center">
-                  <Clock className="h-5 w-5 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-2xl font-bold">{trend.current_6h}</p>
-                  <p className="text-xs text-muted-foreground">Last 6 Hours</p>
+                <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center border border-[hsl(var(--portal-border))]">
+                  <Clock className="h-5 w-5 mx-auto mb-2 text-[hsl(var(--portal-text-secondary))]" />
+                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{trend.current_6h}</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-tertiary))]">Last 6 Hours</p>
                 </div>
-                <div className="p-4 rounded-lg bg-muted/30 text-center">
-                  <TrendingUp className="h-5 w-5 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-2xl font-bold">{Math.round(trend.velocity)}%</p>
-                  <p className="text-xs text-muted-foreground">Velocity</p>
+                <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center border border-[hsl(var(--portal-border))]">
+                  <TrendingUp className="h-5 w-5 mx-auto mb-2 text-[hsl(var(--portal-text-secondary))]" />
+                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{Math.round(trend.velocity)}%</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-tertiary))]">Velocity</p>
                 </div>
-                <div className="p-4 rounded-lg bg-muted/30 text-center">
-                  <BarChart3 className="h-5 w-5 mx-auto mb-2 text-muted-foreground" />
+                <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))] text-center border border-[hsl(var(--portal-border))]">
+                  <BarChart3 className="h-5 w-5 mx-auto mb-2 text-[hsl(var(--portal-text-secondary))]" />
                   <p className={cn(
                     "text-2xl font-bold",
-                    trend.acceleration > 20 ? "text-status-success" :
-                    trend.acceleration < -20 ? "text-status-error" : ""
+                    trend.acceleration > 20 ? "text-[hsl(var(--portal-success))]" :
+                    trend.acceleration < -20 ? "text-[hsl(var(--portal-error))]" : "text-[hsl(var(--portal-text-primary))]"
                   )}>
                     {trend.acceleration > 0 ? '+' : ''}{Math.round(trend.acceleration)}%
                   </p>
-                  <p className="text-xs text-muted-foreground">Acceleration</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-tertiary))]">Acceleration</p>
                 </div>
               </div>
 
               <div className="mt-6 space-y-3">
-                <h4 className="font-medium text-sm">Baseline Comparison</h4>
+                <h4 className="font-medium text-sm text-[hsl(var(--portal-text-primary))]">Baseline Comparison</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-lg border">
-                    <p className="text-sm text-muted-foreground">7-Day Average</p>
-                    <p className="text-xl font-bold">{trend.baseline_7d.toFixed(1)}/hr</p>
+                  <div className="p-4 rounded-lg border border-[hsl(var(--portal-border))]">
+                    <p className="text-sm text-[hsl(var(--portal-text-secondary))]">7-Day Average</p>
+                    <p className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">{trend.baseline_7d.toFixed(1)}/hr</p>
                   </div>
-                  <div className="p-4 rounded-lg border">
-                    <p className="text-sm text-muted-foreground">30-Day Average</p>
-                    <p className="text-xl font-bold">{trend.baseline_30d.toFixed(1)}/hr</p>
+                  <div className="p-4 rounded-lg border border-[hsl(var(--portal-border))]">
+                    <p className="text-sm text-[hsl(var(--portal-text-secondary))]">30-Day Average</p>
+                    <p className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">{trend.baseline_30d.toFixed(1)}/hr</p>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 space-y-2 text-sm text-muted-foreground border-t pt-4">
+              <div className="mt-6 space-y-2 text-sm text-[hsl(var(--portal-text-secondary))] border-t border-[hsl(var(--portal-border))] pt-4">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   <span>First seen: {formatTimeAgo(trend.first_seen_at)}</span>
@@ -538,23 +584,23 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </V3CardContent>
+          </V3Card>
         </TabsContent>
 
         <TabsContent value="actions" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Suggested Actions</CardTitle>
-              <CardDescription>
+          <V3Card>
+            <V3CardHeader>
+              <V3CardTitle className="text-base">Suggested Actions</V3CardTitle>
+              <V3CardDescription>
                 AI-generated action recommendations based on this trend
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </V3CardDescription>
+            </V3CardHeader>
+            <V3CardContent className="pt-0">
               <SuggestedActionsPanel actions={suggestedActions} />
               
               {suggestedActions.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-8 text-[hsl(var(--portal-text-secondary))]">
                   <Zap className="h-12 w-12 mx-auto mb-3 opacity-30" />
                   <p>No suggested actions yet</p>
                   <p className="text-sm mt-1">Actions will be generated based on trend analysis</p>
@@ -564,10 +610,10 @@ export function TrendEventDrilldownView({ trendId, onBack }: TrendEventDrilldown
                   </Button>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </V3CardContent>
+          </V3Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </motion.div>
   );
 }
