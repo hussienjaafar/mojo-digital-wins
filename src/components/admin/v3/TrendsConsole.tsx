@@ -116,7 +116,7 @@ function TrendEventCard({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="font-semibold text-foreground truncate">{trend.event_title}</h4>
+            <h4 className="font-semibold text-foreground truncate">{trend.canonical_label || trend.event_title}</h4>
             {trend.is_breaking && (
               <Badge variant="destructive" className="text-[10px]">BREAKING</Badge>
             )}
