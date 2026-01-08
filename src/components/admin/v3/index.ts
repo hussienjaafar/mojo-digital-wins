@@ -51,3 +51,6 @@ export { RelevanceExplainerInline } from "./RelevanceExplainerInline";
 // Phase 7: Data & ML Components
 export { LearningInsightsPanel } from "./LearningInsightsPanel";
 export { SemanticClusterBadge } from "./SemanticClusterBadge";
+
+// Phase 8: Campaign Integration
+export { CampaignLaunchPanel } from "./CampaignLaunchPanel";

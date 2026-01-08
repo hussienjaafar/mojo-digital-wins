@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 
-export type ActionType = 'sms' | 'email' | 'alert' | 'watchlist' | 'dismiss' | 'share';
+export type ActionType = 'sms' | 'email' | 'alert' | 'watchlist' | 'dismiss' | 'share' | 'generate_campaign' | 'launch_campaign';
 export type OutcomeType = 'donation' | 'click' | 'signup' | 'conversion' | 'engagement' | 'none';
 
 interface TrackActionParams {
