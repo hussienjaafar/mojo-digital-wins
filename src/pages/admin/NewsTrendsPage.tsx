@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
-import { Users, Globe, Newspaper, PanelLeftClose, PanelLeft } from "lucide-react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { Users, Globe, Newspaper, Search } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -8,18 +8,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   TrendsConsole,
   AdminPageHeader,
-  BriefingStrip,
   BriefingDrawer,
   AlertsDrawer,
-  PersonalizationBanner,
   TrendsFilterRail,
   SavedViewsSelector,
+  ExecutiveSignalBar,
+  ExecutiveSummary,
+  PrimarySignalCard,
+  SecondaryExplorer,
+  CommandPaletteFilter,
   type FilterState,
 } from "@/components/admin/v3";
 import { PipelineHealthDrawer } from "@/components/admin/v3/PipelineHealthDrawer";
 import { TrendEventDrilldownView } from "@/components/admin/v3/TrendEventDrilldownView";
 import { NewsFeed } from "@/components/news/NewsFeed";
 import { useSavedViews } from "@/hooks/useSavedViews";
+import { useTrendEvents } from "@/hooks/useTrendEvents";
 
 type ViewMode = "trends" | "feed" | "trend_detail";
 type ClientMode = "for_you" | "global";
@@ -39,17 +43,21 @@ export function NewsTrendsPage() {
   const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
   const [briefingDrawerOpen, setBriefingDrawerOpen] = useState(false);
   const [alertsDrawerOpen, setAlertsDrawerOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [clientMode, setClientMode] = useState<ClientMode>("for_you");
   const [activeTab, setActiveTab] = useState<TabMode>("for_you");
-  const [showPersonalizationBanner, setShowPersonalizationBanner] = useState(true);
+  const [secondaryExpanded, setSecondaryExpanded] = useState(false);
   
-  // Filter rail state
-  const [filterRailCollapsed, setFilterRailCollapsed] = useState(false);
+  // Filter rail state - collapsed by default per Phase 1
+  const [filterRailCollapsed, setFilterRailCollapsed] = useState(true);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Saved views
   const { views, activeView, activeViewId, selectView, createView, deleteView } = useSavedViews();
+  
+  // Fetch trends for primary signals
+  const { events: trends, isLoading: trendsLoading, stats } = useTrendEvents({ limit: 50, minConfidence: 30 });
   
   // Sync filters when saved view changes
   useEffect(() => {
@@ -58,9 +66,48 @@ export function NewsTrendsPage() {
     }
   }, [activeView]);
 
-  // Placeholder personalization data - in production from org profile
-  const personalizationPriorities = ["Middle East policy", "Civil rights", "Michigan"];
+  // Available topics for filtering
   const availableTopics = ["Middle East", "Civil Rights", "Healthcare", "Education", "Climate", "Immigration"];
+
+  // Compute primary signals (top 5 for "Monitor Mode")
+  const primarySignals = useMemo(() => {
+    if (!trends) return [];
+    
+    // Filter for high-confidence or breaking trends
+    const actionable = trends.filter(t => 
+      t.is_breaking || 
+      t.confidence_score >= 70 ||
+      (t.z_score_velocity && t.z_score_velocity >= 2)
+    );
+    
+    // Sort by importance (breaking first, then by confidence)
+    return actionable
+      .sort((a, b) => {
+        if (a.is_breaking && !b.is_breaking) return -1;
+        if (!a.is_breaking && b.is_breaking) return 1;
+        return b.confidence_score - a.confidence_score;
+      })
+      .slice(0, 5);
+  }, [trends]);
+
+  // Executive summary data
+  const executiveSummaryData = useMemo(() => {
+    const opportunities = primarySignals.filter(t => 
+      t.trend_stage === 'emerging' || t.trend_stage === 'surging'
+    ).length;
+    
+    const risks = primarySignals.filter(t => 
+      t.is_breaking || t.trend_stage === 'peaking'
+    ).length;
+    
+    const keyTakeaways = primarySignals.slice(0, 2).map(t => ({
+      text: t.context_summary || `${t.canonical_label || t.event_title} is ${t.trend_stage || 'trending'} with ${t.current_24h} mentions`,
+      type: (t.is_breaking ? 'risk' : t.trend_stage === 'emerging' ? 'opportunity' : 'neutral') as 'opportunity' | 'risk' | 'neutral',
+      trendId: t.id,
+    }));
+    
+    return { opportunities, risks, keyTakeaways };
+  }, [primarySignals]);
 
   // Handle drilldown to trend_events detail view
   const handleTrendDrilldown = useCallback((trendId: string) => {
@@ -81,6 +128,22 @@ export function NewsTrendsPage() {
     }
   }, []);
 
+  const handleSearchFromPalette = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
+
+  // Keyboard shortcut for command palette
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setCommandPaletteOpen(true);
+      }
+    };
+    document.addEventListener('keydown', down);
+    return () => document.removeEventListener('keydown', down);
+  }, []);
+
   return (
     <motion.div 
       className="space-y-4"
@@ -89,24 +152,34 @@ export function NewsTrendsPage() {
       transition={{ duration: 0.3, ease: "easeOut" }}
     >
       <AdminPageHeader
-        title="News & Trends"
-        description="Real-time political intelligence monitoring and evidence-based trend analysis"
+        title="Political Intelligence"
+        description="Decision support for high-stakes moments"
       />
 
-      {/* Layer 1: Briefing Strip - Calm, minimal status bar */}
-      <BriefingStrip
+      {/* Layer 1: Executive Signal Bar */}
+      <ExecutiveSignalBar
+        actionableSignalCount={primarySignals.length}
         onOpenBriefing={() => setBriefingDrawerOpen(true)}
         onOpenAlerts={() => setAlertsDrawerOpen(true)}
         onOpenDetails={() => setDetailsDrawerOpen(true)}
         alertCount={3}
-        clientMode={clientMode}
-        onClientModeChange={setClientMode}
       />
 
-      {/* Layer 2: Main Workspace with Tabs */}
+      {/* Layer 2: Executive Summary (collapsible) */}
+      {activeTab === "for_you" && (
+        <ExecutiveSummary
+          opportunities={executiveSummaryData.opportunities}
+          risks={executiveSummaryData.risks}
+          keyTakeaways={executiveSummaryData.keyTakeaways}
+          lastLoginAt={new Date(Date.now() - 1000 * 60 * 60 * 4)} // Mock: 4 hours ago
+          onViewTrend={handleTrendDrilldown}
+        />
+      )}
+
+      {/* Main Content Area */}
       {mode !== "trend_detail" ? (
         <>
-          {/* For You / Explore Tabs */}
+          {/* Tabs for view switching */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -138,83 +211,101 @@ export function NewsTrendsPage() {
                 )}
               </div>
               
-              {/* Filter Rail Toggle */}
+              {/* Command Palette Trigger */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setFilterRailCollapsed(!filterRailCollapsed)}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-2 text-xs"
+                    onClick={() => setCommandPaletteOpen(true)}
                   >
-                    {filterRailCollapsed ? (
-                      <PanelLeft className="h-4 w-4" />
-                    ) : (
-                      <PanelLeftClose className="h-4 w-4" />
-                    )}
+                    <Search className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Search & Filter</span>
+                    <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">
+                      <span className="text-xs">⌘</span>K
+                    </kbd>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {filterRailCollapsed ? "Show filters" : "Hide filters"}
+                  Search trends and apply filters
                 </TooltipContent>
               </Tooltip>
             </div>
 
-            {/* Personalization Banner - Only in For You tab */}
-            {activeTab === "for_you" && showPersonalizationBanner && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mt-3"
-              >
-                <PersonalizationBanner
-                  clientName="Democracy Forward"
-                  priorities={personalizationPriorities}
-                  onEditPreferences={() => console.log("Edit preferences")}
-                  onDismiss={() => setShowPersonalizationBanner(false)}
-                />
-              </motion.div>
-            )}
-
-            {/* Main Content Area with Filter Rail */}
-            <div className="flex gap-4 mt-4">
-              {/* Filter Rail - Collapsible sidebar */}
-              <TrendsFilterRail
-                filters={filters}
-                onFiltersChange={setFilters}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                isCollapsed={filterRailCollapsed}
-                onToggleCollapse={() => setFilterRailCollapsed(!filterRailCollapsed)}
-                availableTopics={availableTopics}
-              />
-
-              {/* Trends Console - Main workspace */}
-              <div className="flex-1 min-w-0">
-                <TabsContent value="for_you" className="mt-0">
-                  <TrendsConsole 
-                    onDrilldown={handleTrendDrilldown}
-                    viewMode="for_you"
-                    filters={filters}
-                    searchQuery={searchQuery}
+            {/* For You Tab - Primary Signals */}
+            <TabsContent value="for_you" className="mt-4 space-y-4">
+              {/* Layer 3: Primary Signal List (3-5 max) */}
+              <div className="space-y-3">
+                {primarySignals.map((trend, index) => (
+                  <PrimarySignalCard
+                    key={trend.id}
+                    trend={trend}
+                    rank={index + 1}
+                    whyItMatters={trend.context_summary || `This trend is ${trend.trend_stage || 'active'} and may affect your organization's priorities.`}
+                    matchedReasons={trend.context_terms?.slice(0, 3) || []}
+                    evidencePreview={trend.top_headline ? [
+                      { headline: trend.top_headline, source: 'News' }
+                    ] : []}
+                    onInvestigate={() => handleTrendDrilldown(trend.id)}
+                    onAct={() => handleTrendDrilldown(trend.id)}
+                    onCreateAlert={() => console.log('Create alert for', trend.id)}
                   />
-                </TabsContent>
+                ))}
                 
-                <TabsContent value="explore" className="mt-0">
+                {primarySignals.length === 0 && !trendsLoading && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <p>No actionable signals at this time.</p>
+                    <p className="text-sm mt-1">Check back soon or explore all trends below.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Layer 4: Secondary Exploration (collapsed by default) */}
+              <SecondaryExplorer
+                isCollapsed={!secondaryExpanded}
+                onToggleCollapse={() => setSecondaryExpanded(!secondaryExpanded)}
+                onOpenFilters={() => setCommandPaletteOpen(true)}
+                newsFeedContent={<NewsFeed />}
+              >
+                <TrendsConsole 
+                  onDrilldown={handleTrendDrilldown}
+                  viewMode="for_you"
+                  filters={filters}
+                  searchQuery={searchQuery}
+                />
+              </SecondaryExplorer>
+            </TabsContent>
+            
+            {/* Explore Tab - Full Trends Console */}
+            <TabsContent value="explore" className="mt-4">
+              <div className="flex gap-4">
+                {/* Filter Rail - Still available but collapsed by default */}
+                <TrendsFilterRail
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  isCollapsed={filterRailCollapsed}
+                  onToggleCollapse={() => setFilterRailCollapsed(!filterRailCollapsed)}
+                  availableTopics={availableTopics}
+                />
+
+                <div className="flex-1 min-w-0">
                   <TrendsConsole 
                     onDrilldown={handleTrendDrilldown}
                     viewMode="explore"
                     filters={filters}
                     searchQuery={searchQuery}
                   />
-                </TabsContent>
-                
-                <TabsContent value="feed" className="mt-0">
-                  <NewsFeed />
-                </TabsContent>
+                </div>
               </div>
-            </div>
+            </TabsContent>
+            
+            {/* News Feed Tab */}
+            <TabsContent value="feed" className="mt-4">
+              <NewsFeed />
+            </TabsContent>
           </Tabs>
         </>
       ) : (
@@ -235,6 +326,16 @@ export function NewsTrendsPage() {
           </motion.div>
         </AnimatePresence>
       )}
+
+      {/* Command Palette Filter */}
+      <CommandPaletteFilter
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+        filters={filters}
+        onFiltersChange={setFilters}
+        onSearch={handleSearchFromPalette}
+        availableTopics={availableTopics}
+      />
 
       {/* Drawers */}
       <PipelineHealthDrawer open={detailsDrawerOpen} onOpenChange={setDetailsDrawerOpen} />
