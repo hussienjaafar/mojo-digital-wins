@@ -676,6 +676,28 @@ export function TrendDrilldownPanel({
         </div>
       </div>
 
+      {/* Context Bundle */}
+      {(trend.context_terms?.length || trend.context_phrases?.length || trend.context_summary) && (
+        <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">
+          <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))] mb-2">Context</p>
+          {trend.context_terms && trend.context_terms.length > 0 && (
+            <p className="text-xs text-[hsl(var(--portal-text-muted))] mb-1">
+              {trend.context_terms.slice(0, 5).join(' · ')}
+            </p>
+          )}
+          {trend.context_phrases && trend.context_phrases.length > 0 && (
+            <p className="text-xs text-[hsl(var(--portal-text-secondary))]">
+              {trend.context_phrases.slice(0, 3).join(' · ')}
+            </p>
+          )}
+          {trend.context_summary && (
+            <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-2">
+              {trend.context_summary}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Source Tier Distribution - Phase 4 */}
       {(trend.tier1_count || trend.tier2_count || trend.tier3_count) && (
         <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-elevated))]">

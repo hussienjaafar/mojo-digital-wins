@@ -63,6 +63,13 @@ export interface TrendEvent {
   top_headline: string | null;
   sentiment_score: number | null;
   sentiment_label: 'positive' | 'negative' | 'neutral' | 'mixed' | null;
+
+  // Context bundles
+  context_terms?: string[] | null;
+  context_phrases?: string[] | null;
+  context_summary?: string | null;
+  label_quality?: 'event_phrase' | 'entity_only' | 'fallback_generated';
+  label_source?: string | null;
   
   // Clustering
   related_phrases?: string[];

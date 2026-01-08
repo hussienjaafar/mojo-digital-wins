@@ -165,6 +165,13 @@ function TrendCard({
             </p>
           )}
 
+          {/* Context terms for entity-only trends */}
+          {trend.context_terms && trend.context_terms.length > 0 && (
+            <p className="text-xs text-[hsl(var(--portal-text-muted))] truncate">
+              {trend.context_terms.slice(0, 3).join(' · ')}
+            </p>
+          )}
+
           {/* Compact meta line: velocity · sources · freshness · badge */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-[hsl(var(--portal-text-muted))] flex items-center gap-1">
