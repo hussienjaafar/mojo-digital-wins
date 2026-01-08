@@ -28,6 +28,8 @@ interface PrimarySignalCardProps {
     headline: string;
     source: string;
   }>;
+  opportunityTier?: 'act_now' | 'consider' | 'watch' | null;
+  decisionScore?: number | null;
   onInvestigate: () => void;
   onAct: () => void;
   onCreateAlert?: () => void;
@@ -79,6 +81,8 @@ export function PrimarySignalCard({
   whyItMatters,
   matchedReasons = [],
   evidencePreview = [],
+  opportunityTier,
+  decisionScore,
   onInvestigate,
   onAct,
   onCreateAlert,
@@ -131,6 +135,18 @@ export function PrimarySignalCard({
                 ) : (
                   <Badge variant="outline" className={cn("text-[10px] font-semibold", stageConfig.badgeClass)}>
                     {stageConfig.label}
+                  </Badge>
+                )}
+                
+                {/* Opportunity Tier Badge */}
+                {opportunityTier === 'act_now' && (
+                  <Badge className="text-[10px] font-semibold bg-[hsl(var(--portal-success))] text-white">
+                    ACT NOW
+                  </Badge>
+                )}
+                {opportunityTier === 'consider' && (
+                  <Badge variant="outline" className="text-[10px] font-semibold border-[hsl(var(--portal-warning))] text-[hsl(var(--portal-warning))]">
+                    CONSIDER
                   </Badge>
                 )}
               </div>

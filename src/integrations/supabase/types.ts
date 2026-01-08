@@ -7348,6 +7348,81 @@ export type Database = {
           },
         ]
       }
+      trend_action_outcomes: {
+        Row: {
+          action_taken_at: string
+          action_type: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          organization_id: string | null
+          outcome_recorded_at: string | null
+          outcome_type: string | null
+          outcome_value: number | null
+          trend_event_id: string | null
+        }
+        Insert: {
+          action_taken_at?: string
+          action_type: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          outcome_recorded_at?: string | null
+          outcome_type?: string | null
+          outcome_value?: number | null
+          trend_event_id?: string | null
+        }
+        Update: {
+          action_taken_at?: string
+          action_type?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          outcome_recorded_at?: string | null
+          outcome_type?: string | null
+          outcome_value?: number | null
+          trend_event_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_action_outcomes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_action_outcomes_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "label_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+          {
+            foreignKeyName: "trend_action_outcomes_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_action_outcomes_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events_active"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_action_outcomes_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+        ]
+      }
       trend_anomalies: {
         Row: {
           acknowledged_at: string | null
@@ -7688,6 +7763,7 @@ export type Database = {
           current_1h: number | null
           current_24h: number | null
           current_6h: number | null
+          decision_score: number | null
           embedding: string | null
           embedding_generated_at: string | null
           embedding_text: string | null
@@ -7709,6 +7785,7 @@ export type Database = {
           label_source: string | null
           last_seen_at: string
           news_source_count: number | null
+          opportunity_tier: string | null
           peak_at: string | null
           poisson_surprise: number | null
           rank_score: number | null
@@ -7756,6 +7833,7 @@ export type Database = {
           current_1h?: number | null
           current_24h?: number | null
           current_6h?: number | null
+          decision_score?: number | null
           embedding?: string | null
           embedding_generated_at?: string | null
           embedding_text?: string | null
@@ -7777,6 +7855,7 @@ export type Database = {
           label_source?: string | null
           last_seen_at?: string
           news_source_count?: number | null
+          opportunity_tier?: string | null
           peak_at?: string | null
           poisson_surprise?: number | null
           rank_score?: number | null
@@ -7824,6 +7903,7 @@ export type Database = {
           current_1h?: number | null
           current_24h?: number | null
           current_6h?: number | null
+          decision_score?: number | null
           embedding?: string | null
           embedding_generated_at?: string | null
           embedding_text?: string | null
@@ -7845,6 +7925,7 @@ export type Database = {
           label_source?: string | null
           last_seen_at?: string
           news_source_count?: number | null
+          opportunity_tier?: string | null
           peak_at?: string | null
           poisson_surprise?: number | null
           rank_score?: number | null
