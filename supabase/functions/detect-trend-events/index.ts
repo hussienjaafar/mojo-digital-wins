@@ -2022,6 +2022,14 @@ serve(async (req) => {
         }
       }
       
+      // NEW: For entity-only trends with context_summary, upgrade canonical_label to use the context
+      // This ensures entity names like "Hakeem Jeffries" display as "Jeffries calls Noem a liar..."
+      if (labelQualityForRanking === 'entity_only' && contextSummary && contextSummary.length > 20) {
+        // Use context_summary as the canonical label for better display
+        canonicalLabel = contextSummary;
+        console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..."`);
+      }
+      
       // PHASE 2/A: labelQuality already computed earlier for ranking - reuse it
       // Use labelQualityForRanking which was computed before rankScore calculation
       const labelQuality = labelQualityForRanking;
