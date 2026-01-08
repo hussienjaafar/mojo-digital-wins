@@ -7706,6 +7706,7 @@ export type Database = {
           is_trending: boolean | null
           is_verified: boolean | null
           label_quality: string | null
+          label_source: string | null
           last_seen_at: string
           news_source_count: number | null
           peak_at: string | null
@@ -7773,6 +7774,7 @@ export type Database = {
           is_trending?: boolean | null
           is_verified?: boolean | null
           label_quality?: string | null
+          label_source?: string | null
           last_seen_at?: string
           news_source_count?: number | null
           peak_at?: string | null
@@ -7840,6 +7842,7 @@ export type Database = {
           is_trending?: boolean | null
           is_verified?: boolean | null
           label_quality?: string | null
+          label_source?: string | null
           last_seen_at?: string
           news_source_count?: number | null
           peak_at?: string | null
