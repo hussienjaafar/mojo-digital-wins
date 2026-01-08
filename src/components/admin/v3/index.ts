@@ -47,3 +47,7 @@ export { CommandPaletteFilter } from "./CommandPaletteFilter";
 
 // Phase 2: Personalization Components
 export { RelevanceExplainerInline } from "./RelevanceExplainerInline";
+
+// Phase 7: Data & ML Components
+export { LearningInsightsPanel } from "./LearningInsightsPanel";
+export { SemanticClusterBadge } from "./SemanticClusterBadge";

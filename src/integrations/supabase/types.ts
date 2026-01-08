@@ -4124,6 +4124,39 @@ export type Database = {
         }
         Relationships: []
       }
+      learning_signals: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_calculated_at: string | null
+          metadata: Json | null
+          pattern_key: string
+          sample_count: number | null
+          signal_type: string
+          weight_adjustment: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_calculated_at?: string | null
+          metadata?: Json | null
+          pattern_key: string
+          sample_count?: number | null
+          signal_type: string
+          weight_adjustment?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_calculated_at?: string | null
+          metadata?: Json | null
+          pattern_key?: string
+          sample_count?: number | null
+          signal_type?: string
+          weight_adjustment?: number | null
+        }
+        Relationships: []
+      }
       login_history: {
         Row: {
           created_at: string
@@ -7793,6 +7826,7 @@ export type Database = {
           related_entities: string[] | null
           related_phrases: string[] | null
           related_topics: string[] | null
+          semantic_cluster_id: string | null
           sentiment_label: string | null
           sentiment_score: number | null
           social_source_count: number | null
@@ -7863,6 +7897,7 @@ export type Database = {
           related_entities?: string[] | null
           related_phrases?: string[] | null
           related_topics?: string[] | null
+          semantic_cluster_id?: string | null
           sentiment_label?: string | null
           sentiment_score?: number | null
           social_source_count?: number | null
@@ -7933,6 +7968,7 @@ export type Database = {
           related_entities?: string[] | null
           related_phrases?: string[] | null
           related_topics?: string[] | null
+          semantic_cluster_id?: string | null
           sentiment_label?: string | null
           sentiment_score?: number | null
           social_source_count?: number | null
@@ -7951,7 +7987,15 @@ export type Database = {
           weighted_evidence_score?: number | null
           z_score_velocity?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "trend_events_semantic_cluster_id_fkey"
+            columns: ["semantic_cluster_id"]
+            isOneToOne: false
+            referencedRelation: "trend_semantic_clusters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trend_evidence: {
         Row: {
@@ -8221,6 +8265,42 @@ export type Database = {
             referencedColumns: ["trend_id"]
           },
         ]
+      }
+      trend_semantic_clusters: {
+        Row: {
+          avg_confidence: number | null
+          avg_velocity: number | null
+          centroid_keywords: string[] | null
+          cluster_description: string | null
+          cluster_name: string
+          created_at: string | null
+          id: string
+          member_trend_ids: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          avg_confidence?: number | null
+          avg_velocity?: number | null
+          centroid_keywords?: string[] | null
+          cluster_description?: string | null
+          cluster_name: string
+          created_at?: string | null
+          id?: string
+          member_trend_ids?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          avg_confidence?: number | null
+          avg_velocity?: number | null
+          centroid_keywords?: string[] | null
+          cluster_description?: string | null
+          cluster_name?: string
+          created_at?: string | null
+          id?: string
+          member_trend_ids?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       trending_news_topics: {
         Row: {
@@ -8801,6 +8881,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      action_effectiveness_summary: {
+        Row: {
+          action_type: string | null
+          avg_outcome_value: number | null
+          success_rate: number | null
+          successful_actions: number | null
+          total_actions: number | null
+          total_outcome_value: number | null
+          trend_label: string | null
+        }
+        Relationships: []
       }
       action_outcome_summary: {
         Row: {
