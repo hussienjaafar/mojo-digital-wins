@@ -1094,13 +1094,13 @@ function extractDomain(url?: string): string {
 // PERFORMANCE LIMITS - Prevent CPU timeout
 // ============================================================================
 const PERF_LIMITS = {
-  TIME_WINDOW_HOURS: 12,        // Reduced from 24h to limit data volume
-  MAX_RSS_ARTICLES: 1000,       // Limit RSS articles per run
-  MAX_GOOGLE_NEWS: 800,         // Limit Google News articles  
-  MAX_BLUESKY_POSTS: 2000,      // Limit Bluesky posts (was 5000)
-  MAX_EXISTING_EVENTS: 300,     // Limit embedding index (was 500)
-  UPSERT_BATCH_SIZE: 100,       // Batch upserts to avoid large payloads
-  TIMEOUT_GUARD_MS: 45000,      // Exit early if nearing 50s CPU limit
+  TIME_WINDOW_HOURS: 6,         // Reduced from 12h to prevent CPU timeout
+  MAX_RSS_ARTICLES: 400,        // Reduced from 1000 - prioritize quality over volume
+  MAX_GOOGLE_NEWS: 200,         // Reduced from 800  
+  MAX_BLUESKY_POSTS: 600,       // Reduced from 2000 - social is lowest priority
+  MAX_EXISTING_EVENTS: 100,     // Reduced from 300 - limit embedding work
+  UPSERT_BATCH_SIZE: 50,        // Smaller batches for faster commits
+  TIMEOUT_GUARD_MS: 30000,      // Exit earlier (30s) to ensure DB writes complete
 };
 
 serve(async (req) => {
