@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { PortalRoot } from "@/components/PortalRoot";
 import { PageTransition } from "@/components/PageTransition";
 import ScrollToTop from "@/components/ScrollToTop";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
@@ -146,6 +147,8 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="light" storageKey="molitico-ui-theme">
+      {/* Global portal root - MUST be inside ThemeProvider for CSS variable inheritance */}
+      <PortalRoot />
       <MaintenanceProvider>
         <ImpersonationProvider>
           <TooltipProvider>
