@@ -121,8 +121,11 @@ export const navigationGroups: NavigationGroup[] = [
     icon: Shield,
     collapsedByDefault: true,
     items: [
+      { title: "Admin Users", icon: UserCog, value: "users", requiredRole: 'admin' },
+      { title: "Admin Invites", icon: Mail, value: "invite-codes", requiredRole: 'admin' },
       { title: "Operations", icon: Activity, value: "scheduler", requiredRole: 'admin' },
       { title: "Coverage Governance", icon: Layers, value: "coverage-governance", requiredRole: 'admin' },
+      { title: "Sessions", icon: Shield, value: "sessions", requiredRole: 'admin' },
       { title: "Audit & Activity", icon: FileText, value: "audit-activity", requiredRole: 'admin' },
       { title: "Audit Logs", icon: FileText, value: "audit-logs", requiredRole: 'admin' },
     ],
