@@ -69,8 +69,8 @@ export function Step2OrgProfile({
     try {
       const { data, error } = await supabase.functions.invoke('scrape-organization-website', {
         body: { 
-          organization_id: organizationId,
-          url: websiteUrl,
+          organizationId: organizationId,
+          websiteUrl: websiteUrl,
         },
       });
 
