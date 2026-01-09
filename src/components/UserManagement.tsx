@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Shield, Users, Building2, UsersRound } from "lucide-react";
+import { Search, Shield, Users, Building2, UsersRound, ExternalLink } from "lucide-react";
 import { V3Button } from "@/components/v3/V3Button";
 import {
   Select,
@@ -388,7 +389,15 @@ export const UserManagement = () => {
               ) : (
                 filteredUsers.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.email}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link 
+                        to={`/admin/users/${user.id}`}
+                        className="hover:underline text-primary flex items-center gap-1"
+                      >
+                        {user.email}
+                        <ExternalLink className="h-3 w-3 opacity-50" />
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       <UserAccessBadges
                         platformRoles={user.roles}
