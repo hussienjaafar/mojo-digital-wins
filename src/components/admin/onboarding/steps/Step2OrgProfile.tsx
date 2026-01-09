@@ -6,7 +6,7 @@ import { V3Button } from '@/components/v3/V3Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Target, MapPin, Loader2, Sparkles, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Target, MapPin, Loader2, Sparkles, AlertCircle, ChevronDown, ChevronUp, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -44,6 +44,8 @@ export function Step2OrgProfile({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScraping, setIsScraping] = useState(false);
+  const [scrapeStatus, setScrapeStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [scrapeMessage, setScrapeMessage] = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [formData, setFormData] = useState<OrgProfileData>({
     mission_statement: initialData?.mission_statement || '',
@@ -66,6 +68,9 @@ export function Step2OrgProfile({
     if (!websiteUrl) return;
     
     setIsScraping(true);
+    setScrapeStatus('idle');
+    setScrapeMessage('');
+    
     try {
       const { data, error } = await supabase.functions.invoke('scrape-organization-website', {
         body: { 
@@ -75,21 +80,36 @@ export function Step2OrgProfile({
       });
 
       if (error) throw error;
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
+      // Map edge function response fields to form fields
       if (data?.profile) {
+        const profile = data.profile;
         setFormData(prev => ({
           ...prev,
-          mission_statement: data.profile.mission_statement || prev.mission_statement,
-          focus_areas: data.profile.focus_areas || prev.focus_areas,
-          policy_domains: data.profile.policy_domains || prev.policy_domains,
+          mission_statement: profile.mission || prev.mission_statement,
+          focus_areas: profile.focus_areas || prev.focus_areas,
+          policy_domains: profile.key_issues || prev.policy_domains,
         }));
+        
+        setScrapeStatus('success');
+        setScrapeMessage(`Extracted mission and ${(profile.focus_areas?.length || 0) + (profile.key_issues?.length || 0)} focus areas`);
         
         toast({
           title: 'Website Analyzed',
           description: 'Organization profile auto-filled from website content',
         });
+      } else {
+        throw new Error('No profile data returned');
       }
     } catch (err: any) {
+      console.error('[Step2OrgProfile] Scrape error:', err);
+      setScrapeStatus('error');
+      setScrapeMessage(err.message || 'Could not analyze website');
+      
       toast({
         title: 'Scrape Failed',
         description: 'Could not analyze website. Please fill in details manually.',
@@ -174,15 +194,29 @@ export function Step2OrgProfile({
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* AI Scrape Banner */}
       {websiteUrl && (
-        <Card className="border-[hsl(var(--portal-accent-purple))]/30 bg-[hsl(var(--portal-accent-purple))]/5">
+        <Card className={`border-[hsl(var(--portal-accent-purple))]/30 ${
+          scrapeStatus === 'success' ? 'bg-green-500/5 border-green-500/30' :
+          scrapeStatus === 'error' ? 'bg-destructive/5 border-destructive/30' :
+          'bg-[hsl(var(--portal-accent-purple))]/5'
+        }`}>
           <CardContent className="py-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <Sparkles className="w-5 h-5 text-[hsl(var(--portal-accent-purple))]" />
+                {scrapeStatus === 'success' ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                ) : scrapeStatus === 'error' ? (
+                  <XCircle className="w-5 h-5 text-destructive" />
+                ) : (
+                  <Sparkles className="w-5 h-5 text-[hsl(var(--portal-accent-purple))]" />
+                )}
                 <div>
-                  <p className="text-sm font-medium">AI-Powered Profile Extraction</p>
+                  <p className="text-sm font-medium">
+                    {scrapeStatus === 'success' ? 'Profile Extracted Successfully' :
+                     scrapeStatus === 'error' ? 'Extraction Failed' :
+                     'AI-Powered Profile Extraction'}
+                  </p>
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                    Extract mission & focus areas from website
+                    {scrapeMessage || 'Extract mission & focus areas from website'}
                   </p>
                 </div>
               </div>
@@ -198,8 +232,12 @@ export function Step2OrgProfile({
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Analyzing...
                   </>
+                ) : scrapeStatus === 'error' ? (
+                  'Retry'
+                ) : scrapeStatus === 'success' ? (
+                  'Re-analyze'
                 ) : (
-                  'Re-analyze Website'
+                  'Analyze Website'
                 )}
               </V3Button>
             </div>
