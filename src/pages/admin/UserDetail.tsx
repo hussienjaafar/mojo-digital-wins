@@ -274,18 +274,23 @@ export default function UserDetail() {
   return (
     <div className="container max-w-4xl mx-auto py-8 px-4 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+      <div className="flex items-center gap-4 relative z-10">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => navigate(-1)}
+          className="shrink-0"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <User className="h-6 w-6" />
             User Details
           </h1>
-          <p className="text-muted-foreground">{user.email}</p>
+          <p className="text-muted-foreground truncate">{user.email}</p>
         </div>
-        <Badge variant={user.is_active ? "default" : "destructive"}>
+        <Badge variant={user.is_active ? "default" : "destructive"} className="shrink-0">
           {user.is_active ? "Active" : "Inactive"}
         </Badge>
       </div>
