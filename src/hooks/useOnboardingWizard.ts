@@ -89,7 +89,7 @@ export function useOnboardingWizard(
     }
   }, [toast]);
 
-  // Initialize onboarding for a new org
+  // Initialize onboarding for a new org - marks step 1 as complete and advances to step 2
   const initializeOnboarding = useCallback(async (orgId: string) => {
     setIsSaving(true);
     setError(null);
@@ -98,12 +98,13 @@ export function useOnboardingWizard(
       const { data: session } = await supabase.auth.getSession();
       const userId = session?.session?.user?.id;
       
+      // Step 1 is already complete (org was just created), so we start at step 2
       const { data, error: insertError } = await (supabase as any)
         .from('org_onboarding_state')
         .upsert({
           organization_id: orgId,
-          current_step: 1,
-          completed_steps: [],
+          current_step: 2,
+          completed_steps: [1],
           step_data: {},
           status: 'in_progress',
           created_by: userId,
@@ -117,8 +118,8 @@ export function useOnboardingWizard(
       if (insertError) throw insertError;
       
       setStateId(data.id);
-      setCurrentStep(1);
-      setCompletedSteps([]);
+      setCurrentStep(2);
+      setCompletedSteps([1]);
       setStatus('in_progress');
       setStepData({});
       
@@ -127,7 +128,7 @@ export function useOnboardingWizard(
         _organization_id: orgId,
         _action_type: 'started',
         _step: 1,
-        _details: { initialized: true },
+        _details: { initialized: true, step1_completed: true },
       });
       
     } catch (err: any) {
