@@ -237,6 +237,9 @@ verify_jwt = false
 [functions.send-notification-email]
 verify_jwt = false
 
+[functions.send-user-invitation]
+verify_jwt = false
+
 # --- OTHER FUNCTIONS ---
 [functions.fetch-bill-text]
 verify_jwt = false
