@@ -49,6 +49,8 @@ import { CoverageGovernancePanel } from "@/components/admin/v3";
 import { OnboardingWizard } from "@/components/admin/onboarding/OnboardingWizard";
 import { IntegrationsHub } from "@/components/admin/integrations/IntegrationsHub";
 import { AuditActivityCenter } from "@/components/admin/audit/AuditActivityCenter";
+import { BulkOperations } from "@/components/admin/bulk/BulkOperations";
+import { EnvironmentBanner } from "@/components/admin/EnvironmentBanner";
 
 type ContactSubmission = {
   id: string;
@@ -333,6 +335,8 @@ const Admin = () => {
         return <OnboardingWizard />;
       case "client-users":
         return <ClientUserManager />;
+      case "bulk-ops":
+        return <BulkOperations />;
       case "integrations-hub":
         return <IntegrationsHub />;
       case "audit-activity":
@@ -412,6 +416,10 @@ const Admin = () => {
               <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
               <div className="flex-1 flex flex-col min-w-0">
+                {/* Environment indicator for non-production */}
+                <EnvironmentBanner 
+                  environment={import.meta.env.MODE === "production" ? "production" : "development"} 
+                />
                 {/* Mobile-optimized header with breadcrumb */}
                 <header className="portal-header">
               <div className="flex flex-col">
