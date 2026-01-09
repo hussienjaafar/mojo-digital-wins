@@ -37,6 +37,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Install = lazy(() => import("./pages/Install"));
 const AccessDenied = lazy(() => import("./pages/AccessDenied"));
 const BillDetail = lazy(() => import("./pages/BillDetail"));
+const MetaOAuthCallback = lazy(() => import("./pages/MetaOAuthCallback"));
 
 // Admin pages (lazy loaded - larger bundle)
 const Admin = lazy(() => import("./pages/Admin"));
@@ -98,6 +99,7 @@ const AppContent = () => {
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/bills/:billNumber" element={<BillDetail />} />
+            <Route path="/meta-oauth-callback" element={<MetaOAuthCallback />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/install" element={<Install />} />
             <Route path="/auth" element={<Auth />} />

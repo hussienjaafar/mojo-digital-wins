@@ -34,63 +34,62 @@ export function MetaOAuthFlow({ organizationId, onComplete, onCancel }: MetaOAut
   const [expiresIn, setExpiresIn] = useState<number>(0);
   const [error, setError] = useState<string>('');
 
-  // Handle OAuth callback from URL
+  // Handle OAuth callback via message from popup
   useEffect(() => {
-    const handleCallback = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      const state = urlParams.get('state');
-      const errorParam = urlParams.get('error');
-      const errorDescription = urlParams.get('error_description');
-
-      if (errorParam) {
-        setError(errorDescription || errorParam);
-        return;
-      }
-
-      if (code && state) {
-        // Clear URL params
-        window.history.replaceState({}, '', window.location.pathname);
+    const handleMessage = async (event: MessageEvent) => {
+      // Only accept messages from same origin
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data?.type === 'META_OAUTH_CALLBACK') {
+        const { code, state, error: oauthError, errorDescription } = event.data;
         
-        setIsLoading(true);
-        setStep('selecting');
+        if (oauthError) {
+          setError(errorDescription || oauthError);
+          return;
+        }
 
-        try {
-          const { data, error: fnError } = await supabase.functions.invoke('meta-oauth-callback', {
-            body: {
-              code,
-              state,
-              redirectUri: `${window.location.origin}/admin`,
-            },
-          });
+        if (code && state) {
+          setIsLoading(true);
+          setStep('selecting');
 
-          if (fnError) throw fnError;
-          if (data.error) throw new Error(data.error);
+          try {
+            const { data, error: fnError } = await supabase.functions.invoke('meta-oauth-callback', {
+              body: {
+                code,
+                state,
+                redirectUri: `${window.location.origin}/meta-oauth-callback`,
+              },
+            });
 
-          setMetaUser(data.metaUser);
-          setAdAccounts(data.adAccounts || []);
-          setAccessToken(data.accessToken);
-          setExpiresIn(data.expiresIn);
+            if (fnError) throw fnError;
+            if (data.error) throw new Error(data.error);
 
-          if (data.adAccounts?.length === 1) {
-            setSelectedAccountId(data.adAccounts[0].id);
+            setMetaUser(data.metaUser);
+            setAdAccounts(data.adAccounts || []);
+            setAccessToken(data.accessToken);
+            setExpiresIn(data.expiresIn);
+
+            if (data.adAccounts?.length === 1) {
+              setSelectedAccountId(data.adAccounts[0].id);
+            }
+
+            toast({
+              title: 'Connected to Meta',
+              description: `Logged in as ${data.metaUser.name}. Select an ad account.`,
+            });
+          } catch (err: any) {
+            console.error('OAuth callback error:', err);
+            setError(err.message || 'Failed to complete OAuth');
+            setStep('init');
+          } finally {
+            setIsLoading(false);
           }
-
-          toast({
-            title: 'Connected to Meta',
-            description: `Logged in as ${data.metaUser.name}. Select an ad account.`,
-          });
-        } catch (err: any) {
-          console.error('OAuth callback error:', err);
-          setError(err.message || 'Failed to complete OAuth');
-          setStep('init');
-        } finally {
-          setIsLoading(false);
         }
       }
     };
 
-    handleCallback();
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, [toast]);
 
   const handleStartOAuth = async () => {
@@ -101,18 +100,28 @@ export function MetaOAuthFlow({ organizationId, onComplete, onCancel }: MetaOAut
       const { data, error: fnError } = await supabase.functions.invoke('meta-oauth-init', {
         body: {
           organizationId,
-          redirectUri: `${window.location.origin}/admin`,
+          redirectUri: `${window.location.origin}/meta-oauth-callback`,
         },
       });
 
       if (fnError) throw fnError;
       if (data.error) throw new Error(data.error);
 
-      // Redirect to Meta OAuth
-      window.location.href = data.authUrl;
+      // Open Meta OAuth in a popup window
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      window.open(
+        data.authUrl,
+        'meta-oauth',
+        `width=${width},height=${height},left=${left},top=${top},popup=yes`
+      );
     } catch (err: any) {
       console.error('OAuth init error:', err);
       setError(err.message || 'Failed to start OAuth');
+    } finally {
       setIsLoading(false);
     }
   };
