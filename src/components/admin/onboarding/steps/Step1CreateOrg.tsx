@@ -32,6 +32,27 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
       .replace(/^-+|-+$/g, '');
   };
 
+  const isValidEmail = (value: string) => {
+    // Simple, pragmatic validation (we still let the backend be the source of truth)
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  };
+
+  const normalizeHttpUrl = (value: string): string | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+
+    // Users often paste domains without protocol; normalize to https://
+    const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+    try {
+      const url = new URL(withProtocol);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+      return url.toString();
+    } catch {
+      return null;
+    }
+  };
+
   const handleNameChange = (name: string) => {
     const newData = {
       ...formData,
@@ -50,7 +71,9 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // We intentionally use custom validation because optional email/url fields
+    // can cause the browser to block submit silently.
     if (!formData.name.trim() || !formData.slug.trim()) {
       toast({
         title: 'Validation Error',
@@ -60,17 +83,54 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
       return;
     }
 
+    const email = formData.primary_contact_email.trim();
+    if (email && !isValidEmail(email)) {
+      toast({
+        title: 'Invalid email',
+        description: 'Please enter a valid email address (or leave it blank).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const websiteUrl = normalizeHttpUrl(formData.website_url);
+    if (websiteUrl === null) {
+      toast({
+        title: 'Invalid website URL',
+        description: 'Please enter a valid website URL (e.g. https://example.org) or leave it blank.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const logoUrl = normalizeHttpUrl(formData.logo_url);
+    if (logoUrl === null) {
+      toast({
+        title: 'Invalid logo URL',
+        description: 'Please enter a valid logo URL (e.g. https://example.org/logo.png) or leave it blank.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const normalizedData: CreateOrgData = {
+      ...formData,
+      primary_contact_email: email,
+      website_url: websiteUrl,
+      logo_url: logoUrl,
+    };
+
     setIsSubmitting(true);
-    
+
     try {
       // Create the organization
       const { data: org, error: orgError } = await (supabase as any)
         .from('client_organizations')
         .insert({
-          name: formData.name.trim(),
-          slug: formData.slug.trim(),
-          primary_contact_email: formData.primary_contact_email?.trim() || null,
-          logo_url: formData.logo_url?.trim() || null,
+          name: normalizedData.name.trim(),
+          slug: normalizedData.slug.trim(),
+          primary_contact_email: normalizedData.primary_contact_email?.trim() || null,
+          logo_url: normalizedData.logo_url?.trim() || null,
           is_active: true,
         })
         .select()
@@ -84,18 +144,18 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
         _table_affected: 'client_organizations',
         _record_id: org.id,
         _new_value: {
-          name: formData.name,
-          slug: formData.slug,
-          primary_contact_email: formData.primary_contact_email || null,
+          name: normalizedData.name,
+          slug: normalizedData.slug,
+          primary_contact_email: normalizedData.primary_contact_email || null,
         },
       });
 
       toast({
         title: 'Organization Created',
-        description: `${formData.name} has been created successfully`,
+        description: `${normalizedData.name} has been created successfully`,
       });
 
-      onComplete(org.id, formData);
+      onComplete(org.id, normalizedData);
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -108,7 +168,7 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} noValidate className="space-y-6">
       <Card className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]">
         <CardHeader>
           <div className="flex items-center gap-3">
