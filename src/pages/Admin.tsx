@@ -48,6 +48,7 @@ import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
 import { CoverageGovernancePanel } from "@/components/admin/v3";
 import { OnboardingWizard } from "@/components/admin/onboarding/OnboardingWizard";
 import { IntegrationsHub } from "@/components/admin/integrations/IntegrationsHub";
+import { AuditActivityCenter } from "@/components/admin/audit/AuditActivityCenter";
 
 type ContactSubmission = {
   id: string;
@@ -334,6 +335,8 @@ const Admin = () => {
         return <ClientUserManager />;
       case "integrations-hub":
         return <IntegrationsHub />;
+      case "audit-activity":
+        return <AuditActivityCenter />;
       case "api-credentials":
         return <APICredentialsManager />;
       case "attribution":

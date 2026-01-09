@@ -122,7 +122,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { title: "Operations", icon: Activity, value: "scheduler", requiredRole: 'admin' },
       { title: "Coverage Governance", icon: Layers, value: "coverage-governance", requiredRole: 'admin' },
-      { title: "API & Credentials", icon: Key, value: "api-credentials", requiredRole: 'admin' },
+      { title: "Audit & Activity", icon: FileText, value: "audit-activity", requiredRole: 'admin' },
       { title: "Audit Logs", icon: FileText, value: "audit-logs", requiredRole: 'admin' },
     ],
   },
