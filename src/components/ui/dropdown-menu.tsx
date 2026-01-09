@@ -61,6 +61,7 @@ const DropdownMenuSubContent = React.forwardRef<
       "data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
       className,
     )}
+    style={{ pointerEvents: "auto" }}
     {...props}
   />
 ));
@@ -91,6 +92,7 @@ const DropdownMenuContent = React.forwardRef<
         "data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         className,
       )}
+      style={{ pointerEvents: "auto" }}
       {...props}
     />
   </DropdownMenuPrimitive.Portal>

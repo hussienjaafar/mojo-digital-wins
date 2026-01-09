@@ -30,6 +30,7 @@ const DialogOverlay = React.forwardRef<
       "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className,
     )}
+    style={{ pointerEvents: "auto" }}
     {...props}
   />
 ));
@@ -62,6 +63,7 @@ const DialogContent = React.forwardRef<
         "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
         className,
       )}
+      style={{ pointerEvents: "auto" }}
       {...props}
     >
       {children}

@@ -86,6 +86,7 @@ const SelectContent = React.forwardRef<
         className,
       )}
       position={position}
+      style={{ pointerEvents: "auto" }}
       {...props}
     >
       <SelectScrollUpButton />
