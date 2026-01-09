@@ -212,6 +212,12 @@ verify_jwt = false
 [functions.reset-client-password]
 verify_jwt = true
 
+[functions.terminate-user-sessions]
+verify_jwt = true
+
+[functions.unlock-account]
+verify_jwt = true
+
 [functions.scrape-organization-website]
 verify_jwt = true
 

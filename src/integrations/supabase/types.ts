@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_lockouts: {
+        Row: {
+          created_at: string
+          failed_attempts: number
+          id: string
+          is_active: boolean
+          locked_at: string
+          reason: string
+          unlock_at: string
+          unlocked_at: string | null
+          unlocked_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          failed_attempts?: number
+          id?: string
+          is_active?: boolean
+          locked_at?: string
+          reason?: string
+          unlock_at: string
+          unlocked_at?: string | null
+          unlocked_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          failed_attempts?: number
+          id?: string
+          is_active?: boolean
+          locked_at?: string
+          reason?: string
+          unlock_at?: string
+          unlocked_at?: string | null
+          unlocked_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       actblue_transactions: {
         Row: {
           ab_test_name: string | null
@@ -2137,6 +2176,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           logo_url: string | null
+          mfa_grace_period_days: number | null
+          mfa_required: boolean | null
           name: string
           primary_contact_email: string | null
           slug: string
@@ -2147,6 +2188,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
+          mfa_grace_period_days?: number | null
+          mfa_required?: boolean | null
           name: string
           primary_contact_email?: string | null
           slug: string
@@ -2157,6 +2200,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
+          mfa_grace_period_days?: number | null
+          mfa_required?: boolean | null
           name?: string
           primary_contact_email?: string | null
           slug?: string
@@ -4926,6 +4971,36 @@ export type Database = {
         }
         Relationships: []
       }
+      mfa_enrollment_log: {
+        Row: {
+          action: string
+          id: string
+          ip_address: string | null
+          method: string
+          performed_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          id?: string
+          ip_address?: string | null
+          method: string
+          performed_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          id?: string
+          ip_address?: string | null
+          method?: string
+          performed_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string | null
@@ -6244,8 +6319,11 @@ export type Database = {
           id: string
           is_active: boolean
           last_sign_in_at: string | null
+          mfa_enabled_at: string | null
+          mfa_method: string | null
           onboarding_completed: boolean | null
           onboarding_completed_at: string | null
+          session_revoked_at: string | null
           updated_at: string
         }
         Insert: {
@@ -6254,8 +6332,11 @@ export type Database = {
           id: string
           is_active?: boolean
           last_sign_in_at?: string | null
+          mfa_enabled_at?: string | null
+          mfa_method?: string | null
           onboarding_completed?: boolean | null
           onboarding_completed_at?: string | null
+          session_revoked_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -6264,8 +6345,11 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_sign_in_at?: string | null
+          mfa_enabled_at?: string | null
+          mfa_method?: string | null
           onboarding_completed?: boolean | null
           onboarding_completed_at?: string | null
+          session_revoked_at?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -6860,6 +6944,33 @@ export type Database = {
           negative_count?: number | null
           neutral_count?: number | null
           positive_count?: number | null
+        }
+        Relationships: []
+      }
+      session_revocation_log: {
+        Row: {
+          id: string
+          reason: string | null
+          revoked_at: string
+          revoked_by: string
+          sessions_terminated: number | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          reason?: string | null
+          revoked_at?: string
+          revoked_by: string
+          sessions_terminated?: number | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          reason?: string | null
+          revoked_at?: string
+          revoked_by?: string
+          sessions_terminated?: number | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -10851,6 +10962,10 @@ export type Database = {
       }
       check_authenticated_access: { Args: never; Returns: boolean }
       check_contact_rate_limit: { Args: never; Returns: boolean }
+      check_failed_attempts_and_lock: {
+        Args: { _user_id: string }
+        Returns: Json
+      }
       check_pipeline_deadman: {
         Args: never
         Returns: {
@@ -11158,6 +11273,7 @@ export type Database = {
         Args: { content_hash_param: string }
         Returns: undefined
       }
+      is_account_locked: { Args: { _user_id: string }; Returns: boolean }
       is_client_admin: { Args: never; Returns: boolean }
       is_org_admin_or_manager: { Args: never; Returns: boolean }
       is_system_admin: { Args: never; Returns: boolean }
@@ -11240,6 +11356,10 @@ export type Database = {
       resolve_job_failure: {
         Args: { p_failure_id: string }
         Returns: undefined
+      }
+      unlock_account: {
+        Args: { _admin_id: string; _user_id: string }
+        Returns: boolean
       }
       update_bluesky_trends: {
         Args: never
@@ -11324,6 +11444,7 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: boolean
       }
+      user_needs_mfa: { Args: { _user_id: string }; Returns: Json }
       verify_admin_invite_code: {
         Args: { invite_code: string; user_id: string }
         Returns: boolean
