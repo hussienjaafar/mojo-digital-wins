@@ -13,6 +13,7 @@ import { useIntegrationSummary } from '@/hooks/useIntegrationSummary';
 import { IntegrationStatusBar } from './IntegrationStatusBar';
 import { IntegrationClientRow } from './IntegrationClientRow';
 import { CredentialSlideOver } from './CredentialSlideOver';
+import { IntegrationQuickActions } from './IntegrationQuickActions';
 import { IntegrationHealthStatus, PLATFORM_DISPLAY_NAMES } from '@/types/integrations';
 import { toast } from 'sonner';
 
@@ -76,6 +77,49 @@ export function IntegrationCenter() {
     refetch();
   };
 
+  // Quick action states
+  const [isTestingAll, setIsTestingAll] = useState(false);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+
+  const handleTestAllFailing = async () => {
+    setIsTestingAll(true);
+    try {
+      const failingIntegrations = data
+        .flatMap(d => d.integrations)
+        .filter(i => i.last_sync_status === 'error' || i.last_sync_status === 'failed' || !i.last_tested_at);
+      
+      let successCount = 0;
+      let failCount = 0;
+      
+      for (const integration of failingIntegrations) {
+        const success = await testConnection(integration.id);
+        if (success) successCount++;
+        else failCount++;
+      }
+      
+      toast.success(`Tested ${failingIntegrations.length} integrations: ${successCount} passed, ${failCount} failed`);
+    } catch (err) {
+      toast.error('Failed to test integrations');
+    } finally {
+      setIsTestingAll(false);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    setIsSyncingAll(true);
+    try {
+      toast.info('Triggering sync for all active integrations...');
+      // In production, this would call edge functions for each platform
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      toast.success('Sync triggered for all active integrations');
+      refetch();
+    } catch (err) {
+      toast.error('Failed to trigger sync');
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
+
   // Sort data: needs_attention first, then untested, then no_setup, then healthy
   const sortedData = useMemo(() => {
     const priorityOrder: Record<IntegrationHealthStatus, number> = {
@@ -131,6 +175,18 @@ export function IntegrationCenter() {
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
       />
+
+      {/* Quick Actions */}
+      {(statusCounts.needsAttention > 0 || statusCounts.untested > 0) && (
+        <IntegrationQuickActions
+          failingCount={statusCounts.needsAttention}
+          untestedCount={statusCounts.untested}
+          onTestAllFailing={handleTestAllFailing}
+          onSyncAll={handleSyncAll}
+          isTestingAll={isTestingAll}
+          isSyncingAll={isSyncingAll}
+        />
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-4">

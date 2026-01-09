@@ -5,10 +5,10 @@ import {
   Circle, 
   HelpCircle,
   Loader2,
-  Play,
   Power,
   Settings,
-  RefreshCw
+  RefreshCw,
+  Link2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,7 @@ import {
   PLATFORM_ICONS 
 } from '@/types/integrations';
 import { formatDistanceToNow } from 'date-fns';
+import { ErrorTypeBadge } from './ErrorTypeBadge';
 
 interface IntegrationCardProps {
   integration: IntegrationDetail;
@@ -101,15 +102,19 @@ export function IntegrationCard({
       <div className="flex items-center gap-3">
         <span className="text-xl">{platformIcon}</span>
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium">{platformName}</span>
             {getStatusIcon()}
-            <Badge 
-              variant={hasError ? "destructive" : integration.is_active ? "default" : "secondary"}
-              className="text-xs"
-            >
-              {getStatusText()}
-            </Badge>
+            {hasError ? (
+              <ErrorTypeBadge errorMessage={integration.last_sync_error} />
+            ) : (
+              <Badge 
+                variant={integration.is_active ? "default" : "secondary"}
+                className="text-xs"
+              >
+                {getStatusText()}
+              </Badge>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">{getLastSyncText()}</p>
         </div>
@@ -165,12 +170,13 @@ export function IntegrationCard({
                   variant="outline"
                   size="sm"
                   onClick={() => onEdit(integration.id)}
-                  className="text-destructive border-destructive/50"
+                  className="text-destructive border-destructive/50 gap-1"
                 >
-                  Fix
+                  <Link2 className="h-3 w-3" />
+                  Reconnect
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Update credentials</TooltipContent>
+              <TooltipContent>Update credentials to fix this integration</TooltipContent>
             </Tooltip>
           )}
 
