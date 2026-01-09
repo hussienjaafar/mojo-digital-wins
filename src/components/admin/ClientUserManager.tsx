@@ -30,9 +30,14 @@ type ClientUser = {
   full_name: string;
   organization_id: string;
   role: string;
+  status: 'pending' | 'active' | 'inactive' | 'suspended';
   created_at: string;
   last_login_at: string | null;
 };
+
+// Valid org roles
+const ORG_ROLES = ['admin', 'manager', 'editor', 'viewer'] as const;
+type OrgRole = typeof ORG_ROLES[number];
 
 const ClientUserManager = () => {
   const { toast } = useToast();
@@ -376,21 +381,22 @@ const ClientUserManager = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <V3Button variant="primary" className="w-full sm:w-auto" leftIcon={<UserPlus className="w-4 h-4" />}>
-                  Add User
+                  Invite User
                 </V3Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setShowCreateDialog(true)}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Create User Directly
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {organizations.slice(0, 5).map((org) => (
-                  <DropdownMenuItem key={org.id} onClick={() => handleInvite(org)}>
-                    <Send className="w-4 h-4 mr-2" />
-                    Invite to {org.name}
+                {organizations.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    No organizations available
                   </DropdownMenuItem>
-                ))}
+                ) : (
+                  organizations.slice(0, 8).map((org) => (
+                    <DropdownMenuItem key={org.id} onClick={() => handleInvite(org)}>
+                      <Send className="w-4 h-4 mr-2" />
+                      Invite to {org.name}
+                    </DropdownMenuItem>
+                  ))
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -431,6 +437,7 @@ const ClientUserManager = () => {
                     <TableHead>Name</TableHead>
                     <TableHead>Organization</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Last Login</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -439,8 +446,8 @@ const ClientUserManager = () => {
                 <TableBody>
                   {users.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
-                        No users yet. Create your first one!
+                      <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        No users yet. Invite your first member!
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -451,7 +458,20 @@ const ClientUserManager = () => {
                           {getOrganizationName(user.organization_id)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{user.role}</Badge>
+                          <Badge variant="outline" className="capitalize">{user.role}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={user.status === 'active' ? 'default' : 'secondary'}
+                            className={
+                              user.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                              user.status === 'suspended' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                              user.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                              'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                            }
+                          >
+                            {user.status || 'active'}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {user.last_login_at
@@ -578,9 +598,10 @@ const ClientUserManager = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="viewer">Viewer</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="viewer">Viewer (read-only)</SelectItem>
+                  <SelectItem value="editor">Editor (basic editing)</SelectItem>
+                  <SelectItem value="manager">Manager (full editing)</SelectItem>
+                  <SelectItem value="admin">Admin (full access)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -663,9 +684,10 @@ const ClientUserManager = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="viewer">Viewer</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="viewer">Viewer (read-only)</SelectItem>
+                  <SelectItem value="editor">Editor (basic editing)</SelectItem>
+                  <SelectItem value="manager">Manager (full editing)</SelectItem>
+                  <SelectItem value="admin">Admin (full access)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

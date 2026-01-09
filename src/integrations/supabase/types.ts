@@ -2173,6 +2173,7 @@ export type Database = {
           mask_pii: boolean | null
           organization_id: string
           role: string | null
+          status: Database["public"]["Enums"]["user_status"]
         }
         Insert: {
           created_at?: string | null
@@ -2182,6 +2183,7 @@ export type Database = {
           mask_pii?: boolean | null
           organization_id: string
           role?: string | null
+          status?: Database["public"]["Enums"]["user_status"]
         }
         Update: {
           created_at?: string | null
@@ -2191,6 +2193,7 @@ export type Database = {
           mask_pii?: boolean | null
           organization_id?: string
           role?: string | null
+          status?: Database["public"]["Enums"]["user_status"]
         }
         Relationships: [
           {
@@ -11329,6 +11332,8 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       creative_type: "image" | "video" | "carousel" | "collection" | "slideshow"
+      org_role: "admin" | "manager" | "editor" | "viewer"
+      user_status: "pending" | "active" | "inactive" | "suspended"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -11458,6 +11463,8 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       creative_type: ["image", "video", "carousel", "collection", "slideshow"],
+      org_role: ["admin", "manager", "editor", "viewer"],
+      user_status: ["pending", "active", "inactive", "suspended"],
     },
   },
 } as const
