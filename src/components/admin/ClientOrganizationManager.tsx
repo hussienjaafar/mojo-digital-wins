@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Building2, Plus, Eye, LogIn, MoreVertical, Search, Users, Plug, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Filter, Command, RefreshCw } from "lucide-react";
+import { Building2, Plus, Eye, LogIn, MoreVertical, Search, Users, Plug, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Filter, Command, RefreshCw, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AdminPageHeader, AdminLoadingState } from "./v3";
@@ -235,6 +235,54 @@ const ClientOrganizationManager = () => {
     }
   };
 
+  const handleDelete = async (org: Organization) => {
+    // Only allow deleting inactive orgs with 0 users
+    if (org.is_active) {
+      toast({
+        title: 'Cannot delete',
+        description: 'Deactivate the organization first before deleting it.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const stats = orgStats[org.id];
+    if (stats?.userCount && stats.userCount > 0) {
+      toast({
+        title: 'Cannot delete',
+        description: 'Remove all users from the organization first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to permanently delete "${org.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await (supabase as any)
+        .from('client_organizations')
+        .delete()
+        .eq('id', org.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Deleted',
+        description: `"${org.name}" has been permanently deleted.`,
+      });
+
+      loadOrganizations();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete organization',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handlePreviewAsClient = async (org: Organization) => {
     try {
       const { data: users, error } = await (supabase as any)
@@ -396,6 +444,18 @@ const ClientOrganizationManager = () => {
                   <DropdownMenuItem onClick={() => toggleActive(org.id, org.is_active)}>
                     {org.is_active ? "Deactivate" : "Activate"}
                   </DropdownMenuItem>
+                  {!org.is_active && (orgStats[org.id]?.userCount || 0) === 0 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => handleDelete(org)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete permanently
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -652,6 +712,18 @@ const ClientOrganizationManager = () => {
                                   <DropdownMenuItem onClick={() => toggleActive(org.id, org.is_active)}>
                                     {org.is_active ? "Deactivate" : "Activate"}
                                   </DropdownMenuItem>
+                                  {!org.is_active && (stats?.userCount || 0) === 0 && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        className="text-destructive focus:text-destructive"
+                                        onClick={() => handleDelete(org)}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete permanently
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
