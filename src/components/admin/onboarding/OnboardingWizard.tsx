@@ -3,7 +3,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useOnboardingWizard } from '@/hooks/useOnboardingWizard';
-import { WizardProgress } from './WizardProgress';
+import { WizardProgress, WIZARD_STEPS } from './WizardProgress';
+import { WizardContextHeader } from './WizardContextHeader';
 import { Step1CreateOrg } from './steps/Step1CreateOrg';
 import { Step2OrgProfile } from './steps/Step2OrgProfile';
 import { Step3Users } from './steps/Step3Users';
@@ -75,6 +76,13 @@ export function OnboardingWizard() {
 
   return (
     <div className="space-y-6">
+      {/* Context Header - shows org info, progress, save status */}
+      <WizardContextHeader
+        organizationId={organizationId}
+        currentStep={currentStep}
+        totalSteps={WIZARD_STEPS.length}
+      />
+
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate('/admin?tab=clients')}>
           <ArrowLeft className="h-4 w-4" />
@@ -116,6 +124,7 @@ export function OnboardingWizard() {
         completedSteps={completedSteps} 
         onStepClick={goToStep}
         canNavigateToStep={canNavigateToStep}
+        compact
       />
 
       <div className="max-w-3xl">
