@@ -287,7 +287,17 @@ serve(async (req) => {
       .single();
 
     if (credError || !credData) {
-      throw new Error('Meta credentials not found or inactive');
+      // Return graceful response for orgs without credentials (e.g., demo orgs)
+      console.log(`[SYNC-META-ADS] No Meta credentials found for org ${organization_id} - skipping sync`);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          skipped: true,
+          message: 'No Meta credentials configured for this organization',
+          insight_records: 0 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const credentials = credData.encrypted_credentials as unknown as MetaCredentials;
