@@ -1,23 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { V3Button } from "@/components/v3/V3Button";
-import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  AlertCircle, 
-  Search, 
-  Shield, 
-  ShieldOff, 
-  UserCheck, 
-  UserX,
-  Users as UsersIcon
-} from "lucide-react";
-import { format } from "date-fns";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { logger } from "@/lib/logger";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,8 +15,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Search, Shield, Users, Building2, UsersRound } from "lucide-react";
+import { V3Button } from "@/components/v3/V3Button";
 import {
   Select,
   SelectContent,
@@ -36,419 +25,477 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { UserAccessBadges } from "@/components/admin/UserAccessBadges";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { logger } from "@/lib/logger";
 
-type UserWithRoles = {
+interface Organization {
+  org_id: string;
+  org_name: string;
+  role: string;
+}
+
+interface UserWithRolesAndOrgs {
   id: string;
   email: string;
   created_at: string;
   last_sign_in_at: string | null;
   is_active: boolean;
   roles: string[];
-};
+  organizations: Organization[];
+}
 
 export const UserManagement = () => {
-  const { toast } = useToast();
-  const [users, setUsers] = useState<UserWithRoles[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<UserWithRoles[]>([]);
+  const [users, setUsers] = useState<UserWithRolesAndOrgs[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<UserWithRolesAndOrgs[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [accessFilter, setAccessFilter] = useState<string>("all");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    type: 'role' | 'status';
+    user: UserWithRolesAndOrgs | null;
+    action: string;
+  }>({ open: false, type: 'role', user: null, action: '' });
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
-  useEffect(() => {
-    filterUsers();
-  }, [searchTerm, roleFilter, statusFilter, users]);
-
   const fetchUsers = async () => {
+    setIsLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_users_with_roles');
+      // Try the new function first, fall back to old one
+      const { data, error } = await supabase.rpc('get_users_with_roles_and_orgs');
 
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (error) {
+      if (error) {
+        logger.warn('get_users_with_roles_and_orgs failed, falling back to get_users_with_roles', error);
+        // Fallback to old function
+        const { data: fallbackData, error: fallbackError } = await supabase.rpc('get_users_with_roles');
+        if (fallbackError) throw fallbackError;
+        
+        // Transform old data to new format
+        const transformedData = (fallbackData || []).map((user: any) => ({
+          id: user.id,
+          email: user.email,
+          created_at: user.created_at,
+          last_sign_in_at: user.last_sign_in_at,
+          is_active: user.is_active,
+          roles: user.roles || [],
+          organizations: []
+        }));
+        setUsers(transformedData);
+        setFilteredUsers(transformedData);
+        return;
+      }
+
+      // Parse organizations from JSONB
+      const parsedData = (data || []).map((user: any) => ({
+        ...user,
+        roles: user.roles || [],
+        organizations: Array.isArray(user.organizations) 
+          ? user.organizations.filter((org: any) => org.org_id)
+          : []
+      }));
+
+      setUsers(parsedData);
+      setFilteredUsers(parsedData);
+    } catch (error: any) {
+      logger.error('Failed to fetch users', error);
       toast({
         title: "Error",
-        description: "Failed to load users.",
-        variant: "destructive",
+        description: "Failed to load users",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filterUsers = () => {
-    let filtered = [...users];
+  // Filter users based on search and filters
+  useEffect(() => {
+    let result = users;
 
     // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(user => 
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      const term = searchTerm.toLowerCase();
+      result = result.filter(user =>
+        user.email?.toLowerCase().includes(term) ||
+        user.organizations.some(org => org.org_name?.toLowerCase().includes(term))
       );
     }
 
     // Role filter
     if (roleFilter !== "all") {
-      filtered = filtered.filter(user => 
-        user.roles.includes(roleFilter)
-      );
+      if (roleFilter === "admin") {
+        result = result.filter(user => user.roles.includes("admin"));
+      } else if (roleFilter === "user") {
+        result = result.filter(user => !user.roles.includes("admin"));
+      }
     }
 
-    // Status filter
-    if (statusFilter !== "all") {
-      const isActive = statusFilter === "active";
-      filtered = filtered.filter(user => user.is_active === isActive);
+    // Access filter
+    if (accessFilter !== "all") {
+      if (accessFilter === "platform-only") {
+        result = result.filter(user => user.roles.includes("admin") && user.organizations.length === 0);
+      } else if (accessFilter === "org-only") {
+        result = result.filter(user => !user.roles.includes("admin") && user.organizations.length > 0);
+      } else if (accessFilter === "dual") {
+        result = result.filter(user => user.roles.includes("admin") && user.organizations.length > 0);
+      }
     }
 
-    setFilteredUsers(filtered);
-  };
+    setFilteredUsers(result);
+  }, [users, searchTerm, roleFilter, accessFilter]);
 
-  const toggleUserRole = async (userId: string, role: 'admin' | 'user', hasRole: boolean) => {
+  // Stats calculations
+  const stats = useMemo(() => {
+    const total = users.length;
+    const platformAdmins = users.filter(u => u.roles.includes("admin")).length;
+    const orgMembers = users.filter(u => u.organizations.length > 0).length;
+    const dualAccess = users.filter(u => u.roles.includes("admin") && u.organizations.length > 0).length;
+    
+    return { total, platformAdmins, orgMembers, dualAccess };
+  }, [users]);
+
+  const toggleUserRole = async (user: UserWithRolesAndOrgs) => {
+    const hasAdminRole = user.roles.includes("admin");
+    
     try {
-      if (hasRole) {
-        // Remove role
+      if (hasAdminRole) {
+        // Remove admin role
         const { error } = await supabase
           .from('user_roles')
           .delete()
-          .eq('user_id', userId)
-          .eq('role', role);
-
+          .eq('user_id', user.id)
+          .eq('role', 'admin');
+        
         if (error) throw error;
-
-        // Log the action
-        await supabase.rpc('log_admin_action', {
-          _action_type: 'remove_role',
-          _table_affected: 'user_roles',
-          _record_id: userId,
-          _old_value: { role },
-        });
-
-        toast({
-          title: "Role removed",
-          description: `${role} role removed from user.`,
-        });
       } else {
-        // Add role
+        // Add admin role
         const { error } = await supabase
           .from('user_roles')
-          .insert({ user_id: userId, role });
-
+          .insert({ user_id: user.id, role: 'admin' });
+        
         if (error) throw error;
+      }
 
-        // Log the action
+      // Log the action
+      const { data: session } = await supabase.auth.getSession();
+      if (session?.session?.user) {
         await supabase.rpc('log_admin_action', {
-          _action_type: 'add_role',
+          _action_type: hasAdminRole ? 'REMOVE_ADMIN_ROLE' : 'ADD_ADMIN_ROLE',
           _table_affected: 'user_roles',
-          _record_id: userId,
-          _new_value: { role },
-        });
-
-        toast({
-          title: "Role added",
-          description: `${role} role granted to user.`,
+          _record_id: user.id,
+          _old_value: hasAdminRole ? { role: 'admin' } : null,
+          _new_value: hasAdminRole ? null : { role: 'admin' }
         });
       }
 
+      toast({
+        title: "Success",
+        description: hasAdminRole 
+          ? "Platform admin role removed" 
+          : "Platform admin role granted"
+      });
+
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to toggle user role', error);
       toast({
         title: "Error",
-        description: "Failed to update user role.",
-        variant: "destructive",
+        description: error.message || "Failed to update role",
+        variant: "destructive"
       });
     }
+    
+    setConfirmDialog({ open: false, type: 'role', user: null, action: '' });
   };
 
-  const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
+  const toggleUserStatus = async (user: UserWithRolesAndOrgs) => {
     try {
-      const newStatus = !currentStatus;
-      
       const { error } = await supabase
         .from('profiles')
-        .update({ is_active: newStatus })
-        .eq('id', userId);
+        .update({ is_active: !user.is_active })
+        .eq('id', user.id);
 
       if (error) throw error;
 
       // Log the action
-      await supabase.rpc('log_admin_action', {
-        _action_type: newStatus ? 'activate_user' : 'deactivate_user',
-        _table_affected: 'profiles',
-        _record_id: userId,
-        _old_value: { is_active: currentStatus },
-        _new_value: { is_active: newStatus },
-      });
+      const { data: session } = await supabase.auth.getSession();
+      if (session?.session?.user) {
+        await supabase.rpc('log_admin_action', {
+          _action_type: user.is_active ? 'DEACTIVATE_USER' : 'ACTIVATE_USER',
+          _table_affected: 'profiles',
+          _record_id: user.id,
+          _old_value: { is_active: user.is_active },
+          _new_value: { is_active: !user.is_active }
+        });
+      }
 
       toast({
-        title: "Status updated",
-        description: `User ${newStatus ? 'activated' : 'deactivated'} successfully.`,
+        title: "Success",
+        description: user.is_active ? "User deactivated" : "User activated"
       });
 
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to toggle user status', error);
       toast({
         title: "Error",
-        description: "Failed to update user status.",
-        variant: "destructive",
+        description: error.message || "Failed to update status",
+        variant: "destructive"
       });
     }
+    
+    setConfirmDialog({ open: false, type: 'status', user: null, action: '' });
   };
 
   if (isLoading) {
     return (
-      <div className="space-y-6 portal-animate-fade-in">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
-            <UsersIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">User Management</h2>
-            <p className="text-sm portal-text-secondary">Loading users...</p>
-          </div>
-        </div>
-        <div className="portal-card p-6">
-          <div className="space-y-3">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 portal-animate-fade-in" style={{ animationDelay: `${i * 50}ms` }}>
-                <div className="portal-skeleton h-10 w-10 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <div className="portal-skeleton h-4 w-2/3" />
-                  <div className="portal-skeleton h-3 w-1/3" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-purple-600" />
+            Platform Admins
+          </CardTitle>
+          <CardDescription>Loading users...</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </CardContent>
+      </Card>
     );
   }
 
-  const stats = {
-    total: users.length,
-    admins: users.filter(u => u.roles.includes('admin')).length,
-    active: users.filter(u => u.is_active).length,
-    inactive: users.filter(u => !u.is_active).length,
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <UsersIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Admins</CardTitle>
-            <Shield className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.admins}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
-            <UserCheck className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.active}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inactive</CardTitle>
-            <UserX className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.inactive}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* User Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Users</CardTitle>
-          <CardDescription>
-            Manage user accounts and permissions
-          </CardDescription>
-          <div className="flex flex-col sm:flex-row gap-4 mt-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="user">User</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-purple-600" />
+              Platform Admins
+            </CardTitle>
+            <CardDescription>
+              Manage users with platform-wide administrative access to this dashboard
+            </CardDescription>
           </div>
-        </CardHeader>
-        <CardContent>
-          {filteredUsers.length === 0 ? (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                No users found matching your filters.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Roles</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Last Sign In</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => {
-                    const isAdmin = user.roles.includes('admin');
-                    return (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.email}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {user.roles.length === 0 ? (
-                              <Badge variant="outline">No roles</Badge>
-                            ) : (
-                              user.roles.map(role => (
-                                <Badge 
-                                  key={role}
-                                  variant={role === 'admin' ? 'default' : 'secondary'}
-                                >
-                                  {role}
-                                </Badge>
-                              ))
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={user.is_active ? 'default' : 'destructive'}>
-                            {user.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(user.created_at), 'MMM dd, yyyy')}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {user.last_sign_in_at 
-                            ? format(new Date(user.last_sign_in_at), 'MMM dd, yyyy')
-                            : 'Never'
-                          }
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <V3Button 
-                                  variant={isAdmin ? "destructive" : "primary"} 
-                                  size="sm"
-                                >
-                                  {isAdmin ? <ShieldOff className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
-                                </V3Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    {isAdmin ? 'Remove Admin Role' : 'Grant Admin Role'}
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    {isAdmin 
-                                      ? `Are you sure you want to remove admin privileges from ${user.email}?`
-                                      : `Are you sure you want to grant admin privileges to ${user.email}?`
-                                    }
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => toggleUserRole(user.id, 'admin', isAdmin)}
-                                  >
-                                    Confirm
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+          
+          <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+            <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-blue-900 dark:text-blue-100">
+              <strong>Platform admins</strong> have full access to this admin dashboard. 
+              For organization-specific user management, see <strong>Organization Members</strong> in the Clients section.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </CardHeader>
 
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <V3Button 
-                                  variant={user.is_active ? "secondary" : "primary"}
-                                  size="sm"
-                                >
-                                  {user.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                                </V3Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    {user.is_active ? 'Deactivate User' : 'Activate User'}
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    {user.is_active
-                                      ? `Deactivating ${user.email} will prevent them from accessing the system.`
-                                      : `Activating ${user.email} will restore their access to the system.`
-                                    }
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => toggleUserStatus(user.id, user.is_active)}
-                                  >
-                                    Confirm
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+      <CardContent className="space-y-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+              <Users className="h-4 w-4" />
+              Total Users
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            <p className="text-2xl font-semibold">{stats.total}</p>
+          </div>
+          <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-950/50">
+            <div className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 mb-1">
+              <Shield className="h-4 w-4" />
+              Platform Admins
+            </div>
+            <p className="text-2xl font-semibold text-purple-900 dark:text-purple-100">{stats.platformAdmins}</p>
+          </div>
+          <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/50">
+            <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 mb-1">
+              <Building2 className="h-4 w-4" />
+              Org Members
+            </div>
+            <p className="text-2xl font-semibold text-blue-900 dark:text-blue-100">{stats.orgMembers}</p>
+          </div>
+          <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/50">
+            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 mb-1">
+              <UsersRound className="h-4 w-4" />
+              Dual Access
+            </div>
+            <p className="text-2xl font-semibold text-green-900 dark:text-green-100">{stats.dualAccess}</p>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by email or organization..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Filter by role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="admin">Admins Only</SelectItem>
+              <SelectItem value="user">Non-Admins</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={accessFilter} onValueChange={setAccessFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Filter by access" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Access Types</SelectItem>
+              <SelectItem value="platform-only">Platform Only</SelectItem>
+              <SelectItem value="org-only">Org Only</SelectItem>
+              <SelectItem value="dual">Dual Access</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Users Table */}
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Email</TableHead>
+                <TableHead>Access</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Last Sign In</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    {searchTerm || roleFilter !== "all" || accessFilter !== "all"
+                      ? "No users match your filters"
+                      : "No users found"
+                    }
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{user.email}</TableCell>
+                    <TableCell>
+                      <UserAccessBadges
+                        platformRoles={user.roles}
+                        organizations={user.organizations}
+                        compact
+                        maxOrgsToShow={2}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={user.is_active ? "default" : "secondary"}>
+                        {user.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {user.last_sign_in_at
+                        ? new Date(user.last_sign_in_at).toLocaleDateString()
+                        : "Never"
+                      }
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <V3Button
+                          variant={user.roles.includes("admin") ? "destructive" : "outline"}
+                          size="sm"
+                          onClick={() => setConfirmDialog({
+                            open: true,
+                            type: 'role',
+                            user,
+                            action: user.roles.includes("admin") ? "remove" : "grant"
+                          })}
+                        >
+                          {user.roles.includes("admin") ? "Remove Admin" : "Make Admin"}
+                        </V3Button>
+                        <V3Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfirmDialog({
+                            open: true,
+                            type: 'status',
+                            user,
+                            action: user.is_active ? "deactivate" : "activate"
+                          })}
+                        >
+                          {user.is_active ? "Deactivate" : "Activate"}
+                        </V3Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog 
+        open={confirmDialog.open} 
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmDialog.type === 'role'
+                ? confirmDialog.action === 'grant'
+                  ? "Grant Platform Admin Access?"
+                  : "Remove Platform Admin Access?"
+                : confirmDialog.action === 'deactivate'
+                  ? "Deactivate User?"
+                  : "Activate User?"
+              }
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialog.type === 'role'
+                ? confirmDialog.action === 'grant'
+                  ? `This will give ${confirmDialog.user?.email} full access to this admin dashboard.`
+                  : `This will remove platform admin access from ${confirmDialog.user?.email}. They will lose access to this dashboard.`
+                : confirmDialog.action === 'deactivate'
+                  ? `This will prevent ${confirmDialog.user?.email} from logging in.`
+                  : `This will restore login access for ${confirmDialog.user?.email}.`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmDialog.user) {
+                  if (confirmDialog.type === 'role') {
+                    toggleUserRole(confirmDialog.user);
+                  } else {
+                    toggleUserStatus(confirmDialog.user);
+                  }
+                }
+              }}
+              className={confirmDialog.action === 'remove' || confirmDialog.action === 'deactivate' 
+                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" 
+                : ""
+              }
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
   );
 };
+
+export default UserManagement;

@@ -292,7 +292,7 @@ export const AdminInviteCodes = () => {
             <Mail className="h-6 w-6 text-purple-600 dark:text-purple-400" />
           </div>
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Invite Codes</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold portal-text-primary">Platform Admin Invitations</h2>
             <p className="text-sm portal-text-secondary">Loading invite codes...</p>
           </div>
         </div>

@@ -102,7 +102,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { title: "Organizations", icon: Building2, value: "clients" },
       { title: "Onboarding Wizard", icon: UserCog, value: "onboarding-wizard", requiredRole: 'admin' },
-      { title: "Users", icon: Users, value: "client-users" },
+      { title: "Organization Members", icon: Users, value: "client-users" },
       { title: "Bulk Operations", icon: Download, value: "bulk-ops", requiredRole: 'admin' },
       { title: "Attribution", icon: GitBranch, value: "attribution" },
       { title: "Health Monitoring", icon: HeartPulse, value: "client-health", requiredRole: 'admin' },
@@ -121,8 +121,8 @@ export const navigationGroups: NavigationGroup[] = [
     icon: Shield,
     collapsedByDefault: true,
     items: [
-      { title: "Admin Users", icon: UserCog, value: "users", requiredRole: 'admin' },
-      { title: "Admin Invites", icon: Mail, value: "invite-codes", requiredRole: 'admin' },
+      { title: "Platform Admins", icon: UserCog, value: "users", requiredRole: 'admin' },
+      { title: "Platform Invites", icon: Mail, value: "invite-codes", requiredRole: 'admin' },
       { title: "Operations", icon: Activity, value: "scheduler", requiredRole: 'admin' },
       { title: "Coverage Governance", icon: Layers, value: "coverage-governance", requiredRole: 'admin' },
       { title: "Sessions", icon: Shield, value: "sessions", requiredRole: 'admin' },
