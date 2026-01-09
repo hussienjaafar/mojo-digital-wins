@@ -179,6 +179,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       action_generator_runs: {
@@ -238,6 +245,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "action_generator_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       admin_activity_alerts: {
@@ -287,6 +301,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_activity_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -1010,6 +1031,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "attribution_matcher_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       attribution_model_log: {
@@ -1056,6 +1084,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attribution_model_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -1109,6 +1144,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attribution_touchpoints_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -1841,11 +1883,20 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "campaign_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       client_api_credentials: {
         Row: {
           created_at: string | null
+          credential_mask: Json | null
+          credential_version: number | null
           encrypted_credentials: Json
           id: string
           is_active: boolean | null
@@ -1853,16 +1904,23 @@ export type Database = {
           last_sync_at: string | null
           last_sync_error: string | null
           last_sync_status: string | null
+          last_test_error: string | null
+          last_test_status: string | null
+          last_tested_at: string | null
           latest_meta_data_date: string | null
           meta_sync_priority: string | null
           organization_id: string
           platform: string
           rate_limit_backoff_until: string | null
+          rotated_at: string | null
+          rotated_by: string | null
           sync_error_count: number | null
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
+          credential_mask?: Json | null
+          credential_version?: number | null
           encrypted_credentials: Json
           id?: string
           is_active?: boolean | null
@@ -1870,16 +1928,23 @@ export type Database = {
           last_sync_at?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
+          last_test_error?: string | null
+          last_test_status?: string | null
+          last_tested_at?: string | null
           latest_meta_data_date?: string | null
           meta_sync_priority?: string | null
           organization_id: string
           platform: string
           rate_limit_backoff_until?: string | null
+          rotated_at?: string | null
+          rotated_by?: string | null
           sync_error_count?: number | null
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
+          credential_mask?: Json | null
+          credential_version?: number | null
           encrypted_credentials?: Json
           id?: string
           is_active?: boolean | null
@@ -1887,11 +1952,16 @@ export type Database = {
           last_sync_at?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
+          last_test_error?: string | null
+          last_test_status?: string | null
+          last_tested_at?: string | null
           latest_meta_data_date?: string | null
           meta_sync_priority?: string | null
           organization_id?: string
           platform?: string
           rate_limit_backoff_until?: string | null
+          rotated_at?: string | null
+          rotated_by?: string | null
           sync_error_count?: number | null
           updated_at?: string | null
         }
@@ -1902,6 +1972,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_api_credentials_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -1967,6 +2044,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_entity_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "client_entity_alerts_trend_event_id_fkey"
@@ -2038,6 +2122,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "client_onboarding_status_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       client_organizations: {
@@ -2108,6 +2199,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -2252,6 +2350,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "creative_performance_learnings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       cron_config: {
@@ -2331,6 +2436,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_aggregated_metrics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -2511,6 +2623,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "data_export_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       data_freshness: {
@@ -2576,6 +2695,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "data_freshness_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       data_freshness_alerts: {
@@ -2622,6 +2748,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_freshness_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -2775,6 +2908,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "donor_demographics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       donor_first_donation: {
@@ -2815,6 +2955,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "donor_first_donation_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -2859,6 +3006,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "donor_identity_links_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -2915,6 +3069,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "donor_journeys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -2992,6 +3153,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "donor_ltv_predictions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -3083,6 +3251,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "email_report_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
             foreignKeyName: "email_report_logs_schedule_id_fkey"
             columns: ["schedule_id"]
             isOneToOne: false
@@ -3147,6 +3322,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_report_schedules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -3351,6 +3533,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "entity_watchlist_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       event_impact_correlations: {
@@ -3412,6 +3601,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_impact_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -3646,6 +3842,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fundraising_opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       generated_campaign_messages: {
@@ -3701,6 +3904,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_campaign_messages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -4018,6 +4228,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "intelligence_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       job_executions: {
@@ -4247,6 +4464,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "magic_moment_cards_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       meta_ad_metrics: {
@@ -4351,6 +4575,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "meta_ad_metrics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       meta_campaigns: {
@@ -4400,6 +4631,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_campaigns_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -4646,6 +4884,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "meta_creative_insights_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       meta_sync_config: {
@@ -4819,6 +5064,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "opportunity_detector_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       org_alert_preferences: {
@@ -4871,6 +5123,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_alert_preferences_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -4934,6 +5193,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "org_feedback_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       org_interest_entities: {
@@ -4968,6 +5234,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_interest_entities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -5046,6 +5319,70 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "org_interest_topics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      org_onboarding_state: {
+        Row: {
+          blocking_reason: string | null
+          completed_steps: Json
+          created_at: string
+          created_by: string | null
+          current_step: number
+          id: string
+          last_updated_at: string
+          last_updated_by: string | null
+          organization_id: string
+          status: string
+          step_data: Json | null
+        }
+        Insert: {
+          blocking_reason?: string | null
+          completed_steps?: Json
+          created_at?: string
+          created_by?: string | null
+          current_step?: number
+          id?: string
+          last_updated_at?: string
+          last_updated_by?: string | null
+          organization_id: string
+          status?: string
+          step_data?: Json | null
+        }
+        Update: {
+          blocking_reason?: string | null
+          completed_steps?: Json
+          created_at?: string
+          created_by?: string | null
+          current_step?: number
+          id?: string
+          last_updated_at?: string
+          last_updated_by?: string | null
+          organization_id?: string
+          status?: string
+          step_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_onboarding_state_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_onboarding_state_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       org_trend_scores: {
@@ -5110,6 +5447,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_trend_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "org_trend_scores_trend_event_id_fkey"
@@ -5273,6 +5617,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "organization_profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       organization_quotas: {
@@ -5325,6 +5676,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_quotas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -5401,6 +5759,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outcome_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -5517,6 +5882,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_health_snapshots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -5675,6 +6047,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "polling_alert_configs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -6059,6 +6438,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "refcode_mappings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       roi_analytics: {
@@ -6117,6 +6503,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roi_analytics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -6386,6 +6779,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "send_time_optimizations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       sentiment_snapshots: {
@@ -6553,6 +6953,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sms_campaign_metrics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       sms_campaigns: {
@@ -6632,6 +7039,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_campaigns_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -6731,6 +7145,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sms_creative_insights_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       sms_events: {
@@ -6798,6 +7219,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -7218,6 +7646,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "suggested_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       system_config: {
@@ -7379,6 +7814,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "transaction_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       trend_action_outcomes: {
@@ -7425,6 +7867,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_action_outcomes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "trend_action_outcomes_trend_event_id_fkey"
@@ -7770,6 +8219,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_detection_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -8122,6 +8578,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "trend_feedback_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       trend_outcome_correlation: {
@@ -8195,6 +8658,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_outcome_correlation_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -8542,6 +9012,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "watchlist_usage_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       webhook_configs: {
@@ -8684,6 +9161,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "webhook_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
     }
@@ -8709,6 +9193,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -8880,6 +9371,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       action_effectiveness_summary: {
@@ -8916,6 +9414,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intelligence_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -9057,6 +9562,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "attribution_touchpoints_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       backfill_monitoring: {
@@ -9170,6 +9682,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "data_freshness_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       donation_attribution: {
@@ -9202,6 +9721,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -9243,6 +9769,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -9336,6 +9869,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "donor_demographics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       donor_segments: {
@@ -9412,6 +9952,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "donor_demographics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -9508,6 +10055,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "client_api_credentials_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       mv_daily_metrics_summary: {
@@ -9534,6 +10088,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_aggregated_metrics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -9591,6 +10152,24 @@ export type Database = {
         }
         Relationships: []
       }
+      org_onboarding_summary: {
+        Row: {
+          blocking_reason: string | null
+          completed_steps: Json | null
+          current_step: number | null
+          has_profile: boolean | null
+          integration_count: number | null
+          is_active: boolean | null
+          onboarding_status: string | null
+          onboarding_updated_at: string | null
+          org_created_at: string | null
+          organization_id: string | null
+          organization_name: string | null
+          slug: string | null
+          user_count: number | null
+        }
+        Relationships: []
+      }
       org_relevant_trends: {
         Row: {
           confidence_score: number | null
@@ -9615,6 +10194,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_trend_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -9892,6 +10478,13 @@ export type Database = {
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "transaction_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       trend_events_active: {
@@ -10116,6 +10709,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -10492,6 +11092,15 @@ export type Database = {
           _failure_reason?: string
           _successful: boolean
           _user_id: string
+        }
+        Returns: string
+      }
+      log_onboarding_action: {
+        Args: {
+          _action_type: string
+          _details?: Json
+          _organization_id: string
+          _step?: number
         }
         Returns: string
       }
