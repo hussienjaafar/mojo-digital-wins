@@ -451,7 +451,17 @@ serve(async (req) => {
         .single();
       
       if (error || !data) {
-        throw new Error(`No ActBlue credentials found for organization ${organization_id}`);
+        // Return graceful response for orgs without credentials (e.g., demo orgs)
+        console.log(`[SYNC-ACTBLUE] No ActBlue credentials found for org ${organization_id} - skipping sync`);
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            skipped: true,
+            message: 'No ActBlue credentials configured for this organization',
+            results: [] 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
       credentials = [data];
     } else {
