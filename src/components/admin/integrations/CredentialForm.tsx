@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck, Facebook } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { IntegrationPlatform } from '@/types/integrations';
+import { MetaCredentialAuth } from './MetaCredentialAuth';
 
 // SECURITY: Form state for new credentials (never persisted to state after save)
 export type CredentialFormData = {
@@ -40,6 +41,7 @@ interface CredentialFormProps {
   formData: CredentialFormData;
   onFormDataChange: (data: CredentialFormData) => void;
   onPlatformChange: (platform: 'meta' | 'switchboard' | 'actblue' | 'google_ads') => void;
+  organizationId?: string;
   disabled?: boolean;
 }
 
@@ -99,8 +101,23 @@ export function CredentialForm({
   formData, 
   onFormDataChange, 
   onPlatformChange,
+  organizationId,
   disabled = false,
 }: CredentialFormProps) {
+  const handleMetaOAuthSuccess = (credentials: {
+    access_token: string;
+    ad_account_id: string;
+    business_manager_id?: string;
+  }) => {
+    onFormDataChange({
+      ...formData,
+      meta: {
+        access_token: credentials.access_token,
+        ad_account_id: credentials.ad_account_id,
+        business_manager_id: credentials.business_manager_id || '',
+      }
+    });
+  };
   const updateMeta = (field: keyof NonNullable<CredentialFormData['meta']>, value: string) => {
     onFormDataChange({
       ...formData,
@@ -139,34 +156,62 @@ export function CredentialForm({
       </TabsList>
 
       <TabsContent value="meta" className="space-y-4 pt-4">
-        <SecureInput
-          id="meta_access_token"
-          label="Access Token"
-          value={formData.meta?.access_token || ''}
-          onChange={(v) => updateMeta('access_token', v)}
-          required
-          disabled={disabled}
-        />
-        <div className="space-y-2">
-          <Label htmlFor="ad_account_id">Ad Account ID</Label>
-          <Input
-            id="ad_account_id"
-            value={formData.meta?.ad_account_id || ''}
-            onChange={(e) => updateMeta('ad_account_id', e.target.value)}
-            placeholder="act_123456789"
+        {organizationId && !disabled ? (
+          <MetaCredentialAuth
+            organizationId={organizationId}
+            onSuccess={handleMetaOAuthSuccess}
             disabled={disabled}
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="business_manager_id">Business Manager ID</Label>
-          <Input
-            id="business_manager_id"
-            value={formData.meta?.business_manager_id || ''}
-            onChange={(e) => updateMeta('business_manager_id', e.target.value)}
-            placeholder="Optional"
-            disabled={disabled}
-          />
-        </div>
+        ) : (
+          <>
+            {formData.meta?.access_token ? (
+              <Alert>
+                <ShieldCheck className="h-4 w-4 text-green-500" />
+                <AlertDescription className="flex items-center justify-between">
+                  <span>
+                    Meta credentials configured
+                    {formData.meta?.ad_account_id && (
+                      <span className="text-muted-foreground ml-1">
+                        ({formData.meta.ad_account_id})
+                      </span>
+                    )}
+                  </span>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <SecureInput
+                  id="meta_access_token"
+                  label="Access Token"
+                  value={formData.meta?.access_token || ''}
+                  onChange={(v) => updateMeta('access_token', v)}
+                  required
+                  disabled={disabled}
+                />
+                <div className="space-y-2">
+                  <Label htmlFor="ad_account_id">Ad Account ID</Label>
+                  <Input
+                    id="ad_account_id"
+                    value={formData.meta?.ad_account_id || ''}
+                    onChange={(e) => updateMeta('ad_account_id', e.target.value)}
+                    placeholder="act_123456789"
+                    disabled={disabled}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="business_manager_id">Business Manager ID</Label>
+                  <Input
+                    id="business_manager_id"
+                    value={formData.meta?.business_manager_id || ''}
+                    onChange={(e) => updateMeta('business_manager_id', e.target.value)}
+                    placeholder="Optional"
+                    disabled={disabled}
+                  />
+                </div>
+              </>
+            )}
+          </>
+        )}
       </TabsContent>
 
       <TabsContent value="switchboard" className="space-y-4 pt-4">

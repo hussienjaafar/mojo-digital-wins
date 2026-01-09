@@ -304,6 +304,7 @@ export function CredentialSlideOver({
                   formData={formData}
                   onFormDataChange={setFormData}
                   onPlatformChange={setPlatform}
+                  organizationId={selectedOrg}
                   disabled={!!existingCredential}
                 />
               </div>
