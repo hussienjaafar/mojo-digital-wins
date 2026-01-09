@@ -273,7 +273,7 @@ const ClientUserManager = () => {
     return (
       <div className="space-y-6">
         <AdminPageHeader
-          title="Client Users"
+          title="Organization Members"
           description="Loading user accounts..."
           icon={Users}
           iconColor="blue"
@@ -346,10 +346,10 @@ const ClientUserManager = () => {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
-              Client Users
+              Organization Members
             </CardTitle>
             <CardDescription>
-              Manage user access to client organizations
+              Manage user access within client organizations. Roles: Admin (full access), Manager (edit), Viewer (read-only)
             </CardDescription>
           </div>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -360,9 +360,9 @@ const ClientUserManager = () => {
             </DialogTrigger>
             <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Create Client User</DialogTitle>
+                <DialogTitle>Add Organization Member</DialogTitle>
                 <DialogDescription>
-                  Add a new user to a client organization
+                  Add a new user to an organization. They will receive login credentials via email.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreate} className="space-y-4">

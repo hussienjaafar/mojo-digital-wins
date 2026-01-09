@@ -11039,6 +11039,18 @@ export type Database = {
           roles: string[]
         }[]
       }
+      get_users_with_roles_and_orgs: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          last_sign_in_at: string
+          organizations: Json
+          roles: string[]
+        }[]
+      }
       has_pii_access:
         | { Args: never; Returns: boolean }
         | { Args: { _organization_id: string }; Returns: boolean }
