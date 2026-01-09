@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { IntegrationConfig, WizardStep } from '../types';
-import { MetaOAuthFlow } from '@/components/integrations/MetaOAuthFlow';
+import { MetaAuthOptions } from '@/components/integrations/MetaAuthOptions';
 import { 
   Plug, 
   ChevronDown, 
@@ -302,7 +302,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
                     <span className="text-sm">Connected and enabled</span>
                   </div>
                 ) : (
-                  <MetaOAuthFlow
+                  <MetaAuthOptions
                     organizationId={organizationId}
                     onComplete={() => {
                       setIntegrations(prev => ({
