@@ -90,7 +90,19 @@ export function Step2OrgProfile({
       // Map edge function response fields to form fields
       if (data?.profile) {
         const profile = data.profile;
-        const aiExtractedAreas = [...(profile.focus_areas || []), ...(profile.key_issues || [])];
+        const focusAreas = profile.focus_areas || [];
+        const keyIssues = profile.key_issues || [];
+        
+        console.log('[Step2OrgProfile] AI Response:', { 
+          mission: profile.mission?.substring(0, 50),
+          focus_areas: focusAreas,
+          key_issues: keyIssues
+        });
+        
+        // Combine and dedupe all extracted areas
+        const aiExtractedAreas = [...new Set([...focusAreas, ...keyIssues])];
+        
+        console.log('[Step2OrgProfile] Combined areas:', aiExtractedAreas);
         
         // Store extracted areas for display
         setExtractedFocusAreas(aiExtractedAreas);
@@ -99,7 +111,7 @@ export function Step2OrgProfile({
         setFormData(prev => ({
           ...prev,
           mission_statement: profile.mission || prev.mission_statement,
-          focus_areas: [...new Set([...prev.focus_areas, ...aiExtractedAreas])],
+          focus_areas: aiExtractedAreas, // Replace with all extracted
         }));
         
         setScrapeStatus('success');
