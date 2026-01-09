@@ -34,11 +34,14 @@ export function OnboardingWizard() {
   } = useOnboardingWizard({ organizationId: organizationId || undefined });
 
   // Handle Step 1 completion - org created
+  // IMPORTANT: initialize onboarding state BEFORE setting organizationId to avoid a race with
+  // the hook's auto-load effect (which can temporarily read "no state" and reset to step 1).
   const handleStep1Complete = async (orgId: string, data: CreateOrgData) => {
-    setOrganizationId(orgId);
     setOrganizationSlug(data.slug);
     setWebsiteUrl(data.website_url || '');
+
     await initializeOnboarding(orgId);
+    setOrganizationId(orgId);
   };
 
   // Handle Step 2 completion

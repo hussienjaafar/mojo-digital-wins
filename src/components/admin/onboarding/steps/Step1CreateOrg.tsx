@@ -10,7 +10,7 @@ import type { CreateOrgData } from '../types';
 
 interface Step1CreateOrgProps {
   initialData?: Partial<CreateOrgData>;
-  onComplete: (orgId: string, data: CreateOrgData) => void;
+  onComplete: (orgId: string, data: CreateOrgData) => void | Promise<void>;
   onDataChange?: (data: Partial<CreateOrgData>) => void;
 }
 
@@ -155,7 +155,8 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
         description: `${normalizedData.name} has been created successfully`,
       });
 
-      onComplete(org.id, normalizedData);
+      // Await to keep the button in a loading state until the wizard advances
+      await Promise.resolve(onComplete(org.id, normalizedData));
     } catch (err: any) {
       toast({
         title: 'Error',
