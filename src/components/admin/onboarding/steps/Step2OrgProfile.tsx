@@ -6,11 +6,12 @@ import { V3Button } from '@/components/v3/V3Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Target, MapPin, Loader2, Sparkles, AlertCircle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Plus, X } from 'lucide-react';
+import { Target, MapPin, Loader2, Sparkles, ChevronDown, ChevronUp, CheckCircle2, XCircle, Plus, X, Building2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import type { OrgProfileData } from '../types';
+import { GeoLocationPicker } from '../GeoLocationPicker';
+import type { OrgProfileData, OrganizationType, GeoLevel, GeoLocation } from '../types';
 
 const POLICY_DOMAINS = [
   'Healthcare', 'Education', 'Environment', 'Labor & Workers Rights',
@@ -18,12 +19,38 @@ const POLICY_DOMAINS = [
   'Criminal Justice', 'Voting Rights', 'Foreign Policy', 'Technology',
 ];
 
-const US_STATES = [
-  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+// Organization type options with labels and implied geo levels
+const ORG_TYPE_OPTIONS: { value: OrganizationType; label: string; category: string; defaultGeoLevel: GeoLevel }[] = [
+  // Campaigns
+  { value: 'campaign_federal', label: 'Federal Campaign (Congress/Senate/President)', category: 'Political Campaign', defaultGeoLevel: 'congressional_district' },
+  { value: 'campaign_state', label: 'State Campaign (Governor/Legislature)', category: 'Political Campaign', defaultGeoLevel: 'state' },
+  { value: 'campaign_local', label: 'Local Campaign (Mayor/Council/County/School Board)', category: 'Political Campaign', defaultGeoLevel: 'city' },
+  // C3s
+  { value: 'c3_national', label: 'National 501(c)(3) Nonprofit', category: '501(c)(3) Nonprofit', defaultGeoLevel: 'national' },
+  { value: 'c3_state', label: 'State 501(c)(3) Nonprofit', category: '501(c)(3) Nonprofit', defaultGeoLevel: 'state' },
+  { value: 'c3_local', label: 'Local 501(c)(3) Nonprofit', category: '501(c)(3) Nonprofit', defaultGeoLevel: 'city' },
+  // C4s
+  { value: 'c4_national', label: 'National 501(c)(4) Advocacy Org', category: '501(c)(4) Advocacy', defaultGeoLevel: 'national' },
+  { value: 'c4_state', label: 'State 501(c)(4) Advocacy Org', category: '501(c)(4) Advocacy', defaultGeoLevel: 'state' },
+  { value: 'c4_local', label: 'Local 501(c)(4) Advocacy Org', category: '501(c)(4) Advocacy', defaultGeoLevel: 'city' },
+  // PACs
+  { value: 'pac_federal', label: 'Federal PAC', category: 'PAC', defaultGeoLevel: 'national' },
+  { value: 'pac_state', label: 'State PAC', category: 'PAC', defaultGeoLevel: 'state' },
+  // International
+  { value: 'international', label: 'International Organization/NGO', category: 'International', defaultGeoLevel: 'international' },
+  // Other
+  { value: 'other', label: 'Other', category: 'Other', defaultGeoLevel: 'national' },
+];
+
+// Geo level options with labels
+const GEO_LEVEL_OPTIONS: { value: GeoLevel; label: string; description: string }[] = [
+  { value: 'national', label: 'National (US-wide)', description: 'Operates across the entire United States' },
+  { value: 'multi_state', label: 'Multi-State', description: 'Operates in multiple specific states' },
+  { value: 'state', label: 'Single State', description: 'Focused on one state' },
+  { value: 'congressional_district', label: 'Congressional District', description: 'Focused on US House district(s)' },
+  { value: 'county', label: 'County', description: 'Focused on county-level' },
+  { value: 'city', label: 'City/Municipal', description: 'Focused on a city or municipality' },
+  { value: 'international', label: 'International', description: 'Operates outside the US or globally' },
 ];
 
 interface Step2OrgProfileProps {
@@ -53,11 +80,31 @@ export function Step2OrgProfile({
     mission_statement: initialData?.mission_statement || '',
     focus_areas: initialData?.focus_areas || [],
     policy_domains: initialData?.policy_domains || [],
-    geo_focus: initialData?.geo_focus || 'federal',
-    target_states: initialData?.target_states || [],
+    organization_type: initialData?.organization_type || 'c4_national',
+    geo_level: initialData?.geo_level || 'national',
+    geo_locations: initialData?.geo_locations || [],
     sentiment_sensitivity: initialData?.sentiment_sensitivity || 'medium',
     risk_tolerance: initialData?.risk_tolerance || 'medium',
   });
+
+  // Update geo level when org type changes
+  const handleOrgTypeChange = (newType: OrganizationType) => {
+    const orgOption = ORG_TYPE_OPTIONS.find(opt => opt.value === newType);
+    setFormData(prev => ({
+      ...prev,
+      organization_type: newType,
+      geo_level: orgOption?.defaultGeoLevel || prev.geo_level,
+      geo_locations: [], // Reset locations when changing type
+    }));
+  };
+
+  const handleGeoLevelChange = (newLevel: GeoLevel) => {
+    setFormData(prev => ({
+      ...prev,
+      geo_level: newLevel,
+      geo_locations: [], // Reset locations when changing level
+    }));
+  };
 
   // Auto-scrape website on mount if URL provided
   useEffect(() => {
@@ -177,20 +224,19 @@ export function Step2OrgProfile({
     }));
   };
 
-  const toggleState = (state: string) => {
-    setFormData(prev => ({
-      ...prev,
-      target_states: prev.target_states.includes(state)
-        ? prev.target_states.filter(s => s !== state)
-        : [...prev.target_states, state],
-    }));
-  };
+  // Legacy function removed - now using geo_locations
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
+      // Build geographies array from new geo_locations
+      const geographies = formData.geo_locations.map(loc => loc.value);
+      if (geographies.length === 0 && formData.geo_level === 'national') {
+        geographies.push('US');
+      }
+
       // Upsert organization profile - map to actual DB columns
       const { error: profileError } = await supabase
         .from('organization_profiles')
@@ -199,13 +245,12 @@ export function Step2OrgProfile({
           mission_summary: formData.mission_statement,
           focus_areas: formData.focus_areas,
           interest_topics: formData.policy_domains,
-          geographies: formData.geo_focus === 'federal' ? ['Federal'] : 
-                       formData.geo_focus === 'state' ? formData.target_states :
-                       formData.geo_focus === 'local' ? ['Local'] : 
-                       [...formData.target_states, 'Federal'],
+          geographies: geographies,
+          org_type: formData.organization_type,
           sensitivity_redlines: {
             sentiment_sensitivity: formData.sentiment_sensitivity,
             risk_tolerance: formData.risk_tolerance,
+            geo_level: formData.geo_level,
           },
         }, {
           onConflict: 'organization_id',
@@ -416,57 +461,89 @@ export function Step2OrgProfile({
         </CardContent>
       </Card>
 
-      {/* Geographic Focus */}
+      {/* Organization Type & Geographic Focus */}
       <Card className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-green-500/10">
-              <MapPin className="w-5 h-5 text-green-500" />
+              <Building2 className="w-5 h-5 text-green-500" />
             </div>
             <div>
-              <CardTitle className="text-lg">Geographic Focus</CardTitle>
-              <CardDescription>Where does this organization operate?</CardDescription>
+              <CardTitle className="text-lg">Organization Type & Geographic Focus</CardTitle>
+              <CardDescription>Define the organization's structure and where it operates</CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Step 1: Organization Type */}
           <div className="space-y-2">
-            <Label>Primary Focus</Label>
+            <Label>Organization Type</Label>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+              Select the type of organization - this will suggest an appropriate geographic scope
+            </p>
             <Select
-              value={formData.geo_focus}
-              onValueChange={(value: 'federal' | 'state' | 'local' | 'multi') => 
-                setFormData(prev => ({ ...prev, geo_focus: value }))
-              }
+              value={formData.organization_type}
+              onValueChange={(value: OrganizationType) => handleOrgTypeChange(value)}
             >
               <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))]">
-                <SelectValue />
+                <SelectValue placeholder="Select organization type..." />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="federal">Federal (National)</SelectItem>
-                <SelectItem value="state">State-level</SelectItem>
-                <SelectItem value="local">Local</SelectItem>
-                <SelectItem value="multi">Multi-level</SelectItem>
+              <SelectContent className="max-h-80 bg-background">
+                {/* Group by category */}
+                {['Political Campaign', '501(c)(3) Nonprofit', '501(c)(4) Advocacy', 'PAC', 'International', 'Other'].map(category => (
+                  <div key={category}>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">
+                      {category}
+                    </div>
+                    {ORG_TYPE_OPTIONS.filter(opt => opt.category === category).map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </div>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
-          {(formData.geo_focus === 'state' || formData.geo_focus === 'multi') && (
-            <div className="space-y-2">
-              <Label>Target States</Label>
-              <div className="flex flex-wrap gap-1.5 p-3 rounded-lg border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] max-h-32 overflow-y-auto">
-                {US_STATES.map(state => (
-                  <Badge
-                    key={state}
-                    variant={formData.target_states.includes(state) ? 'default' : 'outline'}
-                    className="cursor-pointer text-xs"
-                    onClick={() => toggleState(state)}
-                  >
-                    {state}
-                  </Badge>
+          {/* Step 2: Geographic Level */}
+          <div className="space-y-2">
+            <Label>Geographic Scope</Label>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+              Adjust if the suggested scope doesn't match your organization
+            </p>
+            <Select
+              value={formData.geo_level}
+              onValueChange={(value: GeoLevel) => handleGeoLevelChange(value)}
+            >
+              <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-background">
+                {GEO_LEVEL_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    <div className="flex flex-col">
+                      <span>{opt.label}</span>
+                      <span className="text-xs text-muted-foreground">{opt.description}</span>
+                    </div>
+                  </SelectItem>
                 ))}
-              </div>
-            </div>
-          )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Step 3: Location Picker */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              Target Locations
+            </Label>
+            <GeoLocationPicker
+              geoLevel={formData.geo_level}
+              selectedLocations={formData.geo_locations}
+              onChange={(locations) => setFormData(prev => ({ ...prev, geo_locations: locations }))}
+            />
+          </div>
         </CardContent>
       </Card>
 
