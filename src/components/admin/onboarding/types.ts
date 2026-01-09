@@ -39,6 +39,8 @@ export interface WizardStepConfig {
   title: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
+  required: boolean;
+  skipLabel?: string;
 }
 
 // Step 1: Create Organization

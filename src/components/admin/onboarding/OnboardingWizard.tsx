@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useOnboardingWizard } from '@/hooks/useOnboardingWizard';
 import { WizardProgress } from './WizardProgress';
 import { Step1CreateOrg } from './steps/Step1CreateOrg';
@@ -10,14 +11,18 @@ import { Step4Integrations } from './steps/Step4Integrations';
 import { Step5Watchlists } from './steps/Step5Watchlists';
 import { Step6Activation } from './steps/Step6Activation';
 import { WizardStep, CreateOrgData, OrgProfileData } from './types';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertTriangle, XCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export function OnboardingWizard() {
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const resumeOrgId = searchParams.get('resume');
+  const resumeOrgId = searchParams.get('resume') || searchParams.get('org');
   
   const [organizationId, setOrganizationId] = useState<string | null>(resumeOrgId);
+  const [blockingReason, setBlockingReason] = useState<string | null>(null);
   const [organizationSlug, setOrganizationSlug] = useState<string>('');
   const [websiteUrl, setWebsiteUrl] = useState<string>('');
   
@@ -79,6 +84,32 @@ export function OnboardingWizard() {
           <p className="text-muted-foreground">Complete all steps to fully onboard a new organization</p>
         </div>
       </div>
+
+      {/* Blocking reason banner */}
+      {blockingReason && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>Setup is blocked: {blockingReason}</span>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={async () => {
+                if (!organizationId) return;
+                await supabase
+                  .from('org_onboarding_state')
+                  .update({ status: 'in_progress', blocking_reason: null })
+                  .eq('organization_id', organizationId);
+                setBlockingReason(null);
+                toast({ title: 'Blocker resolved', description: 'You can now continue with setup.' });
+              }}
+            >
+              <XCircle className="h-3 w-3 mr-1" />
+              Mark Resolved
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <WizardProgress 
         currentStep={currentStep} 

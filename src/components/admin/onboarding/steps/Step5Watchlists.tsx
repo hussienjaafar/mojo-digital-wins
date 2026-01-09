@@ -380,16 +380,25 @@ export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }
           <Button variant="outline" onClick={onBack}>
             Back
           </Button>
-          <Button onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              'Save & Continue'
+          <div className="flex gap-2">
+            {entities.length === 0 && (
+              <Button variant="ghost" onClick={() => onComplete(5, { entities: [], alert_thresholds: alertThresholds, skipped: true })} disabled={isLoading}>
+                Skip for now
+              </Button>
             )}
-          </Button>
+            <Button onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : entities.length > 0 ? (
+                'Save & Continue'
+              ) : (
+                'Continue'
+              )}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
