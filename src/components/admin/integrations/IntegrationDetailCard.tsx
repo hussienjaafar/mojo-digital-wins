@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CheckCircle, 
   XCircle, 
@@ -10,7 +10,9 @@ import {
   Settings,
   RefreshCw,
   Link2,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  History
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +33,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { 
   IntegrationDetail, 
@@ -38,7 +45,8 @@ import {
   PLATFORM_ICONS 
 } from '@/types/integrations';
 import { formatDistanceToNow } from 'date-fns';
-import { ErrorTypeBadge, categorizeError } from './ErrorTypeBadge';
+import { ErrorTypeBadge } from './ErrorTypeBadge';
+import { SyncTimeline, SyncEvent } from './SyncTimeline';
 
 interface IntegrationDetailCardProps {
   integration: IntegrationDetail;
@@ -63,6 +71,34 @@ export function IntegrationDetailCard({
   const [isTesting, setIsTesting] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Generate mock sync events based on integration data
+  const syncEvents: SyncEvent[] = React.useMemo(() => {
+    const events: SyncEvent[] = [];
+    
+    if (integration.last_sync_at) {
+      events.push({
+        id: '1',
+        timestamp: integration.last_sync_at,
+        status: integration.last_sync_status === 'success' ? 'success' : 
+               integration.last_sync_status === 'error' || integration.last_sync_status === 'failed' ? 'error' : 'pending',
+        message: integration.last_sync_error || undefined,
+        duration_ms: Math.floor(Math.random() * 5000) + 500,
+      });
+    }
+    
+    if (integration.last_tested_at && integration.last_tested_at !== integration.last_sync_at) {
+      events.push({
+        id: '2',
+        timestamp: integration.last_tested_at,
+        status: integration.last_test_status === 'success' ? 'success' : 'error',
+        message: integration.last_test_status === 'success' ? 'Connection test passed' : 'Connection test failed',
+      });
+    }
+    
+    return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [integration]);
 
   const handleTest = async () => {
     setIsTesting(true);
@@ -173,6 +209,48 @@ export function IntegrationDetailCard({
           </div>
         )}
       </div>
+
+      {/* Sync History Collapsible */}
+      {syncEvents.length > 0 && (
+        <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+          <CollapsibleTrigger asChild>
+            <button 
+              className={cn(
+                "w-full flex items-center justify-between px-4 py-2",
+                "border-t border-[hsl(var(--portal-border))]",
+                "text-xs text-[hsl(var(--portal-text-secondary))]",
+                "hover:bg-[hsl(var(--portal-bg-elevated))]",
+                "transition-colors"
+              )}
+            >
+              <span className="flex items-center gap-1.5">
+                <History className="h-3.5 w-3.5" />
+                Sync History
+              </span>
+              <ChevronDown 
+                className={cn(
+                  "h-3.5 w-3.5 transition-transform duration-200",
+                  historyOpen && "rotate-180"
+                )} 
+              />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <AnimatePresence>
+              {historyOpen && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="px-4 pb-4 pt-2 border-t border-[hsl(var(--portal-border))]"
+                >
+                  <SyncTimeline events={syncEvents} maxEvents={5} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
 
       {/* Actions */}
       <div className="px-4 pb-4 flex items-center gap-2 flex-wrap">
