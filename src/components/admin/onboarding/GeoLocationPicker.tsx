@@ -117,13 +117,97 @@ export function GeoLocationPicker({ geoLevel, selectedLocations, onChange }: Geo
     return options;
   }, [geoLevel]);
 
-  // Filter options based on search
+  // Normalize search query for flexible matching
+  const normalizeForSearch = (text: string): string => {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '') // Remove all non-alphanumeric
+      .trim();
+  };
+
+  // Generate search aliases for an option
+  const getSearchAliases = (option: GeoLocation): string[] => {
+    const aliases: string[] = [
+      option.label.toLowerCase(),
+      option.value.toLowerCase(),
+      normalizeForSearch(option.label),
+      normalizeForSearch(option.value),
+    ];
+
+    // For congressional districts, add flexible patterns
+    if (option.type === 'congressional_district') {
+      // "NY-12" -> also match "ny 12", "ny12", "new york 12", etc.
+      const match = option.value.match(/^([A-Z]{2})-(\d+)$/);
+      if (match) {
+        const [, stateAbbr, num] = match;
+        const stateName = STATE_ABBREVIATIONS[stateAbbr];
+        aliases.push(
+          `${stateAbbr.toLowerCase()}${num}`,        // "ny12"
+          `${stateAbbr.toLowerCase()} ${num}`,       // "ny 12"
+          `${stateName?.toLowerCase()} ${num}`,      // "new york 12"
+          `${stateName?.toLowerCase()}${num}`,       // "newyork12"
+          `district ${num} ${stateAbbr.toLowerCase()}`, // "district 12 ny"
+          `${num}${getOrdinalSuffix(parseInt(num))} ${stateAbbr.toLowerCase()}`, // "12th ny"
+        );
+      }
+    }
+
+    // For states, add full name matching
+    if (option.type === 'state') {
+      const abbr = option.value;
+      const name = STATE_ABBREVIATIONS[abbr];
+      if (name) {
+        aliases.push(name.toLowerCase(), normalizeForSearch(name));
+      }
+    }
+
+    return aliases;
+  };
+
+  // Helper for ordinal suffixes
+  const getOrdinalSuffix = (n: number): string => {
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    return s[(v - 20) % 10] || s[v] || s[0];
+  };
+
+  // Filter options based on search with fuzzy matching
   const filteredOptions = useMemo(() => {
-    if (!searchQuery.trim()) return searchOptions.slice(0, 20); // Show first 20 by default
-    const query = searchQuery.toLowerCase();
-    return searchOptions
-      .filter(opt => opt.label.toLowerCase().includes(query) || opt.value.toLowerCase().includes(query))
-      .slice(0, 20);
+    if (!searchQuery.trim()) return searchOptions.slice(0, 20);
+    
+    const normalizedQuery = normalizeForSearch(searchQuery);
+    const queryLower = searchQuery.toLowerCase().trim();
+    
+    // Score each option
+    const scored = searchOptions.map(opt => {
+      const aliases = getSearchAliases(opt);
+      let score = 0;
+      
+      // Exact match on any alias
+      if (aliases.some(a => a === queryLower || a === normalizedQuery)) {
+        score = 100;
+      }
+      // Starts with query
+      else if (aliases.some(a => a.startsWith(queryLower) || a.startsWith(normalizedQuery))) {
+        score = 80;
+      }
+      // Contains query
+      else if (aliases.some(a => a.includes(queryLower) || a.includes(normalizedQuery))) {
+        score = 60;
+      }
+      // Normalized contains
+      else if (aliases.some(a => normalizeForSearch(a).includes(normalizedQuery))) {
+        score = 40;
+      }
+      
+      return { option: opt, score };
+    });
+    
+    return scored
+      .filter(s => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20)
+      .map(s => s.option);
   }, [searchOptions, searchQuery]);
 
   const addLocation = (location: GeoLocation) => {
