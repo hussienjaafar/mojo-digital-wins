@@ -3,12 +3,12 @@ import { Check, Building2, User, Plug, Eye, Bell, Rocket } from 'lucide-react';
 import type { WizardStep, WizardStepConfig } from './types';
 
 export const WIZARD_STEPS: WizardStepConfig[] = [
-  { step: 1, title: 'Create Organization', description: 'Basic info & branding', icon: Building2 },
-  { step: 2, title: 'Organization Profile', description: 'Mission & priorities', icon: User },
-  { step: 3, title: 'Team Members', description: 'Invite users', icon: User },
-  { step: 4, title: 'Integrations', description: 'Connect data sources', icon: Plug },
-  { step: 5, title: 'Watchlists & Alerts', description: 'Configure monitoring', icon: Bell },
-  { step: 6, title: 'Activate', description: 'Review & launch', icon: Rocket },
+  { step: 1, title: 'Create Organization', description: 'Basic info & branding', icon: Building2, required: true },
+  { step: 2, title: 'Organization Profile', description: 'Mission & priorities', icon: User, required: true },
+  { step: 3, title: 'Team Members', description: 'Invite users', icon: User, required: false, skipLabel: 'Add later' },
+  { step: 4, title: 'Integrations', description: 'Connect data sources', icon: Plug, required: false, skipLabel: 'Configure later' },
+  { step: 5, title: 'Watchlists & Alerts', description: 'Configure monitoring', icon: Bell, required: false, skipLabel: 'Set up later' },
+  { step: 6, title: 'Activate', description: 'Review & launch', icon: Rocket, required: true },
 ];
 
 interface WizardProgressProps {
@@ -133,6 +133,9 @@ export function WizardProgress({
                     status === 'current' ? 'text-[hsl(var(--portal-text-primary))]' : 'text-[hsl(var(--portal-text-muted))]'
                   )}>
                     {stepConfig.title}
+                    {!stepConfig.required && (
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">(optional)</span>
+                    )}
                   </span>
                   <span className="block text-xs text-[hsl(var(--portal-text-muted))] mt-0.5">
                     {stepConfig.description}

@@ -509,9 +509,14 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
           <Button variant="outline" onClick={onBack}>
             Back
           </Button>
-          <Button onClick={handleContinue} disabled={isLoading}>
-            Continue
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={handleContinue} disabled={isLoading}>
+              Skip for now
+            </Button>
+            <Button onClick={handleContinue} disabled={isLoading}>
+              {Object.values(integrations).some(i => i.is_enabled) ? 'Save & Continue' : 'Continue'}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

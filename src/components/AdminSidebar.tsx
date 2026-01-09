@@ -199,8 +199,20 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
       
+      // Fetch organizations needing onboarding attention
+      const { data: onboardingSummary } = await supabase
+        .from('org_onboarding_summary')
+        .select('organization_id, effective_status, error_count');
+      
+      const needsAttentionCount = (onboardingSummary || []).filter((org: any) => 
+        org.effective_status === 'not_started' || 
+        org.effective_status === 'blocked' ||
+        (org.error_count || 0) > 0
+      ).length;
+      
       setUnreadCounts({
         contacts: contactCount || 0,
+        clientsAttention: needsAttentionCount,
       });
     } catch (error) {
       logger.error('Failed to fetch unread counts', error);
@@ -521,9 +533,13 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                     <SidebarMenu className={cn("space-y-1", collapsed && "items-center")}>
                       {group.items.map((item, itemIndex) => {
                         const isPinned = pinnedItemValues.includes(item.value);
-                        const badge = item.badge || (item.value === 'contacts' && unreadCounts.contacts > 0 
-                          ? { count: unreadCounts.contacts, status: 'info' as const, pulse: true }
-                          : undefined);
+                        const badge = item.badge 
+                          || (item.value === 'contacts' && unreadCounts.contacts > 0 
+                            ? { count: unreadCounts.contacts, status: 'info' as const, pulse: true }
+                            : undefined)
+                          || (item.value === 'clients' && unreadCounts.clientsAttention > 0
+                            ? { count: unreadCounts.clientsAttention, status: 'warning' as const, pulse: false }
+                            : undefined);
                         
                         return (
                           <SidebarMenuItem 
@@ -581,8 +597,11 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                                           {isPinned && <Star className="h-3 w-3 fill-[hsl(var(--portal-accent-blue))] text-[hsl(var(--portal-accent-blue))]" />}
                                           {badge && (
                                             <Badge 
-                                              variant="destructive"
-                                              className="ml-auto shrink-0 h-5 min-w-[1.25rem] px-1.5"
+                                              variant={badge.status === 'warning' ? 'outline' : 'destructive'}
+                                              className={cn(
+                                                "ml-auto shrink-0 h-5 min-w-[1.25rem] px-1.5",
+                                                badge.status === 'warning' && "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                                              )}
                                             >
                                               {badge.count}
                                             </Badge>
