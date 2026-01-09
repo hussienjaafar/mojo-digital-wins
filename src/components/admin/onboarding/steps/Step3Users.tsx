@@ -106,11 +106,8 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
 
   const handleSubmit = async () => {
     if (users.length === 0) {
-      toast({
-        title: 'No users added',
-        description: 'Please add at least one user to continue.',
-        variant: 'destructive'
-      });
+      // Allow skipping - just move to next step
+      await onComplete(3, { users: [], created_users: [], skipped: true });
       return;
     }
 
@@ -158,9 +155,9 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
           title: 'Users created',
           description: `Successfully created ${createdUsers.length} user(s).`
         });
-
-        await onComplete(3, { users, created_users: createdUsers, errors });
       }
+
+      await onComplete(3, { users, created_users: createdUsers, errors });
     } catch (error) {
       console.error('Error creating users:', error);
       toast({
@@ -316,18 +313,25 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
           <Button variant="outline" onClick={onBack}>
             Back
           </Button>
-          <Button onClick={handleSubmit} disabled={isLoading || users.length === 0}>
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Creating Users...
-              </>
-            ) : (
-              <>
-                Create Users & Continue
-              </>
+          <div className="flex gap-2">
+            {users.length === 0 && (
+              <Button variant="ghost" onClick={handleSubmit} disabled={isLoading}>
+                Skip for now
+              </Button>
             )}
-          </Button>
+            <Button onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {users.length > 0 ? 'Creating Users...' : 'Continuing...'}
+                </>
+              ) : users.length > 0 ? (
+                'Create Users & Continue'
+              ) : (
+                'Continue'
+              )}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
