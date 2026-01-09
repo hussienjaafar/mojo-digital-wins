@@ -106,13 +106,43 @@ export function useOnboardingWizard(
         setCompletedSteps(data.completed_steps || []);
         setStatus(data.status as OnboardingStatus);
         setStepData(data.step_data || {});
-      } else {
-        // No existing state - start fresh
+        return;
+      }
+
+      // No existing state.
+      // IMPORTANT: if an orgId is present, Step 1 is implicitly complete (the org exists).
+      // We attempt to (re)create the onboarding state record, but we never reset the UI to step 1.
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        const userId = session?.session?.user?.id;
+
+        const record = await upsertOnboardingState({
+          orgId,
+          userId,
+          current_step: 2,
+          completed_steps: [1],
+          step_data: {},
+          status: 'in_progress',
+        });
+
+        setStateId(record.id);
+        setCurrentStep(record.current_step as WizardStep);
+        setCompletedSteps((record.completed_steps || [1]) as WizardStep[]);
+        setStatus(record.status as OnboardingStatus);
+        setStepData(record.step_data || {});
+      } catch (err: any) {
+        // If persistence isn't available (e.g. permissions), keep the wizard moving in the UI.
         setStateId(null);
-        setCurrentStep(1);
-        setCompletedSteps([]);
-        setStatus('not_started');
+        setCurrentStep(2);
+        setCompletedSteps([1]);
+        setStatus('in_progress');
         setStepData({});
+
+        toast({
+          title: 'Onboarding state unavailable',
+          description: err?.message || 'Could not load/create onboarding progress. You can continue, but progress may not be saved.',
+          variant: 'destructive',
+        });
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load onboarding state');
@@ -124,7 +154,7 @@ export function useOnboardingWizard(
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, upsertOnboardingState]);
 
   // Initialize onboarding for a new org - marks step 1 as complete and advances to step 2
   // IMPORTANT: we optimistically advance the UI even if persistence fails, so admins never get stuck.
@@ -176,52 +206,80 @@ export function useOnboardingWizard(
 
   // Complete a step
   const completeStep = useCallback(async (
-    step: WizardStep, 
+    step: WizardStep,
     data?: Record<string, unknown>
   ): Promise<boolean> => {
-    if (!organizationId || !stateId) return false;
-    
+    if (!organizationId) return false;
+
     setIsSaving(true);
     setError(null);
-    
+
     try {
       const { data: session } = await supabase.auth.getSession();
       const userId = session?.session?.user?.id;
-      
+
+      // Ensure we have a state record to update.
+      // If we can't create/update it (permissions/etc.), we still advance the UI so admins aren't blocked.
+      let ensuredStateId: string | null = stateId;
+      if (!ensuredStateId) {
+        try {
+          const record = await upsertOnboardingState({
+            orgId: organizationId,
+            userId,
+            current_step: currentStep,
+            completed_steps: completedSteps.length ? completedSteps : [1],
+            step_data: stepData,
+            status: status === 'completed' ? 'completed' : 'in_progress',
+          });
+          ensuredStateId = record.id;
+          setStateId(record.id);
+        } catch (err: any) {
+          ensuredStateId = null;
+          toast({
+            title: 'Progress not saved',
+            description: err?.message || 'Could not create onboarding state. You can continue, but progress may not be saved.',
+            variant: 'destructive',
+          });
+        }
+      }
+
       const newCompletedSteps = [...new Set([...completedSteps, step])].sort() as WizardStep[];
       const nextStep = Math.min(step + 1, 6) as WizardStep;
       const isComplete = newCompletedSteps.length === 6;
-      
-      const newStepData = data 
+
+      const newStepData = data
         ? { ...stepData, [`step${step}`]: data }
         : stepData;
-      
-      const { error: updateError } = await (supabase as any)
-        .from('org_onboarding_state')
-        .update({
-          current_step: nextStep,
-          completed_steps: newCompletedSteps,
-          step_data: newStepData,
-          status: isComplete ? 'completed' : 'in_progress',
-          last_updated_by: userId,
-        })
-        .eq('id', stateId);
-      
-      if (updateError) throw updateError;
-      
+
+      if (ensuredStateId) {
+        const { error: updateError } = await (supabase as any)
+          .from('org_onboarding_state')
+          .update({
+            current_step: nextStep,
+            completed_steps: newCompletedSteps,
+            step_data: newStepData,
+            status: isComplete ? 'completed' : 'in_progress',
+            last_updated_by: userId,
+          })
+          .eq('id', ensuredStateId);
+
+        if (updateError) throw updateError;
+
+        // Log the action (best-effort)
+        await supabase.rpc('log_onboarding_action', {
+          _organization_id: organizationId,
+          _action_type: 'step_completed',
+          _step: step,
+          _details: data ? JSON.parse(JSON.stringify(data)) : null,
+        });
+      }
+
+      // Always advance UI
       setCompletedSteps(newCompletedSteps);
       setCurrentStep(nextStep);
       setStepData(newStepData);
-      if (isComplete) setStatus('completed');
-      
-      // Log the action
-      await supabase.rpc('log_onboarding_action', {
-        _organization_id: organizationId,
-        _action_type: 'step_completed',
-        _step: step,
-        _details: data ? JSON.parse(JSON.stringify(data)) : null,
-      });
-      
+      setStatus(isComplete ? 'completed' : 'in_progress');
+
       return true;
     } catch (err: any) {
       setError(err.message || 'Failed to complete step');
@@ -234,7 +292,7 @@ export function useOnboardingWizard(
     } finally {
       setIsSaving(false);
     }
-  }, [organizationId, stateId, completedSteps, stepData, toast]);
+  }, [organizationId, stateId, currentStep, completedSteps, stepData, status, toast, upsertOnboardingState]);
 
   // Update step data without completing
   const updateStepData = useCallback(async (
@@ -265,7 +323,14 @@ export function useOnboardingWizard(
 
   // Navigation
   const goToStep = useCallback((step: WizardStep) => {
-    if (canNavigateToStep(step)) {
+    // Mirror canNavigateToStep logic here to avoid referencing it before declaration.
+    if (step === 1 || completedSteps.includes(step)) {
+      setCurrentStep(step);
+      return;
+    }
+
+    const maxCompleted = Math.max(0, ...completedSteps);
+    if (step <= maxCompleted + 1) {
       setCurrentStep(step);
     }
   }, [completedSteps]);
