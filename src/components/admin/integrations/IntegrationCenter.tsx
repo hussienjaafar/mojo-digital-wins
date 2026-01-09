@@ -1,6 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Filter, RefreshCw, Plus, Loader2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Filter, RefreshCw, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -11,9 +10,11 @@ import {
 } from '@/components/ui/select';
 import { useIntegrationSummary } from '@/hooks/useIntegrationSummary';
 import { IntegrationStatusBar } from './IntegrationStatusBar';
-import { IntegrationClientRow } from './IntegrationClientRow';
 import { CredentialSlideOver } from './CredentialSlideOver';
 import { IntegrationQuickActions } from './IntegrationQuickActions';
+import { IntegrationSearchInput } from './IntegrationSearchInput';
+import { VirtualizedClientList } from './VirtualizedClientList';
+import { IntegrationListPagination } from './IntegrationListPagination';
 import { IntegrationHealthStatus, PLATFORM_DISPLAY_NAMES } from '@/types/integrations';
 import { toast } from 'sonner';
 
@@ -21,6 +22,10 @@ export function IntegrationCenter() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<IntegrationHealthStatus | 'all'>('all');
   const [platformFilter, setPlatformFilter] = useState<string>('all');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   
   // Slide-over state
   const [slideOverOpen, setSlideOverOpen] = useState(false);
@@ -40,6 +45,17 @@ export function IntegrationCenter() {
     platformFilter,
     searchQuery,
   });
+
+  // Reset page when filters change
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  }, []);
+
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  }, []);
 
   const handleTest = async (integrationId: string) => {
     const success = await testConnection(integrationId);
@@ -135,6 +151,13 @@ export function IntegrationCenter() {
     );
   }, [data]);
 
+  // Pagination
+  const totalPages = Math.ceil(sortedData.length / pageSize);
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return sortedData.slice(startIndex, startIndex + pageSize);
+  }, [sortedData, currentPage, pageSize]);
+
   if (error) {
     return (
       <div className="p-8 text-center">
@@ -190,15 +213,15 @@ export function IntegrationCenter() {
 
       {/* Filters */}
       <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search clients..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <IntegrationSearchInput
+          value={searchQuery}
+          onChange={handleSearchChange}
+          placeholder="Search clients by name or slug..."
+          debounceMs={300}
+          resultCount={sortedData.length}
+          totalCount={statusCounts.needsAttention + statusCounts.healthy + statusCounts.noSetup + statusCounts.untested}
+          className="flex-1 max-w-md"
+        />
         
         <Select value={platformFilter} onValueChange={setPlatformFilter}>
           <SelectTrigger className="w-[180px]">
@@ -242,19 +265,24 @@ export function IntegrationCenter() {
           )}
         </div>
       ) : (
-        <div className="space-y-3">
-          {sortedData.map((summary) => (
-            <IntegrationClientRow
-              key={summary.organization_id}
-              summary={summary}
-              onTest={handleTest}
-              onToggle={handleToggle}
-              onEdit={handleEdit}
-              onAddIntegration={handleAddIntegration}
-              defaultOpen={summary.health_status === 'needs_attention'}
-            />
-          ))}
-        </div>
+        <>
+          <VirtualizedClientList
+            data={paginatedData}
+            onTest={handleTest}
+            onToggle={handleToggle}
+            onEdit={handleEdit}
+            onAddIntegration={handleAddIntegration}
+          />
+          
+          <IntegrationListPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={sortedData.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </>
       )}
 
       {/* Credential Slide-Over */}
