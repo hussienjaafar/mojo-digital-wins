@@ -16,6 +16,8 @@ import { IntegrationSearchInput } from './IntegrationSearchInput';
 import { VirtualizedClientList } from './VirtualizedClientList';
 import { IntegrationListPagination } from './IntegrationListPagination';
 import { IntegrationSortControls, SortConfig } from './IntegrationSortControls';
+import { IntegrationStatsPanel } from './IntegrationStatsPanel';
+import { IntegrationEmptyState } from './IntegrationEmptyState';
 import { IntegrationHealthStatus, IntegrationSummary, PLATFORM_DISPLAY_NAMES } from '@/types/integrations';
 import { toast } from 'sonner';
 
@@ -227,6 +229,11 @@ export function IntegrationCenter() {
         </div>
       </div>
 
+      {/* Stats Overview */}
+      {!isLoading && data.length > 0 && (
+        <IntegrationStatsPanel data={data} />
+      )}
+
       {/* Status Summary Bar */}
       <IntegrationStatusBar
         counts={statusCounts}
@@ -284,26 +291,21 @@ export function IntegrationCenter() {
         <div className="flex items-center justify-center p-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      ) : data.length === 0 ? (
+        <IntegrationEmptyState
+          variant="no-clients"
+          onAddIntegration={() => handleAddIntegration()}
+        />
       ) : sortedData.length === 0 ? (
-        <div className="text-center p-12 border border-dashed rounded-lg">
-          <p className="text-muted-foreground mb-4">
-            {searchQuery || statusFilter !== 'all' || platformFilter !== 'all'
-              ? 'No clients match your filters'
-              : 'No clients found'}
-          </p>
-          {(searchQuery || statusFilter !== 'all' || platformFilter !== 'all') && (
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setSearchQuery('');
-                setStatusFilter('all');
-                setPlatformFilter('all');
-              }}
-            >
-              Clear filters
-            </Button>
-          )}
-        </div>
+        <IntegrationEmptyState
+          variant="no-results"
+          searchQuery={searchQuery}
+          onClearFilters={() => {
+            setSearchQuery('');
+            setStatusFilter('all');
+            setPlatformFilter('all');
+          }}
+        />
       ) : (
         <>
           <VirtualizedClientList
