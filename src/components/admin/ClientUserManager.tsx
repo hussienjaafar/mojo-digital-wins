@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Users, Mail, Eye, Edit, Trash2, Key, MoreVertical, RefreshCw } from "lucide-react";
+import { UserPlus, Users, Mail, Eye, Edit, Trash2, Key, MoreVertical, Send, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -16,6 +17,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { AdminPageHeader, AdminLoadingState } from "./v3";
 import { V3Button } from "@/components/v3/V3Button";
+import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
+import { PendingInvitations } from "@/components/admin/PendingInvitations";
 
 type Organization = {
   id: string;
@@ -40,11 +43,14 @@ const ClientUserManager = () => {
   const [users, setUsers] = useState<ClientUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [selectedOrgForInvite, setSelectedOrgForInvite] = useState<Organization | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ClientUser | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const [formData, setFormData] = useState({
     email: "",
     full_name: "",
@@ -82,6 +88,15 @@ const ClientUserManager = () => {
 
       if (usersError) throw usersError;
       setUsers(usersData || []);
+
+      // Load pending invitation count
+      const { data: pendingData } = await supabase
+        .from('user_invitations')
+        .select('id')
+        .eq('invitation_type', 'organization_member')
+        .eq('status', 'pending');
+      
+      setPendingCount(pendingData?.length || 0);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -91,6 +106,11 @@ const ClientUserManager = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleInvite = (org: Organization) => {
+    setSelectedOrgForInvite(org);
+    setShowInviteDialog(true);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -352,222 +372,188 @@ const ClientUserManager = () => {
               Manage user access within client organizations. Roles: Admin (full access), Manager (edit), Viewer (read-only)
             </CardDescription>
           </div>
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogTrigger asChild>
-              <V3Button variant="primary" className="w-full sm:w-auto" leftIcon={<UserPlus className="w-4 h-4" />}>
-                Add User
-              </V3Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add Organization Member</DialogTitle>
-                <DialogDescription>
-                  Add a new user to an organization. They will receive login credentials via email.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="full_name">Full Name *</Label>
-                  <Input
-                    id="full_name"
-                    value={formData.full_name}
-                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                    placeholder="John Doe"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="john@example.com"
-                    required
-                  />
-                </div>
-                <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <div className="flex items-start gap-2">
-                    <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-                    <div className="text-xs text-blue-900 dark:text-blue-100">
-                      <p className="font-medium mb-1">Automated Setup</p>
-                      <p>A temporary password will be auto-generated and sent to the user via email with login instructions.</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="organization">Organization *</Label>
-                  <Select
-                    value={formData.organization_id}
-                    onValueChange={(value) => setFormData({ ...formData, organization_id: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select organization" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {organizations.map((org) => (
-                        <SelectItem key={org.id} value={org.id}>
-                          {org.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role *</Label>
-                  <Select
-                    value={formData.role}
-                    onValueChange={(value) => setFormData({ ...formData, role: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                      <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <V3Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setShowCreateDialog(false)}
-                    disabled={isCreating}
-                  >
-                    Cancel
-                  </V3Button>
-                  <V3Button type="submit" isLoading={isCreating} loadingText="Creating...">
-                    Create User
-                  </V3Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <V3Button variant="primary" className="w-full sm:w-auto" leftIcon={<UserPlus className="w-4 h-4" />}>
+                  Add User
+                </V3Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowCreateDialog(true)}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Create User Directly
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {organizations.slice(0, 5).map((org) => (
+                  <DropdownMenuItem key={org.id} onClick={() => handleInvite(org)}>
+                    <Send className="w-4 h-4 mr-2" />
+                    Invite to {org.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
-        {/* Mobile Card View */}
-        {isMobile ? (
-          <div className="space-y-3">
-            {users.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                No users yet. Create your first one!
-              </p>
-            ) : (
-              users.map(renderMobileUserCard)
-            )}
-          </div>
-        ) : (
-          /* Desktop Table View */
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Organization</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Last Login</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    No users yet. Create your first one!
-                  </TableCell>
-                </TableRow>
-              ) : (
-                users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.full_name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {getOrganizationName(user.organization_id)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{user.role}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {user.last_login_at
-                        ? new Date(user.last_login_at).toLocaleDateString()
-                        : 'Never'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <V3Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewPortal(user)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Portal
-                        </V3Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <V3Button variant="ghost" size="icon-sm">
-                              <MoreVertical className="h-4 w-4" />
-                            </V3Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditClick(user)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit User
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleResetPassword(user)}>
-                              <Key className="h-4 w-4 mr-2" />
-                              Reset Password
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              onClick={() => handleDeleteClick(user)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete User
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+        <Tabs defaultValue="users" className="w-full">
+          <TabsList>
+            <TabsTrigger value="users">
+              Active Members
+              <Badge variant="secondary" className="ml-2">{users.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="pending">
+              Pending Invites
+              {pendingCount > 0 && (
+                <Badge variant="default" className="ml-2">{pendingCount}</Badge>
               )}
-            </TableBody>
-          </Table>
-        )}
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="users" className="mt-4">
+            {/* Mobile Card View */}
+            {isMobile ? (
+              <div className="space-y-3">
+                {users.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No users yet. Create your first one!
+                  </p>
+                ) : (
+                  users.map(renderMobileUserCard)
+                )}
+              </div>
+            ) : (
+              /* Desktop Table View */
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Organization</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Last Login</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        No users yet. Create your first one!
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.full_name}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {getOrganizationName(user.organization_id)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{user.role}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {user.last_login_at
+                            ? new Date(user.last_login_at).toLocaleDateString()
+                            : 'Never'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(user.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <V3Button variant="ghost" size="icon-sm">
+                                <MoreVertical className="h-4 w-4" />
+                              </V3Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewPortal(user)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Portal
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditClick(user)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit User
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                                <Key className="h-4 w-4 mr-2" />
+                                Reset Password
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteClick(user)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete User
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="pending" className="mt-4">
+            <PendingInvitations 
+              type="organization_member" 
+              onInvitationChange={loadData}
+            />
+          </TabsContent>
+        </Tabs>
       </CardContent>
 
-      {/* Edit User Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-md">
+      {/* Create User Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
+            <DialogTitle>Add Organization Member</DialogTitle>
             <DialogDescription>
-              Update user information and permissions
+              Add a new user to an organization. They will receive login credentials via email.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4">
+          <form onSubmit={handleCreate} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit_full_name">Full Name *</Label>
+              <Label htmlFor="full_name">Full Name *</Label>
               <Input
-                id="edit_full_name"
-                value={editFormData.full_name}
-                onChange={(e) => setEditFormData({ ...editFormData, full_name: e.target.value })}
+                id="full_name"
+                value={formData.full_name}
+                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                placeholder="John Doe"
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit_organization">Organization *</Label>
+              <Label htmlFor="email">Email *</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="john@example.com"
+                required
+              />
+            </div>
+            <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-2">
+                <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <div className="text-xs text-blue-900 dark:text-blue-100">
+                  <p className="font-medium mb-1">Automated Setup</p>
+                  <p>A temporary password will be auto-generated and sent to the user via email with login instructions.</p>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="organization">Organization *</Label>
               <Select
-                value={editFormData.organization_id}
-                onValueChange={(value) => setEditFormData({ ...editFormData, organization_id: value })}
+                value={formData.organization_id}
+                onValueChange={(value) => setFormData({ ...formData, organization_id: value })}
                 required
               >
                 <SelectTrigger>
@@ -583,7 +569,92 @@ const ClientUserManager = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit_role">Role *</Label>
+              <Label htmlFor="role">Role *</Label>
+              <Select
+                value={formData.role}
+                onValueChange={(value) => setFormData({ ...formData, role: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <V3Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setShowCreateDialog(false)}
+                disabled={isCreating}
+              >
+                Cancel
+              </V3Button>
+              <V3Button type="submit" isLoading={isCreating} loadingText="Creating...">
+                Create User
+              </V3Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invite Dialog */}
+      {selectedOrgForInvite && (
+        <InviteUserDialog
+          open={showInviteDialog}
+          onOpenChange={(open) => {
+            setShowInviteDialog(open);
+            if (!open) setSelectedOrgForInvite(null);
+          }}
+          type="organization_member"
+          organizationId={selectedOrgForInvite.id}
+          organizationName={selectedOrgForInvite.name}
+          onSuccess={loadData}
+        />
+      )}
+
+      {/* Edit User Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user information and permissions
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit_full_name">Full Name</Label>
+              <Input
+                id="edit_full_name"
+                value={editFormData.full_name}
+                onChange={(e) => setEditFormData({ ...editFormData, full_name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_organization">Organization</Label>
+              <Select
+                value={editFormData.organization_id}
+                onValueChange={(value) => setEditFormData({ ...editFormData, organization_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_role">Role</Label>
               <Select
                 value={editFormData.role}
                 onValueChange={(value) => setEditFormData({ ...editFormData, role: value })}
