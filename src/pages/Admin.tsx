@@ -48,7 +48,7 @@ import OpsPanel from "@/components/admin/OpsPanel";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
 import { CoverageGovernancePanel } from "@/components/admin/v3";
 import { OnboardingWizard } from "@/components/admin/onboarding/OnboardingWizard";
-import { IntegrationsHub } from "@/components/admin/integrations/IntegrationsHub";
+import { IntegrationCenter } from "@/components/admin/integrations/IntegrationCenter";
 import { AuditActivityCenter } from "@/components/admin/audit/AuditActivityCenter";
 import { BulkOperations } from "@/components/admin/bulk/BulkOperations";
 import { EnvironmentBanner } from "@/components/admin/EnvironmentBanner";
@@ -338,12 +338,10 @@ const Admin = () => {
         return <ClientUserManager />;
       case "bulk-ops":
         return <BulkOperations />;
-      case "integrations-hub":
-        return <IntegrationsHub />;
+      case "integration-center":
+        return <IntegrationCenter />;
       case "audit-activity":
         return <AuditActivityCenter />;
-      case "api-credentials":
-        return <APICredentialsManager />;
       case "attribution":
         return <CampaignAttributionManager />;
       case "scheduler":
