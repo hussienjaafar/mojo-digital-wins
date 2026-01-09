@@ -101,9 +101,18 @@ export const navigationGroups: NavigationGroup[] = [
     icon: Building2,
     items: [
       { title: "Organizations", icon: Building2, value: "clients" },
+      { title: "Onboarding Wizard", icon: UserCog, value: "onboarding-wizard", requiredRole: 'admin' },
       { title: "Users", icon: Users, value: "client-users" },
       { title: "Attribution", icon: GitBranch, value: "attribution" },
       { title: "Health Monitoring", icon: HeartPulse, value: "client-health", requiredRole: 'admin' },
+    ],
+  },
+  {
+    label: "Integrations",
+    icon: Key,
+    items: [
+      { title: "Integrations Hub", icon: Key, value: "integrations-hub", requiredRole: 'admin' },
+      { title: "API Credentials", icon: Key, value: "api-credentials", requiredRole: 'admin' },
     ],
   },
   {
