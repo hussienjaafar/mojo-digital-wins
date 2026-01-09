@@ -9,16 +9,22 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UserInvite, WizardStep } from '../types';
-import { Users, Plus, Trash2, Upload, Mail, Loader2 } from 'lucide-react';
+import { Users, Plus, Trash2, Upload, Mail, Loader2, Send, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+// Valid org roles
+const ORG_ROLES = ['admin', 'manager', 'editor', 'viewer'] as const;
+type OrgRole = typeof ORG_ROLES[number];
 
 interface Step3UsersProps {
   organizationId: string;
+  organizationName?: string;
   stepData: Record<string, unknown>;
   onComplete: (step: WizardStep, data: Record<string, unknown>) => Promise<void>;
   onBack: () => void;
 }
 
-export function Step3Users({ organizationId, stepData, onComplete, onBack }: Step3UsersProps) {
+export function Step3Users({ organizationId, organizationName, stepData, onComplete, onBack }: Step3UsersProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [users, setUsers] = useState<UserInvite[]>(
@@ -74,7 +80,7 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
             parsed.push({
               email,
               full_name,
-              role: (['admin', 'manager', 'viewer'].includes(role) ? role : 'viewer') as 'admin' | 'manager' | 'viewer'
+              role: (ORG_ROLES.includes(role as OrgRole) ? role : 'viewer') as OrgRole
             });
           }
         } else {
@@ -107,35 +113,39 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
   const handleSubmit = async () => {
     if (users.length === 0) {
       // Allow skipping - just move to next step
-      await onComplete(3, { users: [], created_users: [], skipped: true });
+      await onComplete(3, { users: [], invited_users: [], skipped: true });
       return;
     }
 
     setIsLoading(true);
-    const createdUsers: string[] = [];
+    const invitedUsers: string[] = [];
     const errors: string[] = [];
 
     try {
+      // Send invitations instead of creating users directly
       for (const user of users) {
-        const { error } = await supabase.functions.invoke('create-client-user', {
+        const { data, error } = await supabase.functions.invoke('send-user-invitation', {
           body: {
             email: user.email,
-            full_name: user.full_name,
-            organization_id: organizationId,
-            role: user.role
+            invitationType: 'organization_member',
+            organizationId: organizationId,
+            role: user.role,
+            customMessage: `Welcome to ${organizationName || 'the organization'}! You've been invited to join as a ${user.role}.`
           }
         });
 
         if (error) {
           errors.push(`${user.email}: ${error.message}`);
+        } else if (!data?.success) {
+          errors.push(`${user.email}: ${data?.error || 'Failed to send invitation'}`);
         } else {
-          createdUsers.push(user.email);
+          invitedUsers.push(user.email);
           
-          // Log audit action for each user
+          // Log audit action for each invitation
           await supabase.rpc('log_admin_action', {
-            _action_type: 'create_user',
-            _table_affected: 'client_users',
-            _record_id: null,
+            _action_type: 'invite_user',
+            _table_affected: 'user_invitations',
+            _record_id: data.invitation_id || null,
             _old_value: null,
             _new_value: { email: user.email, role: user.role, organization_id: organizationId }
           });
@@ -144,25 +154,25 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
 
       if (errors.length > 0) {
         toast({
-          title: 'Some users failed to create',
+          title: 'Some invitations failed',
           description: errors.slice(0, 3).join('\n'),
           variant: 'destructive'
         });
       }
 
-      if (createdUsers.length > 0) {
+      if (invitedUsers.length > 0) {
         toast({
-          title: 'Users created',
-          description: `Successfully created ${createdUsers.length} user(s).`
+          title: 'Invitations sent',
+          description: `Successfully sent ${invitedUsers.length} invitation(s).`
         });
       }
 
-      await onComplete(3, { users, created_users: createdUsers, errors });
+      await onComplete(3, { users, invited_users: invitedUsers, errors });
     } catch (error) {
-      console.error('Error creating users:', error);
+      console.error('Error sending invitations:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create users. Please try again.',
+        description: 'Failed to send invitations. Please try again.',
         variant: 'destructive'
       });
     } finally {
@@ -174,7 +184,8 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
     switch (role) {
       case 'admin': return 'destructive';
       case 'manager': return 'default';
-      default: return 'secondary';
+      case 'editor': return 'secondary';
+      default: return 'outline';
     }
   };
 
@@ -183,13 +194,23 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Users className="h-5 w-5" />
-          Create Initial Users
+          Invite Team Members
         </CardTitle>
         <CardDescription>
-          Add team members who will have access to this organization's dashboard.
+          Invite team members who will have access to this organization's dashboard.
+          They'll receive an email with a secure link to set up their account.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Info Alert */}
+        <Alert>
+          <Send className="h-4 w-4" />
+          <AlertDescription>
+            Invited users will receive an email with a secure link to create their account and set a password.
+            No temporary passwords are sent—invitations are the recommended approach for security.
+          </AlertDescription>
+        </Alert>
+
         {/* Add Single User */}
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
@@ -216,7 +237,7 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
               <Label htmlFor="role">Role</Label>
               <Select
                 value={newUser.role}
-                onValueChange={(value: 'admin' | 'manager' | 'viewer') => 
+                onValueChange={(value: OrgRole) => 
                   setNewUser({ ...newUser, role: value })
                 }
               >
@@ -224,16 +245,17 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="viewer">Viewer</SelectItem>
+                  <SelectItem value="admin">Admin (full access)</SelectItem>
+                  <SelectItem value="manager">Manager (full editing)</SelectItem>
+                  <SelectItem value="editor">Editor (basic editing)</SelectItem>
+                  <SelectItem value="viewer">Viewer (read-only)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <Button onClick={addUser} variant="outline" size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            Add User
+            Add to List
           </Button>
         </div>
 
@@ -269,7 +291,7 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
           <div className="border rounded-lg">
             <div className="p-3 border-b bg-muted/50">
               <span className="text-sm font-medium">
-                Users to Create ({users.length})
+                Users to Invite ({users.length})
               </span>
             </div>
             <div className="divide-y">
@@ -304,7 +326,7 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
           <div className="text-center py-8 text-muted-foreground">
             <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p>No users added yet</p>
-            <p className="text-sm">Add at least one user to continue</p>
+            <p className="text-sm">Add users to invite, or skip this step</p>
           </div>
         )}
 
@@ -323,10 +345,13 @@ export function Step3Users({ organizationId, stepData, onComplete, onBack }: Ste
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {users.length > 0 ? 'Creating Users...' : 'Continuing...'}
+                  {users.length > 0 ? 'Sending Invitations...' : 'Continuing...'}
                 </>
               ) : users.length > 0 ? (
-                'Create Users & Continue'
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Invitations & Continue
+                </>
               ) : (
                 'Continue'
               )}

@@ -99,7 +99,7 @@ export interface OrgProfileData {
 export interface UserInvite {
   email: string;
   full_name: string;
-  role: 'admin' | 'manager' | 'viewer';
+  role: 'admin' | 'manager' | 'editor' | 'viewer';
 }
 
 // Step 4: Integrations
