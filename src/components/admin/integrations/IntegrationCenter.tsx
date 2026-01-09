@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { RefreshCw, Plus, Loader2 } from 'lucide-react';
+import { RefreshCw, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useIntegrationSummary } from '@/hooks/useIntegrationSummary';
@@ -10,6 +10,11 @@ import { IntegrationListPagination } from './IntegrationListPagination';
 import { IntegrationEmptyState } from './IntegrationEmptyState';
 import { CredentialSlideOver } from './CredentialSlideOver';
 import { IntegrationDetailDrawer } from './IntegrationDetailDrawer';
+import { 
+  SystemHealthSkeleton, 
+  DiscoveryBarSkeleton, 
+  OrgListSkeleton 
+} from './IntegrationSkeletons';
 import { IntegrationHealthStatus, IntegrationSummary } from '@/types/integrations';
 import { toast } from 'sonner';
 
@@ -257,7 +262,15 @@ export function IntegrationCenter() {
       </motion.div>
 
       {/* System Health Overview */}
-      {!isLoading && data.length > 0 && (
+      {isLoading ? (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <SystemHealthSkeleton />
+        </motion.div>
+      ) : data.length > 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -271,33 +284,47 @@ export function IntegrationCenter() {
             isSyncingAll={isSyncingAll}
           />
         </motion.div>
-      )}
+      ) : null}
 
       {/* Discovery Bar (Search, Filters, Sort) */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <IntegrationDiscoveryBar
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          statusFilter={statusFilter}
-          onStatusFilterChange={handleStatusFilterChange}
-          platformFilter={platformFilter}
-          onPlatformFilterChange={handlePlatformFilterChange}
-          sortConfig={sortConfig}
-          onSortChange={setSortConfig}
-          statusCounts={statusCounts}
-          resultCount={sortedData.length}
-        />
-      </motion.div>
+      {isLoading ? (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <DiscoveryBarSkeleton />
+        </motion.div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <IntegrationDiscoveryBar
+            searchQuery={searchQuery}
+            onSearchChange={handleSearchChange}
+            statusFilter={statusFilter}
+            onStatusFilterChange={handleStatusFilterChange}
+            platformFilter={platformFilter}
+            onPlatformFilterChange={handlePlatformFilterChange}
+            sortConfig={sortConfig}
+            onSortChange={setSortConfig}
+            statusCounts={statusCounts}
+            resultCount={sortedData.length}
+          />
+        </motion.div>
+      )}
 
       {/* Organization List */}
       {isLoading ? (
-        <div className="flex items-center justify-center p-12">
-          <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--portal-text-tertiary))]" />
-        </div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <OrgListSkeleton count={5} />
+        </motion.div>
       ) : data.length === 0 ? (
         <IntegrationEmptyState
           variant="no-clients"
