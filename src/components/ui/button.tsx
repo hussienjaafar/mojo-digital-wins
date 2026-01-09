@@ -1,35 +1,82 @@
-import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
-import { cva, type VariantProps } from "class-variance-authority";
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva, type VariantProps } from "class-variance-authority"
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
+/**
+ * Base Button component - Enterprise-grade styling
+ * 
+ * Variant mapping:
+ * - default: Primary CTA (use sparingly)
+ * - secondary: Normal actions
+ * - outline: Alternative secondary
+ * - ghost: Utility actions (Refresh, Export, Test)
+ * - destructive: Dangerous actions (filled red, NEVER yellow)
+ * - link: Inline text actions
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  [
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap",
+    "rounded-lg text-sm font-medium transition-all duration-200",
+    "ring-offset-background focus-visible:outline-none focus-visible:ring-2",
+    "focus-visible:ring-ring focus-visible:ring-offset-2",
+    "disabled:pointer-events-none disabled:opacity-50",
+    "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  ].join(" "),
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border-2 border-primary bg-transparent text-primary hover:bg-primary hover:text-primary-foreground font-bold transition-all duration-300 dark:border-accent dark:text-accent dark:hover:bg-accent dark:hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-        hero: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg hover:shadow-xl transform hover:scale-105 font-bold border-2 border-destructive hover:border-primary-foreground",
-        cta: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-md hover:shadow-xl font-bold transition-all duration-300 transform hover:scale-105",
-        brutal: "bg-accent text-accent-foreground font-black border-4 border-destructive shadow-[4px_4px_0px_hsl(var(--destructive))] hover:shadow-[6px_6px_0px_hsl(var(--destructive))] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-all",
-        movement: "bg-gradient-to-r from-secondary to-primary text-primary-foreground font-bold shadow-lg hover:shadow-glow-red transform hover:scale-105 border-2 border-primary-foreground/20",
-        gradient: "bg-gradient-to-r from-primary via-primary/90 to-primary/80 text-primary-foreground shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] font-semibold",
-        glass: "backdrop-blur-xl bg-background/10 dark:bg-background/5 border border-border/20 hover:bg-background/20 dark:hover:bg-background/10 shadow-lg hover:shadow-xl",
-        smooth: "bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 hover:border-primary/30 hover:shadow-md",
-        shine: "bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-md hover:shadow-lg relative overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-primary-foreground/20 before:to-transparent before:translate-x-[-200%] hover:before:translate-x-[200%] before:transition-transform before:duration-700",
+        // Primary - main CTA
+        default: [
+          "bg-primary text-primary-foreground",
+          "hover:bg-primary/90",
+          "shadow-sm hover:shadow-md active:shadow-sm active:translate-y-px",
+        ].join(" "),
+        
+        // Destructive - filled red, NEVER yellow or outline
+        destructive: [
+          "bg-destructive text-destructive-foreground",
+          "hover:bg-destructive/90",
+          "shadow-sm hover:shadow-md active:shadow-sm active:translate-y-px",
+        ].join(" "),
+        
+        // Outline - secondary with visible border
+        outline: [
+          "border border-input bg-background",
+          "text-foreground",
+          "hover:bg-accent hover:text-accent-foreground",
+          "active:bg-accent/80",
+        ].join(" "),
+        
+        // Secondary - subtle surface
+        secondary: [
+          "bg-secondary text-secondary-foreground",
+          "hover:bg-secondary/80",
+          "active:bg-secondary/70",
+        ].join(" "),
+        
+        // Ghost - minimal, for utility actions
+        ghost: [
+          "text-muted-foreground",
+          "hover:bg-accent hover:text-accent-foreground",
+          "active:bg-accent/80",
+        ].join(" "),
+        
+        // Link - text-style button
+        link: [
+          "text-primary underline-offset-4",
+          "hover:underline",
+          "p-0 h-auto",
+        ].join(" "),
       },
       size: {
-        default: "h-11 px-4 py-2 min-h-[44px]",
-        sm: "h-10 rounded-md px-3 min-h-[40px]",
-        lg: "h-12 rounded-md px-6 md:px-8 min-h-[48px]",
-        xl: "h-14 rounded-lg px-8 md:px-10 text-base min-h-[56px]",
-        icon: "h-11 w-11 min-h-[44px] min-w-[44px]",
+        // Improved sizing with premium padding
+        default: "h-10 px-5 py-2.5",
+        sm: "h-8 rounded-md px-3 text-xs",
+        lg: "h-11 rounded-lg px-6",
+        xl: "h-12 rounded-lg px-8 text-base",
+        icon: "h-10 w-10 p-0",
       },
     },
     defaultVariants: {
@@ -37,20 +84,26 @@ const buttonVariants = cva(
       size: "default",
     },
   },
-);
+)
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
+  asChild?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
-    return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />;
-  },
-);
-Button.displayName = "Button";
+    const Comp = asChild ? Slot : "button"
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Button.displayName = "Button"
 
-export { Button, buttonVariants };
+export { Button, buttonVariants }

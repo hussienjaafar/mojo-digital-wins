@@ -455,7 +455,7 @@ const Index = () => {
           </div>
 
           <div className="text-center mt-12">
-            <Button variant="brutal" size="xl" asChild className="text-lg">
+            <Button variant="default" size="xl" asChild className="text-lg">
               <Link to="/case-studies">View All Case Studies</Link>
             </Button>
           </div>
@@ -665,7 +665,7 @@ const Index = () => {
           </div>
 
           <div className="text-center mt-16">
-            <Button variant="brutal" size="xl" asChild className="text-lg">
+            <Button variant="default" size="xl" asChild className="text-lg">
               <Link to="/services">Explore All Services</Link>
             </Button>
           </div>
@@ -751,7 +751,7 @@ const Index = () => {
             <div className={`text-center transition-all duration-700 ${
               compoundingImpact.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
             }`} style={{ transitionDelay: '600ms' }}>
-              <Button variant="brutal" size="xl" asChild className="text-lg">
+              <Button variant="default" size="xl" asChild className="text-lg">
                 <Link to="/services">Learn Our Process</Link>
               </Button>
             </div>

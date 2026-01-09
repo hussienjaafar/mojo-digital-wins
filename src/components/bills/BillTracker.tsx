@@ -158,7 +158,7 @@ export function BillTracker() {
             Tracking {filteredBills.length} relevant bills
           </p>
         </div>
-        <Button onClick={syncBills} disabled={syncing} variant="smooth">
+        <Button onClick={syncBills} disabled={syncing} variant="ghost">
           <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
           Sync Bills
         </Button>
@@ -205,7 +205,7 @@ export function BillTracker() {
       {filteredBills.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground">No bills found matching your criteria</p>
-          <Button onClick={syncBills} className="mt-4" variant="smooth">
+          <Button onClick={syncBills} className="mt-4" variant="ghost">
             <RefreshCw className="w-4 h-4 mr-2" />
             Sync Bills from Congress.gov
           </Button>

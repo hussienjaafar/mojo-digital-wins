@@ -221,32 +221,38 @@
   box-shadow: var(--portal-shadow-md);
 }
 
-/* Portal Buttons */
+/* Portal Buttons - Enterprise-grade styling */
 .portal-btn-primary {
   background: hsl(var(--portal-accent-blue));
   color: white;
   border: none;
   border-radius: var(--portal-radius-sm);
   padding: 0.625rem 1.25rem;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.875rem;
   transition: all var(--portal-transition-base);
   cursor: pointer;
+  box-shadow: var(--portal-shadow-sm);
 }
 
 .portal-btn-primary:hover {
   background: hsl(var(--portal-accent-blue-hover));
-  box-shadow: var(--portal-shadow-glow);
+  box-shadow: var(--portal-shadow-md);
   transform: translateY(-1px);
 }
 
+.portal-btn-primary:active {
+  transform: translateY(0);
+  box-shadow: var(--portal-shadow-sm);
+}
+
 .portal-btn-secondary {
-  background: transparent;
+  background: hsl(var(--portal-bg-secondary));
   color: hsl(var(--portal-text-primary));
   border: 1px solid hsl(var(--portal-border));
   border-radius: var(--portal-radius-sm);
   padding: 0.625rem 1.25rem;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.875rem;
   transition: all var(--portal-transition-base);
   cursor: pointer;
@@ -255,6 +261,87 @@
 .portal-btn-secondary:hover {
   background: hsl(var(--portal-bg-elevated));
   border-color: hsl(var(--portal-border-hover));
+}
+
+.portal-btn-secondary:active {
+  background: hsl(var(--portal-bg-tertiary));
+}
+
+/* Ghost/Tertiary button - for utility actions */
+.portal-btn-ghost {
+  background: transparent;
+  color: hsl(var(--portal-text-secondary));
+  border: none;
+  border-radius: var(--portal-radius-sm);
+  padding: 0.625rem 1.25rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all var(--portal-transition-base);
+  cursor: pointer;
+}
+
+.portal-btn-ghost:hover {
+  background: hsl(var(--portal-bg-hover));
+  color: hsl(var(--portal-text-primary));
+}
+
+.portal-btn-ghost:active {
+  background: hsl(var(--portal-bg-tertiary));
+}
+
+/* Destructive button - always filled, NEVER yellow */
+.portal-btn-destructive {
+  background: hsl(var(--portal-error));
+  color: white;
+  border: none;
+  border-radius: var(--portal-radius-sm);
+  padding: 0.625rem 1.25rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all var(--portal-transition-base);
+  cursor: pointer;
+  box-shadow: var(--portal-shadow-sm);
+}
+
+.portal-btn-destructive:hover {
+  background: hsl(var(--portal-error) / 0.85);
+  box-shadow: var(--portal-shadow-md);
+  transform: translateY(-1px);
+}
+
+.portal-btn-destructive:active {
+  transform: translateY(0);
+  box-shadow: var(--portal-shadow-sm);
+}
+
+/* Icon button - square, for icon-only actions */
+.portal-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  background: transparent;
+  color: hsl(var(--portal-text-secondary));
+  border: none;
+  border-radius: var(--portal-radius-sm);
+  transition: all var(--portal-transition-base);
+  cursor: pointer;
+}
+
+.portal-btn-icon:hover {
+  background: hsl(var(--portal-bg-hover));
+  color: hsl(var(--portal-text-primary));
+}
+
+.portal-btn-icon:active {
+  background: hsl(var(--portal-bg-tertiary));
+}
+
+.portal-btn-icon-sm {
+  width: 2rem;
+  height: 2rem;
 }
 
 /* Portal Text */
