@@ -47,6 +47,7 @@ export { CommandPaletteFilter } from "./CommandPaletteFilter";
 
 // Phase 2: Personalization Components
 export { RelevanceExplainerInline } from "./RelevanceExplainerInline";
+export { PersonalizationPanel } from "./PersonalizationPanel";
 
 // Phase 7: Data & ML Components
 export { LearningInsightsPanel } from "./LearningInsightsPanel";
@@ -54,3 +55,8 @@ export { SemanticClusterBadge } from "./SemanticClusterBadge";
 
 // Phase 8: Campaign Integration
 export { CampaignLaunchPanel } from "./CampaignLaunchPanel";
+
+// Enhanced Components (Part C Redesign)
+export { ExecutiveSummaryEnhanced } from "./ExecutiveSummaryEnhanced";
+export { QuickFilterChips, type QuickFilter } from "./QuickFilterChips";
+export { TrendCardEnhanced } from "./TrendCardEnhanced";
