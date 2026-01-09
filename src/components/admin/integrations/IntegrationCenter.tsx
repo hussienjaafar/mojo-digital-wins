@@ -12,21 +12,19 @@ import {
 import { useIntegrationSummary } from '@/hooks/useIntegrationSummary';
 import { IntegrationStatusBar } from './IntegrationStatusBar';
 import { IntegrationClientRow } from './IntegrationClientRow';
+import { CredentialSlideOver } from './CredentialSlideOver';
 import { IntegrationHealthStatus, PLATFORM_DISPLAY_NAMES } from '@/types/integrations';
 import { toast } from 'sonner';
 
-interface IntegrationCenterProps {
-  onAddCredential?: (orgId?: string) => void;
-  onEditCredential?: (credentialId: string) => void;
-}
-
-export function IntegrationCenter({ 
-  onAddCredential, 
-  onEditCredential 
-}: IntegrationCenterProps) {
+export function IntegrationCenter() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<IntegrationHealthStatus | 'all'>('all');
   const [platformFilter, setPlatformFilter] = useState<string>('all');
+  
+  // Slide-over state
+  const [slideOverOpen, setSlideOverOpen] = useState(false);
+  const [editingCredentialId, setEditingCredentialId] = useState<string | null>(null);
+  const [preselectedOrgId, setPreselectedOrgId] = useState<string | null>(null);
   
   const { 
     data, 
@@ -63,11 +61,19 @@ export function IntegrationCenter({
   };
 
   const handleEdit = (credentialId: string) => {
-    onEditCredential?.(credentialId);
+    setEditingCredentialId(credentialId);
+    setPreselectedOrgId(null);
+    setSlideOverOpen(true);
   };
 
-  const handleAddIntegration = (orgId: string) => {
-    onAddCredential?.(orgId);
+  const handleAddIntegration = (orgId?: string) => {
+    setEditingCredentialId(null);
+    setPreselectedOrgId(orgId || null);
+    setSlideOverOpen(true);
+  };
+
+  const handleSlideOverSuccess = () => {
+    refetch();
   };
 
   // Sort data: needs_attention first, then untested, then no_setup, then healthy
@@ -112,7 +118,7 @@ export function IntegrationCenter({
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button onClick={() => onAddCredential?.()}>
+          <Button onClick={() => handleAddIntegration()}>
             <Plus className="h-4 w-4 mr-2" />
             Add Integration
           </Button>
@@ -194,6 +200,15 @@ export function IntegrationCenter({
           ))}
         </div>
       )}
+
+      {/* Credential Slide-Over */}
+      <CredentialSlideOver
+        open={slideOverOpen}
+        onOpenChange={setSlideOverOpen}
+        editingCredentialId={editingCredentialId}
+        preselectedOrgId={preselectedOrgId}
+        onSuccess={handleSlideOverSuccess}
+      />
     </div>
   );
 }

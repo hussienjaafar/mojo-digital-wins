@@ -1,0 +1,377 @@
+import React, { useState, useEffect } from 'react';
+import { X, ShieldCheck, Play, Loader2, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { CredentialForm, CredentialFormData } from './CredentialForm';
+
+interface Organization {
+  id: string;
+  name: string;
+}
+
+interface CredentialSlideOverProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingCredentialId?: string | null;
+  preselectedOrgId?: string | null;
+  onSuccess?: () => void;
+}
+
+export function CredentialSlideOver({
+  open,
+  onOpenChange,
+  editingCredentialId,
+  preselectedOrgId,
+  onSuccess,
+}: CredentialSlideOverProps) {
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [selectedOrg, setSelectedOrg] = useState('');
+  const [platform, setPlatform] = useState<'meta' | 'switchboard' | 'actblue' | 'google_ads'>('meta');
+  const [formData, setFormData] = useState<CredentialFormData>({});
+  const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [existingCredential, setExistingCredential] = useState<any>(null);
+
+  // Fetch organizations on mount
+  useEffect(() => {
+    if (open) {
+      fetchOrganizations();
+    }
+  }, [open]);
+
+  // Set preselected org when provided
+  useEffect(() => {
+    if (preselectedOrgId && open) {
+      setSelectedOrg(preselectedOrgId);
+    }
+  }, [preselectedOrgId, open]);
+
+  // Load existing credential when editing
+  useEffect(() => {
+    if (editingCredentialId && open) {
+      loadCredential(editingCredentialId);
+    }
+  }, [editingCredentialId, open]);
+
+  // Reset form when closed
+  useEffect(() => {
+    if (!open) {
+      resetForm();
+    }
+  }, [open]);
+
+  const fetchOrganizations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('client_organizations')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setOrganizations(data || []);
+    } catch (err) {
+      console.error('Failed to fetch organizations:', err);
+      toast.error('Failed to load organizations');
+    }
+  };
+
+  const loadCredential = async (id: string) => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('client_api_credentials')
+        .select('id, organization_id, platform, is_active')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setExistingCredential(data);
+        setSelectedOrg(data.organization_id);
+        setPlatform(data.platform as any);
+        // SECURITY: Don't populate form with existing credentials
+        // User must re-enter all credentials when editing
+        setFormData({});
+      }
+    } catch (err) {
+      console.error('Failed to load credential:', err);
+      toast.error('Failed to load credential details');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedOrg('');
+    setPlatform('meta');
+    setFormData({});
+    setExistingCredential(null);
+  };
+
+  const validateForm = (): boolean => {
+    if (!selectedOrg) {
+      toast.error('Please select an organization');
+      return false;
+    }
+
+    const platformData = formData[platform];
+    if (!platformData) {
+      toast.error('Please fill in the credentials');
+      return false;
+    }
+
+    // Platform-specific validation
+    if (platform === 'meta' && !formData.meta?.access_token) {
+      toast.error('Meta access token is required');
+      return false;
+    }
+
+    if (platform === 'switchboard' && !formData.switchboard?.api_key) {
+      toast.error('Switchboard API key is required');
+      return false;
+    }
+
+    if (platform === 'actblue' && !formData.actblue?.webhook_secret) {
+      toast.error('ActBlue webhook secret is required for secure webhook validation');
+      return false;
+    }
+
+    if (platform === 'google_ads' && !formData.google_ads?.developer_token) {
+      toast.error('Google Ads developer token is required');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleTest = async () => {
+    if (!validateForm()) return;
+
+    setIsTesting(true);
+    try {
+      const endpoints: Record<string, string> = {
+        meta: 'admin-sync-meta',
+        switchboard: 'sync-switchboard-sms',
+        actblue: 'sync-actblue-csv',
+        google_ads: 'sync-google-ads',
+      };
+
+      const { data, error } = await supabase.functions.invoke(endpoints[platform], {
+        body: {
+          organization_id: selectedOrg,
+          test_only: true,
+          credentials: formData[platform],
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success(`${platform} credentials are valid. You can now save them.`);
+    } catch (err: any) {
+      toast.error(err.message || `Unable to verify ${platform} credentials`);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) return;
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('client_api_credentials')
+        .upsert([{
+          organization_id: selectedOrg,
+          platform: platform,
+          encrypted_credentials: formData[platform],
+          is_active: true,
+        }], {
+          onConflict: 'organization_id,platform'
+        });
+
+      if (error) throw error;
+
+      toast.success(existingCredential ? 'Credentials updated securely' : 'Credentials saved securely');
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save credentials');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!existingCredential) return;
+
+    try {
+      const { error } = await supabase
+        .from('client_api_credentials')
+        .delete()
+        .eq('id', existingCredential.id);
+
+      if (error) throw error;
+
+      toast.success('Credentials deleted');
+      setShowDeleteDialog(false);
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete credentials');
+    }
+  };
+
+  const selectedOrgName = organizations.find(o => o.id === selectedOrg)?.name;
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-green-600" />
+              {existingCredential ? 'Update' : 'Add'} Integration
+            </SheetTitle>
+            <SheetDescription>
+              Credentials are encrypted before storage and never displayed after saving.
+            </SheetDescription>
+          </SheetHeader>
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-6 py-6">
+              {/* Organization Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="organization">Organization</Label>
+                <Select 
+                  value={selectedOrg} 
+                  onValueChange={setSelectedOrg}
+                  disabled={!!existingCredential}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select organization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizations.map(org => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Platform & Credentials Form */}
+              <div className="space-y-2">
+                <Label>Platform & Credentials</Label>
+                <CredentialForm
+                  platform={platform}
+                  formData={formData}
+                  onFormDataChange={setFormData}
+                  onPlatformChange={setPlatform}
+                  disabled={!!existingCredential}
+                />
+              </div>
+            </div>
+          )}
+
+          <SheetFooter className="flex-col gap-2 sm:flex-row">
+            {existingCredential && (
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteDialog(true)}
+                className="w-full sm:w-auto"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            )}
+            <div className="flex-1" />
+            <Button
+              variant="outline"
+              onClick={handleTest}
+              disabled={isTesting || isSaving}
+              className="w-full sm:w-auto"
+            >
+              {isTesting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 mr-2" />
+              )}
+              Test
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isTesting || isSaving}
+              className="w-full sm:w-auto"
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <ShieldCheck className="h-4 w-4 mr-2" />
+              )}
+              {existingCredential ? 'Update' : 'Save'} Securely
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Credentials</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the {platform} credentials for {selectedOrgName}? 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
