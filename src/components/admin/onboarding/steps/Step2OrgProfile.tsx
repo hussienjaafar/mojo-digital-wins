@@ -6,7 +6,7 @@ import { V3Button } from '@/components/v3/V3Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Target, MapPin, Loader2, Sparkles, AlertCircle, ChevronDown, ChevronUp, CheckCircle2, XCircle } from 'lucide-react';
+import { Target, MapPin, Loader2, Sparkles, AlertCircle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Plus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -47,6 +47,8 @@ export function Step2OrgProfile({
   const [scrapeStatus, setScrapeStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [scrapeMessage, setScrapeMessage] = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [extractedFocusAreas, setExtractedFocusAreas] = useState<string[]>([]);
+  const [customFocusArea, setCustomFocusArea] = useState('');
   const [formData, setFormData] = useState<OrgProfileData>({
     mission_statement: initialData?.mission_statement || '',
     focus_areas: initialData?.focus_areas || [],
@@ -88,19 +90,24 @@ export function Step2OrgProfile({
       // Map edge function response fields to form fields
       if (data?.profile) {
         const profile = data.profile;
+        const aiExtractedAreas = [...(profile.focus_areas || []), ...(profile.key_issues || [])];
+        
+        // Store extracted areas for display
+        setExtractedFocusAreas(aiExtractedAreas);
+        
+        // Auto-select all extracted areas
         setFormData(prev => ({
           ...prev,
           mission_statement: profile.mission || prev.mission_statement,
-          focus_areas: profile.focus_areas || prev.focus_areas,
-          policy_domains: profile.key_issues || prev.policy_domains,
+          focus_areas: [...new Set([...prev.focus_areas, ...aiExtractedAreas])],
         }));
         
         setScrapeStatus('success');
-        setScrapeMessage(`Extracted mission and ${(profile.focus_areas?.length || 0) + (profile.key_issues?.length || 0)} focus areas`);
+        setScrapeMessage(`Extracted mission and ${aiExtractedAreas.length} focus areas`);
         
         toast({
           title: 'Website Analyzed',
-          description: 'Organization profile auto-filled from website content',
+          description: `Found ${aiExtractedAreas.length} focus areas. Review and adjust below.`,
         });
       } else {
         throw new Error('No profile data returned');
@@ -118,6 +125,35 @@ export function Step2OrgProfile({
     } finally {
       setIsScraping(false);
     }
+  };
+
+  const toggleFocusArea = (area: string) => {
+    setFormData(prev => ({
+      ...prev,
+      focus_areas: prev.focus_areas.includes(area)
+        ? prev.focus_areas.filter(a => a !== area)
+        : [...prev.focus_areas, area],
+    }));
+  };
+
+  const addCustomFocusArea = () => {
+    const trimmed = customFocusArea.trim();
+    if (trimmed && !formData.focus_areas.includes(trimmed)) {
+      setFormData(prev => ({
+        ...prev,
+        focus_areas: [...prev.focus_areas, trimmed],
+      }));
+      setCustomFocusArea('');
+    }
+  };
+
+  const removeFocusArea = (area: string) => {
+    setFormData(prev => ({
+      ...prev,
+      focus_areas: prev.focus_areas.filter(a => a !== area),
+    }));
+    // Also remove from extracted if present
+    setExtractedFocusAreas(prev => prev.filter(a => a !== area));
   };
 
   const toggleDomain = (domain: string) => {
@@ -271,10 +307,86 @@ export function Step2OrgProfile({
             />
           </div>
 
+          {/* AI Extracted Focus Areas */}
+          {(extractedFocusAreas.length > 0 || formData.focus_areas.length > 0) && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label>Focus Areas</Label>
+                {extractedFocusAreas.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    AI Extracted
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                {extractedFocusAreas.length > 0 
+                  ? 'Click to select/deselect extracted areas, or add your own'
+                  : 'Areas this organization focuses on'}
+              </p>
+              <div className="flex flex-wrap gap-2 p-3 rounded-lg border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))]">
+                {/* Show all unique areas: extracted + manually added */}
+                {[...new Set([...extractedFocusAreas, ...formData.focus_areas])].map(area => {
+                  const isSelected = formData.focus_areas.includes(area);
+                  const isExtracted = extractedFocusAreas.includes(area);
+                  return (
+                    <Badge
+                      key={area}
+                      variant={isSelected ? 'default' : 'outline'}
+                      className={`cursor-pointer transition-all hover:opacity-80 pr-1 ${
+                        isExtracted && isSelected ? 'bg-[hsl(var(--portal-accent-purple))] hover:bg-[hsl(var(--portal-accent-purple))]/80' : ''
+                      }`}
+                      onClick={() => toggleFocusArea(area)}
+                    >
+                      {area}
+                      {isSelected && (
+                        <button
+                          type="button"
+                          className="ml-1 p-0.5 rounded-full hover:bg-black/20"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFocusArea(area);
+                          }}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </Badge>
+                  );
+                })}
+              </div>
+              
+              {/* Add custom focus area */}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Add custom focus area..."
+                  value={customFocusArea}
+                  onChange={(e) => setCustomFocusArea(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addCustomFocusArea();
+                    }
+                  }}
+                  className="bg-[hsl(var(--portal-bg-secondary))] flex-1"
+                />
+                <V3Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={addCustomFocusArea}
+                  disabled={!customFocusArea.trim()}
+                >
+                  <Plus className="w-4 h-4" />
+                </V3Button>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label>Policy Domains</Label>
             <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-              Select all areas this organization focuses on
+              Select all policy areas this organization works on
             </p>
             <div className="flex flex-wrap gap-2">
               {POLICY_DOMAINS.map(domain => (
