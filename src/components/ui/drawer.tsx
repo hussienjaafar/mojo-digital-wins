@@ -2,6 +2,7 @@ import * as React from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 
 import { cn } from "@/lib/utils";
+import { getFloatingPortalContainer } from "@/lib/floating-portal";
 
 const Drawer = ({ shouldScaleBackground = true, ...props }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
   <DrawerPrimitive.Root shouldScaleBackground={shouldScaleBackground} {...props} />
@@ -10,7 +11,12 @@ Drawer.displayName = "Drawer";
 
 const DrawerTrigger = DrawerPrimitive.Trigger;
 
-const DrawerPortal = DrawerPrimitive.Portal;
+const DrawerPortal = ({ children, ...props }: React.ComponentProps<typeof DrawerPrimitive.Portal>) => (
+  <DrawerPrimitive.Portal container={getFloatingPortalContainer()} {...props}>
+    {children}
+  </DrawerPrimitive.Portal>
+);
+DrawerPortal.displayName = "DrawerPortal";
 
 const DrawerClose = DrawerPrimitive.Close;
 
@@ -18,7 +24,12 @@ const DrawerOverlay = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Overlay>
 >(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Overlay ref={ref} className={cn("fixed inset-0 z-50 bg-black/80", className)} {...props} />
+  <DrawerPrimitive.Overlay 
+    ref={ref} 
+    className={cn("fixed inset-0 z-50 bg-black/80", className)} 
+    style={{ pointerEvents: "auto" }}
+    {...props} 
+  />
 ));
 DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
 
@@ -31,12 +42,17 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
+        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px]",
+        // V3 Portal surface - opaque background
+        "bg-[hsl(var(--portal-bg-secondary))] text-[hsl(var(--portal-text-primary))]",
+        // Border
+        "border border-[hsl(var(--portal-border))]",
         className,
       )}
+      style={{ pointerEvents: "auto" }}
       {...props}
     >
-      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
+      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-[hsl(var(--portal-border))]" />
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>
@@ -59,7 +75,7 @@ const DrawerTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Title
     ref={ref}
-    className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+    className={cn("text-lg font-semibold leading-none tracking-tight text-[hsl(var(--portal-text-primary))]", className)}
     {...props}
   />
 ));
@@ -69,7 +85,11 @@ const DrawerDescription = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Description>
 >(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Description ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+  <DrawerPrimitive.Description 
+    ref={ref} 
+    className={cn("text-sm text-[hsl(var(--portal-text-secondary))]", className)} 
+    {...props} 
+  />
 ));
 DrawerDescription.displayName = DrawerPrimitive.Description.displayName;
 
