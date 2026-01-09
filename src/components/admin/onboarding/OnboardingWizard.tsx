@@ -17,52 +17,44 @@ export function OnboardingWizard() {
   const navigate = useNavigate();
   const resumeOrgId = searchParams.get('resume');
   
-  const { state, isLoading, loadOnboardingState, initializeOnboarding, completeStep } = useOnboardingWizard();
-
   const [organizationId, setOrganizationId] = useState<string | null>(resumeOrgId);
   const [organizationSlug, setOrganizationSlug] = useState<string>('');
-  const [currentStep, setCurrentStep] = useState<WizardStep>(1);
-  const [stepData, setStepData] = useState<Record<string, unknown>>({});
+  const [websiteUrl, setWebsiteUrl] = useState<string>('');
+  
+  const {
+    currentStep,
+    completedSteps,
+    stepData,
+    isLoading,
+    goToStep,
+    completeStep,
+    initializeOnboarding,
+    loadOnboardingState,
+    canNavigateToStep,
+  } = useOnboardingWizard({ organizationId: organizationId || undefined });
 
-  useEffect(() => {
-    if (resumeOrgId) {
-      loadOnboardingState(resumeOrgId).then((existingState) => {
-        if (existingState) {
-          setCurrentStep(existingState.current_step);
-          setStepData(existingState.step_data || {});
-        }
-      });
-    }
-  }, [resumeOrgId, loadOnboardingState]);
-
+  // Handle Step 1 completion - org created
   const handleStep1Complete = async (orgId: string, data: CreateOrgData) => {
     setOrganizationId(orgId);
     setOrganizationSlug(data.slug);
+    setWebsiteUrl(data.website_url || '');
     await initializeOnboarding(orgId);
-    setStepData(prev => ({ ...prev, step1: data }));
-    setCurrentStep(2);
   };
 
+  // Handle Step 2 completion
   const handleStep2Complete = async (data: OrgProfileData) => {
-    if (!organizationId) return;
-    await completeStep(organizationId, 2, data as unknown as Record<string, unknown>);
-    setStepData(prev => ({ ...prev, step2: data }));
-    setCurrentStep(3);
+    await completeStep(2, data as unknown as Record<string, unknown>);
   };
 
+  // Generic step complete handler for steps 3-6
   const handleStepComplete = async (step: WizardStep, data: Record<string, unknown>) => {
-    if (!organizationId) return;
-    await completeStep(organizationId, step, data);
-    setStepData(prev => ({ ...prev, [`step${step}`]: data }));
-    if (step < 6) setCurrentStep((step + 1) as WizardStep);
+    await completeStep(step, data);
   };
 
   const handleBack = () => {
-    if (currentStep > 1) setCurrentStep((currentStep - 1) as WizardStep);
-  };
-
-  const handleNavigateToStep = (step: WizardStep) => {
-    if (state && state.completed_steps.includes(step)) setCurrentStep(step);
+    if (currentStep > 1) {
+      goToStep((currentStep - 1) as WizardStep);
+    }
   };
 
   if (isLoading) {
@@ -72,8 +64,6 @@ export function OnboardingWizard() {
       </div>
     );
   }
-
-  const completedSteps = state?.completed_steps || [];
 
   return (
     <div className="space-y-6">
@@ -87,26 +77,61 @@ export function OnboardingWizard() {
         </div>
       </div>
 
-      <WizardProgress currentStep={currentStep} completedSteps={completedSteps} onNavigate={handleNavigateToStep} />
+      <WizardProgress 
+        currentStep={currentStep} 
+        completedSteps={completedSteps} 
+        onStepClick={goToStep}
+        canNavigateToStep={canNavigateToStep}
+      />
 
       <div className="max-w-3xl">
         {currentStep === 1 && (
-          <Step1CreateOrg stepData={stepData.step1 as Record<string, unknown> || {}} onComplete={handleStep1Complete} />
+          <Step1CreateOrg 
+            initialData={stepData.step1 as Partial<CreateOrgData>}
+            onComplete={handleStep1Complete} 
+          />
         )}
         {currentStep === 2 && organizationId && (
-          <Step2OrgProfile organizationId={organizationId} stepData={stepData.step2 as Record<string, unknown> || {}} onComplete={handleStep2Complete} onBack={handleBack} />
+          <Step2OrgProfile 
+            organizationId={organizationId} 
+            websiteUrl={websiteUrl}
+            initialData={stepData.step2 as Partial<OrgProfileData>}
+            onComplete={handleStep2Complete} 
+            onBack={handleBack} 
+          />
         )}
         {currentStep === 3 && organizationId && (
-          <Step3Users organizationId={organizationId} stepData={stepData.step3 as Record<string, unknown> || {}} onComplete={handleStepComplete} onBack={handleBack} />
+          <Step3Users 
+            organizationId={organizationId} 
+            stepData={stepData.step3 as Record<string, unknown> || {}} 
+            onComplete={handleStepComplete} 
+            onBack={handleBack} 
+          />
         )}
         {currentStep === 4 && organizationId && (
-          <Step4Integrations organizationId={organizationId} stepData={stepData.step4 as Record<string, unknown> || {}} onComplete={handleStepComplete} onBack={handleBack} />
+          <Step4Integrations 
+            organizationId={organizationId} 
+            stepData={stepData.step4 as Record<string, unknown> || {}} 
+            onComplete={handleStepComplete} 
+            onBack={handleBack} 
+          />
         )}
         {currentStep === 5 && organizationId && (
-          <Step5Watchlists organizationId={organizationId} stepData={stepData.step5 as Record<string, unknown> || {}} onComplete={handleStepComplete} onBack={handleBack} />
+          <Step5Watchlists 
+            organizationId={organizationId} 
+            stepData={stepData.step5 as Record<string, unknown> || {}} 
+            onComplete={handleStepComplete} 
+            onBack={handleBack} 
+          />
         )}
         {currentStep === 6 && organizationId && (
-          <Step6Activation organizationId={organizationId} organizationSlug={organizationSlug} stepData={stepData.step6 as Record<string, unknown> || {}} onComplete={handleStepComplete} onBack={handleBack} />
+          <Step6Activation 
+            organizationId={organizationId} 
+            organizationSlug={organizationSlug} 
+            stepData={stepData.step6 as Record<string, unknown> || {}} 
+            onComplete={handleStepComplete} 
+            onBack={handleBack} 
+          />
         )}
       </div>
     </div>

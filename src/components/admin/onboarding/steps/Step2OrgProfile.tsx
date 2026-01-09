@@ -123,18 +123,22 @@ export function Step2OrgProfile({
     setIsSubmitting(true);
 
     try {
-      // Upsert organization profile
-      const { error: profileError } = await (supabase as any)
+      // Upsert organization profile - map to actual DB columns
+      const { error: profileError } = await supabase
         .from('organization_profiles')
         .upsert({
           organization_id: organizationId,
-          mission_statement: formData.mission_statement,
+          mission_summary: formData.mission_statement,
           focus_areas: formData.focus_areas,
-          policy_domains: formData.policy_domains,
-          geo_focus: formData.geo_focus,
-          target_states: formData.target_states,
-          sentiment_sensitivity: formData.sentiment_sensitivity,
-          risk_tolerance: formData.risk_tolerance,
+          interest_topics: formData.policy_domains,
+          geographies: formData.geo_focus === 'federal' ? ['Federal'] : 
+                       formData.geo_focus === 'state' ? formData.target_states :
+                       formData.geo_focus === 'local' ? ['Local'] : 
+                       [...formData.target_states, 'Federal'],
+          sensitivity_redlines: {
+            sentiment_sensitivity: formData.sentiment_sensitivity,
+            risk_tolerance: formData.risk_tolerance,
+          },
         }, {
           onConflict: 'organization_id',
         });
