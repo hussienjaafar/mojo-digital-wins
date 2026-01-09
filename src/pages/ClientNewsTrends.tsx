@@ -590,7 +590,7 @@ export default function ClientNewsTrends() {
       <Sheet open={!!selectedTrend} onOpenChange={() => setSelectedTrend(null)}>
         <SheetContent 
           side="right" 
-          className="w-full sm:max-w-2xl overflow-y-auto bg-[hsl(var(--portal-bg))]"
+          className="w-full sm:max-w-2xl overflow-y-auto !bg-[hsl(var(--portal-bg-secondary))]"
         >
           {selectedTrend && (
             <TrendDrilldownPanel
