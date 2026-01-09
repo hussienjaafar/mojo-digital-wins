@@ -8958,6 +8958,63 @@ export type Database = {
         }
         Relationships: []
       }
+      user_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string | null
+          email: string
+          expires_at: string | null
+          id: string
+          invitation_type: string
+          invited_by: string | null
+          organization_id: string | null
+          role: string | null
+          status: string | null
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string | null
+          email: string
+          expires_at?: string | null
+          id?: string
+          invitation_type: string
+          invited_by?: string | null
+          organization_id?: string | null
+          role?: string | null
+          status?: string | null
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string | null
+          email?: string
+          expires_at?: string | null
+          id?: string
+          invitation_type?: string
+          invited_by?: string | null
+          organization_id?: string | null
+          role?: string | null
+          status?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -10721,6 +10778,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_invitation: {
+        Args: { p_token: string; p_user_id: string }
+        Returns: Json
+      }
       archive_old_data: {
         Args: never
         Returns: {
@@ -10929,6 +10990,19 @@ export type Database = {
         }
         Returns: Json
       }
+      get_invitation_by_token: {
+        Args: { p_token: string }
+        Returns: {
+          email: string
+          expires_at: string
+          id: string
+          invitation_type: string
+          organization_id: string
+          organization_name: string
+          role: string
+          status: string
+        }[]
+      }
       get_meta_accounts_due_for_sync: {
         Args: { p_limit?: number }
         Returns: {
@@ -10957,6 +11031,22 @@ export type Database = {
           trend_event_id: string
           trend_key: string
           urgency_score: number
+        }[]
+      }
+      get_pending_invitations: {
+        Args: { p_organization_id?: string; p_type?: string }
+        Returns: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invitation_type: string
+          invited_by: string
+          invited_by_email: string
+          organization_id: string
+          organization_name: string
+          role: string
+          status: string
         }[]
       }
       get_recurring_health: {
