@@ -1,27 +1,20 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Filter, RefreshCw, Plus, Loader2 } from 'lucide-react';
+import { RefreshCw, Plus, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useIntegrationSummary } from '@/hooks/useIntegrationSummary';
-import { IntegrationStatusBar } from './IntegrationStatusBar';
-import { CredentialSlideOver } from './CredentialSlideOver';
-import { IntegrationQuickActions } from './IntegrationQuickActions';
-import { IntegrationSearchInput } from './IntegrationSearchInput';
-import { VirtualizedClientList } from './VirtualizedClientList';
+import { IntegrationSystemHealth } from './IntegrationSystemHealth';
+import { IntegrationDiscoveryBar, SortConfig } from './IntegrationDiscoveryBar';
+import { IntegrationOrgList } from './IntegrationOrgList';
 import { IntegrationListPagination } from './IntegrationListPagination';
-import { IntegrationSortControls, SortConfig } from './IntegrationSortControls';
-import { IntegrationStatsPanel } from './IntegrationStatsPanel';
 import { IntegrationEmptyState } from './IntegrationEmptyState';
-import { IntegrationHealthStatus, IntegrationSummary, PLATFORM_DISPLAY_NAMES } from '@/types/integrations';
+import { CredentialSlideOver } from './CredentialSlideOver';
+import { IntegrationDetailDrawer } from './IntegrationDetailDrawer';
+import { IntegrationHealthStatus, IntegrationSummary } from '@/types/integrations';
 import { toast } from 'sonner';
 
 export function IntegrationCenter() {
+  // Filter & search state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<IntegrationHealthStatus | 'all'>('all');
   const [platformFilter, setPlatformFilter] = useState<string>('all');
@@ -33,7 +26,11 @@ export function IntegrationCenter() {
   // Sort state
   const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'status', direction: 'desc' });
   
-  // Slide-over state
+  // Detail drawer state
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  
+  // Slide-over state (for adding new integrations)
   const [slideOverOpen, setSlideOverOpen] = useState(false);
   const [editingCredentialId, setEditingCredentialId] = useState<string | null>(null);
   const [preselectedOrgId, setPreselectedOrgId] = useState<string | null>(null);
@@ -58,10 +55,30 @@ export function IntegrationCenter() {
     setCurrentPage(1);
   }, []);
 
+  const handleStatusFilterChange = useCallback((value: IntegrationHealthStatus | 'all') => {
+    setStatusFilter(value);
+    setCurrentPage(1);
+  }, []);
+
+  const handlePlatformFilterChange = useCallback((value: string) => {
+    setPlatformFilter(value);
+    setCurrentPage(1);
+  }, []);
+
   const handlePageSizeChange = useCallback((size: number) => {
     setPageSize(size);
     setCurrentPage(1);
   }, []);
+
+  // Organization selection
+  const handleSelectOrg = useCallback((orgId: string) => {
+    setSelectedOrgId(orgId);
+    setDrawerOpen(true);
+  }, []);
+
+  const selectedOrg = useMemo(() => {
+    return data.find(d => d.organization_id === selectedOrgId) || null;
+  }, [data, selectedOrgId]);
 
   const handleTest = async (integrationId: string) => {
     const success = await testConnection(integrationId);
@@ -131,7 +148,6 @@ export function IntegrationCenter() {
     setIsSyncingAll(true);
     try {
       toast.info('Triggering sync for all active integrations...');
-      // In production, this would call edge functions for each platform
       await new Promise(resolve => setTimeout(resolve, 2000));
       toast.success('Sync triggered for all active integrations');
       refetch();
@@ -198,7 +214,7 @@ export function IntegrationCenter() {
   if (error) {
     return (
       <div className="p-8 text-center">
-        <p className="text-destructive mb-4">{error}</p>
+        <p className="text-[hsl(var(--portal-error))] mb-4">{error}</p>
         <Button onClick={refetch} variant="outline">
           <RefreshCw className="h-4 w-4 mr-2" />
           Retry
@@ -210,15 +226,26 @@ export function IntegrationCenter() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <motion.div 
+        className="flex items-center justify-between"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Integration Center</h2>
-          <p className="text-muted-foreground">
-            Manage and monitor all client integrations in one place
+          <h2 className="text-2xl font-bold tracking-tight text-[hsl(var(--portal-text-primary))]">
+            Integration Center
+          </h2>
+          <p className="text-[hsl(var(--portal-text-secondary))]">
+            Manage and monitor all client integrations
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={refetch} disabled={isLoading}>
+          <Button 
+            variant="outline" 
+            onClick={refetch} 
+            disabled={isLoading}
+            className="border-[hsl(var(--portal-border))]"
+          >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -227,69 +254,49 @@ export function IntegrationCenter() {
             Add Integration
           </Button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Stats Overview */}
+      {/* System Health Overview */}
       {!isLoading && data.length > 0 && (
-        <IntegrationStatsPanel data={data} />
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <IntegrationSystemHealth
+            data={data}
+            onTestAllFailing={handleTestAllFailing}
+            onSyncAll={handleSyncAll}
+            isTestingAll={isTestingAll}
+            isSyncingAll={isSyncingAll}
+          />
+        </motion.div>
       )}
 
-      {/* Status Summary Bar */}
-      <IntegrationStatusBar
-        counts={statusCounts}
-        activeFilter={statusFilter}
-        onFilterChange={setStatusFilter}
-      />
-
-      {/* Quick Actions */}
-      {(statusCounts.needsAttention > 0 || statusCounts.untested > 0) && (
-        <IntegrationQuickActions
-          failingCount={statusCounts.needsAttention}
-          untestedCount={statusCounts.untested}
-          onTestAllFailing={handleTestAllFailing}
-          onSyncAll={handleSyncAll}
-          isTestingAll={isTestingAll}
-          isSyncingAll={isSyncingAll}
-        />
-      )}
-
-      {/* Filters */}
-      <div className="flex items-center gap-4">
-        <IntegrationSearchInput
-          value={searchQuery}
-          onChange={handleSearchChange}
-          placeholder="Search clients by name or slug..."
-          debounceMs={300}
-          resultCount={sortedData.length}
-          totalCount={statusCounts.needsAttention + statusCounts.healthy + statusCounts.noSetup + statusCounts.untested}
-          className="flex-1 max-w-md"
-        />
-        
-        <Select value={platformFilter} onValueChange={setPlatformFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="All platforms" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All platforms</SelectItem>
-            {Object.entries(PLATFORM_DISPLAY_NAMES).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        <IntegrationSortControls
-          sort={sortConfig}
+      {/* Discovery Bar (Search, Filters, Sort) */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <IntegrationDiscoveryBar
+          searchQuery={searchQuery}
+          onSearchChange={handleSearchChange}
+          statusFilter={statusFilter}
+          onStatusFilterChange={handleStatusFilterChange}
+          platformFilter={platformFilter}
+          onPlatformFilterChange={handlePlatformFilterChange}
+          sortConfig={sortConfig}
           onSortChange={setSortConfig}
+          statusCounts={statusCounts}
+          resultCount={sortedData.length}
         />
-      </div>
+      </motion.div>
 
-      {/* Client List */}
+      {/* Organization List */}
       {isLoading ? (
         <div className="flex items-center justify-center p-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--portal-text-tertiary))]" />
         </div>
       ) : data.length === 0 ? (
         <IntegrationEmptyState
@@ -307,13 +314,15 @@ export function IntegrationCenter() {
           }}
         />
       ) : (
-        <>
-          <VirtualizedClientList
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <IntegrationOrgList
             data={paginatedData}
-            onTest={handleTest}
-            onToggle={handleToggle}
-            onEdit={handleEdit}
-            onAddIntegration={handleAddIntegration}
+            selectedOrgId={selectedOrgId}
+            onSelectOrg={handleSelectOrg}
           />
           
           <IntegrationListPagination
@@ -324,10 +333,21 @@ export function IntegrationCenter() {
             onPageChange={setCurrentPage}
             onPageSizeChange={handlePageSizeChange}
           />
-        </>
+        </motion.div>
       )}
 
-      {/* Credential Slide-Over */}
+      {/* Integration Detail Drawer */}
+      <IntegrationDetailDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        organization={selectedOrg}
+        onTest={handleTest}
+        onToggle={handleToggle}
+        onEdit={handleEdit}
+        onAddIntegration={handleAddIntegration}
+      />
+
+      {/* Credential Slide-Over (for adding/editing) */}
       <CredentialSlideOver
         open={slideOverOpen}
         onOpenChange={setSlideOverOpen}
