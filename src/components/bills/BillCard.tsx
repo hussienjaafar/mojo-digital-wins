@@ -246,7 +246,7 @@ export function BillCard({ bill }: BillCardProps) {
         {/* Actions */}
         <div className="flex gap-2">
           <Button
-            variant="smooth"
+            variant="secondary"
             size="sm"
             className="flex-1"
             asChild
@@ -257,7 +257,7 @@ export function BillCard({ bill }: BillCardProps) {
             </Link>
           </Button>
           <Button
-            variant="smooth"
+            variant="secondary"
             size="sm"
             className="flex-1"
             asChild
