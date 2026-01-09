@@ -11,11 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Building2, Plus, Eye, LogIn, MoreVertical, Search, Users, Plug, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Filter, Command, RefreshCw, Trash2 } from "lucide-react";
+import { Building2, Plus, Eye, LogIn, MoreVertical, Search, Users, Plug, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Filter, Command, RefreshCw, Trash2, Rocket, PlayCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AdminPageHeader, AdminLoadingState } from "./v3";
 import { cn } from "@/lib/utils";
+import { OnboardingStatusBadge, type OnboardingEffectiveStatus } from "./clients/OnboardingStatusBadge";
+import { useClientOnboardingSummary, type ClientOnboardingSummary } from "@/hooks/useClientOnboardingSummary";
+import { EmptyClientState } from "./clients/EmptyClientState";
 
 type Organization = {
   id: string;
@@ -45,6 +48,7 @@ const ClientOrganizationManager = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filterOnboarding, setFilterOnboarding] = useState<'all' | OnboardingEffectiveStatus | 'needs_attention'>('all');
   const [filterIntegrations, setFilterIntegrations] = useState<boolean>(false);
   const [expandedOrg, setExpandedOrg] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -54,6 +58,18 @@ const ClientOrganizationManager = () => {
     logo_url: "",
   });
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Use the new onboarding summary hook
+  const { data: onboardingSummaries, refetch: refetchOnboarding } = useClientOnboardingSummary();
+  
+  // Create a lookup map for onboarding data
+  const onboardingMap = useMemo(() => {
+    const map: Record<string, ClientOnboardingSummary> = {};
+    onboardingSummaries?.forEach(s => {
+      map[s.organization_id] = s;
+    });
+    return map;
+  }, [onboardingSummaries]);
 
   useEffect(() => {
     loadOrganizations();
@@ -157,12 +173,38 @@ const ClientOrganizationManager = () => {
       if (filterStatus === 'active' && !org.is_active) return false;
       if (filterStatus === 'inactive' && org.is_active) return false;
 
+      // Onboarding filter
+      const onboarding = onboardingMap[org.id];
+      const effectiveStatus = onboarding?.effective_status || 'not_started';
+      
+      if (filterOnboarding !== 'all') {
+        if (filterOnboarding === 'needs_attention') {
+          const needsAttention = effectiveStatus === 'not_started' || 
+                                  effectiveStatus === 'blocked' ||
+                                  (onboarding?.error_count || 0) > 0;
+          if (!needsAttention) return false;
+        } else if (effectiveStatus !== filterOnboarding) {
+          return false;
+        }
+      }
+
       // Integrations filter
       if (filterIntegrations && (orgStats[org.id]?.integrationCount || 0) === 0) return false;
 
       return true;
     });
-  }, [organizations, searchQuery, filterStatus, filterIntegrations, orgStats]);
+  }, [organizations, searchQuery, filterStatus, filterOnboarding, filterIntegrations, orgStats, onboardingMap]);
+  
+  // Count organizations needing attention for badge
+  const needsAttentionCount = useMemo(() => {
+    return organizations.filter(org => {
+      const onboarding = onboardingMap[org.id];
+      const effectiveStatus = onboarding?.effective_status || 'not_started';
+      return effectiveStatus === 'not_started' || 
+             effectiveStatus === 'blocked' ||
+             (onboarding?.error_count || 0) > 0;
+    }).length;
+  }, [organizations, onboardingMap]);
 
   const generateSlug = (name: string) => {
     return name
@@ -202,6 +244,7 @@ const ClientOrganizationManager = () => {
       setShowCreateDialog(false);
       setFormData({ name: "", slug: "", primary_contact_email: "", logo_url: "" });
       loadOrganizations();
+      refetchOnboarding();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -570,14 +613,39 @@ const ClientOrganizationManager = () => {
               <V3Button variant="secondary">
                 <Filter className="w-4 h-4" />
                 Filters
-                {(filterStatus !== 'all' || filterIntegrations) && (
+                {(filterStatus !== 'all' || filterOnboarding !== 'all' || filterIntegrations) && (
                   <Badge variant="secondary" className="ml-1">
-                    {(filterStatus !== 'all' ? 1 : 0) + (filterIntegrations ? 1 : 0)}
+                    {(filterStatus !== 'all' ? 1 : 0) + (filterOnboarding !== 'all' ? 1 : 0) + (filterIntegrations ? 1 : 0)}
                   </Badge>
                 )}
               </V3Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuCheckboxItem
+                checked={filterOnboarding === 'needs_attention'}
+                onCheckedChange={(checked) => setFilterOnboarding(checked ? 'needs_attention' : 'all')}
+              >
+                ⚠️ Needs Attention
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={filterOnboarding === 'not_started'}
+                onCheckedChange={(checked) => setFilterOnboarding(checked ? 'not_started' : 'all')}
+              >
+                Setup Required
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={filterOnboarding === 'in_progress'}
+                onCheckedChange={(checked) => setFilterOnboarding(checked ? 'in_progress' : 'all')}
+              >
+                In Progress
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={filterOnboarding === 'blocked'}
+                onCheckedChange={(checked) => setFilterOnboarding(checked ? 'blocked' : 'all')}
+              >
+                Blocked
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
               <DropdownMenuCheckboxItem
                 checked={filterStatus === 'active'}
                 onCheckedChange={(checked) => setFilterStatus(checked ? 'active' : 'all')}
@@ -622,6 +690,7 @@ const ClientOrganizationManager = () => {
                 <TableRow>
                   <TableHead className="w-10"></TableHead>
                   <TableHead>Organization</TableHead>
+                  <TableHead>Setup Status</TableHead>
                   <TableHead>Users</TableHead>
                   <TableHead>Integrations</TableHead>
                   <TableHead>Health</TableHead>
@@ -632,8 +701,8 @@ const ClientOrganizationManager = () => {
               <TableBody>
                 {filteredOrganizations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      {searchQuery || filterStatus !== 'all' || filterIntegrations
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      {searchQuery || filterStatus !== 'all' || filterOnboarding !== 'all' || filterIntegrations
                         ? 'No organizations match your filters'
                         : 'No organizations yet. Create your first one!'}
                     </TableCell>
@@ -642,6 +711,9 @@ const ClientOrganizationManager = () => {
                   filteredOrganizations.map((org) => {
                     const stats = orgStats[org.id];
                     const isExpanded = expandedOrg === org.id;
+                    const onboarding = onboardingMap[org.id];
+                    const effectiveStatus = (onboarding?.effective_status || 'not_started') as OnboardingEffectiveStatus;
+                    const currentStep = onboarding?.current_step || 1;
                     
                     return (
                       <>
@@ -668,6 +740,51 @@ const ClientOrganizationManager = () => {
                                 <p>{org.name}</p>
                                 <p className="text-xs text-muted-foreground">{org.slug}</p>
                               </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <OnboardingStatusBadge
+                                status={effectiveStatus}
+                                currentStep={currentStep}
+                                totalSteps={6}
+                                blockingReason={onboarding?.blocking_reason}
+                                size="sm"
+                              />
+                              {/* Inline action button */}
+                              {effectiveStatus === 'not_started' && (
+                                <V3Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => navigate(`/admin?tab=onboarding-wizard&org=${org.id}`)}
+                                >
+                                  <Rocket className="h-3 w-3" />
+                                  Start
+                                </V3Button>
+                              )}
+                              {effectiveStatus === 'in_progress' && (
+                                <V3Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => navigate(`/admin?tab=onboarding-wizard&org=${org.id}`)}
+                                >
+                                  <PlayCircle className="h-3 w-3" />
+                                  Continue
+                                </V3Button>
+                              )}
+                              {effectiveStatus === 'blocked' && (
+                                <V3Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => navigate(`/admin?tab=onboarding-wizard&org=${org.id}`)}
+                                >
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Resolve
+                                </V3Button>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>

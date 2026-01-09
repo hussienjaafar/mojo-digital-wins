@@ -10328,6 +10328,8 @@ export type Database = {
           blocking_reason: string | null
           completed_steps: Json | null
           current_step: number | null
+          effective_status: string | null
+          error_count: number | null
           has_profile: boolean | null
           integration_count: number | null
           is_active: boolean | null
@@ -10336,6 +10338,7 @@ export type Database = {
           org_created_at: string | null
           organization_id: string | null
           organization_name: string | null
+          progress_percentage: number | null
           slug: string | null
           user_count: number | null
         }
