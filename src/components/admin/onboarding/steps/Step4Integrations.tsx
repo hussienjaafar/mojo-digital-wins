@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { IntegrationConfig, WizardStep } from '../types';
+import { MetaOAuthFlow } from '@/components/integrations/MetaOAuthFlow';
 import { 
   Plug, 
   ChevronDown, 
@@ -270,7 +271,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Meta Ads */}
+        {/* Meta Ads - OAuth Flow */}
         <Collapsible
           open={formState.meta.isOpen}
           onOpenChange={(open) => updateFormState('meta', { isOpen: open })}
@@ -294,62 +295,33 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="p-4 pt-0 space-y-4 border-t">
-                <div className="space-y-2">
-                  <Label>Access Token</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type={formState.meta.showToken ? 'text' : 'password'}
-                      placeholder="Enter Meta access token"
-                      value={formState.meta.access_token}
-                      onChange={(e) => updateFormState('meta', { access_token: e.target.value })}
-                      disabled={integrations.meta.is_enabled}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => updateFormState('meta', { showToken: !formState.meta.showToken })}
-                    >
-                      {formState.meta.showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Ad Account ID</Label>
-                  <Input
-                    placeholder="act_123456789"
-                    value={formState.meta.ad_account_id}
-                    onChange={(e) => updateFormState('meta', { ad_account_id: e.target.value })}
-                    disabled={integrations.meta.is_enabled}
-                  />
-                </div>
-                {!integrations.meta.is_enabled && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => testConnection('meta')}
-                      disabled={testingIntegration === 'meta'}
-                    >
-                      {testingIntegration === 'meta' ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <TestTube className="h-4 w-4 mr-2" />
-                      )}
-                      Test Connection
-                    </Button>
-                    <Button
-                      onClick={() => saveIntegration('meta')}
-                      disabled={!integrations.meta.is_tested || integrations.meta.last_test_status !== 'success'}
-                    >
-                      Save & Enable
-                    </Button>
-                  </div>
-                )}
-                {integrations.meta.is_enabled && (
+              <div className="p-4 pt-0 border-t">
+                {integrations.meta.is_enabled ? (
                   <div className="flex items-center gap-2 text-green-600">
                     <CheckCircle2 className="h-4 w-4" />
                     <span className="text-sm">Connected and enabled</span>
                   </div>
+                ) : (
+                  <MetaOAuthFlow
+                    organizationId={organizationId}
+                    onComplete={() => {
+                      setIntegrations(prev => ({
+                        ...prev,
+                        meta: { 
+                          ...prev.meta, 
+                          is_enabled: true, 
+                          is_tested: true, 
+                          last_test_status: 'success' 
+                        }
+                      }));
+                      updateFormState('meta', { isOpen: false });
+                      toast({
+                        title: 'Meta Ads connected',
+                        description: 'Your ad account has been successfully linked.'
+                      });
+                    }}
+                    onCancel={() => updateFormState('meta', { isOpen: false })}
+                  />
                 )}
               </div>
             </CollapsibleContent>
