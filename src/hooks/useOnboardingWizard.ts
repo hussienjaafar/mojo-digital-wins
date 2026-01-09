@@ -132,10 +132,11 @@ export function useOnboardingWizard(
       });
       
     } catch (err: any) {
-      setError(err.message || 'Failed to initialize onboarding');
+      const message = err?.message || 'Failed to initialize onboarding';
+      setError(message);
       toast({
         title: 'Error',
-        description: 'Failed to start onboarding',
+        description: message,
         variant: 'destructive',
       });
     } finally {
