@@ -27,12 +27,13 @@ import {
   Mail,
   ShieldCheck,
   ShieldOff,
-  Plus,
   Trash2,
   History,
+  Lock,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
+import { UserSecurityCard } from "@/components/admin/security/UserSecurityCard";
 
 interface UserDetails {
   id: string;
@@ -56,12 +57,27 @@ interface AuditLogEntry {
   new_value: any;
 }
 
+interface SecurityInfo {
+  mfaEnabled: boolean;
+  mfaMethod: string | null;
+  sessionRevokedAt: string | null;
+  lockout: {
+    id: string;
+    locked_at: string;
+    unlock_at: string;
+    reason: string;
+    failed_attempts: number;
+    is_active: boolean;
+  } | null;
+}
+
 export default function UserDetail() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
 
   const [user, setUser] = useState<UserDetails | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [securityInfo, setSecurityInfo] = useState<SecurityInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
@@ -82,8 +98,48 @@ export default function UserDetail() {
     if (userId) {
       loadUser();
       loadAuditLogs();
+      loadSecurityInfo();
     }
   }, [userId]);
+
+  const loadSecurityInfo = async () => {
+    if (!userId) return;
+    
+    try {
+      // Get profile MFA info
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("mfa_enabled_at, mfa_method, session_revoked_at")
+        .eq("id", userId)
+        .single();
+
+      // Get active lockout
+      const { data: lockout } = await supabase
+        .from("account_lockouts")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .order("locked_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      setSecurityInfo({
+        mfaEnabled: !!profile?.mfa_enabled_at,
+        mfaMethod: profile?.mfa_method || null,
+        sessionRevokedAt: profile?.session_revoked_at || null,
+        lockout: lockout ? {
+          id: lockout.id,
+          locked_at: lockout.locked_at,
+          unlock_at: lockout.unlock_at,
+          reason: lockout.reason,
+          failed_attempts: lockout.failed_attempts,
+          is_active: lockout.is_active,
+        } : null,
+      });
+    } catch (err) {
+      console.error("Error loading security info:", err);
+    }
+  };
 
   const loadUser = async () => {
     try {
@@ -285,8 +341,12 @@ export default function UserDetail() {
       </Card>
 
       {/* Access Management Tabs */}
-      <Tabs defaultValue="platform" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="security" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="security" className="gap-2">
+            <Lock className="h-4 w-4" />
+            Security
+          </TabsTrigger>
           <TabsTrigger value="platform" className="gap-2">
             <Shield className="h-4 w-4" />
             Platform Access
@@ -300,6 +360,24 @@ export default function UserDetail() {
             Activity
           </TabsTrigger>
         </TabsList>
+
+        {/* Security Tab */}
+        <TabsContent value="security" className="mt-4">
+          {securityInfo && (
+            <UserSecurityCard
+              userId={user.id}
+              userEmail={user.email}
+              mfaEnabled={securityInfo.mfaEnabled}
+              mfaMethod={securityInfo.mfaMethod}
+              lockout={securityInfo.lockout}
+              sessionRevokedAt={securityInfo.sessionRevokedAt}
+              onUpdate={() => {
+                loadSecurityInfo();
+                loadAuditLogs();
+              }}
+            />
+          )}
+        </TabsContent>
 
         {/* Platform Access Tab */}
         <TabsContent value="platform" className="mt-4">
