@@ -67,27 +67,30 @@ export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }
         // Get org profile to inform suggestions
         const { data: profile } = await supabase
           .from('organization_profiles')
-          .select('focus_areas, target_states')
+          .select('focus_areas, interest_topics, key_issues')
           .eq('organization_id', organizationId)
           .maybeSingle();
 
+        // Generate suggestions based on profile
+        const suggestions: WatchlistEntity[] = [];
+        
+        // Add default suggestions
+        suggestions.push({ name: 'Healthcare Policy', entity_type: 'topic', is_ai_suggested: true });
+        suggestions.push({ name: 'Immigration Reform', entity_type: 'topic', is_ai_suggested: true });
+        
         if (profile) {
-          // Generate suggestions based on profile
-          const suggestions: WatchlistEntity[] = [];
-          const focusAreas = profile.focus_areas as string[] | null;
-          
-          // Add default suggestions
-          suggestions.push({ name: 'Healthcare Policy', entity_type: 'topic', is_ai_suggested: true });
-          suggestions.push({ name: 'Immigration Reform', entity_type: 'topic', is_ai_suggested: true });
-          
-          // Add topics from focus areas
-          focusAreas?.slice(0, 3).forEach((area: string) => {
-            suggestions.push({ name: area, entity_type: 'topic', is_ai_suggested: true });
+          const focusAreas = (profile.focus_areas || []) as string[];
+          const interestTopics = (profile.interest_topics || []) as string[];
+          // Add topics from focus areas and interest topics
+          [...focusAreas, ...interestTopics].slice(0, 3).forEach((area: string) => {
+            if (area && !suggestions.some(s => s.name === area)) {
+              suggestions.push({ name: area, entity_type: 'topic', is_ai_suggested: true });
+            }
           });
+        }
 
-          if (suggestions.length > 0) {
-            setEntities(suggestions);
-          }
+        if (suggestions.length > 0) {
+          setEntities(suggestions);
         }
       } catch (error) {
         console.error('Error fetching suggestions:', error);
@@ -163,7 +166,10 @@ export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }
         _new_value: {
           organization_id: organizationId, 
           entities: entities.map(e => e.name),
-          alert_thresholds: alertThresholds
+          breaking_news: alertThresholds.breaking_news,
+          sentiment_shift: alertThresholds.sentiment_shift,
+          mention_spike: alertThresholds.mention_spike,
+          threshold_value: alertThresholds.threshold_value
         }
       });
 
