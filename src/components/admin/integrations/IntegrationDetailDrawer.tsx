@@ -67,13 +67,13 @@ const healthConfig: Record<IntegrationHealthStatus, {
   no_setup: {
     icon: <Circle className="h-4 w-4" />,
     label: 'No Integrations',
-    color: 'text-[hsl(var(--portal-text-tertiary))]',
+    color: 'text-[hsl(var(--portal-text-muted))]',
     bgColor: 'bg-[hsl(var(--portal-bg-elevated))]',
   },
   all_disabled: {
     icon: <Circle className="h-4 w-4" />,
     label: 'All Disabled',
-    color: 'text-[hsl(var(--portal-text-tertiary))]',
+    color: 'text-[hsl(var(--portal-text-muted))]',
     bgColor: 'bg-[hsl(var(--portal-bg-elevated))]',
   },
 };
@@ -96,10 +96,10 @@ export function IntegrationDetailDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
         side="right" 
-        className="w-full sm:max-w-lg p-0 border-l border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg))]"
+        className="w-full sm:max-w-lg p-0 border-l border-[hsl(var(--portal-border))] !bg-[hsl(var(--portal-bg-secondary))]"
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-[hsl(var(--portal-bg-card))] border-b border-[hsl(var(--portal-border))]">
+        <div className="sticky top-0 z-10 bg-[hsl(var(--portal-bg-secondary))] border-b border-[hsl(var(--portal-border))]">
           <SheetHeader className="p-6 pb-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3 min-w-0">

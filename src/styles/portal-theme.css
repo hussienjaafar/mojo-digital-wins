@@ -47,6 +47,11 @@
   --portal-text-primary: 215 25% 15%;        /* #1E293B - High contrast text */
   --portal-text-secondary: 215 15% 40%;      /* #52606D - Secondary text (7:1 ratio) */
   --portal-text-muted: 215 10% 55%;          /* #7A8593 - Muted text (4.5:1 ratio) */
+  --portal-text-tertiary: 215 10% 55%;       /* Alias for --portal-text-muted */
+  
+  /* Backwards compatibility aliases */
+  --portal-bg: 210 20% 98%;                  /* Alias for --portal-bg-primary */
+  --portal-bg-card: 0 0% 100%;               /* Alias for --portal-bg-secondary */
   
   /* === PORTAL GRADIENTS - LIGHT MODE === */
   --portal-gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(210 20% 98%) 100%);
@@ -144,6 +149,11 @@
   --portal-text-primary: 0 0% 98%;           /* #FAFAFA - High contrast */
   --portal-text-secondary: 220 15% 70%;      /* #A8B0BC - Secondary (5:1 ratio) */
   --portal-text-muted: 220 10% 55%;          /* #848C98 - Muted (4.5:1 ratio) */
+  --portal-text-tertiary: 220 10% 55%;       /* Alias for --portal-text-muted */
+  
+  /* Backwards compatibility aliases */
+  --portal-bg: 220 15% 8%;                   /* Alias for --portal-bg-primary */
+  --portal-bg-card: 220 15% 12%;             /* Alias for --portal-bg-secondary */
   
   /* === PORTAL GRADIENTS - DARK MODE === */
   --portal-gradient-card: linear-gradient(135deg, hsl(220 15% 12%) 0%, hsl(220 15% 14%) 100%);
