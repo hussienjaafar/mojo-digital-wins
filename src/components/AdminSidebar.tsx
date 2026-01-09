@@ -112,8 +112,7 @@ export const navigationGroups: NavigationGroup[] = [
     label: "Integrations",
     icon: Key,
     items: [
-      { title: "Integrations Hub", icon: Key, value: "integrations-hub", requiredRole: 'admin' },
-      { title: "API Credentials", icon: Key, value: "api-credentials", requiredRole: 'admin' },
+      { title: "Integration Center", icon: Key, value: "integration-center", requiredRole: 'admin' },
     ],
   },
   {
