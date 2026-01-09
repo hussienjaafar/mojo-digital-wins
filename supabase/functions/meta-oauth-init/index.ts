@@ -42,7 +42,7 @@ serve(async (req) => {
       );
     }
 
-    const { organizationId, redirectUri } = await req.json();
+    const { organizationId, redirectUri, useRedirect = false } = await req.json();
     
     if (!organizationId || !redirectUri) {
       return new Response(
@@ -56,6 +56,8 @@ serve(async (req) => {
       organizationId,
       userId: claimsData.claims.sub,
       timestamp: Date.now(),
+      // For redirect mode, we need to know where to return
+      returnUrl: useRedirect ? `/admin?tab=onboarding-wizard&org=${organizationId}` : undefined,
     };
     const state = btoa(JSON.stringify(stateData));
 
@@ -74,6 +76,11 @@ serve(async (req) => {
     authUrl.searchParams.set('state', state);
     authUrl.searchParams.set('scope', scopes);
     authUrl.searchParams.set('response_type', 'code');
+    
+    // For full-page redirect, use 'page' display mode for better mobile experience
+    if (useRedirect) {
+      authUrl.searchParams.set('display', 'page');
+    }
 
     console.log('[meta-oauth-init] Generated OAuth URL for org:', organizationId);
 
