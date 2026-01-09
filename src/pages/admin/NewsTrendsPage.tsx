@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Users, Globe, Newspaper, Search } from "lucide-react";
+import { Users, Globe, Newspaper, Search, Settings } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -13,12 +13,15 @@ import {
   TrendsFilterRail,
   SavedViewsSelector,
   ExecutiveSignalBar,
-  ExecutiveSummary,
   PrimarySignalCard,
   SecondaryExplorer,
   CommandPaletteFilter,
   LearningInsightsPanel,
+  ExecutiveSummaryEnhanced,
+  QuickFilterChips,
+  PersonalizationPanel,
   type FilterState,
+  type QuickFilter,
 } from "@/components/admin/v3";
 import { PipelineHealthDrawer } from "@/components/admin/v3/PipelineHealthDrawer";
 import { TrendEventDrilldownView } from "@/components/admin/v3/TrendEventDrilldownView";
@@ -39,6 +42,21 @@ const DEFAULT_FILTERS: FilterState = {
   topics: [],
 };
 
+const DEFAULT_PREFERENCES = {
+  priorities: ['Healthcare Policy', 'Climate Action'],
+  geographies: ['Federal', 'California'],
+  watchlistEntities: [],
+  alertThresholds: {
+    breakingNews: true,
+    highConfidence: 70,
+    velocitySpike: 2,
+  },
+  sourceTrust: {
+    preferNews: true,
+    preferSocial: true,
+  },
+};
+
 export function NewsTrendsPage() {
   const [mode, setMode] = useState<ViewMode>("trends");
   const [selectedTrendId, setSelectedTrendId] = useState<string | null>(null);
@@ -46,6 +64,7 @@ export function NewsTrendsPage() {
   const [briefingDrawerOpen, setBriefingDrawerOpen] = useState(false);
   const [alertsDrawerOpen, setAlertsDrawerOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [personalizationOpen, setPersonalizationOpen] = useState(false);
   const [clientMode, setClientMode] = useState<ClientMode>("for_you");
   const [activeTab, setActiveTab] = useState<TabMode>("for_you");
   const [secondaryExpanded, setSecondaryExpanded] = useState(false);
@@ -54,6 +73,12 @@ export function NewsTrendsPage() {
   const [filterRailCollapsed, setFilterRailCollapsed] = useState(true);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Quick filter chips (C4)
+  const [activeQuickFilters, setActiveQuickFilters] = useState<QuickFilter[]>([]);
+  
+  // Org preferences (C6)
+  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   
   // Saved views
   const { views, activeView, activeViewId, selectView, createView, deleteView } = useSavedViews();
@@ -150,6 +175,12 @@ export function NewsTrendsPage() {
     setSearchQuery(query);
   }, []);
 
+  const handleToggleQuickFilter = useCallback((filter: QuickFilter) => {
+    setActiveQuickFilters(prev => 
+      prev.includes(filter) ? prev.filter(f => f !== filter) : [...prev, filter]
+    );
+  }, []);
+
   // Keyboard shortcut for command palette
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -183,14 +214,26 @@ export function NewsTrendsPage() {
         alertCount={3}
       />
 
-      {/* Layer 2: Executive Summary (collapsible) */}
+      {/* Layer 2: Executive Summary Enhanced (collapsible) */}
       {activeTab === "for_you" && (
-        <ExecutiveSummary
+        <ExecutiveSummaryEnhanced
           opportunities={executiveSummaryData.opportunities}
           risks={executiveSummaryData.risks}
           keyTakeaways={executiveSummaryData.keyTakeaways}
-          lastLoginAt={new Date(Date.now() - 1000 * 60 * 60 * 4)} // Mock: 4 hours ago
+          lastLoginAt={new Date(Date.now() - 1000 * 60 * 60 * 4)}
           onViewTrend={handleTrendDrilldown}
+        />
+      )}
+
+      {/* Quick Filter Chips (C4) */}
+      {activeTab === "for_you" && (
+        <QuickFilterChips
+          activeFilters={activeQuickFilters}
+          onToggleFilter={handleToggleQuickFilter}
+          counts={{
+            breaking: trends.filter(t => t.is_breaking).length,
+            high_confidence: trends.filter(t => t.confidence_score >= 70).length,
+          }}
         />
       )}
 
@@ -388,6 +431,15 @@ export function NewsTrendsPage() {
           setAlertsDrawerOpen(false);
           handleTrendDrilldown(trendId);
         }}
+      />
+
+      {/* Personalization Panel (C6) */}
+      <PersonalizationPanel
+        open={personalizationOpen}
+        onOpenChange={setPersonalizationOpen}
+        preferences={preferences}
+        onPreferencesChange={setPreferences}
+        orgName="Your Organization"
       />
     </motion.div>
   );
