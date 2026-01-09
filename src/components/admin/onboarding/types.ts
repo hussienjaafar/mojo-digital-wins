@@ -51,12 +51,46 @@ export interface CreateOrgData {
 }
 
 // Step 2: Organization Profile
+export type OrganizationType = 
+  | 'campaign_federal'      // US Congress, Senate, President
+  | 'campaign_state'        // Governor, State Legislature
+  | 'campaign_local'        // Mayor, City Council, County Commissioner, School Board
+  | 'c3_national'           // National 501(c)(3)
+  | 'c3_state'              // State-level 501(c)(3)
+  | 'c3_local'              // Local 501(c)(3)
+  | 'c4_national'           // National 501(c)(4)
+  | 'c4_state'              // State-level 501(c)(4)
+  | 'c4_local'              // Local 501(c)(4)
+  | 'pac_federal'           // Federal PAC
+  | 'pac_state'             // State PAC
+  | 'international'         // International NGO/Organization
+  | 'other';
+
+export type GeoLevel = 
+  | 'national'              // Entire US
+  | 'multi_state'           // Multiple states
+  | 'state'                 // Single state
+  | 'congressional_district' // US House district
+  | 'county'                // County level
+  | 'city'                  // City/Municipal
+  | 'international';        // Outside US
+
+export interface GeoLocation {
+  type: GeoLevel;
+  value: string;           // e.g., "CA", "San Francisco, CA", "CA-12"
+  label: string;           // Display name
+}
+
 export interface OrgProfileData {
   mission_statement: string;
   focus_areas: string[];
   policy_domains: string[];
-  geo_focus: 'federal' | 'state' | 'local' | 'multi';
-  target_states: string[];
+  organization_type: OrganizationType;
+  geo_level: GeoLevel;
+  geo_locations: GeoLocation[];
+  // Legacy fields for backwards compatibility
+  geo_focus?: 'federal' | 'state' | 'local' | 'multi';
+  target_states?: string[];
   sentiment_sensitivity: 'low' | 'medium' | 'high';
   risk_tolerance: 'low' | 'medium' | 'high';
 }
