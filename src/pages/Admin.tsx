@@ -46,6 +46,8 @@ import { NewsFilterProvider, useNewsFilters } from "@/contexts/NewsFilterContext
 import OpsPanel from "@/components/admin/OpsPanel";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
 import { CoverageGovernancePanel } from "@/components/admin/v3";
+import { OnboardingWizard } from "@/components/admin/onboarding/OnboardingWizard";
+import { IntegrationsHub } from "@/components/admin/integrations/IntegrationsHub";
 
 type ContactSubmission = {
   id: string;
@@ -326,8 +328,12 @@ const Admin = () => {
         return <AlertSettings />;
       case "clients":
         return <ClientOrganizationManager />;
+      case "onboarding-wizard":
+        return <OnboardingWizard />;
       case "client-users":
         return <ClientUserManager />;
+      case "integrations-hub":
+        return <IntegrationsHub />;
       case "api-credentials":
         return <APICredentialsManager />;
       case "attribution":
