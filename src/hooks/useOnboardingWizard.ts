@@ -50,20 +50,56 @@ export function useOnboardingWizard(
   const [error, setError] = useState<string | null>(null);
   const [stateId, setStateId] = useState<string | null>(null);
 
+  // Internal helper: create (or re-create) onboarding state if it doesn't exist yet.
+  // This makes the wizard resilient to partial failures (e.g. org created but state insert failed).
+  const upsertOnboardingState = useCallback(async (params: {
+    orgId: string;
+    userId: string | null | undefined;
+    current_step: WizardStep;
+    completed_steps: WizardStep[];
+    step_data: Record<string, unknown>;
+    status: OnboardingStatus;
+  }) => {
+    const { data, error } = await (supabase as any)
+      .from('org_onboarding_state')
+      .upsert({
+        organization_id: params.orgId,
+        current_step: params.current_step,
+        completed_steps: params.completed_steps,
+        step_data: params.step_data,
+        status: params.status,
+        created_by: params.userId,
+        last_updated_by: params.userId,
+      }, {
+        onConflict: 'organization_id',
+      })
+      .select('id, current_step, completed_steps, status, step_data')
+      .single();
+
+    if (error) throw error;
+    return data as {
+      id: string;
+      current_step: number;
+      completed_steps: WizardStep[];
+      status: OnboardingStatus;
+      step_data: Record<string, unknown>;
+    };
+  }, []);
+
   // Load existing onboarding state
   const loadOnboardingState = useCallback(async (orgId: string) => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const { data, error: fetchError } = await (supabase as any)
         .from('org_onboarding_state')
         .select('*')
         .eq('organization_id', orgId)
         .maybeSingle();
-      
+
       if (fetchError) throw fetchError;
-      
+
       if (data) {
         setStateId(data.id);
         setCurrentStep(data.current_step as WizardStep);
@@ -72,6 +108,7 @@ export function useOnboardingWizard(
         setStepData(data.step_data || {});
       } else {
         // No existing state - start fresh
+        setStateId(null);
         setCurrentStep(1);
         setCompletedSteps([]);
         setStatus('not_started');
@@ -90,59 +127,52 @@ export function useOnboardingWizard(
   }, [toast]);
 
   // Initialize onboarding for a new org - marks step 1 as complete and advances to step 2
+  // IMPORTANT: we optimistically advance the UI even if persistence fails, so admins never get stuck.
   const initializeOnboarding = useCallback(async (orgId: string) => {
     setIsSaving(true);
     setError(null);
-    
+
+    // Optimistic UI: step 1 is already done once the org exists
+    setCurrentStep(2);
+    setCompletedSteps([1]);
+    setStatus('in_progress');
+    setStepData({});
+
     try {
       const { data: session } = await supabase.auth.getSession();
       const userId = session?.session?.user?.id;
-      
-      // Step 1 is already complete (org was just created), so we start at step 2
-      const { data, error: insertError } = await (supabase as any)
-        .from('org_onboarding_state')
-        .upsert({
-          organization_id: orgId,
-          current_step: 2,
-          completed_steps: [1],
-          step_data: {},
-          status: 'in_progress',
-          created_by: userId,
-          last_updated_by: userId,
-        }, {
-          onConflict: 'organization_id',
-        })
-        .select()
-        .single();
-      
-      if (insertError) throw insertError;
-      
-      setStateId(data.id);
-      setCurrentStep(2);
-      setCompletedSteps([1]);
-      setStatus('in_progress');
-      setStepData({});
-      
-      // Log the action
+
+      const record = await upsertOnboardingState({
+        orgId,
+        userId,
+        current_step: 2,
+        completed_steps: [1],
+        step_data: {},
+        status: 'in_progress',
+      });
+
+      setStateId(record.id);
+
+      // Log the action (non-blocking)
       await supabase.rpc('log_onboarding_action', {
         _organization_id: orgId,
         _action_type: 'started',
         _step: 1,
         _details: { initialized: true, step1_completed: true },
       });
-      
     } catch (err: any) {
       const message = err?.message || 'Failed to initialize onboarding';
       setError(message);
       toast({
-        title: 'Error',
+        title: 'Onboarding state not saved',
         description: message,
         variant: 'destructive',
       });
+      // NOTE: we intentionally do NOT revert the optimistic UI.
     } finally {
       setIsSaving(false);
     }
-  }, [toast]);
+  }, [toast, upsertOnboardingState]);
 
   // Complete a step
   const completeStep = useCallback(async (
