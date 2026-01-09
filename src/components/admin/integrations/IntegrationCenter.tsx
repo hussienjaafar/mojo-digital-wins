@@ -15,7 +15,8 @@ import { IntegrationQuickActions } from './IntegrationQuickActions';
 import { IntegrationSearchInput } from './IntegrationSearchInput';
 import { VirtualizedClientList } from './VirtualizedClientList';
 import { IntegrationListPagination } from './IntegrationListPagination';
-import { IntegrationHealthStatus, PLATFORM_DISPLAY_NAMES } from '@/types/integrations';
+import { IntegrationSortControls, SortConfig } from './IntegrationSortControls';
+import { IntegrationHealthStatus, IntegrationSummary, PLATFORM_DISPLAY_NAMES } from '@/types/integrations';
 import { toast } from 'sonner';
 
 export function IntegrationCenter() {
@@ -26,6 +27,9 @@ export function IntegrationCenter() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  
+  // Sort state
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'status', direction: 'desc' });
   
   // Slide-over state
   const [slideOverOpen, setSlideOverOpen] = useState(false);
@@ -136,9 +140,9 @@ export function IntegrationCenter() {
     }
   };
 
-  // Sort data: needs_attention first, then untested, then no_setup, then healthy
+  // Sort data based on sortConfig
   const sortedData = useMemo(() => {
-    const priorityOrder: Record<IntegrationHealthStatus, number> = {
+    const healthPriority: Record<IntegrationHealthStatus, number> = {
       needs_attention: 0,
       untested: 1,
       no_setup: 2,
@@ -146,10 +150,41 @@ export function IntegrationCenter() {
       healthy: 4,
     };
     
-    return [...data].sort((a, b) => 
-      (priorityOrder[a.health_status] ?? 5) - (priorityOrder[b.health_status] ?? 5)
-    );
-  }, [data]);
+    const sorted = [...data].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortConfig.field) {
+        case 'status':
+          comparison = (healthPriority[a.health_status] ?? 5) - (healthPriority[b.health_status] ?? 5);
+          break;
+        case 'name':
+          comparison = a.organization_name.localeCompare(b.organization_name);
+          break;
+        case 'integrations':
+          comparison = b.total_count - a.total_count;
+          break;
+        case 'lastSync':
+          const aSync = getLatestSync(a);
+          const bSync = getLatestSync(b);
+          comparison = (bSync?.getTime() ?? 0) - (aSync?.getTime() ?? 0);
+          break;
+      }
+      
+      return sortConfig.direction === 'asc' ? -comparison : comparison;
+    });
+    
+    return sorted;
+  }, [data, sortConfig]);
+
+  // Helper to get latest sync from integrations
+  function getLatestSync(summary: IntegrationSummary): Date | null {
+    const syncDates = summary.integrations
+      .map(i => i.last_sync_at ? new Date(i.last_sync_at) : null)
+      .filter((d): d is Date => d !== null);
+    
+    if (syncDates.length === 0) return null;
+    return new Date(Math.max(...syncDates.map(d => d.getTime())));
+  }
 
   // Pagination
   const totalPages = Math.ceil(sortedData.length / pageSize);
@@ -237,6 +272,11 @@ export function IntegrationCenter() {
             ))}
           </SelectContent>
         </Select>
+        
+        <IntegrationSortControls
+          sort={sortConfig}
+          onSortChange={setSortConfig}
+        />
       </div>
 
       {/* Client List */}
