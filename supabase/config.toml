@@ -282,6 +282,16 @@ verify_jwt = false
 [functions.update-trend-baselines]
 verify_jwt = false
 
+# Meta OAuth integration functions
+[functions.meta-oauth-init]
+verify_jwt = false
+
+[functions.meta-oauth-callback]
+verify_jwt = false
+
+[functions.meta-save-connection]
+verify_jwt = false
+
 # DELETED FUNCTIONS (removed as part of attribution hardening):
 # - populate-attribution: Dead code (click_id/fbclid tables don't exist)
 # - backfill-attribution: Circular dependency, reads/writes same table
