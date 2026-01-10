@@ -382,8 +382,6 @@ export function NewsFeed() {
     }
   };
 
-  };
-
   const applyFilters = (filters: FilterState) => {
     // Save current filters
     setCurrentFilters(filters);
