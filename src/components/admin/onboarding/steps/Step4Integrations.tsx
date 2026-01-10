@@ -1,5 +1,4 @@
 import { useState } from 'react';
-// Card removed - using integrated layout
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,13 +10,14 @@ import { IntegrationConfig, WizardStep } from '../types';
 import { MetaAuthOptions } from '@/components/integrations/MetaAuthOptions';
 import { 
   Plug, 
-  ChevronDown, 
+  ChevronRight, 
   CheckCircle2, 
   XCircle, 
   Loader2,
   TestTube,
   Eye,
-  EyeOff
+  EyeOff,
+  Zap
 } from 'lucide-react';
 
 interface Step4IntegrationsProps {
@@ -83,13 +83,11 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     try {
       let testResult = { success: false, error: '' };
 
-      // Platform-specific test logic
       if (platform === 'meta') {
         const { access_token, ad_account_id } = formState.meta;
         if (!access_token || !ad_account_id) {
           throw new Error('Please enter access token and ad account ID');
         }
-        // Simulate test - in production this would call an edge function
         testResult = { success: true, error: '' };
       } else if (platform === 'switchboard') {
         const { api_key, account_id } = formState.switchboard;
@@ -203,7 +201,6 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
 
       if (error) throw error;
 
-      // Log audit action
       await supabase.rpc('log_admin_action', {
         _action_type: 'create_integration',
         _table_affected: 'client_api_credentials',
@@ -217,7 +214,6 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
         [platform]: { ...prev[platform], is_enabled: true }
       }));
 
-      // Clear sensitive data from form
       if (platform === 'meta') {
         updateFormState('meta', { access_token: '', isOpen: false });
       } else if (platform === 'switchboard') {
@@ -248,262 +244,270 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
 
   const getStatusBadge = (config: IntegrationConfig) => {
     if (config.is_enabled) {
-      return <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Connected</Badge>;
+      return (
+        <Badge className="bg-[hsl(var(--portal-success))]/10 text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success))]/20 text-[11px]">
+          <CheckCircle2 className="w-3 h-3 mr-1" />
+          Connected
+        </Badge>
+      );
     }
     if (config.is_tested && config.last_test_status === 'success') {
-      return <Badge variant="outline" className="text-amber-600 border-amber-500/20">Tested - Save to Enable</Badge>;
+      return (
+        <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/5 text-[11px]">
+          Tested
+        </Badge>
+      );
     }
     if (config.is_tested && config.last_test_status === 'error') {
-      return <Badge variant="destructive">Test Failed</Badge>;
+      return (
+        <Badge variant="destructive" className="text-[11px]">
+          <XCircle className="w-3 h-3 mr-1" />
+          Failed
+        </Badge>
+      );
     }
-    return <Badge variant="secondary">Not Connected</Badge>;
+    return (
+      <Badge variant="secondary" className="text-[11px] bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-muted))]">
+        Not Connected
+      </Badge>
+    );
+  };
+
+  const integrationConfigs = [
+    {
+      key: 'meta' as const,
+      name: 'Meta Ads',
+      description: 'Facebook & Instagram ad campaigns',
+      color: 'blue',
+      letter: 'M'
+    },
+    {
+      key: 'switchboard' as const,
+      name: 'Switchboard SMS',
+      description: 'SMS campaign delivery data',
+      color: 'purple',
+      letter: 'S'
+    },
+    {
+      key: 'actblue' as const,
+      name: 'ActBlue',
+      description: 'Donation and transaction data',
+      color: 'red',
+      letter: 'A'
+    }
+  ];
+
+  const getColorClasses = (color: string) => {
+    switch (color) {
+      case 'blue': return 'bg-blue-500/10 text-blue-600';
+      case 'purple': return 'bg-purple-500/10 text-purple-600';
+      case 'red': return 'bg-red-500/10 text-red-600';
+      default: return 'bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-muted))]';
+    }
   };
 
   return (
-    <div className="space-y-4">
-        {/* Meta Ads - OAuth Flow */}
-        <Collapsible
-          open={formState.meta.isOpen}
-          onOpenChange={(open) => updateFormState('meta', { isOpen: open })}
-        >
-          <div className="border rounded-lg">
-            <CollapsibleTrigger asChild>
-              <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/50">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                    <span className="text-blue-600 font-bold text-sm">M</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">Meta Ads</p>
-                    <p className="text-sm text-muted-foreground">Facebook & Instagram ad campaigns</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(integrations.meta)}
-                  <ChevronDown className="h-4 w-4" />
-                </div>
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="p-4 pt-0 border-t">
-                {integrations.meta.is_enabled ? (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-sm">Connected and enabled</span>
-                  </div>
-                ) : (
-                  <MetaAuthOptions
-                    organizationId={organizationId}
-                    onComplete={() => {
-                      setIntegrations(prev => ({
-                        ...prev,
-                        meta: { 
-                          ...prev.meta, 
-                          is_enabled: true, 
-                          is_tested: true, 
-                          last_test_status: 'success' 
-                        }
-                      }));
-                      updateFormState('meta', { isOpen: false });
-                      toast({
-                        title: 'Meta Ads connected',
-                        description: 'Your ad account has been successfully linked.'
-                      });
-                    }}
-                    onCancel={() => updateFormState('meta', { isOpen: false })}
-                  />
-                )}
-              </div>
-            </CollapsibleContent>
+    <div className="space-y-6">
+      {/* Header Info */}
+      <div className="rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10 flex items-center justify-center flex-shrink-0">
+            <Zap className="w-[18px] h-[18px] text-[hsl(var(--portal-accent-blue))]" />
           </div>
-        </Collapsible>
+          <div>
+            <p className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">Connect Your Data Sources</p>
+            <p className="text-[12px] text-[hsl(var(--portal-text-secondary))] mt-0.5">
+              Integrations are optional and can be configured later from the Integrations Hub.
+            </p>
+          </div>
+        </div>
+      </div>
 
-        {/* Switchboard SMS */}
-        <Collapsible
-          open={formState.switchboard.isOpen}
-          onOpenChange={(open) => updateFormState('switchboard', { isOpen: open })}
-        >
-          <div className="border rounded-lg">
-            <CollapsibleTrigger asChild>
-              <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/50">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                    <span className="text-purple-600 font-bold text-sm">S</span>
+      {/* Integration Cards */}
+      <div className="space-y-3">
+        {integrationConfigs.map(({ key, name, description, color, letter }) => (
+          <Collapsible
+            key={key}
+            open={formState[key].isOpen}
+            onOpenChange={(open) => updateFormState(key, { isOpen: open })}
+          >
+            <div className="rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] overflow-hidden">
+              <CollapsibleTrigger asChild>
+                <div className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-[hsl(var(--portal-bg-hover))] transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className={`h-10 w-10 rounded-lg ${getColorClasses(color)} flex items-center justify-center`}>
+                      <span className="font-bold text-sm">{letter}</span>
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-semibold text-[hsl(var(--portal-text-primary))]">{name}</p>
+                      <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">{description}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">Switchboard SMS</p>
-                    <p className="text-sm text-muted-foreground">SMS campaign delivery data</p>
+                  <div className="flex items-center gap-3">
+                    {getStatusBadge(integrations[key])}
+                    <ChevronRight className={`h-4 w-4 text-[hsl(var(--portal-text-muted))] transition-transform ${formState[key].isOpen ? 'rotate-90' : ''}`} />
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(integrations.switchboard)}
-                  <ChevronDown className="h-4 w-4" />
-                </div>
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="p-4 pt-0 space-y-4 border-t">
-                <div className="space-y-2">
-                  <Label>API Key</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type={formState.switchboard.showKey ? 'text' : 'password'}
-                      placeholder="Enter Switchboard API key"
-                      value={formState.switchboard.api_key}
-                      onChange={(e) => updateFormState('switchboard', { api_key: e.target.value })}
-                      disabled={integrations.switchboard.is_enabled}
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="px-5 pb-5 pt-2 border-t border-[hsl(var(--portal-border))]">
+                  {integrations[key].is_enabled ? (
+                    <div className="flex items-center gap-2 text-[hsl(var(--portal-success))] py-2">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span className="text-[13px]">Connected and enabled</span>
+                    </div>
+                  ) : key === 'meta' ? (
+                    <MetaAuthOptions
+                      organizationId={organizationId}
+                      onComplete={() => {
+                        setIntegrations(prev => ({
+                          ...prev,
+                          meta: { 
+                            ...prev.meta, 
+                            is_enabled: true, 
+                            is_tested: true, 
+                            last_test_status: 'success' 
+                          }
+                        }));
+                        updateFormState('meta', { isOpen: false });
+                        toast({
+                          title: 'Meta Ads connected',
+                          description: 'Your ad account has been successfully linked.'
+                        });
+                      }}
+                      onCancel={() => updateFormState('meta', { isOpen: false })}
                     />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => updateFormState('switchboard', { showKey: !formState.switchboard.showKey })}
-                    >
-                      {formState.switchboard.showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Account ID</Label>
-                  <Input
-                    placeholder="Enter account ID"
-                    value={formState.switchboard.account_id}
-                    onChange={(e) => updateFormState('switchboard', { account_id: e.target.value })}
-                    disabled={integrations.switchboard.is_enabled}
-                  />
-                </div>
-                {!integrations.switchboard.is_enabled && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => testConnection('switchboard')}
-                      disabled={testingIntegration === 'switchboard'}
-                    >
-                      {testingIntegration === 'switchboard' ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <TestTube className="h-4 w-4 mr-2" />
+                  ) : (
+                    <div className="space-y-4 pt-2">
+                      {key === 'switchboard' && (
+                        <>
+                          <div className="space-y-2">
+                            <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">API Key</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={formState.switchboard.showKey ? 'text' : 'password'}
+                                placeholder="Enter Switchboard API key"
+                                value={formState.switchboard.api_key}
+                                onChange={(e) => updateFormState('switchboard', { api_key: e.target.value })}
+                                className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => updateFormState('switchboard', { showKey: !formState.switchboard.showKey })}
+                                className="h-11 w-11"
+                              >
+                                {formState.switchboard.showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Account ID</Label>
+                            <Input
+                              placeholder="Enter account ID"
+                              value={formState.switchboard.account_id}
+                              onChange={(e) => updateFormState('switchboard', { account_id: e.target.value })}
+                              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                            />
+                          </div>
+                          <div className="flex gap-2 pt-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => testConnection('switchboard')}
+                              disabled={testingIntegration === 'switchboard'}
+                              className="h-10"
+                            >
+                              {testingIntegration === 'switchboard' ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <TestTube className="h-4 w-4 mr-2" />
+                              )}
+                              Test Connection
+                            </Button>
+                            <Button
+                              onClick={() => saveIntegration('switchboard')}
+                              disabled={!integrations.switchboard.is_tested || integrations.switchboard.last_test_status !== 'success'}
+                              className="h-10"
+                            >
+                              Save & Enable
+                            </Button>
+                          </div>
+                        </>
                       )}
-                      Test Connection
-                    </Button>
-                    <Button
-                      onClick={() => saveIntegration('switchboard')}
-                      disabled={!integrations.switchboard.is_tested || integrations.switchboard.last_test_status !== 'success'}
-                    >
-                      Save & Enable
-                    </Button>
-                  </div>
-                )}
-                {integrations.switchboard.is_enabled && (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-sm">Connected and enabled</span>
-                  </div>
-                )}
-              </div>
-            </CollapsibleContent>
-          </div>
-        </Collapsible>
-
-        {/* ActBlue */}
-        <Collapsible
-          open={formState.actblue.isOpen}
-          onOpenChange={(open) => updateFormState('actblue', { isOpen: open })}
-        >
-          <div className="border rounded-lg">
-            <CollapsibleTrigger asChild>
-              <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/50">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-                    <span className="text-red-600 font-bold text-sm">A</span>
-                  </div>
-                  <div>
-                    <p className="font-medium">ActBlue</p>
-                    <p className="text-sm text-muted-foreground">Donation and transaction data</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(integrations.actblue)}
-                  <ChevronDown className="h-4 w-4" />
-                </div>
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="p-4 pt-0 space-y-4 border-t">
-                <div className="space-y-2">
-                  <Label>Webhook Secret</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type={formState.actblue.showSecret ? 'text' : 'password'}
-                      placeholder="Enter webhook secret"
-                      value={formState.actblue.webhook_secret}
-                      onChange={(e) => updateFormState('actblue', { webhook_secret: e.target.value })}
-                      disabled={integrations.actblue.is_enabled}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => updateFormState('actblue', { showSecret: !formState.actblue.showSecret })}
-                    >
-                      {formState.actblue.showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Entity ID</Label>
-                  <Input
-                    placeholder="Enter entity ID"
-                    value={formState.actblue.entity_id}
-                    onChange={(e) => updateFormState('actblue', { entity_id: e.target.value })}
-                    disabled={integrations.actblue.is_enabled}
-                  />
-                </div>
-                {!integrations.actblue.is_enabled && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => testConnection('actblue')}
-                      disabled={testingIntegration === 'actblue'}
-                    >
-                      {testingIntegration === 'actblue' ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <TestTube className="h-4 w-4 mr-2" />
+                      {key === 'actblue' && (
+                        <>
+                          <div className="space-y-2">
+                            <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Webhook Secret</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={formState.actblue.showSecret ? 'text' : 'password'}
+                                placeholder="Enter webhook secret"
+                                value={formState.actblue.webhook_secret}
+                                onChange={(e) => updateFormState('actblue', { webhook_secret: e.target.value })}
+                                className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => updateFormState('actblue', { showSecret: !formState.actblue.showSecret })}
+                                className="h-11 w-11"
+                              >
+                                {formState.actblue.showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Entity ID</Label>
+                            <Input
+                              placeholder="Enter entity ID"
+                              value={formState.actblue.entity_id}
+                              onChange={(e) => updateFormState('actblue', { entity_id: e.target.value })}
+                              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                            />
+                          </div>
+                          <div className="flex gap-2 pt-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => testConnection('actblue')}
+                              disabled={testingIntegration === 'actblue'}
+                              className="h-10"
+                            >
+                              {testingIntegration === 'actblue' ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <TestTube className="h-4 w-4 mr-2" />
+                              )}
+                              Test Connection
+                            </Button>
+                            <Button
+                              onClick={() => saveIntegration('actblue')}
+                              disabled={!integrations.actblue.is_tested || integrations.actblue.last_test_status !== 'success'}
+                              className="h-10"
+                            >
+                              Save & Enable
+                            </Button>
+                          </div>
+                        </>
                       )}
-                      Test Connection
-                    </Button>
-                    <Button
-                      onClick={() => saveIntegration('actblue')}
-                      disabled={!integrations.actblue.is_tested || integrations.actblue.last_test_status !== 'success'}
-                    >
-                      Save & Enable
-                    </Button>
-                  </div>
-                )}
-                {integrations.actblue.is_enabled && (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-sm">Connected and enabled</span>
-                  </div>
-                )}
-              </div>
-            </CollapsibleContent>
-          </div>
-        </Collapsible>
-
-        <p className="text-sm text-muted-foreground">
-          You can skip integrations for now and connect them later from the Integrations Hub.
-        </p>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
+        ))}
+      </div>
 
       {/* Actions */}
-      <div className="flex justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
-        <Button variant="outline" onClick={onBack}>
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onBack} className="h-10 px-5">
           Back
         </Button>
         <div className="flex gap-2">
-          <Button variant="ghost" onClick={handleContinue} disabled={isLoading}>
+          <Button variant="ghost" onClick={handleContinue} disabled={isLoading} className="h-10 px-5">
             Skip for now
           </Button>
-          <Button onClick={handleContinue} disabled={isLoading}>
+          <Button onClick={handleContinue} disabled={isLoading} className="h-10 px-5">
             {Object.values(integrations).some(i => i.is_enabled) ? 'Save & Continue' : 'Continue'}
           </Button>
         </div>

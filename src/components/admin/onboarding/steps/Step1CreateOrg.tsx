@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { V3Button } from '@/components/v3/V3Button';
-// Card components removed - using integrated layout
-import { Building2, Globe, Mail, Image, Loader2 } from 'lucide-react';
+import { Building2, Globe, Mail, Image, Loader2, Check, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
@@ -39,7 +38,6 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
   };
 
   const isValidEmail = (value: string) => {
-    // Simple, pragmatic validation (we still let the backend be the source of truth)
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   };
 
@@ -47,7 +45,6 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
     const trimmed = value.trim();
     if (!trimmed) return '';
 
-    // Users often paste domains without protocol; normalize to https://
     const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 
     try {
@@ -87,7 +84,6 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
         setSlugAvailabilityMsg('Slug is available.');
       }
     } catch (err: any) {
-      // If we can't check (permissions/etc.), don't block submit.
       logger.warn('[Step1CreateOrg] slug availability check failed', err);
       setSlugAvailability('idle');
       setSlugAvailabilityMsg('');
@@ -116,12 +112,10 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
       }
       return `${root}-${maxSuffix + 1}`;
     } catch (err) {
-      // Fallback: timestamp-based suffix
       return `${root}-${Date.now().toString().slice(-4)}`;
     }
   };
 
-  // Debounced slug availability check (best-effort)
   const slugToCheck = useMemo(() => formData.slug.trim(), [formData.slug]);
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -159,8 +153,6 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
       slugAvailability,
     });
 
-    // We intentionally use custom validation because optional email/url fields
-    // can cause the browser to block submit silently.
     if (!formData.name.trim() || !formData.slug.trim()) {
       toast({
         title: 'Validation Error',
@@ -220,7 +212,6 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
     setIsSubmitting(true);
 
     try {
-      // Create the organization
       const { data: org, error: orgError } = await (supabase as any)
         .from('client_organizations')
         .insert({
@@ -235,7 +226,6 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
 
       if (orgError) throw orgError;
 
-      // Log the audit action
       await supabase.rpc('log_admin_action', {
         _action_type: 'create_organization',
         _table_affected: 'client_organizations',
@@ -254,7 +244,6 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
 
       logger.info('[Step1CreateOrg] org created', { id: org.id, slug: normalizedData.slug });
 
-      // Await to keep the button in a loading state until the wizard advances
       await Promise.resolve(onComplete(org.id, normalizedData));
     } catch (err: any) {
       logger.error('[Step1CreateOrg] submit failed', err);
@@ -273,11 +262,10 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
 
         toast({
           title: 'Slug already exists',
-          description: `We suggested a new slug: “${suggested}”. Click Create & Continue again.`,
+          description: `We suggested a new slug: "${suggested}". Click Create & Continue again.`,
           variant: 'destructive',
         });
 
-        // focus so the user sees what changed
         window.setTimeout(() => slugInputRef.current?.focus(), 0);
         return;
       }
@@ -293,21 +281,23 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
   };
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-8">
-      {/* Organization Details Section */}
-      <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10 flex items-center justify-center">
-            <Building2 className="w-4 h-4 text-[hsl(var(--portal-accent-blue))]" />
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] tracking-tight">Organization Details</h3>
-            <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Basic information about the client</p>
+    <form onSubmit={handleSubmit} noValidate className="space-y-6">
+      {/* Organization Details Card */}
+      <div className="rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-tertiary))]/50">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10 flex items-center justify-center">
+              <Building2 className="w-[18px] h-[18px] text-[hsl(var(--portal-accent-blue))]" />
+            </div>
+            <div>
+              <h3 className="text-[13px] font-semibold text-[hsl(var(--portal-text-primary))]">Organization Details</h3>
+              <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Basic information about the client</p>
+            </div>
           </div>
         </div>
         
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div className="space-y-2 sm:col-span-2">
+        <div className="p-5 space-y-5">
+          <div className="space-y-2">
             <Label htmlFor="name" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">
               Organization Name <span className="text-[hsl(var(--portal-error))]">*</span>
             </Label>
@@ -317,104 +307,126 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder="Acme Corporation"
               required
-              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors"
+              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors placeholder:text-[hsl(var(--portal-text-muted))]/60"
             />
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="slug" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">
-              URL Slug <span className="text-[hsl(var(--portal-error))]">*</span>
-            </Label>
-            <Input
-              id="slug"
-              ref={slugInputRef}
-              value={formData.slug}
-              onChange={(e) => handleFieldChange('slug', e.target.value)}
-              placeholder="acme-corporation"
-              required
-              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors"
-            />
-            <p
-              className={
-                "text-[11px] " +
-                (slugAvailability === 'taken'
-                  ? 'text-[hsl(var(--portal-error))]'
-                  : 'text-[hsl(var(--portal-text-muted))]')
-              }
-              aria-live="polite"
-            >
-              {slugAvailabilityMsg || 'Auto-generated from name'}
-            </p>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))] flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
-              Primary Contact Email
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.primary_contact_email}
-              onChange={(e) => handleFieldChange('primary_contact_email', e.target.value)}
-              placeholder="contact@acme.com"
-              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors"
-            />
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="slug" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">
+                URL Slug <span className="text-[hsl(var(--portal-error))]">*</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="slug"
+                  ref={slugInputRef}
+                  value={formData.slug}
+                  onChange={(e) => handleFieldChange('slug', e.target.value)}
+                  placeholder="acme-corporation"
+                  required
+                  className="h-11 pr-10 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors placeholder:text-[hsl(var(--portal-text-muted))]/60"
+                />
+                {slugAvailability === 'available' && (
+                  <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--portal-success))]" />
+                )}
+                {slugAvailability === 'taken' && (
+                  <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--portal-error))]" />
+                )}
+                {slugAvailability === 'checking' && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[hsl(var(--portal-text-muted))]" />
+                )}
+              </div>
+              <p
+                className={
+                  "text-[11px] " +
+                  (slugAvailability === 'taken'
+                    ? 'text-[hsl(var(--portal-error))]'
+                    : slugAvailability === 'available'
+                    ? 'text-[hsl(var(--portal-success))]'
+                    : 'text-[hsl(var(--portal-text-muted))]')
+                }
+                aria-live="polite"
+              >
+                {slugAvailabilityMsg || 'Auto-generated from name'}
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))] flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
+                Primary Contact Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.primary_contact_email}
+                onChange={(e) => handleFieldChange('primary_contact_email', e.target.value)}
+                placeholder="contact@acme.com"
+                className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors placeholder:text-[hsl(var(--portal-text-muted))]/60"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Branding Section */}
-      <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[hsl(var(--portal-accent-purple))]/10 flex items-center justify-center">
-            <Globe className="w-4 h-4 text-[hsl(var(--portal-accent-purple))]" />
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] tracking-tight">Branding & Web Presence</h3>
-            <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Optional - can be completed later</p>
+      {/* Branding Card */}
+      <div className="rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-tertiary))]/50">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[hsl(var(--portal-accent-purple))]/10 flex items-center justify-center">
+              <Globe className="w-[18px] h-[18px] text-[hsl(var(--portal-accent-purple))]" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-[13px] font-semibold text-[hsl(var(--portal-text-primary))]">Branding & Web Presence</h3>
+                <span className="text-[10px] font-medium text-[hsl(var(--portal-text-muted))] bg-[hsl(var(--portal-bg-elevated))] px-2 py-0.5 rounded-full">Optional</span>
+              </div>
+              <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Can be completed later</p>
+            </div>
           </div>
         </div>
         
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="website" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))] flex items-center gap-1.5">
-              <Globe className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
-              Website URL
-            </Label>
-            <Input
-              id="website"
-              type="url"
-              value={formData.website_url}
-              onChange={(e) => handleFieldChange('website_url', e.target.value)}
-              placeholder="https://acme.com"
-              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors"
-            />
-            <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">
-              Used to auto-extract organization profile
-            </p>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="logo" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))] flex items-center gap-1.5">
-              <Image className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
-              Logo URL
-            </Label>
-            <Input
-              id="logo"
-              type="url"
-              value={formData.logo_url}
-              onChange={(e) => handleFieldChange('logo_url', e.target.value)}
-              placeholder="https://acme.com/logo.png"
-              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors"
-            />
+        <div className="p-5">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="website" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))] flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
+                Website URL
+              </Label>
+              <Input
+                id="website"
+                type="url"
+                value={formData.website_url}
+                onChange={(e) => handleFieldChange('website_url', e.target.value)}
+                placeholder="https://acme.com"
+                className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors placeholder:text-[hsl(var(--portal-text-muted))]/60"
+              />
+              <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">
+                Used to auto-extract organization profile
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="logo" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))] flex items-center gap-1.5">
+                <Image className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
+                Logo URL
+              </Label>
+              <Input
+                id="logo"
+                type="url"
+                value={formData.logo_url}
+                onChange={(e) => handleFieldChange('logo_url', e.target.value)}
+                placeholder="https://acme.com/logo.png"
+                className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors placeholder:text-[hsl(var(--portal-text-muted))]/60"
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Action Footer */}
-      <div className="flex justify-end pt-6 mt-2 border-t border-[hsl(var(--portal-border))]">
-        <V3Button type="submit" disabled={isSubmitting} className="h-10 px-5 text-sm font-medium">
+      <div className="flex justify-end pt-2">
+        <V3Button type="submit" disabled={isSubmitting} className="h-10 px-6 text-sm font-medium">
           {isSubmitting ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin mr-2" />

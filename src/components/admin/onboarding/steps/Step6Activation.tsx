@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-// Card removed - using integrated layout
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -16,7 +15,8 @@ import {
   ExternalLink,
   Zap,
   Database,
-  Activity
+  Activity,
+  PartyPopper
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -65,7 +65,6 @@ export function Step6Activation({
     setIsLoading(true);
     const newChecks = [...healthChecks];
 
-    // Check 1: Database connection
     newChecks[0] = { ...newChecks[0], status: 'checking', message: 'Checking...' };
     setHealthChecks([...newChecks]);
     
@@ -91,7 +90,6 @@ export function Step6Activation({
     }
     setHealthChecks([...newChecks]);
 
-    // Check 2: Integration status
     newChecks[1] = { ...newChecks[1], status: 'checking', message: 'Checking...' };
     setHealthChecks([...newChecks]);
     
@@ -120,7 +118,6 @@ export function Step6Activation({
     }
     setHealthChecks([...newChecks]);
 
-    // Check 3: Pipeline health (simulated)
     newChecks[2] = { ...newChecks[2], status: 'checking', message: 'Checking...' };
     setHealthChecks([...newChecks]);
     
@@ -132,7 +129,6 @@ export function Step6Activation({
     };
     setHealthChecks([...newChecks]);
 
-    // Update activation status
     const allPassed = newChecks.every(c => c.status === 'success' || c.status === 'pending');
     setActivationStatus(prev => ({
       ...prev,
@@ -149,7 +145,6 @@ export function Step6Activation({
   const activateOrganization = async () => {
     setIsActivating(true);
     try {
-      // Mark organization as active
       const { error: orgError } = await supabase
         .from('client_organizations')
         .update({ is_active: true })
@@ -157,7 +152,6 @@ export function Step6Activation({
 
       if (orgError) throw orgError;
 
-      // Update onboarding state
       const { error: stateError } = await supabase
         .from('org_onboarding_state')
         .update({
@@ -169,7 +163,6 @@ export function Step6Activation({
 
       if (stateError) throw stateError;
 
-      // Log audit action
       await supabase.rpc('log_admin_action', {
         _action_type: 'activate_organization',
         _table_affected: 'client_organizations',
@@ -210,10 +203,10 @@ export function Step6Activation({
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'success': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-      case 'error': return <XCircle className="h-4 w-4 text-destructive" />;
-      case 'checking': return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
-      default: return <div className="h-4 w-4 rounded-full bg-muted" />;
+      case 'success': return <CheckCircle2 className="h-4 w-4 text-[hsl(var(--portal-success))]" />;
+      case 'error': return <XCircle className="h-4 w-4 text-[hsl(var(--portal-error))]" />;
+      case 'checking': return <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--portal-accent-blue))]" />;
+      default: return <div className="h-4 w-4 rounded-full bg-[hsl(var(--portal-bg-tertiary))]" />;
     }
   };
 
@@ -222,105 +215,137 @@ export function Step6Activation({
 
   return (
     <div className="space-y-6">
-      {/* Health Check Progress */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-[hsl(var(--portal-text-secondary))]">Health Check Progress</span>
-          <span className="text-[hsl(var(--portal-text-muted))]">{completedChecks}/{healthChecks.length}</span>
-        </div>
-        <Progress value={progress} className="h-2" />
-      </div>
-
-        {/* Health Checks */}
-        <div className="space-y-3">
-          {healthChecks.map((check, idx) => {
-            const Icon = check.icon;
-            return (
-              <div 
-                key={idx} 
-                className="flex items-center justify-between p-3 border rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">{check.name}</p>
-                    <p className="text-xs text-muted-foreground">{check.message}</p>
-                  </div>
-                </div>
-                {getStatusIcon(check.status)}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Rerun Checks */}
-        <Button 
-          variant="outline" 
-          onClick={runHealthChecks}
-          disabled={isLoading}
-          className="w-full"
-        >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4 mr-2" />
-          )}
-          Re-run Health Checks
-        </Button>
-
-        {/* Activation Status */}
-        {activationStatus.pipelines_enabled && (
-          <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="font-medium">Organization Activated!</span>
+      {/* Activation Success State */}
+      {activationStatus.pipelines_enabled ? (
+        <div className="rounded-xl border border-[hsl(var(--portal-success))]/30 bg-[hsl(var(--portal-success))]/5 p-6">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-2xl bg-[hsl(var(--portal-success))]/10 flex items-center justify-center mb-4">
+              <PartyPopper className="h-8 w-8 text-[hsl(var(--portal-success))]" />
             </div>
-            <p className="text-sm text-muted-foreground mt-2">
+            <h3 className="text-lg font-semibold text-[hsl(var(--portal-text-primary))] mb-1">Organization Activated!</h3>
+            <p className="text-[13px] text-[hsl(var(--portal-text-secondary))] mb-6 max-w-md">
               The organization is now live. Users can log in and data pipelines are running.
             </p>
-            <div className="flex gap-2 mt-4">
+            <div className="flex gap-3">
               <Button
                 variant="outline"
-                size="sm"
                 onClick={() => navigate(`/client/${organizationSlug}`)}
+                className="h-10 px-5"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 View Client Portal
               </Button>
               <Button
-                variant="outline"
-                size="sm"
                 onClick={() => navigate('/admin?tab=clients')}
+                className="h-10 px-5"
               >
                 Back to Organizations
               </Button>
             </div>
           </div>
-        )}
-
-      {/* Actions */}
-      {!activationStatus.pipelines_enabled && (
-        <div className="flex justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
-          <Button variant="outline" onClick={onBack}>
-            Back
-          </Button>
-          <Button 
-            onClick={activateOrganization}
-            disabled={isActivating || !activationStatus.health_check_passed}
-          >
-            {isActivating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Activating...
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 mr-2" />
-                Activate Organization
-              </>
-            )}
-          </Button>
         </div>
+      ) : (
+        <>
+          {/* Health Check Progress Card */}
+          <div className="rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-tertiary))]/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10 flex items-center justify-center">
+                    <Activity className="w-[18px] h-[18px] text-[hsl(var(--portal-accent-blue))]" />
+                  </div>
+                  <div>
+                    <h3 className="text-[13px] font-semibold text-[hsl(var(--portal-text-primary))]">System Health Check</h3>
+                    <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Verifying all systems are ready</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">{completedChecks}/{healthChecks.length}</span>
+                  <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Passed</p>
+                </div>
+              </div>
+              <Progress value={progress} className="h-1.5 mt-4" />
+            </div>
+            
+            <div className="divide-y divide-[hsl(var(--portal-border))]">
+              {healthChecks.map((check, idx) => {
+                const Icon = check.icon;
+                return (
+                  <div 
+                    key={idx} 
+                    className="px-5 py-4 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-[hsl(var(--portal-bg-tertiary))] flex items-center justify-center">
+                        <Icon className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">{check.name}</p>
+                        <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">{check.message}</p>
+                      </div>
+                    </div>
+                    {getStatusIcon(check.status)}
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="px-5 py-4 border-t border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-tertiary))]/30">
+              <Button 
+                variant="outline" 
+                onClick={runHealthChecks}
+                disabled={isLoading}
+                className="w-full h-10"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Re-run Health Checks
+              </Button>
+            </div>
+          </div>
+
+          {/* Activation Card */}
+          <div className="rounded-xl border border-[hsl(var(--portal-accent-blue))]/30 bg-[hsl(var(--portal-accent-blue))]/5 p-5">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-[hsl(var(--portal-accent-blue))]/10 flex items-center justify-center flex-shrink-0">
+                <Rocket className="w-5 h-5 text-[hsl(var(--portal-accent-blue))]" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-[14px] font-semibold text-[hsl(var(--portal-text-primary))] mb-1">Ready to Launch</h3>
+                <p className="text-[13px] text-[hsl(var(--portal-text-secondary))] mb-4">
+                  All health checks have passed. Activate the organization to enable user access and start data pipelines.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-between pt-2">
+            <Button variant="outline" onClick={onBack} className="h-10 px-5">
+              Back
+            </Button>
+            <Button 
+              onClick={activateOrganization}
+              disabled={isActivating || !activationStatus.health_check_passed}
+              className="h-10 px-6"
+            >
+              {isActivating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Activating...
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Activate Organization
+                </>
+              )}
+            </Button>
+          </div>
+        </>
       )}
     </div>
   );
