@@ -538,6 +538,7 @@ export function Step2OrgProfile({
               selectedLocations={formData.geo_locations}
               onChange={(locations) => setFormData(prev => ({ ...prev, geo_locations: locations }))}
             />
+          </div>
         </div>
       </div>
 
