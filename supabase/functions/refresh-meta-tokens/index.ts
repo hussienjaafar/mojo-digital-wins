@@ -31,7 +31,7 @@ function validateCronSecret(req: Request): boolean {
   return providedSecret === cronSecret;
 }
 
-async function validateAuth(req: Request, supabase: ReturnType<typeof createClient>): Promise<boolean> {
+async function validateAuth(req: Request, supabase: any): Promise<boolean> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) return false;
 
