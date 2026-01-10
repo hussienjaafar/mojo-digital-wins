@@ -1,10 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { getCorsHeaders, validateCronOrAdmin, checkRateLimit } from "../_shared/security.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const corsHeaders = getCorsHeaders();
 
 // Calculate Levenshtein distance for string similarity
 function levenshtein(a: string, b: string): number {
@@ -69,6 +67,25 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // SECURITY: Require cron secret or admin JWT
+    const authResult = await validateCronOrAdmin(req, supabase);
+    if (!authResult.valid) {
+      console.error('[detect-duplicates] Unauthorized access attempt');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // SECURITY: Rate limiting
+    const rateLimit = await checkRateLimit('detect-duplicates', 10, 60000);
+    if (!rateLimit.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded', resetAt: rateLimit.resetAt }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { lookbackHours = 24, similarityThreshold = 0.75 } = await req.json().catch(() => ({}));
 
@@ -211,3 +228,4 @@ serve(async (req) => {
     );
   }
 });
+

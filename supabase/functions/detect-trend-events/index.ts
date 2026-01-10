@@ -844,7 +844,7 @@ function extractDomain(url?: string): string {
 // PERFORMANCE LIMITS - Prevent CPU timeout
 // ============================================================================
 const PERF_LIMITS = {
-  TIME_WINDOW_HOURS: 12,        // Reduced from 24h to limit data volume
+  TIME_WINDOW_HOURS: 24,        // Align window with current_24h metrics
   MAX_RSS_ARTICLES: 1000,       // Limit RSS articles per run
   MAX_GOOGLE_NEWS: 800,         // Limit Google News articles  
   MAX_BLUESKY_POSTS: 2000,      // Limit Bluesky posts (was 5000)
@@ -2402,3 +2402,4 @@ serve(async (req) => {
     });
   }
 });
+

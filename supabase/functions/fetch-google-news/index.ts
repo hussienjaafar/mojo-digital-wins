@@ -254,53 +254,95 @@ serve(async (req) => {
         totalFetched += items.length;
 
         if (items.length > 0) {
-          // Insert with upsert on URL + content_hash for deduplication
-          const { data: insertedData, error: insertError } = await supabase
-            .from('google_news_articles')
-            .upsert(items.map(item => ({
-              title: item.title,
-              source_name: item.source_name,
-              source_url: item.source_url,
-              description: item.description,
-              published_at: item.published_at,
-              url: item.url,
-              canonical_url: item.canonical_url,
-              content_hash: item.content_hash,
-            })), { 
-              onConflict: 'url',
-              ignoreDuplicates: true 
-            })
-            .select('id, content_hash, canonical_url, title, published_at');
+          const itemsByHash = new Map<string, NewsItem>();
+          for (const item of items) {
+            const dedupeKey = item.content_hash || item.url;
+            if (!itemsByHash.has(dedupeKey)) {
+              itemsByHash.set(dedupeKey, item);
+            }
+          }
+          const dedupedItems = Array.from(itemsByHash.values());
+          const intraBatchDuplicates = items.length - dedupedItems.length;
 
-          if (insertError) {
-            console.error(`Insert error for ${source.name}:`, insertError.message);
-            sourceErrors++;
-            await updateSourceHealth(supabase, source.id, false, insertError.message);
-          } else {
-            const insertedCount = insertedData?.length || 0;
-            totalInserted += insertedCount;
-            totalDuplicates += items.length - insertedCount;
-            
-            // Register for cross-source dedupe
-            for (const article of insertedData || []) {
-              await registerForDedupe(
-                supabase,
-                article.content_hash,
-                article.canonical_url,
-                source.id,
-                article.id,
-                article.title,
-                article.published_at
+          const contentHashes = dedupedItems
+            .map(item => item.content_hash)
+            .filter(hash => hash.length > 0);
+          let existingHashes = new Set<string>();
+
+          if (contentHashes.length > 0) {
+            const { data: existingRows, error: existingError } = await supabase
+              .from('google_news_articles')
+              .select('content_hash')
+              .in('content_hash', contentHashes);
+
+            if (existingError) {
+              console.warn('Content hash lookup failed for ' + source.name + ':', existingError.message);
+            } else {
+              existingHashes = new Set(
+                (existingRows || [])
+                  .map(row => row.content_hash)
+                  .filter(hash => hash && hash.length > 0)
               );
             }
-            
-            await updateSourceHealth(supabase, source.id, true, undefined, insertedCount);
+          }
+
+          const newItems = dedupedItems.filter(
+            item => !item.content_hash || !existingHashes.has(item.content_hash)
+          );
+          const contentHashDuplicates = dedupedItems.length - newItems.length;
+
+          if (newItems.length > 0) {
+            // Insert with upsert on URL after content_hash dedupe
+            const { data: insertedData, error: insertError } = await supabase
+              .from('google_news_articles')
+              .upsert(newItems.map(item => ({
+                title: item.title,
+                source_name: item.source_name,
+                source_url: item.source_url,
+                description: item.description,
+                published_at: item.published_at,
+                url: item.url,
+                canonical_url: item.canonical_url,
+                content_hash: item.content_hash,
+              })), { 
+                onConflict: 'url',
+                ignoreDuplicates: true 
+              })
+              .select('id, content_hash, canonical_url, title, published_at');
+
+            if (insertError) {
+              console.error('Insert error for ' + source.name + ':', insertError.message);
+              sourceErrors++;
+              await updateSourceHealth(supabase, source.id, false, insertError.message);
+            } else {
+              const insertedCount = insertedData?.length || 0;
+              const urlDuplicates = newItems.length - insertedCount;
+              totalInserted += insertedCount;
+              totalDuplicates += intraBatchDuplicates + contentHashDuplicates + urlDuplicates;
+              
+              // Register for cross-source dedupe
+              for (const article of insertedData || []) {
+                await registerForDedupe(
+                  supabase,
+                  article.content_hash,
+                  article.canonical_url,
+                  source.id,
+                  article.id,
+                  article.title,
+                  article.published_at
+                );
+              }
+              
+              await updateSourceHealth(supabase, source.id, true, undefined, insertedCount);
+            }
+          } else {
+            totalDuplicates += intraBatchDuplicates + contentHashDuplicates;
+            await updateSourceHealth(supabase, source.id, true, undefined, 0);
           }
         } else {
           // No items but successful fetch
           await updateSourceHealth(supabase, source.id, true, undefined, 0);
         }
-
         sourcesProcessed++;
 
       } catch (error: any) {
@@ -348,3 +390,5 @@ serve(async (req) => {
     });
   }
 });
+
+

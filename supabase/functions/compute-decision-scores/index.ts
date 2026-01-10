@@ -22,12 +22,24 @@ Deno.serve(async (req) => {
     let trendQuery = supabase
       .from('trend_events')
       .select(`
-        id, name, event_type, stage, velocity, sentiment,
-        total_mentions, topics, confidence_score,
-        first_detected_at, source_breakdown
+        id,
+        event_title,
+        canonical_label,
+        entity_type,
+        trend_stage,
+        velocity,
+        sentiment_score,
+        current_24h,
+        related_topics,
+        confidence_score,
+        first_seen_at,
+        source_count,
+        news_source_count,
+        social_source_count,
+        is_breaking
       `)
-      .eq('is_active', true)
-      .order('first_detected_at', { ascending: false })
+      .eq('is_trending', true)
+      .order('first_seen_at', { ascending: false })
       .limit(100);
 
     if (trend_event_ids?.length) {
@@ -70,7 +82,7 @@ Deno.serve(async (req) => {
 
     // Calculate success rates by topic (simple learning signal)
     const topicSuccessRates: Record<string, { successes: number; total: number }> = {};
-    
+
     if (outcomes?.length) {
       for (const outcome of outcomes) {
         if (outcome.outcome_type === 'donation' || outcome.outcome_type === 'conversion') {
@@ -83,20 +95,30 @@ Deno.serve(async (req) => {
     const updates: Array<{ id: string; decision_score: number; opportunity_tier: string }> = [];
 
     for (const trend of trends) {
-      const alertAge = trend.first_detected_at
-        ? (Date.now() - new Date(trend.first_detected_at).getTime()) / (1000 * 60 * 60)
+      const alertAge = trend.first_seen_at
+        ? (Date.now() - new Date(trend.first_seen_at).getTime()) / (1000 * 60 * 60)
         : undefined;
 
+      const sampleSources: Array<{ type: string; count?: number }> = [];
+      if (trend.news_source_count) {
+        sampleSources.push({ type: 'news', count: trend.news_source_count });
+      }
+      if (trend.social_source_count) {
+        sampleSources.push({ type: 'social', count: trend.social_source_count });
+      }
+      if (sampleSources.length === 0 && trend.source_count) {
+        sampleSources.push({ type: 'sources', count: trend.source_count });
+      }
+
       const input: DecisionScoreInput = {
-        entityName: trend.name,
-        alertType: trend.event_type || 'spike',
+        entityName: trend.canonical_label || trend.event_title,
+        entityType: trend.entity_type || undefined,
+        alertType: trend.is_breaking ? 'breaking' : (trend.trend_stage || 'spike'),
         velocity: trend.velocity,
-        sentiment: trend.sentiment,
-        mentions: trend.total_mentions,
-        topics: trend.topics || [],
-        sampleSources: trend.source_breakdown ? 
-          Object.entries(trend.source_breakdown).map(([type, count]) => ({ type, count: count as number })) : 
-          undefined,
+        sentiment: trend.sentiment_score,
+        mentions: trend.current_24h,
+        topics: trend.related_topics || [],
+        sampleSources: sampleSources.length ? sampleSources : undefined,
         alertAge,
       };
 
@@ -125,10 +147,10 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        message: `Decision scores computed`,
+        message: 'Decision scores computed',
         total: trends.length,
         updated: updatedCount,
-        scores: updates.slice(0, 10), // Return sample
+        scores: updates.slice(0, 10),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

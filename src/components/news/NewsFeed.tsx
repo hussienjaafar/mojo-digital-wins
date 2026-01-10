@@ -6,7 +6,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { RefreshCw, AlertCircle, Sparkles, TrendingUp } from "lucide-react";
+import { RefreshCw, AlertCircle, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNewsFilters } from "@/contexts/NewsFilterContext";
 import { NewsFeedSkeleton } from "@/components/ui/data-skeleton";
@@ -382,32 +382,6 @@ export function NewsFeed() {
     }
   };
 
-  const detectDuplicates = async () => {
-    try {
-      toast({
-        title: "Detecting duplicates",
-        description: "This may take a moment...",
-      });
-      
-      const { data, error } = await supabase.functions.invoke('detect-duplicates', {
-        body: { lookbackHours: 24, similarityThreshold: 0.75 }
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Duplicate detection complete",
-        description: `Found ${data.clustersFound} duplicate clusters. ${data.clustersCreated} new clusters created.`,
-      });
-      
-      await loadArticles();
-    } catch (err: any) {
-      toast({
-        title: "Error detecting duplicates",
-        description: err.message,
-        variant: "destructive"
-      });
-    }
   };
 
   const applyFilters = (filters: FilterState) => {
@@ -461,21 +435,7 @@ export function NewsFeed() {
         </div>
         <TooltipProvider>
           <div className="flex gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={detectDuplicates}
-                  variant="ghost"
-                  className="gap-2"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Detect Duplicates
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Find and cluster duplicate articles across sources</p>
-              </TooltipContent>
-            </Tooltip>
+            
 
             <Tooltip>
               <TooltipTrigger asChild>
@@ -572,3 +532,4 @@ export function NewsFeed() {
     </div>
   );
 }
+

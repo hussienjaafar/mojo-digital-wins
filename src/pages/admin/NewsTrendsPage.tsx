@@ -69,8 +69,8 @@ export function NewsTrendsPage() {
   const [activeTab, setActiveTab] = useState<TabMode>("for_you");
   const [secondaryExpanded, setSecondaryExpanded] = useState(false);
   
-  // Filter rail state - collapsed by default per Phase 1
-  const [filterRailCollapsed, setFilterRailCollapsed] = useState(true);
+  // Filter rail state - expanded by default on desktop for better discoverability
+  const [filterRailCollapsed, setFilterRailCollapsed] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [searchQuery, setSearchQuery] = useState('');
   

@@ -18,6 +18,7 @@ const JOB_DEPENDENCIES: Record<string, string[]> = {
   'detect_fundraising_opportunities': ['correlate_social_news'],
   'smart_alerting': ['analyze_articles', 'detect_anomalies'],
   'detect_trend_events': ['update_baselines'],  // Baselines must run before trend detection
+  'detect_duplicates': ['fetch_rss'],
 };
 
 // Jobs that can be skipped if no new data
@@ -25,6 +26,7 @@ const SKIP_IF_NO_DATA: Record<string, { table: string; column: string; minutes: 
   'analyze_articles': { table: 'articles', column: 'created_at', minutes: 20 },
   'analyze_bluesky': { table: 'bluesky_posts', column: 'created_at', minutes: 15 },
   'calculate_bluesky_trends': { table: 'bluesky_posts', column: 'ai_processed_at', minutes: 20 },
+  'detect_duplicates': { table: 'articles', column: 'created_at', minutes: 20 },
 };
 
 serve(async (req) => {
@@ -268,6 +270,16 @@ serve(async (req) => {
             itemsCreated = result?.analyzed || 0;
             break;
 
+          case 'detect_duplicates':
+            const dedupeResponse = await supabase.functions.invoke('detect-duplicates', {
+              body: { lookbackHours: 24, similarityThreshold: 0.75 },
+              headers: authHeaders
+            });
+            if (dedupeResponse.error) throw new Error(dedupeResponse.error.message);
+            result = dedupeResponse.data;
+            itemsProcessed = result?.articlesProcessed || 0;
+            itemsCreated = result?.clustersCreated || 0;
+            break;
           case 'extract_trending_topics':
             const trendingResponse = await supabase.functions.invoke('extract-trending-topics', { body: {} });
             if (trendingResponse.error) throw new Error(trendingResponse.error.message);
@@ -773,3 +785,4 @@ serve(async (req) => {
     );
   }
 });
+

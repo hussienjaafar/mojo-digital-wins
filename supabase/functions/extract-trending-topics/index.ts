@@ -137,7 +137,7 @@ serve(async (req) => {
     await loadEntityAliases(supabase);
 
     const body = await req.json().catch(() => ({}));
-    const hoursBack = body.hoursBack || 0.5; // Analyze last 30 minutes
+    const hoursBack = body.hoursBack || 2; // Analyze last 2 hours (expanded from 30 min to reduce backlog risk)
 
     // Function timeout tracker
     const startTime = Date.now();
@@ -154,7 +154,7 @@ serve(async (req) => {
       .eq('topics_extracted', false)
       .gte('published_date', cutoffTime)
       .order('published_date', { ascending: false })
-      .limit(50);
+      .limit(200); // Expanded from 50 to reduce backlog risk
 
     if (fetchError) throw fetchError;
 

@@ -1,10 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders, validateCronOrAdmin, checkRateLimit } from "../_shared/security.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const corsHeaders = getCorsHeaders();
 
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
@@ -534,6 +532,25 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // SECURITY: Require cron secret or admin JWT
+    const authResult = await validateCronOrAdmin(req, supabase);
+    if (!authResult.valid) {
+      console.error('[batch-analyze-content] Unauthorized access attempt');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // SECURITY: Rate limiting
+    const rateLimit = await checkRateLimit('batch-analyze-content', 6, 60000);
+    if (!rateLimit.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded', resetAt: rateLimit.resetAt }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Load entity aliases for canonicalization
     await loadEntityAliases(supabase);
 
@@ -867,3 +884,4 @@ serve(async (req) => {
     });
   }
 });
+

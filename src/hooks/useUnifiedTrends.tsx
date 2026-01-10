@@ -97,12 +97,12 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
     setError(null);
     
     try {
-      // Build parallel queries - now using trend_events as single source of truth
+      // Build parallel queries - using trend_events_active view for consistency with useTrendEvents
       // Order by is_breaking first, then rank_score (Twitter-like), then confidence_score, fallback to trend_score
-      let trendEventsQuery = supabase
-        .from('trend_events')
+      const trendEventsQuery = supabase
+        .from('trend_events_active')
         .select('*')
-        .gte('last_seen_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .eq('is_trending', true) // Align with useTrendEvents filter
         .gte('confidence_score', 20)
         .order('is_breaking', { ascending: false })
         .order('rank_score', { ascending: false, nullsFirst: false })
@@ -130,10 +130,31 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
         orgScoresPromise,
       ]);
 
+      // Handle view error with fallback to direct table query (like useTrendEvents)
+      let eventsData = eventsResult.data;
       if (eventsResult.error) {
-        console.error('Error fetching trend events:', eventsResult.error);
-        setError(eventsResult.error.message);
-        return;
+        console.warn('trend_events_active view error, falling back to table:', eventsResult.error.message);
+
+        // Fallback query to trend_events table directly
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('trend_events')
+          .select('*')
+          .eq('is_trending', true)
+          .gte('last_seen_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+          .gte('confidence_score', 20)
+          .order('is_breaking', { ascending: false })
+          .order('rank_score', { ascending: false, nullsFirst: false })
+          .order('confidence_score', { ascending: false })
+          .order('trend_score', { ascending: false, nullsFirst: false })
+          .limit(limit + 50);
+
+        if (fallbackError) {
+          console.error('Error fetching trend events from fallback:', fallbackError);
+          setError(fallbackError.message);
+          return;
+        }
+
+        eventsData = fallbackData;
       }
 
       const watchlistEntities = (watchlistResult.data || []).map((w: any) => w.entity_name?.toLowerCase() || '');
@@ -149,7 +170,7 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
       }
 
       // Transform trend_events to UnifiedTrend format
-      let enrichedTrends = (eventsResult.data || [])
+      let enrichedTrends = (eventsData || [])
         .filter((event: any) => {
           if (!excludeEvergreen) return true;
           
