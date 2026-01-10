@@ -1,5 +1,4 @@
 import { useState } from 'react';
-// Card removed - using integrated layout
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,8 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UserInvite, WizardStep } from '../types';
-import { Users, Plus, Trash2, Upload, Mail, Loader2, Send, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Users, Plus, Trash2, Upload, Mail, Loader2, Send, ChevronDown, UserPlus } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 // Valid org roles
 const ORG_ROLES = ['admin', 'manager', 'editor', 'viewer'] as const;
@@ -112,7 +111,6 @@ export function Step3Users({ organizationId, organizationName, stepData, onCompl
 
   const handleSubmit = async () => {
     if (users.length === 0) {
-      // Allow skipping - just move to next step
       await onComplete(3, { users: [], invited_users: [], skipped: true });
       return;
     }
@@ -122,7 +120,6 @@ export function Step3Users({ organizationId, organizationName, stepData, onCompl
     const errors: string[] = [];
 
     try {
-      // Send invitations instead of creating users directly
       for (const user of users) {
         const { data, error } = await supabase.functions.invoke('send-user-invitation', {
           body: {
@@ -141,7 +138,6 @@ export function Step3Users({ organizationId, organizationName, stepData, onCompl
         } else {
           invitedUsers.push(user.email);
           
-          // Log audit action for each invitation
           await supabase.rpc('log_admin_action', {
             _action_type: 'invite_user',
             _table_affected: 'user_invitations',
@@ -191,46 +187,67 @@ export function Step3Users({ organizationId, organizationName, stepData, onCompl
 
   return (
     <div className="space-y-6">
-      {/* Info Alert */}
-      <Alert>
-        <Send className="h-4 w-4" />
-        <AlertDescription>
-          Invited users will receive an email with a secure link to create their account and set a password.
-          No temporary passwords are sent—invitations are the recommended approach for security.
-        </AlertDescription>
-      </Alert>
+      {/* Info Banner */}
+      <div className="rounded-xl border border-[hsl(var(--portal-accent-blue))]/20 bg-[hsl(var(--portal-accent-blue))]/5 p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10 flex items-center justify-center flex-shrink-0">
+            <Send className="w-4 h-4 text-[hsl(var(--portal-accent-blue))]" />
+          </div>
+          <div>
+            <p className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">Secure Email Invitations</p>
+            <p className="text-[12px] text-[hsl(var(--portal-text-secondary))] mt-0.5">
+              Invited users will receive an email with a secure link to create their account. No temporary passwords are sent.
+            </p>
+          </div>
+        </div>
+      </div>
 
-        {/* Add Single User */}
-        <div className="space-y-4">
+      {/* Add User Card */}
+      <div className="rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-tertiary))]/50">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10 flex items-center justify-center">
+              <UserPlus className="w-[18px] h-[18px] text-[hsl(var(--portal-accent-blue))]" />
+            </div>
+            <div>
+              <h3 className="text-[13px] font-semibold text-[hsl(var(--portal-text-primary))]">Add Team Member</h3>
+              <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Invite users to join this organization</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="p-5 space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">Email</Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="user@example.com"
                 value={newUser.email}
                 onChange={e => setNewUser({ ...newUser, email: e.target.value })}
+                className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors placeholder:text-[hsl(var(--portal-text-muted))]/60"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="full_name">Full Name</Label>
+              <Label htmlFor="full_name" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">Full Name</Label>
               <Input
                 id="full_name"
                 placeholder="John Doe"
                 value={newUser.full_name}
                 onChange={e => setNewUser({ ...newUser, full_name: e.target.value })}
+                className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors placeholder:text-[hsl(var(--portal-text-muted))]/60"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
+              <Label htmlFor="role" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">Role</Label>
               <Select
                 value={newUser.role}
                 onValueChange={(value: OrgRole) => 
                   setNewUser({ ...newUser, role: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -242,95 +259,119 @@ export function Step3Users({ organizationId, organizationName, stepData, onCompl
               </Select>
             </div>
           </div>
-          <Button onClick={addUser} variant="outline" size="sm">
+          <Button onClick={addUser} variant="outline" size="sm" className="h-9">
             <Plus className="h-4 w-4 mr-2" />
             Add to List
           </Button>
         </div>
+      </div>
 
-        {/* Bulk Input Toggle */}
-        <div className="border-t pt-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowBulkInput(!showBulkInput)}
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            {showBulkInput ? 'Hide' : 'Show'} Bulk Import
-          </Button>
-          
-          {showBulkInput && (
-            <div className="mt-4 space-y-2">
-              <Label>Paste CSV (email, name, role per line)</Label>
-              <Textarea
-                placeholder="john@example.com, John Doe, admin&#10;jane@example.com, Jane Smith, viewer"
-                value={bulkInput}
-                onChange={e => setBulkInput(e.target.value)}
-                rows={4}
-              />
-              <Button onClick={parseBulkInput} variant="outline" size="sm">
+      {/* Bulk Import Card */}
+      <Collapsible open={showBulkInput} onOpenChange={setShowBulkInput}>
+        <div className="rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] overflow-hidden">
+          <CollapsibleTrigger asChild>
+            <div className="px-5 py-4 cursor-pointer hover:bg-[hsl(var(--portal-bg-hover))] transition-colors">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-[hsl(var(--portal-accent-purple))]/10 flex items-center justify-center">
+                    <Upload className="w-[18px] h-[18px] text-[hsl(var(--portal-accent-purple))]" />
+                  </div>
+                  <div>
+                    <h3 className="text-[13px] font-semibold text-[hsl(var(--portal-text-primary))]">Bulk Import</h3>
+                    <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Import multiple users at once via CSV</p>
+                  </div>
+                </div>
+                <ChevronDown className={`h-4 w-4 text-[hsl(var(--portal-text-muted))] transition-transform ${showBulkInput ? 'rotate-180' : ''}`} />
+              </div>
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="px-5 pb-5 space-y-3">
+              <div className="space-y-2">
+                <Label className="text-[12px] text-[hsl(var(--portal-text-muted))]">Format: email, name, role (one per line)</Label>
+                <Textarea
+                  placeholder="john@example.com, John Doe, admin&#10;jane@example.com, Jane Smith, viewer"
+                  value={bulkInput}
+                  onChange={e => setBulkInput(e.target.value)}
+                  rows={4}
+                  className="bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] text-[13px]"
+                />
+              </div>
+              <Button onClick={parseBulkInput} variant="outline" size="sm" className="h-9">
                 Parse & Add
               </Button>
             </div>
-          )}
+          </CollapsibleContent>
         </div>
+      </Collapsible>
 
-        {/* Users List */}
-        {users.length > 0 && (
-          <div className="border rounded-lg">
-            <div className="p-3 border-b bg-muted/50">
-              <span className="text-sm font-medium">
-                Users to Invite ({users.length})
-              </span>
-            </div>
-            <div className="divide-y">
-              {users.map(user => (
-                <div key={user.email} className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">{user.full_name}</p>
-                      <p className="text-xs text-muted-foreground">{user.email}</p>
-                    </div>
+      {/* Users List Card */}
+      <div className="rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] overflow-hidden">
+        <div className="px-5 py-3 border-b border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-tertiary))]/50">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">
+              Invite List
+            </span>
+            {users.length > 0 && (
+              <Badge variant="secondary" className="text-[11px]">
+                {users.length} user{users.length !== 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
+        </div>
+        
+        {users.length > 0 ? (
+          <div className="divide-y divide-[hsl(var(--portal-border))]">
+            {users.map(user => (
+              <div key={user.email} className="px-5 py-3 flex items-center justify-between hover:bg-[hsl(var(--portal-bg-hover))] transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[hsl(var(--portal-bg-tertiary))] flex items-center justify-center">
+                    <Mail className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={getRoleBadgeVariant(user.role)}>
-                      {user.role}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeUser(user.email)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                  <div>
+                    <p className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">{user.full_name}</p>
+                    <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">{user.email}</p>
                   </div>
                 </div>
-              ))}
+                <div className="flex items-center gap-2">
+                  <Badge variant={getRoleBadgeVariant(user.role)} className="text-[11px]">
+                    {user.role}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeUser(user.email)}
+                    className="h-8 w-8 text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-error))]"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-12 text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-xl border-2 border-dashed border-[hsl(var(--portal-border))] flex items-center justify-center">
+              <Users className="h-5 w-5 text-[hsl(var(--portal-text-muted))]" />
             </div>
+            <p className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">No users added yet</p>
+            <p className="text-[12px] text-[hsl(var(--portal-text-muted))] mt-1">Add users to invite, or skip this step</p>
           </div>
         )}
-
-        {users.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>No users added yet</p>
-            <p className="text-sm">Add users to invite, or skip this step</p>
-          </div>
-        )}
+      </div>
 
       {/* Actions */}
-      <div className="flex justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
-        <Button variant="outline" onClick={onBack}>
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onBack} className="h-10 px-5">
           Back
         </Button>
         <div className="flex gap-2">
           {users.length === 0 && (
-            <Button variant="ghost" onClick={handleSubmit} disabled={isLoading}>
+            <Button variant="ghost" onClick={handleSubmit} disabled={isLoading} className="h-10 px-5">
               Skip for now
             </Button>
           )}
-          <Button onClick={handleSubmit} disabled={isLoading}>
+          <Button onClick={handleSubmit} disabled={isLoading} className="h-10 px-5">
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

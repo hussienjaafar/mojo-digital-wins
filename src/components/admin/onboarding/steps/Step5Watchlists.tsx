@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-// Card removed - using integrated layout
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,7 +21,8 @@ import {
   User,
   Building2,
   Hash,
-  FileText
+  FileText,
+  Search
 } from 'lucide-react';
 
 interface Step5WatchlistsProps {
@@ -57,31 +57,26 @@ export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }
     is_ai_suggested: false
   });
 
-  // Fetch AI-suggested entities based on org profile
   useEffect(() => {
     const fetchSuggestions = async () => {
-      if (entities.length > 0) return; // Skip if already has entities
+      if (entities.length > 0) return;
       
       setIsSuggestingEntities(true);
       try {
-        // Get org profile to inform suggestions
         const { data: profile } = await supabase
           .from('organization_profiles')
           .select('focus_areas, interest_topics, key_issues')
           .eq('organization_id', organizationId)
           .maybeSingle();
 
-        // Generate suggestions based on profile
         const suggestions: WatchlistEntity[] = [];
         
-        // Add default suggestions
         suggestions.push({ name: 'Healthcare Policy', entity_type: 'topic', is_ai_suggested: true });
         suggestions.push({ name: 'Immigration Reform', entity_type: 'topic', is_ai_suggested: true });
         
         if (profile) {
           const focusAreas = (profile.focus_areas || []) as string[];
           const interestTopics = (profile.interest_topics || []) as string[];
-          // Add topics from focus areas and interest topics
           [...focusAreas, ...interestTopics].slice(0, 3).forEach((area: string) => {
             if (area && !suggestions.some(s => s.name === area)) {
               suggestions.push({ name: area, entity_type: 'topic', is_ai_suggested: true });
@@ -142,7 +137,6 @@ export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      // Save watchlist entities
       for (const entity of entities) {
         await supabase
           .from('entity_watchlist')
@@ -157,7 +151,6 @@ export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }
           });
       }
 
-      // Log audit action
       await supabase.rpc('log_admin_action', {
         _action_type: 'create_watchlist',
         _table_affected: 'entity_watchlist',
@@ -195,40 +188,49 @@ export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }
     <div className="space-y-6">
       {/* AI Suggestions Loading */}
       {isSuggestingEntities && (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm">Generating suggestions based on organization profile...</span>
+        <div className="rounded-xl border border-[hsl(var(--portal-accent-purple))]/20 bg-[hsl(var(--portal-accent-purple))]/5 p-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--portal-accent-purple))]" />
+            <span className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Generating suggestions based on organization profile...</span>
+          </div>
         </div>
       )}
-        {/* AI Suggestions Loading */}
-        {isSuggestingEntities && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Generating suggestions based on organization profile...</span>
-          </div>
-        )}
 
-        {/* Add Entity */}
-        <div className="space-y-4">
+      {/* Add Entity Card */}
+      <div className="rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-tertiary))]/50">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10 flex items-center justify-center">
+              <Search className="w-[18px] h-[18px] text-[hsl(var(--portal-accent-blue))]" />
+            </div>
+            <div>
+              <h3 className="text-[13px] font-semibold text-[hsl(var(--portal-text-primary))]">Add to Watchlist</h3>
+              <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Monitor politicians, organizations, topics, or keywords</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="p-5 space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="sm:col-span-2 space-y-2">
-              <Label htmlFor="entity_name">Entity Name</Label>
+              <Label htmlFor="entity_name" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">Entity Name</Label>
               <Input
                 id="entity_name"
                 placeholder="Enter name to watch"
                 value={newEntity.name}
                 onChange={e => setNewEntity({ ...newEntity, name: e.target.value })}
+                className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors placeholder:text-[hsl(var(--portal-text-muted))]/60"
               />
             </div>
             <div className="space-y-2">
-              <Label>Type</Label>
+              <Label className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">Type</Label>
               <Select
                 value={newEntity.entity_type}
                 onValueChange={(value: 'politician' | 'organization' | 'topic' | 'keyword') => 
                   setNewEntity({ ...newEntity, entity_type: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -240,150 +242,174 @@ export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }
               </Select>
             </div>
           </div>
-          <Button onClick={addEntity} variant="outline" size="sm">
+          <Button onClick={addEntity} variant="outline" size="sm" className="h-9">
             <Plus className="h-4 w-4 mr-2" />
             Add to Watchlist
           </Button>
         </div>
+      </div>
 
-        {/* Entities List */}
-        {entities.length > 0 && (
-          <div className="border rounded-lg">
-            <div className="p-3 border-b bg-muted/50">
-              <span className="text-sm font-medium">
-                Watchlist Entities ({entities.length})
-              </span>
-            </div>
-            <div className="divide-y">
-              {entities.map(entity => {
-                const Icon = getEntityIcon(entity.entity_type);
-                return (
-                  <div key={entity.name} className="p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Icon className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{entity.name}</span>
-                        {entity.is_ai_suggested && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Sparkles className="h-3 w-3 mr-1" />
-                            Suggested
-                          </Badge>
-                        )}
-                      </div>
+      {/* Entities List Card */}
+      <div className="rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] overflow-hidden">
+        <div className="px-5 py-3 border-b border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-tertiary))]/50">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">
+              Watchlist Entities
+            </span>
+            {entities.length > 0 && (
+              <Badge variant="secondary" className="text-[11px]">
+                {entities.length} item{entities.length !== 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
+        </div>
+        
+        {entities.length > 0 ? (
+          <div className="divide-y divide-[hsl(var(--portal-border))]">
+            {entities.map(entity => {
+              const Icon = getEntityIcon(entity.entity_type);
+              return (
+                <div key={entity.name} className="px-5 py-3 flex items-center justify-between hover:bg-[hsl(var(--portal-bg-hover))] transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-[hsl(var(--portal-bg-tertiary))] flex items-center justify-center">
+                      <Icon className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {entity.entity_type}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeEntity(entity.name)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <span className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">{entity.name}</span>
+                      {entity.is_ai_suggested && (
+                        <Badge variant="secondary" className="text-[10px] bg-[hsl(var(--portal-accent-purple))]/10 text-[hsl(var(--portal-accent-purple))] border-0">
+                          <Sparkles className="h-3 w-3 mr-1" />
+                          Suggested
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                );
-              })}
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[11px] capitalize">
+                      {entity.entity_type}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeEntity(entity.name)}
+                      className="h-8 w-8 text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-error))]"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="py-12 text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-xl border-2 border-dashed border-[hsl(var(--portal-border))] flex items-center justify-center">
+              <Eye className="h-5 w-5 text-[hsl(var(--portal-text-muted))]" />
             </div>
+            <p className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">No entities in watchlist</p>
+            <p className="text-[12px] text-[hsl(var(--portal-text-muted))] mt-1">Add entities to monitor for this organization</p>
           </div>
         )}
+      </div>
 
-        {entities.length === 0 && !isSuggestingEntities && (
-          <div className="text-center py-8 text-muted-foreground">
-            <Eye className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>No entities in watchlist</p>
-            <p className="text-sm">Add entities to monitor for this organization</p>
-          </div>
-        )}
-
-        {/* Alert Configuration */}
-        <Collapsible open={showAlertConfig} onOpenChange={setShowAlertConfig}>
+      {/* Alert Configuration Card */}
+      <Collapsible open={showAlertConfig} onOpenChange={setShowAlertConfig}>
+        <div className="rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] overflow-hidden">
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" className="w-full justify-between">
-              <span className="flex items-center gap-2">
-                <Bell className="h-4 w-4" />
-                Alert Configuration
-              </span>
-              <ChevronDown className={`h-4 w-4 transition-transform ${showAlertConfig ? 'rotate-180' : ''}`} />
-            </Button>
+            <div className="px-5 py-4 cursor-pointer hover:bg-[hsl(var(--portal-bg-hover))] transition-colors">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <Bell className="w-[18px] h-[18px] text-amber-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-[13px] font-semibold text-[hsl(var(--portal-text-primary))]">Alert Configuration</h3>
+                    <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Customize when and how you receive alerts</p>
+                  </div>
+                </div>
+                <ChevronDown className={`h-4 w-4 text-[hsl(var(--portal-text-muted))] transition-transform ${showAlertConfig ? 'rotate-180' : ''}`} />
+              </div>
+            </div>
           </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-4 pt-4">
-            <div className="space-y-4 p-4 border rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">Breaking News Alerts</p>
-                  <p className="text-xs text-muted-foreground">Get notified of breaking news mentioning watched entities</p>
+          <CollapsibleContent>
+            <div className="px-5 pb-5 space-y-4 border-t border-[hsl(var(--portal-border))] pt-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">Breaking News Alerts</p>
+                    <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Get notified of breaking news mentioning watched entities</p>
+                  </div>
+                  <Switch
+                    checked={alertThresholds.breaking_news}
+                    onCheckedChange={(checked) => 
+                      setAlertThresholds({ ...alertThresholds, breaking_news: checked })
+                    }
+                  />
                 </div>
-                <Switch
-                  checked={alertThresholds.breaking_news}
-                  onCheckedChange={(checked) => 
-                    setAlertThresholds({ ...alertThresholds, breaking_news: checked })
-                  }
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">Sentiment Shift Alerts</p>
-                  <p className="text-xs text-muted-foreground">Alert when sentiment significantly changes</p>
+                
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">Sentiment Shift Alerts</p>
+                    <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Alert when sentiment significantly changes</p>
+                  </div>
+                  <Switch
+                    checked={alertThresholds.sentiment_shift}
+                    onCheckedChange={(checked) => 
+                      setAlertThresholds({ ...alertThresholds, sentiment_shift: checked })
+                    }
+                  />
                 </div>
-                <Switch
-                  checked={alertThresholds.sentiment_shift}
-                  onCheckedChange={(checked) => 
-                    setAlertThresholds({ ...alertThresholds, sentiment_shift: checked })
-                  }
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">Mention Spike Alerts</p>
-                  <p className="text-xs text-muted-foreground">Alert when mentions exceed threshold</p>
+                
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">Mention Spike Alerts</p>
+                    <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Alert when mentions exceed threshold</p>
+                  </div>
+                  <Switch
+                    checked={alertThresholds.mention_spike}
+                    onCheckedChange={(checked) => 
+                      setAlertThresholds({ ...alertThresholds, mention_spike: checked })
+                    }
+                  />
                 </div>
-                <Switch
-                  checked={alertThresholds.mention_spike}
-                  onCheckedChange={(checked) => 
-                    setAlertThresholds({ ...alertThresholds, mention_spike: checked })
-                  }
-                />
-              </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Threshold Sensitivity</Label>
-                  <span className="text-sm text-muted-foreground">{alertThresholds.threshold_value}%</span>
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Threshold Sensitivity</Label>
+                    <span className="text-[13px] font-medium text-[hsl(var(--portal-text-primary))]">{alertThresholds.threshold_value}%</span>
+                  </div>
+                  <Slider
+                    value={[alertThresholds.threshold_value]}
+                    onValueChange={([value]) => 
+                      setAlertThresholds({ ...alertThresholds, threshold_value: value })
+                    }
+                    min={10}
+                    max={100}
+                    step={10}
+                    className="w-full"
+                  />
+                  <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">
+                    Lower values = more sensitive (more alerts), higher = less sensitive
+                  </p>
                 </div>
-                <Slider
-                  value={[alertThresholds.threshold_value]}
-                  onValueChange={([value]) => 
-                    setAlertThresholds({ ...alertThresholds, threshold_value: value })
-                  }
-                  min={10}
-                  max={100}
-                  step={10}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Lower values = more sensitive (more alerts), higher = less sensitive
-                </p>
               </div>
             </div>
           </CollapsibleContent>
-        </Collapsible>
+        </div>
+      </Collapsible>
 
       {/* Actions */}
-      <div className="flex justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
-        <Button variant="outline" onClick={onBack}>
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onBack} className="h-10 px-5">
           Back
         </Button>
         <div className="flex gap-2">
           {entities.length === 0 && (
-            <Button variant="ghost" onClick={() => onComplete(5, { entities: [], alert_thresholds: alertThresholds, skipped: true })} disabled={isLoading}>
+            <Button variant="ghost" onClick={() => onComplete(5, { entities: [], alert_thresholds: alertThresholds, skipped: true })} disabled={isLoading} className="h-10 px-5">
               Skip for now
             </Button>
           )}
-          <Button onClick={handleSubmit} disabled={isLoading}>
+          <Button onClick={handleSubmit} disabled={isLoading} className="h-10 px-5">
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
