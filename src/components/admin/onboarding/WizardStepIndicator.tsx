@@ -17,7 +17,6 @@ interface WizardStepIndicatorProps {
   completedSteps: WizardStep[];
   onStepClick?: (step: WizardStep) => void;
   canNavigateToStep?: (step: WizardStep) => boolean;
-  compact?: boolean;
 }
 
 export function WizardStepIndicator({
@@ -25,7 +24,6 @@ export function WizardStepIndicator({
   completedSteps,
   onStepClick,
   canNavigateToStep,
-  compact = false,
 }: WizardStepIndicatorProps) {
   const getStepStatus = (step: WizardStep): 'completed' | 'current' | 'upcoming' => {
     if (completedSteps.includes(step)) return 'completed';
@@ -45,81 +43,82 @@ export function WizardStepIndicator({
         const status = getStepStatus(stepConfig.step);
         const isClickable = canNavigateToStep?.(stepConfig.step) ?? false;
         const Icon = stepConfig.icon;
+        const isLast = index === WIZARD_STEPS.length - 1;
 
         return (
-          <motion.button
-            key={stepConfig.step}
-            type="button"
-            onClick={() => handleStepClick(stepConfig.step)}
-            disabled={!isClickable}
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.03 }}
-            className={cn(
-              'w-full flex items-center gap-2.5 transition-all text-left rounded-lg',
-              compact ? 'p-2' : 'p-3',
-              'border border-transparent',
-              status === 'current' && 'bg-[hsl(var(--portal-accent-blue))]/10 border-[hsl(var(--portal-accent-blue))]/20',
-              status === 'completed' && 'bg-[hsl(var(--portal-success))]/5',
-              status === 'upcoming' && 'opacity-50',
-              isClickable && status !== 'current' && 'hover:bg-[hsl(var(--portal-bg-tertiary))] cursor-pointer',
-              !isClickable && 'cursor-not-allowed'
+          <div key={stepConfig.step} className="relative">
+            {/* Connector line */}
+            {!isLast && (
+              <div 
+                className={cn(
+                  "absolute left-[11px] top-[28px] w-[2px] h-[calc(100%+4px)]",
+                  status === 'completed' 
+                    ? 'bg-[hsl(var(--portal-success))]' 
+                    : 'bg-[hsl(var(--portal-border))]'
+                )}
+              />
             )}
-          >
-            {/* Step number/check indicator */}
-            <div className={cn(
-              'flex-shrink-0 rounded-md flex items-center justify-center transition-all',
-              compact ? 'w-6 h-6' : 'w-8 h-8',
-              status === 'completed' && 'bg-[hsl(var(--portal-success))] text-white',
-              status === 'current' && 'bg-[hsl(var(--portal-accent-blue))] text-white',
-              status === 'upcoming' && 'bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-muted))]'
-            )}>
-              {status === 'completed' ? (
-                <Check className={cn(compact ? 'h-3 w-3' : 'h-4 w-4')} />
-              ) : (
-                <Icon className={cn(compact ? 'h-3 w-3' : 'h-4 w-4')} />
+            
+            <motion.button
+              type="button"
+              onClick={() => handleStepClick(stepConfig.step)}
+              disabled={!isClickable}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.04 }}
+              className={cn(
+                'relative w-full flex items-start gap-3 p-2 transition-all text-left rounded-md group',
+                status === 'current' && 'bg-[hsl(var(--portal-accent-blue))]/8',
+                status === 'upcoming' && 'opacity-50',
+                isClickable && status !== 'current' && 'hover:bg-[hsl(var(--portal-bg-hover))] cursor-pointer',
+                !isClickable && 'cursor-default'
               )}
-            </div>
-
-            {/* Step info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className={cn(
-                  'font-medium truncate',
-                  compact ? 'text-xs' : 'text-sm',
-                  status === 'current' ? 'text-[hsl(var(--portal-text-primary))]' : 'text-[hsl(var(--portal-text-secondary))]'
-                )}>
-                  {stepConfig.title}
-                </span>
-                {!stepConfig.required && !compact && (
-                  <span className="text-[9px] uppercase tracking-wider text-[hsl(var(--portal-text-muted))] font-medium opacity-70">
-                    opt
-                  </span>
+            >
+              {/* Step indicator */}
+              <div className={cn(
+                'relative z-10 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all ring-2 ring-[hsl(var(--portal-bg-card))]',
+                status === 'completed' && 'bg-[hsl(var(--portal-success))]',
+                status === 'current' && 'bg-[hsl(var(--portal-accent-blue))]',
+                status === 'upcoming' && 'bg-[hsl(var(--portal-bg-tertiary))]'
+              )}>
+                {status === 'completed' ? (
+                  <Check className="h-3 w-3 text-white" />
+                ) : (
+                  <Icon className={cn(
+                    'h-3 w-3',
+                    status === 'current' ? 'text-white' : 'text-[hsl(var(--portal-text-muted))]'
+                  )} />
                 )}
               </div>
-              {!compact && (
-                <span className="text-[11px] text-[hsl(var(--portal-text-muted))] truncate block leading-tight">
-                  {stepConfig.description}
-                </span>
-              )}
-            </div>
 
-            {/* Status dot */}
-            {status === 'completed' && (
-              <div className="flex-shrink-0">
-                <div className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--portal-success))]" />
+              {/* Step content */}
+              <div className="flex-1 min-w-0 pt-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className={cn(
+                    'text-xs font-medium truncate leading-tight',
+                    status === 'current' 
+                      ? 'text-[hsl(var(--portal-text-primary))]' 
+                      : status === 'completed'
+                        ? 'text-[hsl(var(--portal-text-secondary))]'
+                        : 'text-[hsl(var(--portal-text-muted))]'
+                  )}>
+                    {stepConfig.title}
+                  </span>
+                </div>
+                <span className={cn(
+                  'text-[10px] leading-tight block mt-0.5',
+                  status === 'current' 
+                    ? 'text-[hsl(var(--portal-text-secondary))]'
+                    : 'text-[hsl(var(--portal-text-muted))]'
+                )}>
+                  {stepConfig.description}
+                  {!stepConfig.required && (
+                    <span className="ml-1 opacity-60">• optional</span>
+                  )}
+                </span>
               </div>
-            )}
-            {status === 'current' && (
-              <div className="flex-shrink-0">
-                <motion.div 
-                  className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--portal-accent-blue))]"
-                  animate={{ opacity: [1, 0.5, 1] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                />
-              </div>
-            )}
-          </motion.button>
+            </motion.button>
+          </div>
         );
       })}
     </div>

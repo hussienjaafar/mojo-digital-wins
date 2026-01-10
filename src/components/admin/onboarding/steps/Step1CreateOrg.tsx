@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { V3Button } from '@/components/v3/V3Button';
-// Card components removed - using integrated layout
-import { Building2, Globe, Mail, Image, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Building2, Globe, Mail, Image, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
@@ -39,17 +38,13 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
   };
 
   const isValidEmail = (value: string) => {
-    // Simple, pragmatic validation (we still let the backend be the source of truth)
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   };
 
   const normalizeHttpUrl = (value: string): string | null => {
     const trimmed = value.trim();
     if (!trimmed) return '';
-
-    // Users often paste domains without protocol; normalize to https://
     const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-
     try {
       const url = new URL(withProtocol);
       if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
@@ -81,13 +76,12 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
 
       if (data?.id) {
         setSlugAvailability('taken');
-        setSlugAvailabilityMsg('Slug is already in use.');
+        setSlugAvailabilityMsg('This slug is already in use');
       } else {
         setSlugAvailability('available');
-        setSlugAvailabilityMsg('Slug is available.');
+        setSlugAvailabilityMsg('Slug is available');
       }
     } catch (err: any) {
-      // If we can't check (permissions/etc.), don't block submit.
       logger.warn('[Step1CreateOrg] slug availability check failed', err);
       setSlugAvailability('idle');
       setSlugAvailabilityMsg('');
@@ -116,18 +110,15 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
       }
       return `${root}-${maxSuffix + 1}`;
     } catch (err) {
-      // Fallback: timestamp-based suffix
       return `${root}-${Date.now().toString().slice(-4)}`;
     }
   };
 
-  // Debounced slug availability check (best-effort)
   const slugToCheck = useMemo(() => formData.slug.trim(), [formData.slug]);
   useEffect(() => {
     const t = window.setTimeout(() => {
       void checkSlugAvailability(slugToCheck);
     }, 400);
-
     return () => window.clearTimeout(t);
   }, [slugToCheck]);
 
@@ -155,16 +146,13 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
       slug: formData.slug,
       hasEmail: Boolean(formData.primary_contact_email?.trim()),
       hasWebsite: Boolean(formData.website_url?.trim()),
-      hasLogo: Boolean(formData.logo_url?.trim()),
       slugAvailability,
     });
 
-    // We intentionally use custom validation because optional email/url fields
-    // can cause the browser to block submit silently.
     if (!formData.name.trim() || !formData.slug.trim()) {
       toast({
-        title: 'Validation Error',
-        description: 'Organization name and slug are required',
+        title: 'Required fields missing',
+        description: 'Please enter organization name and slug',
         variant: 'destructive',
       });
       return;
@@ -173,7 +161,7 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
     if (slugAvailability === 'taken') {
       toast({
         title: 'Slug already in use',
-        description: 'Please choose a different slug before continuing.',
+        description: 'Please choose a different slug',
         variant: 'destructive',
       });
       slugInputRef.current?.focus();
@@ -183,8 +171,8 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
     const email = formData.primary_contact_email.trim();
     if (email && !isValidEmail(email)) {
       toast({
-        title: 'Invalid email',
-        description: 'Please enter a valid email address (or leave it blank).',
+        title: 'Invalid email format',
+        description: 'Please enter a valid email or leave it blank',
         variant: 'destructive',
       });
       return;
@@ -194,7 +182,7 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
     if (websiteUrl === null) {
       toast({
         title: 'Invalid website URL',
-        description: 'Please enter a valid website URL (e.g. https://example.org) or leave it blank.',
+        description: 'Please enter a valid URL or leave it blank',
         variant: 'destructive',
       });
       return;
@@ -204,7 +192,7 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
     if (logoUrl === null) {
       toast({
         title: 'Invalid logo URL',
-        description: 'Please enter a valid logo URL (e.g. https://example.org/logo.png) or leave it blank.',
+        description: 'Please enter a valid URL or leave it blank',
         variant: 'destructive',
       });
       return;
@@ -220,7 +208,6 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
     setIsSubmitting(true);
 
     try {
-      // Create the organization
       const { data: org, error: orgError } = await (supabase as any)
         .from('client_organizations')
         .insert({
@@ -235,7 +222,6 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
 
       if (orgError) throw orgError;
 
-      // Log the audit action
       await supabase.rpc('log_admin_action', {
         _action_type: 'create_organization',
         _table_affected: 'client_organizations',
@@ -248,13 +234,11 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
       });
 
       toast({
-        title: 'Organization Created',
+        title: 'Organization created',
         description: `${normalizedData.name} has been created successfully`,
       });
 
       logger.info('[Step1CreateOrg] org created', { id: org.id, slug: normalizedData.slug });
-
-      // Await to keep the button in a loading state until the wizard advances
       await Promise.resolve(onComplete(org.id, normalizedData));
     } catch (err: any) {
       logger.error('[Step1CreateOrg] submit failed', err);
@@ -273,18 +257,17 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
 
         toast({
           title: 'Slug already exists',
-          description: `We suggested a new slug: “${suggested}”. Click Create & Continue again.`,
+          description: `Suggested new slug: "${suggested}"`,
           variant: 'destructive',
         });
 
-        // focus so the user sees what changed
         window.setTimeout(() => slugInputRef.current?.focus(), 0);
         return;
       }
 
       toast({
-        title: 'Error',
-        description: err.message || 'Failed to create organization',
+        title: 'Error creating organization',
+        description: err.message || 'Please try again',
         variant: 'destructive',
       });
     } finally {
@@ -293,93 +276,105 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
   };
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-6">
-      {/* Organization Details Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 pb-2 border-b border-[hsl(var(--portal-border))]">
+    <form onSubmit={handleSubmit} noValidate className="space-y-8">
+      {/* Section: Organization Details */}
+      <section className="space-y-5">
+        <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10">
             <Building2 className="w-4 h-4 text-[hsl(var(--portal-accent-blue))]" />
           </div>
           <div>
-            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Organization Details</h3>
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">Basic information about the client</p>
+            <h3 className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">Organization Details</h3>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">Required information to create the client</p>
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="name">Organization Name *</Label>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div className="sm:col-span-2 space-y-2">
+            <Label htmlFor="name" className="text-sm font-medium">
+              Organization Name <span className="text-[hsl(var(--portal-error))]">*</span>
+            </Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="Acme Corporation"
+              placeholder="Acme Foundation"
               required
-              className="bg-[hsl(var(--portal-bg-secondary))]"
+              className="h-10 bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
             />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="slug">URL Slug *</Label>
+            <Label htmlFor="slug" className="text-sm font-medium">
+              URL Slug <span className="text-[hsl(var(--portal-error))]">*</span>
+            </Label>
             <Input
               id="slug"
               ref={slugInputRef}
               value={formData.slug}
               onChange={(e) => handleFieldChange('slug', e.target.value)}
-              placeholder="acme-corporation"
+              placeholder="acme-foundation"
               required
-              className="bg-[hsl(var(--portal-bg-secondary))]"
+              className="h-10 bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
             />
-            {slugAvailabilityMsg ? (
-              <p
-                className={
-                  "text-xs " +
-                  (slugAvailability === 'taken'
-                    ? 'text-destructive'
-                    : slugAvailability === 'available'
-                      ? 'text-[hsl(var(--portal-text-muted))]'
-                      : 'text-[hsl(var(--portal-text-muted))]')
-                }
-                aria-live="polite"
-              >
-                {slugAvailabilityMsg}
-              </p>
-            ) : (
-              <p className="text-xs text-[hsl(var(--portal-text-muted))]">Auto-generated from name</p>
-            )}
+            <div className="flex items-center gap-1.5 text-xs">
+              {slugAvailability === 'checking' && (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--portal-text-muted))]" />
+                  <span className="text-[hsl(var(--portal-text-muted))]">{slugAvailabilityMsg}</span>
+                </>
+              )}
+              {slugAvailability === 'available' && (
+                <>
+                  <CheckCircle2 className="h-3 w-3 text-[hsl(var(--portal-success))]" />
+                  <span className="text-[hsl(var(--portal-success))]">{slugAvailabilityMsg}</span>
+                </>
+              )}
+              {slugAvailability === 'taken' && (
+                <>
+                  <AlertCircle className="h-3 w-3 text-[hsl(var(--portal-error))]" />
+                  <span className="text-[hsl(var(--portal-error))]">{slugAvailabilityMsg}</span>
+                </>
+              )}
+              {slugAvailability === 'idle' && !slugAvailabilityMsg && (
+                <span className="text-[hsl(var(--portal-text-muted))]">Auto-generated from name</span>
+              )}
+            </div>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="email" className="flex items-center gap-2">
-              <Mail className="w-4 h-4" />
-              Primary Contact Email
+            <Label htmlFor="email" className="text-sm font-medium flex items-center gap-2">
+              <Mail className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
+              Contact Email
             </Label>
             <Input
               id="email"
               type="email"
               value={formData.primary_contact_email}
               onChange={(e) => handleFieldChange('primary_contact_email', e.target.value)}
-              placeholder="contact@acme.com"
-              className="bg-[hsl(var(--portal-bg-secondary))]"
+              placeholder="contact@example.com"
+              className="h-10 bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
             />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Branding Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 pb-2 border-b border-[hsl(var(--portal-border))]">
+      {/* Section: Branding */}
+      <section className="space-y-5">
+        <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-purple))]/10">
             <Globe className="w-4 h-4 text-[hsl(var(--portal-accent-purple))]" />
           </div>
           <div>
-            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Branding & Web Presence</h3>
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">Optional - can be completed later</p>
+            <h3 className="text-sm font-semibold text-[hsl(var(--portal-text-primary))]">Branding & Web Presence</h3>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">Optional — website enables AI profile extraction</p>
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+
+        <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="website" className="flex items-center gap-2">
-              <Globe className="w-4 h-4" />
+            <Label htmlFor="website" className="text-sm font-medium flex items-center gap-2">
+              <Globe className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
               Website URL
             </Label>
             <Input
@@ -387,17 +382,17 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
               type="url"
               value={formData.website_url}
               onChange={(e) => handleFieldChange('website_url', e.target.value)}
-              placeholder="https://acme.com"
-              className="bg-[hsl(var(--portal-bg-secondary))]"
+              placeholder="https://acme.org"
+              className="h-10 bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
             />
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-              Used to auto-extract organization profile
+            <p className="text-[10px] text-[hsl(var(--portal-text-muted))]">
+              Used to auto-extract mission and focus areas
             </p>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="logo" className="flex items-center gap-2">
-              <Image className="w-4 h-4" />
+            <Label htmlFor="logo" className="text-sm font-medium flex items-center gap-2">
+              <Image className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
               Logo URL
             </Label>
             <Input
@@ -405,24 +400,29 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
               type="url"
               value={formData.logo_url}
               onChange={(e) => handleFieldChange('logo_url', e.target.value)}
-              placeholder="https://acme.com/logo.png"
-              className="bg-[hsl(var(--portal-bg-secondary))]"
+              placeholder="https://acme.org/logo.png"
+              className="h-10 bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
             />
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="flex justify-end pt-4 border-t border-[hsl(var(--portal-border))]">
-        <V3Button type="submit" disabled={isSubmitting} className="min-w-[140px]">
+      {/* Footer Actions */}
+      <div className="flex justify-end pt-6 border-t border-[hsl(var(--portal-border))]">
+        <Button 
+          type="submit" 
+          disabled={isSubmitting} 
+          className="min-w-[160px] h-10"
+        >
           {isSubmitting ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Creating...
             </>
           ) : (
             'Create & Continue'
           )}
-        </V3Button>
+        </Button>
       </div>
     </form>
   );
