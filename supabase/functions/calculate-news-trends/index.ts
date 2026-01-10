@@ -14,6 +14,14 @@ function calculateVelocity(hourlyCount: number, sixHourCount: number, dailyCount
   return ((sixHourAvg - dailyAvg) / dailyAvg) * 100;
 }
 
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders();
   
@@ -104,6 +112,27 @@ serve(async (req) => {
 
     console.log(`[calculate-news-trends] Found ${topicMentions.size} unique topics`);
 
+    const topics = Array.from(topicMentions.keys());
+    const existingByTopic = new Map<string, { peak_velocity: number | null; trending_since: string | null; peak_at: string | null }>();
+
+    if (topics.length > 0) {
+      for (const chunk of chunkArray(topics, 200)) {
+        const { data: existingTopics, error: existingError } = await supabase
+          .from('trending_news_topics')
+          .select('topic, peak_velocity, trending_since, peak_at')
+          .in('topic', chunk);
+
+        if (existingError) {
+          console.warn('[calculate-news-trends] Failed to load existing topic stats:', existingError);
+          continue;
+        }
+
+        for (const row of existingTopics || []) {
+          existingByTopic.set(row.topic, row);
+        }
+      }
+    }
+
     // Calculate trends for each topic
     const trends = [];
     let trendingCount = 0;
@@ -130,11 +159,7 @@ serve(async (req) => {
       const negative = sentiments.filter(s => s < -0.3).length;
 
       // Check if we should track peak velocity
-      const { data: existing } = await supabase
-        .from('trending_news_topics')
-        .select('peak_velocity, trending_since, peak_at')
-        .eq('topic', topic)
-        .maybeSingle();
+      const existing = existingByTopic.get(topic);
 
       const peakVelocity = existing?.peak_velocity 
         ? Math.max(existing.peak_velocity, velocity) 
@@ -200,3 +225,8 @@ serve(async (req) => {
     );
   }
 });
+
+
+
+
+

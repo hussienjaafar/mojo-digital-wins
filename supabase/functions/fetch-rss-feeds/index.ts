@@ -42,6 +42,15 @@ const KEYWORDS = [
   'executive order', 'supreme court', 'federal court', 'state legislature'
 ];
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, (match) => `\\${match}`);
+}
+
+const KEYWORD_PATTERNS = KEYWORDS.map((keyword) => ({
+  keyword,
+  regex: new RegExp(`\\b${escapeRegex(keyword).replace(/\s+/g, "\\s+")}\\b`, "i"),
+}));
+
 // IMPROVED THREAT DETECTION
 const THREAT_INDICATORS = {
   critical: [
@@ -158,12 +167,13 @@ function sanitizeText(text: string): string {
   let decoded = text
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ').replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
+    .replace(/&nbsp;/g, ' ').replace(/&ndash;/g, '-').replace(/&mdash;/g, '--')
     .replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"')
-    .replace(/&lsquo;/g, '\u2018').replace(/&rsquo;/g, '\u2019')
-    .replace(/&hellip;/g, '\u2026')
+    .replace(/&lsquo;/g, "'").replace(/&rsquo;/g, "'")
+    .replace(/&hellip;/g, "...")
     .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num, 10)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\u2013/g, '-').replace(/\u2014/g, '--');
   return decoded
     .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, '')
     .replace(/\uFFFD/g, '')
@@ -171,8 +181,10 @@ function sanitizeText(text: string): string {
 }
 
 function extractTags(title: string, description: string, content: string): string[] {
-  const text = `${title} ${description} ${content}`.toLowerCase();
-  return KEYWORDS.filter(keyword => text.includes(keyword.toLowerCase()));
+  const text = `${title} ${description} ${content}`;
+  return KEYWORD_PATTERNS
+    .filter(({ regex }) => regex.test(text))
+    .map(({ keyword }) => keyword);
 }
 
 async function parseRSSFeed(url: string): Promise<any[]> {
@@ -433,3 +445,7 @@ serve(async (req) => {
     );
   }
 });
+
+
+
+

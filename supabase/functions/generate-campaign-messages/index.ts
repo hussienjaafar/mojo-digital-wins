@@ -1,10 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { getCorsHeaders, validateAuth, userBelongsToOrg, checkRateLimit } from "../_shared/security.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const corsHeaders = getCorsHeaders();
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -16,18 +14,44 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { 
-      organization_id, 
+    // SECURITY: Require authenticated user
+    const authResult = await validateAuth(req, supabase);
+    if (!authResult) {
+      console.error('[generate-campaign-messages] Unauthorized access attempt');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // SECURITY: Rate limiting
+    const rateLimit = await checkRateLimit(`generate-campaign-messages:${authResult.user.id}`, 20, 60000);
+    if (!rateLimit.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded', resetAt: rateLimit.resetAt }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const {
+      organization_id,
       entity_name,
       entity_type,
       opportunity_context,
-      num_variants = 3 
+      num_variants = 3
     } = await req.json();
 
     if (!organization_id || !entity_name) {
       throw new Error('organization_id and entity_name are required');
     }
 
+    const canAccessOrg = authResult.isAdmin || await userBelongsToOrg(supabase, authResult.user.id, organization_id);
+    if (!canAccessOrg) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     console.log(`Generating campaign messages for ${entity_name} (${organization_id})`);
 
     // Get historical successful messages for this org
@@ -176,3 +200,5 @@ Return ONLY a JSON array of ${num_variants} message objects with this structure:
     );
   }
 });
+
+

@@ -280,6 +280,40 @@ serve(async (req) => {
             itemsProcessed = result?.articlesProcessed || 0;
             itemsCreated = result?.clustersCreated || 0;
             break;
+
+          case 'refresh_meta_tokens':
+            const refreshTokensResponse = await supabase.functions.invoke('refresh-meta-tokens', {
+              body: {},
+              headers: authHeaders
+            });
+            if (refreshTokensResponse.error) throw new Error(refreshTokensResponse.error.message);
+            result = refreshTokensResponse.data;
+            itemsProcessed = result?.total_checked || 0;
+            itemsCreated = result?.refreshed || 0;
+            break;
+
+          case 'retry_meta_conversions':
+            const retryConversionsResponse = await supabase.functions.invoke('retry-meta-conversions', {
+              body: {},
+              headers: authHeaders
+            });
+            if (retryConversionsResponse.error) throw new Error(retryConversionsResponse.error.message);
+            result = retryConversionsResponse.data;
+            itemsProcessed = result?.processed || 0;
+            itemsCreated = result?.sent || 0;
+            break;
+
+          case 'backfill_actblue_conversions':
+            const backfillConversionsResponse = await supabase.functions.invoke('backfill-actblue-conversions', {
+              body: { limit: 50, lookback_days: 60 },
+              headers: authHeaders
+            });
+            if (backfillConversionsResponse.error) throw new Error(backfillConversionsResponse.error.message);
+            result = backfillConversionsResponse.data;
+            itemsProcessed = result?.processed || 0;
+            itemsCreated = result?.sent || 0;
+            break;
+
           case 'extract_trending_topics':
             const trendingResponse = await supabase.functions.invoke('extract-trending-topics', { body: {} });
             if (trendingResponse.error) throw new Error(trendingResponse.error.message);
@@ -785,4 +819,7 @@ serve(async (req) => {
     );
   }
 });
+
+
+
 

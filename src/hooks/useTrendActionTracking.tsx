@@ -10,6 +10,7 @@ interface TrackActionParams {
   organizationId: string;
   actionType: ActionType;
   metadata?: Json;
+  entityName?: string; // Optional: for intelligence_actions linkage
 }
 
 interface RecordOutcomeParams {
@@ -25,8 +26,10 @@ export function useTrendActionTracking() {
     organizationId,
     actionType,
     metadata = {},
+    entityName,
   }: TrackActionParams): Promise<string | null> => {
     try {
+      // Primary write: trend_action_outcomes (backwards compatible)
       const { data, error } = await supabase
         .from('trend_action_outcomes')
         .insert([{
@@ -39,7 +42,31 @@ export function useTrendActionTracking() {
         .single();
 
       if (error) throw error;
-      return data?.id || null;
+      const actionId = data?.id || null;
+
+      // Dual-write: Also write to intelligence_actions for unified learning
+      // This enables the feedback loop to work with both old and new tables
+      if (actionId) {
+        try {
+          await supabase
+            .from('intelligence_actions')
+            .insert([{
+              id: actionId, // Use same ID for correlation
+              organization_id: organizationId,
+              trend_event_id: trendEventId,
+              entity_name: entityName || null,
+              action_type: actionType,
+              action_status: 'sent',
+              sent_at: new Date().toISOString(),
+              metadata,
+            }]);
+          // Don't fail if dual-write fails - just log and continue
+        } catch (dualWriteError) {
+          console.warn('Dual-write to intelligence_actions failed (non-fatal):', dualWriteError);
+        }
+      }
+
+      return actionId;
     } catch (error) {
       console.error('Failed to track action:', error);
       return null;
@@ -52,6 +79,7 @@ export function useTrendActionTracking() {
     outcomeValue = 0,
   }: RecordOutcomeParams): Promise<boolean> => {
     try {
+      // Update trend_action_outcomes (primary)
       const { error } = await supabase
         .from('trend_action_outcomes')
         .update({
@@ -62,6 +90,22 @@ export function useTrendActionTracking() {
         .eq('id', actionId);
 
       if (error) throw error;
+
+      // Dual-write: Also create outcome_event for unified learning
+      try {
+        await supabase
+          .from('outcome_events')
+          .insert([{
+            action_id: actionId,
+            outcome_type: outcomeType,
+            outcome_value: outcomeValue.toString(),
+            outcome_count: 1,
+            recorded_at: new Date().toISOString(),
+          }]);
+      } catch (dualWriteError) {
+        console.warn('Dual-write to outcome_events failed (non-fatal):', dualWriteError);
+      }
+
       return true;
     } catch (error) {
       console.error('Failed to record outcome:', error);
@@ -71,6 +115,18 @@ export function useTrendActionTracking() {
 
   const getActionHistory = useCallback(async (trendEventId: string) => {
     try {
+      // Try unified view first, fallback to old table
+      const { data: unifiedData, error: unifiedError } = await supabase
+        .from('unified_action_outcomes')
+        .select('*')
+        .eq('trend_event_id', trendEventId)
+        .order('sent_at', { ascending: false });
+
+      if (!unifiedError && unifiedData) {
+        return unifiedData;
+      }
+
+      // Fallback to trend_action_outcomes
       const { data, error } = await supabase
         .from('trend_action_outcomes')
         .select('*')

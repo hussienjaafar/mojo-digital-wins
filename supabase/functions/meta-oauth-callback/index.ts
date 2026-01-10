@@ -107,8 +107,44 @@ serve(async (req) => {
 
     console.log('[meta-oauth-callback] Found', adAccountsData.data?.length || 0, 'ad accounts');
 
+    // Store credentials with expiry timestamp for proactive refresh
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    const tokenExpiresAt = new Date(Date.now() + (finalExpiry * 1000));
+
+    const { error: upsertError } = await supabase
+      .from('client_api_credentials')
+      .upsert({
+        organization_id: stateData.organizationId,
+        platform: 'meta',
+        encrypted_credentials: {
+          access_token: finalToken,
+          meta_user_id: userInfo.id,
+          meta_user_name: userInfo.name,
+          meta_user_email: userInfo.email,
+          ad_accounts: adAccountsData.data || [],
+        },
+        token_expires_at: tokenExpiresAt.toISOString(),
+        refresh_status: null,
+        is_active: true,
+        last_sync_status: 'oauth_complete',
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'organization_id,platform',
+      });
+
+    if (upsertError) {
+      console.error('[meta-oauth-callback] Failed to store credentials:', upsertError);
+      // Don't fail the request, just log - frontend will still get the token
+    } else {
+      console.log('[meta-oauth-callback] Stored credentials with expiry:', tokenExpiresAt.toISOString());
+    }
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         organizationId: stateData.organizationId,
         userId: stateData.userId,
@@ -120,7 +156,8 @@ serve(async (req) => {
         adAccounts: adAccountsData.data || [],
         accessToken: finalToken,
         expiresIn: finalExpiry,
-      }), 
+        tokenExpiresAt: tokenExpiresAt.toISOString(),
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

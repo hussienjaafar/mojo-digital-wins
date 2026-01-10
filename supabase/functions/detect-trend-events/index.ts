@@ -1686,15 +1686,27 @@ serve(async (req) => {
       
       // Baseline quality factor
       const baselineQuality = hasHistoricalBaseline ? 1.0 : 0.6;
-      
+
       // Calculate z-score for velocity using baseline std-dev when available
+      // FIX: Use statistically valid Poisson-based fallback instead of heuristic
       const baselineStdDev = hasHistoricalBaseline ? (rolling?.stddev_7d || 0) : 0;
-      const fallbackStdDev = Math.max(0.5, baseline7d * 0.5);
-      const denom = baselineStdDev > 0 ? baselineStdDev : fallbackStdDev;
-      const rawZ = denom > 0 ? (currentHourlyRate - baseline7d) / denom : 0;
-      const zScoreVelocity = Math.min(10, Math.max(-2,
-        hasHistoricalBaseline ? rawZ : Math.min(currentHourlyRate * 0.5, 5)
-      ));
+
+      let zScoreVelocity: number;
+      if (hasHistoricalBaseline && baselineStdDev > 0) {
+        // Standard z-score with historical baseline data
+        const rawZ = (currentHourlyRate - baseline7d) / baselineStdDev;
+        zScoreVelocity = Math.min(10, Math.max(-2, rawZ));
+      } else {
+        // Poisson-based fallback for new topics without historical baseline
+        // For count data, variance ≈ mean under Poisson assumption
+        // Use conservative baseline estimate: assume current rate is 3x normal spike
+        const conservativeBaseline = Math.max(0.5, currentHourlyRate / 3);
+        // Poisson std-dev = sqrt(mean), use max of baseline and 1 to avoid division issues
+        const poissonStdDev = Math.sqrt(Math.max(1, conservativeBaseline));
+        const rawZ = (currentHourlyRate - conservativeBaseline) / poissonStdDev;
+        // Apply baseline quality penalty and clamp
+        zScoreVelocity = Math.min(10, Math.max(-2, rawZ * baselineQuality));
+      }
       
       // Volume gate: minimum thresholds to prevent low-volume spikes
       // Require either:

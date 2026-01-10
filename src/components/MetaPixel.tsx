@@ -4,6 +4,40 @@ import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
 
 const PIXEL_ID = "1344961220416600";
+const getCookieValue = (name: string): string | undefined => {
+  const match = document.cookie.split('; ').find((row) => row.startsWith(`${name}=`));
+  if (!match) return undefined;
+  return decodeURIComponent(match.split('=').slice(1).join('='));
+};
+
+const createEventId = (): string => {
+  if (crypto?.randomUUID) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+const META_CUSTOM_DATA_KEYS = new Set([
+  'value', 'currency', 'content_type', 'content_ids', 'contents', 'num_items',
+  'order_id', 'predicted_ltv'
+]);
+
+const STANDARD_EVENTS = new Set([
+  'Purchase', 'Lead', 'CompleteRegistration', 'AddToCart', 'InitiateCheckout',
+  'ViewContent', 'Search', 'AddPaymentInfo', 'AddToWishlist', 'Subscribe',
+  'Contact', 'Schedule', 'StartTrial', 'SubmitApplication', 'FindLocation',
+  'Donate'
+]);
+
+const filterMetaCustomData = (data?: Record<string, any>): Record<string, any> => {
+  const filtered: Record<string, any> = {};
+  if (!data) return filtered;
+  for (const [key, value] of Object.entries(data)) {
+    if (!META_CUSTOM_DATA_KEYS.has(key)) continue;
+    if (value === undefined) continue;
+    filtered[key] = value;
+  }
+  return filtered;
+};
+
+const isStandardEvent = (eventName: string): boolean => STANDARD_EVENTS.has(eventName);
 
 export const initMetaPixel = () => {
   // Check if advertising cookies are enabled
@@ -78,15 +112,44 @@ export const trackConversion = async (
       return;
     }
 
+    const eventId = createEventId();
+    const fbp = getCookieValue('_fbp');
+    const fbc = getCookieValue('_fbc');
+    const userData: Record<string, string> = {};
+
+    if (fbp) userData.fbp = fbp;
+    if (fbc) userData.fbc = fbc;
+
+    const payload: Record<string, any> = {
+      event_name: eventName,
+      event_id: eventId,
+      event_source_url: window.location.href,
+    };
+
+    if (Object.keys(userData).length > 0) {
+      payload.user_data = userData;
+    }
+
+    if (customData) {
+      payload.custom_data = customData;
+    }
+
+    if (window.fbq) {
+      const metaParams = filterMetaCustomData(customData);
+      const pixelParams = Object.keys(metaParams).length > 0 ? metaParams : undefined;
+      const options = { eventID: eventId };
+      if (isStandardEvent(eventName)) {
+        window.fbq('track', eventName, pixelParams, options);
+      } else {
+        window.fbq('trackCustom', eventName, pixelParams, options);
+      }
+    }
+
     const { error } = await supabase.functions.invoke('meta-conversions', {
       headers: {
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: {
-        event_name: eventName,
-        event_source_url: window.location.href,
-        custom_data: customData,
-      },
+      body: payload,
     });
 
     if (error) {
@@ -126,3 +189,6 @@ const MetaPixel = () => {
 };
 
 export default MetaPixel;
+
+
+
