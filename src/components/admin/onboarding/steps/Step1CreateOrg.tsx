@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { V3Button } from '@/components/v3/V3Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+// Card components removed - using integrated layout
 import { Building2, Globe, Mail, Image, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -294,131 +294,125 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-6">
-      <Card className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10">
-              <Building2 className="w-5 h-5 text-[hsl(var(--portal-accent-blue))]" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Organization Details</CardTitle>
-              <CardDescription>Basic information about the client</CardDescription>
-            </div>
+      {/* Organization Details Section */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 pb-2 border-b border-[hsl(var(--portal-border))]">
+          <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10">
+            <Building2 className="w-4 h-4 text-[hsl(var(--portal-accent-blue))]" />
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="name">Organization Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="Acme Corporation"
-                required
-                className="bg-[hsl(var(--portal-bg-secondary))]"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="slug">URL Slug *</Label>
-              <Input
-                id="slug"
-                ref={slugInputRef}
-                value={formData.slug}
-                onChange={(e) => handleFieldChange('slug', e.target.value)}
-                placeholder="acme-corporation"
-                required
-                className="bg-[hsl(var(--portal-bg-secondary))]"
-              />
-              {slugAvailabilityMsg ? (
-                <p
-                  className={
-                    "text-xs " +
-                    (slugAvailability === 'taken'
-                      ? 'text-destructive'
-                      : slugAvailability === 'available'
-                        ? 'text-[hsl(var(--portal-text-muted))]'
-                        : 'text-[hsl(var(--portal-text-muted))]')
-                  }
-                  aria-live="polite"
-                >
-                  {slugAvailabilityMsg}
-                </p>
-              ) : (
-                <p className="text-xs text-[hsl(var(--portal-text-muted))]">Auto-generated from name</p>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="email" className="flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                Primary Contact Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.primary_contact_email}
-                onChange={(e) => handleFieldChange('primary_contact_email', e.target.value)}
-                placeholder="contact@acme.com"
-                className="bg-[hsl(var(--portal-bg-secondary))]"
-              />
-            </div>
+          <div>
+            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Organization Details</h3>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">Basic information about the client</p>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-purple))]/10">
-              <Globe className="w-5 h-5 text-[hsl(var(--portal-accent-purple))]" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Branding & Web Presence</CardTitle>
-              <CardDescription>Optional - can be completed later</CardDescription>
-            </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="name">Organization Name *</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              placeholder="Acme Corporation"
+              required
+              className="bg-[hsl(var(--portal-bg-secondary))]"
+            />
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="website" className="flex items-center gap-2">
-                <Globe className="w-4 h-4" />
-                Website URL
-              </Label>
-              <Input
-                id="website"
-                type="url"
-                value={formData.website_url}
-                onChange={(e) => handleFieldChange('website_url', e.target.value)}
-                placeholder="https://acme.com"
-                className="bg-[hsl(var(--portal-bg-secondary))]"
-              />
-              <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                Used to auto-extract organization profile
+          
+          <div className="space-y-2">
+            <Label htmlFor="slug">URL Slug *</Label>
+            <Input
+              id="slug"
+              ref={slugInputRef}
+              value={formData.slug}
+              onChange={(e) => handleFieldChange('slug', e.target.value)}
+              placeholder="acme-corporation"
+              required
+              className="bg-[hsl(var(--portal-bg-secondary))]"
+            />
+            {slugAvailabilityMsg ? (
+              <p
+                className={
+                  "text-xs " +
+                  (slugAvailability === 'taken'
+                    ? 'text-destructive'
+                    : slugAvailability === 'available'
+                      ? 'text-[hsl(var(--portal-text-muted))]'
+                      : 'text-[hsl(var(--portal-text-muted))]')
+                }
+                aria-live="polite"
+              >
+                {slugAvailabilityMsg}
               </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="logo" className="flex items-center gap-2">
-                <Image className="w-4 h-4" />
-                Logo URL
-              </Label>
-              <Input
-                id="logo"
-                type="url"
-                value={formData.logo_url}
-                onChange={(e) => handleFieldChange('logo_url', e.target.value)}
-                placeholder="https://acme.com/logo.png"
-                className="bg-[hsl(var(--portal-bg-secondary))]"
-              />
-            </div>
+            ) : (
+              <p className="text-xs text-[hsl(var(--portal-text-muted))]">Auto-generated from name</p>
+            )}
           </div>
-        </CardContent>
-      </Card>
+          
+          <div className="space-y-2">
+            <Label htmlFor="email" className="flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              Primary Contact Email
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.primary_contact_email}
+              onChange={(e) => handleFieldChange('primary_contact_email', e.target.value)}
+              placeholder="contact@acme.com"
+              className="bg-[hsl(var(--portal-bg-secondary))]"
+            />
+          </div>
+        </div>
+      </div>
 
-      <div className="flex justify-end">
+      {/* Branding Section */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 pb-2 border-b border-[hsl(var(--portal-border))]">
+          <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-purple))]/10">
+            <Globe className="w-4 h-4 text-[hsl(var(--portal-accent-purple))]" />
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Branding & Web Presence</h3>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">Optional - can be completed later</p>
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="website" className="flex items-center gap-2">
+              <Globe className="w-4 h-4" />
+              Website URL
+            </Label>
+            <Input
+              id="website"
+              type="url"
+              value={formData.website_url}
+              onChange={(e) => handleFieldChange('website_url', e.target.value)}
+              placeholder="https://acme.com"
+              className="bg-[hsl(var(--portal-bg-secondary))]"
+            />
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+              Used to auto-extract organization profile
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="logo" className="flex items-center gap-2">
+              <Image className="w-4 h-4" />
+              Logo URL
+            </Label>
+            <Input
+              id="logo"
+              type="url"
+              value={formData.logo_url}
+              onChange={(e) => handleFieldChange('logo_url', e.target.value)}
+              placeholder="https://acme.com/logo.png"
+              className="bg-[hsl(var(--portal-bg-secondary))]"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end pt-4 border-t border-[hsl(var(--portal-border))]">
         <V3Button type="submit" disabled={isSubmitting} className="min-w-[140px]">
           {isSubmitting ? (
             <>

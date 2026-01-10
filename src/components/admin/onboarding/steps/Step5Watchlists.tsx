@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+// Card removed - using integrated layout
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -192,17 +192,14 @@ export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Eye className="h-5 w-5" />
-          Configure Watchlists & Alerts
-        </CardTitle>
-        <CardDescription>
-          Set up entities to monitor and configure alert thresholds.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <div className="space-y-6">
+      {/* AI Suggestions Loading */}
+      {isSuggestingEntities && (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">Generating suggestions based on organization profile...</span>
+        </div>
+      )}
         {/* AI Suggestions Loading */}
         {isSuggestingEntities && (
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -375,32 +372,31 @@ export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }
           </CollapsibleContent>
         </Collapsible>
 
-        {/* Actions */}
-        <div className="flex justify-between pt-4 border-t">
-          <Button variant="outline" onClick={onBack}>
-            Back
-          </Button>
-          <div className="flex gap-2">
-            {entities.length === 0 && (
-              <Button variant="ghost" onClick={() => onComplete(5, { entities: [], alert_thresholds: alertThresholds, skipped: true })} disabled={isLoading}>
-                Skip for now
-              </Button>
-            )}
-            <Button onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : entities.length > 0 ? (
-                'Save & Continue'
-              ) : (
-                'Continue'
-              )}
+      {/* Actions */}
+      <div className="flex justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
+        <Button variant="outline" onClick={onBack}>
+          Back
+        </Button>
+        <div className="flex gap-2">
+          {entities.length === 0 && (
+            <Button variant="ghost" onClick={() => onComplete(5, { entities: [], alert_thresholds: alertThresholds, skipped: true })} disabled={isLoading}>
+              Skip for now
             </Button>
-          </div>
+          )}
+          <Button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : entities.length > 0 ? (
+              'Save & Continue'
+            ) : (
+              'Continue'
+            )}
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
