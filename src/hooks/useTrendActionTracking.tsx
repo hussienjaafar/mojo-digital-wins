@@ -91,52 +91,26 @@ export function useTrendActionTracking() {
 
       if (error) throw error;
 
-      // Dual-write: Also create outcome_event for unified learning
-      try {
-        await supabase
-          .from('outcome_events')
-          .insert([{
-            action_id: actionId,
-            outcome_type: outcomeType,
-            outcome_value: outcomeValue.toString(),
-            outcome_count: 1,
-            recorded_at: new Date().toISOString(),
-          }]);
-      } catch (dualWriteError) {
-        console.warn('Dual-write to outcome_events failed (non-fatal):', dualWriteError);
-      }
-
       return true;
-    } catch (error) {
-      console.error('Failed to record outcome:', error);
+    } catch (err) {
+      console.error('Failed to record outcome:', err);
       return false;
     }
   }, []);
 
   const getActionHistory = useCallback(async (trendEventId: string) => {
     try {
-      // Try unified view first, fallback to old table
-      const { data: unifiedData, error: unifiedError } = await supabase
-        .from('unified_action_outcomes')
-        .select('*')
-        .eq('trend_event_id', trendEventId)
-        .order('sent_at', { ascending: false });
-
-      if (!unifiedError && unifiedData) {
-        return unifiedData;
-      }
-
-      // Fallback to trend_action_outcomes
-      const { data, error } = await supabase
+      // Query from trend_action_outcomes table directly
+      const { data: historyData, error: historyError } = await supabase
         .from('trend_action_outcomes')
         .select('*')
         .eq('trend_event_id', trendEventId)
         .order('action_taken_at', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Failed to get action history:', error);
+      if (historyError) throw historyError;
+      return historyData || [];
+    } catch (err) {
+      console.error('Failed to get action history:', err);
       return [];
     }
   }, []);
