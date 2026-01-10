@@ -293,33 +293,38 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
   };
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-6">
+    <form onSubmit={handleSubmit} noValidate className="space-y-8">
       {/* Organization Details Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 pb-2 border-b border-[hsl(var(--portal-border))]">
-          <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10">
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10 flex items-center justify-center">
             <Building2 className="w-4 h-4 text-[hsl(var(--portal-accent-blue))]" />
           </div>
           <div>
-            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Organization Details</h3>
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">Basic information about the client</p>
+            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] tracking-tight">Organization Details</h3>
+            <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Basic information about the client</p>
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        
+        <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="name">Organization Name *</Label>
+            <Label htmlFor="name" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">
+              Organization Name <span className="text-[hsl(var(--portal-error))]">*</span>
+            </Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder="Acme Corporation"
               required
-              className="bg-[hsl(var(--portal-bg-secondary))]"
+              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors"
             />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="slug">URL Slug *</Label>
+            <Label htmlFor="slug" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))]">
+              URL Slug <span className="text-[hsl(var(--portal-error))]">*</span>
+            </Label>
             <Input
               id="slug"
               ref={slugInputRef}
@@ -327,30 +332,24 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
               onChange={(e) => handleFieldChange('slug', e.target.value)}
               placeholder="acme-corporation"
               required
-              className="bg-[hsl(var(--portal-bg-secondary))]"
+              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors"
             />
-            {slugAvailabilityMsg ? (
-              <p
-                className={
-                  "text-xs " +
-                  (slugAvailability === 'taken'
-                    ? 'text-destructive'
-                    : slugAvailability === 'available'
-                      ? 'text-[hsl(var(--portal-text-muted))]'
-                      : 'text-[hsl(var(--portal-text-muted))]')
-                }
-                aria-live="polite"
-              >
-                {slugAvailabilityMsg}
-              </p>
-            ) : (
-              <p className="text-xs text-[hsl(var(--portal-text-muted))]">Auto-generated from name</p>
-            )}
+            <p
+              className={
+                "text-[11px] " +
+                (slugAvailability === 'taken'
+                  ? 'text-[hsl(var(--portal-error))]'
+                  : 'text-[hsl(var(--portal-text-muted))]')
+              }
+              aria-live="polite"
+            >
+              {slugAvailabilityMsg || 'Auto-generated from name'}
+            </p>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="email" className="flex items-center gap-2">
-              <Mail className="w-4 h-4" />
+            <Label htmlFor="email" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))] flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
               Primary Contact Email
             </Label>
             <Input
@@ -359,27 +358,28 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
               value={formData.primary_contact_email}
               onChange={(e) => handleFieldChange('primary_contact_email', e.target.value)}
               placeholder="contact@acme.com"
-              className="bg-[hsl(var(--portal-bg-secondary))]"
+              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors"
             />
           </div>
         </div>
       </div>
 
       {/* Branding Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 pb-2 border-b border-[hsl(var(--portal-border))]">
-          <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-purple))]/10">
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[hsl(var(--portal-accent-purple))]/10 flex items-center justify-center">
             <Globe className="w-4 h-4 text-[hsl(var(--portal-accent-purple))]" />
           </div>
           <div>
-            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Branding & Web Presence</h3>
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">Optional - can be completed later</p>
+            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))] tracking-tight">Branding & Web Presence</h3>
+            <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">Optional - can be completed later</p>
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        
+        <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="website" className="flex items-center gap-2">
-              <Globe className="w-4 h-4" />
+            <Label htmlFor="website" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))] flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
               Website URL
             </Label>
             <Input
@@ -388,16 +388,16 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
               value={formData.website_url}
               onChange={(e) => handleFieldChange('website_url', e.target.value)}
               placeholder="https://acme.com"
-              className="bg-[hsl(var(--portal-bg-secondary))]"
+              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors"
             />
-            <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+            <p className="text-[11px] text-[hsl(var(--portal-text-muted))]">
               Used to auto-extract organization profile
             </p>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="logo" className="flex items-center gap-2">
-              <Image className="w-4 h-4" />
+            <Label htmlFor="logo" className="text-[13px] font-medium text-[hsl(var(--portal-text-secondary))] flex items-center gap-1.5">
+              <Image className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" />
               Logo URL
             </Label>
             <Input
@@ -406,17 +406,18 @@ export function Step1CreateOrg({ initialData, onComplete, onDataChange }: Step1C
               value={formData.logo_url}
               onChange={(e) => handleFieldChange('logo_url', e.target.value)}
               placeholder="https://acme.com/logo.png"
-              className="bg-[hsl(var(--portal-bg-secondary))]"
+              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] focus:border-[hsl(var(--portal-accent-blue))] focus:ring-1 focus:ring-[hsl(var(--portal-accent-blue))]/20 transition-colors"
             />
           </div>
         </div>
       </div>
 
-      <div className="flex justify-end pt-4 border-t border-[hsl(var(--portal-border))]">
-        <V3Button type="submit" disabled={isSubmitting} className="min-w-[140px]">
+      {/* Action Footer */}
+      <div className="flex justify-end pt-6 mt-2 border-t border-[hsl(var(--portal-border))]">
+        <V3Button type="submit" disabled={isSubmitting} className="h-10 px-5 text-sm font-medium">
           {isSubmitting ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
               Creating...
             </>
           ) : (
