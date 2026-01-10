@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+// Card removed - using integrated layout
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -260,17 +260,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Plug className="h-5 w-5" />
-          Connect Integrations
-        </CardTitle>
-        <CardDescription>
-          Connect data sources to enable automated syncing and attribution tracking.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
         {/* Meta Ads - OAuth Flow */}
         <Collapsible
           open={formState.meta.isOpen}
@@ -504,21 +494,20 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
           You can skip integrations for now and connect them later from the Integrations Hub.
         </p>
 
-        {/* Actions */}
-        <div className="flex justify-between pt-4 border-t">
-          <Button variant="outline" onClick={onBack}>
-            Back
+      {/* Actions */}
+      <div className="flex justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
+        <Button variant="outline" onClick={onBack}>
+          Back
+        </Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={handleContinue} disabled={isLoading}>
+            Skip for now
           </Button>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={handleContinue} disabled={isLoading}>
-              Skip for now
-            </Button>
-            <Button onClick={handleContinue} disabled={isLoading}>
-              {Object.values(integrations).some(i => i.is_enabled) ? 'Save & Continue' : 'Continue'}
-            </Button>
-          </div>
+          <Button onClick={handleContinue} disabled={isLoading}>
+            {Object.values(integrations).some(i => i.is_enabled) ? 'Save & Continue' : 'Continue'}
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

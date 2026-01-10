@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+// Card removed - using integrated layout
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -221,25 +221,15 @@ export function Step6Activation({
   const progress = (completedChecks / healthChecks.length) * 100;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Rocket className="h-5 w-5" />
-          Activate & Verify
-        </CardTitle>
-        <CardDescription>
-          Final checks before activating the organization.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Health Check Progress */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span>Health Check Progress</span>
-            <span className="text-muted-foreground">{completedChecks}/{healthChecks.length}</span>
-          </div>
-          <Progress value={progress} className="h-2" />
+    <div className="space-y-6">
+      {/* Health Check Progress */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-[hsl(var(--portal-text-secondary))]">Health Check Progress</span>
+          <span className="text-[hsl(var(--portal-text-muted))]">{completedChecks}/{healthChecks.length}</span>
         </div>
+        <Progress value={progress} className="h-2" />
+      </div>
 
         {/* Health Checks */}
         <div className="space-y-3">
@@ -308,31 +298,30 @@ export function Step6Activation({
           </div>
         )}
 
-        {/* Actions */}
-        {!activationStatus.pipelines_enabled && (
-          <div className="flex justify-between pt-4 border-t">
-            <Button variant="outline" onClick={onBack}>
-              Back
-            </Button>
-            <Button 
-              onClick={activateOrganization}
-              disabled={isActivating || !activationStatus.health_check_passed}
-            >
-              {isActivating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Activating...
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4 mr-2" />
-                  Activate Organization
-                </>
-              )}
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {/* Actions */}
+      {!activationStatus.pipelines_enabled && (
+        <div className="flex justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
+          <Button variant="outline" onClick={onBack}>
+            Back
+          </Button>
+          <Button 
+            onClick={activateOrganization}
+            disabled={isActivating || !activationStatus.health_check_passed}
+          >
+            {isActivating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Activating...
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4 mr-2" />
+                Activate Organization
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+// Card removed - using integrated layout
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -190,26 +190,15 @@ export function Step3Users({ organizationId, organizationName, stepData, onCompl
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="h-5 w-5" />
-          Invite Team Members
-        </CardTitle>
-        <CardDescription>
-          Invite team members who will have access to this organization's dashboard.
-          They'll receive an email with a secure link to set up their account.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Info Alert */}
-        <Alert>
-          <Send className="h-4 w-4" />
-          <AlertDescription>
-            Invited users will receive an email with a secure link to create their account and set a password.
-            No temporary passwords are sent—invitations are the recommended approach for security.
-          </AlertDescription>
-        </Alert>
+    <div className="space-y-6">
+      {/* Info Alert */}
+      <Alert>
+        <Send className="h-4 w-4" />
+        <AlertDescription>
+          Invited users will receive an email with a secure link to create their account and set a password.
+          No temporary passwords are sent—invitations are the recommended approach for security.
+        </AlertDescription>
+      </Alert>
 
         {/* Add Single User */}
         <div className="space-y-4">
@@ -330,35 +319,34 @@ export function Step3Users({ organizationId, organizationName, stepData, onCompl
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex justify-between pt-4 border-t">
-          <Button variant="outline" onClick={onBack}>
-            Back
-          </Button>
-          <div className="flex gap-2">
-            {users.length === 0 && (
-              <Button variant="ghost" onClick={handleSubmit} disabled={isLoading}>
-                Skip for now
-              </Button>
-            )}
-            <Button onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {users.length > 0 ? 'Sending Invitations...' : 'Continuing...'}
-                </>
-              ) : users.length > 0 ? (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Invitations & Continue
-                </>
-              ) : (
-                'Continue'
-              )}
+      {/* Actions */}
+      <div className="flex justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
+        <Button variant="outline" onClick={onBack}>
+          Back
+        </Button>
+        <div className="flex gap-2">
+          {users.length === 0 && (
+            <Button variant="ghost" onClick={handleSubmit} disabled={isLoading}>
+              Skip for now
             </Button>
-          </div>
+          )}
+          <Button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {users.length > 0 ? 'Sending Invitations...' : 'Continuing...'}
+              </>
+            ) : users.length > 0 ? (
+              <>
+                <Send className="h-4 w-4 mr-2" />
+                Send Invitations & Continue
+              </>
+            ) : (
+              'Continue'
+            )}
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

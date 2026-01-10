@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { V3Button } from '@/components/v3/V3Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+// Card removed - using integrated layout
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Target, MapPin, Loader2, Sparkles, ChevronDown, ChevronUp, CheckCircle2, XCircle, Plus, X, Building2, AlertCircle } from 'lucide-react';
@@ -287,71 +287,68 @@ export function Step2OrgProfile({
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* AI Scrape Banner */}
       {websiteUrl && (
-        <Card className={`border-[hsl(var(--portal-accent-purple))]/30 ${
+        <div className={`rounded-lg border p-4 ${
           scrapeStatus === 'success' ? 'bg-green-500/5 border-green-500/30' :
           scrapeStatus === 'error' ? 'bg-destructive/5 border-destructive/30' :
-          'bg-[hsl(var(--portal-accent-purple))]/5'
+          'bg-[hsl(var(--portal-accent-purple))]/5 border-[hsl(var(--portal-accent-purple))]/30'
         }`}>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                {scrapeStatus === 'success' ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-500" />
-                ) : scrapeStatus === 'error' ? (
-                  <XCircle className="w-5 h-5 text-destructive" />
-                ) : (
-                  <Sparkles className="w-5 h-5 text-[hsl(var(--portal-accent-purple))]" />
-                )}
-                <div>
-                  <p className="text-sm font-medium">
-                    {scrapeStatus === 'success' ? 'Profile Extracted Successfully' :
-                     scrapeStatus === 'error' ? 'Extraction Failed' :
-                     'AI-Powered Profile Extraction'}
-                  </p>
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                    {scrapeMessage || 'Extract mission & focus areas from website'}
-                  </p>
-                </div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              {scrapeStatus === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 text-green-500" />
+              ) : scrapeStatus === 'error' ? (
+                <XCircle className="w-5 h-5 text-destructive" />
+              ) : (
+                <Sparkles className="w-5 h-5 text-[hsl(var(--portal-accent-purple))]" />
+              )}
+              <div>
+                <p className="text-sm font-medium">
+                  {scrapeStatus === 'success' ? 'Profile Extracted Successfully' :
+                   scrapeStatus === 'error' ? 'Extraction Failed' :
+                   'AI-Powered Profile Extraction'}
+                </p>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                  {scrapeMessage || 'Extract mission & focus areas from website'}
+                </p>
               </div>
-              <V3Button 
-                type="button" 
-                variant="secondary" 
-                size="sm"
-                onClick={handleScrapeWebsite}
-                disabled={isScraping}
-              >
-                {isScraping ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : scrapeStatus === 'error' ? (
-                  'Retry'
-                ) : scrapeStatus === 'success' ? (
-                  'Re-analyze'
-                ) : (
-                  'Analyze Website'
-                )}
-              </V3Button>
             </div>
-          </CardContent>
-        </Card>
+            <V3Button 
+              type="button" 
+              variant="secondary" 
+              size="sm"
+              onClick={handleScrapeWebsite}
+              disabled={isScraping}
+            >
+              {isScraping ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : scrapeStatus === 'error' ? (
+                'Retry'
+              ) : scrapeStatus === 'success' ? (
+                'Re-analyze'
+              ) : (
+                'Analyze Website'
+              )}
+            </V3Button>
+          </div>
+        </div>
       )}
 
       {/* Mission & Focus */}
-      <Card className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10">
-              <Target className="w-5 h-5 text-[hsl(var(--portal-accent-blue))]" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Mission & Focus Areas</CardTitle>
-              <CardDescription>What does this organization care about?</CardDescription>
-            </div>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 pb-2 border-b border-[hsl(var(--portal-border))]">
+          <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10">
+            <Target className="w-4 h-4 text-[hsl(var(--portal-accent-blue))]" />
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Mission & Focus Areas</h3>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">What does this organization care about?</p>
+          </div>
+        </div>
+        
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="mission">Mission Statement</Label>
             <Textarea
@@ -458,23 +455,21 @@ export function Step2OrgProfile({
               ))}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Organization Type & Geographic Focus */}
-      <Card className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/10">
-              <Building2 className="w-5 h-5 text-green-500" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Organization Type & Geographic Focus</CardTitle>
-              <CardDescription>Define the organization's structure and where it operates</CardDescription>
-            </div>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 pb-2 border-b border-[hsl(var(--portal-border))]">
+          <div className="p-2 rounded-lg bg-green-500/10">
+            <Building2 className="w-4 h-4 text-green-500" />
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
+          <div>
+            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Organization Type & Geographic Focus</h3>
+            <p className="text-xs text-[hsl(var(--portal-text-muted))]">Define the organization's structure and where it operates</p>
+          </div>
+        </div>
+        <div className="space-y-6">
           {/* Step 1: Organization Type */}
           <div className="space-y-2">
             <Label>Organization Type</Label>
@@ -543,31 +538,30 @@ export function Step2OrgProfile({
               selectedLocations={formData.geo_locations}
               onChange={(locations) => setFormData(prev => ({ ...prev, geo_locations: locations }))}
             />
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Advanced Settings (Collapsed by default) */}
       <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-        <Card className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]">
+        <div className="rounded-lg border border-[hsl(var(--portal-border))]">
           <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-[hsl(var(--portal-bg-hover))] transition-colors">
+            <div className="cursor-pointer hover:bg-[hsl(var(--portal-bg-hover))] transition-colors p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-orange-500/10">
-                    <AlertCircle className="w-5 h-5 text-orange-500" />
+                    <AlertCircle className="w-4 h-4 text-orange-500" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">Advanced Settings</CardTitle>
-                    <CardDescription>Sensitivity & risk configuration</CardDescription>
+                    <h3 className="text-sm font-medium">Advanced Settings</h3>
+                    <p className="text-xs text-[hsl(var(--portal-text-muted))]">Sensitivity & risk configuration</p>
                   </div>
                 </div>
-                {advancedOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                {advancedOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </div>
-            </CardHeader>
+            </div>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="space-y-4 pt-0">
+            <div className="p-4 pt-0 space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Sentiment Sensitivity</Label>
@@ -607,12 +601,12 @@ export function Step2OrgProfile({
                   </Select>
                 </div>
               </div>
-            </CardContent>
+            </div>
           </CollapsibleContent>
-        </Card>
+        </div>
       </Collapsible>
 
-      <div className="flex justify-between">
+      <div className="flex justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
         <V3Button type="button" variant="secondary" onClick={onBack}>
           Back
         </V3Button>

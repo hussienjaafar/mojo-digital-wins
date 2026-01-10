@@ -20,13 +20,10 @@ import {
   AlertTriangle, 
   XCircle,
   Building2,
-  CheckCircle2,
-  Clock,
-  Sparkles
+  Clock
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 
 export function OnboardingWizardRedesign() {
   const { toast } = useToast();
@@ -110,7 +107,7 @@ export function OnboardingWizardRedesign() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between">
         <Button 
@@ -140,66 +137,6 @@ export function OnboardingWizardRedesign() {
           </div>
         )}
       </div>
-
-      {/* Hero Section */}
-      <motion.div 
-        className="relative overflow-hidden rounded-2xl border border-[hsl(var(--portal-border))] bg-gradient-to-br from-[hsl(var(--portal-bg-card))] to-[hsl(var(--portal-bg-elevated))]"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        {/* Background decoration */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[hsl(var(--portal-accent-blue))]/10 to-transparent rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-[hsl(var(--portal-accent-purple))]/10 to-transparent rounded-full blur-3xl" />
-        
-        <div className="relative p-8">
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Left: Title + Progress */}
-            <div className="flex-1 space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-[hsl(var(--portal-accent-purple))]" />
-                  <span className="text-sm font-medium text-[hsl(var(--portal-accent-purple))]">
-                    {resumeOrgId ? 'Resume Setup' : 'New Client Setup'}
-                  </span>
-                </div>
-                <h1 className="text-2xl lg:text-3xl font-bold text-[hsl(var(--portal-text-primary))]">
-                  {currentStepConfig?.title || 'Organization Setup'}
-                </h1>
-                <p className="text-[hsl(var(--portal-text-secondary))] max-w-lg">
-                  {currentStepConfig?.description || 'Complete all steps to fully onboard your new client'}
-                </p>
-              </div>
-              
-              {/* Progress bar */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-[hsl(var(--portal-text-secondary))]">
-                    Step {currentStep} of {WIZARD_STEPS.length}
-                  </span>
-                  <span className="font-medium text-[hsl(var(--portal-text-primary))]">
-                    {Math.round(progressPercentage)}% complete
-                  </span>
-                </div>
-                <Progress 
-                  value={progressPercentage} 
-                  className="h-2 bg-[hsl(var(--portal-bg-tertiary))]"
-                />
-              </div>
-            </div>
-
-            {/* Right: Step indicators */}
-            <div className="lg:w-[340px]">
-              <WizardStepIndicator
-                currentStep={currentStep}
-                completedSteps={completedSteps}
-                onStepClick={goToStep}
-                canNavigateToStep={canNavigateToStep}
-              />
-            </div>
-          </div>
-        </div>
-      </motion.div>
 
       {/* Blocking reason banner */}
       <AnimatePresence>
@@ -236,63 +173,123 @@ export function OnboardingWizardRedesign() {
         )}
       </AnimatePresence>
 
-      {/* Step Content */}
+      {/* Main Onboarding Card - Integrated Layout */}
       <motion.div 
-        key={currentStep}
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -20 }}
-        transition={{ duration: 0.3 }}
-        className="max-w-3xl"
+        className="rounded-2xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))] overflow-hidden"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
       >
-        {currentStep === 1 && (
-          <Step1CreateOrg 
-            initialData={stepData.step1 as Partial<CreateOrgData>}
-            onComplete={handleStep1Complete} 
-          />
-        )}
-        {currentStep === 2 && organizationId && (
-          <Step2OrgProfile 
-            organizationId={organizationId} 
-            websiteUrl={websiteUrl}
-            initialData={stepData.step2 as Partial<OrgProfileData>}
-            onComplete={handleStep2Complete} 
-            onBack={handleBack} 
-          />
-        )}
-        {currentStep === 3 && organizationId && (
-          <Step3Users 
-            organizationId={organizationId} 
-            stepData={stepData.step3 as Record<string, unknown> || {}} 
-            onComplete={handleStepComplete} 
-            onBack={handleBack} 
-          />
-        )}
-        {currentStep === 4 && organizationId && (
-          <Step4Integrations 
-            organizationId={organizationId} 
-            stepData={stepData.step4 as Record<string, unknown> || {}} 
-            onComplete={handleStepComplete} 
-            onBack={handleBack} 
-          />
-        )}
-        {currentStep === 5 && organizationId && (
-          <Step5Watchlists 
-            organizationId={organizationId} 
-            stepData={stepData.step5 as Record<string, unknown> || {}} 
-            onComplete={handleStepComplete} 
-            onBack={handleBack} 
-          />
-        )}
-        {currentStep === 6 && organizationId && (
-          <Step6Activation 
-            organizationId={organizationId} 
-            organizationSlug={organizationSlug} 
-            stepData={stepData.step6 as Record<string, unknown> || {}} 
-            onComplete={handleStepComplete} 
-            onBack={handleBack} 
-          />
-        )}
+        <div className="flex min-h-[600px]">
+          {/* Main Content Area */}
+          <div className="flex-1 flex flex-col">
+            {/* Step Header */}
+            <div className="px-8 pt-6 pb-4 border-b border-[hsl(var(--portal-border))]">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-xs font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wider">
+                  Step {currentStep} of {WIZARD_STEPS.length}
+                </div>
+                <h1 className="text-xl font-semibold text-[hsl(var(--portal-text-primary))]">
+                  {currentStepConfig?.title || 'Organization Setup'}
+                </h1>
+                <p className="text-sm text-[hsl(var(--portal-text-secondary))]">
+                  {currentStepConfig?.description || 'Complete all steps to fully onboard your new client'}
+                </p>
+                {/* Subtle progress bar */}
+                <Progress 
+                  value={progressPercentage} 
+                  className="h-1 bg-[hsl(var(--portal-bg-tertiary))]"
+                />
+              </div>
+            </div>
+
+            {/* Form Content Area */}
+            <div className="flex-1 px-8 py-6 overflow-y-auto">
+              <AnimatePresence mode="wait">
+                <motion.div 
+                  key={currentStep}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {currentStep === 1 && (
+                    <Step1CreateOrg 
+                      initialData={stepData.step1 as Partial<CreateOrgData>}
+                      onComplete={handleStep1Complete} 
+                    />
+                  )}
+                  {currentStep === 2 && organizationId && (
+                    <Step2OrgProfile 
+                      organizationId={organizationId} 
+                      websiteUrl={websiteUrl}
+                      initialData={stepData.step2 as Partial<OrgProfileData>}
+                      onComplete={handleStep2Complete} 
+                      onBack={handleBack} 
+                    />
+                  )}
+                  {currentStep === 3 && organizationId && (
+                    <Step3Users 
+                      organizationId={organizationId} 
+                      stepData={stepData.step3 as Record<string, unknown> || {}} 
+                      onComplete={handleStepComplete} 
+                      onBack={handleBack} 
+                    />
+                  )}
+                  {currentStep === 4 && organizationId && (
+                    <Step4Integrations 
+                      organizationId={organizationId} 
+                      stepData={stepData.step4 as Record<string, unknown> || {}} 
+                      onComplete={handleStepComplete} 
+                      onBack={handleBack} 
+                    />
+                  )}
+                  {currentStep === 5 && organizationId && (
+                    <Step5Watchlists 
+                      organizationId={organizationId} 
+                      stepData={stepData.step5 as Record<string, unknown> || {}} 
+                      onComplete={handleStepComplete} 
+                      onBack={handleBack} 
+                    />
+                  )}
+                  {currentStep === 6 && organizationId && (
+                    <Step6Activation 
+                      organizationId={organizationId} 
+                      organizationSlug={organizationSlug} 
+                      stepData={stepData.step6 as Record<string, unknown> || {}} 
+                      onComplete={handleStepComplete} 
+                      onBack={handleBack} 
+                    />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Right Sidebar - Step Progress */}
+          <div className="w-[280px] border-l border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]/50 p-4 flex flex-col">
+            <div className="text-xs font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wider mb-3 px-1">
+              Progress
+            </div>
+            <div className="flex-1">
+              <WizardStepIndicator
+                currentStep={currentStep}
+                completedSteps={completedSteps}
+                onStepClick={goToStep}
+                canNavigateToStep={canNavigateToStep}
+                compact
+              />
+            </div>
+            <div className="pt-4 mt-4 border-t border-[hsl(var(--portal-border))]">
+              <div className="flex items-center justify-between text-xs text-[hsl(var(--portal-text-muted))]">
+                <span>{completedSteps.length} of {WIZARD_STEPS.length} complete</span>
+                <span className="font-medium text-[hsl(var(--portal-text-secondary))]">
+                  {Math.round(progressPercentage)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </motion.div>
     </div>
   );
