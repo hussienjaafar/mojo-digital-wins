@@ -183,23 +183,25 @@ export function OnboardingWizardRedesign() {
         <div className="flex min-h-[600px]">
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col">
-            {/* Step Header */}
-            <div className="px-8 pt-6 pb-4 border-b border-[hsl(var(--portal-border))]">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-xs font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wider">
+            {/* Step Header - Clean, minimal design */}
+            <div className="px-8 pt-6 pb-5 border-b border-[hsl(var(--portal-border))]">
+              <div className="space-y-2">
+                <span className="text-[11px] font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-widest">
                   Step {currentStep} of {WIZARD_STEPS.length}
-                </div>
-                <h1 className="text-xl font-semibold text-[hsl(var(--portal-text-primary))]">
+                </span>
+                <h1 className="text-lg font-semibold text-[hsl(var(--portal-text-primary))] tracking-tight">
                   {currentStepConfig?.title || 'Organization Setup'}
                 </h1>
-                <p className="text-sm text-[hsl(var(--portal-text-secondary))]">
+                <p className="text-[13px] text-[hsl(var(--portal-text-secondary))] leading-relaxed">
                   {currentStepConfig?.description || 'Complete all steps to fully onboard your new client'}
                 </p>
                 {/* Subtle progress bar */}
-                <Progress 
-                  value={progressPercentage} 
-                  className="h-1 bg-[hsl(var(--portal-bg-tertiary))]"
-                />
+                <div className="pt-2">
+                  <Progress 
+                    value={progressPercentage} 
+                    className="h-0.5 bg-[hsl(var(--portal-bg-tertiary))]"
+                  />
+                </div>
               </div>
             </div>
 
