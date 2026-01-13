@@ -20,29 +20,34 @@ interface FlatSearchResultsProps {
   isEffectivelyExpanded?: boolean;
 }
 
-// Escape HTML entities to prevent XSS
-function escapeHtml(str: string): string {
-  const htmlEntities: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  };
-  return str.replace(/[&<>"']/g, (char) => htmlEntities[char] || char);
-}
-
 // Escape regex special characters
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function highlightMatch(text: string, search: string): string {
-  const escapedText = escapeHtml(text);
-  if (!search) return escapedText;
-  const escapedSearch = escapeRegex(escapeHtml(search));
-  const regex = new RegExp(`(${escapedSearch})`, 'gi');
-  return escapedText.replace(regex, '<mark class="bg-[hsl(var(--portal-accent-blue)/0.3)] text-[hsl(var(--portal-text-primary))] rounded px-0.5 font-semibold">$1</mark>');
+// Safe React component for highlighting search matches - avoids dangerouslySetInnerHTML
+function HighlightedText({ text, search }: { text: string; search: string }) {
+  if (!search) return <>{text}</>;
+  
+  const escapedSearch = escapeRegex(search);
+  const parts = text.split(new RegExp(`(${escapedSearch})`, 'gi'));
+  
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === search.toLowerCase() ? (
+          <mark
+            key={i}
+            className="bg-[hsl(var(--portal-accent-blue)/0.3)] text-[hsl(var(--portal-text-primary))] rounded px-0.5 font-semibold"
+          >
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
 }
 
 export function FlatSearchResults({
@@ -79,10 +84,7 @@ export function FlatSearchResults({
       )}
       <SidebarGroupContent>
         <SidebarMenu className="space-y-1">
-          {items.map((item, index) => {
-            const itemTitle = highlightMatch(item.title, searchTerm);
-            
-            return (
+          {items.map((item, index) => (
               <SidebarMenuItem key={item.value}>
                 <SidebarMenuButton
                   onClick={() => onTabChange(item.value)}
@@ -112,15 +114,13 @@ export function FlatSearchResults({
                       : "text-[hsl(var(--portal-text-secondary))]"
                   )} />
                   {isEffectivelyExpanded && (
-                    <span 
-                      className="flex-1 truncate text-sm"
-                      dangerouslySetInnerHTML={{ __html: itemTitle }}
-                    />
+                    <span className="flex-1 truncate text-sm">
+                      <HighlightedText text={item.title} search={searchTerm} />
+                    </span>
                   )}
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            );
-          })}
+            ))}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
