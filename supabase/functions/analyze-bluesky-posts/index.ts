@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parseJsonBody, z } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -330,7 +331,21 @@ serve(async (req) => {
     console.log('🤖 Starting AI analysis of Bluesky posts (proper nouns only) - batch size 100...');
 
     // PHASE 2: Increased batch size from 30 to 100 for 3x throughput
-    const { batchSize = 100, minRelevance = 0.01 } = await req.json().catch(() => ({ batchSize: 100, minRelevance: 0.01 }));
+    const bodySchema = z.object({
+      batchSize: z.coerce.number().int().min(1).max(500).optional(),
+      minRelevance: z.coerce.number().min(0).max(1).optional(),
+    }).passthrough();
+
+    const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: true, allowInvalidJson: true });
+    if (!parsedBody.ok) {
+      return new Response(
+        JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const batchSize = parsedBody.data.batchSize ?? 100;
+    const minRelevance = parsedBody.data.minRelevance ?? 0.01;
 
     // Get unprocessed posts
     const { data: posts, error: fetchError } = await supabase

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { parseJsonBody, uuidSchema, isoDateSchema, z } from "../_shared/validators.ts";
 
 // Use restricted CORS
 const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
@@ -102,14 +103,24 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const { organization_id, start_date, end_date, mode } = await req.json();
 
-    if (!organization_id) {
+    const bodySchema = z.object({
+      organization_id: uuidSchema,
+      start_date: isoDateSchema.optional(),
+      end_date: isoDateSchema.optional(),
+      mode: z.string().trim().max(30).optional(),
+    }).passthrough();
+
+    const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: false });
+    if (!parsedBody.ok) {
       return new Response(
-        JSON.stringify({ error: 'organization_id is required' }),
+        JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const { organization_id, start_date, end_date, mode } = parsedBody.data;
+
 
     console.log(`[META SYNC] Starting for organization: ${organization_id}, mode: ${mode || 'default'}`);
 

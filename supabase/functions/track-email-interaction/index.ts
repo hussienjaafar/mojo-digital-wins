@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { parseJsonBody, uuidSchema, z } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +17,28 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { 
+    const bodySchema = z.object({
+      organization_id: uuidSchema,
+      donor_email: z.string().trim().email().max(255).optional().nullable(),
+      interaction_type: z.enum(['open', 'click']),
+      campaign_id: z.string().trim().max(100).optional().nullable(),
+      email_subject: z.string().trim().max(500).optional().nullable(),
+      link_url: z.string().trim().max(2000).optional().nullable(),
+      utm_source: z.string().trim().max(100).optional().nullable(),
+      utm_medium: z.string().trim().max(100).optional().nullable(),
+      utm_campaign: z.string().trim().max(200).optional().nullable(),
+      refcode: z.string().trim().max(200).optional().nullable(),
+    }).passthrough();
+
+    const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: false });
+    if (!parsedBody.ok) {
+      return new Response(
+        JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const {
       organization_id,
       donor_email,
       interaction_type, // 'open' | 'click'
@@ -27,11 +49,8 @@ serve(async (req) => {
       utm_medium,
       utm_campaign,
       refcode,
-    } = await req.json();
+    } = parsedBody.data;
 
-    if (!organization_id || !interaction_type) {
-      throw new Error('organization_id and interaction_type are required');
-    }
 
     console.log(`Tracking email ${interaction_type} for organization: ${organization_id}`);
 

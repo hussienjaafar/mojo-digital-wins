@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { parseJsonBody, uuidSchema, isoDateSchema, z } from "../_shared/validators.ts";
 
 // Use restricted CORS
 const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
@@ -235,14 +236,24 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    const body = await req.json();
-    const { organization_id, force_full_sync = false, since_date = null } = body;
+    const bodySchema = z.object({
+      organization_id: uuidSchema,
+      force_full_sync: z.coerce.boolean().optional().default(false),
+      since_date: isoDateSchema.nullable().optional(),
+    }).passthrough();
+
+    const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: false });
+    if (!parsedBody.ok) {
+      return new Response(
+        JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { organization_id, force_full_sync, since_date } = parsedBody.data;
     
     console.log(`[SMS SYNC] Starting sync for org: ${organization_id}, force_full: ${force_full_sync}, since: ${since_date}`);
 
-    if (!organization_id) {
-      throw new Error('organization_id is required');
-    }
 
     // --- AUTH CHECK ---
     // Either cron secret, scheduled job header, or user JWT with org membership

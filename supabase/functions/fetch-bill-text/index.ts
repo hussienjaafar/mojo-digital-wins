@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { parseJsonBody, z } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,7 +16,21 @@ serve(async (req) => {
   }
 
   try {
-    const { congress, billType, billNumber } = await req.json();
+    const bodySchema = z.object({
+      congress: z.coerce.number().int().min(1).max(300),
+      billType: z.string().trim().min(1).max(20),
+      billNumber: z.string().trim().min(1).max(20),
+    }).passthrough();
+
+    const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: false });
+    if (!parsedBody.ok) {
+      return new Response(
+        JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { congress, billType, billNumber } = parsedBody.data;
 
     console.log(`Fetching full text for ${billType}${billNumber} from Congress ${congress}`);
 

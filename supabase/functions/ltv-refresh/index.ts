@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { parseJsonBody, uuidSchema, z } from "../_shared/validators.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,10 +17,21 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { organization_id, lookback_days = 365 } = await req.json();
-    if (!organization_id) {
-      return new Response(JSON.stringify({ error: "organization_id is required" }), { status: 400, headers: corsHeaders });
+    const bodySchema = z.object({
+      organization_id: uuidSchema,
+      lookback_days: z.coerce.number().int().min(1).max(3650).optional().default(365),
+    }).passthrough();
+
+    const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: false });
+    if (!parsedBody.ok) {
+      return new Response(
+        JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
+        { status: 400, headers: corsHeaders }
+      );
     }
+
+    const { organization_id, lookback_days } = parsedBody.data;
+
 
     const { data, error } = await supabase.rpc("refresh_donor_ltv_predictions", {
       p_org: organization_id,

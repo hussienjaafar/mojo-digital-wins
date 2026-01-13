@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parseJsonBody, uuidSchema, z } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,11 +13,21 @@ serve(async (req) => {
   }
 
   try {
-    const { organizationId, websiteUrl } = await req.json();
+    const bodySchema = z.object({
+      organizationId: uuidSchema,
+      websiteUrl: z.string().trim().url().max(2000),
+    }).passthrough();
 
-    if (!organizationId || !websiteUrl) {
-      throw new Error('organizationId and websiteUrl are required');
+    const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: false });
+    if (!parsedBody.ok) {
+      return new Response(
+        JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    const { organizationId, websiteUrl } = parsedBody.data;
+
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

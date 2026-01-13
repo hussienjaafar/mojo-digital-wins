@@ -30,6 +30,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { parseJsonBody, uuidSchema, isoDateSchema, z } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -185,10 +186,25 @@ serve(async (req) => {
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Parse request body first
-    const body = await req.json();
-    const { organization_id, start_date, end_date, mode, check_freshness_only } = body;
-    
+    // Parse + validate request body first
+    const bodySchema = z.object({
+      organization_id: uuidSchema,
+      start_date: isoDateSchema.optional(),
+      end_date: isoDateSchema.optional(),
+      mode: z.string().trim().max(30).optional(),
+      check_freshness_only: z.coerce.boolean().optional(),
+    }).passthrough();
+
+    const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: false });
+    if (!parsedBody.ok) {
+      return new Response(
+        JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { organization_id, start_date, end_date, mode, check_freshness_only } = parsedBody.data;
+
     // --- SECURITY: Authentication checks ---
     const internalKey = req.headers.get('x-internal-key');
     const isInternalCall = mode === 'backfill' && organization_id && internalKey === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.slice(0, 20);
