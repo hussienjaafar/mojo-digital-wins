@@ -115,6 +115,7 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
       label: "Creative Intelligence",
       items: [
         { title: "Creative Analysis", url: "/client/creative-intelligence", icon: Sparkles },
+        { title: "Ad Performance", url: "/client/ad-performance", icon: Target },
         { title: "A/B Test Analytics", url: "/client/ab-tests", icon: FlaskConical },
       ],
     },

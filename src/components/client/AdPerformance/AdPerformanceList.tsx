@@ -1,56 +1,80 @@
-import React from 'react';
-import { AdPerformanceData } from '../../../queries/useAdPerformanceQuery';
-import { AdPerformanceCard } from './AdPerformanceCard'; 
-import { AdPerformanceCardSkeleton } from './AdPerformanceCardSkeleton'; // Import the skeleton
-import { V3EmptyState } from '../../../design-system/V3EmptyState'; // Assuming path to V3EmptyState
-import { V3ErrorState } from '../../../design-system/V3ErrorState'; // Assuming path to V3ErrorState
+/**
+ * AdPerformanceList Component
+ *
+ * Renders a list of AdPerformanceCard components with loading,
+ * empty, and error states.
+ */
+
+import { AdPerformanceCard } from './AdPerformanceCard';
+import { AdPerformanceCardSkeleton } from './AdPerformanceCardSkeleton';
+import { PortalEmptyState } from '@/components/portal/PortalEmptyState';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { BarChart3, AlertCircle, RefreshCw } from 'lucide-react';
+import type { AdPerformanceData } from '@/types/adPerformance';
 
 interface AdPerformanceListProps {
-  ads?: AdPerformanceData[]; // Make optional to handle loading state
+  ads: AdPerformanceData[];
   isLoading: boolean;
-  isError: boolean;
-  error?: Error | null;
-  // Placeholder for filter/sort controls if they were passed down
-  // sortBy: string;
-  // sortOrder: 'asc' | 'desc';
+  error: Error | null;
+  onRetry?: () => void;
+  onSelectAd?: (ad: AdPerformanceData) => void;
 }
 
-export const AdPerformanceList: React.FC<AdPerformanceListProps> = ({ ads, isLoading, isError, error }) => {
+export function AdPerformanceList({
+  ads,
+  isLoading,
+  error,
+  onRetry,
+  onSelectAd,
+}: AdPerformanceListProps) {
+  // Loading state
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[...Array(6)].map((_, i) => ( // Show 6 skeletons while loading
+      <div className="space-y-4" role="status" aria-label="Loading ad performance data">
+        {Array.from({ length: 3 }).map((_, i) => (
           <AdPerformanceCardSkeleton key={i} />
         ))}
       </div>
     );
   }
 
-  if (isError) {
+  // Error state with retry
+  if (error) {
     return (
-      <V3ErrorState
-        title="Failed to Load Ad Performance"
-        message={error?.message || "An unexpected error occurred. Please try again."}
-        onRetry={() => window.location.reload()} // Simple reload for retry, can be more sophisticated
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Error loading ad performance</AlertTitle>
+        <AlertDescription className="flex items-center justify-between">
+          <span>{error.message}</span>
+          {onRetry && (
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          )}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  // Empty state
+  if (ads.length === 0) {
+    return (
+      <PortalEmptyState
+        icon={BarChart3}
+        title="No Ad Performance Data"
+        description="No ads with spend were found in the selected date range. Try expanding your date range or check that your Meta Ads integration is syncing properly."
       />
     );
   }
 
-  if (!ads || ads.length === 0) {
-    return (
-      <V3EmptyState
-        title="No Ad Performance Data Available"
-        message="No ad performance data was found for the selected period. Try adjusting your filters or date range, or launching new campaigns."
-      />
-    );
-  }
-
+  // Render ads list
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="space-y-4">
       {ads.map((ad) => (
-        <AdPerformanceCard key={ad.ad_id} ad={ad} />
+        <AdPerformanceCard key={ad.id} ad={ad} onSelect={onSelectAd} />
       ))}
     </div>
   );
-};
-
+}

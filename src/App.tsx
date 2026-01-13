@@ -66,6 +66,8 @@ const ClientCreativeIntelligence = lazy(() => import("./pages/ClientCreativeInte
 const ClientABTests = lazy(() => import("./pages/ClientABTests"));
 const ClientRecurringHealth = lazy(() => import("./pages/ClientRecurringHealth"));
 const ClientNewsTrends = lazy(() => import("./pages/ClientNewsTrends"));
+const ClientAttribution = lazy(() => import("./pages/ClientAttribution"));
+const ClientAdPerformance = lazy(() => import("./pages/ClientAdPerformance"));
 
 const queryClient = new QueryClient();
 
@@ -135,6 +137,7 @@ const AppContent = () => {
             <Route path="/client/ab-tests" element={<ClientABTests />} />
             <Route path="/client/recurring-health" element={<ClientRecurringHealth />} />
             <Route path="/client/news-trends" element={<ClientNewsTrends />} />
+            <Route path="/client/ad-performance" element={<ClientAdPerformance />} />
             <Route path="/access-denied" element={<AccessDenied />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

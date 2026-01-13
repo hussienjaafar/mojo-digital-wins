@@ -1,126 +1,259 @@
-import React from 'react';
-import { AdPerformanceData } from '../../queries/useAdPerformanceQuery'; // Adjust path as needed
-// Assuming these are available in a shared design system
-import { V3Card } from '../../../design-system/V3Card'; 
-import { V3MetricChip } from '../../../design-system/V3MetricChip';
-import { V3Badge } from '../../../design-system/V3Badge'; 
-import { ChevronDownIcon } from '@radix-ui/react-icons'; 
-import * as Accordion from '@radix-ui/react-accordion'; 
+/**
+ * AdPerformanceCard Component
+ *
+ * Displays individual ad performance metrics in a card format.
+ * Shows creative preview, key metrics, and expandable message details.
+ */
 
-// Simple utility for formatting currency and percentage for demonstration
-const formatCurrency = (value: number | undefined | null) => {
-  if (value === undefined || value === null || isNaN(value)) return 'N/A';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-};
-
-const formatPercentage = (value: number | undefined | null) => {
-  if (value === undefined || value === null || isNaN(value)) return 'N/A';
-  return new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value / 100);
-};
+import { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  ChevronDown,
+  DollarSign,
+  Eye,
+  MousePointer,
+  Users,
+  TrendingUp,
+  AlertTriangle,
+  Video,
+  Image as ImageIcon,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { AdPerformanceData } from '@/types/adPerformance';
+import {
+  formatCurrency,
+  formatPercentage,
+  formatRoas,
+  formatNumber,
+  getTierColor,
+  getTierLabel,
+  getCardAccentColor,
+  getStatusBadgeVariant,
+  getRoasColor,
+  isLowSpend,
+} from '@/utils/adPerformance';
 
 interface AdPerformanceCardProps {
   ad: AdPerformanceData;
+  onSelect?: (ad: AdPerformanceData) => void;
 }
 
-export const AdPerformanceCard: React.FC<AdPerformanceCardProps> = ({ ad }) => {
-  const isLowSpend = ad.spend < 50; // Example threshold for statistical caution
-
-  // Determine badge variant for status
-  const getStatusBadgeVariant = (status: AdPerformanceData['status']) => {
-    switch (status) {
-      case 'ACTIVE': return 'success';
-      case 'PAUSED': return 'warning';
-      case 'ARCHIVED': return 'default';
-      default: return 'default';
-    }
-  };
-
-  // Determine card accent based on performance tier
-  const getCardAccent = (tier?: AdPerformanceData['performance_tier']) => {
-    switch (tier) {
-      case 'TOP_PERFORMER': return 'green';
-      case 'STRONG': return 'blue';
-      case 'NEEDS_IMPROVEMENT': return 'red';
-      case 'AVERAGE': return 'amber';
-      default: return 'default';
-    }
-  };
+export function AdPerformanceCard({ ad, onSelect }: AdPerformanceCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const lowSpend = isLowSpend(ad);
+  const isVideo = ad.creative_type === 'video';
 
   return (
-    <V3Card accent={getCardAccent(ad.performance_tier)} className="p-4 flex flex-col space-y-4">
-      <div className="flex items-center space-x-4">
-        {ad.creative_thumbnail_url && (
-          <img
-            src={ad.creative_thumbnail_url}
-            alt={`Thumbnail for ${ad.ref_code}`}
-            className="w-16 h-16 object-cover rounded"
-          />
-        )}
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold">{ad.ref_code}</h3>
-          <div className="flex items-center space-x-2 text-sm text-gray-500">
-            <V3Badge variant={getStatusBadgeVariant(ad.status)}>{ad.status}</V3Badge>
-            {isLowSpend && (
-              <V3Badge variant="info" tooltip="Statistical Caution: Results may not be significant due to low spend.">
-                Low Spend <span className="ml-1">ⓘ</span>
-              </V3Badge>
+    <Card
+      className={cn(
+        'overflow-hidden hover:shadow-lg transition-all duration-200',
+        getCardAccentColor(ad.performance_tier),
+        onSelect && 'cursor-pointer'
+      )}
+      onClick={() => onSelect?.(ad)}
+    >
+      <CardContent className="p-0">
+        <div className="flex flex-col md:flex-row">
+          {/* Thumbnail */}
+          <div className="relative w-full md:w-40 h-32 md:h-auto bg-muted flex-shrink-0">
+            {ad.creative_thumbnail_url ? (
+              <img
+                src={ad.creative_thumbnail_url}
+                alt={ad.ad_copy_headline || 'Ad creative'}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                {isVideo ? (
+                  <Video className="h-10 w-10 text-muted-foreground" />
+                ) : (
+                  <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                )}
+              </div>
+            )}
+
+            {/* Performance tier badge */}
+            {ad.performance_tier && (
+              <Badge
+                className={cn('absolute top-2 right-2 text-xs', getTierColor(ad.performance_tier))}
+              >
+                {getTierLabel(ad.performance_tier)}
+              </Badge>
             )}
           </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <V3MetricChip label="Spend" value={formatCurrency(ad.spend)} />
-        <V3MetricChip label="Raised" value={ad.raised !== undefined ? formatCurrency(ad.raised) : 'N/A'} />
-        <V3MetricChip
-          label="ROAS"
-          value={ad.roas !== undefined && !isNaN(ad.roas) ? `${ad.roas.toFixed(2)}x` : 'N/A'}
-          // Add tooltip for 0 Raised if ROAS is 0
-          tooltip={ad.raised === 0 ? 'No attributed donations yet' : undefined}
-        />
-        {/* Only show CPA if it's a valid number and not infinity (e.g., spend > 0 and 0 conversions) */}
-        {ad.cpa !== undefined && ad.cpa !== null && !isNaN(ad.cpa) && ad.cpa !== Infinity && (
-          <V3MetricChip label="CPA" value={formatCurrency(ad.cpa)} />
-        )}
-        {ad.ctr !== undefined && !isNaN(ad.ctr) && <V3MetricChip label="CTR" value={formatPercentage(ad.ctr)} />}
-        {ad.cpm !== undefined && !isNaN(ad.cpm) && <V3MetricChip label="CPM" value={formatCurrency(ad.cpm)} />}
-        {/* Add more metrics as needed */}
-      </div>
-
-      <Accordion.Root type="single" collapsible>
-        <Accordion.Item value="message-details">
-          <Accordion.Header className="flex justify-between items-center w-full py-2 group">
-            <h4 className="text-md font-medium">Message Details</h4>
-            <ChevronDownIcon className="w-5 h-5 transition-transform duration-300 group-data-[state=open]:rotate-180" />
-          </Accordion.Header>
-          <Accordion.Content className="overflow-hidden data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
-            <div className="pt-2">
-              {/* MessagePerformanceView will go here when implemented */}
-              <p className="text-sm text-gray-700">
-                **Headline:** {ad.ad_copy_headline || 'N/A'}
-              </p>
-              <p className="text-sm text-gray-700 mt-1">
-                **Primary Text:** {ad.ad_copy_primary_text || 'N/A'}
-              </p>
-              <p className="text-sm text-gray-700 mt-1">
-                **Description:** {ad.ad_copy_description || 'N/A'}
-              </p>
-              {ad.performance_tier && (
-                <V3Badge variant={getCardAccent(ad.performance_tier)} className="mt-2">
-                  Performance Tier: {ad.performance_tier.replace(/_/g, ' ')}
-                </V3Badge>
-              )}
-              {ad.key_themes && ad.key_themes.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {ad.key_themes.map((theme, idx) => (
-                    <V3Badge key={idx} variant="default">{theme}</V3Badge>
-                  ))}
+          {/* Content */}
+          <div className="flex-1 p-4">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-sm line-clamp-1">
+                  {ad.ad_copy_headline || ad.refcode || `Ad ${ad.ad_id.slice(0, 8)}`}
+                </h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant={getStatusBadgeVariant(ad.status)} className="text-xs">
+                    {ad.status}
+                  </Badge>
+                  {ad.creative_type && (
+                    <Badge variant="outline" className="text-xs capitalize">
+                      {ad.creative_type}
+                    </Badge>
+                  )}
+                  {lowSpend && (
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Badge variant="secondary" className="text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Low Spend
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs max-w-[200px]">
+                          Statistical caution: Results may not be significant due to low spend
+                          (&lt;$50).
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
-              )}
+              </div>
+
+              {/* ROAS highlight */}
+              <div className="text-right">
+                <div className={cn('text-xl font-bold', getRoasColor(ad.roas))}>
+                  {formatRoas(ad.roas)}
+                </div>
+                <span className="text-xs text-muted-foreground">ROAS</span>
+              </div>
             </div>
-          </Accordion.Content>
-        </Accordion.Item>
-      </Accordion.Root>
-    </V3Card>
+
+            {/* Key Metrics Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              <div>
+                <div className="text-sm font-semibold">{formatCurrency(ad.spend)}</div>
+                <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                  <DollarSign className="h-3 w-3" />
+                  Spend
+                </div>
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-green-600 dark:text-green-400">
+                  {formatCurrency(ad.raised)}
+                </div>
+                <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                  <TrendingUp className="h-3 w-3" />
+                  Raised
+                </div>
+              </div>
+              <div>
+                <div className="text-sm font-semibold">{formatCurrency(ad.cpa)}</div>
+                <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                  <Users className="h-3 w-3" />
+                  CPA
+                </div>
+              </div>
+              <div>
+                <div className="text-sm font-semibold">{formatNumber(ad.impressions)}</div>
+                <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                  <Eye className="h-3 w-3" />
+                  Impr.
+                </div>
+              </div>
+              <div>
+                <div className="text-sm font-semibold">{formatPercentage(ad.ctr)}</div>
+                <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                  <MousePointer className="h-3 w-3" />
+                  CTR
+                </div>
+              </div>
+              <div>
+                <div className="text-sm font-semibold">{ad.unique_donors}</div>
+                <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                  <Users className="h-3 w-3" />
+                  Donors
+                </div>
+              </div>
+            </div>
+
+            {/* Expandable Message Details */}
+            <Collapsible open={isExpanded} onOpenChange={setIsExpanded} className="mt-3">
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between p-0 h-8 text-muted-foreground hover:text-foreground"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="text-xs">Message Details</span>
+                  <ChevronDown
+                    className={cn('h-4 w-4 transition-transform', isExpanded && 'rotate-180')}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2 space-y-2">
+                {ad.ad_copy_headline && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">Headline:</span>
+                    <p className="text-sm">{ad.ad_copy_headline}</p>
+                  </div>
+                )}
+                {ad.ad_copy_primary_text && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">Primary Text:</span>
+                    <p className="text-sm line-clamp-3">{ad.ad_copy_primary_text}</p>
+                  </div>
+                )}
+                {ad.ad_copy_description && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">Description:</span>
+                    <p className="text-sm">{ad.ad_copy_description}</p>
+                  </div>
+                )}
+                {/* AI Analysis Tags */}
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {ad.topic && (
+                    <Badge variant="outline" className="text-xs">
+                      {ad.topic}
+                    </Badge>
+                  )}
+                  {ad.tone && (
+                    <Badge variant="outline" className="text-xs capitalize">
+                      {ad.tone}
+                    </Badge>
+                  )}
+                  {ad.urgency_level && (
+                    <Badge variant="outline" className="text-xs capitalize">
+                      {ad.urgency_level} urgency
+                    </Badge>
+                  )}
+                </div>
+                {ad.key_themes && ad.key_themes.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {ad.key_themes.map((theme, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-xs">
+                        {theme}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
-};
+}
