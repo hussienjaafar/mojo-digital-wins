@@ -191,7 +191,7 @@ describe('ClientShell', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /toggle theme/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /switch to (light|dark) mode/i })).toBeInTheDocument();
       });
     });
   });

@@ -173,8 +173,8 @@ describe('Campaign/Creative Filter End-to-End', () => {
 
       // Filtered net revenue: 47.5 (txn-1 net) - 25 (ALL refunds) = 22.5
       // Filtered spend: 500 (campaign-A Meta only)
-      // ROI = (Revenue - Cost) / Cost = (22.5 - 500) / 500 = -0.955
-      expect(kpis.roi).toBeCloseTo(-0.955, 2);
+      // ROI = Net Revenue / Spend (investment multiplier) = 22.5 / 500 = 0.045
+      expect(kpis.roi).toBeCloseTo(0.045, 2);
     });
 
     it('shows only Meta in channel breakdown when campaign filter active', async () => {
@@ -288,8 +288,8 @@ describe('Campaign/Creative Filter End-to-End', () => {
 
       // Net revenue: 47.5 (txn-1 net) - 25 (ALL refunds, not filtered) = 22.5
       // Spend: 500 (creative-1 Meta only, SMS excluded)
-      // ROI = (Revenue - Cost) / Cost = (22.5 - 500) / 500 = -0.955
-      expect(kpis.roi).toBeCloseTo(-0.955, 2);
+      // ROI = Net Revenue / Spend (investment multiplier) = 22.5 / 500 = 0.045
+      expect(kpis.roi).toBeCloseTo(0.045, 2);
     });
   });
 
@@ -415,11 +415,11 @@ describe('Campaign/Creative Filter End-to-End', () => {
 
       const { kpis } = result.current.data!;
 
-      // ROI = (Revenue - Cost) / Cost
+      // ROI = Net Revenue / Spend (investment multiplier)
       // Net revenue: 22.5 (filtered donations minus ALL refunds)
       // Total spend: 500 (campaign-A Meta only, SMS excluded)
-      // ROI: (22.5 - 500) / 500 = -0.955
-      expect(kpis.roi).toBeCloseTo(-0.955, 2);
+      // ROI: 22.5 / 500 = 0.045
+      expect(kpis.roi).toBeCloseTo(0.045, 2);
     });
   });
 });

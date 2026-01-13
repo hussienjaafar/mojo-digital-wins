@@ -98,10 +98,10 @@ describe('useSuggestedActionsQuery', () => {
       const action = result.current.data?.actions[0];
       expect(action).toBeDefined();
       expect(action).toHaveProperty('id');
-      expect(action).toHaveProperty('title');
-      expect(action).toHaveProperty('description');
-      expect(action).toHaveProperty('urgency');
-      expect(action).toHaveProperty('status');
+      expect(action).toHaveProperty('topic');
+      expect(action).toHaveProperty('sms_copy');
+      expect(action).toHaveProperty('urgency_score');
+      expect(action).toHaveProperty('is_used');
     });
 
     it('exposes dataUpdatedAt timestamp', async () => {

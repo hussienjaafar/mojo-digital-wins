@@ -168,7 +168,7 @@ describe('useClientDashboardMetricsQuery', () => {
   });
 
   describe('ROI Calculation', () => {
-    it('calculates ROI as net revenue divided by total spend', async () => {
+    it('calculates ROI as net revenue divided by total spend (investment multiplier)', async () => {
       const { result } = renderHookWithClient(() =>
         useClientDashboardMetricsQuery(TEST_ORG_ID)
       );
@@ -181,9 +181,9 @@ describe('useClientDashboardMetricsQuery', () => {
       // SMS cost: 100 + 150 = 250
       // Total spend: 1350
       // Net revenue: 188.75
-      // ROI = (Revenue - Cost) / Cost = (188.75 - 1350) / 1350 = -0.86
+      // ROI = Net Revenue / Spend (investment multiplier) = 188.75 / 1350 = 0.14
       expect(kpis.totalSpend).toBe(1350);
-      expect(kpis.roi).toBeCloseTo(-0.86, 1);
+      expect(kpis.roi).toBeCloseTo(0.14, 1);
     });
   });
 
@@ -254,14 +254,14 @@ describe('useClientDashboardMetricsQuery', () => {
       const { sparklines, timeSeries } = result.current.data!;
 
       // ROI sparkline should use netDonations (which is refund-adjusted)
-      // For each day: ROI = (netDonations - spend) / spend
+      // For each day: ROI = netDonations / spend (investment multiplier)
       expect(sparklines.roi.length).toBe(timeSeries.length);
 
       // Find a day with spend to verify ROI calculation
       const dayWithSpend = timeSeries.find(d => d.metaSpend + d.smsSpend > 0);
       if (dayWithSpend) {
         const spend = dayWithSpend.metaSpend + dayWithSpend.smsSpend;
-        const expectedRoi = (dayWithSpend.netDonations - spend) / spend;
+        const expectedRoi = dayWithSpend.netDonations / spend;
         const roiIndex = timeSeries.indexOf(dayWithSpend);
         expect(sparklines.roi[roiIndex].value).toBeCloseTo(expectedRoi, 2);
       }
