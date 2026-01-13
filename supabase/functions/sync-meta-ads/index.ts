@@ -1227,6 +1227,145 @@ serve(async (req) => {
       }
     }
 
+    // ========== NEW: Fetch AD-LEVEL daily metrics for accurate ROAS ==========
+    // This fetches metrics at the ad level (not campaign level) with daily granularity
+    let adLevelRecords = 0;
+
+    console.log(`[AD-LEVEL METRICS] Starting ad-level insights fetch for date range ${dateRanges.since} to ${dateRanges.until}`);
+
+    try {
+      // Fetch account-level insights broken down by ad with daily granularity
+      const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/insights?` +
+        `level=ad&` +
+        `fields=ad_id,ad_name,campaign_id,adset_id,impressions,clicks,spend,reach,cpc,cpm,ctr,frequency,` +
+        `actions,action_values,cost_per_action_type,purchase_roas,quality_ranking,engagement_rate_ranking,conversion_rate_ranking&` +
+        `time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&` +
+        `time_increment=1&` + // Daily granularity
+        `limit=500&` +
+        `access_token=${access_token}`;
+
+      console.log(`[AD-LEVEL METRICS] Fetching from Meta API...`);
+
+      let nextUrl: string | null = adInsightsUrl;
+
+      while (nextUrl) {
+        const adInsightsResponse = await fetch(nextUrl);
+        const adInsightsData = await adInsightsResponse.json();
+
+        if (adInsightsData.error) {
+          console.error(`[AD-LEVEL METRICS] Meta API error:`, adInsightsData.error.message);
+          break;
+        }
+
+        const adInsights = adInsightsData.data || [];
+        console.log(`[AD-LEVEL METRICS] Processing ${adInsights.length} ad-level insight records`);
+
+        for (const insight of adInsights) {
+          if (!insight.ad_id) {
+            console.warn(`[AD-LEVEL METRICS] Skipping record without ad_id`);
+            continue;
+          }
+
+          // Extract conversions from actions
+          let conversions = 0;
+          let conversionValue = 0;
+          let costPerResult = 0;
+
+          if (insight.actions) {
+            const convAction = insight.actions.find((a: any) =>
+              a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+            );
+            if (convAction) conversions = parseInt(convAction.value) || 0;
+          }
+
+          if (insight.action_values) {
+            const valueAction = insight.action_values.find((a: any) =>
+              a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+            );
+            if (valueAction) conversionValue = parseFloat(valueAction.value) || 0;
+          }
+
+          if (insight.cost_per_action_type) {
+            const cprAction = insight.cost_per_action_type.find((a: any) =>
+              a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+            );
+            if (cprAction) costPerResult = parseFloat(cprAction.value) || 0;
+          }
+
+          // Get Meta's purchase_roas (matches Ads Manager)
+          const metaRoas = insight.purchase_roas?.[0]?.value
+            ? parseFloat(insight.purchase_roas[0].value)
+            : null;
+
+          // Normalize CTR to decimal (Meta returns as percentage)
+          const normalizedCtr = (parseFloat(insight.ctr) || 0) / 100;
+
+          // Look up creative_id from meta_creative_insights if we have it
+          let creativeId: string | null = null;
+          const { data: creativeMapping } = await supabase
+            .from('meta_creative_insights')
+            .select('creative_id')
+            .eq('organization_id', organization_id)
+            .eq('ad_id', insight.ad_id)
+            .limit(1)
+            .single();
+
+          if (creativeMapping?.creative_id) {
+            creativeId = creativeMapping.creative_id;
+          }
+
+          // Upsert to meta_ad_metrics_daily
+          const { error: dailyError } = await supabase
+            .from('meta_ad_metrics_daily')
+            .upsert({
+              organization_id,
+              ad_account_id: ad_account_id.replace('act_', ''), // Store without prefix
+              date: insight.date_start,
+              ad_id: insight.ad_id,
+              campaign_id: insight.campaign_id,
+              adset_id: insight.adset_id || null,
+              creative_id: creativeId,
+              ad_name: insight.ad_name || null,
+              spend: parseFloat(insight.spend) || 0,
+              impressions: parseInt(insight.impressions) || 0,
+              clicks: parseInt(insight.clicks) || 0,
+              reach: parseInt(insight.reach) || 0,
+              cpc: parseFloat(insight.cpc) || null,
+              cpm: parseFloat(insight.cpm) || null,
+              ctr: normalizedCtr || null,
+              frequency: parseFloat(insight.frequency) || null,
+              conversions,
+              conversion_value: conversionValue,
+              cost_per_result: costPerResult || null,
+              meta_roas: metaRoas,
+              quality_ranking: insight.quality_ranking || null,
+              engagement_ranking: insight.engagement_rate_ranking || null,
+              conversion_ranking: insight.conversion_rate_ranking || null,
+              synced_at: new Date().toISOString(),
+            }, {
+              onConflict: 'organization_id,ad_account_id,date,ad_id'
+            });
+
+          if (dailyError) {
+            console.error(`[AD-LEVEL METRICS] Error storing ad ${insight.ad_id} on ${insight.date_start}:`, dailyError);
+          } else {
+            adLevelRecords++;
+          }
+        }
+
+        // Handle pagination
+        nextUrl = adInsightsData.paging?.next || null;
+        if (nextUrl) {
+          console.log(`[AD-LEVEL METRICS] Fetching next page...`);
+        }
+      }
+
+      console.log(`[AD-LEVEL METRICS] Completed. Stored ${adLevelRecords} ad-level daily records.`);
+
+    } catch (adLevelError) {
+      console.error(`[AD-LEVEL METRICS] Error fetching ad-level insights:`, adLevelError);
+    }
+
     // Update freshness info
     freshnessInfo.actualDataRange.start = earliestDataDate;
     freshnessInfo.actualDataRange.end = latestDataDate;
@@ -1266,6 +1405,7 @@ serve(async (req) => {
     console.log(`Campaigns: ${campaigns.length}`);
     console.log(`Creatives processed: ${creativesProcessed}`);
     console.log(`Total insight records: ${totalInsightRecords}`);
+    console.log(`Ad-level daily records: ${adLevelRecords}`);
     console.log(`Demographic breakdowns captured: ${demographicRecords}`);
     console.log(`Placement breakdowns captured: ${placementRecords}`);
     console.log(`Actual data range: ${earliestDataDate || 'none'} to ${latestDataDate || 'none'}`);
@@ -1274,10 +1414,11 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        success: true, 
+        success: true,
         campaigns: campaigns.length,
         creatives_processed: creativesProcessed,
         insight_records: totalInsightRecords,
+        ad_level_daily_records: adLevelRecords,
         demographic_breakdowns: demographicRecords,
         placement_breakdowns: placementRecords,
         data_freshness: {
@@ -1290,7 +1431,7 @@ serve(async (req) => {
           meta_api_latency_hours: freshness.latencyHours,
           freshness_message: freshness.message
         },
-        message: 'Meta Ads sync completed successfully with enhanced demographics and placement data'
+        message: 'Meta Ads sync completed successfully with ad-level daily metrics'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

@@ -3,8 +3,8 @@
  *
  * Fetches granular Meta ad performance data with ActBlue attribution.
  *
- * CRITICAL FIX: Uses meta_ad_metrics for date-filtered spend (daily data)
- * instead of meta_creative_insights which contains cumulative totals.
+ * UPDATED: Now uses meta_ad_metrics_daily for TRUE ad-level ROAS.
+ * Falls back to campaign-level distribution if no ad-level data exists.
  */
 
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
@@ -35,7 +35,7 @@ function getPerformanceTier(roas: number): AdPerformanceTier {
 }
 
 /**
- * Build totals from ads - FIXED: Uses Set for unique donors instead of summing
+ * Build totals from ads - Uses Set for unique donors
  */
 function buildTotals(
   ads: AdPerformanceData[],
@@ -47,7 +47,7 @@ function buildTotals(
   const total_impressions = ads.reduce((sum, ad) => sum + ad.impressions, 0);
   const total_clicks = ads.reduce((sum, ad) => sum + ad.clicks, 0);
 
-  // CRITICAL FIX: Use unique donors from the actual set, not sum of per-ad unique donors
+  // Use unique donors from the actual set
   const unique_donors = new Set(allDonorEmails).size;
 
   return {
@@ -81,51 +81,88 @@ export function useAdPerformanceQuery({
     queryFn: async () => {
       const sb = supabase as any;
 
-      // 1. Get DATE-FILTERED spend from meta_ad_metrics (daily data)
-      // This is the CRITICAL FIX - using daily metrics instead of cumulative
-      const { data: metricsData, error: metricsError } = await sb
-        .from('meta_ad_metrics')
-        .select('ad_creative_id, campaign_id, ad_id, spend, impressions, clicks, ctr, cpm, cpc')
+      // ========== STEP 1: Try ad-level daily metrics (preferred) ==========
+      // This gives TRUE ad-level ROAS from meta_ad_metrics_daily
+      const { data: adLevelData, error: adLevelError } = await sb
+        .from('meta_ad_metrics_daily')
+        .select(`
+          ad_id,
+          ad_name,
+          campaign_id,
+          adset_id,
+          creative_id,
+          spend,
+          impressions,
+          clicks,
+          reach,
+          ctr,
+          cpm,
+          cpc,
+          frequency,
+          conversions,
+          conversion_value,
+          meta_roas,
+          quality_ranking,
+          engagement_ranking,
+          conversion_ranking
+        `)
         .eq('organization_id', organizationId)
         .gte('date', startDate)
         .lte('date', endDate);
 
-      if (metricsError) {
-        logger.error('Failed to load ad metrics', metricsError);
-        throw new Error('Failed to load ad performance data');
-      }
+      const hasAdLevelData = !adLevelError && adLevelData && adLevelData.length > 0;
 
-      // Aggregate daily metrics by creative_id
-      const metricsMap = new Map<string, {
+      logger.debug('[AdPerformance] Ad-level data check', {
+        hasAdLevelData,
+        rowCount: adLevelData?.length || 0,
+        error: adLevelError?.message,
+      });
+
+      // Aggregate ad-level metrics by ad_id
+      const adMetricsMap = new Map<string, {
+        ad_id: string;
+        ad_name: string | null;
+        campaign_id: string;
+        creative_id: string | null;
         spend: number;
         impressions: number;
         clicks: number;
-        campaign_id: string;
-        ad_id: string | null;
+        reach: number;
+        meta_roas: number | null;
+        quality_ranking: string | null;
       }>();
 
-      for (const row of metricsData || []) {
-        const creativeId = row.ad_creative_id;
-        if (!creativeId) continue;
+      if (hasAdLevelData) {
+        for (const row of adLevelData) {
+          const adId = row.ad_id;
+          if (!adId) continue;
 
-        const existing = metricsMap.get(creativeId) || {
-          spend: 0,
-          impressions: 0,
-          clicks: 0,
-          campaign_id: row.campaign_id,
-          ad_id: row.ad_id,
-        };
+          const existing = adMetricsMap.get(adId) || {
+            ad_id: adId,
+            ad_name: row.ad_name,
+            campaign_id: row.campaign_id,
+            creative_id: row.creative_id,
+            spend: 0,
+            impressions: 0,
+            clicks: 0,
+            reach: 0,
+            meta_roas: null,
+            quality_ranking: row.quality_ranking,
+          };
 
-        metricsMap.set(creativeId, {
-          spend: existing.spend + Number(row.spend || 0),
-          impressions: existing.impressions + Number(row.impressions || 0),
-          clicks: existing.clicks + Number(row.clicks || 0),
-          campaign_id: row.campaign_id,
-          ad_id: row.ad_id,
-        });
+          adMetricsMap.set(adId, {
+            ...existing,
+            spend: existing.spend + Number(row.spend || 0),
+            impressions: existing.impressions + Number(row.impressions || 0),
+            clicks: existing.clicks + Number(row.clicks || 0),
+            reach: existing.reach + Number(row.reach || 0),
+            // Use the most recent meta_roas value
+            meta_roas: row.meta_roas ?? existing.meta_roas,
+          });
+        }
       }
 
-      // 2. Get creative details from meta_creative_insights
+      // ========== STEP 2: Get creative details for enrichment ==========
       const { data: creativesData, error: creativesError } = await sb
         .from('meta_creative_insights')
         .select(`
@@ -153,7 +190,19 @@ export function useAdPerformanceQuery({
         throw new Error('Failed to load creative data');
       }
 
-      // 3. Get DATE-FILTERED donations with attribution
+      // Build creative lookup by ad_id
+      const creativeByAdId = new Map<string, any>();
+      const creativeByCreativeId = new Map<string, any>();
+      for (const creative of creativesData || []) {
+        if (creative.ad_id) {
+          creativeByAdId.set(creative.ad_id, creative);
+        }
+        if (creative.creative_id) {
+          creativeByCreativeId.set(creative.creative_id, creative);
+        }
+      }
+
+      // ========== STEP 3: Get donations with attribution ==========
       const { data: donationsData, error: donationsError } = await sb
         .from('donation_attribution')
         .select(`
@@ -176,124 +225,266 @@ export function useAdPerformanceQuery({
         throw new Error('Failed to load donation data');
       }
 
-      // Aggregate donations by creative_id
-      const donationsByCreative = new Map<string, {
+      // Aggregate donations by ad_id (primary) or creative_id (fallback)
+      const donationsByAdId = new Map<string, {
         raised: number;
         count: number;
         donors: Set<string>;
         attribution_methods: Map<string, number>;
       }>();
 
-      // Track all donor emails for global unique count
+      const donationsByCreativeId = new Map<string, {
+        raised: number;
+        count: number;
+        donors: Set<string>;
+        attribution_methods: Map<string, number>;
+      }>();
+
       const allDonorEmails: string[] = [];
 
       for (const donation of donationsData || []) {
-        const creativeId = donation.attributed_creative_id;
-        if (!creativeId) continue;
-
         const donorEmail = donation.donor_email || 'anonymous';
         allDonorEmails.push(donorEmail);
-
-        const existing = donationsByCreative.get(creativeId) || {
-          raised: 0,
-          count: 0,
-          donors: new Set<string>(),
-          attribution_methods: new Map<string, number>(),
-        };
-
-        existing.raised += Number(donation.net_amount ?? donation.amount ?? 0);
-        existing.count += 1;
-        existing.donors.add(donorEmail);
-
+        const amount = Number(donation.net_amount ?? donation.amount ?? 0);
         const method = donation.attribution_method || 'unknown';
-        existing.attribution_methods.set(
-          method,
-          (existing.attribution_methods.get(method) || 0) + 1
-        );
 
-        donationsByCreative.set(creativeId, existing);
+        // Try ad_id first
+        if (donation.attributed_ad_id) {
+          const adId = donation.attributed_ad_id;
+          const existing = donationsByAdId.get(adId) || {
+            raised: 0,
+            count: 0,
+            donors: new Set<string>(),
+            attribution_methods: new Map<string, number>(),
+          };
+          existing.raised += amount;
+          existing.count += 1;
+          existing.donors.add(donorEmail);
+          existing.attribution_methods.set(method, (existing.attribution_methods.get(method) || 0) + 1);
+          donationsByAdId.set(adId, existing);
+        }
+
+        // Also track by creative_id for fallback
+        if (donation.attributed_creative_id) {
+          const creativeId = donation.attributed_creative_id;
+          const existing = donationsByCreativeId.get(creativeId) || {
+            raised: 0,
+            count: 0,
+            donors: new Set<string>(),
+            attribution_methods: new Map<string, number>(),
+          };
+          existing.raised += amount;
+          existing.count += 1;
+          existing.donors.add(donorEmail);
+          existing.attribution_methods.set(method, (existing.attribution_methods.get(method) || 0) + 1);
+          donationsByCreativeId.set(creativeId, existing);
+        }
       }
 
-      // 4. Build ad performance data by joining metrics, creatives, and donations
+      // ========== STEP 4: Build ad performance data ==========
       const ads: AdPerformanceData[] = [];
 
-      for (const creative of creativesData || []) {
-        const creativeId = creative.creative_id || creative.id;
-        const metrics = metricsMap.get(creativeId);
-        const donations = donationsByCreative.get(creativeId);
+      if (hasAdLevelData && adMetricsMap.size > 0) {
+        // PRIMARY PATH: Use ad-level metrics (TRUE ROAS)
+        logger.debug('[AdPerformance] Using ad-level metrics path', { adCount: adMetricsMap.size });
 
-        // Skip creatives with no metrics in the selected period
-        if (!metrics) continue;
+        for (const [adId, metrics] of adMetricsMap) {
+          // Look up donations by ad_id first, then by creative_id
+          let donations = donationsByAdId.get(adId);
+          if (!donations && metrics.creative_id) {
+            donations = donationsByCreativeId.get(metrics.creative_id);
+          }
 
-        const spend = metrics.spend;
-        const raised = donations?.raised || 0;
-        const donationCount = donations?.count || 0;
-        const uniqueDonors = donations?.donors?.size || 0;
+          // Get creative details
+          let creative = creativeByAdId.get(adId);
+          if (!creative && metrics.creative_id) {
+            creative = creativeByCreativeId.get(metrics.creative_id);
+          }
 
-        const roas = spend > 0 ? raised / spend : 0;
-        const profit = raised - spend;
-        const roiPct = spend > 0 ? (profit / spend) * 100 : 0;
-        const avgDonation = donationCount > 0 ? raised / donationCount : 0;
-        const cpa = uniqueDonors > 0 ? spend / uniqueDonors : 0;
-        const ctr = metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0;
-        const cpm = metrics.impressions > 0 ? (spend / metrics.impressions) * 1000 : 0;
-        const cpc = metrics.clicks > 0 ? spend / metrics.clicks : 0;
+          const spend = metrics.spend;
+          const raised = donations?.raised || 0;
+          const donationCount = donations?.count || 0;
+          const uniqueDonors = donations?.donors?.size || 0;
 
-        ads.push({
-          id: creative.id,
-          ad_id: creative.ad_id || metrics.ad_id || '',
-          creative_id: creativeId,
-          campaign_id: creative.campaign_id || metrics.campaign_id,
-          status: 'ACTIVE', // TODO: Get actual status from meta_ad_status if available
-          spend,
-          raised,
-          roas,
-          profit,
-          roi_pct: roiPct,
-          unique_donors: uniqueDonors,
-          donation_count: donationCount,
-          avg_donation: avgDonation,
-          cpa,
-          impressions: metrics.impressions,
-          clicks: metrics.clicks,
-          ctr,
-          cpm,
-          cpc,
-          creative_thumbnail_url: creative.thumbnail_url,
-          ad_copy_primary_text: creative.primary_text,
-          ad_copy_headline: creative.headline,
-          ad_copy_description: creative.description,
-          creative_type: creative.creative_type,
-          performance_tier: creative.performance_tier || getPerformanceTier(roas),
-          topic: creative.topic,
-          tone: creative.tone,
-          sentiment_score: creative.sentiment_score,
-          urgency_level: creative.urgency_level,
-          key_themes: creative.key_themes,
-          refcode: creative.extracted_refcode,
-          attribution_method: null, // Per-donation, not per-ad
-        });
+          const roas = spend > 0 ? raised / spend : 0;
+          const profit = raised - spend;
+          const roiPct = spend > 0 ? (profit / spend) * 100 : 0;
+          const avgDonation = donationCount > 0 ? raised / donationCount : 0;
+          const cpa = uniqueDonors > 0 ? spend / uniqueDonors : 0;
+          const ctr = metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0;
+          const cpm = metrics.impressions > 0 ? (spend / metrics.impressions) * 1000 : 0;
+          const cpc = metrics.clicks > 0 ? spend / metrics.clicks : 0;
+
+          ads.push({
+            id: creative?.id || adId,
+            ad_id: adId,
+            creative_id: metrics.creative_id || creative?.creative_id || '',
+            campaign_id: metrics.campaign_id,
+            status: 'ACTIVE',
+            spend,
+            raised,
+            roas,
+            profit,
+            roi_pct: roiPct,
+            unique_donors: uniqueDonors,
+            donation_count: donationCount,
+            avg_donation: avgDonation,
+            cpa,
+            impressions: metrics.impressions,
+            clicks: metrics.clicks,
+            ctr,
+            cpm,
+            cpc,
+            creative_thumbnail_url: creative?.thumbnail_url || null,
+            ad_copy_primary_text: creative?.primary_text || null,
+            ad_copy_headline: creative?.headline || metrics.ad_name || null,
+            ad_copy_description: creative?.description || null,
+            creative_type: creative?.creative_type || 'unknown',
+            performance_tier: creative?.performance_tier || getPerformanceTier(roas),
+            topic: creative?.topic || null,
+            tone: creative?.tone || null,
+            sentiment_score: creative?.sentiment_score || null,
+            urgency_level: creative?.urgency_level || null,
+            key_themes: creative?.key_themes || null,
+            refcode: creative?.extracted_refcode || null,
+            attribution_method: null,
+          });
+        }
+      } else {
+        // FALLBACK PATH: Use campaign-level distribution (legacy approach)
+        logger.debug('[AdPerformance] Falling back to campaign-level metrics');
+
+        // Fetch from old meta_ad_metrics table
+        const { data: metricsData, error: metricsError } = await sb
+          .from('meta_ad_metrics')
+          .select('campaign_id, ad_id, spend, impressions, clicks')
+          .eq('organization_id', organizationId)
+          .gte('date', startDate)
+          .lte('date', endDate);
+
+        if (metricsError) {
+          logger.error('Failed to load campaign metrics', metricsError);
+          throw new Error('Failed to load ad performance data');
+        }
+
+        // Aggregate by campaign_id
+        const metricsByCampaign = new Map<string, {
+          spend: number;
+          impressions: number;
+          clicks: number;
+        }>();
+
+        for (const row of metricsData || []) {
+          const campaignId = row.campaign_id;
+          if (!campaignId) continue;
+
+          const existing = metricsByCampaign.get(campaignId) || {
+            spend: 0,
+            impressions: 0,
+            clicks: 0,
+          };
+
+          metricsByCampaign.set(campaignId, {
+            spend: existing.spend + Number(row.spend || 0),
+            impressions: existing.impressions + Number(row.impressions || 0),
+            clicks: existing.clicks + Number(row.clicks || 0),
+          });
+        }
+
+        // Build ads from creatives with campaign-level distribution
+        for (const creative of creativesData || []) {
+          const creativeId = creative.creative_id || creative.id;
+          const campaignId = creative.campaign_id;
+          const metrics = campaignId ? metricsByCampaign.get(campaignId) : null;
+          const donations = donationsByCreativeId.get(creativeId);
+
+          if (!metrics) continue;
+
+          // Count creatives per campaign for distribution
+          const creativesInCampaign = (creativesData || []).filter(
+            (c: any) => c.campaign_id === campaignId
+          ).length;
+
+          const spendShare = creativesInCampaign > 0 ? metrics.spend / creativesInCampaign : metrics.spend;
+          const impressionsShare = creativesInCampaign > 0 ? metrics.impressions / creativesInCampaign : metrics.impressions;
+          const clicksShare = creativesInCampaign > 0 ? metrics.clicks / creativesInCampaign : metrics.clicks;
+
+          const spend = spendShare;
+          const raised = donations?.raised || 0;
+          const donationCount = donations?.count || 0;
+          const uniqueDonors = donations?.donors?.size || 0;
+
+          const roas = spend > 0 ? raised / spend : 0;
+          const profit = raised - spend;
+          const roiPct = spend > 0 ? (profit / spend) * 100 : 0;
+          const avgDonation = donationCount > 0 ? raised / donationCount : 0;
+          const cpa = uniqueDonors > 0 ? spend / uniqueDonors : 0;
+          const ctr = impressionsShare > 0 ? (clicksShare / impressionsShare) * 100 : 0;
+          const cpm = impressionsShare > 0 ? (spend / impressionsShare) * 1000 : 0;
+          const cpc = clicksShare > 0 ? spend / clicksShare : 0;
+
+          ads.push({
+            id: creative.id,
+            ad_id: creative.ad_id || '',
+            creative_id: creativeId,
+            campaign_id: creative.campaign_id,
+            status: 'ACTIVE',
+            spend,
+            raised,
+            roas,
+            profit,
+            roi_pct: roiPct,
+            unique_donors: uniqueDonors,
+            donation_count: donationCount,
+            avg_donation: avgDonation,
+            cpa,
+            impressions: impressionsShare,
+            clicks: clicksShare,
+            ctr,
+            cpm,
+            cpc,
+            creative_thumbnail_url: creative.thumbnail_url,
+            ad_copy_primary_text: creative.primary_text,
+            ad_copy_headline: creative.headline,
+            ad_copy_description: creative.description,
+            creative_type: creative.creative_type,
+            performance_tier: creative.performance_tier || getPerformanceTier(roas),
+            topic: creative.topic,
+            tone: creative.tone,
+            sentiment_score: creative.sentiment_score,
+            urgency_level: creative.urgency_level,
+            key_themes: creative.key_themes,
+            refcode: creative.extracted_refcode,
+            attribution_method: null,
+          });
+        }
       }
 
-      // Sort by spend descending (highest spend first)
+      // Sort by spend descending
       ads.sort((a, b) => b.spend - a.spend);
 
-      // 5. Calculate totals with FIXED unique donor counting
+      // ========== STEP 5: Calculate totals and summary ==========
       const totals = buildTotals(ads, allDonorEmails);
 
-      // 6. Build summary
       const topThree = [...ads]
         .sort((a, b) => b.roas - a.roas)
         .filter((ad) => ad.raised > 0)
         .slice(0, 3);
 
-      // 7. Calculate attribution quality metrics
+      // Calculate attribution quality metrics
       let clickAttributed = 0;
       let refcodeAttributed = 0;
       let modeledAttributed = 0;
 
-      for (const [, donations] of donationsByCreative) {
+      const allDonationMaps = [...donationsByAdId.values(), ...donationsByCreativeId.values()];
+      const seenMethods = new Set<string>();
+
+      for (const donations of allDonationMaps) {
         for (const [method, count] of donations.attribution_methods) {
+          const key = `${method}-${count}`;
+          if (seenMethods.has(key)) continue;
+          seenMethods.add(key);
+
           if (method === 'click') clickAttributed += count;
           else if (method === 'refcode') refcodeAttributed += count;
           else if (method === 'modeled' || method === 'view') modeledAttributed += count;
@@ -301,14 +492,16 @@ export function useAdPerformanceQuery({
       }
 
       const totalAttributed = clickAttributed + refcodeAttributed + modeledAttributed;
-
-      // CRITICAL FIX: attributionFallbackMode should only be true when:
-      // 1. We have ads with spend, AND
-      // 2. We have ZERO click-based or refcode-based attribution
-      // NOT when there's simply no data
       const hasAdsWithSpend = ads.some((ad) => ad.spend > 0);
       const hasDirectAttribution = clickAttributed > 0 || refcodeAttributed > 0;
       const attributionFallbackMode = hasAdsWithSpend && !hasDirectAttribution && totalAttributed > 0;
+
+      logger.debug('[AdPerformance] Query complete', {
+        dataSource: hasAdLevelData ? 'ad-level' : 'campaign-level',
+        adsReturned: ads.length,
+        totalSpend: totals.total_spend,
+        totalRaised: totals.total_raised,
+      });
 
       return {
         ads,
