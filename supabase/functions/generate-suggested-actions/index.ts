@@ -20,6 +20,7 @@ import {
   appendOptOut,
   type ComplianceCheckResult,
 } from "../_shared/complianceChecker.ts";
+import { z, parseJsonBody, uuidSchema } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
