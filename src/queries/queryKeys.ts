@@ -103,6 +103,12 @@ export const kpiKeys = {
     [...kpiKeys.all, 'summary', orgId, dateRange] as const,
 };
 
+export const adPerformanceKeys = {
+  all: ['adPerformance'] as const,
+  list: (params: { startDate: string; endDate: string }) =>
+    [...adPerformanceKeys.all, 'list', params] as const,
+};
+
 // Unified queryKeys object for backwards compatibility
 export const queryKeys = {
   dashboard: dashboardKeys,
@@ -116,4 +122,5 @@ export const queryKeys = {
   trends: trendsKeys,
   sync: syncKeys,
   kpis: kpiKeys,
+  adPerformance: adPerformanceKeys,
 };
