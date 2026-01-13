@@ -46,16 +46,36 @@ export async function validateAuth(
 
 /**
  * Validate cron secret for scheduled jobs
+ * SECURITY: Fails closed - rejects requests if CRON_SECRET is not configured
  */
 export function validateCronSecret(req: Request): boolean {
   const cronSecret = Deno.env.get('CRON_SECRET');
   if (!cronSecret) {
-    console.warn('CRON_SECRET not configured - allowing request');
-    return true;
+    console.error('SECURITY: CRON_SECRET not configured - rejecting request for safety');
+    return false; // FAIL CLOSED - reject if secret not configured
   }
   
   const providedSecret = req.headers.get('x-cron-secret');
-  return providedSecret === cronSecret;
+  if (!providedSecret) {
+    console.warn('SECURITY: No x-cron-secret header provided');
+    return false;
+  }
+  
+  // Use timing-safe comparison to prevent timing attacks
+  return timingSafeEqual(providedSecret, cronSecret);
+}
+
+/**
+ * Timing-safe string comparison to prevent timing attacks on secret validation
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
 }
 
 /**
@@ -77,13 +97,29 @@ export async function userBelongsToOrg(
 }
 
 /**
+ * Get encryption key with validation - fails if not configured
+ * SECURITY: No default value - encryption key MUST be configured
+ */
+function getEncryptionKey(): string {
+  const secret = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY');
+  if (!secret) {
+    throw new Error('SECURITY: CREDENTIALS_ENCRYPTION_KEY not configured - cannot encrypt/decrypt credentials');
+  }
+  if (secret === 'default-key-change-me' || secret.length < 32) {
+    throw new Error('SECURITY: CREDENTIALS_ENCRYPTION_KEY is insecure - use a strong random key (at least 32 characters)');
+  }
+  return secret;
+}
+
+/**
  * Encrypt sensitive data before storage (AES-GCM with PBKDF2 key derivation)
+ * SECURITY: Requires CREDENTIALS_ENCRYPTION_KEY to be properly configured
  */
 export async function encryptCredentials(data: Record<string, any>, orgId: string): Promise<string> {
   const encoder = new TextEncoder();
   const dataStr = JSON.stringify(data);
   
-  const secret = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY') || 'default-key-change-me';
+  const secret = getEncryptionKey();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     encoder.encode(secret + orgId),
@@ -121,6 +157,7 @@ export async function encryptCredentials(data: Record<string, any>, orgId: strin
 
 /**
  * Decrypt credentials
+ * SECURITY: Requires CREDENTIALS_ENCRYPTION_KEY to be properly configured
  */
 export async function decryptCredentials(encryptedData: string, orgId: string): Promise<Record<string, any>> {
   const encoder = new TextEncoder();
@@ -130,7 +167,7 @@ export async function decryptCredentials(encryptedData: string, orgId: string): 
   const iv = combined.slice(0, 12);
   const encrypted = combined.slice(12);
   
-  const secret = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY') || 'default-key-change-me';
+  const secret = getEncryptionKey();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     encoder.encode(secret + orgId),
@@ -396,19 +433,6 @@ export async function checkRateLimit(
   const remaining = Math.max(0, maxRequests - entry.count);
   
   return { allowed, remaining, resetAt: entry.resetAt };
-}
-
-/**
- * Timing-safe string comparison to prevent timing attacks
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
 }
 
 /**
