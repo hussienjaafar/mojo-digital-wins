@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parseJsonBody, z } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,10 +19,13 @@ serve(async (req) => {
 
     console.log('🔄 Starting backfill of unprocessed Bluesky posts...');
 
-    const { batchSize = 500, maxBatches = 10 } = await req.json().catch(() => ({ 
-      batchSize: 500,
-      maxBatches: 10 
-    }));
+     const bodySchema = z.object({
+       batchSize: z.coerce.number().int().min(1).max(1000).optional().default(500),
+       maxBatches: z.coerce.number().int().min(1).max(50).optional().default(10),
+     }).passthrough();
+
+     const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: true, allowInvalidJson: true });
+     const { batchSize, maxBatches } = parsedBody.ok ? parsedBody.data : { batchSize: 500, maxBatches: 10 };
 
     let totalProcessed = 0;
     let batchCount = 0;

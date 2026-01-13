@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { Resend } from "https://esm.sh/resend@4.0.0";
+import { parseJsonBody, uuidSchema, z } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -100,15 +101,25 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Parse request body first to get userId for validation
-    const { userId, type, title, message, link }: NotificationRequest = await req.json();
+    // Parse + validate request body first to get userId for authorization checks
+    const requestSchema = z.object({
+      userId: uuidSchema,
+      type: z.enum(['bill_update', 'new_article', 'bill_alert', 'bookmark_update']),
+      title: z.string().trim().min(1).max(200),
+      message: z.string().trim().min(1).max(5000),
+      link: z.string().trim().max(2000).optional(),
+    }).passthrough();
 
-    if (!userId || !type || !title || !message) {
+    const parsedBody = await parseJsonBody(req, requestSchema, { allowEmpty: false });
+    if (!parsedBody.ok) {
       return new Response(
-        JSON.stringify({ error: 'userId, type, title, and message are required' }),
+        JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const { userId, type, title, message, link } = parsedBody.data;
+
 
     // SECURITY: Validate authentication
     // Allow: cron secret, admin JWT, or user triggering for themselves

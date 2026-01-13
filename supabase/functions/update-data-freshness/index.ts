@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { parseJsonBody, uuidSchema, z } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,23 +23,33 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const body = await req.json();
-    const {
-      source,
-      organization_id = null,
-      latest_data_timestamp = null,
-      sync_status = 'success',
-      error_message = null,
-      records_synced = 0,
-      duration_ms = null,
-    } = body;
+     const bodySchema = z.object({
+       source: z.string().trim().min(1).max(50),
+       organization_id: uuidSchema.nullable().optional(),
+       latest_data_timestamp: z.string().trim().max(50).nullable().optional(),
+       sync_status: z.string().trim().max(30).optional().default('success'),
+       error_message: z.string().trim().max(2000).nullable().optional(),
+       records_synced: z.coerce.number().int().min(0).max(1_000_000_000).optional().default(0),
+       duration_ms: z.coerce.number().int().min(0).max(1_000_000_000).nullable().optional(),
+     }).passthrough();
 
-    if (!source) {
-      return new Response(
-        JSON.stringify({ error: 'source is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+     const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: false });
+     if (!parsedBody.ok) {
+       return new Response(
+         JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
+         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+       );
+     }
+
+     const {
+       source,
+       organization_id = null,
+       latest_data_timestamp = null,
+       sync_status,
+       error_message = null,
+       records_synced,
+       duration_ms = null,
+     } = parsedBody.data;
 
     console.log(`Updating freshness for source: ${source}, org: ${organization_id || 'global'}`);
 

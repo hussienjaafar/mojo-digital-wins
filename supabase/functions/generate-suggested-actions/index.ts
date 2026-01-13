@@ -280,19 +280,31 @@ serve(async (req) => {
   let minActionableScore = 50;
   let targetOrgId: string | null = null;
 
-  try {
-    const body = await req.json();
-    forceMode = body.force === true;
-    lookbackDays = Math.min(body.lookback_days || 7, 30);
-    minActionableScore = Math.max(body.min_actionable_score || 50, 20);
-    targetOrgId = body.organization_id || null;
-    
-    if (forceMode) {
-      console.log(`🔧 Force mode enabled: lookback=${lookbackDays}d, minScore=${minActionableScore}`);
-    }
-  } catch {
-    // No body or invalid JSON - use defaults
+  const bodySchema = z.object({
+    force: z.coerce.boolean().optional(),
+    lookback_days: z.coerce.number().int().min(1).max(30).optional(),
+    min_actionable_score: z.coerce.number().int().min(0).max(100).optional(),
+    organization_id: uuidSchema.nullable().optional(),
+  }).passthrough();
+
+  const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: true, allowInvalidJson: true });
+  if (!parsedBody.ok) {
+    return new Response(
+      JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
+
+  const body = parsedBody.data;
+  forceMode = body.force === true;
+  lookbackDays = Math.min(body.lookback_days ?? 7, 30);
+  minActionableScore = Math.max(body.min_actionable_score ?? 50, 20);
+  targetOrgId = body.organization_id ?? null;
+
+  if (forceMode) {
+    console.log(`🔧 Force mode enabled: lookback=${lookbackDays}d, minScore=${minActionableScore}`);
+  }
+
 
   // Create audit record
   const auditData = {

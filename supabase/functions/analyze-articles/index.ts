@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { parseJsonBody, z } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -222,8 +223,19 @@ serve(async (req) => {
     // BATCH SIZE: 5 articles per API call (80% reduction in API calls)
     const BATCH_SIZE = 5;
     
-    const overrides = await req.json().catch(() => ({}));
-    const batchSize = Math.min(Math.max(1, overrides.batchSize || BATCH_SIZE), 10);
+    const overridesSchema = z.object({
+      batchSize: z.coerce.number().int().min(1).max(10).optional(),
+    }).passthrough();
+
+    const parsedOverrides = await parseJsonBody(req, overridesSchema, { allowEmpty: true, allowInvalidJson: true });
+    if (!parsedOverrides.ok) {
+      return new Response(
+        JSON.stringify({ error: parsedOverrides.error, details: parsedOverrides.details }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const batchSize = parsedOverrides.data.batchSize ?? BATCH_SIZE;
 
     console.log(`[analyze-articles] Starting batch analysis (size: ${batchSize})...`);
 

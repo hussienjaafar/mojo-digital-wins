@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { parseJsonBody, z } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -169,7 +170,35 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const body = await req.json().catch(() => ({}));
+    const addSchema = z.object({
+      action: z.literal('add'),
+      state_code: z.string().trim().length(2),
+      state_name: z.string().trim().min(2).max(100).optional(),
+      action_type: z.string().trim().min(1).max(100),
+      title: z.string().trim().min(1).max(500),
+      description: z.string().trim().max(5000).optional().nullable(),
+      source_url: z.string().trim().max(2000).optional().nullable(),
+      official_name: z.string().trim().max(200).optional().nullable(),
+      official_title: z.string().trim().max(200).optional().nullable(),
+      action_date: z.string().trim().max(50).optional().nullable(),
+    }).passthrough();
+
+    const fetchSchema = z.object({
+      action: z.literal('fetch').optional(),
+      limit: z.coerce.number().int().min(1).max(10).optional(),
+    }).passthrough();
+
+    const bodySchema = z.union([addSchema, fetchSchema]);
+
+    const parsedBody = await parseJsonBody(req, bodySchema, { allowEmpty: true, allowInvalidJson: true });
+    if (!parsedBody.ok) {
+      return new Response(
+        JSON.stringify({ error: parsedBody.error, details: parsedBody.details }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const body = parsedBody.data;
 
     // Handle manual state action submission
     if (body.action === 'add') {
