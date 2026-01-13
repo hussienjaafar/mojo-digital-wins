@@ -121,58 +121,78 @@ export default function ClientAdPerformance() {
     });
   };
 
-  return (
-    <ClientLayout>
-      <div className="container mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Ad Performance</h1>
-            <p className="text-muted-foreground mt-1">
-              Drill down into individual ad metrics with ActBlue attribution
-            </p>
-          </div>
+  // --- State Detection for UI Migration ---
+  const hasData = !isLoading && !error && adPerformanceData && adPerformanceData.ads && adPerformanceData.ads.length > 0;
+  const showNoDataEmptyState = !isLoading && !error && (!adPerformanceData || !adPerformanceData.ads || adPerformanceData.ads.length === 0);
+  // Assume Claude provides this flag. It's safer than deriving.
+  const showCampaignLevelBanner = hasData && adPerformanceData.isCampaignLevelDistributionActive;
 
-          {/* Date Range Picker */}
-          <div className="flex items-center gap-2">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-start text-left">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d, yyyy')}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <div className="flex">
-                  <div className="border-r p-2 space-y-1">
-                    {DATE_PRESETS.map((preset) => (
-                      <Button
-                        key={preset.days}
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start"
-                        onClick={() => handleDatePreset(preset.days)}
-                      >
-                        {preset.label}
-                      </Button>
-                    ))}
-                  </div>
-                  <Calendar
-                    mode="range"
-                    selected={{ from: dateRange.from, to: dateRange.to }}
-                    onSelect={(range) => {
-                      if (range?.from && range?.to) {
-                        setDateRange({ from: range.from, to: range.to });
-                      }
-                    }}
-                    numberOfMonths={2}
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="space-y-6">
+          {/* Skeleton for Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i}><CardContent className="p-4"><div className="h-12 bg-gray-200 rounded animate-pulse"></div></CardContent></Card>
+            ))}
           </div>
+          {/* Skeleton for Filters */}
+          <div className="flex flex-wrap items-center gap-4">
+              <div className="h-10 bg-gray-200 rounded w-48 animate-pulse"></div>
+              <div className="h-10 bg-gray-200 rounded w-40 animate-pulse"></div>
+              <div className="h-10 bg-gray-200 rounded w-32 animate-pulse"></div>
+          </div>
+          <AdPerformanceList isLoading={true} />
         </div>
+      );
+    }
 
+    if (error) {
+      return (
+        <Card className="mt-6">
+          <CardContent className="p-8 text-center">
+            <AlertTriangle className="mx-auto h-12 w-12 text-destructive" />
+            <h3 className="mt-4 text-xl font-semibold">Error Loading Data</h3>
+            <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+              {error.message || 'An unexpected error occurred while fetching ad performance data.'}
+            </p>
+            <Button className="mt-6" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (showNoDataEmptyState) {
+      return (
+        <Card className="mt-6">
+          <CardContent className="p-8 text-center">
+            <BarChart3 className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-xl font-semibold">No Ad Performance Data</h3>
+            <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+              There is no ad performance data available for the selected filters and date range.
+            </p>
+            <div className="mt-6 space-y-2">
+              <p className="text-sm font-medium">Suggestions:</p>
+              <ul className="text-sm list-disc list-inside text-muted-foreground inline-block text-left">
+                <li>Try expanding the date range.</li>
+                <li>Check your Meta ad account connection status.</li>
+                <li>Ensure you have active or recent campaigns.</li>
+              </ul>
+            </div>
+            <Button variant="outline" className="mt-6" onClick={() => handleDatePreset(90)}>
+              Switch to Last 90 Days
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+    
+    // Default state: Render all data
+    return (
+      <div className="space-y-6">
         {/* Attribution Quality Warning */}
         {adPerformanceData?.attributionFallbackMode && (
           <Card className="border-yellow-500/50 bg-yellow-500/10">
@@ -181,8 +201,22 @@ export default function ClientAdPerformance() {
               <div>
                 <p className="font-medium text-sm">Attribution Quality Notice</p>
                 <p className="text-sm text-muted-foreground">
-                  No direct click or refcode attribution data found. Results are based on modeled
-                  attribution which may be less accurate.
+                  No direct click or refcode attribution data found. Results are based on modeled attribution which may be less accurate.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        {/* Campaign-level Fallback Banner */}
+        {showCampaignLevelBanner && (
+          <Card className="border-blue-500/50 bg-blue-500/10">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-500 mt-0.5" />
+              <div>
+                <p className="font-medium text-sm">Campaign-Level Metrics</p>
+                <p className="text-sm text-muted-foreground">
+                  Ad-level metrics are still backfilling; showing campaign-level estimates temporarily.
                 </p>
               </div>
             </CardContent>
@@ -203,7 +237,6 @@ export default function ClientAdPerformance() {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -215,7 +248,6 @@ export default function ClientAdPerformance() {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -232,7 +264,6 @@ export default function ClientAdPerformance() {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -244,7 +275,6 @@ export default function ClientAdPerformance() {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -256,7 +286,6 @@ export default function ClientAdPerformance() {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -367,14 +396,68 @@ export default function ClientAdPerformance() {
             </span>
           )}
         </div>
-
-        {/* Ad List */}
+        
         <AdPerformanceList
           ads={processedAds}
-          isLoading={isLoading}
-          error={error}
-          onRetry={() => refetch()}
         />
+      </div>
+    );
+  };
+
+  return (
+    <ClientLayout>
+      <div className="container mx-auto p-6 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold">Ad Performance</h1>
+            <p className="text-muted-foreground mt-1">
+              Drill down into individual ad metrics with ActBlue attribution
+            </p>
+          </div>
+
+          {/* Date Range Picker */}
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-start text-left">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d, yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <div className="flex">
+                  <div className="border-r p-2 space-y-1">
+                    {DATE_PRESETS.map((preset) => (
+                      <Button
+                        key={preset.days}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => handleDatePreset(preset.days)}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
+                  <Calendar
+                    mode="range"
+                    selected={{ from: dateRange.from, to: dateRange.to }}
+                    onSelect={(range) => {
+                      if (range?.from && range?.to) {
+                        setDateRange({ from: range.from, to: range.to });
+                      }
+                    }}
+                    numberOfMonths={2}
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+        
+        {renderContent()}
+
       </div>
     </ClientLayout>
   );
