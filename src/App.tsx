@@ -66,7 +66,6 @@ const ClientCreativeIntelligence = lazy(() => import("./pages/ClientCreativeInte
 const ClientABTests = lazy(() => import("./pages/ClientABTests"));
 const ClientRecurringHealth = lazy(() => import("./pages/ClientRecurringHealth"));
 const ClientNewsTrends = lazy(() => import("./pages/ClientNewsTrends"));
-const ClientAttribution = lazy(() => import("./pages/ClientAttribution"));
 const ClientAdPerformance = lazy(() => import("./pages/ClientAdPerformance"));
 
 const queryClient = new QueryClient();
