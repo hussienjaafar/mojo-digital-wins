@@ -4,6 +4,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { IntegrationConfig, WizardStep } from '../types';
@@ -17,7 +28,8 @@ import {
   TestTube,
   Eye,
   EyeOff,
-  Zap
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 
 interface Step4IntegrationsProps {
@@ -52,6 +64,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [testingIntegration, setTestingIntegration] = useState<string | null>(null);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
   
   const [integrations, setIntegrations] = useState<Record<string, IntegrationConfig>>(
     (stepData.integrations as Record<string, IntegrationConfig>) || {
@@ -242,6 +255,43 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     await onComplete(4, { integrations });
   };
 
+  const handleDisconnectIntegration = async (platform: 'meta' | 'switchboard' | 'actblue') => {
+    setIsDisconnecting(true);
+    try {
+      const { error } = await supabase
+        .from('client_api_credentials')
+        .delete()
+        .eq('organization_id', organizationId)
+        .eq('platform', platform);
+
+      if (error) throw error;
+
+      setIntegrations(prev => ({
+        ...prev,
+        [platform]: { 
+          platform, 
+          is_enabled: false, 
+          is_tested: false, 
+          last_test_status: null 
+        }
+      }));
+
+      toast({
+        title: 'Integration disconnected',
+        description: `${platform === 'meta' ? 'Meta Ads' : platform === 'switchboard' ? 'Switchboard SMS' : 'ActBlue'} has been disconnected. You can now reconnect with a different account.`
+      });
+    } catch (error) {
+      console.error('Error disconnecting integration:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to disconnect integration. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
   const getStatusBadge = (config: IntegrationConfig) => {
     if (config.is_enabled) {
       return (
@@ -352,9 +402,42 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
               <CollapsibleContent>
                 <div className="px-5 pb-5 pt-2 border-t border-[hsl(var(--portal-border))]">
                   {integrations[key].is_enabled ? (
-                    <div className="flex items-center gap-2 text-[hsl(var(--portal-success))] py-2">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span className="text-[13px]">Connected and enabled</span>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-[hsl(var(--portal-success))] py-2">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span className="text-[13px]">Connected and enabled</span>
+                      </div>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            disabled={isDisconnecting}
+                            className="h-9"
+                          >
+                            {isDisconnecting ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                            )}
+                            Reconnect with different account
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Reconnect {key === 'meta' ? 'Meta Ads' : key === 'switchboard' ? 'Switchboard SMS' : 'ActBlue'}?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will disconnect the current account. You'll need to log in again to connect a different account.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDisconnectIntegration(key)}>
+                              Disconnect & Reconnect
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   ) : key === 'meta' ? (
                     <MetaAuthOptions
