@@ -2251,6 +2251,7 @@ export type Database = {
           name: string
           primary_contact_email: string | null
           slug: string
+          timezone: string | null
           updated_at: string | null
         }
         Insert: {
@@ -2263,6 +2264,7 @@ export type Database = {
           name: string
           primary_contact_email?: string | null
           slug: string
+          timezone?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -2275,6 +2277,7 @@ export type Database = {
           name?: string
           primary_contact_email?: string | null
           slug?: string
+          timezone?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -9977,6 +9980,49 @@ export type Database = {
           },
         ]
       }
+      actblue_daily_rollup: {
+        Row: {
+          day: string | null
+          donation_count: number | null
+          fee_percentage: number | null
+          gross_raised: number | null
+          net_raised: number | null
+          net_revenue: number | null
+          one_time_count: number | null
+          one_time_revenue: number | null
+          organization_id: string | null
+          recurring_count: number | null
+          recurring_revenue: number | null
+          refund_count: number | null
+          refund_rate: number | null
+          refunds: number | null
+          total_fees: number | null
+          unique_donors: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       actblue_transactions_secure: {
         Row: {
           ab_test_name: string | null
@@ -11775,6 +11821,55 @@ export type Database = {
           frequency: number
           keyword: string
           source_type: string
+        }[]
+      }
+      get_actblue_daily_rollup: {
+        Args: {
+          _end_date: string
+          _organization_id: string
+          _start_date: string
+        }
+        Returns: {
+          day: string
+          donation_count: number
+          fee_percentage: number
+          gross_raised: number
+          net_raised: number
+          net_revenue: number
+          one_time_count: number
+          one_time_revenue: number
+          recurring_count: number
+          recurring_revenue: number
+          refund_count: number
+          refund_rate: number
+          refunds: number
+          total_fees: number
+          unique_donors: number
+        }[]
+      }
+      get_actblue_period_summary: {
+        Args: {
+          _end_date: string
+          _organization_id: string
+          _start_date: string
+        }
+        Returns: {
+          avg_donation: number
+          avg_fee_percentage: number
+          days_with_donations: number
+          donation_count: number
+          gross_raised: number
+          net_raised: number
+          net_revenue: number
+          one_time_count: number
+          one_time_revenue: number
+          recurring_count: number
+          recurring_revenue: number
+          refund_count: number
+          refund_rate: number
+          refunds: number
+          total_fees: number
+          unique_donors_approx: number
         }[]
       }
       get_backfill_progress: {
