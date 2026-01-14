@@ -9,6 +9,45 @@ export type AdPerformanceStatus = 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
 export type AdPerformanceTier = 'TOP_PERFORMER' | 'STRONG' | 'AVERAGE' | 'NEEDS_IMPROVEMENT';
 
 /**
+ * Video transcription status
+ */
+export type VideoTranscriptionStatus =
+  | 'PENDING'
+  | 'URL_FETCHED'
+  | 'URL_EXPIRED'
+  | 'URL_INACCESSIBLE'
+  | 'DOWNLOADED'
+  | 'TRANSCRIBED'
+  | 'TRANSCRIPT_FAILED'
+  | 'ERROR'
+  | 'NO_VIDEO';
+
+/**
+ * Video transcription data for an ad
+ */
+export interface AdVideoTranscription {
+  video_id: string;
+  status: VideoTranscriptionStatus;
+  transcript_text: string | null;
+  duration_seconds: number | null;
+  language: string | null;
+  speaker_count: number | null;
+  words_per_minute: number | null;
+  hook_text: string | null;
+  topic_primary: string | null;
+  topic_tags: string[] | null;
+  tone_primary: string | null;
+  tone_tags: string[] | null;
+  sentiment_score: number | null;
+  urgency_level: string | null;
+  cta_text: string | null;
+  cta_type: string | null;
+  key_phrases: string[] | null;
+  error_message: string | null;
+  transcribed_at: string | null;
+}
+
+/**
  * Individual ad performance data combining Meta creative insights with ActBlue attribution
  */
 export interface AdPerformanceData {
@@ -56,6 +95,9 @@ export interface AdPerformanceData {
   // Attribution
   refcode: string | null;
   attribution_method: 'click' | 'view' | 'refcode' | 'modeled' | null;
+
+  // Video transcription (optional, populated when available)
+  transcription?: AdVideoTranscription | null;
 }
 
 /**

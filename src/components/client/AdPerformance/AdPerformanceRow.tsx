@@ -27,7 +27,7 @@ import {
   AlertTriangle,
   TrendingUp,
 } from 'lucide-react';
-import type { AdPerformanceData } from '@/types/adPerformance';
+import type { AdPerformanceData, AdVideoTranscription } from '@/types/adPerformance';
 import {
   formatCurrency,
   formatPercentage,
@@ -35,12 +35,19 @@ import {
   getRoasColor,
   isLowSpend,
 } from '@/utils/adPerformance';
+import { TranscriptionStatusBadge } from './TranscriptionStatusBadge';
 
 interface AdPerformanceRowProps {
   ad: AdPerformanceData;
   onSelect?: (ad: AdPerformanceData) => void;
   /** If true, spend/impressions are estimated (campaign distributed) */
   isEstimatedDistribution?: boolean;
+  /** Transcription data for this ad's video (if available) */
+  transcription?: AdVideoTranscription | null;
+  /** Callback to trigger transcription for this ad */
+  onTranscribe?: (adId: string, videoId: string) => void;
+  /** Whether transcription is in progress for this ad */
+  isTranscribing?: boolean;
 }
 
 /**
@@ -81,13 +88,29 @@ function getTierBadge(
   }
 }
 
-export function AdPerformanceRow({ ad, onSelect, isEstimatedDistribution = false }: AdPerformanceRowProps) {
+export function AdPerformanceRow({
+  ad,
+  onSelect,
+  isEstimatedDistribution = false,
+  transcription,
+  onTranscribe,
+  isTranscribing = false,
+}: AdPerformanceRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const lowSpend = isLowSpend(ad);
   const isVideo = ad.creative_type === 'video';
   const hasAttribution = ad.raised > 0 || ad.unique_donors > 0;
   const tierBadge = getTierBadge(ad.performance_tier, ad.spend, hasAttribution, isEstimatedDistribution);
   const hasNoAttribution = ad.raised === 0 && ad.spend > 0;
+
+  // Use ad.transcription if provided, otherwise use the prop
+  const adTranscription = ad.transcription || transcription;
+
+  const handleTranscribe = () => {
+    if (onTranscribe && adTranscription?.video_id) {
+      onTranscribe(ad.ad_id, adTranscription.video_id);
+    }
+  };
 
   return (
     <div
@@ -160,6 +183,16 @@ export function AdPerformanceRow({ ad, onSelect, isEstimatedDistribution = false
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+            )}
+            {/* Transcription Status Badge - only for video ads */}
+            {isVideo && (
+              <TranscriptionStatusBadge
+                transcription={adTranscription}
+                creativeType={ad.creative_type}
+                onTranscribe={onTranscribe ? handleTranscribe : undefined}
+                isTranscribing={isTranscribing}
+                compact
+              />
             )}
           </div>
         </div>
