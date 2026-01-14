@@ -22,6 +22,7 @@ import { MetaAuthOptions } from '@/components/integrations/MetaAuthOptions';
 import { 
   Plug, 
   ChevronRight, 
+  ChevronDown,
   CheckCircle2, 
   XCircle, 
   Loader2,
@@ -29,7 +30,12 @@ import {
   Eye,
   EyeOff,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Info,
+  ExternalLink,
+  Copy,
+  Check,
+  HelpCircle
 } from 'lucide-react';
 
 interface Step4IntegrationsProps {
@@ -68,6 +74,10 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
   const [isLoading, setIsLoading] = useState(false);
   const [testingIntegration, setTestingIntegration] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [copiedEndpoint, setCopiedEndpoint] = useState(false);
+  const [showActBlueHelp, setShowActBlueHelp] = useState(false);
+  
+  const webhookEndpointUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/actblue-webhook`;
   
   const [integrations, setIntegrations] = useState<Record<string, IntegrationConfig>>(
     (stepData.integrations as Record<string, IntegrationConfig>) || {
@@ -82,6 +92,12 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     switchboard: { api_key: '', account_id: '', isOpen: false, showKey: false },
     actblue: { webhook_secret: '', entity_id: '', csv_username: '', csv_password: '', isOpen: false, showSecret: false, showCsvPassword: false }
   });
+  
+  const copyEndpointUrl = async () => {
+    await navigator.clipboard.writeText(webhookEndpointUrl);
+    setCopiedEndpoint(true);
+    setTimeout(() => setCopiedEndpoint(false), 2000);
+  };
 
   const updateFormState = <K extends keyof IntegrationFormState>(
     platform: K,
@@ -528,17 +544,87 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
                       )}
                       {key === 'actblue' && (
                         <>
+                          {/* Intro Info Box */}
+                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-4">
+                            <div className="flex items-start gap-3">
+                              <Info className="h-5 w-5 text-blue-400 mt-0.5 shrink-0" />
+                              <div className="text-[13px] text-[hsl(var(--portal-text-secondary))]">
+                                <p className="font-medium text-[hsl(var(--portal-text-primary))] mb-2">
+                                  Two integrations are required for complete ActBlue data:
+                                </p>
+                                <ol className="list-decimal list-inside space-y-1 text-[12px]">
+                                  <li><strong>Webhook</strong> — Receives real-time donation notifications</li>
+                                  <li><strong>CSV API</strong> — Backfills historical data and verifies webhook accuracy</li>
+                                </ol>
+                              </div>
+                            </div>
+                          </div>
+
                           {/* Webhook Section */}
                           <div className="space-y-4">
-                            <div className="text-[12px] font-medium text-[hsl(var(--portal-text-secondary))] uppercase tracking-wide">
-                              Webhook Integration
+                            <div>
+                              <div className="text-[12px] font-medium text-[hsl(var(--portal-text-secondary))] uppercase tracking-wide">
+                                Webhook Integration
+                              </div>
+                              <p className="text-[11px] text-[hsl(var(--portal-text-muted))] mt-1">
+                                Receives real-time donation notifications from ActBlue
+                              </p>
                             </div>
+                            
+                            {/* Webhook Setup Instructions */}
+                            <div className="bg-[hsl(var(--portal-bg-tertiary))] rounded-lg p-3 text-[12px] space-y-3">
+                              <p className="font-medium text-[hsl(var(--portal-text-secondary))]">Setup Steps:</p>
+                              <ol className="list-decimal list-inside space-y-2 text-[hsl(var(--portal-text-muted))]">
+                                <li>
+                                  Go to{' '}
+                                  <a 
+                                    href="https://secure.actblue.com/integrations" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-blue-400 hover:text-blue-300 hover:underline inline-flex items-center gap-1"
+                                  >
+                                    ActBlue → Settings → Integrations
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                </li>
+                                <li>Click <strong>"Create Webhook"</strong></li>
+                                <li>Set Event Type to <strong>"ActBlue Default"</strong></li>
+                                <li>
+                                  <span>Enter this Endpoint URL:</span>
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <code className="bg-black/30 px-2 py-1 rounded text-[11px] text-blue-300 break-all flex-1">
+                                      {webhookEndpointUrl}
+                                    </code>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={copyEndpointUrl}
+                                      className="h-7 px-2 shrink-0"
+                                    >
+                                      {copiedEndpoint ? (
+                                        <Check className="h-3.5 w-3.5 text-green-400" />
+                                      ) : (
+                                        <Copy className="h-3.5 w-3.5" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                </li>
+                                <li>Create a <strong>Username</strong> and <strong>Password</strong> for authentication</li>
+                                <li>Copy the <strong>Username</strong> below as "Webhook Secret"</li>
+                              </ol>
+                            </div>
+
                             <div className="space-y-2">
-                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Webhook Secret</Label>
+                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">
+                                Webhook Secret
+                                <span className="text-[11px] font-normal text-[hsl(var(--portal-text-muted))] ml-2">
+                                  (Username you created in ActBlue)
+                                </span>
+                              </Label>
                               <div className="flex gap-2">
                                 <Input
                                   type={formState.actblue.showSecret ? 'text' : 'password'}
-                                  placeholder="Enter webhook secret"
+                                  placeholder="Enter webhook username/secret"
                                   value={formState.actblue.webhook_secret}
                                   onChange={(e) => updateFormState('actblue', { webhook_secret: e.target.value })}
                                   className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
@@ -554,9 +640,14 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
                               </div>
                             </div>
                             <div className="space-y-2">
-                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Entity ID</Label>
+                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">
+                                Entity ID
+                                <span className="text-[11px] font-normal text-[hsl(var(--portal-text-muted))] ml-2">
+                                  (Found in ActBlue under Settings → General)
+                                </span>
+                              </Label>
                               <Input
-                                placeholder="Enter entity ID"
+                                placeholder="Enter entity ID (e.g., 12345)"
                                 value={formState.actblue.entity_id}
                                 onChange={(e) => updateFormState('actblue', { entity_id: e.target.value })}
                                 className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
@@ -571,11 +662,42 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
                                 CSV API (for reconciliation)
                               </div>
                               <p className="text-[11px] text-[hsl(var(--portal-text-muted))] mt-1">
-                                Used to backfill and verify webhook data every 6 hours
+                                Used to backfill historical data and verify webhook accuracy every 6 hours
                               </p>
                             </div>
+                            
+                            {/* CSV API Setup Instructions */}
+                            <div className="bg-[hsl(var(--portal-bg-tertiary))] rounded-lg p-3 text-[12px] space-y-3">
+                              <p className="font-medium text-[hsl(var(--portal-text-secondary))]">Setup Steps:</p>
+                              <ol className="list-decimal list-inside space-y-2 text-[hsl(var(--portal-text-muted))]">
+                                <li>
+                                  Go to{' '}
+                                  <a 
+                                    href="https://secure.actblue.com/api_credentials" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-blue-400 hover:text-blue-300 hover:underline inline-flex items-center gap-1"
+                                  >
+                                    ActBlue → Settings → API Credentials
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                </li>
+                                <li>Click <strong>"Create API Credentials"</strong> or use existing ones</li>
+                                <li>Copy the <strong>Username</strong> and <strong>Password</strong> below</li>
+                              </ol>
+                              <p className="text-[11px] text-yellow-400/80 flex items-center gap-1.5 mt-2 pt-2 border-t border-[hsl(var(--portal-border))]">
+                                <Info className="h-3.5 w-3.5" />
+                                These are different from your webhook credentials
+                              </p>
+                            </div>
+
                             <div className="space-y-2">
-                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">CSV API Username</Label>
+                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">
+                                CSV API Username
+                                <span className="text-[11px] font-normal text-[hsl(var(--portal-text-muted))] ml-2">
+                                  (From API Credentials page)
+                                </span>
+                              </Label>
                               <Input
                                 placeholder="Enter CSV API username"
                                 value={formState.actblue.csv_username}
@@ -584,7 +706,12 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">CSV API Password</Label>
+                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">
+                                CSV API Password
+                                <span className="text-[11px] font-normal text-[hsl(var(--portal-text-muted))] ml-2">
+                                  (From API Credentials page)
+                                </span>
+                              </Label>
                               <div className="flex gap-2">
                                 <Input
                                   type={formState.actblue.showCsvPassword ? 'text' : 'password'}
@@ -604,6 +731,37 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
                               </div>
                             </div>
                           </div>
+
+                          {/* Collapsible Help Section */}
+                          <Collapsible open={showActBlueHelp} onOpenChange={setShowActBlueHelp}>
+                            <CollapsibleTrigger className="flex items-center gap-2 text-[12px] text-blue-400 hover:text-blue-300 mt-4">
+                              <HelpCircle className="h-4 w-4" />
+                              Need help finding these credentials?
+                              <ChevronDown className={`h-4 w-4 transition-transform ${showActBlueHelp ? 'rotate-180' : ''}`} />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-3 p-4 bg-[hsl(var(--portal-bg-tertiary))] rounded-lg text-[12px] space-y-4">
+                              <div>
+                                <p className="font-medium text-[hsl(var(--portal-text-secondary))] mb-1">Where to find your Entity ID:</p>
+                                <p className="text-[hsl(var(--portal-text-muted))]">
+                                  ActBlue → Settings → General → Your entity ID is displayed at the top of the page
+                                </p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-[hsl(var(--portal-text-secondary))] mb-1">Webhook vs CSV API credentials:</p>
+                                <p className="text-[hsl(var(--portal-text-muted))]">
+                                  These are <strong>separate credential sets</strong>. The webhook uses credentials you create when 
+                                  setting up the webhook integration. The CSV API uses credentials from the API Credentials page in Settings.
+                                </p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-[hsl(var(--portal-text-secondary))] mb-1">Don't have API credentials yet?</p>
+                                <p className="text-[hsl(var(--portal-text-muted))]">
+                                  You may need to contact ActBlue support to enable API access for your account. Once enabled, 
+                                  you can create credentials from Settings → API Credentials.
+                                </p>
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
 
                           <div className="flex gap-2 pt-4">
                             <Button
