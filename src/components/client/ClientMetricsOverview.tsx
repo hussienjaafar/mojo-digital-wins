@@ -9,6 +9,7 @@ import { PortalSkeleton } from "@/components/portal/PortalSkeleton";
 import { EChartsLineChart, V3DonutChart } from "@/components/charts/echarts";
 import { NoDataEmptyState } from "@/components/portal/PortalEmptyState";
 import { formatCurrency, formatPercent } from "@/lib/chart-formatters";
+import type { DailyRollupRow, PeriodSummary } from "@/queries/useActBlueDailyRollupQuery";
 
 type Props = {
   organizationId: string;
@@ -16,17 +17,21 @@ type Props = {
   endDate: string;
 };
 
-type AggregatedMetrics = {
+// Combined data from canonical rollup + Meta/SMS spend
+type DailyMetrics = {
   date: string;
-  total_ad_spend: number;
-  total_sms_cost: number;
-  total_funds_raised: number;
-  total_donations: number;
+  net_revenue: number;
+  donation_count: number;
+  meta_spend: number;
+  sms_cost: number;
   roi_percentage: number;
 };
 
 const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) => {
-  const [metrics, setMetrics] = useState<AggregatedMetrics[]>([]);
+  const [dailyMetrics, setDailyMetrics] = useState<DailyMetrics[]>([]);
+  const [summary, setSummary] = useState<PeriodSummary | null>(null);
+  const [totalMetaSpend, setTotalMetaSpend] = useState(0);
+  const [totalSmsSpend, setTotalSmsSpend] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -36,16 +41,116 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
   const loadMetrics = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from('daily_aggregated_metrics')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: true });
+      // Fetch data from CANONICAL ROLLUP (single source of truth for ActBlue metrics)
+      // Plus Meta and SMS spend from their respective tables
+      const [
+        { data: rollupData, error: rollupError },
+        { data: summaryData, error: summaryError },
+        { data: metaData, error: metaError },
+        { data: smsData, error: smsError },
+      ] = await Promise.all([
+        // Canonical daily rollup - timezone-aware, SINGLE SOURCE OF TRUTH
+        (supabase as any).rpc('get_actblue_daily_rollup', {
+          _organization_id: organizationId,
+          _start_date: startDate,
+          _end_date: endDate,
+        }),
+        // Canonical period summary
+        (supabase as any).rpc('get_actblue_period_summary', {
+          _organization_id: organizationId,
+          _start_date: startDate,
+          _end_date: endDate,
+        }),
+        // Meta ad spend by day
+        (supabase as any)
+          .from('meta_ad_metrics')
+          .select('date, spend')
+          .eq('organization_id', organizationId)
+          .gte('date', startDate)
+          .lte('date', endDate),
+        // SMS cost by day
+        (supabase as any)
+          .from('sms_campaigns')
+          .select('send_date, cost')
+          .eq('organization_id', organizationId)
+          .gte('send_date', startDate)
+          .lte('send_date', endDate)
+          .neq('status', 'draft'),
+      ]);
 
-      if (error) throw error;
-      setMetrics(data || []);
+      if (rollupError) throw rollupError;
+      if (summaryError) throw summaryError;
+      if (metaError) throw metaError;
+      if (smsError) throw smsError;
+
+      // Process canonical summary
+      const summaryRow = summaryData?.[0] || {};
+      const periodSummary: PeriodSummary = {
+        gross_raised: Number(summaryRow.gross_raised) || 0,
+        net_raised: Number(summaryRow.net_raised) || 0,
+        refunds: Number(summaryRow.refunds) || 0,
+        net_revenue: Number(summaryRow.net_revenue) || 0,
+        total_fees: Number(summaryRow.total_fees) || 0,
+        donation_count: Number(summaryRow.donation_count) || 0,
+        unique_donors_approx: Number(summaryRow.unique_donors_approx) || 0,
+        refund_count: Number(summaryRow.refund_count) || 0,
+        recurring_count: Number(summaryRow.recurring_count) || 0,
+        one_time_count: Number(summaryRow.one_time_count) || 0,
+        recurring_revenue: Number(summaryRow.recurring_revenue) || 0,
+        one_time_revenue: Number(summaryRow.one_time_revenue) || 0,
+        avg_fee_percentage: Number(summaryRow.avg_fee_percentage) || 0,
+        refund_rate: Number(summaryRow.refund_rate) || 0,
+        avg_donation: Number(summaryRow.avg_donation) || 0,
+        days_with_donations: Number(summaryRow.days_with_donations) || 0,
+      };
+      setSummary(periodSummary);
+
+      // Index Meta spend by day
+      const metaByDay = new Map<string, number>();
+      (metaData || []).forEach((m: any) => {
+        const current = metaByDay.get(m.date) || 0;
+        metaByDay.set(m.date, current + Number(m.spend || 0));
+      });
+
+      // Index SMS cost by day
+      const smsByDay = new Map<string, number>();
+      (smsData || []).forEach((s: any) => {
+        const current = smsByDay.get(s.send_date) || 0;
+        smsByDay.set(s.send_date, current + Number(s.cost || 0));
+      });
+
+      // Calculate totals
+      const metaSpendTotal = Array.from(metaByDay.values()).reduce((sum, v) => sum + v, 0);
+      const smsSpendTotal = Array.from(smsByDay.values()).reduce((sum, v) => sum + v, 0);
+      setTotalMetaSpend(metaSpendTotal);
+      setTotalSmsSpend(smsSpendTotal);
+
+      // Combine canonical rollup with spend data
+      const combined: DailyMetrics[] = (rollupData || []).map((row: any) => {
+        const netRevenue = Number(row.net_revenue) || 0;
+        const metaSpend = metaByDay.get(row.day) || 0;
+        const smsSpend = smsByDay.get(row.day) || 0;
+        const totalSpend = metaSpend + smsSpend;
+        const roi = totalSpend > 0 ? ((netRevenue - totalSpend) / totalSpend) * 100 : 0;
+
+        return {
+          date: row.day,
+          net_revenue: netRevenue,
+          donation_count: Number(row.donation_count) || 0,
+          meta_spend: metaSpend,
+          sms_cost: smsSpend,
+          roi_percentage: roi,
+        };
+      });
+
+      setDailyMetrics(combined);
+
+      logger.debug('ClientMetricsOverview using canonical rollup', {
+        netRevenue: periodSummary.net_revenue,
+        donations: periodSummary.donation_count,
+        metaSpend: metaSpendTotal,
+        smsSpend: smsSpendTotal,
+      });
     } catch (error) {
       logger.error('Failed to load metrics', error);
     } finally {
@@ -53,14 +158,15 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
     }
   };
 
-  const totalRaised = metrics.reduce((sum, m) => sum + Number(m.total_funds_raised || 0), 0);
-  const totalSpent = metrics.reduce((sum, m) => sum + Number(m.total_ad_spend || 0) + Number(m.total_sms_cost || 0), 0);
-  const totalDonations = metrics.reduce((sum, m) => sum + Number(m.total_donations || 0), 0);
-  const avgROI = totalSpent > 0 ? ((totalRaised - totalSpent) / totalSpent * 100) : 0;
+  // Use canonical rollup summary for KPIs
+  const totalNetRevenue = summary?.net_revenue || 0;
+  const totalSpent = totalMetaSpend + totalSmsSpend;
+  const totalDonations = summary?.donation_count || 0;
+  const avgROI = totalSpent > 0 ? ((totalNetRevenue - totalSpent) / totalSpent * 100) : 0;
 
   const spendByChannel = [
-    { name: 'Meta Ads', value: metrics.reduce((sum, m) => sum + Number(m.total_ad_spend || 0), 0) },
-    { name: 'SMS', value: metrics.reduce((sum, m) => sum + Number(m.total_sms_cost || 0), 0) },
+    { name: 'Meta Ads', value: totalMetaSpend },
+    { name: 'SMS', value: totalSmsSpend },
   ];
 
   if (isLoading) {
@@ -80,7 +186,7 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
     );
   }
 
-  if (metrics.length === 0) {
+  if (dailyMetrics.length === 0) {
     return <NoDataEmptyState onRefresh={loadMetrics} />;
   }
 
@@ -90,9 +196,9 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <V3KPICard
           icon={DollarSign}
-          label="Total Raised"
-          value={formatCurrency(totalRaised, false)}
-          subtitle={`${totalDonations} donations`}
+          label="Net Revenue"
+          value={formatCurrency(totalNetRevenue, false)}
+          subtitle={`${totalDonations} donations (after fees & refunds)`}
           accent="green"
         />
         <V3KPICard
@@ -111,9 +217,9 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
         />
         <V3KPICard
           icon={Users}
-          label="Avg Donation"
-          value={formatCurrency(totalDonations > 0 ? totalRaised / totalDonations : 0, false)}
-          subtitle="Per donor"
+          label="Avg Net Donation"
+          value={formatCurrency(totalDonations > 0 ? totalNetRevenue / totalDonations : 0, false)}
+          subtitle="Per donor (after fees)"
           accent="purple"
         />
       </div>
@@ -121,17 +227,17 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
       {/* Charts - Enhanced with V3 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <V3ChartWrapper
-          title="Funds Raised Over Time"
-          ariaLabel="Line chart showing funds raised over time"
+          title="Net Revenue Over Time"
+          ariaLabel="Line chart showing net revenue over time"
           accent="green"
         >
           <EChartsLineChart
-            data={metrics}
+            data={dailyMetrics}
             xAxisKey="date"
             series={[
               {
-                dataKey: "total_funds_raised",
-                name: "Funds Raised",
+                dataKey: "net_revenue",
+                name: "Net Revenue",
                 color: "hsl(var(--primary))",
                 type: "area",
                 areaStyle: { opacity: 0.1 },
@@ -166,7 +272,7 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
         accent="purple"
       >
         <EChartsLineChart
-          data={metrics}
+          data={dailyMetrics}
           xAxisKey="date"
           series={[
             {

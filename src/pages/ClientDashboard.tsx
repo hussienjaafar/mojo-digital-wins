@@ -27,6 +27,7 @@ import { useClientDashboardMetricsQuery, useRecurringHealthQuery } from "@/queri
 import { buildHeroKpis } from "@/utils/buildHeroKpis";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
+import { ActBlueMetricsDebug } from "@/components/debug/ActBlueMetricsDebug";
 
 // Lazy load Heatmap for performance
 const DonationHeatmap = lazy(() => import("@/components/client/DonationHeatmap"));
@@ -494,6 +495,22 @@ const ClientDashboard = () => {
             </motion.div>
           </TooltipProvider>
         </PortalErrorBoundary>
+
+        {/* Debug Panel - only visible when ?debug=actblue or VITE_ENABLE_METRICS_DEBUG=true */}
+        <ActBlueMetricsDebug
+          organizationId={organizationId}
+          startDate={dateRange.startDate}
+          endDate={dateRange.endDate}
+          dashboardKpis={data?.kpis ? {
+            totalRaised: data.kpis.totalRaised,
+            totalNetRevenue: data.kpis.totalNetRevenue,
+            totalFees: data.kpis.totalFees,
+            refundAmount: data.kpis.refundAmount,
+            donationCount: data.kpis.donationCount,
+            uniqueDonors: data.kpis.uniqueDonors,
+          } : undefined}
+          timezone="America/New_York"
+        />
       </div>
     </ClientShell>
   );

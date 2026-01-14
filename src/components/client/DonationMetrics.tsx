@@ -202,8 +202,9 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         <motion.div variants={itemVariants}>
           <V3KPICard
             icon={DollarSign}
-            label="Total Raised"
+            label="Gross Raised"
             value={formatCurrency(metrics.totalRaised, true)}
+            subtitle="Before fees"
             accent="green"
           />
         </motion.div>

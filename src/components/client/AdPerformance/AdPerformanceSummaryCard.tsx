@@ -95,7 +95,7 @@ export function AdPerformanceSummaryCard({
             <div className="text-lg font-bold text-green-600 dark:text-green-400">
               {formatCurrency(totals.total_raised)}
             </div>
-            <div className="text-xs text-muted-foreground">Total Raised</div>
+            <div className="text-xs text-muted-foreground">Net Raised</div>
           </div>
           <div>
             <div className={cn('text-lg font-bold', getRoasColor(totals.total_roas))}>

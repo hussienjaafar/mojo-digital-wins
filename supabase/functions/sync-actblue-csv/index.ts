@@ -644,10 +644,18 @@ serve(async (req) => {
           
             for (const row of rows) {
               totalProcessed++;
-            
-              // ActBlue CSV can have either lineitem_id or receipt_id as the unique identifier
-              const transactionId = row.lineitem_id || row.receipt_id;
-              
+
+              // CANONICAL DEDUPE STRATEGY:
+              // 1. Use lineitem_id as primary identifier (matches webhook)
+              // 2. Store receipt_id separately for cross-reference
+              // 3. If only receipt_id exists, use it as fallback but flag for review
+              const lineitemIdStr = row.lineitem_id;
+              const receiptIdStr = row.receipt_id;
+
+              // Prefer lineitem_id for consistency with webhook ingestion
+              // Webhook uses lineitemId from JSON payload
+              const transactionId = lineitemIdStr || receiptIdStr;
+
               // Skip if no transaction identifier
               if (!transactionId) {
                 totalSkipped++;
@@ -655,6 +663,11 @@ serve(async (req) => {
                   console.log(`Skipped row - no identifier. First 5 keys: ${Object.keys(row).slice(0, 5).join(', ')}`);
                 }
                 continue;
+              }
+
+              // Log warning if using receipt_id as fallback (potential dedupe issue)
+              if (!lineitemIdStr && receiptIdStr && totalProcessed <= 5) {
+                console.warn(`[DEDUPE] Row ${totalProcessed} using receipt_id as transaction_id - may cause duplicates with webhook`);
               }
               
               // Extract all the enhanced fields using helper functions
@@ -748,6 +761,9 @@ serve(async (req) => {
               const transactionData = {
                 organization_id: orgId,
                 transaction_id: transactionId,
+                // DEDUPE: Store both identifiers for cross-reference
+                lineitem_id: lineitemIdStr ? parseInt(lineitemIdStr) : null,
+                receipt_id: receiptIdStr || null,
                 donor_email: row.donor_email || null,
                 donor_name: donorName,
                 first_name: firstName,
@@ -779,7 +795,6 @@ serve(async (req) => {
                 double_down: doubleDown,
                 // Standard fields
                 text_message_option: row.text_message_option || null,
-                lineitem_id: parseInt(transactionId) || null,
                 entity_id: row.entity_id || config.entity_id,
                 committee_name: row.recipient || null,
                 fec_id: row.fec_id || null,

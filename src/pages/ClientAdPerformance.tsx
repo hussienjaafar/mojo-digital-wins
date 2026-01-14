@@ -305,7 +305,7 @@ export default function ClientAdPerformance() {
               <CardContent className="p-3">
                 <div className="flex items-center gap-1.5 text-[hsl(var(--portal-text-muted))] mb-1">
                   <TrendingUp className="h-3.5 w-3.5" />
-                  <span className="text-[10px] font-medium uppercase tracking-wide">Total Raised</span>
+                  <span className="text-[10px] font-medium uppercase tracking-wide">Net Raised</span>
                 </div>
                 <div className="text-lg font-bold text-green-600 dark:text-green-400">
                   {formatCurrency(adPerformanceData.totals.total_raised)}

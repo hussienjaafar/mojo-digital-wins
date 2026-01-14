@@ -2,7 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDateRange, useSelectedCampaignId, useSelectedCreativeId } from "@/stores/dashboardStore";
 import { format, parseISO, subDays, eachDayOfInterval, addDays } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { logger } from "@/lib/logger";
+import { DEFAULT_ORG_TIMEZONE } from "@/lib/metricDefinitions";
+import type { DailyRollupRow, PeriodSummary } from "./useActBlueDailyRollupQuery";
 
 export interface DashboardKPIs {
   totalRaised: number;
@@ -93,32 +96,52 @@ function getPreviousPeriod(startDate: string, endDate: string) {
 
 // ============================================================================
 // Performance: Bucket items by yyyy-MM-dd key for O(1) lookups
+// IMPORTANT: All bucketing uses org timezone to match SQL day boundaries
 // ============================================================================
 
 /**
- * Extract yyyy-MM-dd from an ISO-ish date string (e.g., "2024-01-15T12:30:00").
- * Returns null if the string doesn't start with a valid date format.
+ * Extract yyyy-MM-dd from an ISO timestamp in the specified timezone.
+ * This ensures client-side bucketing matches server-side (SQL) day boundaries.
+ *
+ * Example: "2025-01-15T00:30:00.000Z" in America/New_York:
+ * - UTC: 2025-01-15 00:30
+ * - ET (EST): 2025-01-14 19:30 → buckets to "2025-01-14"
+ *
+ * @param dateStr ISO timestamp string (e.g., "2024-01-15T12:30:00.000Z")
+ * @param timezone IANA timezone (e.g., "America/New_York")
+ * @returns yyyy-MM-dd string in the specified timezone, or null if invalid
  */
-function extractDayKey(dateStr: string | null | undefined): string | null {
-  if (!dateStr || dateStr.length < 10) return null;
-  // Check for yyyy-MM-dd format (positions 4 and 7 are '-')
-  if (dateStr[4] !== '-' || dateStr[7] !== '-') return null;
-  return dateStr.slice(0, 10);
+function extractDayKeyInTimezone(
+  dateStr: string | null | undefined,
+  timezone: string
+): string | null {
+  if (!dateStr) return null;
+  try {
+    const date = parseISO(dateStr);
+    if (isNaN(date.getTime())) return null;
+    return formatInTimeZone(date, timezone, 'yyyy-MM-dd');
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Bucket an array of items by day key for O(1) lookups.
+ * Uses org timezone to ensure consistency with SQL day bucketing.
+ *
  * @param items Array of items to bucket
  * @param getDateStr Function to extract date string from each item
+ * @param timezone IANA timezone for day bucketing (default: America/New_York)
  * @returns Map from yyyy-MM-dd key to array of items for that day
  */
 function bucketByDay<T>(
   items: T[],
-  getDateStr: (item: T) => string | null | undefined
+  getDateStr: (item: T) => string | null | undefined,
+  timezone: string = DEFAULT_ORG_TIMEZONE
 ): Map<string, T[]> {
   const buckets = new Map<string, T[]>();
   for (const item of items) {
-    const dayKey = extractDayKey(getDateStr(item));
+    const dayKey = extractDayKeyInTimezone(getDateStr(item), timezone);
     if (dayKey) {
       const bucket = buckets.get(dayKey);
       if (bucket) {
@@ -147,6 +170,90 @@ function bucketMetaByDay<T extends { date?: string }>(items: T[]): Map<string, T
     }
   }
   return buckets;
+}
+
+// ============================================================================
+// Canonical ActBlue Rollup Functions (timezone-aware, single source of truth)
+// ============================================================================
+
+/**
+ * Fetch daily ActBlue rollup from the canonical RPC.
+ * This uses org timezone for day bucketing - the SINGLE SOURCE OF TRUTH.
+ */
+async function fetchCanonicalDailyRollup(
+  organizationId: string,
+  startDate: string,
+  endDate: string
+): Promise<DailyRollupRow[]> {
+  const { data, error } = await (supabase as any).rpc('get_actblue_daily_rollup', {
+    _organization_id: organizationId,
+    _start_date: startDate,
+    _end_date: endDate,
+  });
+
+  if (error) {
+    logger.error('Failed to fetch canonical ActBlue daily rollup', { error, organizationId });
+    throw new Error(`Failed to fetch daily rollup: ${error.message}`);
+  }
+
+  return (data || []).map((row: any) => ({
+    day: row.day,
+    gross_raised: Number(row.gross_raised) || 0,
+    net_raised: Number(row.net_raised) || 0,
+    refunds: Number(row.refunds) || 0,
+    net_revenue: Number(row.net_revenue) || 0,
+    total_fees: Number(row.total_fees) || 0,
+    donation_count: Number(row.donation_count) || 0,
+    unique_donors: Number(row.unique_donors) || 0,
+    refund_count: Number(row.refund_count) || 0,
+    recurring_count: Number(row.recurring_count) || 0,
+    one_time_count: Number(row.one_time_count) || 0,
+    recurring_revenue: Number(row.recurring_revenue) || 0,
+    one_time_revenue: Number(row.one_time_revenue) || 0,
+    fee_percentage: Number(row.fee_percentage) || 0,
+    refund_rate: Number(row.refund_rate) || 0,
+  }));
+}
+
+/**
+ * Fetch ActBlue period summary from the canonical RPC.
+ * This uses org timezone for day bucketing - the SINGLE SOURCE OF TRUTH.
+ */
+async function fetchCanonicalPeriodSummary(
+  organizationId: string,
+  startDate: string,
+  endDate: string
+): Promise<PeriodSummary> {
+  const { data, error } = await (supabase as any).rpc('get_actblue_period_summary', {
+    _organization_id: organizationId,
+    _start_date: startDate,
+    _end_date: endDate,
+  });
+
+  if (error) {
+    logger.error('Failed to fetch canonical ActBlue period summary', { error, organizationId });
+    throw new Error(`Failed to fetch period summary: ${error.message}`);
+  }
+
+  const row = data?.[0] || {};
+  return {
+    gross_raised: Number(row.gross_raised) || 0,
+    net_raised: Number(row.net_raised) || 0,
+    refunds: Number(row.refunds) || 0,
+    net_revenue: Number(row.net_revenue) || 0,
+    total_fees: Number(row.total_fees) || 0,
+    donation_count: Number(row.donation_count) || 0,
+    unique_donors_approx: Number(row.unique_donors_approx) || 0,
+    refund_count: Number(row.refund_count) || 0,
+    recurring_count: Number(row.recurring_count) || 0,
+    one_time_count: Number(row.one_time_count) || 0,
+    recurring_revenue: Number(row.recurring_revenue) || 0,
+    one_time_revenue: Number(row.one_time_revenue) || 0,
+    avg_fee_percentage: Number(row.avg_fee_percentage) || 0,
+    refund_rate: Number(row.refund_rate) || 0,
+    avg_donation: Number(row.avg_donation) || 0,
+    days_with_donations: Number(row.days_with_donations) || 0,
+  };
 }
 
 async function fetchDashboardMetrics(
@@ -207,7 +314,10 @@ async function fetchDashboardMetrics(
     prevFilteredTxIds = new Set((prevAttrData || []).map((a: any) => a.transaction_id).filter(Boolean));
   }
 
-  // Phase 2: Fetch all data (transactions will be filtered client-side if filters active)
+  // Phase 2: Fetch all data
+  // - When no filters: use canonical rollup for ActBlue metrics (timezone-aware)
+  // - When filters: use raw transactions (filtered by attribution)
+  // - Raw transactions still needed for: attribution analysis, donor tracking, upsell metrics
   const [
     { data: donationData },
     { data: prevDonationData },
@@ -217,8 +327,12 @@ async function fetchDashboardMetrics(
     { data: prevMetaData },
     { data: smsData },
     { data: prevSmsData },
+    canonicalDailyRollup,
+    canonicalPeriodSummary,
+    prevCanonicalSummary,
   ] = await Promise.all([
     // Current period donations - fetch all, filter client-side if needed
+    // Still needed for: attribution, donors, upsell tracking
     (supabase as any)
       .from('actblue_transactions_secure')
       .select('id, amount, net_amount, fee, donor_email, donor_id_hash, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_type, transaction_date, refcode, source_campaign, click_id, fbclid')
@@ -256,6 +370,12 @@ async function fetchDashboardMetrics(
       .gte('send_date', prevPeriod.start)
       .lt('send_date', prevEndInclusive)
       .neq('status', 'draft'),
+    // Canonical ActBlue daily rollup - timezone-aware, SINGLE SOURCE OF TRUTH
+    fetchCanonicalDailyRollup(organizationId, startDate, endDate),
+    // Canonical ActBlue period summary
+    fetchCanonicalPeriodSummary(organizationId, startDate, endDate),
+    // Previous period canonical summary
+    fetchCanonicalPeriodSummary(organizationId, prevPeriod.start, prevPeriod.end),
   ]);
 
   // Apply client-side filtering for donations only (not refunds)
@@ -293,16 +413,47 @@ async function fetchDashboardMetrics(
   const metaMetrics = metaData || [];
   const prevMetaMetrics = prevMetaData || [];
 
-  // Calculate current period KPIs using donations only (not refunds)
-  const grossDonations = donations.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
-  const refundAmount = refunds.reduce((sum: number, d: any) => sum + Math.abs(Number(d.net_amount ?? d.amount ?? 0)), 0);
-  const totalRaised = grossDonations; // Gross donations only
-  const totalNetRevenue = donations.reduce((sum: number, d: any) => sum + Number(d.net_amount ?? d.amount ?? 0), 0) - refundAmount;
-  const totalFees = donations.reduce((sum: number, d: any) => sum + Number(d.fee || 0), 0);
-  const feePercentage = grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0;
+  // ============================================================================
+  // ActBlue KPIs: Use CANONICAL ROLLUP when no filters, raw transactions when filtered
+  // This ensures timezone-aware day bucketing matches SQL exactly
+  // ============================================================================
+  let totalRaised: number;
+  let totalNetRevenue: number;
+  let refundAmount: number;
+  let totalFees: number;
+  let feePercentage: number;
+  let refundRate: number;
 
-  // Refund rate: refunds as percentage of gross donations
-  const refundRate = grossDonations > 0 ? (refundAmount / grossDonations) * 100 : 0;
+  if (!hasFilters) {
+    // Use canonical rollup for ActBlue metrics - SINGLE SOURCE OF TRUTH
+    totalRaised = canonicalPeriodSummary.gross_raised;
+    totalNetRevenue = canonicalPeriodSummary.net_revenue;
+    refundAmount = canonicalPeriodSummary.refunds;
+    totalFees = canonicalPeriodSummary.total_fees;
+    feePercentage = canonicalPeriodSummary.avg_fee_percentage;
+    refundRate = canonicalPeriodSummary.refund_rate;
+
+    logger.debug('Using canonical rollup for ActBlue KPIs', {
+      gross: totalRaised,
+      net: totalNetRevenue,
+      refunds: refundAmount,
+      fees: totalFees,
+    });
+  } else {
+    // With filters, calculate from filtered raw transactions
+    const grossDonations = donations.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+    refundAmount = refunds.reduce((sum: number, d: any) => sum + Math.abs(Number(d.net_amount ?? d.amount ?? 0)), 0);
+    totalRaised = grossDonations;
+    totalNetRevenue = donations.reduce((sum: number, d: any) => sum + Number(d.net_amount ?? d.amount ?? 0), 0) - refundAmount;
+    totalFees = donations.reduce((sum: number, d: any) => sum + Number(d.fee || 0), 0);
+    feePercentage = grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0;
+    refundRate = grossDonations > 0 ? (refundAmount / grossDonations) * 100 : 0;
+
+    logger.debug('Using filtered raw transactions for ActBlue KPIs (campaign/creative filter active)', {
+      gross: totalRaised,
+      filtered: donations.length,
+    });
+  }
 
   // Recurring donations (only actual donations, not refunds)
   const recurringDonations = donations.filter((d: any) => d.is_recurring);
@@ -342,7 +493,10 @@ async function fetchDashboardMetrics(
 
   const totalImpressions = metaMetrics.reduce((sum: number, m: any) => sum + (m.impressions || 0), 0);
   const totalClicks = metaMetrics.reduce((sum: number, m: any) => sum + (m.clicks || 0), 0);
-  const avgDonation = donations.length > 0 ? grossDonations / donations.length : 0;
+  // Average donation: use canonical summary when no filters
+  const avgDonation = !hasFilters
+    ? canonicalPeriodSummary.avg_donation
+    : (donations.length > 0 ? totalRaised / donations.length : 0);
 
   // Deterministic rate from donation_attribution (includes refcode, click_id, fbclid, sms_last_touch)
   // Fall back to transaction-level fields if attribution view is empty
@@ -380,12 +534,28 @@ async function fetchDashboardMetrics(
   // Track if we're using fallback mode for attribution (helps UI show warning)
   const attributionFallbackMode = donationAttributions.length === 0 && donations.length > 0;
 
-  // Calculate previous period KPIs (using the same methodology as current period)
-  const prevGrossDonations = prevDonations.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
-  const prevRefundAmount = prevRefunds.reduce((sum: number, d: any) => sum + Math.abs(Number(d.net_amount ?? d.amount ?? 0)), 0);
-  const prevTotalRaised = prevGrossDonations;
-  const prevTotalNetRevenue = prevDonations.reduce((sum: number, d: any) => sum + Number(d.net_amount ?? d.amount ?? 0), 0) - prevRefundAmount;
-  const prevRefundRate = prevGrossDonations > 0 ? (prevRefundAmount / prevGrossDonations) * 100 : 0;
+  // ============================================================================
+  // Previous Period ActBlue KPIs: Use CANONICAL ROLLUP when no filters
+  // ============================================================================
+  let prevTotalRaised: number;
+  let prevTotalNetRevenue: number;
+  let prevRefundAmount: number;
+  let prevRefundRate: number;
+
+  if (!hasFilters) {
+    // Use canonical rollup for previous period - SINGLE SOURCE OF TRUTH
+    prevTotalRaised = prevCanonicalSummary.gross_raised;
+    prevTotalNetRevenue = prevCanonicalSummary.net_revenue;
+    prevRefundAmount = prevCanonicalSummary.refunds;
+    prevRefundRate = prevCanonicalSummary.refund_rate;
+  } else {
+    // With filters, calculate from filtered raw transactions
+    const prevGrossDonations = prevDonations.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+    prevRefundAmount = prevRefunds.reduce((sum: number, d: any) => sum + Math.abs(Number(d.net_amount ?? d.amount ?? 0)), 0);
+    prevTotalRaised = prevGrossDonations;
+    prevTotalNetRevenue = prevDonations.reduce((sum: number, d: any) => sum + Number(d.net_amount ?? d.amount ?? 0), 0) - prevRefundAmount;
+    prevRefundRate = prevGrossDonations > 0 ? (prevRefundAmount / prevGrossDonations) * 100 : 0;
+  }
 
   const prevRecurringDonations = prevDonations.filter((d: any) => d.is_recurring);
   const prevRecurringRaised = prevRecurringDonations.reduce((sum: number, d: any) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
@@ -423,7 +593,11 @@ async function fetchDashboardMetrics(
       : 0;
   }
 
+  // ============================================================================
   // Build time series data
+  // When no filters: Use CANONICAL DAILY ROLLUP for ActBlue metrics (timezone-aware)
+  // When filters: Use client-side bucketing of filtered transactions
+  // ============================================================================
   const days = eachDayOfInterval({
     start: parseISO(startDate),
     end: parseISO(endDate),
@@ -433,16 +607,23 @@ async function fetchDashboardMetrics(
     end: parseISO(prevPeriod.end),
   });
 
-  // Pre-bucket data by day for O(1) lookups instead of O(days × rows) filtering
-  // Donations are filtered by campaign/creative; refunds include ALL (not filterable)
-  const donationsByDay = bucketByDay(donations, (d: any) => d.transaction_date);
-  const refundsByDay = bucketByDay(refunds, (d: any) => d.transaction_date);
+  // Pre-bucket Meta/SMS by day (these don't have timezone issues - already in yyyy-MM-dd)
   const metaByDay = bucketMetaByDay(metaMetrics);
   const smsByDay = bucketByDay(smsMetrics, (s: any) => s.send_date);
-  const prevDonationsByDay = bucketByDay(prevDonations, (d: any) => d.transaction_date);
-  const prevRefundsByDay = bucketByDay(prevRefunds, (d: any) => d.transaction_date);
   const prevMetaByDay = bucketMetaByDay(prevMetaMetrics);
   const prevSmsByDay = bucketByDay(prevSmsMetrics, (s: any) => s.send_date);
+
+  // For filtered case, still need transaction bucketing (used for attribution sparklines too)
+  const donationsByDay = bucketByDay(donations, (d: any) => d.transaction_date);
+  const refundsByDay = bucketByDay(refunds, (d: any) => d.transaction_date);
+  const prevDonationsByDay = bucketByDay(prevDonations, (d: any) => d.transaction_date);
+  const prevRefundsByDay = bucketByDay(prevRefunds, (d: any) => d.transaction_date);
+
+  // Index canonical rollup by day for O(1) lookups
+  const canonicalByDay = new Map<string, DailyRollupRow>();
+  for (const row of canonicalDailyRollup) {
+    canonicalByDay.set(row.day, row);
+  }
 
   const timeSeries: DashboardTimeSeriesPoint[] = days.map((day, index) => {
     const dayStr = format(day, 'yyyy-MM-dd');
@@ -450,40 +631,51 @@ async function fetchDashboardMetrics(
     const prevDay = prevDays[index];
     const prevDayStr = prevDay ? format(prevDay, 'yyyy-MM-dd') : null;
 
-    // O(1) lookups using pre-bucketed data
-    const dayDonationsOnly = donationsByDay.get(dayStr) ?? [];
-    const dayRefundsOnly = refundsByDay.get(dayStr) ?? [];
+    // Meta/SMS lookups (not affected by timezone issues)
     const dayMeta = metaByDay.get(dayStr) ?? [];
     const daySms = smsByDay.get(dayStr) ?? [];
-
-    const prevDayDonationsOnly = prevDayStr ? (prevDonationsByDay.get(prevDayStr) ?? []) : [];
-    const prevDayRefundsOnly = prevDayStr ? (prevRefundsByDay.get(prevDayStr) ?? []) : [];
     const prevDayMeta = prevDayStr ? (prevMetaByDay.get(prevDayStr) ?? []) : [];
     const prevDaySms = prevDayStr ? (prevSmsByDay.get(prevDayStr) ?? []) : [];
 
-    // Gross donations (donations only, not refunds)
-    const grossDonationsDay = dayDonationsOnly.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
-    const donationNetDay = dayDonationsOnly.reduce((sum: number, d: any) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    // Refunds use net_amount when available, with Math.abs for consistent positive value
-    const refundAmountDay = dayRefundsOnly.reduce((sum: number, d: any) => sum + Math.abs(Number(d.net_amount ?? d.amount ?? 0)), 0);
-    // Net donations = donation net minus refund net (refund-adjusted for charts)
-    const netDonationsDay = donationNetDay - refundAmountDay;
+    // ActBlue metrics: Use canonical rollup when no filters
+    let grossDonationsDay: number;
+    let netDonationsDay: number;
+    let refundAmountDay: number;
 
+    if (!hasFilters) {
+      // Use canonical rollup - SINGLE SOURCE OF TRUTH (timezone-aware)
+      const canonicalDay = canonicalByDay.get(dayStr);
+      grossDonationsDay = canonicalDay?.gross_raised ?? 0;
+      // netDonations = net_revenue (already refund-adjusted in canonical)
+      netDonationsDay = canonicalDay?.net_revenue ?? 0;
+      refundAmountDay = canonicalDay?.refunds ?? 0;
+    } else {
+      // With filters, use client-side bucketing
+      const dayDonationsOnly = donationsByDay.get(dayStr) ?? [];
+      const dayRefundsOnly = refundsByDay.get(dayStr) ?? [];
+      grossDonationsDay = dayDonationsOnly.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+      const donationNetDay = dayDonationsOnly.reduce((sum: number, d: any) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
+      refundAmountDay = dayRefundsOnly.reduce((sum: number, d: any) => sum + Math.abs(Number(d.net_amount ?? d.amount ?? 0)), 0);
+      netDonationsDay = donationNetDay - refundAmountDay;
+    }
+
+    // Previous period: still use client-side bucketing (canonical rollup not fetched for prev daily)
+    const prevDayDonationsOnly = prevDayStr ? (prevDonationsByDay.get(prevDayStr) ?? []) : [];
+    const prevDayRefundsOnly = prevDayStr ? (prevRefundsByDay.get(prevDayStr) ?? []) : [];
     const prevGross = prevDayDonationsOnly.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
     const prevDonationNet = prevDayDonationsOnly.reduce((sum: number, d: any) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
     const prevRefundAmountDay = prevDayRefundsOnly.reduce((sum: number, d: any) => sum + Math.abs(Number(d.net_amount ?? d.amount ?? 0)), 0);
-    // Previous period net donations also refund-adjusted
     const prevNetDonationsDay = prevDonationNet - prevRefundAmountDay;
 
     return {
       name: dayLabel,
       donations: grossDonationsDay,
-      netDonations: netDonationsDay, // Refund-adjusted: donation net - refund net
+      netDonations: netDonationsDay,
       refunds: -refundAmountDay, // Negative for chart display
       metaSpend: dayMeta.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0),
       smsSpend: daySms.reduce((sum: number, s: any) => sum + Number(s.cost || 0), 0),
       donationsPrev: prevGross,
-      netDonationsPrev: prevNetDonationsDay, // Refund-adjusted for previous period
+      netDonationsPrev: prevNetDonationsDay,
       refundsPrev: -prevRefundAmountDay,
       metaSpendPrev: prevDayMeta.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0),
       smsSpendPrev: prevDaySms.reduce((sum: number, s: any) => sum + Number(s.cost || 0), 0),
@@ -628,12 +820,12 @@ async function fetchDashboardMetrics(
           firstRecurringByDonor.set(email, { date: txnDate, amount: Number(don.net_amount ?? don.amount ?? 0) });
         }
       }
-      // Bucket by day within the selected period
+      // Bucket by day within the selected period (using org timezone for consistency)
       return days.map((day) => {
         const dayStr = format(day, 'yyyy-MM-dd');
         let dayTotal = 0;
         for (const [, { date, amount }] of firstRecurringByDonor) {
-          if (extractDayKey(date) === dayStr) {
+          if (extractDayKeyInTimezone(date, DEFAULT_ORG_TIMEZONE) === dayStr) {
             dayTotal += amount;
           }
         }

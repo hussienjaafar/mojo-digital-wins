@@ -12,6 +12,8 @@ import {
   mockDonationTransactions,
   mockDonationAttributions,
   mockSmsEvents,
+  mockCanonicalDailyRollup,
+  mockCanonicalPeriodSummary,
   TEST_ORG_ID,
 } from './fixtures';
 
@@ -458,5 +460,29 @@ export const handlers = [
         email: 'test@example.com',
       },
     });
+  }),
+
+  // -------------------------------------------------------------------------
+  // Canonical ActBlue Rollup RPCs
+  // These are the SINGLE SOURCE OF TRUTH for ActBlue metrics
+  // -------------------------------------------------------------------------
+  http.post(`${SUPABASE_URL}/rest/v1/rpc/get_actblue_daily_rollup`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    const orgId = body._organization_id;
+
+    if (orgId === TEST_ORG_ID) {
+      return HttpResponse.json(mockCanonicalDailyRollup);
+    }
+    return HttpResponse.json([]);
+  }),
+
+  http.post(`${SUPABASE_URL}/rest/v1/rpc/get_actblue_period_summary`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    const orgId = body._organization_id;
+
+    if (orgId === TEST_ORG_ID) {
+      return HttpResponse.json(mockCanonicalPeriodSummary);
+    }
+    return HttpResponse.json([]);
   }),
 ];

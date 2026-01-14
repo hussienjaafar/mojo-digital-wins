@@ -176,3 +176,13 @@ export {
   useRecurringHealthQuery,
   type RecurringHealthV2Data,
 } from "./useRecurringHealthQuery";
+
+// ActBlue Canonical Rollup (SINGLE SOURCE OF TRUTH for ActBlue metrics)
+export {
+  useActBlueDailyRollupQuery,
+  useActBluePeriodSummaryQuery,
+  actBlueRollupKeys,
+  type DailyRollupRow,
+  type PeriodSummary,
+  type ActBlueRollupData,
+} from "./useActBlueDailyRollupQuery";

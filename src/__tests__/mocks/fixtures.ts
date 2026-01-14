@@ -568,3 +568,115 @@ export const mockSparklineData = [
   { date: 'Jan 22', value: 1650 },
   { date: 'Jan 29', value: 1820 },
 ];
+
+// ============================================================================
+// Canonical ActBlue Rollup Fixtures (for RPC mocks)
+// These match the values from mockDonationTransactions above
+// ============================================================================
+
+/**
+ * Canonical daily rollup - timezone-aware day bucketing
+ * Matches mockDonationTransactions:
+ * - 2024-01-15: txn-1 ($50, net $47.5)
+ * - 2024-01-16: txn-2 ($100, net $95)
+ * - 2024-01-17: txn-3 (refund -$25)
+ * - 2024-01-18: txn-4 ($75, net $71.25)
+ */
+export const mockCanonicalDailyRollup = [
+  {
+    day: '2024-01-15',
+    gross_raised: 50,
+    net_raised: 47.5,
+    refunds: 0,
+    net_revenue: 47.5,
+    total_fees: 2.5,
+    donation_count: 1,
+    unique_donors: 1,
+    refund_count: 0,
+    recurring_count: 0,
+    one_time_count: 1,
+    recurring_revenue: 0,
+    one_time_revenue: 47.5,
+    fee_percentage: 5,
+    refund_rate: 0,
+  },
+  {
+    day: '2024-01-16',
+    gross_raised: 100,
+    net_raised: 95,
+    refunds: 0,
+    net_revenue: 95,
+    total_fees: 5,
+    donation_count: 1,
+    unique_donors: 1,
+    refund_count: 0,
+    recurring_count: 1,
+    one_time_count: 0,
+    recurring_revenue: 95,
+    one_time_revenue: 0,
+    fee_percentage: 5,
+    refund_rate: 0,
+  },
+  {
+    day: '2024-01-17',
+    gross_raised: 0,
+    net_raised: 0,
+    refunds: 25,
+    net_revenue: -25,
+    total_fees: 0,
+    donation_count: 0,
+    unique_donors: 0,
+    refund_count: 1,
+    recurring_count: 0,
+    one_time_count: 0,
+    recurring_revenue: 0,
+    one_time_revenue: 0,
+    fee_percentage: 0,
+    refund_rate: 0,
+  },
+  {
+    day: '2024-01-18',
+    gross_raised: 75,
+    net_raised: 71.25,
+    refunds: 0,
+    net_revenue: 71.25,
+    total_fees: 3.75,
+    donation_count: 1,
+    unique_donors: 1,
+    refund_count: 0,
+    recurring_count: 0,
+    one_time_count: 1,
+    recurring_revenue: 0,
+    one_time_revenue: 71.25,
+    fee_percentage: 5,
+    refund_rate: 0,
+  },
+];
+
+/**
+ * Canonical period summary - aggregated from mockDonationTransactions
+ * - Gross: $50 + $100 + $75 = $225
+ * - Net raised: $47.5 + $95 + $71.25 = $213.75
+ * - Refunds: $25
+ * - Net revenue: $213.75 - $25 = $188.75
+ */
+export const mockCanonicalPeriodSummary = [
+  {
+    gross_raised: 225,
+    net_raised: 213.75,
+    refunds: 25,
+    net_revenue: 188.75,
+    total_fees: 11.25,
+    donation_count: 3,
+    unique_donors_approx: 3,
+    refund_count: 1,
+    recurring_count: 1,
+    one_time_count: 2,
+    recurring_revenue: 95,
+    one_time_revenue: 118.75,
+    avg_fee_percentage: 5,
+    refund_rate: 11.11, // 25/225 * 100
+    avg_donation: 75, // 225/3
+    days_with_donations: 3,
+  },
+];
