@@ -4842,6 +4842,115 @@ export type Database = {
           },
         ]
       }
+      meta_ad_metrics_daily: {
+        Row: {
+          ad_account_id: string
+          ad_id: string
+          ad_name: string | null
+          adset_id: string | null
+          campaign_id: string
+          clicks: number | null
+          conversion_ranking: string | null
+          conversion_value: number | null
+          conversions: number | null
+          cost_per_result: number | null
+          cpc: number | null
+          cpm: number | null
+          created_at: string | null
+          creative_id: string | null
+          ctr: number | null
+          date: string
+          engagement_ranking: string | null
+          frequency: number | null
+          id: string
+          impressions: number | null
+          meta_roas: number | null
+          organization_id: string
+          quality_ranking: string | null
+          reach: number | null
+          spend: number | null
+          synced_at: string | null
+        }
+        Insert: {
+          ad_account_id: string
+          ad_id: string
+          ad_name?: string | null
+          adset_id?: string | null
+          campaign_id: string
+          clicks?: number | null
+          conversion_ranking?: string | null
+          conversion_value?: number | null
+          conversions?: number | null
+          cost_per_result?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          creative_id?: string | null
+          ctr?: number | null
+          date: string
+          engagement_ranking?: string | null
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          meta_roas?: number | null
+          organization_id: string
+          quality_ranking?: string | null
+          reach?: number | null
+          spend?: number | null
+          synced_at?: string | null
+        }
+        Update: {
+          ad_account_id?: string
+          ad_id?: string
+          ad_name?: string | null
+          adset_id?: string | null
+          campaign_id?: string
+          clicks?: number | null
+          conversion_ranking?: string | null
+          conversion_value?: number | null
+          conversions?: number | null
+          cost_per_result?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          creative_id?: string | null
+          ctr?: number | null
+          date?: string
+          engagement_ranking?: string | null
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          meta_roas?: number | null
+          organization_id?: string
+          quality_ranking?: string | null
+          reach?: number | null
+          spend?: number | null
+          synced_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ad_metrics_daily_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ad_metrics_daily_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_ad_metrics_daily_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       meta_campaigns: {
         Row: {
           campaign_id: string

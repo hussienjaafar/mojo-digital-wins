@@ -1249,8 +1249,8 @@ serve(async (req) => {
       let nextUrl: string | null = adInsightsUrl;
 
       while (nextUrl) {
-        const adInsightsResponse = await fetch(nextUrl);
-        const adInsightsData = await adInsightsResponse.json();
+        const adInsightsRes: Response = await fetch(nextUrl);
+        const adInsightsData: { error?: { message: string }; data?: any[]; paging?: { next?: string } } = await adInsightsRes.json();
 
         if (adInsightsData.error) {
           console.error(`[AD-LEVEL METRICS] Meta API error:`, adInsightsData.error.message);
