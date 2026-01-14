@@ -879,8 +879,8 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
           <PresetDropdown value={selectedPreset} onChange={handlePresetChange} />
         )}
 
-        {/* Date Range Picker - shrinkable wrapper */}
-        <div className="min-w-0 max-w-full flex-1">
+        {/* Date Range Picker */}
+        <div className="shrink-0">
           <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
             <PopoverTrigger asChild>
               <DateRangeButton
