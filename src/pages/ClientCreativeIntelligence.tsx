@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { ClientShell } from "@/components/client/ClientShell";
+import { ProductionGate } from "@/components/client/ProductionGate";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -275,6 +276,11 @@ export default function ClientCreativeIntelligence() {
 
   return (
     <ClientShell showDateControls={false}>
+      <ProductionGate
+        title="Creative Analysis"
+        description="Analyze ad creative performance with AI-powered insights on messaging, imagery, and audience resonance."
+        icon={Sparkles}
+      >
       <V3PageContainer
         title="Creative Intelligence"
         description="AI-powered analysis of your ad creatives"
@@ -484,6 +490,7 @@ export default function ClientCreativeIntelligence() {
           </TabsContent>
         </Tabs>
       </V3PageContainer>
+      </ProductionGate>
     </ClientShell>
   );
 }

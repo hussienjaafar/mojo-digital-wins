@@ -14,6 +14,7 @@ import {
   Info,
   Eye,
 } from "lucide-react";
+import { ProductionGate } from "@/components/client/ProductionGate";
 
 import { ClientShell } from "@/components/client/ClientShell";
 import { ChartPanel } from "@/components/charts/ChartPanel";
@@ -320,6 +321,11 @@ const ClientAlerts = () => {
 
   return (
     <ClientShell pageTitle="Critical Alerts" showDateControls={false}>
+      <ProductionGate
+        title="Critical Alerts"
+        description="Real-time alerts for significant changes in your tracked entities and fundraising metrics."
+        icon={Bell}
+      >
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
         {/* Hero Panel */}
         <ChartPanel
@@ -527,6 +533,7 @@ const ClientAlerts = () => {
           </Tabs>
         </ChartPanel>
       </div>
+      </ProductionGate>
 
       {/* Alert Detail Dialog */}
       <AlertDetailDialog

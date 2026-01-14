@@ -18,6 +18,7 @@ import {
   Shuffle,
   Target,
 } from "lucide-react";
+import { ProductionGate } from "@/components/client/ProductionGate";
 import { ClientShell } from "@/components/client/ClientShell";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -610,6 +611,11 @@ const ClientDonorJourney = () => {
 
   return (
     <ClientShell pageTitle="Attribution & Performance" showDateControls={false}>
+      <ProductionGate
+        title="Attribution & Performance"
+        description="Track donor journeys from first touch to conversion with multi-channel attribution modeling."
+        icon={GitBranch}
+      >
       <V3PageContainer
         icon={GitBranch}
         title="Attribution & Performance"
@@ -969,6 +975,7 @@ const ClientDonorJourney = () => {
           </p>
         )}
       </V3PageContainer>
+      </ProductionGate>
     </ClientShell>
   );
 };
