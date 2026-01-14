@@ -89,9 +89,9 @@ async function fetchDataPointDetails(
   const startOfDay = `${date}T00:00:00`;
   const endOfDay = `${date}T23:59:59`;
 
-  // Fetch transactions for the day (using correct column names from schema)
-  const { data: transactions } = await supabase
-    .from("actblue_transactions")
+  // Fetch transactions for the day (using secure view)
+  const { data: transactions } = await (supabase as any)
+    .from("actblue_transactions_secure")
     .select("id, amount, fee, donor_name, refcode, transaction_date")
     .eq("organization_id", organizationId)
     .gte("transaction_date", startOfDay)
@@ -99,13 +99,19 @@ async function fetchDataPointDetails(
     .order("transaction_date", { ascending: false })
     .limit(10);
 
-  // Fetch daily aggregated metrics for the day
-  const { data: dailyMetrics } = await supabase
-    .from("daily_aggregated_metrics")
-    .select("total_ad_spend, meta_impressions, meta_clicks")
+  // Fetch Meta ad metrics for the day (canonical source, replaces daily_aggregated_metrics)
+  const { data: metaMetrics } = await (supabase as any)
+    .from("meta_ad_metrics")
+    .select("spend, impressions, clicks")
     .eq("organization_id", organizationId)
-    .eq("date", date)
-    .maybeSingle();
+    .eq("date", date);
+
+  // Aggregate Meta metrics for the day
+  const dailyMetrics = {
+    total_ad_spend: (metaMetrics || []).reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0),
+    meta_impressions: (metaMetrics || []).reduce((sum: number, m: any) => sum + Number(m.impressions || 0), 0),
+    meta_clicks: (metaMetrics || []).reduce((sum: number, m: any) => sum + Number(m.clicks || 0), 0),
+  };
 
   // Calculate aggregates
   const totalGross = (transactions || []).reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
@@ -121,11 +127,12 @@ async function fetchDataPointDetails(
     { label: "Avg Donation", value: formatValue(donationCount > 0 ? totalGross / donationCount : 0, "currency"), type: "currency" as const },
   ];
 
-  if (dailyMetrics) {
+  // Add Meta ad metrics if there's any spend
+  if (dailyMetrics.total_ad_spend > 0 || dailyMetrics.meta_impressions > 0) {
     metrics.push(
-      { label: "Ad Spend", value: formatValue(Number(dailyMetrics.total_ad_spend || 0), "currency"), type: "currency" as const },
-      { label: "Impressions", value: Number(dailyMetrics.meta_impressions || 0), type: "number" as const },
-      { label: "Clicks", value: Number(dailyMetrics.meta_clicks || 0), type: "number" as const }
+      { label: "Ad Spend", value: formatValue(dailyMetrics.total_ad_spend, "currency"), type: "currency" as const },
+      { label: "Impressions", value: dailyMetrics.meta_impressions, type: "number" as const },
+      { label: "Clicks", value: dailyMetrics.meta_clicks, type: "number" as const }
     );
   }
 
