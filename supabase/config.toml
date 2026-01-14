@@ -280,6 +280,9 @@ verify_jwt = false
 [functions.refcode-reconcile]
 verify_jwt = false
 
+[functions.reconstruct-ad-history]
+verify_jwt = false
+
 [functions.match-touchpoints-to-donors]
 verify_jwt = false
 
