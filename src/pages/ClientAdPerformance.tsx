@@ -508,7 +508,7 @@ export default function ClientAdPerformance() {
           </div>
 
           {/* V3 Performance Controls Toolbar */}
-          <div className="flex-shrink-0 max-w-lg">
+          <div className="flex-shrink-0 w-auto">
             <PerformanceControlsToolbar
               showRefresh={true}
               onRefresh={() => refetch()}
