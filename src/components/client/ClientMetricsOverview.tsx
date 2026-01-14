@@ -36,16 +36,91 @@ const ClientMetricsOverview = ({ organizationId, startDate, endDate }: Props) =>
   const loadMetrics = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from('daily_aggregated_metrics')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: true });
+      // Query canonical sources instead of legacy daily_aggregated_metrics
+      const [actblueResult, metaResult, smsResult] = await Promise.all([
+        // ActBlue transactions
+        (supabase as any)
+          .from('actblue_transactions_secure')
+          .select('amount, transaction_date')
+          .eq('organization_id', organizationId)
+          .gte('transaction_date', startDate)
+          .lte('transaction_date', `${endDate}T23:59:59`),
+        // Meta ad metrics
+        (supabase as any)
+          .from('meta_ad_metrics')
+          .select('date, spend')
+          .eq('organization_id', organizationId)
+          .gte('date', startDate)
+          .lte('date', endDate),
+        // SMS campaigns
+        (supabase as any)
+          .from('sms_campaigns')
+          .select('send_date, cost')
+          .eq('organization_id', organizationId)
+          .neq('status', 'draft')
+          .gte('send_date', startDate)
+          .lte('send_date', `${endDate}T23:59:59`),
+      ]);
 
-      if (error) throw error;
-      setMetrics(data || []);
+      const actblueData = actblueResult.data || [];
+      const metaData = metaResult.data || [];
+      const smsData = smsResult.data || [];
+
+      // Group ActBlue by date
+      const actblueByDate: Record<string, { raised: number; count: number }> = {};
+      actblueData.forEach((t: any) => {
+        const dateKey = t.transaction_date?.split('T')[0];
+        if (!dateKey) return;
+        if (!actblueByDate[dateKey]) {
+          actblueByDate[dateKey] = { raised: 0, count: 0 };
+        }
+        actblueByDate[dateKey].raised += Number(t.amount) || 0;
+        actblueByDate[dateKey].count += 1;
+      });
+
+      // Group Meta by date
+      const metaByDate: Record<string, number> = {};
+      metaData.forEach((m: any) => {
+        const dateKey = m.date;
+        if (!dateKey) return;
+        metaByDate[dateKey] = (metaByDate[dateKey] || 0) + (Number(m.spend) || 0);
+      });
+
+      // Group SMS by date
+      const smsByDate: Record<string, number> = {};
+      smsData.forEach((s: any) => {
+        const dateKey = s.send_date?.split('T')[0];
+        if (!dateKey) return;
+        smsByDate[dateKey] = (smsByDate[dateKey] || 0) + (Number(s.cost) || 0);
+      });
+
+      // Build combined metrics by date
+      const allDates = new Set([
+        ...Object.keys(actblueByDate),
+        ...Object.keys(metaByDate),
+        ...Object.keys(smsByDate),
+      ]);
+
+      const combinedMetrics: AggregatedMetrics[] = Array.from(allDates)
+        .sort()
+        .map((dateKey) => {
+          const actblue = actblueByDate[dateKey] || { raised: 0, count: 0 };
+          const adSpend = metaByDate[dateKey] || 0;
+          const smsCost = smsByDate[dateKey] || 0;
+          const totalSpend = adSpend + smsCost;
+          const roi = totalSpend > 0 ? ((actblue.raised - totalSpend) / totalSpend) * 100 : 0;
+
+          return {
+            date: dateKey,
+            total_ad_spend: adSpend,
+            total_sms_cost: smsCost,
+            total_funds_raised: actblue.raised,
+            total_donations: actblue.count,
+            roi_percentage: roi,
+          };
+        });
+
+      setMetrics(combinedMetrics);
     } catch (error) {
       logger.error('Failed to load metrics', error);
     } finally {
