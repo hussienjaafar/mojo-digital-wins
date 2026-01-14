@@ -55,8 +55,11 @@ interface IntegrationFormState {
   actblue: {
     webhook_secret: string;
     entity_id: string;
+    csv_username: string;
+    csv_password: string;
     isOpen: boolean;
     showSecret: boolean;
+    showCsvPassword: boolean;
   };
 }
 
@@ -77,7 +80,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
   const [formState, setFormState] = useState<IntegrationFormState>({
     meta: { access_token: '', ad_account_id: '', isOpen: false, showToken: false },
     switchboard: { api_key: '', account_id: '', isOpen: false, showKey: false },
-    actblue: { webhook_secret: '', entity_id: '', isOpen: false, showSecret: false }
+    actblue: { webhook_secret: '', entity_id: '', csv_username: '', csv_password: '', isOpen: false, showSecret: false, showCsvPassword: false }
   });
 
   const updateFormState = <K extends keyof IntegrationFormState>(
@@ -109,9 +112,12 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
         }
         testResult = { success: true, error: '' };
       } else if (platform === 'actblue') {
-        const { webhook_secret, entity_id } = formState.actblue;
+        const { webhook_secret, entity_id, csv_username, csv_password } = formState.actblue;
         if (!webhook_secret || !entity_id) {
           throw new Error('Please enter webhook secret and entity ID');
+        }
+        if (!csv_username || !csv_password) {
+          throw new Error('Please enter CSV API username and password for reconciliation');
         }
         testResult = { success: true, error: '' };
       }
@@ -189,11 +195,14 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
       } else if (platform === 'actblue') {
         credentials = {
           webhook_secret: formState.actblue.webhook_secret,
-          entity_id: formState.actblue.entity_id
+          entity_id: formState.actblue.entity_id,
+          username: formState.actblue.csv_username,
+          password: formState.actblue.csv_password
         };
         credentialMask = {
           secret_hint: `****${formState.actblue.webhook_secret.slice(-4)}`,
-          entity_id: formState.actblue.entity_id
+          entity_id: formState.actblue.entity_id,
+          username_hint: formState.actblue.csv_username
         };
       }
 
@@ -519,36 +528,84 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
                       )}
                       {key === 'actblue' && (
                         <>
-                          <div className="space-y-2">
-                            <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Webhook Secret</Label>
-                            <div className="flex gap-2">
+                          {/* Webhook Section */}
+                          <div className="space-y-4">
+                            <div className="text-[12px] font-medium text-[hsl(var(--portal-text-secondary))] uppercase tracking-wide">
+                              Webhook Integration
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Webhook Secret</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  type={formState.actblue.showSecret ? 'text' : 'password'}
+                                  placeholder="Enter webhook secret"
+                                  value={formState.actblue.webhook_secret}
+                                  onChange={(e) => updateFormState('actblue', { webhook_secret: e.target.value })}
+                                  className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => updateFormState('actblue', { showSecret: !formState.actblue.showSecret })}
+                                  className="h-11 w-11"
+                                >
+                                  {formState.actblue.showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Entity ID</Label>
                               <Input
-                                type={formState.actblue.showSecret ? 'text' : 'password'}
-                                placeholder="Enter webhook secret"
-                                value={formState.actblue.webhook_secret}
-                                onChange={(e) => updateFormState('actblue', { webhook_secret: e.target.value })}
+                                placeholder="Enter entity ID"
+                                value={formState.actblue.entity_id}
+                                onChange={(e) => updateFormState('actblue', { entity_id: e.target.value })}
                                 className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
                               />
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => updateFormState('actblue', { showSecret: !formState.actblue.showSecret })}
-                                className="h-11 w-11"
-                              >
-                                {formState.actblue.showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </Button>
                             </div>
                           </div>
-                          <div className="space-y-2">
-                            <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Entity ID</Label>
-                            <Input
-                              placeholder="Enter entity ID"
-                              value={formState.actblue.entity_id}
-                              onChange={(e) => updateFormState('actblue', { entity_id: e.target.value })}
-                              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
-                            />
+
+                          {/* CSV API Section */}
+                          <div className="space-y-4 pt-4 mt-4 border-t border-[hsl(var(--portal-border))]">
+                            <div>
+                              <div className="text-[12px] font-medium text-[hsl(var(--portal-text-secondary))] uppercase tracking-wide">
+                                CSV API (for reconciliation)
+                              </div>
+                              <p className="text-[11px] text-[hsl(var(--portal-text-muted))] mt-1">
+                                Used to backfill and verify webhook data every 6 hours
+                              </p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">CSV API Username</Label>
+                              <Input
+                                placeholder="Enter CSV API username"
+                                value={formState.actblue.csv_username}
+                                onChange={(e) => updateFormState('actblue', { csv_username: e.target.value })}
+                                className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">CSV API Password</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  type={formState.actblue.showCsvPassword ? 'text' : 'password'}
+                                  placeholder="Enter CSV API password"
+                                  value={formState.actblue.csv_password}
+                                  onChange={(e) => updateFormState('actblue', { csv_password: e.target.value })}
+                                  className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => updateFormState('actblue', { showCsvPassword: !formState.actblue.showCsvPassword })}
+                                  className="h-11 w-11"
+                                >
+                                  {formState.actblue.showCsvPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex gap-2 pt-2">
+
+                          <div className="flex gap-2 pt-4">
                             <Button
                               variant="outline"
                               onClick={() => testConnection('actblue')}
