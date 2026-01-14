@@ -32,7 +32,7 @@ export function DateRangeSelector({
   className,
 }: DateRangeSelectorProps) {
   const isMobile = useIsMobile();
-  const [selectedPreset, setSelectedPreset] = useState<number | "custom">(30);
+  const [selectedPreset, setSelectedPreset] = useState<number | "custom">(0);
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 

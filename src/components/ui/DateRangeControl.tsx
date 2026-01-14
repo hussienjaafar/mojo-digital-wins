@@ -485,7 +485,7 @@ export const DateRangeControl: React.FC<DateRangeControlProps> = ({
   trailingControl,
 }) => {
   const { dateRange, setDateRange } = useDashboardStore();
-  const [selectedPreset, setSelectedPreset] = React.useState<PresetKey>("30d");
+  const [selectedPreset, setSelectedPreset] = React.useState<PresetKey>("today");
   const [compareMode, setCompareMode] = React.useState<CompareMode>("none");
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
 
