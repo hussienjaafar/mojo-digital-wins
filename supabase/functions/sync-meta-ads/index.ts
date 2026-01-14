@@ -924,9 +924,11 @@ serve(async (req) => {
               } else {
                 creativesProcessed++;
                 
-                // NEW: Store refcode mapping for deterministic attribution
-                // Force update to ensure donations are attributed to the CURRENT running ad
+                // Store refcode mapping for deterministic attribution
                 if (extractedRefcode) {
+                  const now = new Date().toISOString();
+                  
+                  // 1. Update current pointer in refcode_mappings
                   const { error: refcodeError } = await supabase
                     .from('refcode_mappings')
                     .upsert({
@@ -940,16 +942,37 @@ serve(async (req) => {
                       creative_id: creative.id,
                       creative_name: creative.name || null,
                       landing_page: destinationUrl,
-                      updated_at: new Date().toISOString(),
+                      updated_at: now,
                     }, {
                       onConflict: 'organization_id,refcode',
-                      ignoreDuplicates: false  // Force update existing rows with new ad_id
+                      ignoreDuplicates: false
                     });
                   
                   if (refcodeError) {
                     console.error(`[REFCODE MAPPING] Error storing refcode mapping for ${extractedRefcode}:`, refcodeError);
                   } else {
-                    console.log(`[REFCODE MAPPING] Stored/updated mapping: refcode="${extractedRefcode}" -> ad_id=${ad.id}, campaign=${campaign.name}`);
+                    console.log(`[REFCODE MAPPING] Stored/updated mapping: refcode="${extractedRefcode}" -> ad_id=${ad.id}`);
+                  }
+                  
+                  // 2. Insert into history table for versioned attribution
+                  const { error: historyError } = await supabase
+                    .from('refcode_mapping_history')
+                    .upsert({
+                      organization_id,
+                      refcode: extractedRefcode,
+                      ad_id: ad.id,
+                      campaign_id: campaign.id,
+                      creative_id: creative.id,
+                      landing_page: destinationUrl,
+                      last_seen_at: now,
+                      is_active: true,
+                    }, {
+                      onConflict: 'organization_id,refcode,ad_id',
+                      ignoreDuplicates: false
+                    });
+                  
+                  if (historyError) {
+                    console.error(`[REFCODE HISTORY] Error:`, historyError);
                   }
                 }
               }

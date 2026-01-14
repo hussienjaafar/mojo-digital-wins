@@ -6873,6 +6873,73 @@ export type Database = {
         }
         Relationships: []
       }
+      refcode_mapping_history: {
+        Row: {
+          ad_id: string
+          campaign_id: string | null
+          created_at: string
+          creative_id: string | null
+          first_seen_at: string
+          id: string
+          is_active: boolean | null
+          landing_page: string | null
+          last_seen_at: string
+          organization_id: string
+          refcode: string
+          updated_at: string
+        }
+        Insert: {
+          ad_id: string
+          campaign_id?: string | null
+          created_at?: string
+          creative_id?: string | null
+          first_seen_at?: string
+          id?: string
+          is_active?: boolean | null
+          landing_page?: string | null
+          last_seen_at?: string
+          organization_id: string
+          refcode: string
+          updated_at?: string
+        }
+        Update: {
+          ad_id?: string
+          campaign_id?: string | null
+          created_at?: string
+          creative_id?: string | null
+          first_seen_at?: string
+          id?: string
+          is_active?: boolean | null
+          landing_page?: string | null
+          last_seen_at?: string
+          organization_id?: string
+          refcode?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refcode_mapping_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refcode_mapping_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "refcode_mapping_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       refcode_mappings: {
         Row: {
           ad_id: string | null
