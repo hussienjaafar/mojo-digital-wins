@@ -497,7 +497,57 @@ export function useAdPerformanceQuery({
       // Sort by spend descending
       ads.sort((a, b) => b.spend - a.spend);
 
-      // ========== STEP 5: Calculate totals and summary ==========
+      // ========== STEP 5: Detect estimation artifacts ==========
+      // Check if we're using estimated distribution (campaign-level fallback)
+      const isEstimatedDistribution = !hasAdLevelData && ads.length > 0;
+
+      // Detect identical spend values (artifact of even distribution)
+      const spendValues = ads.map((ad) => ad.spend).filter((s) => s > 0);
+      const uniqueSpendValues = new Set(spendValues.map((s) => s.toFixed(2)));
+      const hasIdenticalSpend = spendValues.length > 1 && uniqueSpendValues.size === 1;
+
+      // DEV-ONLY: Log distribution artifact detection
+      if (process.env.NODE_ENV !== 'production' && hasIdenticalSpend) {
+        console.warn('[AdPerformance:Hook] DISTRIBUTION ARTIFACT DETECTED:', {
+          adsWithSpend: spendValues.length,
+          uniqueSpendValues: uniqueSpendValues.size,
+          sampleSpend: spendValues[0],
+          isEstimatedDistribution,
+          hint: 'All ads have identical spend - this indicates campaign-level distribution, not true ad-level metrics',
+        });
+      }
+
+      // Calculate attributed vs unattributed donations
+      const totalDonationsInPeriod = (donationsData || []).length;
+      const attributedToAdCount = [...donationsByAdId.values()].reduce((sum, d) => sum + d.count, 0);
+      const attributedToCreativeCount = [...donationsByCreativeId.values()].reduce((sum, d) => sum + d.count, 0);
+      const totalAttributedCount = Math.max(attributedToAdCount, attributedToCreativeCount);
+      const unattributedDonationCount = totalDonationsInPeriod - totalAttributedCount;
+
+      // Calculate unattributed raised
+      const totalRaisedInPeriod = (donationsData || []).reduce(
+        (sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0),
+        0
+      );
+      const attributedRaised = ads.reduce((sum, ad) => sum + ad.raised, 0);
+      const unattributedRaised = Math.max(0, totalRaisedInPeriod - attributedRaised);
+      const hasUnattributedDonations = unattributedDonationCount > 0 || unattributedRaised > 0;
+
+      // DEV-ONLY: Log attribution coverage
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[AdPerformance:Hook] Attribution coverage:', {
+          totalDonationsInPeriod,
+          attributedToAdCount,
+          attributedToCreativeCount,
+          unattributedDonationCount,
+          totalRaisedInPeriod: totalRaisedInPeriod.toFixed(2),
+          attributedRaised: attributedRaised.toFixed(2),
+          unattributedRaised: unattributedRaised.toFixed(2),
+          hasUnattributedDonations,
+        });
+      }
+
+      // ========== STEP 6: Calculate totals and summary ==========
       const totals = buildTotals(ads, allDonorEmails);
 
       const topThree = [...ads]
@@ -576,6 +626,10 @@ export function useAdPerformanceQuery({
           total_attributed: totalAttributed,
         },
         attributionFallbackMode,
+        isEstimatedDistribution,
+        hasUnattributedDonations,
+        unattributedDonationCount,
+        unattributedRaised,
       };
     },
     enabled: !!organizationId && !!startDate && !!endDate,

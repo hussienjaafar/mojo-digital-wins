@@ -39,12 +39,29 @@ import {
 interface AdPerformanceRowProps {
   ad: AdPerformanceData;
   onSelect?: (ad: AdPerformanceData) => void;
+  /** If true, spend/impressions are estimated (campaign distributed) */
+  isEstimatedDistribution?: boolean;
 }
 
 /**
- * Get tier badge styles - only show red for significant spend
+ * Get tier badge styles - contextual based on data quality
  */
-function getTierBadge(tier: string | null, spend: number): { label: string; className: string } | null {
+function getTierBadge(
+  tier: string | null,
+  spend: number,
+  hasAttribution: boolean,
+  isEstimatedDistribution: boolean
+): { label: string; className: string } | null {
+  // If in estimated mode and no attribution, don't show ROAS-based tier
+  if (isEstimatedDistribution && !hasAttribution) {
+    return { label: 'Estimated', className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' };
+  }
+
+  // If no attribution at all, show "No Attribution" instead of misleading ROAS tier
+  if (!hasAttribution && spend > 0) {
+    return { label: 'No Attribution', className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' };
+  }
+
   // Don't show "Needs Improvement" for low spend - show "Learning" instead
   if (spend < 50) {
     return { label: 'Learning', className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' };
@@ -64,11 +81,12 @@ function getTierBadge(tier: string | null, spend: number): { label: string; clas
   }
 }
 
-export function AdPerformanceRow({ ad, onSelect }: AdPerformanceRowProps) {
+export function AdPerformanceRow({ ad, onSelect, isEstimatedDistribution = false }: AdPerformanceRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const lowSpend = isLowSpend(ad);
   const isVideo = ad.creative_type === 'video';
-  const tierBadge = getTierBadge(ad.performance_tier, ad.spend);
+  const hasAttribution = ad.raised > 0 || ad.unique_donors > 0;
+  const tierBadge = getTierBadge(ad.performance_tier, ad.spend, hasAttribution, isEstimatedDistribution);
   const hasNoAttribution = ad.raised === 0 && ad.spend > 0;
 
   return (

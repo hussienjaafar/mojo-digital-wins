@@ -102,4 +102,12 @@ export interface AdPerformanceResult {
   };
   // Flag indicating whether fallback attribution was used due to no click data
   attributionFallbackMode: boolean;
+  // Flag indicating spend/impressions are estimated (campaign distributed, not true ad-level)
+  isEstimatedDistribution: boolean;
+  // Flag indicating donations exist but couldn't be attributed to specific ads
+  hasUnattributedDonations: boolean;
+  // Count of donations in period that weren't matched to any ad
+  unattributedDonationCount: number;
+  // Total raised from unattributed donations
+  unattributedRaised: number;
 }

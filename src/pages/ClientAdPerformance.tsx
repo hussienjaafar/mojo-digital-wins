@@ -27,6 +27,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   BarChart3,
   TrendingUp,
   DollarSign,
@@ -36,6 +42,7 @@ import {
   Info,
   Search,
   SlidersHorizontal,
+  HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatRoas, formatPercentage, getRoasColor } from '@/utils/adPerformance';
@@ -152,7 +159,13 @@ export default function ClientAdPerformance() {
   // State detection for UI
   const hasData = !isLoading && !error && adPerformanceData?.ads && adPerformanceData.ads.length > 0;
   const showNoDataEmptyState = !isLoading && !error && (!adPerformanceData?.ads || adPerformanceData.ads.length === 0);
-  const showCampaignLevelBanner = hasData && (adPerformanceData as any)?.isCampaignLevelDistributionActive;
+  const showEstimatedDistributionBanner = hasData && adPerformanceData?.isEstimatedDistribution;
+  const showUnattributedDonationsBanner = hasData && adPerformanceData?.hasUnattributedDonations;
+
+  // Calculate attributed donors for display
+  const attributedDonors = useMemo(() => {
+    return deduplicatedAds.reduce((sum, ad) => sum + ad.unique_donors, 0);
+  }, [deduplicatedAds]);
 
   const renderContent = () => {
     if (isLoading) {
@@ -219,6 +232,42 @@ export default function ClientAdPerformance() {
 
     return (
       <div className="space-y-4">
+        {/* Estimated Distribution Warning - HIGH PRIORITY */}
+        {showEstimatedDistributionBanner && (
+          <Card className="border-orange-500/50 bg-orange-500/5">
+            <CardContent className="p-3 flex items-start gap-3">
+              <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm text-[hsl(var(--portal-text-primary))]">
+                  Estimated Metrics
+                </p>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                  Ad-level data is still syncing. Spend, impressions, and CTR shown below are{' '}
+                  <strong>campaign-level estimates</strong> distributed across ads. True per-ad metrics will appear after the next sync.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Unattributed Donations Warning */}
+        {showUnattributedDonationsBanner && adPerformanceData?.unattributedRaised > 0 && (
+          <Card className="border-blue-500/50 bg-blue-500/5">
+            <CardContent className="p-3 flex items-start gap-3">
+              <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm text-[hsl(var(--portal-text-primary))]">
+                  Unattributed Donations: {formatCurrency(adPerformanceData.unattributedRaised)}
+                </p>
+                <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                  {adPerformanceData.unattributedDonationCount} donation(s) in this period couldn't be matched to specific ads.
+                  Per-ad "Raised" may be lower than total fundraising.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Attribution Quality Warning */}
         {adPerformanceData?.attributionFallbackMode && (
           <Card className="border-yellow-500/50 bg-yellow-500/5">
@@ -230,23 +279,6 @@ export default function ClientAdPerformance() {
                 </p>
                 <p className="text-xs text-[hsl(var(--portal-text-muted))]">
                   No direct click or refcode attribution found. Results use modeled attribution.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Campaign-level Fallback Banner */}
-        {showCampaignLevelBanner && (
-          <Card className="border-blue-500/50 bg-blue-500/5">
-            <CardContent className="p-3 flex items-start gap-3">
-              <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-sm text-[hsl(var(--portal-text-primary))]">
-                  Campaign-Level Metrics
-                </p>
-                <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                  Ad-level metrics are backfilling; showing campaign-level estimates.
                 </p>
               </div>
             </CardContent>
@@ -291,10 +323,26 @@ export default function ClientAdPerformance() {
             </Card>
             <Card className="bg-[hsl(var(--portal-bg-secondary))]">
               <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 text-[hsl(var(--portal-text-muted))] mb-1">
-                  <Users className="h-3.5 w-3.5" />
-                  <span className="text-[10px] font-medium uppercase tracking-wide">Unique Donors</span>
-                </div>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1.5 text-[hsl(var(--portal-text-muted))] mb-1 cursor-help">
+                        <Users className="h-3.5 w-3.5" />
+                        <span className="text-[10px] font-medium uppercase tracking-wide">Donors (Period)</span>
+                        <HelpCircle className="h-3 w-3" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[250px]">
+                      <p className="text-xs">
+                        <strong>Total:</strong> {adPerformanceData.totals.unique_donors} unique donors in period<br />
+                        <strong>Attributed:</strong> {attributedDonors} matched to specific ads<br />
+                        <span className="text-[hsl(var(--portal-text-muted))]">
+                          Difference may be from untracked sources or attribution gaps.
+                        </span>
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <div className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
                   {adPerformanceData.totals.unique_donors.toLocaleString()}
                 </div>
@@ -439,6 +487,7 @@ export default function ClientAdPerformance() {
         {/* Ad List */}
         <AdPerformanceList
           ads={deduplicatedAds}
+          isEstimatedDistribution={adPerformanceData?.isEstimatedDistribution}
         />
       </div>
     );

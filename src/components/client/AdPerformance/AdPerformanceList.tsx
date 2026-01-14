@@ -20,6 +20,8 @@ interface AdPerformanceListProps {
   error?: Error | null;
   onRetry?: () => void;
   onSelectAd?: (ad: AdPerformanceData) => void;
+  /** If true, spend/impressions are estimated (campaign distributed) */
+  isEstimatedDistribution?: boolean;
 }
 
 /**
@@ -61,6 +63,7 @@ export function AdPerformanceList({
   error,
   onRetry,
   onSelectAd,
+  isEstimatedDistribution = false,
 }: AdPerformanceListProps) {
   // Loading state
   if (isLoading) {
@@ -115,6 +118,7 @@ export function AdPerformanceList({
           key={ad.ad_id || ad.id}
           ad={ad}
           onSelect={onSelectAd}
+          isEstimatedDistribution={isEstimatedDistribution}
         />
       ))}
     </div>
