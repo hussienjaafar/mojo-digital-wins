@@ -10212,6 +10212,38 @@ export type Database = {
           },
         ]
       }
+      ad_refcode_overlap: {
+        Row: {
+          ad_count: number | null
+          ads: Json | null
+          has_date_overlap: boolean | null
+          organization_id: string | null
+          refcode: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refcode_mapping_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refcode_mapping_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "refcode_mapping_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       admin_audit_logs_secure: {
         Row: {
           action_type: string | null
@@ -10499,6 +10531,7 @@ export type Database = {
           attributed_ad_id: string | null
           attributed_campaign_id: string | null
           attributed_creative_id: string | null
+          attribution_confidence: number | null
           attribution_method: string | null
           donor_email: string | null
           donor_name: string | null
