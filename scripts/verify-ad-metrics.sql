@@ -122,3 +122,93 @@ SELECT
   COUNT(DISTINCT ad_id) as unique_ad_ids
 FROM meta_creative_insights
 WHERE ad_id IS NOT NULL AND ad_id != '';
+
+-- =====================================================
+-- DATE RANGE DIAGNOSTICS (for debugging "No Data" issues)
+-- =====================================================
+
+-- 9. Check all available date ranges per organization
+SELECT
+  'Date ranges per organization' as check_name,
+  organization_id,
+  MIN(date) as earliest_date,
+  MAX(date) as latest_date,
+  COUNT(DISTINCT date) as days_with_data
+FROM meta_ad_metrics
+GROUP BY organization_id
+ORDER BY latest_date DESC;
+
+-- 10. For a specific org, check what dates have data
+-- Replace 'YOUR_ORG_ID' with actual organization ID
+-- SELECT
+--   date,
+--   COUNT(*) as records,
+--   SUM(spend) as total_spend
+-- FROM meta_ad_metrics
+-- WHERE organization_id = 'YOUR_ORG_ID'
+-- GROUP BY date
+-- ORDER BY date DESC
+-- LIMIT 30;
+
+-- 11. Check meta_creative_insights campaign coverage
+SELECT
+  'Creatives per organization' as check_name,
+  organization_id,
+  COUNT(*) as total_creatives,
+  COUNT(DISTINCT campaign_id) as unique_campaigns,
+  COUNT(DISTINCT ad_id) as unique_ads
+FROM meta_creative_insights
+GROUP BY organization_id;
+
+-- 12. Identify campaigns with metrics but no creatives (potential join miss)
+WITH campaigns_with_metrics AS (
+  SELECT DISTINCT organization_id, campaign_id
+  FROM meta_ad_metrics
+  WHERE campaign_id IS NOT NULL
+),
+campaigns_with_creatives AS (
+  SELECT DISTINCT organization_id, campaign_id
+  FROM meta_creative_insights
+  WHERE campaign_id IS NOT NULL
+)
+SELECT
+  cwm.organization_id,
+  COUNT(DISTINCT cwm.campaign_id) as campaigns_with_metrics,
+  COUNT(DISTINCT cwc.campaign_id) as campaigns_with_creatives,
+  COUNT(DISTINCT CASE WHEN cwc.campaign_id IS NULL THEN cwm.campaign_id END) as campaigns_missing_creatives
+FROM campaigns_with_metrics cwm
+LEFT JOIN campaigns_with_creatives cwc
+  ON cwm.organization_id = cwc.organization_id
+  AND cwm.campaign_id = cwc.campaign_id
+GROUP BY cwm.organization_id;
+
+-- 13. Debug query: Show exactly what the hook would find for a given date range
+-- Replace ORG_ID, START_DATE, END_DATE with actual values
+-- Example: '2025-12-14' to '2026-01-13' for "Last 30 days"
+/*
+WITH params AS (
+  SELECT
+    'YOUR_ORG_ID'::uuid as org_id,
+    '2025-12-14'::date as start_date,
+    '2026-01-13'::date as end_date
+)
+SELECT
+  'meta_ad_metrics_daily' as source,
+  (SELECT COUNT(*) FROM meta_ad_metrics_daily m, params p
+   WHERE m.organization_id = p.org_id AND m.date >= p.start_date AND m.date <= p.end_date) as row_count,
+  (SELECT SUM(spend) FROM meta_ad_metrics_daily m, params p
+   WHERE m.organization_id = p.org_id AND m.date >= p.start_date AND m.date <= p.end_date) as total_spend
+UNION ALL
+SELECT
+  'meta_ad_metrics (fallback)' as source,
+  (SELECT COUNT(*) FROM meta_ad_metrics m, params p
+   WHERE m.organization_id = p.org_id AND m.date >= p.start_date AND m.date <= p.end_date) as row_count,
+  (SELECT SUM(spend) FROM meta_ad_metrics m, params p
+   WHERE m.organization_id = p.org_id AND m.date >= p.start_date AND m.date <= p.end_date) as total_spend
+UNION ALL
+SELECT
+  'meta_creative_insights' as source,
+  (SELECT COUNT(*) FROM meta_creative_insights m, params p
+   WHERE m.organization_id = p.org_id) as row_count,
+  NULL as total_spend;
+*/

@@ -81,6 +81,16 @@ export function useAdPerformanceQuery({
     queryFn: async () => {
       const sb = supabase as any;
 
+      // DEV-ONLY: Log received dates and the values used in Supabase filters
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[AdPerformance:Hook] Query parameters received:', {
+          organizationId,
+          startDate,
+          endDate,
+          queryKey: adPerformanceKeys.list(organizationId, startDate, endDate),
+        });
+      }
+
       // ========== STEP 1: Try ad-level daily metrics (preferred) ==========
       // This gives TRUE ad-level ROAS from meta_ad_metrics_daily
       const { data: adLevelData, error: adLevelError } = await sb
@@ -117,6 +127,18 @@ export function useAdPerformanceQuery({
         rowCount: adLevelData?.length || 0,
         error: adLevelError?.message,
       });
+
+      // DEV-ONLY: Detailed ad-level query diagnostics
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[AdPerformance:Hook] Ad-level query result:', {
+          table: 'meta_ad_metrics_daily',
+          filters: { organization_id: organizationId, 'date >=': startDate, 'date <=': endDate },
+          hasData: hasAdLevelData,
+          rowCount: adLevelData?.length || 0,
+          error: adLevelError?.message || null,
+          sampleDates: adLevelData?.slice(0, 3).map((r: any) => r.date) || [],
+        });
+      }
 
       // Aggregate ad-level metrics by ad_id
       const adMetricsMap = new Map<string, {
@@ -357,10 +379,22 @@ export function useAdPerformanceQuery({
         // Fetch from old meta_ad_metrics table
         const { data: metricsData, error: metricsError } = await sb
           .from('meta_ad_metrics')
-          .select('campaign_id, ad_id, spend, impressions, clicks')
+          .select('campaign_id, ad_id, spend, impressions, clicks, date')
           .eq('organization_id', organizationId)
           .gte('date', startDate)
           .lte('date', endDate);
+
+        // DEV-ONLY: Fallback query diagnostics
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[AdPerformance:Hook] Fallback query result:', {
+            table: 'meta_ad_metrics',
+            filters: { organization_id: organizationId, 'date >=': startDate, 'date <=': endDate },
+            rowCount: metricsData?.length || 0,
+            error: metricsError?.message || null,
+            sampleDates: metricsData?.slice(0, 5).map((r: any) => r.date) || [],
+            sampleCampaigns: [...new Set(metricsData?.map((r: any) => r.campaign_id) || [])].slice(0, 3),
+          });
+        }
 
         if (metricsError) {
           logger.error('Failed to load campaign metrics', metricsError);
@@ -502,6 +536,24 @@ export function useAdPerformanceQuery({
         totalSpend: totals.total_spend,
         totalRaised: totals.total_raised,
       });
+
+      // DEV-ONLY: Final summary diagnostics
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[AdPerformance:Hook] Final result summary:', {
+          dataSource: hasAdLevelData ? 'ad-level (meta_ad_metrics_daily)' : 'campaign-level (meta_ad_metrics)',
+          totalAdsReturned: ads.length,
+          totalCreativesFound: creativesData?.length || 0,
+          totalDonationsFound: (donationsData || []).length,
+          totals: {
+            spend: totals.total_spend,
+            raised: totals.total_raised,
+            roas: totals.total_roas,
+          },
+          debugHint: ads.length === 0
+            ? 'NO DATA: Check if (1) meta_ad_metrics_daily has rows for org+dateRange, (2) meta_ad_metrics has campaign rows, (3) meta_creative_insights has creatives that match campaign_ids'
+            : null,
+        });
+      }
 
       return {
         ads,

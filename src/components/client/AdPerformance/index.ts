@@ -7,4 +7,5 @@
 export { AdPerformanceCard } from './AdPerformanceCard';
 export { AdPerformanceCardSkeleton } from './AdPerformanceCardSkeleton';
 export { AdPerformanceList } from './AdPerformanceList';
+export { AdPerformanceRow } from './AdPerformanceRow';
 export { AdPerformanceSummaryCard } from './AdPerformanceSummaryCard';
