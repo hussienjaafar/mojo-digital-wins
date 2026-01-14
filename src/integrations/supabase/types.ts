@@ -2000,9 +2000,11 @@ export type Database = {
           organization_id: string
           platform: string
           rate_limit_backoff_until: string | null
+          refresh_status: string | null
           rotated_at: string | null
           rotated_by: string | null
           sync_error_count: number | null
+          token_expires_at: string | null
           updated_at: string | null
         }
         Insert: {
@@ -2024,9 +2026,11 @@ export type Database = {
           organization_id: string
           platform: string
           rate_limit_backoff_until?: string | null
+          refresh_status?: string | null
           rotated_at?: string | null
           rotated_by?: string | null
           sync_error_count?: number | null
+          token_expires_at?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -2048,9 +2052,11 @@ export type Database = {
           organization_id?: string
           platform?: string
           rate_limit_backoff_until?: string | null
+          refresh_status?: string | null
           rotated_at?: string | null
           rotated_by?: string | null
           sync_error_count?: number | null
+          token_expires_at?: string | null
           updated_at?: string | null
         }
         Relationships: [
