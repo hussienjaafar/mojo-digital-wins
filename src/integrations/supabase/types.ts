@@ -10499,15 +10499,12 @@ export type Database = {
           attributed_ad_id: string | null
           attributed_campaign_id: string | null
           attributed_creative_id: string | null
-          attributed_platform: string | null
           attribution_method: string | null
-          creative_tone: string | null
-          creative_topic: string | null
-          creative_type: string | null
           donor_email: string | null
-          donor_id_hash: string | null
-          fee: number | null
+          donor_name: string | null
           is_recurring: boolean | null
+          mapping_first_seen: string | null
+          mapping_last_seen: string | null
           net_amount: number | null
           organization_id: string | null
           refcode: string | null
