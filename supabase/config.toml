@@ -119,6 +119,9 @@ verify_jwt = true
 [functions.backfill-creative-analysis]
 verify_jwt = true
 
+[functions.backfill-meta-ads]
+verify_jwt = false
+
 [functions.backfill-thumbnails]
 verify_jwt = true
 
