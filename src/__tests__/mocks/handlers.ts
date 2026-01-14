@@ -14,6 +14,10 @@ import {
   mockSmsEvents,
   mockCanonicalDailyRollup,
   mockCanonicalPeriodSummary,
+  mockFilteredRollupCampaignA,
+  mockFilteredRollupCampaignB,
+  mockFilteredRollupCreative1,
+  mockFilteredRollupEmpty,
   TEST_ORG_ID,
 } from './fixtures';
 
@@ -484,5 +488,43 @@ export const handlers = [
       return HttpResponse.json(mockCanonicalPeriodSummary);
     }
     return HttpResponse.json([]);
+  }),
+
+  // -------------------------------------------------------------------------
+  // Filtered ActBlue Rollup RPC
+  // Used when campaign/creative filters are active
+  // -------------------------------------------------------------------------
+  http.post(`${SUPABASE_URL}/rest/v1/rpc/get_actblue_filtered_rollup`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    const orgId = body.p_org_id;
+    const campaignId = body.p_campaign_id as string | null;
+    const creativeId = body.p_creative_id as string | null;
+
+    if (orgId !== TEST_ORG_ID) {
+      return HttpResponse.json([]);
+    }
+
+    // Return filtered data based on campaign/creative filter
+    // Creative filter takes precedence if both are set (they produce same data for creative-1)
+    if (creativeId === 'creative-1') {
+      return HttpResponse.json(mockFilteredRollupCreative1);
+    }
+
+    if (campaignId === 'campaign-A') {
+      return HttpResponse.json(mockFilteredRollupCampaignA);
+    }
+
+    if (campaignId === 'campaign-B') {
+      return HttpResponse.json(mockFilteredRollupCampaignB);
+    }
+
+    // Non-existent campaign/creative returns empty
+    if (campaignId || creativeId) {
+      return HttpResponse.json(mockFilteredRollupEmpty);
+    }
+
+    // No filters - return canonical (shouldn't hit this path normally,
+    // as unfiltered queries use get_actblue_daily_rollup instead)
+    return HttpResponse.json(mockCanonicalDailyRollup);
   }),
 ];

@@ -680,3 +680,83 @@ export const mockCanonicalPeriodSummary = [
     days_with_donations: 3,
   },
 ];
+
+// ============================================================================
+// Filtered ActBlue Rollup Fixtures (for get_actblue_filtered_rollup RPC)
+// These are returned when campaign/creative filters are active
+// ============================================================================
+
+/**
+ * Filtered rollup for campaign-A filter
+ * Only includes txn-1 ($50, net $47.5) + global refund txn-3 ($25)
+ *
+ * Test expects:
+ * - totalRaised = 50
+ * - totalNetRevenue = 22.5 (47.5 - 25 global refunds)
+ * - refundAmount = 25 (global, not filtered)
+ */
+export const mockFilteredRollupCampaignA = [
+  {
+    day: '2024-01-15',
+    gross_raised: 50,
+    net_raised: 47.5,
+    refund_amount: 0,
+    transaction_count: 1,
+    refund_count: 0,
+    unique_donors: 1,
+    recurring_count: 0,
+    recurring_amount: 0,
+  },
+  // Include global refund on 2024-01-17 (refunds are not filtered by campaign)
+  {
+    day: '2024-01-17',
+    gross_raised: 0,
+    net_raised: 0,
+    refund_amount: 25,
+    transaction_count: 0,
+    refund_count: 1,
+    unique_donors: 0,
+    recurring_count: 0,
+    recurring_amount: 0,
+  },
+];
+
+/**
+ * Filtered rollup for campaign-B filter
+ * Only includes txn-2 ($100, net $95) + global refund txn-3 ($25)
+ */
+export const mockFilteredRollupCampaignB = [
+  {
+    day: '2024-01-16',
+    gross_raised: 100,
+    net_raised: 95,
+    refund_amount: 0,
+    transaction_count: 1,
+    refund_count: 0,
+    unique_donors: 1,
+    recurring_count: 1,
+    recurring_amount: 100,
+  },
+  // Include global refund
+  {
+    day: '2024-01-17',
+    gross_raised: 0,
+    net_raised: 0,
+    refund_amount: 25,
+    transaction_count: 0,
+    refund_count: 1,
+    unique_donors: 0,
+    recurring_count: 0,
+    recurring_amount: 0,
+  },
+];
+
+/**
+ * Filtered rollup for creative-1 filter (same as campaign-A since txn-1 has creative-1)
+ */
+export const mockFilteredRollupCreative1 = mockFilteredRollupCampaignA;
+
+/**
+ * Filtered rollup for non-existent campaign/creative (empty)
+ */
+export const mockFilteredRollupEmpty: typeof mockFilteredRollupCampaignA = [];
