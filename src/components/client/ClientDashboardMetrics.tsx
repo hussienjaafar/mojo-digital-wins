@@ -9,11 +9,16 @@ import { format, parseISO, eachDayOfInterval, subDays } from "date-fns";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useActBlueFilteredRollup } from "@/hooks/queries/useActBlueFilteredRollup";
 
 interface ClientDashboardMetricsProps {
   organizationId: string;
   startDate: string;
   endDate: string;
+  /** Optional campaign filter for filtered rollup */
+  campaignId?: string | null;
+  /** Optional creative filter for filtered rollup */
+  creativeId?: string | null;
 }
 
 interface DonationData {
@@ -47,7 +52,8 @@ interface SMSData {
   amount_raised: number;
 }
 
-export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: ClientDashboardMetricsProps) => {
+export const ClientDashboardMetrics = ({ organizationId, startDate, endDate, campaignId, creativeId }: ClientDashboardMetricsProps) => {
+  // State for raw donations (needed for donor identity tracking and attribution breakdown)
   const [donations, setDonations] = useState<DonationData[]>([]);
   const [metaMetrics, setMetaMetrics] = useState<MetaData[]>([]);
   const [smsMetrics, setSmsMetrics] = useState<SMSData[]>([]);
@@ -58,6 +64,43 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [valueMode, setValueMode] = useState<"both" | "net">("both");
+
+  // Use server-side RPC for ActBlue rollup metrics (timezone-aware, filtered)
+  const {
+    data: actblueRollup,
+    summary: actblueSummary,
+    isLoading: isRollupLoading,
+  } = useActBlueFilteredRollup({
+    organizationId,
+    startDate,
+    endDate,
+    campaignId,
+    creativeId,
+  });
+
+  // Previous period rollup for comparison
+  const prevPeriod = useMemo(() => {
+    const start = parseISO(startDate);
+    const end = parseISO(endDate);
+    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const prevEnd = subDays(start, 1);
+    const prevStart = subDays(prevEnd, daysDiff);
+    return {
+      start: format(prevStart, 'yyyy-MM-dd'),
+      end: format(prevEnd, 'yyyy-MM-dd'),
+    };
+  }, [startDate, endDate]);
+
+  const {
+    summary: prevActblueSummary,
+  } = useActBlueFilteredRollup({
+    organizationId,
+    startDate: prevPeriod.start,
+    endDate: prevPeriod.end,
+    campaignId,
+    creativeId,
+  });
+
   const deterministicRate = useMemo(() => {
     if (donations.length === 0) return 0;
     const deterministic = donations.filter(d => d.refcode || d.source_campaign).length;
@@ -82,26 +125,14 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     smsPrev: "#8B5CF688",
   };
 
-  // Calculate previous period dates for comparison
-  const getPreviousPeriod = () => {
-    const start = parseISO(startDate);
-    const end = parseISO(endDate);
-    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const prevEnd = subDays(start, 1);
-    const prevStart = subDays(prevEnd, daysDiff);
-    return {
-      start: format(prevStart, 'yyyy-MM-dd'),
-      end: format(prevEnd, 'yyyy-MM-dd'),
-    };
-  };
-
   useEffect(() => {
     loadAllData();
-  }, [organizationId, startDate, endDate]);
+  }, [organizationId, startDate, endDate, campaignId, creativeId]);
 
+  // Load supplementary data (Meta, SMS, raw donations for attribution)
+  // ActBlue totals come from the RPC hook above
   const loadAllData = async () => {
     setIsLoading(true);
-    const prevPeriod = getPreviousPeriod();
     
     try {
       // Load current period donations (using secure view for defense-in-depth PII protection)
@@ -234,26 +265,33 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     return ((current - previous) / previous) * 100;
   };
 
-  // Calculate KPIs for current period - now with net revenue, refunds, and recurring health
+  // Calculate KPIs for current period - uses RPC data for ActBlue metrics (timezone-aware)
   const kpis = useMemo(() => {
-    const totalRaised = donations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
-    // Net revenue = gross - fees (using net_amount when available)
-    const totalNetRevenue = donations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const totalFees = donations.reduce((sum, d) => sum + Number(d.fee || 0), 0);
+    // ActBlue metrics from server-side RPC (canonical source)
+    const totalRaised = actblueSummary?.grossRaised ?? 0;
+    const totalNetRevenue = actblueSummary?.netRaised ?? 0;
+    const totalFees = totalRaised - totalNetRevenue;
     const feePercentage = totalRaised > 0 ? (totalFees / totalRaised) * 100 : 0;
-    const refunds = donations.filter(d => d.transaction_type === 'refund');
-    const refundAmount = refunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const refundRate = totalRaised > 0 ? (refundAmount / totalRaised) * 100 : 0;
+    const refundAmount = actblueSummary?.refundAmount ?? 0;
+    const refundRate = actblueSummary?.refundRate ?? 0;
 
-    // Recurring health
+    // Recurring metrics from RPC
+    const recurringRaised = actblueSummary?.recurringAmount ?? 0;
+    const recurringDonationsCount = actblueSummary?.recurringCount ?? 0;
+    const transactionCount = actblueSummary?.transactionCount ?? 0;
+    const recurringPercentage = actblueSummary?.recurringRate ?? 0;
+
+    // Churn calculation from raw donations (requires individual records)
     const recurringDonations = donations.filter(d => d.is_recurring);
-    const recurringRaised = recurringDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
     const recurringCancellations = recurringDonations.filter(d => d.transaction_type === 'cancellation').length;
     const recurringRefunds = recurringDonations.filter(d => d.transaction_type === 'refund').length;
     const recurringChurnEvents = recurringCancellations + recurringRefunds;
     const recurringChurnRate = recurringDonations.length > 0 ? (recurringChurnEvents / recurringDonations.length) * 100 : 0;
-    
-    const uniqueDonors = new Set(donations.map(d => d.donor_id_hash || d.donor_email)).size;
+
+    // Unique donors from RPC
+    const uniqueDonors = actblueSummary?.uniqueDonors ?? 0;
+
+    // New vs returning requires raw donation data (donor identity comparison)
     const currentDonorSet = new Set(donations.map(d => d.donor_id_hash || d.donor_email));
     const prevDonorSet = new Set(prevDonations.map(d => d.donor_id_hash || d.donor_email));
     let newDonors = 0;
@@ -262,31 +300,30 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       if (prevDonorSet.has(d)) returningDonors += 1;
       else newDonors += 1;
     });
-    const recurringDonors = donations.filter(d => d.is_recurring).length;
-    const recurringPercentage = donations.length > 0 ? (recurringDonors / donations.length) * 100 : 0;
-    
-    // Recurring upsell metrics
+
+    // Recurring upsell metrics (requires raw data)
     const upsellShown = donations.filter(d => d.recurring_upsell_shown).length;
     const upsellSucceeded = donations.filter(d => d.recurring_upsell_succeeded).length;
     const upsellConversionRate = upsellShown > 0 ? (upsellSucceeded / upsellShown) * 100 : 0;
-    
-    // Attribution breakdown by source
+
+    // Attribution breakdown by source (requires raw data)
     const bySource = donations.reduce((acc, d) => {
       const source = d.source_campaign || 'direct';
       acc[source] = (acc[source] || 0) + Number(d.amount || 0);
       return acc;
     }, {} as Record<string, number>);
-    
+
+    // Spend metrics from Meta and SMS
     const totalMetaSpend = metaMetrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
     const totalSMSCost = smsMetrics.reduce((sum, s) => sum + Number(s.cost || 0), 0);
     const totalSpend = totalMetaSpend + totalSMSCost;
-    
+
     // Use net revenue for accurate ROI calculation
     const roi = totalSpend > 0 ? totalNetRevenue / totalSpend : 0;
-    
+
     const totalImpressions = metaMetrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
     const totalClicks = metaMetrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
-    const avgDonation = donations.length > 0 ? totalRaised / donations.length : 0;
+    const avgDonation = transactionCount > 0 ? totalRaised / transactionCount : 0;
 
     return {
       totalRaised,
@@ -297,7 +334,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       refundRate,
       recurringRaised,
       recurringChurnRate,
-      recurringDonations: recurringDonations.length,
+      recurringDonations: recurringDonationsCount,
       uniqueDonors,
       newDonors,
       returningDonors,
@@ -308,30 +345,31 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       totalImpressions,
       totalClicks,
       avgDonation,
-      donationCount: donations.length,
+      donationCount: transactionCount,
       revenueBySource: bySource,
     };
-  }, [donations, metaMetrics, smsMetrics]);
+  }, [actblueSummary, donations, prevDonations, metaMetrics, smsMetrics]);
 
-  // Calculate KPIs for previous period
+  // Calculate KPIs for previous period - uses RPC data for ActBlue metrics
   const prevKpis = useMemo(() => {
-    const totalRaised = prevDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
-    const totalNetRevenue = prevDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const refunds = prevDonations.filter(d => d.transaction_type === 'refund');
-    const refundAmount = refunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const refundRate = totalRaised > 0 ? (refundAmount / totalRaised) * 100 : 0;
+    // ActBlue metrics from server-side RPC (canonical source)
+    const totalRaised = prevActblueSummary?.grossRaised ?? 0;
+    const totalNetRevenue = prevActblueSummary?.netRaised ?? 0;
+    const refundAmount = prevActblueSummary?.refundAmount ?? 0;
+    const refundRate = prevActblueSummary?.refundRate ?? 0;
+    const recurringRaised = prevActblueSummary?.recurringAmount ?? 0;
+    const uniqueDonors = prevActblueSummary?.uniqueDonors ?? 0;
+    const recurringPercentage = prevActblueSummary?.recurringRate ?? 0;
+
+    // Churn requires raw data
     const prevRecurring = prevDonations.filter(d => d.is_recurring);
-    const prevRecurringRaised = prevRecurring.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
     const prevRecurringChurn = prevRecurring.filter(d => d.transaction_type === 'cancellation' || d.transaction_type === 'refund').length;
-    const prevRecurringChurnRate = prevRecurring.length > 0 ? (prevRecurringChurn / prevRecurring.length) * 100 : 0;
-    const uniqueDonors = new Set(prevDonations.map(d => d.donor_id_hash || d.donor_email)).size;
-    const recurringDonors = prevDonations.filter(d => d.is_recurring).length;
-    const recurringPercentage = prevDonations.length > 0 ? (recurringDonors / prevDonations.length) * 100 : 0;
-    
+    const recurringChurnRate = prevRecurring.length > 0 ? (prevRecurringChurn / prevRecurring.length) * 100 : 0;
+
     const totalMetaSpend = prevMetaMetrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
     const totalSMSCost = prevSmsMetrics.reduce((sum, s) => sum + Number(s.cost || 0), 0);
     const totalSpend = totalMetaSpend + totalSMSCost;
-    
+
     const roi = totalSpend > 0 ? totalNetRevenue / totalSpend : 0;
 
     return {
@@ -339,18 +377,17 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       totalNetRevenue,
       refundAmount,
       refundRate,
-      recurringRaised: prevRecurringRaised,
-      recurringChurnRate: prevRecurringChurnRate,
+      recurringRaised,
+      recurringChurnRate,
       uniqueDonors,
       recurringPercentage,
       roi,
       totalSpend,
     };
-  }, [prevDonations, prevMetaMetrics, prevSmsMetrics]);
+  }, [prevActblueSummary, prevDonations, prevMetaMetrics, prevSmsMetrics]);
 
-  // Build time series data for charts
+  // Build time series data for charts - uses RPC rollup for ActBlue daily data
   const timeSeriesData = useMemo(() => {
-    const prevPeriod = getPreviousPeriod();
     const days = eachDayOfInterval({
       start: parseISO(startDate),
       end: parseISO(endDate),
@@ -360,24 +397,36 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
       end: parseISO(prevPeriod.end),
     });
 
+    // Create lookup map for RPC rollup data by day
+    const rollupByDay = new Map<string, typeof actblueRollup extends (infer T)[] | null ? T : never>();
+    if (actblueRollup) {
+      actblueRollup.forEach(r => {
+        rollupByDay.set(r.day, r);
+      });
+    }
+
     return days.map(day => {
       const dayStr = format(day, 'yyyy-MM-dd');
       const dayLabel = format(day, 'MMM d');
       const prevDay = prevDays[days.indexOf(day)];
       const prevDayStr = prevDay ? format(prevDay, 'yyyy-MM-dd') : null;
-      
-      const dayDonations = donations.filter(d => d.transaction_date?.startsWith(dayStr));
+
+      // Use RPC rollup data for ActBlue metrics (timezone-aware server-side aggregation)
+      const dayRollup = rollupByDay.get(dayStr);
+      const grossDonations = Number(dayRollup?.gross_raised || 0);
+      const netDonations = Number(dayRollup?.net_raised || 0);
+      const refundAmount = Number(dayRollup?.refund_amount || 0);
+
+      // Meta and SMS from raw data (unchanged)
       const dayMeta = metaMetrics.filter(m => m.date === dayStr);
       const daySms = smsMetrics.filter(s => s.send_date?.startsWith(dayStr));
-      const dayRefunds = dayDonations.filter(d => d.transaction_type === 'refund');
+
+      // Previous period from raw donations (for comparison chart overlay)
       const prevDayDonations = prevDayStr ? prevDonations.filter(d => d.transaction_date?.startsWith(prevDayStr)) : [];
       const prevDayMeta = prevDayStr ? prevMetaMetrics.filter(m => m.date === prevDayStr) : [];
       const prevDaySms = prevDayStr ? prevSmsMetrics.filter(s => s.send_date?.startsWith(prevDayStr)) : [];
       const prevDayRefunds = prevDayDonations.filter(d => d.transaction_type === 'refund');
 
-      const grossDonations = dayDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
-      const netDonations = dayDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-      const refundAmount = dayRefunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
       const prevGross = prevDayDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0);
       const prevNet = prevDayDonations.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
       const prevRefundAmount = prevDayRefunds.reduce((sum, d) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
@@ -396,7 +445,7 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
         smsSpendPrev: prevDaySms.reduce((sum, s) => sum + Number(s.cost || 0), 0),
       };
     });
-  }, [donations, metaMetrics, smsMetrics, prevDonations, prevMetaMetrics, prevSmsMetrics, startDate, endDate]);
+  }, [actblueRollup, metaMetrics, smsMetrics, prevDonations, prevMetaMetrics, prevSmsMetrics, startDate, endDate, prevPeriod]);
 
   // Channel breakdown for bar chart
   const channelBreakdown = useMemo(() => {
@@ -503,7 +552,8 @@ export const ClientDashboardMetrics = ({ organizationId, startDate, endDate }: C
     },
   ];
 
-  if (isLoading) {
+  // Combined loading state: both local data and RPC rollup
+  if (isLoading || isRollupLoading) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
