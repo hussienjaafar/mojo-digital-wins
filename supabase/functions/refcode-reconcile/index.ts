@@ -92,8 +92,9 @@ serve(async (req) => {
     console.log(`[REFCODE RECONCILE] Found ${refcodeToLatestAd.size} unique refcodes from ${creatives?.length || 0} creatives`);
 
     for (const [refcode, c] of refcodeToLatestAd) {
-      // Use UPDATE to force refresh the ad_id even if refcode already exists
-      // This ensures donations get attributed to the CURRENT running ad, not old ads
+      const now = new Date().toISOString();
+      
+      // 1. Update refcode_mappings (current pointer) - always points to newest ad
       const { error: upsertErr } = await supabase
         .from('refcode_mappings')
         .upsert({
@@ -103,10 +104,10 @@ serve(async (req) => {
           campaign_id: c.campaign_id,
           ad_id: c.ad_id,
           creative_id: c.creative_id,
-          updated_at: new Date().toISOString(),
+          updated_at: now,
         }, { 
           onConflict: 'organization_id,refcode',
-          ignoreDuplicates: false  // Force update existing rows
+          ignoreDuplicates: false
         });
 
       if (upsertErr) {
@@ -114,6 +115,26 @@ serve(async (req) => {
       } else {
         upserts++;
         console.log(`[REFCODE RECONCILE] Upserted refcode=${refcode} -> ad_id=${c.ad_id}`);
+      }
+      
+      // 2. Also insert into refcode_mapping_history for versioned attribution
+      const { error: historyErr } = await supabase
+        .from('refcode_mapping_history')
+        .upsert({
+          organization_id,
+          refcode,
+          ad_id: c.ad_id,
+          campaign_id: c.campaign_id,
+          creative_id: c.creative_id,
+          last_seen_at: now,
+          is_active: true,
+        }, {
+          onConflict: 'organization_id,refcode,ad_id',
+          ignoreDuplicates: false
+        });
+      
+      if (historyErr) {
+        console.error('[REFCODE RECONCILE] History insert failed:', historyErr);
       }
     }
 
