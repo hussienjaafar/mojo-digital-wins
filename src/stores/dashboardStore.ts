@@ -133,7 +133,7 @@ interface DashboardState {
 // ============================================================================
 
 const getDefaultDateRange = (): DateRange => ({
-  startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
+  startDate: format(new Date(), 'yyyy-MM-dd'),
   endDate: format(new Date(), 'yyyy-MM-dd'),
 });
 
