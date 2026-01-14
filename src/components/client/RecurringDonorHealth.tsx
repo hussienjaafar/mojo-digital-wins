@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3CardDescription } from "@/components/v3/V3Card";
 import { V3Badge } from "@/components/v3/V3Badge";
 import { V3LoadingState } from "@/components/v3/V3LoadingState";
-import { V3SectionHeader } from "@/components/v3/V3SectionHeader";
+import { V3KPICard } from "@/components/v3/V3KPICard";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 import { V3EmptyState } from "@/components/v3/V3EmptyState";
@@ -16,7 +16,8 @@ import {
   ArrowUpCircle,
   Calendar,
   PlusCircle,
-  AlertTriangle
+  AlertTriangle,
+  Activity
 } from "lucide-react";
 
 interface RecurringHealthData {
@@ -64,11 +65,7 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
   });
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <V3LoadingState variant="kpi-grid" count={6} />
-      </div>
-    );
+    return <V3LoadingState variant="kpi-grid" count={6} />;
   }
 
   if (error) {
@@ -116,73 +113,36 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
 
   return (
     <div className="space-y-6">
-      <V3SectionHeader
-        title="Recurring Donor Health"
-        subtitle="Monitor MRR, churn rates, and recurring donation performance"
-        icon={RefreshCw}
-        variant="premium"
-        badges={[
-          <V3Badge 
-            key="health" 
-            variant={healthStatus === 'excellent' ? 'success' : healthStatus === 'good' ? 'info' : 'error'}
-          >
-            Health Score: {healthScore}%
-          </V3Badge>
-        ]}
-      />
-
-      {/* Current State Section */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <DollarSign className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
-          <h3 className="text-sm font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wide">Current State</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <V3Card accent="green">
-            <V3CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Current Active MRR</p>
-                  <p className="text-2xl font-bold text-[hsl(var(--portal-success))]">
-                    {formatCurrency(healthData.current_active_mrr || 0)}
-                  </p>
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Expected monthly revenue</p>
-                </div>
-                <DollarSign className="h-10 w-10 text-[hsl(var(--portal-success)/0.2)]" />
-              </div>
-            </V3CardContent>
-          </V3Card>
-
-          <V3Card accent="blue">
-            <V3CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Active Recurring Donors</p>
-                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
-                    {formatNumber(healthData.current_active_donors || 0)}
-                  </p>
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Currently active subscriptions</p>
-                </div>
-                <Users className="h-10 w-10 text-[hsl(var(--portal-accent-blue)/0.2)]" />
-              </div>
-            </V3CardContent>
-          </V3Card>
-
-          <V3Card accent="purple">
-            <V3CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Avg Recurring Amount</p>
-                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
-                    {formatCurrency(healthData.avg_recurring_amount || 0)}
-                  </p>
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">Per active donor</p>
-                </div>
-                <TrendingUp className="h-10 w-10 text-[hsl(var(--portal-accent-purple)/0.2)]" />
-              </div>
-            </V3CardContent>
-          </V3Card>
-        </div>
+      {/* Hero KPIs Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <V3KPICard
+          icon={Activity}
+          label="Health Score"
+          value={`${healthScore}%`}
+          accent={healthStatus === 'excellent' ? 'green' : healthStatus === 'good' ? 'blue' : healthStatus === 'fair' ? 'amber' : 'red'}
+          subtitle={healthStatus.charAt(0).toUpperCase() + healthStatus.slice(1)}
+        />
+        <V3KPICard
+          icon={DollarSign}
+          label="Active MRR"
+          value={formatCurrency(healthData.current_active_mrr || 0)}
+          accent="green"
+          subtitle="Expected monthly"
+        />
+        <V3KPICard
+          icon={Users}
+          label="Active Donors"
+          value={formatNumber(healthData.current_active_donors || 0)}
+          accent="blue"
+          subtitle={`${formatPercent(activeRate)} of total`}
+        />
+        <V3KPICard
+          icon={TrendingUp}
+          label="Avg Amount"
+          value={formatCurrency(healthData.avg_recurring_amount || 0)}
+          accent="purple"
+          subtitle="Per active donor"
+        />
       </div>
 
       {/* Period Performance Section */}
@@ -191,51 +151,28 @@ export function RecurringDonorHealth({ organizationId, startDate, endDate }: Rec
           <Calendar className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
           <h3 className="text-sm font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wide">Period Performance</h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <V3Card accent="green">
-            <V3CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">New MRR Added</p>
-                  <p className="text-2xl font-bold text-[hsl(var(--portal-success))]">
-                    {formatCurrency(healthData.new_recurring_mrr || 0)}
-                  </p>
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">From new recurring donors</p>
-                </div>
-                <PlusCircle className="h-10 w-10 text-[hsl(var(--portal-success)/0.2)]" />
-              </div>
-            </V3CardContent>
-          </V3Card>
-
-          <V3Card accent="blue">
-            <V3CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">New Recurring Donors</p>
-                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
-                    {formatNumber(healthData.new_recurring_donors || 0)}
-                  </p>
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">First recurring in period</p>
-                </div>
-                <Users className="h-10 w-10 text-[hsl(var(--portal-accent-blue)/0.2)]" />
-              </div>
-            </V3CardContent>
-          </V3Card>
-
-          <V3Card accent="amber">
-            <V3CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">Period Recurring Revenue</p>
-                  <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
-                    {formatCurrency(healthData.period_recurring_revenue || 0)}
-                  </p>
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">{formatNumber(healthData.period_recurring_transactions || 0)} transactions</p>
-                </div>
-                <DollarSign className="h-10 w-10 text-[hsl(var(--portal-accent-amber)/0.2)]" />
-              </div>
-            </V3CardContent>
-          </V3Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <V3KPICard
+            icon={PlusCircle}
+            label="New MRR Added"
+            value={formatCurrency(healthData.new_recurring_mrr || 0)}
+            accent="green"
+            subtitle="From new recurring donors"
+          />
+          <V3KPICard
+            icon={Users}
+            label="New Recurring Donors"
+            value={formatNumber(healthData.new_recurring_donors || 0)}
+            accent="blue"
+            subtitle="First recurring in period"
+          />
+          <V3KPICard
+            icon={DollarSign}
+            label="Period Recurring Revenue"
+            value={formatCurrency(healthData.period_recurring_revenue || 0)}
+            accent="amber"
+            subtitle={`${formatNumber(healthData.period_recurring_transactions || 0)} transactions`}
+          />
         </div>
       </div>
 
