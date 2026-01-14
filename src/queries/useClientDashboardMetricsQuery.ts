@@ -256,6 +256,85 @@ async function fetchCanonicalPeriodSummary(
   };
 }
 
+/**
+ * Fetch filtered ActBlue rollup using server-side RPC.
+ * This is used when campaign/creative filters are active for better performance.
+ */
+async function fetchFilteredActBlueRollup(
+  organizationId: string,
+  startDate: string,
+  endDate: string,
+  campaignId: string | null,
+  creativeId: string | null,
+  timezone: string = DEFAULT_ORG_TIMEZONE
+): Promise<{ daily: DailyRollupRow[]; summary: PeriodSummary }> {
+  const { data, error } = await (supabase as any).rpc('get_actblue_filtered_rollup', {
+    p_org_id: organizationId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+    p_campaign_id: campaignId || null,
+    p_creative_id: creativeId || null,
+    p_timezone: timezone,
+  });
+
+  if (error) {
+    logger.error('Failed to fetch filtered ActBlue rollup', { error, organizationId });
+    throw new Error(`Failed to fetch filtered rollup: ${error.message}`);
+  }
+
+  const daily: DailyRollupRow[] = (data || []).map((row: any) => ({
+    day: row.day,
+    gross_raised: Number(row.gross_raised) || 0,
+    net_raised: Number(row.net_raised) || 0,
+    // net_revenue = net_raised - refund_amount (RPC returns them separately)
+    refunds: Number(row.refund_amount) || 0,
+    net_revenue: (Number(row.net_raised) || 0) - (Number(row.refund_amount) || 0),
+    total_fees: 0, // Not returned by filtered RPC, calculate from gross - net
+    donation_count: Number(row.transaction_count) || 0,
+    unique_donors: Number(row.unique_donors) || 0,
+    refund_count: Number(row.refund_count) || 0,
+    recurring_count: Number(row.recurring_count) || 0,
+    one_time_count: (Number(row.transaction_count) || 0) - (Number(row.recurring_count) || 0),
+    recurring_revenue: Number(row.recurring_amount) || 0,
+    one_time_revenue: (Number(row.gross_raised) || 0) - (Number(row.recurring_amount) || 0),
+    fee_percentage: 0, // Calculated in summary
+    refund_rate: 0, // Calculated in summary
+  }));
+
+  // Aggregate to summary
+  const grossRaised = daily.reduce((sum, d) => sum + d.gross_raised, 0);
+  const netRaised = daily.reduce((sum, d) => sum + d.net_raised, 0);
+  const refunds = daily.reduce((sum, d) => sum + d.refunds, 0);
+  const donationCount = daily.reduce((sum, d) => sum + d.donation_count, 0);
+  const uniqueDonors = daily.reduce((sum, d) => sum + d.unique_donors, 0);
+  const refundCount = daily.reduce((sum, d) => sum + d.refund_count, 0);
+  const recurringCount = daily.reduce((sum, d) => sum + d.recurring_count, 0);
+  const recurringRevenue = daily.reduce((sum, d) => sum + d.recurring_revenue, 0);
+  const totalFees = grossRaised - netRaised; // Estimate fees from gross - net
+  const netRevenue = netRaised - refunds;
+
+  const summary: PeriodSummary = {
+    gross_raised: grossRaised,
+    net_raised: netRaised,
+    refunds,
+    net_revenue: netRevenue,
+    total_fees: totalFees,
+    donation_count: donationCount,
+    unique_donors_approx: uniqueDonors,
+    refund_count: refundCount,
+    recurring_count: recurringCount,
+    one_time_count: donationCount - recurringCount,
+    recurring_revenue: recurringRevenue,
+    one_time_revenue: grossRaised - recurringRevenue,
+    avg_fee_percentage: grossRaised > 0 ? (totalFees / grossRaised) * 100 : 0,
+    refund_rate: grossRaised > 0 ? (refunds / grossRaised) * 100 : 0,
+    avg_donation: donationCount > 0 ? grossRaised / donationCount : 0,
+    days_with_donations: daily.filter(d => d.donation_count > 0).length,
+  };
+
+  return { daily, summary };
+}
+
 async function fetchDashboardMetrics(
   organizationId: string,
   startDate: string,
@@ -316,7 +395,7 @@ async function fetchDashboardMetrics(
 
   // Phase 2: Fetch all data
   // - When no filters: use canonical rollup for ActBlue metrics (timezone-aware)
-  // - When filters: use raw transactions (filtered by attribution)
+  // - When filters: use get_actblue_filtered_rollup RPC for server-side filtering
   // - Raw transactions still needed for: attribution analysis, donor tracking, upsell metrics
   const [
     { data: donationData },
@@ -330,6 +409,8 @@ async function fetchDashboardMetrics(
     canonicalDailyRollup,
     canonicalPeriodSummary,
     prevCanonicalSummary,
+    filteredRollup,
+    prevFilteredRollup,
   ] = await Promise.all([
     // Current period donations - fetch all, filter client-side if needed
     // Still needed for: attribution, donors, upsell tracking
@@ -376,6 +457,14 @@ async function fetchDashboardMetrics(
     fetchCanonicalPeriodSummary(organizationId, startDate, endDate),
     // Previous period canonical summary
     fetchCanonicalPeriodSummary(organizationId, prevPeriod.start, prevPeriod.end),
+    // Filtered rollup using server-side RPC (only used when campaign/creative filters are active)
+    hasFilters
+      ? fetchFilteredActBlueRollup(organizationId, startDate, endDate, campaignId, creativeId)
+      : Promise.resolve(null),
+    // Previous period filtered rollup
+    hasFilters
+      ? fetchFilteredActBlueRollup(organizationId, prevPeriod.start, prevPeriod.end, campaignId, creativeId)
+      : Promise.resolve(null),
   ]);
 
   // Apply client-side filtering for donations only (not refunds)
@@ -414,7 +503,7 @@ async function fetchDashboardMetrics(
   const prevMetaMetrics = prevMetaData || [];
 
   // ============================================================================
-  // ActBlue KPIs: Use CANONICAL ROLLUP when no filters, raw transactions when filtered
+  // ActBlue KPIs: Use CANONICAL ROLLUP when no filters, FILTERED ROLLUP RPC when filtered
   // This ensures timezone-aware day bucketing matches SQL exactly
   // ============================================================================
   let totalRaised: number;
@@ -439,8 +528,23 @@ async function fetchDashboardMetrics(
       refunds: refundAmount,
       fees: totalFees,
     });
+  } else if (filteredRollup) {
+    // With filters, use server-side filtered rollup RPC for accurate ActBlue metrics
+    totalRaised = filteredRollup.summary.gross_raised;
+    totalNetRevenue = filteredRollup.summary.net_revenue;
+    refundAmount = filteredRollup.summary.refunds;
+    totalFees = filteredRollup.summary.total_fees;
+    feePercentage = filteredRollup.summary.avg_fee_percentage;
+    refundRate = filteredRollup.summary.refund_rate;
+
+    logger.debug('Using filtered rollup RPC for ActBlue KPIs (campaign/creative filter active)', {
+      gross: totalRaised,
+      net: totalNetRevenue,
+      refunds: refundAmount,
+      dailyRows: filteredRollup.daily.length,
+    });
   } else {
-    // With filters, calculate from filtered raw transactions
+    // Fallback to client-side calculation if filtered rollup failed
     const grossDonations = donations.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
     refundAmount = refunds.reduce((sum: number, d: any) => sum + Math.abs(Number(d.net_amount ?? d.amount ?? 0)), 0);
     totalRaised = grossDonations;
@@ -449,7 +553,7 @@ async function fetchDashboardMetrics(
     feePercentage = grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0;
     refundRate = grossDonations > 0 ? (refundAmount / grossDonations) * 100 : 0;
 
-    logger.debug('Using filtered raw transactions for ActBlue KPIs (campaign/creative filter active)', {
+    logger.warn('Filtered rollup RPC returned null, falling back to client-side calculation', {
       gross: totalRaised,
       filtered: donations.length,
     });
@@ -535,7 +639,7 @@ async function fetchDashboardMetrics(
   const attributionFallbackMode = donationAttributions.length === 0 && donations.length > 0;
 
   // ============================================================================
-  // Previous Period ActBlue KPIs: Use CANONICAL ROLLUP when no filters
+  // Previous Period ActBlue KPIs: Use CANONICAL ROLLUP when no filters, FILTERED ROLLUP when filtered
   // ============================================================================
   let prevTotalRaised: number;
   let prevTotalNetRevenue: number;
@@ -548,8 +652,14 @@ async function fetchDashboardMetrics(
     prevTotalNetRevenue = prevCanonicalSummary.net_revenue;
     prevRefundAmount = prevCanonicalSummary.refunds;
     prevRefundRate = prevCanonicalSummary.refund_rate;
+  } else if (prevFilteredRollup) {
+    // With filters, use server-side filtered rollup RPC for previous period
+    prevTotalRaised = prevFilteredRollup.summary.gross_raised;
+    prevTotalNetRevenue = prevFilteredRollup.summary.net_revenue;
+    prevRefundAmount = prevFilteredRollup.summary.refunds;
+    prevRefundRate = prevFilteredRollup.summary.refund_rate;
   } else {
-    // With filters, calculate from filtered raw transactions
+    // Fallback to client-side calculation if filtered rollup failed
     const prevGrossDonations = prevDonations.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
     prevRefundAmount = prevRefunds.reduce((sum: number, d: any) => sum + Math.abs(Number(d.net_amount ?? d.amount ?? 0)), 0);
     prevTotalRaised = prevGrossDonations;
@@ -625,6 +735,20 @@ async function fetchDashboardMetrics(
     canonicalByDay.set(row.day, row);
   }
 
+  // Index filtered rollup by day for O(1) lookups (when filters are active)
+  const filteredByDay = new Map<string, DailyRollupRow>();
+  if (filteredRollup) {
+    for (const row of filteredRollup.daily) {
+      filteredByDay.set(row.day, row);
+    }
+  }
+  const prevFilteredByDay = new Map<string, DailyRollupRow>();
+  if (prevFilteredRollup) {
+    for (const row of prevFilteredRollup.daily) {
+      prevFilteredByDay.set(row.day, row);
+    }
+  }
+
   const timeSeries: DashboardTimeSeriesPoint[] = days.map((day, index) => {
     const dayStr = format(day, 'yyyy-MM-dd');
     const dayLabel = format(day, 'MMM d');
@@ -637,7 +761,7 @@ async function fetchDashboardMetrics(
     const prevDayMeta = prevDayStr ? (prevMetaByDay.get(prevDayStr) ?? []) : [];
     const prevDaySms = prevDayStr ? (prevSmsByDay.get(prevDayStr) ?? []) : [];
 
-    // ActBlue metrics: Use canonical rollup when no filters
+    // ActBlue metrics: Use canonical rollup when no filters, filtered rollup when filtered
     let grossDonationsDay: number;
     let netDonationsDay: number;
     let refundAmountDay: number;
@@ -649,8 +773,14 @@ async function fetchDashboardMetrics(
       // netDonations = net_revenue (already refund-adjusted in canonical)
       netDonationsDay = canonicalDay?.net_revenue ?? 0;
       refundAmountDay = canonicalDay?.refunds ?? 0;
+    } else if (filteredRollup) {
+      // With filters, use server-side filtered rollup RPC
+      const filteredDay = filteredByDay.get(dayStr);
+      grossDonationsDay = filteredDay?.gross_raised ?? 0;
+      netDonationsDay = filteredDay?.net_revenue ?? 0;
+      refundAmountDay = filteredDay?.refunds ?? 0;
     } else {
-      // With filters, use client-side bucketing
+      // Fallback: client-side bucketing
       const dayDonationsOnly = donationsByDay.get(dayStr) ?? [];
       const dayRefundsOnly = refundsByDay.get(dayStr) ?? [];
       grossDonationsDay = dayDonationsOnly.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
@@ -659,13 +789,24 @@ async function fetchDashboardMetrics(
       netDonationsDay = donationNetDay - refundAmountDay;
     }
 
-    // Previous period: still use client-side bucketing (canonical rollup not fetched for prev daily)
-    const prevDayDonationsOnly = prevDayStr ? (prevDonationsByDay.get(prevDayStr) ?? []) : [];
-    const prevDayRefundsOnly = prevDayStr ? (prevRefundsByDay.get(prevDayStr) ?? []) : [];
-    const prevGross = prevDayDonationsOnly.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
-    const prevDonationNet = prevDayDonationsOnly.reduce((sum: number, d: any) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
-    const prevRefundAmountDay = prevDayRefundsOnly.reduce((sum: number, d: any) => sum + Math.abs(Number(d.net_amount ?? d.amount ?? 0)), 0);
-    const prevNetDonationsDay = prevDonationNet - prevRefundAmountDay;
+    // Previous period: use filtered rollup when available, otherwise client-side bucketing
+    let prevGross: number;
+    let prevNetDonationsDay: number;
+    let prevRefundAmountDay: number;
+
+    if (prevFilteredRollup && prevDayStr) {
+      const prevFilteredDay = prevFilteredByDay.get(prevDayStr);
+      prevGross = prevFilteredDay?.gross_raised ?? 0;
+      prevNetDonationsDay = prevFilteredDay?.net_revenue ?? 0;
+      prevRefundAmountDay = prevFilteredDay?.refunds ?? 0;
+    } else {
+      const prevDayDonationsOnly = prevDayStr ? (prevDonationsByDay.get(prevDayStr) ?? []) : [];
+      const prevDayRefundsOnly = prevDayStr ? (prevRefundsByDay.get(prevDayStr) ?? []) : [];
+      prevGross = prevDayDonationsOnly.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+      const prevDonationNet = prevDayDonationsOnly.reduce((sum: number, d: any) => sum + Number(d.net_amount ?? d.amount ?? 0), 0);
+      prevRefundAmountDay = prevDayRefundsOnly.reduce((sum: number, d: any) => sum + Math.abs(Number(d.net_amount ?? d.amount ?? 0)), 0);
+      prevNetDonationsDay = prevDonationNet - prevRefundAmountDay;
+    }
 
     return {
       name: dayLabel,
