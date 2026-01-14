@@ -6,6 +6,36 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to handle Meta API pagination
+async function fetchAllPages(baseUrl: string, accessToken: string): Promise<any[]> {
+  const allData: any[] = [];
+  let nextUrl: string | null = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}access_token=${accessToken}`;
+  
+  while (nextUrl) {
+    try {
+      const res: Response = await fetch(nextUrl);
+      const json: { data?: any[]; error?: any; paging?: { next?: string } } = await res.json();
+      
+      if (json.error) {
+        console.error('[meta-oauth-callback] Pagination error:', json.error);
+        break;
+      }
+      
+      if (json.data) {
+        allData.push(...json.data);
+      }
+      
+      // Check for next page
+      nextUrl = json.paging?.next || null;
+    } catch (error) {
+      console.error('[meta-oauth-callback] Fetch error during pagination:', error);
+      break;
+    }
+  }
+  
+  return allData;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -91,21 +121,53 @@ serve(async (req) => {
     );
     const userInfo = await userInfoResponse.json();
 
-    // Fetch available ad accounts
-    const adAccountsResponse = await fetch(
-      `https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_id,account_status,currency,business_name&access_token=${finalToken}`
+    // ===== Fetch ALL ad accounts (user-level + Business Manager) =====
+    
+    // 1. Fetch user-level ad accounts (personal/directly owned)
+    console.log('[meta-oauth-callback] Fetching user ad accounts...');
+    const userAdAccounts = await fetchAllPages(
+      'https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_id,account_status,currency,business_name',
+      finalToken
     );
-    const adAccountsData = await adAccountsResponse.json();
+    console.log('[meta-oauth-callback] Found', userAdAccounts.length, 'user ad accounts');
 
-    if (adAccountsData.error) {
-      console.error('[meta-oauth-callback] Ad accounts error:', adAccountsData.error);
-      return new Response(
-        JSON.stringify({ error: adAccountsData.error.message || 'Failed to fetch ad accounts' }), 
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    // 2. Fetch all businesses the user has access to
+    console.log('[meta-oauth-callback] Fetching businesses...');
+    const businesses = await fetchAllPages(
+      'https://graph.facebook.com/v19.0/me/businesses?fields=id,name',
+      finalToken
+    );
+    console.log('[meta-oauth-callback] Found', businesses.length, 'businesses');
+
+    // 3. Fetch ad accounts from each business (owned + client accounts)
+    let businessAdAccounts: any[] = [];
+    for (const business of businesses) {
+      console.log('[meta-oauth-callback] Fetching ad accounts for business:', business.name, '(', business.id, ')');
+      
+      // Fetch owned ad accounts
+      const ownedAccounts = await fetchAllPages(
+        `https://graph.facebook.com/v19.0/${business.id}/owned_ad_accounts?fields=id,name,account_id,account_status,currency,business_name`,
+        finalToken
       );
+      console.log('[meta-oauth-callback] - Owned accounts:', ownedAccounts.length);
+      businessAdAccounts = businessAdAccounts.concat(ownedAccounts);
+      
+      // Fetch client ad accounts (accounts shared with this business)
+      const clientAccounts = await fetchAllPages(
+        `https://graph.facebook.com/v19.0/${business.id}/client_ad_accounts?fields=id,name,account_id,account_status,currency,business_name`,
+        finalToken
+      );
+      console.log('[meta-oauth-callback] - Client accounts:', clientAccounts.length);
+      businessAdAccounts = businessAdAccounts.concat(clientAccounts);
     }
+    console.log('[meta-oauth-callback] Total business ad accounts:', businessAdAccounts.length);
 
-    console.log('[meta-oauth-callback] Found', adAccountsData.data?.length || 0, 'ad accounts');
+    // 4. Combine and deduplicate by account_id
+    const allAccounts = [...userAdAccounts, ...businessAdAccounts];
+    const uniqueAccounts = Array.from(
+      new Map(allAccounts.map(acc => [acc.account_id, acc])).values()
+    );
+    console.log('[meta-oauth-callback] Total unique ad accounts:', uniqueAccounts.length);
 
     // Store credentials with expiry timestamp for proactive refresh
     const supabase = createClient(
@@ -125,7 +187,7 @@ serve(async (req) => {
           meta_user_id: userInfo.id,
           meta_user_name: userInfo.name,
           meta_user_email: userInfo.email,
-          ad_accounts: adAccountsData.data || [],
+          ad_accounts: uniqueAccounts,
         },
         token_expires_at: tokenExpiresAt.toISOString(),
         refresh_status: null,
@@ -153,7 +215,7 @@ serve(async (req) => {
           name: userInfo.name,
           email: userInfo.email,
         },
-        adAccounts: adAccountsData.data || [],
+        adAccounts: uniqueAccounts,
         accessToken: finalToken,
         expiresIn: finalExpiry,
         tokenExpiresAt: tokenExpiresAt.toISOString(),
