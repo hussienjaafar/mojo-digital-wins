@@ -45,7 +45,7 @@ bucketed_transactions AS (
     t.is_recurring,
     -- Bucket by org timezone: transaction_date AT TIME ZONE tz
     DATE(t.transaction_date AT TIME ZONE COALESCE(oz.tz, 'America/New_York')) AS local_day
-  FROM public.actblue_transactions t
+  FROM public.actblue_transactions_secure t
   LEFT JOIN org_timezones oz ON oz.organization_id = t.organization_id
 ),
 daily_donations AS (
@@ -277,12 +277,12 @@ COMMENT ON FUNCTION public.get_actblue_period_summary IS
   'Note: unique_donors_approx is the sum of daily unique donors, which may double-count donors across days.';
 
 -- ============================================================================
--- PHASE 5: Create index on actblue_transactions for timezone-aware queries
+-- PHASE 5: Create index on actblue_transactions_secure for timezone-aware queries
 -- ============================================================================
 
 -- Index for efficient timezone-aware date bucketing
-CREATE INDEX IF NOT EXISTS idx_actblue_transactions_org_date_type
-  ON public.actblue_transactions (organization_id, transaction_date, transaction_type);
+CREATE INDEX IF NOT EXISTS idx_actblue_transactions_secure_org_date_type
+  ON public.actblue_transactions_secure (organization_id, transaction_date, transaction_type);
 
 -- ============================================================================
 -- Grant RLS-safe SELECT on the view for authenticated users
