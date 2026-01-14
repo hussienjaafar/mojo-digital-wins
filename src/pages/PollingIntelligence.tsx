@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { TrendingUp, TrendingDown, AlertTriangle, Target, Users, BarChart3 } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
+import { ProductionGate } from "@/components/client/ProductionGate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -157,6 +158,11 @@ export default function PollingIntelligence() {
 
   return (
     <ClientShell>
+      <ProductionGate
+        title="Polling Intelligence"
+        description="Track polling data, race projections, and electoral trends with advanced analytics."
+        icon={BarChart3}
+      >
       <V3PageContainer
         title="Polling Intelligence"
         description="Track key races and polling trends"
@@ -355,6 +361,7 @@ export default function PollingIntelligence() {
           </TabsContent>
         </Tabs>
       </V3PageContainer>
+      </ProductionGate>
     </ClientShell>
   );
 }

@@ -17,6 +17,7 @@ import {
   AlertCircle,
   X,
 } from "lucide-react";
+import { ProductionGate } from "@/components/client/ProductionGate";
 
 import { ClientShell } from "@/components/client/ClientShell";
 import { ChartPanel } from "@/components/charts/ChartPanel";
@@ -195,6 +196,11 @@ const ClientWatchlist = () => {
 
   return (
     <ClientShell pageTitle="Watchlist & Alerts" showDateControls={false}>
+      <ProductionGate
+        title="Entity Watchlist"
+        description="Monitor key entities, legislators, and organizations with automated alerts and tracking."
+        icon={Eye}
+      >
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
         {/* Hero Panel */}
         <ChartPanel
@@ -484,6 +490,7 @@ const ClientWatchlist = () => {
           )}
         </ChartPanel>
       </div>
+      </ProductionGate>
     </ClientShell>
   );
 };

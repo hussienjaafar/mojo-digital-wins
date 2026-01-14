@@ -19,6 +19,7 @@ import {
   Eye,
   Activity,
 } from "lucide-react";
+import { ProductionGate } from "@/components/client/ProductionGate";
 
 import { ClientShell } from "@/components/client/ClientShell";
 import { ChartPanel } from "@/components/charts/ChartPanel";
@@ -514,6 +515,11 @@ const ClientActions = () => {
 
   return (
     <ClientShell pageTitle="Suggested Actions" showDateControls={false}>
+      <ProductionGate
+        title="Suggested Actions"
+        description="AI-powered action recommendations to optimize your fundraising strategy and donor engagement."
+        icon={Lightbulb}
+      >
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
         {/* Pipeline Health Panel */}
         <PipelineHealthPanel 
@@ -868,6 +874,7 @@ const ClientActions = () => {
         onConfirm={handleConfirmDismiss}
         isLoading={dismissMutation.isPending}
       />
+      </ProductionGate>
     </ClientShell>
   );
 };

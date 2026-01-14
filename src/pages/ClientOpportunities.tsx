@@ -15,6 +15,7 @@ import {
   X,
   MessageSquare,
 } from "lucide-react";
+import { ProductionGate } from "@/components/client/ProductionGate";
 import { toast } from "sonner";
 
 import { ClientShell } from "@/components/client/ClientShell";
@@ -413,6 +414,11 @@ export default function ClientOpportunities() {
 
   return (
     <ClientShell pageTitle="Opportunities" showDateControls={false}>
+      <ProductionGate
+        title="Fundraising Opportunities"
+        description="Discover untapped fundraising opportunities based on donor behavior, market trends, and predictive analytics."
+        icon={Target}
+      >
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
         {/* Hero Panel */}
         <ChartPanel
@@ -596,6 +602,7 @@ export default function ClientOpportunities() {
         isMarking={markCompleteMutation.isPending}
         isDismissing={dismissMutation.isPending}
       />
+      </ProductionGate>
     </ClientShell>
   );
 }

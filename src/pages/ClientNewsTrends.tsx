@@ -3,6 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { ClientShell } from "@/components/client/ClientShell";
+import { ProductionGate } from "@/components/client/ProductionGate";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { useTrendEvents, useTrendEvidence } from "@/hooks/useTrendEvents";
 import { useUnifiedTrends } from "@/hooks/useUnifiedTrends";
@@ -392,6 +393,11 @@ export default function ClientNewsTrends() {
 
   return (
     <ClientShell pageTitle="News & Trends" showDateControls={false}>
+      <ProductionGate
+        title="News & Trends"
+        description="Stay ahead with real-time news monitoring and trend analysis relevant to your organization."
+        icon={Activity}
+      >
       <div className="p-4 sm:p-6 space-y-5 max-w-[1600px] mx-auto">
         {/* Header */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -585,6 +591,7 @@ export default function ClientNewsTrends() {
           </TabsContent>
         </Tabs>
       </div>
+      </ProductionGate>
 
       {/* Drilldown Sheet */}
       <Sheet open={!!selectedTrend} onOpenChange={() => setSelectedTrend(null)}>

@@ -4,6 +4,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { ClientShell } from "@/components/client/ClientShell";
+import { ProductionGate } from "@/components/client/ProductionGate";
 import { ChartPanel } from "@/components/charts/ChartPanel";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { useRealtimeAlerts } from "@/hooks/useRealtimeAlerts";
@@ -350,6 +351,11 @@ export default function ClientIntelligence() {
 
   return (
     <ClientShell pageTitle="Intelligence Center" showDateControls={false}>
+      <ProductionGate
+        title="Media Intelligence"
+        description="Monitor media coverage, sentiment analysis, and brand mentions across news and social media."
+        icon={Activity}
+      >
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1800px] mx-auto">
         {/* Header */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -735,6 +741,7 @@ export default function ClientIntelligence() {
           </>
         )}
       </div>
+      </ProductionGate>
     </ClientShell>
   );
 }
