@@ -34,10 +34,11 @@ export function AdminDashboardHome() {
       const today = new Date();
       const sevenDaysAgo = subDays(today, 7);
 
-      const [orgsResult, usersResult, metricsResult, alertsResult, credentialsResult] = await Promise.all([
+      const [orgsResult, usersResult, actblueResult, alertsResult, credentialsResult] = await Promise.all([
         supabase.from("client_organizations").select("id, is_active"),
         supabase.from("client_users").select("organization_id, last_login_at"),
-        supabase.from("daily_aggregated_metrics").select("organization_id, date, total_funds_raised").gte("date", sevenDaysAgo.toISOString().split("T")[0]),
+        // Use canonical ActBlue source instead of legacy daily_aggregated_metrics
+        (supabase as any).from("actblue_transactions_secure").select("organization_id, amount, transaction_date").gte("transaction_date", sevenDaysAgo.toISOString().split("T")[0]),
         supabase.from("client_entity_alerts").select("id, severity, organization_id").eq("is_read", false),
         supabase.from("client_api_credentials").select("organization_id, is_active, last_sync_status"),
       ]);
@@ -46,13 +47,13 @@ export function AdminDashboardHome() {
 
       const orgs = orgsResult.data || [];
       const users = usersResult.data || [];
-      const metrics = metricsResult.data || [];
+      const actblueTransactions = actblueResult.data || [];
       const alertsData = alertsResult.data || [];
       const credentials = credentialsResult.data || [];
 
-      // Calculate summary stats
+      // Calculate summary stats from canonical ActBlue source
       const activeCount = orgs.filter((o) => o.is_active).length;
-      const totalRev = metrics.reduce((sum, m) => sum + (Number(m.total_funds_raised) || 0), 0);
+      const totalRev = actblueTransactions.reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
 
       // Calculate needs attention
       const needsAttentionCount = orgs.filter((org) => {

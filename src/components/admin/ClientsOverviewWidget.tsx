@@ -49,10 +49,11 @@ export function ClientsOverviewWidget({ showDragHandle }: Props) {
       const fourteenDaysAgo = subDays(today, 14);
       const sevenDaysAgo = subDays(today, 7);
 
-      const [orgsResult, usersResult, metricsResult, alertsResult] = await Promise.all([
+      const [orgsResult, usersResult, actblueResult, alertsResult] = await Promise.all([
         supabase.from("client_organizations").select("id, name, slug, logo_url, is_active"),
         supabase.from("client_users").select("organization_id, last_login_at"),
-        supabase.from("daily_aggregated_metrics").select("*").gte("date", fourteenDaysAgo.toISOString().split("T")[0]),
+        // Use canonical ActBlue source instead of legacy daily_aggregated_metrics
+        (supabase as any).from("actblue_transactions_secure").select("organization_id, amount, transaction_date").gte("transaction_date", fourteenDaysAgo.toISOString().split("T")[0]),
         supabase.from("client_entity_alerts").select("organization_id, severity").eq("is_read", false),
       ]);
 
@@ -60,7 +61,7 @@ export function ClientsOverviewWidget({ showDragHandle }: Props) {
 
       const orgs = orgsResult.data || [];
       const users = usersResult.data || [];
-      const metrics = metricsResult.data || [];
+      const actblueTransactions = actblueResult.data || [];
       const alertsData = alertsResult.data || [];
 
       const clientData: ClientData[] = orgs.map((org) => {
@@ -72,15 +73,19 @@ export function ClientsOverviewWidget({ showDragHandle }: Props) {
           .reverse()[0] || null;
         const isStale = lastLogin ? differenceInDays(today, parseISO(lastLogin)) > 7 : true;
 
-        const orgMetrics = metrics.filter((m) => m.organization_id === org.id);
-        const current7Days = orgMetrics.filter((m) => parseISO(m.date) >= sevenDaysAgo);
-        const previous7Days = orgMetrics.filter((m) => parseISO(m.date) < sevenDaysAgo && parseISO(m.date) >= fourteenDaysAgo);
+        // Filter ActBlue transactions by organization and time period
+        const orgTransactions = actblueTransactions.filter((t: any) => t.organization_id === org.id);
+        const current7Days = orgTransactions.filter((t: any) => {
+          const txDate = t.transaction_date?.split('T')[0];
+          return txDate && parseISO(txDate) >= sevenDaysAgo;
+        });
+        const previous7Days = orgTransactions.filter((t: any) => {
+          const txDate = t.transaction_date?.split('T')[0];
+          return txDate && parseISO(txDate) < sevenDaysAgo && parseISO(txDate) >= fourteenDaysAgo;
+        });
 
-        const sumMetrics = (data: typeof orgMetrics, field: keyof typeof orgMetrics[0]) =>
-          data.reduce((sum, m) => sum + (Number(m[field]) || 0), 0);
-
-        const currentRevenue = sumMetrics(current7Days, "total_funds_raised");
-        const previousRevenue = sumMetrics(previous7Days, "total_funds_raised");
+        const currentRevenue = current7Days.reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
+        const previousRevenue = previous7Days.reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
         const revenueChange = previousRevenue > 0 ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : currentRevenue > 0 ? 100 : 0;
 
         const orgAlerts = alertsData.filter((a) => a.organization_id === org.id);
