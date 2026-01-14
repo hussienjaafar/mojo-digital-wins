@@ -494,7 +494,7 @@ export default function ClientAdPerformance() {
   };
 
   return (
-    <ClientLayout>
+    <ClientLayout showDateControls={false}>
       <div className="container mx-auto p-6 space-y-4">
         {/* Header with V3 Date Range Toolbar */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
