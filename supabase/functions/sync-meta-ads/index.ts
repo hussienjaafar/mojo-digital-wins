@@ -925,6 +925,7 @@ serve(async (req) => {
                 creativesProcessed++;
                 
                 // NEW: Store refcode mapping for deterministic attribution
+                // Force update to ensure donations are attributed to the CURRENT running ad
                 if (extractedRefcode) {
                   const { error: refcodeError } = await supabase
                     .from('refcode_mappings')
@@ -941,13 +942,14 @@ serve(async (req) => {
                       landing_page: destinationUrl,
                       updated_at: new Date().toISOString(),
                     }, {
-                      onConflict: 'organization_id,refcode'
+                      onConflict: 'organization_id,refcode',
+                      ignoreDuplicates: false  // Force update existing rows with new ad_id
                     });
                   
                   if (refcodeError) {
                     console.error(`[REFCODE MAPPING] Error storing refcode mapping for ${extractedRefcode}:`, refcodeError);
                   } else {
-                    console.log(`[REFCODE MAPPING] Stored mapping: refcode="${extractedRefcode}" -> ad_id=${ad.id}, campaign=${campaign.name}`);
+                    console.log(`[REFCODE MAPPING] Stored/updated mapping: refcode="${extractedRefcode}" -> ad_id=${ad.id}, campaign=${campaign.name}`);
                   }
                 }
               }
