@@ -77,6 +77,9 @@ serve(async (req) => {
     authUrl.searchParams.set('scope', scopes);
     authUrl.searchParams.set('response_type', 'code');
     
+    // Force re-request of any previously declined permissions
+    authUrl.searchParams.set('auth_type', 'rerequest');
+    
     // For full-page redirect, use 'page' display mode for better mobile experience
     if (useRedirect) {
       authUrl.searchParams.set('display', 'page');
