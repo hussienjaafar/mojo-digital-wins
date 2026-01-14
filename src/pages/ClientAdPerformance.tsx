@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ClientLayout } from '@/components/client/ClientLayout';
 import { AdPerformanceList } from '@/components/client/AdPerformance';
 import { useAdPerformanceQuery } from '@/hooks/useAdPerformanceQuery';
+import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
 import { PerformanceControlsToolbar } from '@/components/dashboard/PerformanceControlsToolbar';
 import { useDashboardStore } from '@/stores/dashboardStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +44,7 @@ import {
   Search,
   SlidersHorizontal,
   HelpCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatRoas, formatPercentage, getRoasColor } from '@/utils/adPerformance';
@@ -507,13 +509,22 @@ export default function ClientAdPerformance() {
             </p>
           </div>
 
-          {/* V3 Performance Controls Toolbar */}
-          <div className="w-full lg:w-auto lg:flex-shrink-0 lg:max-w-[600px]">
-            <PerformanceControlsToolbar
-              showRefresh={true}
-              onRefresh={() => refetch()}
-              isRefreshing={isLoading}
+          {/* Date Range Selector */}
+          <div className="flex items-center gap-3">
+            <DateRangeSelector
+              startDate={dateRange.startDate}
+              endDate={dateRange.endDate}
+              onDateChange={(start, end) => useDashboardStore.getState().setDateRange(start, end)}
             />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isLoading}
+              className="h-9 w-9 shrink-0"
+            >
+              <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+            </Button>
           </div>
         </div>
 
