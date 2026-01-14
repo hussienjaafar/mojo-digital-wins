@@ -289,11 +289,19 @@ serve(async (req) => {
   let dryRun = true;
 
   // Parse request body early to get org_id for audit record
-  let requestBody: { organizationId?: string; dryRun?: boolean; minConfidence?: number } = {};
+  // Support both camelCase and snake_case for compatibility
+  let requestBody: { 
+    organizationId?: string; 
+    organization_id?: string;
+    dryRun?: boolean; 
+    dry_run?: boolean;
+    minConfidence?: number;
+    recalculate?: boolean;
+  } = {};
   try {
     requestBody = await req.json();
-    organizationId = requestBody.organizationId || null;
-    dryRun = requestBody.dryRun ?? true;
+    organizationId = requestBody.organizationId || requestBody.organization_id || null;
+    dryRun = requestBody.dryRun ?? requestBody.dry_run ?? true;
   } catch {
     // Will be handled in main try block
   }
