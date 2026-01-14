@@ -134,7 +134,38 @@ ORDER BY
   END;
 
 -- =============================================================================
--- 10. COMPARE VIDEO CREATIVES IN meta_creative_insights vs meta_ad_videos
+-- 10. CRITICAL: VIDEO_ID CONSISTENCY CHECK
+-- This checks if the video_id in meta_ad_videos matches meta_creative_insights
+-- =============================================================================
+SELECT
+  '*** VIDEO_ID CONSISTENCY ***' as check_name,
+  v.organization_id,
+  COUNT(*) as total_checked,
+  COUNT(*) FILTER (WHERE v.video_id = c.meta_video_id) as matching,
+  COUNT(*) FILTER (WHERE v.video_id != c.meta_video_id) as MISMATCHED,
+  COUNT(*) FILTER (WHERE v.resolution_method = 'meta_creative_insights') as from_creative_insights,
+  COUNT(*) FILTER (WHERE v.resolution_method IS NULL OR v.resolution_method != 'meta_creative_insights') as from_api_directly
+FROM meta_ad_videos v
+JOIN meta_creative_insights c ON v.ad_id = c.ad_id AND v.organization_id = c.organization_id
+WHERE c.meta_video_id IS NOT NULL
+GROUP BY v.organization_id;
+
+-- Show specific mismatches (these are the BAD ones that need re-sync)
+SELECT
+  'MISMATCHED VIDEO_IDs (NEED RE-SYNC)' as check_name,
+  v.ad_id,
+  v.video_id as video_table_id,
+  c.meta_video_id as creative_insights_id,
+  v.resolution_method,
+  v.status
+FROM meta_ad_videos v
+JOIN meta_creative_insights c ON v.ad_id = c.ad_id AND v.organization_id = c.organization_id
+WHERE v.video_id != c.meta_video_id
+  AND c.meta_video_id IS NOT NULL
+LIMIT 20;
+
+-- =============================================================================
+-- 11. COMPARE VIDEO CREATIVES IN meta_creative_insights vs meta_ad_videos
 -- =============================================================================
 WITH creative_videos AS (
   SELECT DISTINCT organization_id, ad_id, meta_video_id

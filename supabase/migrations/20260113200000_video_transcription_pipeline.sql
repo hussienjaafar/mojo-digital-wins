@@ -24,7 +24,10 @@ CREATE TABLE IF NOT EXISTS public.meta_ad_videos (
   duration_seconds INTEGER,
 
   -- Resolution method tracking
+  -- 'meta_creative_insights' = video_id sourced from existing meta_creative_insights table
+  -- This ensures consistency with what sync-meta-ads extracted
   resolution_method TEXT CHECK (resolution_method IN (
+    'meta_creative_insights',
     'creative.video_id',
     'object_story_spec.video_data.video_id',
     'object_story_spec.link_data.video_id',
