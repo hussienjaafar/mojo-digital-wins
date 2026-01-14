@@ -496,72 +496,63 @@ const DateRangeButton = React.forwardRef<HTMLButtonElement, DateRangeButtonProps
     const displayText = formatDateRangeByWidth(startDate, endDate, containerWidth);
     const fullText = getFullDateRangeText(startDate, endDate);
 
+    // NOTE: Removed TooltipProvider/TooltipTrigger wrapper to avoid event handler
+    // conflicts with PopoverTrigger (nested Radix asChild triggers can clobber handlers).
+    // The native `title` attribute provides basic tooltip functionality.
     return (
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              ref={ref}
-              type="button"
-              className={cn(
-                // Size - fully shrinkable
-                "h-9 min-w-0 max-w-full w-full",
-                "px-3",
-                // Shape
-                "rounded-[var(--portal-radius-sm)]",
-                // Border and background
-                "border border-[hsl(var(--portal-border))]",
-                "bg-[hsl(var(--portal-bg-secondary))]",
-                // Text
-                "text-sm",
-                "text-[hsl(var(--portal-text-primary))]",
-                // Layout
-                "inline-flex items-center gap-2",
-                // Hover
-                "hover:bg-[hsl(var(--portal-bg-hover))]",
-                "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
-                // Open state
-                isOpen && [
-                  "border-[hsl(var(--portal-accent-blue))]",
-                  "ring-2 ring-[hsl(var(--portal-accent-blue)/0.2)]",
-                ],
-                // Focus
-                "focus:outline-none focus-visible:ring-2",
-                "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.5)]",
-                "focus-visible:ring-offset-1",
-                "focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
-                // Transition
-                "transition-all"
-              )}
-              aria-label={`Open date range calendar. Currently: ${fullText}`}
-              title={fullText}
-              {...props}
-            >
-              <CalendarIcon 
-                className={cn(
-                  "h-4 w-4 shrink-0",
-                  "text-[hsl(var(--portal-accent-blue))]"
-                )} 
-              />
-              <span className="truncate min-w-0 flex-1">{displayText}</span>
-              <ChevronDown 
-                className={cn(
-                  "h-4 w-4 shrink-0 ml-auto",
-                  "text-[hsl(var(--portal-text-muted))]",
-                  "transition-transform",
-                  isOpen && "rotate-180"
-                )} 
-              />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent
-            side="bottom"
-            className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
-          >
-            <p>{fullText}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <button
+        ref={ref}
+        type="button"
+        className={cn(
+          // Size - fully shrinkable
+          "h-9 min-w-0 max-w-full w-full",
+          "px-3",
+          // Shape
+          "rounded-[var(--portal-radius-sm)]",
+          // Border and background
+          "border border-[hsl(var(--portal-border))]",
+          "bg-[hsl(var(--portal-bg-secondary))]",
+          // Text
+          "text-sm",
+          "text-[hsl(var(--portal-text-primary))]",
+          // Layout
+          "inline-flex items-center gap-2",
+          // Hover
+          "hover:bg-[hsl(var(--portal-bg-hover))]",
+          "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
+          // Open state
+          isOpen && [
+            "border-[hsl(var(--portal-accent-blue))]",
+            "ring-2 ring-[hsl(var(--portal-accent-blue)/0.2)]",
+          ],
+          // Focus
+          "focus:outline-none focus-visible:ring-2",
+          "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.5)]",
+          "focus-visible:ring-offset-1",
+          "focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
+          // Transition
+          "transition-all"
+        )}
+        aria-label={`Open date range calendar. Currently: ${fullText}`}
+        title={fullText}
+        {...props}
+      >
+        <CalendarIcon 
+          className={cn(
+            "h-4 w-4 shrink-0",
+            "text-[hsl(var(--portal-accent-blue))]"
+          )} 
+        />
+        <span className="truncate min-w-0 flex-1">{displayText}</span>
+        <ChevronDown 
+          className={cn(
+            "h-4 w-4 shrink-0 ml-auto",
+            "text-[hsl(var(--portal-text-muted))]",
+            "transition-transform",
+            isOpen && "rotate-180"
+          )} 
+        />
+      </button>
     );
   }
 );
