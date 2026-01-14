@@ -96,6 +96,7 @@ export function useAdPerformanceQuery({
       const { data: adLevelData, error: adLevelError } = await sb
         .from('meta_ad_metrics_daily')
         .select(`
+          date,
           ad_id,
           ad_name,
           campaign_id,
@@ -130,13 +131,34 @@ export function useAdPerformanceQuery({
 
       // DEV-ONLY: Detailed ad-level query diagnostics
       if (process.env.NODE_ENV !== 'production') {
+        // Calculate spend distribution to detect estimation artifacts
+        const spendValues = (adLevelData || []).map((r: any) => Number(r.spend || 0)).filter((s: number) => s > 0);
+        const uniqueSpendValues = new Set(spendValues.map((s: number) => s.toFixed(2)));
+        const hasVariedSpend = uniqueSpendValues.size > 1;
+
         console.log('[AdPerformance:Hook] Ad-level query result:', {
           table: 'meta_ad_metrics_daily',
           filters: { organization_id: organizationId, 'date >=': startDate, 'date <=': endDate },
           hasData: hasAdLevelData,
           rowCount: adLevelData?.length || 0,
+          distinctAds: new Set((adLevelData || []).map((r: any) => r.ad_id)).size,
+          dateRange: adLevelData?.length ? {
+            min: Math.min(...(adLevelData || []).map((r: any) => new Date(r.date).getTime())),
+            max: Math.max(...(adLevelData || []).map((r: any) => new Date(r.date).getTime())),
+          } : null,
+          spendDiagnostic: {
+            hasVariedSpend,
+            uniqueSpendValueCount: uniqueSpendValues.size,
+            sampleSpends: spendValues.slice(0, 5),
+          },
           error: adLevelError?.message || null,
-          sampleDates: adLevelData?.slice(0, 3).map((r: any) => r.date) || [],
+          sampleRows: (adLevelData || []).slice(0, 3).map((r: any) => ({
+            date: r.date,
+            ad_id: r.ad_id,
+            spend: r.spend,
+            impressions: r.impressions,
+            clicks: r.clicks,
+          })),
         });
       }
 
@@ -212,16 +234,35 @@ export function useAdPerformanceQuery({
         throw new Error('Failed to load creative data');
       }
 
-      // Build creative lookup by ad_id
+      // Build creative lookup by ad_id, creative_id, and refcode
       const creativeByAdId = new Map<string, any>();
       const creativeByCreativeId = new Map<string, any>();
+      const creativeByRefcode = new Map<string, any>();
+      const refcodeToAdId = new Map<string, string>();
+
       for (const creative of creativesData || []) {
         if (creative.ad_id) {
           creativeByAdId.set(creative.ad_id, creative);
+          // Also map refcode -> ad_id for direct refcode matching
+          if (creative.extracted_refcode) {
+            refcodeToAdId.set(creative.extracted_refcode.toLowerCase(), creative.ad_id);
+            creativeByRefcode.set(creative.extracted_refcode.toLowerCase(), creative);
+          }
         }
         if (creative.creative_id) {
           creativeByCreativeId.set(creative.creative_id, creative);
         }
+      }
+
+      // DEV-ONLY: Log refcode mapping stats
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[AdPerformance:Hook] Creative refcode mappings:', {
+          totalCreatives: (creativesData || []).length,
+          creativesWithAdId: creativeByAdId.size,
+          creativesWithRefcode: creativeByRefcode.size,
+          refcodeToAdIdMappings: refcodeToAdId.size,
+          sampleRefcodes: [...refcodeToAdId.keys()].slice(0, 5),
+        });
       }
 
       // ========== STEP 3: Get donations with attribution ==========
@@ -247,7 +288,7 @@ export function useAdPerformanceQuery({
         throw new Error('Failed to load donation data');
       }
 
-      // Aggregate donations by ad_id (primary) or creative_id (fallback)
+      // Aggregate donations by ad_id (primary), creative_id (secondary), or refcode (fallback)
       const donationsByAdId = new Map<string, {
         raised: number;
         count: number;
@@ -262,15 +303,28 @@ export function useAdPerformanceQuery({
         attribution_methods: Map<string, number>;
       }>();
 
+      // Track by refcode for direct matching when ad_id/creative_id missing
+      const donationsByRefcode = new Map<string, {
+        raised: number;
+        count: number;
+        donors: Set<string>;
+        attribution_methods: Map<string, number>;
+      }>();
+
       const allDonorEmails: string[] = [];
+      let directAdIdMatches = 0;
+      let creativeIdMatches = 0;
+      let refcodeMatches = 0;
+      let unattributedCount = 0;
 
       for (const donation of donationsData || []) {
         const donorEmail = donation.donor_email || 'anonymous';
         allDonorEmails.push(donorEmail);
         const amount = Number(donation.net_amount ?? donation.amount ?? 0);
         const method = donation.attribution_method || 'unknown';
+        let wasAttributed = false;
 
-        // Try ad_id first
+        // Try ad_id first (best: direct attribution)
         if (donation.attributed_ad_id) {
           const adId = donation.attributed_ad_id;
           const existing = donationsByAdId.get(adId) || {
@@ -284,6 +338,8 @@ export function useAdPerformanceQuery({
           existing.donors.add(donorEmail);
           existing.attribution_methods.set(method, (existing.attribution_methods.get(method) || 0) + 1);
           donationsByAdId.set(adId, existing);
+          directAdIdMatches++;
+          wasAttributed = true;
         }
 
         // Also track by creative_id for fallback
@@ -300,7 +356,61 @@ export function useAdPerformanceQuery({
           existing.donors.add(donorEmail);
           existing.attribution_methods.set(method, (existing.attribution_methods.get(method) || 0) + 1);
           donationsByCreativeId.set(creativeId, existing);
+          if (!wasAttributed) creativeIdMatches++;
+          wasAttributed = true;
         }
+
+        // NEW: Try refcode-based matching when ad_id/creative_id are missing
+        // This allows direct matching even if refcode_mappings wasn't updated
+        if (!wasAttributed && donation.refcode) {
+          const refcodeLower = donation.refcode.toLowerCase();
+
+          // Check if we have a direct refcode -> ad_id mapping from creatives
+          const mappedAdId = refcodeToAdId.get(refcodeLower);
+          if (mappedAdId) {
+            const existing = donationsByAdId.get(mappedAdId) || {
+              raised: 0,
+              count: 0,
+              donors: new Set<string>(),
+              attribution_methods: new Map<string, number>(),
+            };
+            existing.raised += amount;
+            existing.count += 1;
+            existing.donors.add(donorEmail);
+            existing.attribution_methods.set('refcode_direct', (existing.attribution_methods.get('refcode_direct') || 0) + 1);
+            donationsByAdId.set(mappedAdId, existing);
+            refcodeMatches++;
+            wasAttributed = true;
+          } else {
+            // Track by refcode for later analysis
+            const existing = donationsByRefcode.get(refcodeLower) || {
+              raised: 0,
+              count: 0,
+              donors: new Set<string>(),
+              attribution_methods: new Map<string, number>(),
+            };
+            existing.raised += amount;
+            existing.count += 1;
+            existing.donors.add(donorEmail);
+            existing.attribution_methods.set(method, (existing.attribution_methods.get(method) || 0) + 1);
+            donationsByRefcode.set(refcodeLower, existing);
+          }
+        }
+
+        if (!wasAttributed) unattributedCount++;
+      }
+
+      // DEV-ONLY: Log attribution stats
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[AdPerformance:Hook] Donation attribution stats:', {
+          totalDonations: (donationsData || []).length,
+          directAdIdMatches,
+          creativeIdMatches,
+          refcodeMatches,
+          unattributedCount,
+          uniqueRefcodesInDonations: donationsByRefcode.size,
+          unmatchedRefcodes: [...donationsByRefcode.keys()].slice(0, 10),
+        });
       }
 
       // ========== STEP 4: Build ad performance data ==========
