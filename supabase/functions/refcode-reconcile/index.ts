@@ -74,10 +74,26 @@ serve(async (req) => {
     if (creativeErr) throw creativeErr;
 
     let upserts = 0;
+    // Build a map of refcode -> latest ad (by ad_id, higher = newer)
+    // This ensures when multiple ads share a refcode, we use the newest ad
+    const refcodeToLatestAd = new Map<string, typeof creatives[0]>();
+    
     for (const c of creatives || []) {
       const refcode = c.extracted_refcode;
       if (!refcode) continue;
+      
+      const existing = refcodeToLatestAd.get(refcode);
+      // Higher ad_id = newer ad (Meta ad IDs are sequential)
+      if (!existing || c.ad_id > existing.ad_id) {
+        refcodeToLatestAd.set(refcode, c);
+      }
+    }
 
+    console.log(`[REFCODE RECONCILE] Found ${refcodeToLatestAd.size} unique refcodes from ${creatives?.length || 0} creatives`);
+
+    for (const [refcode, c] of refcodeToLatestAd) {
+      // Use UPDATE to force refresh the ad_id even if refcode already exists
+      // This ensures donations get attributed to the CURRENT running ad, not old ads
       const { error: upsertErr } = await supabase
         .from('refcode_mappings')
         .upsert({
@@ -88,12 +104,16 @@ serve(async (req) => {
           ad_id: c.ad_id,
           creative_id: c.creative_id,
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'organization_id,refcode' });
+        }, { 
+          onConflict: 'organization_id,refcode',
+          ignoreDuplicates: false  // Force update existing rows
+        });
 
       if (upsertErr) {
         console.error('[REFCODE RECONCILE] Failed for refcode', refcode, upsertErr);
       } else {
         upserts++;
+        console.log(`[REFCODE RECONCILE] Upserted refcode=${refcode} -> ad_id=${c.ad_id}`);
       }
     }
 
