@@ -854,9 +854,9 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
       {/* Row 1: Presets (or dropdown) + Date Range + Refresh */}
       <div
         className={cn(
-          "flex flex-wrap items-center gap-2 min-w-0 max-w-full w-full",
-          // Desktop: align cluster to the right edge of the header
-          layoutMode === "lg" && "justify-end"
+          "flex flex-wrap items-center gap-2 min-w-0 max-w-full w-full overflow-x-auto scrollbar-hide",
+          // Desktop: align cluster to the end; on smaller screens, let it flow naturally
+          layoutMode === "lg" && "lg:justify-end"
         )}
       >
         {/* Presets: Segmented on lg, dropdown on smaller */}
