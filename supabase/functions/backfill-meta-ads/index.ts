@@ -75,19 +75,30 @@ async function runBackfill(params: BackfillParams) {
     console.log(`[BACKFILL] Processing chunk ${processedChunks + 1}/${totalChunks}: ${startStr} to ${endStr}`);
     
     try {
-      // Call sync-meta-ads for this chunk
-      const { data, error } = await supabase.functions.invoke('sync-meta-ads', {
-        body: {
+      // Call sync-meta-ads for this chunk using direct HTTP with x-internal-key
+      // The sync-meta-ads function accepts x-internal-key = first 20 chars of service role key for backfill mode
+      const syncResponse = await fetch(`${supabaseUrl}/functions/v1/sync-meta-ads`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'apikey': serviceRoleKey,
+          'x-internal-key': serviceRoleKey.slice(0, 20),
+        },
+        body: JSON.stringify({
           organization_id,
           start_date: startStr,
           end_date: endStr,
           mode: 'backfill',
-        },
+        }),
       });
       
-      if (error) {
-        throw new Error(error.message || 'sync-meta-ads invocation failed');
+      if (!syncResponse.ok) {
+        const errorText = await syncResponse.text();
+        throw new Error(`HTTP ${syncResponse.status}: ${errorText.slice(0, 200)}`);
       }
+      
+      const data = await syncResponse.json();
       
       if (data?.error) {
         throw new Error(data.error);
