@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { format, subDays } from "date-fns";
-import { DateRange } from "react-day-picker";
+import { DateRange, DayPicker } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
@@ -109,17 +108,106 @@ export function DateRangeSelector({
           <PopoverContent 
             className="w-auto p-0 z-[200] !bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] rounded-lg shadow-lg opacity-100" 
             align="end"
-            side={isMobile ? "bottom" : "bottom"}
+            side="bottom"
             sideOffset={8}
           >
-            <Calendar
+            <DayPicker
               mode="range"
-              defaultMonth={customRange?.from}
               selected={customRange}
               onSelect={handleCustomRangeSelect}
-              numberOfMonths={isMobile ? 1 : 2}
-              className="pointer-events-auto"
+              numberOfMonths={1}
+              defaultMonth={customRange?.from}
+              showOutsideDays
               disabled={(date) => date > new Date()}
+              className={cn(
+                "portal-calendar-panel pointer-events-auto",
+                "p-[var(--portal-space-md)]"
+              )}
+              classNames={{
+                months: "flex flex-col gap-[var(--portal-space-lg)]",
+                month: "space-y-[var(--portal-space-md)]",
+                caption: "flex justify-center pt-1 relative items-center",
+                caption_label: cn(
+                  "text-sm font-semibold",
+                  "text-[hsl(var(--portal-text-primary))]"
+                ),
+                nav: "space-x-1 flex items-center",
+                nav_button: cn(
+                  "h-7 w-7 p-0",
+                  "inline-flex items-center justify-center",
+                  "rounded-[var(--portal-radius-sm)]",
+                  "border border-[hsl(var(--portal-border))]",
+                  "bg-transparent",
+                  "text-[hsl(var(--portal-text-muted))]",
+                  "hover:bg-[hsl(var(--portal-bg-hover))]",
+                  "hover:text-[hsl(var(--portal-text-primary))]",
+                  "transition-colors",
+                  "disabled:opacity-50"
+                ),
+                nav_button_previous: "absolute left-1",
+                nav_button_next: "absolute right-1",
+                table: "w-full border-collapse",
+                head_row: "flex",
+                head_cell: cn(
+                  "w-9 font-medium text-[0.75rem]",
+                  "text-[hsl(var(--portal-text-muted))]",
+                  "rounded-[var(--portal-radius-sm)]"
+                ),
+                row: "flex w-full mt-1",
+                cell: cn(
+                  "h-9 w-9 text-center text-sm p-0 relative",
+                  "[&:has([aria-selected].day-range-end)]:rounded-r-[var(--portal-radius-sm)]",
+                  "[&:has([aria-selected].day-outside)]:bg-[hsl(var(--portal-accent-blue)/0.05)]",
+                  "[&:has([aria-selected])]:bg-[hsl(var(--portal-accent-blue)/0.1)]",
+                  "first:[&:has([aria-selected])]:rounded-l-[var(--portal-radius-sm)]",
+                  "last:[&:has([aria-selected])]:rounded-r-[var(--portal-radius-sm)]",
+                  "focus-within:relative focus-within:z-20"
+                ),
+                day: cn(
+                  "h-9 w-9 p-0 font-normal",
+                  "inline-flex items-center justify-center",
+                  "rounded-[var(--portal-radius-sm)]",
+                  "text-[hsl(var(--portal-text-primary))]",
+                  "hover:bg-[hsl(var(--portal-bg-hover))]",
+                  "transition-colors",
+                  "aria-selected:opacity-100"
+                ),
+                day_range_end: "day-range-end",
+                day_selected: cn(
+                  "bg-[hsl(var(--portal-accent-blue))]",
+                  "text-white",
+                  "hover:bg-[hsl(var(--portal-accent-blue))]",
+                  "hover:text-white",
+                  "focus:bg-[hsl(var(--portal-accent-blue))]",
+                  "focus:text-white"
+                ),
+                day_today: cn(
+                  "bg-[hsl(var(--portal-bg-elevated))]",
+                  "text-[hsl(var(--portal-text-primary))]",
+                  "font-semibold"
+                ),
+                day_outside: cn(
+                  "day-outside",
+                  "text-[hsl(var(--portal-text-muted))]",
+                  "opacity-50",
+                  "aria-selected:bg-[hsl(var(--portal-accent-blue)/0.05)]",
+                  "aria-selected:text-[hsl(var(--portal-text-muted))]",
+                  "aria-selected:opacity-30"
+                ),
+                day_disabled: cn(
+                  "text-[hsl(var(--portal-text-muted))]",
+                  "opacity-50"
+                ),
+                day_range_middle: cn(
+                  "aria-selected:bg-[hsl(var(--portal-accent-blue)/0.1)]",
+                  "aria-selected:text-[hsl(var(--portal-text-primary))]"
+                ),
+                day_hidden: "invisible",
+              }}
+              components={{
+                IconLeft: () => <ChevronLeft className="h-4 w-4" />,
+                IconRight: () => <ChevronRight className="h-4 w-4" />,
+              }}
             />
           </PopoverContent>
         </Popover>
