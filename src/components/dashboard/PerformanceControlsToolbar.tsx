@@ -890,26 +890,26 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
                 isOpen={isCalendarOpen}
               />
             </PopoverTrigger>
-          <PopoverContent
-            className={cn(
-              "w-auto p-0",
-              "z-[100]",
-              "bg-[hsl(var(--portal-bg-secondary))]",
-              "border-[hsl(var(--portal-border))]",
-              "rounded-[var(--portal-radius-lg)]",
-              "shadow-lg",
-              "opacity-100"
-            )}
-            align="start"
-            sideOffset={4}
-          >
-            <PortalCalendar
-              mode="range"
-              selected={draftRange}
-              onSelect={handleDateSelect}
-              numberOfMonths={containerWidth >= 640 ? 2 : 1}
-              defaultMonth={subDays(new Date(), 30)}
-            />
+            <PopoverContent
+              className={cn(
+                "w-auto p-0",
+                "bg-[hsl(var(--portal-bg-secondary))]",
+                "border-[hsl(var(--portal-border))]",
+                "rounded-[var(--portal-radius-lg)]",
+                "shadow-lg"
+              )}
+              align={layoutMode === "lg" ? "end" : "start"}
+              sideOffset={4}
+              avoidCollisions={true}
+              collisionPadding={12}
+            >
+              <PortalCalendar
+                mode="range"
+                selected={draftRange}
+                onSelect={handleDateSelect}
+                numberOfMonths={layoutMode === "lg" && containerWidth >= 768 ? 2 : 1}
+                defaultMonth={subDays(new Date(), 30)}
+              />
             </PopoverContent>
           </Popover>
         </div>
