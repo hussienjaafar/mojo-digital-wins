@@ -11815,10 +11815,9 @@ export type Database = {
         Args: { p_date: string; p_org_id: string }
         Returns: {
           donation_count: number
+          gross_amount: number
           method: string
-          timezone_used: string
-          total_gross: number
-          total_net: number
+          org_timezone: string
         }[]
       }
       deduplicate_topic_name: { Args: { topic_name: string }; Returns: string }
@@ -11857,23 +11856,20 @@ export type Database = {
       }
       get_actblue_daily_rollup: {
         Args: {
-          _end_date: string
-          _organization_id: string
-          _start_date: string
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
         }
         Returns: {
+          avg_donation: number
           day: string
           donation_count: number
-          fee_percentage: number
-          gross_raised: number
-          net_raised: number
+          gross_donations: number
+          net_donations: number
           net_revenue: number
-          one_time_count: number
-          one_time_revenue: number
           recurring_count: number
           recurring_revenue: number
           refund_count: number
-          refund_rate: number
           refunds: number
           total_fees: number
           unique_donors: number
@@ -11884,77 +11880,51 @@ export type Database = {
           p_campaign_id?: string
           p_creative_id?: string
           p_end_date: string
-          p_org_id: string
+          p_organization_id: string
           p_start_date: string
         }
         Returns: Json
       }
-      get_actblue_filtered_rollup:
-        | {
-            Args: {
-              p_campaign_id?: string
-              p_creative_id?: string
-              p_end_date: string
-              p_org_id: string
-              p_start_date: string
-              p_timezone?: string
-            }
-            Returns: {
-              day: string
-              gross_raised: number
-              net_raised: number
-              recurring_amount: number
-              recurring_count: number
-              refund_amount: number
-              refund_count: number
-              transaction_count: number
-              unique_donors: number
-            }[]
-          }
-        | {
-            Args: {
-              p_campaign_id?: string
-              p_creative_id?: string
-              p_end_date: string
-              p_org_id: string
-              p_start_date: string
-              p_timezone?: string
-            }
-            Returns: {
-              day: string
-              gross_raised: number
-              net_raised: number
-              recurring_amount: number
-              recurring_count: number
-              refund_amount: number
-              refund_count: number
-              transaction_count: number
-              unique_donors: number
-            }[]
-          }
-      get_actblue_period_summary: {
+      get_actblue_filtered_rollup: {
         Args: {
-          _end_date: string
-          _organization_id: string
-          _start_date: string
+          p_campaign_id?: string
+          p_creative_id?: string
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+          p_timezone?: string
         }
         Returns: {
-          avg_donation: number
-          avg_fee_percentage: number
-          days_with_donations: number
+          day: string
           donation_count: number
           gross_raised: number
           net_raised: number
-          net_revenue: number
-          one_time_count: number
-          one_time_revenue: number
+          recurring_amount: number
           recurring_count: number
-          recurring_revenue: number
+          refund_amount: number
           refund_count: number
-          refund_rate: number
-          refunds: number
           total_fees: number
-          unique_donors_approx: number
+          unique_donors: number
+        }[]
+      }
+      get_actblue_period_summary: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+        }
+        Returns: {
+          overall_avg_donation: number
+          total_donation_count: number
+          total_fees: number
+          total_gross_donations: number
+          total_net_donations: number
+          total_net_revenue: number
+          total_recurring_count: number
+          total_recurring_revenue: number
+          total_refund_count: number
+          total_refunds: number
+          total_unique_donors: number
         }[]
       }
       get_backfill_progress: {
@@ -12134,7 +12104,11 @@ export type Database = {
         }[]
       }
       get_sms_metrics: {
-        Args: { p_end_date: string; p_org_id: string; p_start_date: string }
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+        }
         Returns: Json
       }
       get_state_city_breakdown: {

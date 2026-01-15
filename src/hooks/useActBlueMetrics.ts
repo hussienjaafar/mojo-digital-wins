@@ -122,7 +122,7 @@ async function fetchActBlueMetrics(
   creativeId?: string | null
 ): Promise<ActBlueMetricsData> {
   const { data, error } = await supabase.rpc('get_actblue_dashboard_metrics', {
-    p_org_id: organizationId,
+    p_organization_id: organizationId,
     p_start_date: startDate,
     p_end_date: endDate,
     p_campaign_id: campaignId || null,
@@ -263,7 +263,7 @@ async function fetchSMSMetrics(
   endDate: string
 ): Promise<SMSMetricsData> {
   const { data, error } = await supabase.rpc('get_sms_metrics', {
-    p_org_id: organizationId,
+    p_organization_id: organizationId,
     p_start_date: startDate,
     p_end_date: endDate,
   });
