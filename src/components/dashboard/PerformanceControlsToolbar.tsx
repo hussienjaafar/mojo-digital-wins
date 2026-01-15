@@ -46,7 +46,7 @@ import { useDashboardStore } from "@/stores/dashboardStore";
 // Types
 // ============================================================================
 
-export type PresetKey = "7d" | "14d" | "30d" | "90d" | "custom";
+export type PresetKey = "today" | "7d" | "14d" | "30d" | "90d" | "custom";
 type LayoutMode = "lg" | "md" | "sm" | "xs";
 
 interface PerformanceControlsToolbarProps {
@@ -71,6 +71,11 @@ interface PerformanceControlsToolbarProps {
 // ============================================================================
 
 const presets: Record<PresetKey, { label: string; shortLabel: string; getValue: () => { start: Date; end: Date } }> = {
+  today: {
+    label: "Today",
+    shortLabel: "Today",
+    getValue: () => ({ start: new Date(), end: new Date() }),
+  },
   "7d": {
     label: "Last 7 days",
     shortLabel: "7D",
@@ -110,7 +115,12 @@ function detectPresetFromDateRange(startDate: string, endDate: string): PresetKe
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
   
-  // Only match presets if the end date is today
+  // Check for "today" preset first (single day = today)
+  if (startDate === endDate && startDate === todayStr) {
+    return "today";
+  }
+  
+  // Only match other presets if the end date is today
   if (endDate !== todayStr) {
     return "custom";
   }
@@ -832,7 +842,7 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
 
   const hasFilters = campaignOptions.length > 0 || creativeOptions.length > 0;
   const showSegmentedPresets = layoutMode === "lg";
-  const presetKeys: PresetKey[] = ["7d", "14d", "30d", "90d"];
+  const presetKeys: PresetKey[] = ["today", "7d", "14d", "30d", "90d"];
 
   return (
     <div
