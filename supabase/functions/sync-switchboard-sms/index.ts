@@ -51,7 +51,8 @@ interface SwitchboardResponse {
 
 interface SwitchboardMessageEvent {
   id: string;
-  phone_number: string | null;
+  to_number: string | null; // Per Switchboard API docs (not phone_number)
+  phone_number?: string | null; // Fallback if API returns this
   status: string | null;
   click_url?: string | null;
   clicks?: number | null;
@@ -61,8 +62,8 @@ interface SwitchboardMessageEvent {
   opted_out_at?: string | null;
   replied_at?: string | null;
   last_click_at?: string | null;
-  reply_text?: string | null; // Reply content for sentiment analysis
-  reply?: string | null; // Alternative field name for reply content
+  reply_text?: string | null;
+  reply?: string | null;
   metadata?: Record<string, any> | null;
 }
 
@@ -442,11 +443,22 @@ serve(async (req) => {
     // DIAGNOSTIC: Log first broadcast's message API response shape (sanitized)
     let firstBroadcastDiagnostic = false;
     
+    // Process broadcasts with incremental upserts per page to avoid timeout
+    const MAX_PAGES_PER_BROADCAST = 20; // Limit pages to prevent timeout
+    const MAX_EXECUTION_MS = 50000; // 50s max to leave buffer before 60s timeout
+    const syncStartTime = Date.now();
+    
     for (const broadcast of allBroadcasts) {
+      // Check execution time to avoid timeout
+      if (Date.now() - syncStartTime > MAX_EXECUTION_MS) {
+        console.warn(`[SMS SYNC] Approaching timeout, stopping after ${allBroadcasts.indexOf(broadcast)} broadcasts`);
+        break;
+      }
+      
       try {
         let msgNext: string | null = null;
         let msgPageCount = 0;
-        const messageEvents: SwitchboardMessageEvent[] = [];
+        let broadcastEventCount = 0;
 
         do {
           msgPageCount++;
@@ -476,69 +488,68 @@ serve(async (req) => {
             const errorMsg = msgResp.errors.map(e => e.description || e.title).join(', ');
             throw new Error(`Switchboard message API errors: ${errorMsg}`);
           }
-          if (msgResp.data?.page) {
-            messageEvents.push(...msgResp.data.page);
-            msgNext = msgResp.data.next_page;
-          } else {
-            msgNext = null;
-          }
-        } while (msgNext && msgPageCount < 100);
+          
+          // INCREMENTAL UPSERT: Process and save each page immediately
+          const pageEvents = msgResp.data?.page || [];
+          
+          if (pageEvents.length > 0) {
+            // Compute phone hashes for this page (use to_number per API docs, fallback to phone_number)
+            const phoneHashes = await Promise.all(
+              pageEvents.map(msg => computePhoneHash(msg.to_number || msg.phone_number || null))
+            );
 
-        // OBSERVABILITY: Track broadcasts with zero messages
-        if (messageEvents.length === 0) {
+            const eventsToUpsert = pageEvents.map((msg, idx) => ({
+              organization_id,
+              campaign_id: broadcast.id,
+              campaign_name: broadcast.title,
+              message_id: msg.id,
+              phone_hash: phoneHashes[idx],
+              event_type: deriveEventType(msg),
+              link_clicked: msg.click_url || null,
+              reply_text: msg.reply_text || msg.reply || null,
+              occurred_at: deriveOccurredAt(msg),
+              metadata: {
+                clicks: msg.clicks || 0,
+                delivered_at: msg.delivered_at,
+                failed_at: msg.failed_at,
+                sent_at: msg.sent_at,
+                opted_out_at: msg.opted_out_at,
+                replied_at: msg.replied_at,
+                last_click_at: msg.last_click_at,
+                raw_status: msg.status,
+                has_reply: !!(msg.reply_text || msg.reply),
+              },
+            }));
+
+            const { error: eventError } = await supabase
+              .from('sms_events')
+              .upsert(eventsToUpsert, { onConflict: 'organization_id,message_id' });
+
+            if (eventError) {
+              console.error(`[SMS SYNC] Error upserting page ${msgPageCount} for broadcast ${broadcast.id}:`, eventError);
+              messageErrors.push({ broadcast_id: broadcast.id, error: eventError.message });
+            } else {
+              broadcastEventCount += eventsToUpsert.length;
+              totalMessageEvents += eventsToUpsert.length;
+            }
+          }
+          
+          msgNext = msgResp.data?.next_page || null;
+          
+        } while (msgNext && msgPageCount < MAX_PAGES_PER_BROADCAST);
+        
+        if (msgPageCount >= MAX_PAGES_PER_BROADCAST && msgNext) {
+          console.warn(`[SMS SYNC] Broadcast ${broadcast.id} has more pages, stopped at ${MAX_PAGES_PER_BROADCAST}`);
+        }
+
+        if (broadcastEventCount === 0) {
           broadcastsWithNoMessages++;
           console.warn(`[SMS SYNC] Broadcast ${broadcast.id} ("${broadcast.title}") returned 0 message events`);
         } else {
           broadcastsWithMessages++;
+          console.log(`[SMS SYNC] Synced ${broadcastEventCount} events for broadcast ${broadcast.id}`);
         }
-
-        if (messageEvents.length > 0) {
-          // Compute phone hashes for all messages in parallel
-          const phoneHashes = await Promise.all(
-            messageEvents.map(msg => computePhoneHash(msg.phone_number))
-          );
-
-          const eventsToUpsert = messageEvents.map((msg, idx) => ({
-            organization_id,
-            campaign_id: broadcast.id,
-            campaign_name: broadcast.title,
-            message_id: msg.id,
-            phone_hash: phoneHashes[idx], // Non-PII hash for donor matching
-            event_type: deriveEventType(msg),
-            link_clicked: msg.click_url || null,
-            reply_text: msg.reply_text || msg.reply || null,
-            occurred_at: deriveOccurredAt(msg),
-            metadata: {
-              clicks: msg.clicks || 0,
-              delivered_at: msg.delivered_at,
-              failed_at: msg.failed_at,
-              sent_at: msg.sent_at,
-              opted_out_at: msg.opted_out_at,
-              replied_at: msg.replied_at,
-              last_click_at: msg.last_click_at,
-              raw_status: msg.status,
-              has_reply: !!(msg.reply_text || msg.reply),
-            },
-          }));
-
-          // Log phone_hash population stats for observability
-          const hashCount = phoneHashes.filter(Boolean).length;
-          if (hashCount < messageEvents.length) {
-            console.warn(`[SMS SYNC] ${messageEvents.length - hashCount} events missing phone_hash (invalid/missing phone numbers)`);
-          }
-
-          const { error: eventError } = await supabase
-            .from('sms_events')
-            .upsert(eventsToUpsert, { onConflict: 'organization_id,message_id' });
-
-          if (eventError) {
-            console.error(`[SMS SYNC] HARD ERROR upserting sms_events for broadcast ${broadcast.id}:`, eventError);
-            messageErrors.push({ broadcast_id: broadcast.id, error: eventError.message });
-          } else {
-            totalMessageEvents += eventsToUpsert.length;
-            console.log(`[SMS SYNC] Upserted ${eventsToUpsert.length} sms_events for broadcast ${broadcast.id}`);
-          }
-        }
+        
       } catch (eventErr) {
         const errMessage = eventErr instanceof Error ? eventErr.message : String(eventErr);
         console.error(`[SMS SYNC] HARD ERROR fetching messages for broadcast ${broadcast.id}:`, errMessage);

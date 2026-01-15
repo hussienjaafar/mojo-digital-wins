@@ -7820,7 +7820,7 @@ export type Database = {
           metadata: Json | null
           occurred_at: string
           organization_id: string
-          phone_hash: string
+          phone_hash: string | null
           reply_intent: string | null
           reply_sentiment: string | null
           reply_text: string | null
@@ -7839,7 +7839,7 @@ export type Database = {
           metadata?: Json | null
           occurred_at: string
           organization_id: string
-          phone_hash: string
+          phone_hash?: string | null
           reply_intent?: string | null
           reply_sentiment?: string | null
           reply_text?: string | null
@@ -7858,7 +7858,7 @@ export type Database = {
           metadata?: Json | null
           occurred_at?: string
           organization_id?: string
-          phone_hash?: string
+          phone_hash?: string | null
           reply_intent?: string | null
           reply_sentiment?: string | null
           reply_text?: string | null
