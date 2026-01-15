@@ -59,12 +59,13 @@ interface IntegrationFormState {
     showKey: boolean;
   };
   actblue: {
-    webhook_secret: string;
+    webhook_username: string;
+    webhook_password: string;
     entity_id: string;
     csv_username: string;
     csv_password: string;
     isOpen: boolean;
-    showSecret: boolean;
+    showWebhookPassword: boolean;
     showCsvPassword: boolean;
   };
 }
@@ -90,7 +91,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
   const [formState, setFormState] = useState<IntegrationFormState>({
     meta: { access_token: '', ad_account_id: '', isOpen: false, showToken: false },
     switchboard: { api_key: '', account_id: '', isOpen: false, showKey: false },
-    actblue: { webhook_secret: '', entity_id: '', csv_username: '', csv_password: '', isOpen: false, showSecret: false, showCsvPassword: false }
+    actblue: { webhook_username: '', webhook_password: '', entity_id: '', csv_username: '', csv_password: '', isOpen: false, showWebhookPassword: false, showCsvPassword: false }
   });
   
   const copyEndpointUrl = async () => {
@@ -128,9 +129,12 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
         }
         testResult = { success: true, error: '' };
       } else if (platform === 'actblue') {
-        const { webhook_secret, entity_id, csv_username, csv_password } = formState.actblue;
-        if (!webhook_secret || !entity_id) {
-          throw new Error('Please enter webhook secret and entity ID');
+        const { webhook_username, webhook_password, entity_id, csv_username, csv_password } = formState.actblue;
+        if (!webhook_username || !webhook_password) {
+          throw new Error('Please enter webhook username and password');
+        }
+        if (!entity_id) {
+          throw new Error('Please enter entity ID');
         }
         if (!csv_username || !csv_password) {
           throw new Error('Please enter CSV API username and password for reconciliation');
@@ -210,15 +214,16 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
         };
       } else if (platform === 'actblue') {
         credentials = {
-          webhook_secret: formState.actblue.webhook_secret,
+          basic_auth_username: formState.actblue.webhook_username,
+          basic_auth_password: formState.actblue.webhook_password,
           entity_id: formState.actblue.entity_id,
           username: formState.actblue.csv_username,
           password: formState.actblue.csv_password
         };
         credentialMask = {
-          secret_hint: `****${formState.actblue.webhook_secret.slice(-4)}`,
+          webhook_username_hint: `****${formState.actblue.webhook_username.slice(-4)}`,
           entity_id: formState.actblue.entity_id,
-          username_hint: formState.actblue.csv_username
+          csv_username_hint: formState.actblue.csv_username
         };
       }
 
@@ -257,7 +262,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
       } else if (platform === 'switchboard') {
         updateFormState('switchboard', { api_key: '', isOpen: false });
       } else if (platform === 'actblue') {
-        updateFormState('actblue', { webhook_secret: '', isOpen: false });
+        updateFormState('actblue', { webhook_username: '', webhook_password: '', isOpen: false });
       }
 
       toast({
@@ -610,33 +615,49 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
                                   </div>
                                 </li>
                                 <li>Create a <strong>Username</strong> and <strong>Password</strong> for authentication</li>
-                                <li>Copy the <strong>Username</strong> below as "Webhook Secret"</li>
+                                <li>Enter both credentials in the fields below</li>
                               </ol>
                             </div>
 
-                            <div className="space-y-2">
-                              <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">
-                                Webhook Secret
-                                <span className="text-[11px] font-normal text-[hsl(var(--portal-text-muted))] ml-2">
-                                  (Username you created in ActBlue)
-                                </span>
-                              </Label>
-                              <div className="flex gap-2">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">
+                                  Webhook Username
+                                  <span className="text-[11px] font-normal text-[hsl(var(--portal-text-muted))] block mt-0.5">
+                                    (Username you created in ActBlue)
+                                  </span>
+                                </Label>
                                 <Input
-                                  type={formState.actblue.showSecret ? 'text' : 'password'}
-                                  placeholder="Enter webhook username/secret"
-                                  value={formState.actblue.webhook_secret}
-                                  onChange={(e) => updateFormState('actblue', { webhook_secret: e.target.value })}
+                                  placeholder="Enter webhook username"
+                                  value={formState.actblue.webhook_username}
+                                  onChange={(e) => updateFormState('actblue', { webhook_username: e.target.value })}
                                   className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
                                 />
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => updateFormState('actblue', { showSecret: !formState.actblue.showSecret })}
-                                  className="h-11 w-11"
-                                >
-                                  {formState.actblue.showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">
+                                  Webhook Password
+                                  <span className="text-[11px] font-normal text-[hsl(var(--portal-text-muted))] block mt-0.5">
+                                    (Password you created in ActBlue)
+                                  </span>
+                                </Label>
+                                <div className="flex gap-2">
+                                  <Input
+                                    type={formState.actblue.showWebhookPassword ? 'text' : 'password'}
+                                    placeholder="Enter webhook password"
+                                    value={formState.actblue.webhook_password}
+                                    onChange={(e) => updateFormState('actblue', { webhook_password: e.target.value })}
+                                    className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => updateFormState('actblue', { showWebhookPassword: !formState.actblue.showWebhookPassword })}
+                                    className="h-11 w-11"
+                                  >
+                                    {formState.actblue.showWebhookPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                             <div className="space-y-2">
