@@ -11811,6 +11811,16 @@ export type Database = {
         Args: { time_window?: unknown; topic_name: string }
         Returns: number
       }
+      debug_timezone_totals: {
+        Args: { p_date: string; p_org_id: string }
+        Returns: {
+          donation_count: number
+          method: string
+          timezone_used: string
+          total_gross: number
+          total_net: number
+        }[]
+      }
       deduplicate_topic_name: { Args: { topic_name: string }; Returns: string }
       detect_donation_channel: {
         Args: {
@@ -11879,27 +11889,49 @@ export type Database = {
         }
         Returns: Json
       }
-      get_actblue_filtered_rollup: {
-        Args: {
-          p_campaign_id?: string
-          p_creative_id?: string
-          p_end_date: string
-          p_org_id: string
-          p_start_date: string
-          p_timezone?: string
-        }
-        Returns: {
-          day: string
-          gross_raised: number
-          net_raised: number
-          recurring_amount: number
-          recurring_count: number
-          refund_amount: number
-          refund_count: number
-          transaction_count: number
-          unique_donors: number
-        }[]
-      }
+      get_actblue_filtered_rollup:
+        | {
+            Args: {
+              p_campaign_id?: string
+              p_creative_id?: string
+              p_end_date: string
+              p_org_id: string
+              p_start_date: string
+              p_timezone?: string
+            }
+            Returns: {
+              day: string
+              gross_raised: number
+              net_raised: number
+              recurring_amount: number
+              recurring_count: number
+              refund_amount: number
+              refund_count: number
+              transaction_count: number
+              unique_donors: number
+            }[]
+          }
+        | {
+            Args: {
+              p_campaign_id?: string
+              p_creative_id?: string
+              p_end_date: string
+              p_org_id: string
+              p_start_date: string
+              p_timezone?: string
+            }
+            Returns: {
+              day: string
+              gross_raised: number
+              net_raised: number
+              recurring_amount: number
+              recurring_count: number
+              refund_amount: number
+              refund_count: number
+              transaction_count: number
+              unique_donors: number
+            }[]
+          }
       get_actblue_period_summary: {
         Args: {
           _end_date: string
