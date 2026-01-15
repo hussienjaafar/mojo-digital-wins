@@ -229,7 +229,7 @@ export function Step6Activation({
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                onClick={() => navigate(`/client/${organizationSlug}`)}
+                onClick={() => navigate('/client/dashboard')}
                 className="h-10 px-5"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
