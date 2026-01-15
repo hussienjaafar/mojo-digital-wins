@@ -11907,6 +11907,19 @@ export type Database = {
           unique_donors: number
         }[]
       }
+      get_actblue_hourly_metrics: {
+        Args: { _date: string; _organization_id: string; _timezone?: string }
+        Returns: {
+          avg_donation: number
+          donation_count: number
+          gross_amount: number
+          hour: number
+          hour_label: string
+          net_amount: number
+          recurring_count: number
+          unique_donors: number
+        }[]
+      }
       get_actblue_period_summary: {
         Args: {
           p_end_date: string
@@ -12060,6 +12073,23 @@ export type Database = {
           status: string
         }[]
       }
+      get_recent_donations: {
+        Args: {
+          _date: string
+          _limit?: number
+          _organization_id: string
+          _timezone?: string
+        }
+        Returns: {
+          amount: number
+          donor_name: string
+          id: string
+          is_recurring: boolean
+          refcode: string
+          source_campaign: string
+          transaction_date: string
+        }[]
+      }
       get_recurring_health: {
         Args: {
           _end_date: string
@@ -12135,6 +12165,18 @@ export type Database = {
         }[]
       }
       get_system_health_metrics: { Args: never; Returns: Json }
+      get_today_comparison_metrics: {
+        Args: { _date: string; _organization_id: string; _timezone?: string }
+        Returns: {
+          avg_donation: number
+          donation_count: number
+          gross_amount: number
+          net_amount: number
+          period: string
+          recurring_count: number
+          unique_donors: number
+        }[]
+      }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_organization_id_safe: { Args: never; Returns: string }
       get_users_with_roles: {

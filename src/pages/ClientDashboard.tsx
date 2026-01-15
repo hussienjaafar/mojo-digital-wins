@@ -29,6 +29,8 @@ import { buildHeroKpis } from "@/utils/buildHeroKpis";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { ActBlueMetricsDebug } from "@/components/debug/ActBlueMetricsDebug";
+import { TodayViewDashboard } from "@/components/client/TodayViewDashboard";
+import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
 
 // Lazy load Heatmap for performance
 const DonationHeatmap = lazy(() => import("@/components/client/DonationHeatmap"));
@@ -246,6 +248,7 @@ const ClientDashboard = () => {
   // Data fetching with TanStack Query
   const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useClientDashboardMetricsQuery(organizationId);
   const { data: recurringHealthData } = useRecurringHealthQuery(organizationId);
+  const isSingleDayView = useIsSingleDayView();
 
   // Handler for refresh button - invalidates cache and forces fresh fetch
   const handleRefresh = useCallback(async () => {
@@ -445,18 +448,22 @@ const ClientDashboard = () => {
                   />
                 )}
                 {data ? (
-                  <ClientDashboardCharts
-                    kpis={data.kpis}
-                    timeSeries={data.timeSeries}
-                    channelBreakdown={data.channelBreakdown}
-                    metaSpend={data.metaSpend}
-                    metaConversions={data.metaConversions}
-                    smsConversions={data.smsConversions}
-                    smsMessagesSent={data.smsMessagesSent}
-                    directDonations={data.directDonations}
-                    startDate={dateRange.startDate}
-                    endDate={dateRange.endDate}
-                  />
+                  isSingleDayView ? (
+                    <TodayViewDashboard organizationId={organizationId} />
+                  ) : (
+                    <ClientDashboardCharts
+                      kpis={data.kpis}
+                      timeSeries={data.timeSeries}
+                      channelBreakdown={data.channelBreakdown}
+                      metaSpend={data.metaSpend}
+                      metaConversions={data.metaConversions}
+                      smsConversions={data.smsConversions}
+                      smsMessagesSent={data.smsMessagesSent}
+                      directDonations={data.directDonations}
+                      startDate={dateRange.startDate}
+                      endDate={dateRange.endDate}
+                    />
+                  )
                 ) : isLoading && !error ? (
                   /* CLS-safe skeleton matching ClientDashboardCharts 3-row layout */
                   <div className="space-y-[var(--portal-space-lg)]">
