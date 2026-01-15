@@ -9993,18 +9993,14 @@ export type Database = {
         Row: {
           day: string | null
           donation_count: number | null
-          fee_percentage: number | null
-          gross_raised: number | null
-          net_raised: number | null
+          gross_donations: number | null
+          net_donations: number | null
           net_revenue: number | null
-          one_time_count: number | null
-          one_time_revenue: number | null
           organization_id: string | null
+          recurring_amount: number | null
           recurring_count: number | null
-          recurring_revenue: number | null
+          refund_amount: number | null
           refund_count: number | null
-          refund_rate: number | null
-          refunds: number | null
           total_fees: number | null
           unique_donors: number | null
         }
@@ -10047,7 +10043,6 @@ export type Database = {
           created_at: string | null
           custom_fields: Json | null
           donor_email: string | null
-          donor_id_hash: string | null
           donor_name: string | null
           double_down: boolean | null
           employer: string | null
@@ -10069,6 +10064,7 @@ export type Database = {
           organization_id: string | null
           payment_method: string | null
           phone: string | null
+          receipt_id: string | null
           recurring_duration: number | null
           recurring_period: string | null
           recurring_state: string | null
@@ -10089,7 +10085,7 @@ export type Database = {
         Insert: {
           ab_test_name?: string | null
           ab_test_variation?: string | null
-          addr1?: never
+          addr1?: string | null
           amount?: number | null
           card_type?: string | null
           city?: string | null
@@ -10099,29 +10095,29 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           custom_fields?: Json | null
-          donor_email?: never
-          donor_id_hash?: never
-          donor_name?: never
+          donor_email?: string | null
+          donor_name?: string | null
           double_down?: boolean | null
-          employer?: never
+          employer?: string | null
           entity_id?: string | null
           fbclid?: string | null
           fec_id?: string | null
           fee?: number | null
-          first_name?: never
+          first_name?: string | null
           id?: string | null
           is_express?: boolean | null
           is_mobile?: boolean | null
           is_recurring?: boolean | null
-          last_name?: never
+          last_name?: string | null
           lineitem_id?: number | null
           net_amount?: number | null
           next_charge_date?: string | null
-          occupation?: never
+          occupation?: string | null
           order_number?: string | null
           organization_id?: string | null
           payment_method?: string | null
-          phone?: never
+          phone?: string | null
+          receipt_id?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
           recurring_state?: string | null
@@ -10142,7 +10138,7 @@ export type Database = {
         Update: {
           ab_test_name?: string | null
           ab_test_variation?: string | null
-          addr1?: never
+          addr1?: string | null
           amount?: number | null
           card_type?: string | null
           city?: string | null
@@ -10152,29 +10148,29 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           custom_fields?: Json | null
-          donor_email?: never
-          donor_id_hash?: never
-          donor_name?: never
+          donor_email?: string | null
+          donor_name?: string | null
           double_down?: boolean | null
-          employer?: never
+          employer?: string | null
           entity_id?: string | null
           fbclid?: string | null
           fec_id?: string | null
           fee?: number | null
-          first_name?: never
+          first_name?: string | null
           id?: string | null
           is_express?: boolean | null
           is_mobile?: boolean | null
           is_recurring?: boolean | null
-          last_name?: never
+          last_name?: string | null
           lineitem_id?: number | null
           net_amount?: number | null
           next_charge_date?: string | null
-          occupation?: never
+          occupation?: string | null
           order_number?: string | null
           organization_id?: string | null
           payment_method?: string | null
-          phone?: never
+          phone?: string | null
+          receipt_id?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
           recurring_state?: string | null

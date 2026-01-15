@@ -205,7 +205,7 @@ async function fetchDonationsSummary(
   // Using secure view for defense-in-depth PII protection
   const { data, error } = await supabase
     .from("actblue_transactions_secure")
-    .select("amount, net_amount, donor_email, donor_id_hash, transaction_date, transaction_type")
+    .select("amount, net_amount, donor_email, transaction_date, transaction_type")
     .eq("organization_id", organizationId)
     .gte("transaction_date", startDate)
     .lte("transaction_date", `${endDate}T23:59:59`)
@@ -225,7 +225,7 @@ async function fetchDonationsSummary(
   const refundCount = refunds.length;
 
   const uniqueDonors = new Set(
-    transactions.map((d) => d.donor_id_hash || d.donor_email)
+    transactions.map((d) => d.donor_email).filter(Boolean)
   ).size;
 
   const avgNet = transactions.length > 0 ? totalNet / transactions.length : 0;
