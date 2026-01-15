@@ -172,8 +172,11 @@ async function fetchBroadcastMessages(
   broadcastId: string,
   cursor?: string
 ): Promise<SwitchboardMessageResponse> {
-  const url = cursor || `https://api.oneswitchboard.com/v1/broadcasts/${broadcastId}/messages`;
+  // FIXED: Correct endpoint is /phone_messages, not /messages (per Switchboard API docs)
+  const url = cursor || `https://api.oneswitchboard.com/v1/broadcasts/${broadcastId}/phone_messages`;
   const credentials = btoa(`${accountId}:${secretKey}`);
+  
+  console.log(`[SMS SYNC] Fetching messages from: ${url.includes('phone_messages') ? `broadcast ${broadcastId}` : 'next page'}`);
   
   const response = await fetch(url, {
     method: 'GET',
