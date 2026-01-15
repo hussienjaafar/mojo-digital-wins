@@ -472,7 +472,7 @@ export const handlers = [
   // -------------------------------------------------------------------------
   http.post(`${SUPABASE_URL}/rest/v1/rpc/get_actblue_daily_rollup`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
-    const orgId = body._organization_id;
+    const orgId = body.p_organization_id;
 
     if (orgId === TEST_ORG_ID) {
       return HttpResponse.json(mockCanonicalDailyRollup);
@@ -482,7 +482,7 @@ export const handlers = [
 
   http.post(`${SUPABASE_URL}/rest/v1/rpc/get_actblue_period_summary`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
-    const orgId = body._organization_id;
+    const orgId = body.p_organization_id;
 
     if (orgId === TEST_ORG_ID) {
       return HttpResponse.json(mockCanonicalPeriodSummary);
