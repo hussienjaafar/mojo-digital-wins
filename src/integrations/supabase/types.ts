@@ -2258,6 +2258,7 @@ export type Database = {
           mfa_grace_period_days: number | null
           mfa_required: boolean | null
           name: string
+          org_timezone: string | null
           primary_contact_email: string | null
           slug: string
           timezone: string | null
@@ -2271,6 +2272,7 @@ export type Database = {
           mfa_grace_period_days?: number | null
           mfa_required?: boolean | null
           name: string
+          org_timezone?: string | null
           primary_contact_email?: string | null
           slug: string
           timezone?: string | null
@@ -2284,6 +2286,7 @@ export type Database = {
           mfa_grace_period_days?: number | null
           mfa_required?: boolean | null
           name?: string
+          org_timezone?: string | null
           primary_contact_email?: string | null
           slug?: string
           timezone?: string | null
@@ -11755,6 +11758,7 @@ export type Database = {
         }[]
       }
       check_authenticated_access: { Args: never; Returns: boolean }
+      check_client_data_health: { Args: { p_org_id: string }; Returns: Json }
       check_contact_rate_limit: { Args: never; Returns: boolean }
       check_failed_attempts_and_lock: {
         Args: { _user_id: string }
@@ -11808,6 +11812,19 @@ export type Database = {
         Returns: number
       }
       deduplicate_topic_name: { Args: { topic_name: string }; Returns: string }
+      detect_donation_channel: {
+        Args: {
+          p_attributed_ad_id?: string
+          p_attributed_campaign_id?: string
+          p_attribution_method?: string
+          p_click_id: string
+          p_contribution_form: string
+          p_fbclid: string
+          p_refcode: string
+          p_source_campaign: string
+        }
+        Returns: string
+      }
       detect_velocity_anomalies: {
         Args: { lookback_hours?: number; z_threshold?: number }
         Returns: {
@@ -11851,6 +11868,16 @@ export type Database = {
           total_fees: number
           unique_donors: number
         }[]
+      }
+      get_actblue_dashboard_metrics: {
+        Args: {
+          p_campaign_id?: string
+          p_creative_id?: string
+          p_end_date: string
+          p_org_id: string
+          p_start_date: string
+        }
+        Returns: Json
       }
       get_actblue_filtered_rollup: {
         Args: {
@@ -12073,6 +12100,10 @@ export type Database = {
           upsell_shown: number
           upsell_succeeded: number
         }[]
+      }
+      get_sms_metrics: {
+        Args: { p_end_date: string; p_org_id: string; p_start_date: string }
+        Returns: Json
       }
       get_state_city_breakdown: {
         Args: { _organization_id: string; _state_abbr: string }
@@ -12316,6 +12347,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      attribution_channel: "meta" | "sms" | "email" | "other" | "unattributed"
       creative_type: "image" | "video" | "carousel" | "collection" | "slideshow"
       org_role: "admin" | "manager" | "editor" | "viewer"
       user_status: "pending" | "active" | "inactive" | "suspended"
@@ -12447,6 +12479,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      attribution_channel: ["meta", "sms", "email", "other", "unattributed"],
       creative_type: ["image", "video", "carousel", "collection", "slideshow"],
       org_role: ["admin", "manager", "editor", "viewer"],
       user_status: ["pending", "active", "inactive", "suspended"],
