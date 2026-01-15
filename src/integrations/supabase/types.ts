@@ -12086,41 +12086,23 @@ export type Database = {
           status: string
         }[]
       }
-      get_recent_donations:
-        | {
-            Args: {
-              _date: string
-              _limit?: number
-              _organization_id: string
-              _timezone?: string
-            }
-            Returns: {
-              amount: number
-              donor_name: string
-              id: string
-              is_recurring: boolean
-              refcode: string
-              source_campaign: string
-              transaction_date: string
-            }[]
-          }
-        | {
-            Args: {
-              _date: string
-              _limit?: number
-              _organization_id: string
-              _timezone?: string
-            }
-            Returns: {
-              amount: number
-              donor_first_name: string
-              id: string
-              is_recurring: boolean
-              net_amount: number
-              refcode: string
-              transaction_date: string
-            }[]
-          }
+      get_recent_donations: {
+        Args: {
+          _date: string
+          _limit?: number
+          _organization_id: string
+          _timezone?: string
+        }
+        Returns: {
+          amount: number
+          donor_first_name: string
+          id: string
+          is_recurring: boolean
+          net_amount: number
+          refcode: string
+          transaction_date: string
+        }[]
+      }
       get_recurring_health: {
         Args: {
           _end_date: string
