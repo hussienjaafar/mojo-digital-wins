@@ -97,7 +97,11 @@ verify_jwt = false
 [functions.check-data-freshness]
 verify_jwt = false
 
-# --- ADMIN-ONLY FUNCTIONS (require admin JWT) ---
+[functions.test-integration]
+verify_jwt = false
+
+[functions.validate-switchboard-data]
+verify_jwt = false
 [functions.admin-sync-meta]
 verify_jwt = false
 

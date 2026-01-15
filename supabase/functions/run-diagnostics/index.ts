@@ -340,6 +340,194 @@ serve(async (req) => {
     }
 
     // =========================================================================
+    // TEST 7: CLIENT DASHBOARD RPC VALIDATION
+    // =========================================================================
+    try {
+      const rpcTests: Array<{ name: string; rpc: string; params?: Record<string, any>; requiredFields: string[] }> = [
+        {
+          name: 'check_client_data_health',
+          rpc: 'check_client_data_health',
+          params: { p_org_id: '00000000-0000-0000-0000-000000000000' },
+          requiredFields: ['transactions', 'channelBreakdown', 'healthChecks'],
+        },
+        {
+          name: 'get_actblue_dashboard_metrics',
+          rpc: 'get_actblue_dashboard_metrics',
+          params: { 
+            p_organization_id: '00000000-0000-0000-0000-000000000000',
+            p_start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            p_end_date: new Date().toISOString().split('T')[0],
+          },
+          requiredFields: ['summary', 'channels', 'trends'],
+        },
+      ];
+
+      const rpcResults: Array<{ rpc: string; status: string; missingFields?: string[]; error?: string }> = [];
+
+      for (const test of rpcTests) {
+        try {
+          const { data, error } = await supabase.rpc(test.rpc, test.params);
+          
+          if (error) {
+            // Expected error for non-existent org is OK
+            if (error.message.includes('not found') || error.code === 'PGRST116') {
+              rpcResults.push({ rpc: test.rpc, status: 'PASS' });
+            } else {
+              rpcResults.push({ rpc: test.rpc, status: 'ERROR', error: error.message });
+            }
+          } else if (data) {
+            // Check for required fields
+            const missingFields = test.requiredFields.filter(field => !(field in data));
+            if (missingFields.length > 0) {
+              rpcResults.push({ rpc: test.rpc, status: 'WARN', missingFields });
+            } else {
+              rpcResults.push({ rpc: test.rpc, status: 'PASS' });
+            }
+          } else {
+            rpcResults.push({ rpc: test.rpc, status: 'PASS' });
+          }
+        } catch (err) {
+          rpcResults.push({ 
+            rpc: test.rpc, 
+            status: 'ERROR', 
+            error: err instanceof Error ? err.message : String(err) 
+          });
+        }
+      }
+
+      const rpcPassed = rpcResults.filter(r => r.status === 'PASS').length;
+      const rpcFailed = rpcResults.filter(r => r.status !== 'PASS').length;
+
+      results.tests.push({
+        name: 'Dashboard RPC Contract Validation',
+        status: rpcFailed === 0 ? 'PASS' : 'WARN',
+        details: {
+          rpcs_tested: rpcResults.length,
+          rpcs_passed: rpcPassed,
+          rpcs_failed: rpcFailed,
+          results: rpcResults,
+        },
+        expected: 'All RPCs return expected field structure',
+        verdict: rpcFailed === 0
+          ? '✅ HEALTHY'
+          : '🟡 SOME MISMATCHES - Check RPC field names',
+      });
+    } catch (err) {
+      results.tests.push({
+        name: 'Dashboard RPC Contract Validation',
+        status: 'ERROR',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // =========================================================================
+    // TEST 8: DATA FRESHNESS ACROSS ALL SOURCES
+    // =========================================================================
+    try {
+      const { data: freshnessRecords, error: freshError } = await supabase
+        .from('data_freshness')
+        .select('source, organization_id, is_within_sla, data_lag_hours, last_synced_at');
+
+      if (freshError) throw freshError;
+
+      const bySource: Record<string, { total: number; stale: number; avgLagHours: number }> = {};
+      
+      for (const record of freshnessRecords || []) {
+        if (!bySource[record.source]) {
+          bySource[record.source] = { total: 0, stale: 0, avgLagHours: 0 };
+        }
+        bySource[record.source].total++;
+        if (!record.is_within_sla) bySource[record.source].stale++;
+        bySource[record.source].avgLagHours += record.data_lag_hours || 0;
+      }
+
+      // Calculate averages
+      Object.keys(bySource).forEach(source => {
+        if (bySource[source].total > 0) {
+          bySource[source].avgLagHours = Math.round(bySource[source].avgLagHours / bySource[source].total);
+        }
+      });
+
+      const totalStale = Object.values(bySource).reduce((sum, s) => sum + s.stale, 0);
+      const totalRecords = Object.values(bySource).reduce((sum, s) => sum + s.total, 0);
+
+      results.tests.push({
+        name: 'Data Freshness Monitoring',
+        status: totalStale === 0 ? 'PASS' : totalStale < totalRecords / 2 ? 'WARN' : 'FAIL',
+        details: {
+          total_records: totalRecords,
+          stale_count: totalStale,
+          by_source: bySource,
+        },
+        expected: 'All data sources within SLA',
+        verdict: totalStale === 0
+          ? '✅ HEALTHY'
+          : totalStale < 3
+          ? '🟡 SOME STALE - Check data_freshness table'
+          : '🔴 CRITICAL - Multiple stale sources',
+      });
+    } catch (err) {
+      results.tests.push({
+        name: 'Data Freshness Monitoring',
+        status: 'ERROR',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // =========================================================================
+    // TEST 9: INTEGRATION HEALTH STATUS
+    // =========================================================================
+    try {
+      const { data: credentials, error: credError } = await supabase
+        .from('client_api_credentials')
+        .select('platform, is_active, last_test_status, last_tested_at')
+        .eq('is_active', true);
+
+      if (credError) throw credError;
+
+      const byPlatform: Record<string, { total: number; healthy: number; failing: number; untested: number }> = {};
+
+      for (const cred of credentials || []) {
+        if (!byPlatform[cred.platform]) {
+          byPlatform[cred.platform] = { total: 0, healthy: 0, failing: 0, untested: 0 };
+        }
+        byPlatform[cred.platform].total++;
+        if (!cred.last_tested_at) {
+          byPlatform[cred.platform].untested++;
+        } else if (cred.last_test_status === 'success') {
+          byPlatform[cred.platform].healthy++;
+        } else {
+          byPlatform[cred.platform].failing++;
+        }
+      }
+
+      const totalFailing = Object.values(byPlatform).reduce((sum, p) => sum + p.failing, 0);
+      const totalIntegrations = Object.values(byPlatform).reduce((sum, p) => sum + p.total, 0);
+
+      results.tests.push({
+        name: 'Integration Health Status',
+        status: totalFailing === 0 ? 'PASS' : 'WARN',
+        details: {
+          total_integrations: totalIntegrations,
+          failing_count: totalFailing,
+          by_platform: byPlatform,
+        },
+        expected: 'All active integrations healthy',
+        verdict: totalFailing === 0
+          ? '✅ HEALTHY'
+          : totalFailing < 3
+          ? '🟡 SOME FAILING - Check integration credentials'
+          : '🔴 CRITICAL - Multiple integrations failing',
+      });
+    } catch (err) {
+      results.tests.push({
+        name: 'Integration Health Status',
+        status: 'ERROR',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // =========================================================================
     // CALCULATE OVERALL STATUS
     // =========================================================================
     const passCount = results.tests.filter((t: any) => t.status === 'PASS').length;

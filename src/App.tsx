@@ -45,6 +45,7 @@ const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
 const Admin = lazy(() => import("./pages/Admin"));
 const AdminClientView = lazy(() => import("./pages/AdminClientView"));
 const UserDetail = lazy(() => import("./pages/admin/UserDetail"));
+const DashboardHealth = lazy(() => import("./pages/admin/DashboardHealth"));
 const Profile = lazy(() => import("./pages/Profile"));
 
 // Client portal pages (lazy loaded)
@@ -112,6 +113,7 @@ const AppContent = () => {
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/users/:userId" element={<UserDetail />} />
             <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />
+            <Route path="/admin/health" element={<DashboardHealth />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/client-login" element={<ClientLogin />} />
             <Route path="/client/dashboard" element={<ClientDashboard />} />

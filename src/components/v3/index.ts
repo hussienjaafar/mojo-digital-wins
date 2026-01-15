@@ -51,3 +51,4 @@ export {
   type V3RankedMetricCellProps,
   type CellValueType,
 } from "./V3TableCell";
+export { DashboardPreflightGate, DashboardHealthHeader } from "./DashboardPreflightGate";

@@ -199,10 +199,7 @@ export function DashboardPreflightGate({
     return (
       <div className={className}>
         {loadingComponent ?? (
-          <V3LoadingState 
-            variant="kpi" 
-            message={sectionName ? `Loading ${sectionName}...` : 'Checking data availability...'} 
-          />
+          <V3LoadingState variant="kpi" />
         )}
       </div>
     );
