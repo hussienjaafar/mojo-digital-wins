@@ -33,6 +33,32 @@ async function fetchDashboardKPIs(
   const prevEnd = new Date(start);
   prevEnd.setDate(prevEnd.getDate() - 1);
 
+  // Helper to fetch ALL rows (bypassing 1000-row limit) using pagination
+  async function fetchAllDonations(orgId: string, startDt: string, endDt: string) {
+    const allRows: { amount: number | null; net_amount: number | null; donor_email: string | null; is_recurring: boolean | null }[] = [];
+    let offset = 0;
+    const pageSize = 1000;
+    
+    while (true) {
+      const { data, error } = await supabase
+        .from("actblue_transactions")
+        .select("amount, net_amount, donor_email, is_recurring")
+        .eq("organization_id", orgId)
+        .gte("transaction_date", startDt)
+        .lte("transaction_date", endDt)
+        .range(offset, offset + pageSize - 1);
+      
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      
+      allRows.push(...data);
+      if (data.length < pageSize) break;
+      offset += pageSize;
+    }
+    
+    return allRows;
+  }
+
   // Parallel fetch all data
   const [
     currentDonations,
@@ -40,21 +66,15 @@ async function fetchDashboardKPIs(
     metaMetrics,
     smsMetrics,
   ] = await Promise.all([
-    // Current period donations
-    supabase
-      .from("actblue_transactions")
-      .select("amount, net_amount, donor_email, is_recurring")
-      .eq("organization_id", organizationId)
-      .gte("transaction_date", startDate)
-      .lte("transaction_date", endDate),
+    // Current period donations (paginated to get ALL)
+    fetchAllDonations(organizationId, startDate, endDate),
 
-    // Previous period donations
-    supabase
-      .from("actblue_transactions")
-      .select("amount, net_amount, donor_email, is_recurring")
-      .eq("organization_id", organizationId)
-      .gte("transaction_date", prevStart.toISOString().split("T")[0])
-      .lte("transaction_date", prevEnd.toISOString().split("T")[0]),
+    // Previous period donations (paginated to get ALL)
+    fetchAllDonations(
+      organizationId,
+      prevStart.toISOString().split("T")[0],
+      prevEnd.toISOString().split("T")[0]
+    ),
 
     // Meta ads spend
     supabase
@@ -74,7 +94,7 @@ async function fetchDashboardKPIs(
   ]);
 
   // Calculate current period metrics
-  const donations = currentDonations.data || [];
+  const donations = currentDonations;
   const totalRaised = donations.reduce((sum, d) => sum + (d.net_amount || d.amount || 0), 0);
   const uniqueDonors = new Set(donations.map((d) => d.donor_email)).size;
   const averageDonation = donations.length > 0 ? totalRaised / donations.length : 0;
@@ -83,7 +103,7 @@ async function fetchDashboardKPIs(
     .reduce((sum, d) => sum + (d.net_amount || d.amount || 0), 0);
 
   // Calculate previous period metrics for trends
-  const prevDonations = previousDonations.data || [];
+  const prevDonations = previousDonations;
   const prevTotalRaised = prevDonations.reduce(
     (sum, d) => sum + (d.net_amount || d.amount || 0),
     0
