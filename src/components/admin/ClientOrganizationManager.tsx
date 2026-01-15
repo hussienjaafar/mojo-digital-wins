@@ -328,25 +328,20 @@ const ClientOrganizationManager = () => {
 
   const handlePreviewAsClient = async (org: Organization) => {
     try {
-      const { data: users, error } = await (supabase as any)
-        .from('client_users')
-        .select('id, full_name')
-        .eq('organization_id', org.id)
-        .limit(1);
-
-      if (error) throw error;
-
-      if (!users || users.length === 0) {
+      // Get current admin session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
         toast({
-          title: "No Users",
-          description: "This organization has no users yet. Create a user first.",
+          title: "Error",
+          description: "No active session",
           variant: "destructive",
         });
         return;
       }
 
-      const user = users[0];
-      setImpersonation(user.id, user.full_name, org.id, org.name);
+      // Set impersonation with admin's own ID but targeting the organization
+      // This allows admins to view any org without needing a client_users entry
+      setImpersonation(session.user.id, "System Admin", org.id, org.name);
       navigate('/client/dashboard');
     } catch (error: any) {
       toast({

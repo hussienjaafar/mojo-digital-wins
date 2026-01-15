@@ -20,7 +20,15 @@ export const ImpersonationBanner = () => {
       <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
       <AlertDescription className="flex items-center justify-between">
         <span className="text-amber-900 dark:text-amber-100">
-          <strong>Admin View:</strong> Viewing as {impersonatedUserName} ({impersonatedOrgName})
+          {impersonatedUserName === "System Admin" ? (
+            <>
+              <strong>Admin View:</strong> Viewing {impersonatedOrgName} as System Admin
+            </>
+          ) : (
+            <>
+              <strong>Admin View:</strong> Viewing as {impersonatedUserName} ({impersonatedOrgName})
+            </>
+          )}
         </span>
         <Button
           variant="outline"
