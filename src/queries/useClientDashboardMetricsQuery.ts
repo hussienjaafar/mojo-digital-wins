@@ -352,9 +352,11 @@ async function fetchDashboardMetrics(
 
   // Helper to build attribution query with filters
   const buildAttrQuery = (start: string, endInc: string) => {
+    // NOTE: donation_attribution schema does NOT include attributed_platform.
+    // We infer platform client-side (meta vs sms) from attribution_method / id fields.
     let query = (supabase as any)
       .from('donation_attribution')
-      .select('transaction_id, attribution_method, attributed_platform, attributed_campaign_id, attributed_creative_id, transaction_type, amount, net_amount, transaction_date')
+      .select('transaction_id, attribution_method, attributed_campaign_id, attributed_creative_id, attributed_ad_id, transaction_type, amount, net_amount, transaction_date')
       .eq('organization_id', organizationId)
       .gte('transaction_date', start)
       .lt('transaction_date', endInc);
@@ -416,14 +418,16 @@ async function fetchDashboardMetrics(
     // Still needed for: attribution, donors, upsell tracking
     (supabase as any)
       .from('actblue_transactions_secure')
-      .select('id, amount, net_amount, fee, donor_email, donor_id_hash, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_type, transaction_date, refcode, source_campaign, click_id, fbclid')
+      // NOTE: actblue_transactions_secure intentionally excludes certain PII/derived fields.
+      // Do NOT select non-existent columns (e.g. donor_id_hash) or the whole query will fail.
+      .select('id, amount, net_amount, fee, donor_email, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_type, transaction_date, refcode, source_campaign, click_id, fbclid')
       .eq('organization_id', organizationId)
       .gte('transaction_date', startDate)
       .lt('transaction_date', endDateInclusive),
     // Previous period donations
     (supabase as any)
       .from('actblue_transactions_secure')
-      .select('id, amount, net_amount, fee, donor_email, donor_id_hash, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_type, transaction_date, refcode, source_campaign, click_id, fbclid')
+      .select('id, amount, net_amount, fee, donor_email, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_type, transaction_date, refcode, source_campaign, click_id, fbclid')
       .eq('organization_id', organizationId)
       .gte('transaction_date', prevPeriod.start)
       .lt('transaction_date', prevEndInclusive),
@@ -571,9 +575,11 @@ async function fetchDashboardMetrics(
   const recurringChurnRate = activeRecurringCount > 0 ? (recurringChurnEvents / activeRecurringCount) * 100 : 0;
 
   // Unique donors (from donations only, not refunds)
-  const uniqueDonors = new Set(donations.map((d: any) => d.donor_id_hash || d.donor_email).filter(Boolean)).size;
-  const currentDonorSet = new Set(donations.map((d: any) => d.donor_id_hash || d.donor_email).filter(Boolean));
-  const prevDonorSet = new Set(prevDonations.map((d: any) => d.donor_id_hash || d.donor_email).filter(Boolean));
+  // actblue_transactions_secure doesn't expose donor_id_hash, so de-dupe by donor_email.
+  // (If we later add a hashed donor id to the secure view, we can prefer it here.)
+  const uniqueDonors = new Set(donations.map((d: any) => d.donor_email).filter(Boolean)).size;
+  const currentDonorSet = new Set(donations.map((d: any) => d.donor_email).filter(Boolean));
+  const prevDonorSet = new Set(prevDonations.map((d: any) => d.donor_email).filter(Boolean));
 
   let newDonors = 0;
   let returningDonors = 0;
@@ -830,12 +836,22 @@ async function fetchDashboardMetrics(
   let unattributedDonations = 0;
 
   if (donationAttributions.length > 0) {
-    // Use donation_attribution view for accurate channel counts
-    metaDonations = donationAttributions.filter((a: any) => a.attributed_platform === 'meta').length;
-    smsDonations = donationAttributions.filter((a: any) => a.attributed_platform === 'sms').length;
-    unattributedDonations = donationAttributions.filter((a: any) =>
-      !a.attributed_platform || a.attribution_method === 'unattributed'
-    ).length;
+    // donation_attribution does not provide attributed_platform; infer it.
+    const inferredPlatform = (a: any): 'meta' | 'sms' | null => {
+      const method = String(a.attribution_method || '').toLowerCase();
+      if (method.includes('sms')) return 'sms';
+      if (method.includes('meta')) return 'meta';
+      // Heuristic: if we have Meta IDs, treat as meta
+      if (a.attributed_campaign_id || a.attributed_ad_id || a.attributed_creative_id) return 'meta';
+      return null;
+    };
+
+    metaDonations = donationAttributions.filter((a: any) => inferredPlatform(a) === 'meta').length;
+    smsDonations = donationAttributions.filter((a: any) => inferredPlatform(a) === 'sms').length;
+    unattributedDonations = donationAttributions.filter((a: any) => {
+      const p = inferredPlatform(a);
+      return !p || a.attribution_method === 'unattributed';
+    }).length;
 
     // Log channel breakdown for observability
     logger.debug('Channel breakdown from donation_attribution', {
