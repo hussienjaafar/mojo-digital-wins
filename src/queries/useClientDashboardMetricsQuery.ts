@@ -873,14 +873,19 @@ async function fetchDashboardMetrics(
     metaDonations = donations.filter((d: any) =>
       d.click_id || d.fbclid || (d.source_campaign && d.source_campaign.toLowerCase().includes('meta'))
     ).length;
-    // SMS attribution requires phone_hash matching, which we can't do client-side without the join
-    // So fallback shows all non-meta attributed as "Direct/Unattributed"
-    smsDonations = 0;
+
+    // SMS attribution fallback: treat TXT* refcodes as SMS.
+    // (This matches our current refcode convention and avoids showing 0 when donation_attribution is empty.)
+    smsDonations = donations.filter((d: any) => {
+      const refcode = String(d.refcode || '').toLowerCase();
+      return refcode.startsWith('txt');
+    }).length;
+
     unattributedDonations = donations.filter((d: any) =>
       !d.refcode && !d.source_campaign && !d.click_id && !d.fbclid
     ).length;
 
-    logger.warn('Channel breakdown fallback: using transaction-level fields (SMS attribution unavailable)');
+    logger.warn('Channel breakdown fallback: using transaction-level fields (SMS inferred via TXT* refcodes)');
   }
 
   // Anything not in meta/sms/unattributed is "Other" (refcode without platform mapping, etc.)
