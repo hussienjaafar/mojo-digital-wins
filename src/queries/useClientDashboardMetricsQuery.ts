@@ -843,6 +843,9 @@ async function fetchDashboardMetrics(
       if (method.includes('meta')) return 'meta';
       // Heuristic: if we have Meta IDs, treat as meta
       if (a.attributed_campaign_id || a.attributed_ad_id || a.attributed_creative_id) return 'meta';
+      // Heuristic: refcodes starting with "TXT" are SMS campaigns
+      const refcode = String(a.refcode || '').toLowerCase();
+      if (refcode.startsWith('txt')) return 'sms';
       return null;
     };
 
