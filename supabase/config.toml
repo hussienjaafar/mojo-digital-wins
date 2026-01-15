@@ -215,6 +215,9 @@ verify_jwt = false
 [functions.reset-client-password]
 verify_jwt = true
 
+[functions.reset-admin-password]
+verify_jwt = true
+
 [functions.terminate-user-sessions]
 verify_jwt = true
 

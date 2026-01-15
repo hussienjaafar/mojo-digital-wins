@@ -376,6 +376,7 @@ export default function UserDetail() {
               mfaMethod={securityInfo.mfaMethod}
               lockout={securityInfo.lockout}
               sessionRevokedAt={securityInfo.sessionRevokedAt}
+              isPlatformAdmin={isPlatformAdmin}
               onUpdate={() => {
                 loadSecurityInfo();
                 loadAuditLogs();
