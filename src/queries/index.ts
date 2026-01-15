@@ -186,3 +186,35 @@ export {
   type PeriodSummary,
   type ActBlueRollupData,
 } from "./useActBlueDailyRollupQuery";
+
+// Unified ActBlue Metrics (NEW - Phase 2 consolidated hook)
+export {
+  useActBlueMetrics,
+  useActBlueSummary,
+  useActBlueChannels,
+  useActBlueDailyData,
+  useSMSMetricsUnified,
+  useClientHealth,
+  actBlueMetricsKeys,
+  type ActBlueSummary,
+  type ActBluePreviousPeriod,
+  type ActBlueTrends,
+  type ActBlueDailyRollup,
+  type ActBlueChannelBreakdown,
+  type ActBlueAttribution,
+  type ActBlueMetadata,
+  type ActBlueMetricsData,
+  type SMSMetricsData,
+  type ClientHealthData,
+} from "@/hooks/useActBlueMetrics";
+
+// Channel Detection Utility
+export {
+  detectChannel,
+  aggregateByChannel,
+  countByChannel,
+  getChannelLabel,
+  getChannelColor,
+  type AttributionChannel,
+  type ChannelDetectionInput,
+} from "@/utils/channelDetection";
