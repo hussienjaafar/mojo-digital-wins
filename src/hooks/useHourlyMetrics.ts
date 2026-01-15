@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/stores/dashboardStore";
-import { format, parseISO, isToday } from "date-fns";
+import { parseISO, isToday } from "date-fns";
 
 // ============================================================================
 // Types
@@ -31,10 +31,10 @@ export interface ComparisonMetrics {
 export interface RecentDonation {
   id: string;
   amount: number;
+  net_amount: number;
   donor_name: string | null;
   transaction_date: string;
   is_recurring: boolean;
-  source_campaign: string | null;
   refcode: string | null;
 }
 
@@ -94,7 +94,17 @@ async function fetchComparisonMetrics(
   });
 
   if (error) throw error;
-  return (data || []) as ComparisonMetrics[];
+  
+  // Map period_name from RPC to period for frontend interface
+  return (data || []).map((row: any) => ({
+    period: row.period_name as "today" | "yesterday" | "last_week",
+    donation_count: Number(row.donation_count) || 0,
+    gross_amount: Number(row.gross_amount) || 0,
+    net_amount: Number(row.net_amount) || 0,
+    unique_donors: Number(row.unique_donors) || 0,
+    avg_donation: Number(row.avg_donation) || 0,
+    recurring_count: Number(row.recurring_count) || 0,
+  }));
 }
 
 async function fetchRecentDonations(
@@ -109,7 +119,17 @@ async function fetchRecentDonations(
   });
 
   if (error) throw error;
-  return (data || []) as RecentDonation[];
+  
+  // Map donor_first_name from RPC to donor_name for frontend interface
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    amount: Number(row.amount) || 0,
+    net_amount: Number(row.net_amount) || 0,
+    donor_name: row.donor_first_name || null,
+    transaction_date: row.transaction_date,
+    is_recurring: row.is_recurring || false,
+    refcode: row.refcode || null,
+  }));
 }
 
 async function fetchTodayMetrics(

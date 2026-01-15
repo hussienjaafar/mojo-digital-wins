@@ -419,6 +419,27 @@ async function fetchDashboardMetrics(
   // - When no filters: use canonical rollup for ActBlue metrics (timezone-aware)
   // - When filters: use get_actblue_filtered_rollup RPC for server-side filtering
   // - Raw transactions still needed for: attribution analysis, donor tracking, upsell metrics
+  
+  // Helper to fetch true unique donors using the new RPC
+  const fetchTrueUniqueDonors = async (start: string, end: string) => {
+    const { data, error } = await (supabase as any).rpc('get_actblue_true_unique_donors', {
+      p_organization_id: organizationId,
+      p_start_date: start,
+      p_end_date: end,
+      p_timezone: 'America/New_York',
+    });
+    if (error) {
+      logger.warn('Failed to fetch true unique donors, falling back to client-side', { error });
+      return null;
+    }
+    const row = data?.[0] || {};
+    return {
+      uniqueDonors: Number(row.unique_donors) || 0,
+      newDonors: Number(row.new_donors) || 0,
+      returningDonors: Number(row.returning_donors) || 0,
+    };
+  };
+
   const [
     { data: donationData },
     { data: prevDonationData },
@@ -433,6 +454,8 @@ async function fetchDashboardMetrics(
     prevCanonicalSummary,
     filteredRollup,
     prevFilteredRollup,
+    trueUniqueDonorsData,
+    prevTrueUniqueDonorsData,
   ] = await Promise.all([
     // Current period donations - fetch all, filter client-side if needed
     // Still needed for: attribution, donors, upsell tracking
@@ -489,6 +512,10 @@ async function fetchDashboardMetrics(
     hasFilters
       ? fetchFilteredActBlueRollup(organizationId, prevPeriod.start, prevPeriod.end, campaignId, creativeId)
       : Promise.resolve(null),
+    // True unique donors - uses COUNT(DISTINCT donor_email) for accurate multi-day counts
+    !hasFilters ? fetchTrueUniqueDonors(startDate, endDate) : Promise.resolve(null),
+    // Previous period true unique donors
+    !hasFilters ? fetchTrueUniqueDonors(prevPeriod.start, prevPeriod.end) : Promise.resolve(null),
   ]);
 
   // Apply client-side filtering for donations only (not refunds)
@@ -594,19 +621,32 @@ async function fetchDashboardMetrics(
   const activeRecurringCount = recurringDonations.length;
   const recurringChurnRate = activeRecurringCount > 0 ? (recurringChurnEvents / activeRecurringCount) * 100 : 0;
 
-  // Unique donors (from donations only, not refunds)
-  // actblue_transactions_secure doesn't expose donor_id_hash, so de-dupe by donor_email.
-  // (If we later add a hashed donor id to the secure view, we can prefer it here.)
-  const uniqueDonors = new Set(donations.map((d: any) => d.donor_email).filter(Boolean)).size;
-  const currentDonorSet = new Set(donations.map((d: any) => d.donor_email).filter(Boolean));
-  const prevDonorSet = new Set(prevDonations.map((d: any) => d.donor_email).filter(Boolean));
+  // Unique donors: Use TRUE unique donors from RPC when available (accurate across multi-day ranges)
+  // Falls back to client-side Set when filters are active (filtered rollup doesn't have unique donors RPC)
+  let uniqueDonors: number;
+  let newDonors: number;
+  let returningDonors: number;
 
-  let newDonors = 0;
-  let returningDonors = 0;
-  currentDonorSet.forEach((d) => {
-    if (prevDonorSet.has(d)) returningDonors += 1;
-    else newDonors += 1;
-  });
+  if (trueUniqueDonorsData && !hasFilters) {
+    // Use RPC for accurate COUNT(DISTINCT donor_email) across the full date range
+    uniqueDonors = trueUniqueDonorsData.uniqueDonors;
+    newDonors = trueUniqueDonorsData.newDonors;
+    returningDonors = trueUniqueDonorsData.returningDonors;
+    logger.debug('Using true unique donors from RPC', { uniqueDonors, newDonors, returningDonors });
+  } else {
+    // Fallback: client-side de-duplication (may be inaccurate for multi-day ranges if paginated)
+    uniqueDonors = new Set(donations.map((d: any) => d.donor_email).filter(Boolean)).size;
+    const currentDonorSet = new Set(donations.map((d: any) => d.donor_email).filter(Boolean));
+    const prevDonorSet = new Set(prevDonations.map((d: any) => d.donor_email).filter(Boolean));
+    
+    newDonors = 0;
+    returningDonors = 0;
+    currentDonorSet.forEach((d) => {
+      if (prevDonorSet.has(d)) returningDonors += 1;
+      else newDonors += 1;
+    });
+    logger.debug('Using client-side unique donors (filters active or RPC failed)', { uniqueDonors, newDonors, returningDonors });
+  }
 
   const recurringPercentage = donations.length > 0 ? (recurringDonations.length / donations.length) * 100 : 0;
 
@@ -698,7 +738,10 @@ async function fetchDashboardMetrics(
   const prevRecurringChurnEvents = prevRefunds.filter((d: any) => d.is_recurring).length;
   const prevRecurringChurnRate = prevRecurringDonations.length > 0 ? (prevRecurringChurnEvents / prevRecurringDonations.length) * 100 : 0;
 
-  const prevUniqueDonors = new Set(prevDonations.map((d: any) => d.donor_id_hash || d.donor_email).filter(Boolean)).size;
+  // Previous period unique donors: Use TRUE unique donors from RPC when available
+  const prevUniqueDonors = prevTrueUniqueDonorsData && !hasFilters
+    ? prevTrueUniqueDonorsData.uniqueDonors
+    : new Set(prevDonations.map((d: any) => d.donor_id_hash || d.donor_email).filter(Boolean)).size;
   const prevRecurringPercentage = prevDonations.length > 0 ? (prevRecurringDonations.length / prevDonations.length) * 100 : 0;
 
   const prevMetaSpend = prevMetaMetrics.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);

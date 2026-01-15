@@ -11940,6 +11940,19 @@ export type Database = {
           total_unique_donors: number
         }[]
       }
+      get_actblue_true_unique_donors: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+          p_timezone?: string
+        }
+        Returns: {
+          new_donors: number
+          returning_donors: number
+          unique_donors: number
+        }[]
+      }
       get_backfill_progress: {
         Args: never
         Returns: {
@@ -12073,23 +12086,41 @@ export type Database = {
           status: string
         }[]
       }
-      get_recent_donations: {
-        Args: {
-          _date: string
-          _limit?: number
-          _organization_id: string
-          _timezone?: string
-        }
-        Returns: {
-          amount: number
-          donor_name: string
-          id: string
-          is_recurring: boolean
-          refcode: string
-          source_campaign: string
-          transaction_date: string
-        }[]
-      }
+      get_recent_donations:
+        | {
+            Args: {
+              _date: string
+              _limit?: number
+              _organization_id: string
+              _timezone?: string
+            }
+            Returns: {
+              amount: number
+              donor_name: string
+              id: string
+              is_recurring: boolean
+              refcode: string
+              source_campaign: string
+              transaction_date: string
+            }[]
+          }
+        | {
+            Args: {
+              _date: string
+              _limit?: number
+              _organization_id: string
+              _timezone?: string
+            }
+            Returns: {
+              amount: number
+              donor_first_name: string
+              id: string
+              is_recurring: boolean
+              net_amount: number
+              refcode: string
+              transaction_date: string
+            }[]
+          }
       get_recurring_health: {
         Args: {
           _end_date: string
@@ -12172,7 +12203,7 @@ export type Database = {
           donation_count: number
           gross_amount: number
           net_amount: number
-          period: string
+          period_name: string
           recurring_count: number
           unique_donors: number
         }[]
