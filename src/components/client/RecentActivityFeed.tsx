@@ -79,7 +79,7 @@ interface DonationItemProps {
 }
 
 const DonationItem: React.FC<DonationItemProps> = ({ donation, index }) => {
-  const channel = getChannelFromRefcode(donation.refcode, donation.source_campaign);
+  const channel = getChannelFromRefcode(donation.refcode, null);
   const channelColor = getChannelColor(channel);
   
   const donorDisplay = donation.donor_name || "Anonymous";
