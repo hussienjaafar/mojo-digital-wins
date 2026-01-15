@@ -269,6 +269,32 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
       await invalidateDashboardQueries();
       await calculateROI();
     } catch (error: any) {
+      const message = (error?.message || "").toLowerCase();
+      const likelyTimeout =
+        message.includes("timeout") ||
+        message.includes("context canceled") ||
+        message.includes("aborted") ||
+        message.includes("failed to fetch");
+
+      // Backfills can take a long time; some environments will abort the client request
+      // even though the backend continues processing.
+      if (backfill && likelyTimeout) {
+        toast({
+          title: "ActBlue backfill still running",
+          description:
+            "This request can time out in the browser while the backfill keeps running in the background. We'll refresh status shortly.",
+        });
+
+        // Refresh status + dashboard data after a short delay.
+        window.setTimeout(async () => {
+          await loadSyncStatuses();
+          await queryClient.invalidateQueries({ queryKey: donationKeys.all });
+          await invalidateDashboardQueries();
+        }, 30_000);
+
+        return;
+      }
+
       toast({
         title: "Error",
         description: error.message || "Failed to sync ActBlue",
