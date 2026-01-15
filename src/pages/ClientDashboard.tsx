@@ -1,4 +1,5 @@
-import { useState, useEffect, lazy, Suspense, useMemo } from "react";
+import { useState, useEffect, lazy, Suspense, useMemo, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { parseISO, parse, isValid, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { ChevronRight, BarChart3, LayoutDashboard, Layers, Clock, Info, LucideIcon } from "lucide-react";
@@ -234,6 +235,7 @@ const ClientDashboard = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showTimeAnalysis, setShowTimeAnalysis] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const queryClient = useQueryClient();
 
   // V3: Use Zustand store for global date range and filters
   const dateRange = useDateRange();
@@ -244,6 +246,34 @@ const ClientDashboard = () => {
   // Data fetching with TanStack Query
   const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useClientDashboardMetricsQuery(organizationId);
   const { data: recurringHealthData } = useRecurringHealthQuery(organizationId);
+
+  // Handler for refresh button - invalidates cache and forces fresh fetch
+  const handleRefresh = useCallback(async () => {
+    logger.info('Dashboard refresh triggered', { organizationId });
+    
+    // Invalidate ALL dashboard-related queries to ensure fresh data
+    await queryClient.invalidateQueries({ 
+      queryKey: ['dashboard'],
+      refetchType: 'all'
+    });
+    
+    // Also invalidate related queries that feed into the dashboard
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['actblue'] }),
+      queryClient.invalidateQueries({ queryKey: ['meta-metrics'] }),
+      queryClient.invalidateQueries({ queryKey: ['sms'] }),
+      queryClient.invalidateQueries({ queryKey: ['attribution'] }),
+      queryClient.invalidateQueries({ queryKey: ['recurring-health'] }),
+    ]);
+    
+    // Trigger store refresh (for components listening to refreshKey)
+    triggerRefresh();
+    
+    // Force refetch with network-only behavior
+    await refetch();
+    
+    toast.success('Dashboard refreshed with latest data');
+  }, [queryClient, organizationId, triggerRefresh, refetch]);
 
   // Fetch filter options for campaigns and creatives
   const { data: filterOptions } = useFilterOptions(
@@ -388,10 +418,7 @@ const ClientDashboard = () => {
                       campaignOptions={filterOptions?.campaigns || []}
                       creativeOptions={filterOptions?.creatives || []}
                       showRefresh
-                      onRefresh={() => {
-                        triggerRefresh();
-                        refetch();
-                      }}
+                      onRefresh={handleRefresh}
                       isRefreshing={isFetching}
                     />
                   }
