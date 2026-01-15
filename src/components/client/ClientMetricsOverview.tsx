@@ -54,9 +54,8 @@ const ClientMetricsOverview = ({ organizationId }: Props) => {
   const totalDonations = summary?.totalDonations || 0;
   const avgDonation = summary?.averageDonation || 0;
 
-  // Calculate ROI (would need spend data - placeholder for now)
-  const totalSpent = 0; // TODO: Add spend from meta_ad_metrics + sms_campaigns
-  const avgROI = totalSpent > 0 ? ((totalNetRevenue - totalSpent) / totalSpent * 100) : 0;
+  // Note: ROI calculation requires spend data from meta_ad_metrics + sms_campaigns
+  // This would be integrated in a future iteration
 
   // Trends
   const trends = data?.trends;

@@ -278,8 +278,19 @@ async function fetchSMSMetrics(
   };
 }
 
+/**
+ * @deprecated Use `useSMSMetricsUnified` from `@/hooks/useActBlueMetrics` instead.
+ * This hook uses the legacy SMS metrics fetching pattern.
+ * Migration: import { useSMSMetricsUnified } from "@/hooks/useActBlueMetrics";
+ */
 export function useSMSMetricsQuery(organizationId: string | undefined) {
   const dateRange = useDateRange();
+
+  if (process.env.NODE_ENV === 'development') {
+    console.warn(
+      '[DEPRECATED] useSMSMetricsQuery is deprecated. Use useSMSMetricsUnified from @/hooks/useActBlueMetrics instead.'
+    );
+  }
 
   return useQuery({
     queryKey: smsKeys.metrics(organizationId || "", dateRange),

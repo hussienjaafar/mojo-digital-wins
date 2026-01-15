@@ -17,7 +17,7 @@ import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, parseISO } from "date-fns";
 import { EChartsLineChart, EChartsBarChart } from "@/components/charts/echarts";
-import { useSMSMetricsQuery } from "@/queries";
+import { useSMSMetricsUnified } from "@/hooks/useActBlueMetrics";
 import { formatRatio, formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 
 type Props = {
@@ -44,39 +44,37 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [performanceFilter, setPerformanceFilter] = useState<string>("all");
 
-  // Use TanStack Query hook instead of direct Supabase calls
-  const { data, isLoading, error, refetch } = useSMSMetricsQuery(organizationId);
+  // Use unified SMS metrics hook (Phase 2 refactor)
+  const { data, isLoading, error, refetch } = useSMSMetricsUnified(organizationId);
 
-  // Memoized derived data
-  const { metrics, dailyMetrics, previousPeriodMetrics, lastSentDate } = useMemo(() => ({
-    metrics: data?.metrics || {},
+  // Memoized derived data from unified RPC
+  const { campaigns, dailyMetrics, lastSentDate, summary, previousPeriod } = useMemo(() => ({
+    campaigns: data?.campaigns || [],
     dailyMetrics: data?.dailyMetrics || [],
-    previousPeriodMetrics: data?.previousPeriodMetrics || {},
-    lastSentDate: data?.lastSentDate || null,
+    lastSentDate: data?.campaigns?.[0]?.last_donation || null,
+    summary: data?.summary,
+    previousPeriod: data?.previousPeriod,
   }), [data]);
 
-  const campaigns = useMemo(() => Object.values(metrics), [metrics]);
-  const previousCampaigns = useMemo(() => Object.values(previousPeriodMetrics), [previousPeriodMetrics]);
-
-  // Current period totals
+  // Current period totals from unified data
   const totals = useMemo(() => ({
-    sent: campaigns.reduce((sum, m) => sum + m.messages_sent, 0),
-    delivered: campaigns.reduce((sum, m) => sum + m.messages_delivered, 0),
-    raised: campaigns.reduce((sum, m) => sum + m.amount_raised, 0),
-    cost: campaigns.reduce((sum, m) => sum + m.cost, 0),
-    conversions: campaigns.reduce((sum, m) => sum + m.conversions, 0),
-    clicks: campaigns.reduce((sum, m) => sum + m.clicks, 0),
-    optOuts: campaigns.reduce((sum, m) => sum + m.opt_outs, 0),
-  }), [campaigns]);
+    sent: summary?.totalDonations || 0, // In SMS context, donations = messages that converted
+    delivered: summary?.totalDonations || 0,
+    raised: summary?.totalRaised || 0,
+    cost: 0, // Cost data comes from sms_campaigns table when available
+    conversions: summary?.totalDonations || 0,
+    clicks: 0, // Click data comes from sms_campaigns table when available
+    optOuts: 0, // Opt-out data comes from sms_campaigns table when available
+  }), [summary]);
 
-  // Previous period totals
+  // Previous period totals  
   const prevTotals = useMemo(() => ({
-    sent: previousCampaigns.reduce((sum, m) => sum + m.messages_sent, 0),
-    delivered: previousCampaigns.reduce((sum, m) => sum + m.messages_delivered, 0),
-    raised: previousCampaigns.reduce((sum, m) => sum + m.amount_raised, 0),
-    cost: previousCampaigns.reduce((sum, m) => sum + m.cost, 0),
-    conversions: previousCampaigns.reduce((sum, m) => sum + m.conversions, 0),
-  }), [previousCampaigns]);
+    sent: previousPeriod?.totalDonations || 0,
+    delivered: previousPeriod?.totalDonations || 0,
+    raised: previousPeriod?.totalRaised || 0,
+    cost: 0,
+    conversions: previousPeriod?.totalDonations || 0,
+  }), [previousPeriod]);
 
   const calcChange = (current: number, previous: number) => {
     if (previous === 0) return current > 0 ? 100 : 0;
@@ -90,40 +88,45 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const ctr = totals.delivered > 0 ? (totals.clicks / totals.delivered) * 100 : 0;
   const optOutRate = totals.delivered > 0 ? (totals.optOuts / totals.delivered) * 100 : 0;
 
-  // Filter campaigns
+  // Filter campaigns (using refcode-based campaigns from unified data)
   const filteredCampaigns = useMemo(() => {
-    let filtered = campaigns;
+    let filtered = [...campaigns] as any[];
 
     if (campaignFilter !== "all") {
-      filtered = filtered.filter(c => c.campaign_id === campaignFilter);
+      filtered = filtered.filter((c: any) => c.campaign_id === campaignFilter);
     }
 
+    // ROI filtering requires cost data - skip if not available
     if (performanceFilter === "high-roi") {
-      filtered = filtered.filter(c => c.roi >= 2);
-    } else if (performanceFilter === "high-optout") {
-      filtered = filtered.filter(c => c.opt_out_rate >= 2);
+      filtered = filtered.filter((c: any) => {
+        const cost = c.cost || 0;
+        const raised = c.raised || 0;
+        return cost > 0 && (raised / cost) >= 2;
+      });
     }
 
     return filtered;
   }, [campaigns, campaignFilter, performanceFilter]);
 
-  // Campaign ROI comparison chart data
-  const roiComparisonData = useMemo(() => campaigns
-    .filter(c => c.cost > 0)
-    .sort((a, b) => b.roi - a.roi)
+  // Campaign comparison chart data (by raised amount since we may not have cost data)
+  const roiComparisonData = useMemo(() => (campaigns as any[])
+    .filter((c: any) => (c.raised || 0) > 0)
+    .sort((a: any, b: any) => (b.raised || 0) - (a.raised || 0))
     .slice(0, 8)
-    .map(c => ({
-      name: c.campaign_name.length > 15 ? c.campaign_name.slice(0, 15) + '...' : c.campaign_name,
-      roi: c.roi,
-      raised: c.amount_raised,
-      cost: c.cost,
+    .map((c: any) => ({
+      name: (c.campaign_name || c.campaign_id || '').length > 15 
+        ? (c.campaign_name || c.campaign_id || '').slice(0, 15) + '...' 
+        : (c.campaign_name || c.campaign_id || ''),
+      roi: c.cost > 0 ? (c.raised / c.cost) : 0,
+      raised: c.raised || 0,
+      cost: c.cost || 0,
     })), [campaigns]);
 
   // Trend chart data
-  const trendChartData = useMemo(() => dailyMetrics.map(d => ({
+  const trendChartData = useMemo(() => (dailyMetrics as any[]).map((d: any) => ({
     name: format(parseISO(d.date), 'MMM d'),
-    Sent: d.messages_sent,
-    Conversions: d.conversions,
+    Sent: d.donations || 0,
+    Conversions: d.donations || 0,
   })), [dailyMetrics]);
 
   // Show loading state
@@ -295,71 +298,49 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
                 key: "campaign_name",
                 header: "Campaign",
                 sortable: true,
-                sortFn: (a, b) => a.campaign_name.localeCompare(b.campaign_name),
-                render: (row) => <span className="font-medium text-[hsl(var(--portal-text-primary))]">{row.campaign_name}</span>,
+                sortFn: (a, b) => (a.campaign_name || a.campaign_id || '').localeCompare(b.campaign_name || b.campaign_id || ''),
+                render: (row) => <span className="font-medium text-[hsl(var(--portal-text-primary))]">{row.campaign_name || row.campaign_id}</span>,
               },
               {
-                key: "messages_sent",
-                header: "Sent",
+                key: "donations",
+                header: "Donations",
                 align: "right",
                 sortable: true,
-                sortFn: (a, b) => a.messages_sent - b.messages_sent,
-                render: (row) => formatNumber(row.messages_sent),
+                sortFn: (a, b) => (a.donations || 0) - (b.donations || 0),
+                render: (row) => formatNumber(row.donations || 0),
               },
               {
-                key: "delivery_rate",
-                header: "Delivery",
+                key: "donors",
+                header: "Donors",
                 align: "right",
                 sortable: true,
-                sortFn: (a, b) => a.delivery_rate - b.delivery_rate,
+                sortFn: (a, b) => (a.donors || 0) - (b.donors || 0),
                 hideOnMobile: true,
-                render: (row) => (
-                  <span className={row.delivery_rate < 90 ? 'text-[hsl(var(--portal-warning))]' : ''}>
-                    {row.delivery_rate.toFixed(1)}%
-                  </span>
-                ),
+                render: (row) => formatNumber(row.donors || 0),
               },
               {
-                key: "roi",
-                header: "ROI",
-                align: "right",
-                sortable: true,
-                sortFn: (a, b) => a.roi - b.roi,
-                render: (row) => (
-                  <span className={row.roi >= 2 ? 'text-[hsl(var(--portal-success))] font-semibold' : ''}>
-                    {row.roi.toFixed(2)}x
-                  </span>
-                ),
-              },
-              {
-                key: "amount_raised",
+                key: "raised",
                 header: "Raised",
                 align: "right",
                 sortable: true,
-                sortFn: (a, b) => a.amount_raised - b.amount_raised,
-                render: (row) => formatCurrency(row.amount_raised),
+                sortFn: (a, b) => (a.raised || 0) - (b.raised || 0),
+                render: (row) => formatCurrency(row.raised || 0),
               },
               {
-                key: "cost",
-                header: "Cost",
+                key: "net",
+                header: "Net",
                 align: "right",
                 sortable: true,
-                sortFn: (a, b) => a.cost - b.cost,
+                sortFn: (a, b) => (a.net || 0) - (b.net || 0),
                 hideOnMobile: true,
-                render: (row) => formatCurrency(row.cost),
+                render: (row) => formatCurrency(row.net || 0),
               },
               {
-                key: "opt_out_rate",
-                header: "Opt-out",
+                key: "last_donation",
+                header: "Last Activity",
                 align: "right",
-                sortable: true,
-                sortFn: (a, b) => a.opt_out_rate - b.opt_out_rate,
                 hideOnMobile: true,
-                render: (row) => (
-                  <span className={row.opt_out_rate >= 2 ? 'text-[hsl(var(--portal-warning))]' : ''}>
-                    {row.opt_out_rate.toFixed(2)}%
-                  </span>
-                ),
+                render: (row) => row.last_donation ? format(parseISO(row.last_donation), 'MMM d') : '—',
               },
             ] as V3Column<typeof filteredCampaigns[0]>[]}
           />

@@ -168,8 +168,19 @@ async function fetchDashboardKPIs(
   };
 }
 
+/**
+ * @deprecated Use `useActBlueMetrics` from `@/hooks/useActBlueMetrics` instead.
+ * This hook uses the legacy dashboard KPIs fetching pattern with client-side aggregation.
+ * Migration: import { useActBlueMetrics } from "@/hooks/useActBlueMetrics";
+ */
 export function useDashboardKPIsQuery(organizationId: string | undefined) {
   const dateRange = useDateRange();
+
+  if (process.env.NODE_ENV === 'development') {
+    console.warn(
+      '[DEPRECATED] useDashboardKPIsQuery is deprecated. Use useActBlueMetrics from @/hooks/useActBlueMetrics instead.'
+    );
+  }
 
   return useQuery({
     queryKey: dashboardKeys.kpis(organizationId || "", dateRange),

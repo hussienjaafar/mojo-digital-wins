@@ -16,7 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/stores/dashboardStore";
 import type { AttributionChannel } from "@/utils/channelDetection";
-import type { Json } from "@/integrations/supabase/types";
+
 
 // ==================== Types ====================
 
