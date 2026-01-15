@@ -186,9 +186,9 @@ async function fetchCanonicalDailyRollup(
   endDate: string
 ): Promise<DailyRollupRow[]> {
   const { data, error } = await (supabase as any).rpc('get_actblue_daily_rollup', {
-    _organization_id: organizationId,
-    _start_date: startDate,
-    _end_date: endDate,
+    p_organization_id: organizationId,
+    p_start_date: startDate,
+    p_end_date: endDate,
   });
 
   if (error) {
@@ -225,9 +225,9 @@ async function fetchCanonicalPeriodSummary(
   endDate: string
 ): Promise<PeriodSummary> {
   const { data, error } = await (supabase as any).rpc('get_actblue_period_summary', {
-    _organization_id: organizationId,
-    _start_date: startDate,
-    _end_date: endDate,
+    p_organization_id: organizationId,
+    p_start_date: startDate,
+    p_end_date: endDate,
   });
 
   if (error) {
