@@ -89,6 +89,7 @@ export type Database = {
           organization_id: string
           payment_method: string | null
           phone: string | null
+          receipt_id: string | null
           recurring_duration: number | null
           recurring_period: string | null
           recurring_state: string | null
@@ -141,6 +142,7 @@ export type Database = {
           organization_id: string
           payment_method?: string | null
           phone?: string | null
+          receipt_id?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
           recurring_state?: string | null
@@ -193,6 +195,7 @@ export type Database = {
           organization_id?: string
           payment_method?: string | null
           phone?: string | null
+          receipt_id?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
           recurring_state?: string | null
