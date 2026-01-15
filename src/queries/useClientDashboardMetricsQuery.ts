@@ -874,18 +874,17 @@ async function fetchDashboardMetrics(
       d.click_id || d.fbclid || (d.source_campaign && d.source_campaign.toLowerCase().includes('meta'))
     ).length;
 
-    // SMS attribution fallback: treat TXT* refcodes as SMS.
-    // (This matches our current refcode convention and avoids showing 0 when donation_attribution is empty.)
+    // SMS attribution fallback: check if contribution_form contains "sms" (e.g., mltcosms)
     smsDonations = donations.filter((d: any) => {
-      const refcode = String(d.refcode || '').toLowerCase();
-      return refcode.startsWith('txt');
+      const form = String(d.contribution_form || '').toLowerCase();
+      return form.includes('sms');
     }).length;
 
     unattributedDonations = donations.filter((d: any) =>
       !d.refcode && !d.source_campaign && !d.click_id && !d.fbclid
     ).length;
 
-    logger.warn('Channel breakdown fallback: using transaction-level fields (SMS inferred via TXT* refcodes)');
+    logger.warn('Channel breakdown fallback: using transaction-level fields (SMS inferred via contribution_form)');
   }
 
   // Anything not in meta/sms/unattributed is "Other" (refcode without platform mapping, etc.)

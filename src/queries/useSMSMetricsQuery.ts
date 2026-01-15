@@ -125,7 +125,8 @@ function calculateTotals(campaigns: SMSMetric[]) {
   };
 }
 
-// Fallback: derive SMS metrics from ActBlue transactions with TXT* refcodes
+// Fallback: derive SMS metrics from ActBlue transactions
+// SMS is identified by contribution_form containing "sms" (e.g., mltcosms)
 async function fetchSMSFromActBlue(
   organizationId: string,
   startDate: string,
@@ -140,23 +141,23 @@ async function fetchSMSFromActBlue(
   const [currentRes, prevRes, latestRes] = await Promise.all([
     supabase
       .from("actblue_transactions")
-      .select("transaction_date, refcode, amount")
+      .select("transaction_date, refcode, amount, contribution_form")
       .eq("organization_id", organizationId)
       .gte("transaction_date", startDate)
       .lte("transaction_date", `${endDate}T23:59:59`)
-      .ilike("refcode", "txt%"),
+      .ilike("contribution_form", "%sms%"),
     supabase
       .from("actblue_transactions")
-      .select("transaction_date, refcode, amount")
+      .select("transaction_date, refcode, amount, contribution_form")
       .eq("organization_id", organizationId)
       .gte("transaction_date", format(prevStart, "yyyy-MM-dd"))
       .lte("transaction_date", `${format(prevEnd, "yyyy-MM-dd")}T23:59:59`)
-      .ilike("refcode", "txt%"),
+      .ilike("contribution_form", "%sms%"),
     supabase
       .from("actblue_transactions")
       .select("transaction_date")
       .eq("organization_id", organizationId)
-      .ilike("refcode", "txt%")
+      .ilike("contribution_form", "%sms%")
       .order("transaction_date", { ascending: false })
       .limit(1),
   ]);
