@@ -125,6 +125,80 @@ function calculateTotals(campaigns: SMSMetric[]) {
   };
 }
 
+// Fallback: derive SMS metrics from ActBlue transactions with TXT* refcodes
+async function fetchSMSFromActBlue(
+  organizationId: string,
+  startDate: string,
+  endDate: string
+): Promise<{ current: any[]; previous: any[]; lastDate: string | null }> {
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+  const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const prevEnd = subDays(start, 1);
+  const prevStart = subDays(prevEnd, daysDiff);
+
+  const [currentRes, prevRes, latestRes] = await Promise.all([
+    supabase
+      .from("actblue_transactions")
+      .select("transaction_date, refcode, amount")
+      .eq("organization_id", organizationId)
+      .gte("transaction_date", startDate)
+      .lte("transaction_date", `${endDate}T23:59:59`)
+      .ilike("refcode", "txt%"),
+    supabase
+      .from("actblue_transactions")
+      .select("transaction_date, refcode, amount")
+      .eq("organization_id", organizationId)
+      .gte("transaction_date", format(prevStart, "yyyy-MM-dd"))
+      .lte("transaction_date", `${format(prevEnd, "yyyy-MM-dd")}T23:59:59`)
+      .ilike("refcode", "txt%"),
+    supabase
+      .from("actblue_transactions")
+      .select("transaction_date")
+      .eq("organization_id", organizationId)
+      .ilike("refcode", "txt%")
+      .order("transaction_date", { ascending: false })
+      .limit(1),
+  ]);
+
+  // Transform ActBlue transactions into campaign-like structure
+  const transformToCampaigns = (transactions: any[]) => {
+    const byRefcode: Record<string, any> = {};
+    transactions?.forEach((tx) => {
+      const refcode = tx.refcode || "Unknown";
+      const date = tx.transaction_date?.split("T")[0];
+      if (!byRefcode[refcode]) {
+        byRefcode[refcode] = {
+          campaign_id: refcode,
+          campaign_name: refcode,
+          send_date: date,
+          messages_sent: 0, // We don't have this data
+          messages_delivered: 0,
+          messages_failed: 0,
+          opt_outs: 0,
+          clicks: 0,
+          conversions: 0,
+          amount_raised: 0,
+          cost: 0,
+        };
+      }
+      byRefcode[refcode].conversions += 1;
+      byRefcode[refcode].amount_raised += Number(tx.amount || 0);
+      // Use earliest date as send_date
+      if (date && (!byRefcode[refcode].send_date || date < byRefcode[refcode].send_date)) {
+        byRefcode[refcode].send_date = date;
+      }
+    });
+    return Object.values(byRefcode);
+  };
+
+  return {
+    current: transformToCampaigns(currentRes.data || []),
+    previous: transformToCampaigns(prevRes.data || []),
+    lastDate: latestRes.data?.[0]?.transaction_date?.split("T")[0] || null,
+  };
+}
+
 async function fetchSMSMetrics(
   organizationId: string,
   startDate: string,
@@ -137,7 +211,7 @@ async function fetchSMSMetrics(
   const prevEnd = subDays(start, 1);
   const prevStart = subDays(prevEnd, daysDiff);
 
-  // Parallel fetch all data
+  // Parallel fetch all data from sms_campaigns
   const [currentRes, prevRes, latestRes] = await Promise.all([
     supabase
       .from("sms_campaigns")
@@ -165,9 +239,21 @@ async function fetchSMSMetrics(
 
   if (currentRes.error) throw currentRes.error;
 
-  const metrics = aggregateMetrics(currentRes.data || []);
-  const dailyMetrics = aggregateDailyMetrics(currentRes.data || []);
-  const previousPeriodMetrics = aggregateMetrics(prevRes.data || []);
+  // If no sms_campaigns data, fallback to ActBlue transactions
+  let currentData = currentRes.data || [];
+  let prevData = prevRes.data || [];
+  let lastSentDate = latestRes.data?.[0]?.send_date?.split("T")[0] || null;
+
+  if (currentData.length === 0) {
+    const fallback = await fetchSMSFromActBlue(organizationId, startDate, endDate);
+    currentData = fallback.current;
+    prevData = fallback.previous;
+    lastSentDate = fallback.lastDate;
+  }
+
+  const metrics = aggregateMetrics(currentData);
+  const dailyMetrics = aggregateDailyMetrics(currentData);
+  const previousPeriodMetrics = aggregateMetrics(prevData);
   const campaigns = Object.values(metrics);
   const previousCampaigns = Object.values(previousPeriodMetrics);
   const totals = calculateTotals(campaigns);
@@ -178,8 +264,6 @@ async function fetchSMSMetrics(
     cost: previousCampaigns.reduce((sum, m) => sum + m.cost, 0),
     conversions: previousCampaigns.reduce((sum, m) => sum + m.conversions, 0),
   };
-
-  const lastSentDate = latestRes.data?.[0]?.send_date?.split("T")[0] || null;
 
   return {
     metrics,
