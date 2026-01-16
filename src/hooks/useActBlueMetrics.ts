@@ -283,16 +283,29 @@ async function fetchSMSMetrics(
 /**
  * Hook for fetching SMS-specific metrics.
  * Uses the dedicated `get_sms_metrics` RPC with unified channel detection.
+ * 
+ * @param organizationId - The organization ID to fetch metrics for
+ * @param startDate - Optional start date (falls back to store if not provided)
+ * @param endDate - Optional end date (falls back to store if not provided)
  */
-export function useSMSMetricsUnified(organizationId: string | undefined) {
-  const { startDate, endDate } = useDateRange();
+export function useSMSMetricsUnified(
+  organizationId: string | undefined,
+  startDate?: string,
+  endDate?: string
+) {
+  const storeRange = useDateRange();
+  
+  // Use provided dates or fall back to store (same pattern as useDonationMetricsQuery)
+  const effectiveStartDate = startDate || storeRange.startDate;
+  const effectiveEndDate = endDate || storeRange.endDate;
 
   return useQuery({
-    queryKey: actBlueMetricsKeys.sms(organizationId || '', startDate, endDate),
-    queryFn: () => fetchSMSMetrics(organizationId!, startDate, endDate),
+    queryKey: actBlueMetricsKeys.sms(organizationId || '', effectiveStartDate, effectiveEndDate),
+    queryFn: () => fetchSMSMetrics(organizationId!, effectiveStartDate, effectiveEndDate),
     enabled: !!organizationId,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    retry: false, // Fail fast instead of infinite skeleton on errors
   });
 }
 

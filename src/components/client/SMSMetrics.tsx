@@ -44,8 +44,8 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [performanceFilter, setPerformanceFilter] = useState<string>("all");
 
-  // Use unified SMS metrics hook (Phase 2 refactor)
-  const { data, isLoading, error, refetch } = useSMSMetricsUnified(organizationId);
+  // Use unified SMS metrics hook with explicit date range (fixes date mismatch issue)
+  const { data, isLoading, error, refetch } = useSMSMetricsUnified(organizationId, startDate, endDate);
 
   // Memoized derived data from unified RPC
   const { campaigns, dailyMetrics, lastSentDate, summary, previousPeriod } = useMemo(() => ({
