@@ -56,7 +56,7 @@ interface ChannelConfig {
   icon: typeof Target;
   description: string;
   accent: V3Accent;
-  component: React.ReactNode;
+  renderComponent: () => React.ReactNode;
   getSummary: (data: ChannelSummariesData | undefined) => SummaryMetric[] | null;
   hasData: (data: ChannelSummariesData | undefined) => boolean;
   getLastDataDate: (data: ChannelSummariesData | undefined) => string | null;
@@ -349,7 +349,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
       icon: Target,
       description: "Facebook & Instagram advertising performance",
       accent: "blue" as V3Accent,
-      component: (
+      renderComponent: () => (
         <Suspense fallback={
           <div className="space-y-6">
             <V3LoadingState variant="kpi-grid" count={5} />
@@ -393,7 +393,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
       icon: MessageSquare,
       description: "Text message campaign metrics and engagement",
       accent: "purple" as V3Accent,
-      component: <SMSMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />,
+      renderComponent: () => <SMSMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />,
       getSummary: (data) => {
         if (!data) return null;
         const { sms } = data;
@@ -416,7 +416,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
       icon: DollarSign,
       description: "Transaction history and donor insights",
       accent: "green" as V3Accent,
-      component: <DonationMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />,
+      renderComponent: () => <DonationMetrics organizationId={organizationId} startDate={startDate} endDate={endDate} />,
       getSummary: (data) => {
         if (!data) return null;
         const { donations } = data;
@@ -666,7 +666,7 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
                         className="overflow-hidden"
                       >
                         <div className="px-4 sm:px-6 pb-6 pt-2 border-t border-[hsl(var(--portal-border))]">
-                          {section.component}
+                          {section.renderComponent()}
                         </div>
                       </motion.div>
                     )}
