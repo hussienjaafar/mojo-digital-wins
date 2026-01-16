@@ -202,45 +202,49 @@ async function fetchDonationsSummary(
   startDate: string,
   endDate: string
 ): Promise<DonationsSummary> {
-  // Using secure view for defense-in-depth PII protection
-  const { data, error } = await supabase
-    .from("actblue_transactions_secure")
-    .select("amount, net_amount, donor_email, transaction_date, transaction_type")
-    .eq("organization_id", organizationId)
-    .gte("transaction_date", startDate)
-    .lte("transaction_date", `${endDate}T23:59:59`)
-    .order("transaction_date", { ascending: false });
+  // Use canonical RPC for timezone-aware, single-source-of-truth metrics
+  const { data, error } = await (supabase as any).rpc('get_actblue_period_summary', {
+    p_organization_id: organizationId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+  });
 
   if (error) {
-    console.error("[useChannelSummariesQuery] Donations fetch error:", error);
+    console.error("[useChannelSummariesQuery] Donations RPC error:", error);
     throw error;
   }
 
-  const transactions = data || [];
-  const totalGross = transactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-  const totalNet = transactions.reduce((sum, t) => sum + Number(t.net_amount ?? t.amount ?? 0), 0);
+  const row = data?.[0] || {};
+  const grossDonations = Number(row.total_gross_donations) || 0;
+  const netDonations = Number(row.total_net_donations) || 0;
+  const donationCount = Number(row.total_donation_count) || 0;
+  const refundCount = Number(row.total_refund_count) || 0;
+  const refundAmount = Number(row.total_refunds) || 0;
+  const uniqueDonors = Number(row.total_unique_donors) || 0;
+  const avgDonation = Number(row.overall_avg_donation) || 0;
 
-  const refunds = transactions.filter((t) => t.transaction_type === "refund");
-  const refundAmount = refunds.reduce((sum, t) => sum + Math.abs(Number(t.net_amount ?? t.amount ?? 0)), 0);
-  const refundCount = refunds.length;
+  // For lastDataDate, we need a separate lightweight query
+  const { data: latestTxn } = await supabase
+    .from("actblue_transactions_secure")
+    .select("transaction_date")
+    .eq("organization_id", organizationId)
+    .gte("transaction_date", startDate)
+    .lte("transaction_date", `${endDate}T23:59:59`)
+    .order("transaction_date", { ascending: false })
+    .limit(1);
 
-  const uniqueDonors = new Set(
-    transactions.map((d) => d.donor_email).filter(Boolean)
-  ).size;
-
-  const avgNet = transactions.length > 0 ? totalNet / transactions.length : 0;
-  const lastDataDate = transactions[0]?.transaction_date?.split("T")[0] || null;
+  const lastDataDate = latestTxn?.[0]?.transaction_date?.split("T")[0] || null;
 
   return {
-    totalGross,
-    totalNet,
+    totalGross: grossDonations,
+    totalNet: netDonations,
     refundAmount,
     refundCount,
     donors: uniqueDonors,
-    avgNet,
-    transactionCount: transactions.length,
+    avgNet: avgDonation,
+    transactionCount: donationCount,
     lastDataDate,
-    hasData: transactions.length > 0,
+    hasData: donationCount > 0,
   };
 }
 
