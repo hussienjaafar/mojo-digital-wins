@@ -103,23 +103,33 @@ async function fetchCanonicalDailyRollup(
     throw new Error(`Failed to fetch daily rollup: ${error.message}`);
   }
 
-  return (data || []).map((row: any) => ({
-    day: row.day,
-    gross_raised: Number(row.gross_raised) || 0,
-    net_raised: Number(row.net_raised) || 0,
-    refunds: Number(row.refunds) || 0,
-    net_revenue: Number(row.net_revenue) || 0,
-    total_fees: Number(row.total_fees) || 0,
-    donation_count: Number(row.donation_count) || 0,
-    unique_donors: Number(row.unique_donors) || 0,
-    refund_count: Number(row.refund_count) || 0,
-    recurring_count: Number(row.recurring_count) || 0,
-    one_time_count: Number(row.one_time_count) || 0,
-    recurring_revenue: Number(row.recurring_revenue) || 0,
-    one_time_revenue: Number(row.one_time_revenue) || 0,
-    fee_percentage: Number(row.fee_percentage) || 0,
-    refund_rate: Number(row.refund_rate) || 0,
-  }));
+  return (data || []).map((row: any) => {
+    const grossDonations = Number(row.gross_donations) || 0;
+    const netDonations = Number(row.net_donations) || 0;
+    const donationCount = Number(row.donation_count) || 0;
+    const recurringCount = Number(row.recurring_count) || 0;
+    const recurringRevenue = Number(row.recurring_revenue) || 0;
+    const totalFees = Number(row.total_fees) || 0;
+    const refundCount = Number(row.refund_count) || 0;
+
+    return {
+      day: row.day,
+      gross_raised: grossDonations,
+      net_raised: netDonations,
+      refunds: Number(row.refunds) || 0,
+      net_revenue: Number(row.net_revenue) || 0,
+      total_fees: totalFees,
+      donation_count: donationCount,
+      unique_donors: Number(row.unique_donors) || 0,
+      refund_count: refundCount,
+      recurring_count: recurringCount,
+      one_time_count: donationCount - recurringCount,
+      recurring_revenue: recurringRevenue,
+      one_time_revenue: netDonations - recurringRevenue,
+      fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
+      refund_rate: donationCount > 0 ? (refundCount / donationCount) * 100 : 0,
+    };
+  });
 }
 
 /**
@@ -142,23 +152,31 @@ async function fetchCanonicalPeriodSummary(
   }
 
   const row = data?.[0] || {};
+  const grossDonations = Number(row.total_gross_donations) || 0;
+  const netDonations = Number(row.total_net_donations) || 0;
+  const donationCount = Number(row.total_donation_count) || 0;
+  const recurringCount = Number(row.total_recurring_count) || 0;
+  const recurringRevenue = Number(row.total_recurring_revenue) || 0;
+  const totalFees = Number(row.total_fees) || 0;
+  const refundCount = Number(row.total_refund_count) || 0;
+
   return {
-    gross_raised: Number(row.gross_raised) || 0,
-    net_raised: Number(row.net_raised) || 0,
-    refunds: Number(row.refunds) || 0,
-    net_revenue: Number(row.net_revenue) || 0,
-    total_fees: Number(row.total_fees) || 0,
-    donation_count: Number(row.donation_count) || 0,
-    unique_donors_approx: Number(row.unique_donors_approx) || 0,
-    refund_count: Number(row.refund_count) || 0,
-    recurring_count: Number(row.recurring_count) || 0,
-    one_time_count: Number(row.one_time_count) || 0,
-    recurring_revenue: Number(row.recurring_revenue) || 0,
-    one_time_revenue: Number(row.one_time_revenue) || 0,
-    avg_fee_percentage: Number(row.avg_fee_percentage) || 0,
-    refund_rate: Number(row.refund_rate) || 0,
-    avg_donation: Number(row.avg_donation) || 0,
-    days_with_donations: Number(row.days_with_donations) || 0,
+    gross_raised: grossDonations,
+    net_raised: netDonations,
+    refunds: Number(row.total_refunds) || 0,
+    net_revenue: Number(row.total_net_revenue) || 0,
+    total_fees: totalFees,
+    donation_count: donationCount,
+    unique_donors_approx: Number(row.total_unique_donors) || 0,
+    refund_count: refundCount,
+    recurring_count: recurringCount,
+    one_time_count: donationCount - recurringCount,
+    recurring_revenue: recurringRevenue,
+    one_time_revenue: netDonations - recurringRevenue,
+    avg_fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
+    refund_rate: donationCount > 0 ? (refundCount / donationCount) * 100 : 0,
+    avg_donation: Number(row.overall_avg_donation) || 0,
+    days_with_donations: 0, // Not provided by RPC
   };
 }
 
