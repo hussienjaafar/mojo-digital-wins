@@ -224,10 +224,22 @@ export interface SMSMetricsData {
     uniqueDonors: number;
     averageDonation: number;
     recurringCount: number;
+    // SMS-specific fields
+    totalSent: number;
+    totalDelivered: number;
+    totalClicks: number;
+    totalOptOuts: number;
+    totalCost: number;
+    campaignCount: number;
   };
   previousPeriod: {
     totalDonations: number;
     totalRaised: number;
+    totalSent: number;
+    totalDelivered: number;
+    totalClicks: number;
+    totalOptOuts: number;
+    totalCost: number;
   };
   trends: {
     raisedTrend: number | null;
@@ -240,6 +252,11 @@ export interface SMSMetricsData {
     raised: number;
     net: number;
     donors: number;
+    cost: number;
+    sent: number;
+    delivered: number;
+    clicks: number;
+    optOuts: number;
     first_donation: string;
     last_donation: string;
   }>;
@@ -248,11 +265,18 @@ export interface SMSMetricsData {
     donations: number;
     raised: number;
     donors: number;
+    sent: number;
+    delivered: number;
+    clicks: number;
+    optOuts: number;
+    cost: number;
   }>;
   metadata: {
     timezone: string;
     startDate: string;
     endDate: string;
+    previousStartDate: string;
+    previousEndDate: string;
     generatedAt: string;
   };
 }
