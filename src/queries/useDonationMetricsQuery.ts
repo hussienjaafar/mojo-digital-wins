@@ -199,9 +199,10 @@ async function fetchDonationMetrics(
     fetchCanonicalPeriodSummary(organizationId, startDate, endDate),
     // Still need raw transactions for donor details, top donors, by source
     // LIMIT to 2000 most recent to prevent slow queries blocking the UI
+    // NOTE: donor_id_hash does NOT exist in actblue_transactions_secure - use donor_email as key
     (supabase as any)
       .from("actblue_transactions_secure")
-      .select("amount, net_amount, donor_email, donor_name, first_name, last_name, state, city, donor_id_hash, is_recurring, transaction_type, transaction_date, refcode, source_campaign, transaction_id, id")
+      .select("amount, net_amount, donor_email, donor_name, first_name, last_name, state, city, is_recurring, transaction_type, transaction_date, refcode, source_campaign, transaction_id, id")
       .eq("organization_id", organizationId)
       .gte("transaction_date", startDate)
       .lt("transaction_date", endDateInclusive)
@@ -299,7 +300,8 @@ async function fetchDonationMetrics(
   }>();
 
   donations.forEach((d: any) => {
-    const donorKey = d.donor_id_hash || d.donor_email;
+    // Use donor_email as the key for donor aggregation (donor_id_hash doesn't exist in this view)
+    const donorKey = d.donor_email || d.transaction_id || `${d.donor_name}-${d.transaction_date}-${d.amount}`;
     if (donorKey) {
       const existing = donorMap.get(donorKey);
       // Use org timezone for consistent date display
@@ -394,6 +396,7 @@ export function useDonationMetricsQuery(
     enabled: !!organizationId,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    retry: false, // Fail fast instead of infinite skeleton on errors
   });
 }
 
