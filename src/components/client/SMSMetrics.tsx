@@ -56,24 +56,26 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     previousPeriod: data?.previousPeriod,
   }), [data]);
 
-  // Current period totals from unified data
+  // Current period totals from unified RPC (now includes SMS-specific fields)
   const totals = useMemo(() => ({
-    sent: summary?.totalDonations || 0, // In SMS context, donations = messages that converted
-    delivered: summary?.totalDonations || 0,
+    sent: summary?.totalSent || 0,
+    delivered: summary?.totalDelivered || 0,
     raised: summary?.totalRaised || 0,
-    cost: 0, // Cost data comes from sms_campaigns table when available
+    cost: summary?.totalCost || 0,
     conversions: summary?.totalDonations || 0,
-    clicks: 0, // Click data comes from sms_campaigns table when available
-    optOuts: 0, // Opt-out data comes from sms_campaigns table when available
+    clicks: summary?.totalClicks || 0,
+    optOuts: summary?.totalOptOuts || 0,
   }), [summary]);
 
-  // Previous period totals  
+  // Previous period totals for trend calculations
   const prevTotals = useMemo(() => ({
-    sent: previousPeriod?.totalDonations || 0,
-    delivered: previousPeriod?.totalDonations || 0,
+    sent: previousPeriod?.totalSent || 0,
+    delivered: previousPeriod?.totalDelivered || 0,
     raised: previousPeriod?.totalRaised || 0,
-    cost: 0,
+    cost: previousPeriod?.totalCost || 0,
     conversions: previousPeriod?.totalDonations || 0,
+    clicks: previousPeriod?.totalClicks || 0,
+    optOuts: previousPeriod?.totalOptOuts || 0,
   }), [previousPeriod]);
 
   const calcChange = (current: number, previous: number) => {
