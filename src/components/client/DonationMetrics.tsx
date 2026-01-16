@@ -62,7 +62,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const { shouldMaskPII, isLoading: piiLoading } = usePIIAccess(organizationId);
 
   // Use TanStack Query hook instead of direct Supabase calls
-  const { data, isLoading, error, refetch } = useDonationMetricsQuery(organizationId);
+  const { data, isLoading, error, refetch } = useDonationMetricsQuery(organizationId, startDate, endDate);
 
   // Extract data from query result
   const metrics = data?.metrics;

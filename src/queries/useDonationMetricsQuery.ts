@@ -372,13 +372,23 @@ async function fetchDonationMetrics(
   return { metrics, timeSeries, bySource, topDonors, recentDonations };
 }
 
-export function useDonationMetricsQuery(organizationId: string | undefined) {
-  const dateRange = useDateRange();
+export function useDonationMetricsQuery(
+  organizationId: string | undefined,
+  startDate?: string,
+  endDate?: string
+) {
+  const storeRange = useDateRange();
+  
+  // Use provided dates or fall back to store
+  const effectiveRange = {
+    startDate: startDate || storeRange.startDate,
+    endDate: endDate || storeRange.endDate,
+  };
 
   return useQuery({
-    queryKey: donationKeys.metrics(organizationId || "", dateRange),
+    queryKey: donationKeys.metrics(organizationId || "", effectiveRange),
     queryFn: () =>
-      fetchDonationMetrics(organizationId!, dateRange.startDate, dateRange.endDate),
+      fetchDonationMetrics(organizationId!, effectiveRange.startDate, effectiveRange.endDate),
     enabled: !!organizationId,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -386,16 +396,26 @@ export function useDonationMetricsQuery(organizationId: string | undefined) {
 }
 
 // Separate hook for time series only (lighter weight)
-export function useDonationTimeSeriesQuery(organizationId: string | undefined) {
-  const dateRange = useDateRange();
+export function useDonationTimeSeriesQuery(
+  organizationId: string | undefined,
+  startDate?: string,
+  endDate?: string
+) {
+  const storeRange = useDateRange();
+  
+  // Use provided dates or fall back to store
+  const effectiveRange = {
+    startDate: startDate || storeRange.startDate,
+    endDate: endDate || storeRange.endDate,
+  };
 
   return useQuery({
-    queryKey: donationKeys.timeSeries(organizationId || "", dateRange),
+    queryKey: donationKeys.timeSeries(organizationId || "", effectiveRange),
     queryFn: async () => {
       const result = await fetchDonationMetrics(
         organizationId!,
-        dateRange.startDate,
-        dateRange.endDate
+        effectiveRange.startDate,
+        effectiveRange.endDate
       );
       return result.timeSeries;
     },
