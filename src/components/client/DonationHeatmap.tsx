@@ -61,7 +61,7 @@ export const DonationHeatmap = ({
   organizationId,
   startDate,
   endDate,
-  timezone = getBrowserTimezone()
+  timezone: propTimezone
 }: DonationHeatmapProps) => {
   const isMobile = useIsMobile();
   const { toast } = useToast();
@@ -72,7 +72,30 @@ export const DonationHeatmap = ({
   // Metric state
   const [metric, setMetric] = useState<HeatmapMetric>('revenue');
 
-  // Fetch heatmap data from RPC
+  // Fetch organization timezone for consistent analysis (same as Canonical Rollup logic)
+  const { data: orgTimezone } = useQuery({
+    queryKey: ["organization", "timezone", organizationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_organizations")
+        .select("org_timezone")
+        .eq("id", organizationId)
+        .single();
+      
+      if (error) {
+        console.warn("Failed to fetch org timezone, using default:", error);
+        return "America/New_York";
+      }
+      return data?.org_timezone || "America/New_York";
+    },
+    enabled: !!organizationId,
+    staleTime: 30 * 60 * 1000, // Cache for 30 minutes
+  });
+
+  // Use org timezone from DB, fallback to prop, then browser timezone
+  const timezone = propTimezone || orgTimezone || getBrowserTimezone();
+
+  // Fetch heatmap data from RPC using org timezone
   const { data: rpcData, isLoading, isError, error } = useQuery({
     queryKey: ["donations", "heatmap", organizationId, startDate, endDate, timezone],
     queryFn: async () => {
@@ -86,7 +109,7 @@ export const DonationHeatmap = ({
       if (error) throw error;
       return data || [];
     },
-    enabled: !!organizationId,
+    enabled: !!organizationId && !!timezone,
     staleTime: 5 * 60 * 1000,
   });
 
