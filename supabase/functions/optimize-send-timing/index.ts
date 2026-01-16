@@ -6,6 +6,47 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/**
+ * Parse a date in a specific timezone and extract hour/day
+ * This ensures we use the actual donation time, not UTC
+ */
+function getLocalTimeComponents(
+  dateStr: string, 
+  timezone: string
+): { hour: number; dayOfWeek: number } {
+  try {
+    const date = new Date(dateStr);
+    // Format in the target timezone to get correct local hour/day
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      hour12: false,
+      weekday: 'short',
+    });
+    
+    const parts = formatter.formatToParts(date);
+    const hourPart = parts.find(p => p.type === 'hour');
+    const dayPart = parts.find(p => p.type === 'weekday');
+    
+    const hour = hourPart ? parseInt(hourPart.value, 10) : date.getUTCHours();
+    
+    // Convert weekday name to number (0=Sunday, 6=Saturday)
+    const dayNames: Record<string, number> = {
+      'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+    };
+    const dayOfWeek = dayPart ? (dayNames[dayPart.value] ?? date.getUTCDay()) : date.getUTCDay();
+    
+    return { hour, dayOfWeek };
+  } catch (e) {
+    // Fallback to UTC if timezone parsing fails
+    const date = new Date(dateStr);
+    return {
+      hour: date.getUTCHours(),
+      dayOfWeek: date.getUTCDay(),
+    };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -18,10 +59,10 @@ serve(async (req) => {
 
     console.log('Analyzing optimal send times...');
 
-    // Get all organizations
+    // Get all organizations WITH their timezone settings
     const { data: orgs } = await supabase
       .from('client_organizations')
-      .select('id')
+      .select('id, org_timezone')
       .eq('is_active', true);
 
     if (!orgs || orgs.length === 0) {
@@ -31,7 +72,11 @@ serve(async (req) => {
     }
 
     for (const org of orgs) {
+      // Use org's configured timezone, default to America/New_York
+      const timezone = org.org_timezone || 'America/New_York';
+      
       // Analyze donation patterns by hour of day and day of week
+      // Using transaction_date (when donation occurred), NOT created_at (when uploaded)
       const { data: donations } = await supabase
         .from('actblue_transactions')
         .select('transaction_date, amount')
@@ -44,14 +89,14 @@ serve(async (req) => {
         continue;
       }
 
-      // Group by hour of day (0-23)
+      // Group by hour of day (0-23) in the org's timezone
       const hourlyStats = new Array(24).fill(0).map(() => ({
         count: 0,
         total: 0,
         avg: 0,
       }));
 
-      // Group by day of week (0-6, Sunday-Saturday)
+      // Group by day of week (0-6, Sunday-Saturday) in the org's timezone
       const dailyStats = new Array(7).fill(0).map(() => ({
         count: 0,
         total: 0,
@@ -59,15 +104,14 @@ serve(async (req) => {
       }));
 
       donations.forEach(d => {
-        const date = new Date(d.transaction_date);
-        const hour = date.getHours();
-        const day = date.getDay();
+        // Parse date in the organization's timezone (not UTC or browser timezone)
+        const { hour, dayOfWeek } = getLocalTimeComponents(d.transaction_date, timezone);
 
         hourlyStats[hour].count++;
         hourlyStats[hour].total += d.amount;
 
-        dailyStats[day].count++;
-        dailyStats[day].total += d.amount;
+        dailyStats[dayOfWeek].count++;
+        dailyStats[dayOfWeek].total += d.amount;
       });
 
       // Calculate averages
@@ -124,7 +168,7 @@ serve(async (req) => {
           sample_size: w.count,
         }));
 
-      // Store optimization results
+      // Store optimization results with timezone info
       const { error: upsertError } = await supabase
         .from('send_time_optimizations')
         .upsert({
@@ -136,6 +180,7 @@ serve(async (req) => {
           daily_performance: dailyStats,
           analyzed_at: new Date().toISOString(),
           sample_size: donations.length,
+          // Note: Times are in the org's configured timezone
         }, {
           onConflict: 'organization_id',
         });
@@ -143,7 +188,7 @@ serve(async (req) => {
       if (upsertError) {
         console.error(`Error storing timing optimization for ${org.id}:`, upsertError);
       } else {
-        console.log(`Stored timing optimization for ${org.id}: Best hours ${bestHours.join(', ')}`);
+        console.log(`Stored timing optimization for ${org.id} (${timezone}): Best hours ${bestHours.join(', ')}`);
       }
     }
 
