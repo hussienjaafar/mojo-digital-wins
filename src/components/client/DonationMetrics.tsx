@@ -59,7 +59,9 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [currentPage, setCurrentPage] = useState(1);
 
   // PII access control - masks donor names/emails for users without PII access
+  // Default to masked while loading (fail-closed, non-blocking)
   const { shouldMaskPII, isLoading: piiLoading } = usePIIAccess(organizationId);
+  const effectiveMaskPII = piiLoading ? true : shouldMaskPII;
 
   // Use TanStack Query hook instead of direct Supabase calls
   const { data, isLoading, error, refetch } = useDonationMetricsQuery(organizationId, startDate, endDate);
@@ -137,7 +139,8 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     }
     
     // Apply PII masking after filtering (so search works on real data)
-    if (shouldMaskPII) {
+    // Use effectiveMaskPII which defaults to masked while loading
+    if (effectiveMaskPII) {
       result = result.map(d => ({
         ...d,
         donorName: maskName(d.donorName),
@@ -146,18 +149,31 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     }
     
     return result;
-  }, [recentDonations, searchTerm, sortBy, filterRecurring, shouldMaskPII]);
+  }, [recentDonations, searchTerm, sortBy, filterRecurring, effectiveMaskPII]);
 
-  // PII masking indicator component
-  const PIIMaskingIndicator = () => shouldMaskPII ? (
-    <div className="flex items-center gap-1.5 text-xs text-[hsl(var(--portal-text-muted))] bg-[hsl(var(--portal-bg-elevated))] px-2 py-1 rounded border border-[hsl(var(--portal-border))]">
-      <ShieldAlert className="h-3 w-3" aria-hidden="true" />
-      <span>Donor PII masked</span>
-    </div>
-  ) : null;
+  // PII masking indicator component - shows when masked or still checking
+  const PIIMaskingIndicator = () => {
+    if (piiLoading) {
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-[hsl(var(--portal-text-muted))] bg-[hsl(var(--portal-bg-elevated))] px-2 py-1 rounded border border-[hsl(var(--portal-border))]">
+          <ShieldAlert className="h-3 w-3 animate-pulse" aria-hidden="true" />
+          <span>Checking permissions...</span>
+        </div>
+      );
+    }
+    if (effectiveMaskPII) {
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-[hsl(var(--portal-text-muted))] bg-[hsl(var(--portal-bg-elevated))] px-2 py-1 rounded border border-[hsl(var(--portal-border))]">
+          <ShieldAlert className="h-3 w-3" aria-hidden="true" />
+          <span>Donor PII masked</span>
+        </div>
+      );
+    }
+    return null;
+  };
 
-  // Show loading state
-  if (isLoading || piiLoading) {
+  // Show loading state ONLY for donation data - PII is non-blocking (defaults to masked)
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <V3LoadingState variant="kpi-grid" count={4} />

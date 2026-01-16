@@ -198,13 +198,15 @@ async function fetchDonationMetrics(
     fetchCanonicalDailyRollup(organizationId, startDate, endDate),
     fetchCanonicalPeriodSummary(organizationId, startDate, endDate),
     // Still need raw transactions for donor details, top donors, by source
+    // LIMIT to 2000 most recent to prevent slow queries blocking the UI
     (supabase as any)
       .from("actblue_transactions_secure")
       .select("amount, net_amount, donor_email, donor_name, first_name, last_name, state, city, donor_id_hash, is_recurring, transaction_type, transaction_date, refcode, source_campaign, transaction_id, id")
       .eq("organization_id", organizationId)
       .gte("transaction_date", startDate)
       .lt("transaction_date", endDateInclusive)
-      .order("transaction_date", { ascending: true }),
+      .order("transaction_date", { ascending: false })
+      .limit(2000),
   ]);
 
   if (error) throw error;
