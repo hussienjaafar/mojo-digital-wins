@@ -13,12 +13,13 @@ import {
   V3DataTable,
   type V3Column,
 } from "@/components/v3";
-import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter } from "lucide-react";
+import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter, Info, CheckCircle2, AlertCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, parseISO } from "date-fns";
 import { EChartsLineChart, EChartsBarChart } from "@/components/charts/echarts";
 import { useSMSMetricsUnified } from "@/hooks/useActBlueMetrics";
 import { formatRatio, formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Props = {
   organizationId: string;
@@ -124,10 +125,10 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
       cost: c.cost || 0,
     })), [campaigns]);
 
-  // Trend chart data
+  // Trend chart data - correctly map sent and conversions
   const trendChartData = useMemo(() => (dailyMetrics as any[]).map((d: any) => ({
     name: format(parseISO(d.date), 'MMM d'),
-    Sent: d.donations || 0,
+    Sent: d.sent || 0,
     Conversions: d.donations || 0,
   })), [dailyMetrics]);
 
@@ -168,8 +169,56 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     );
   }
 
+  // Get attribution metadata from RPC response
+  const attributionMetadata = data?.metadata;
+
   return (
     <div className="space-y-6">
+      {/* Attribution Status Banner */}
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--portal-card-bg))] border border-[hsl(var(--portal-border))]">
+        {totals.conversions > 0 ? (
+          <CheckCircle2 className="h-5 w-5 text-[hsl(var(--portal-success))] flex-shrink-0" />
+        ) : (
+          <AlertCircle className="h-5 w-5 text-[hsl(var(--portal-accent-amber))] flex-shrink-0" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+              Attribution Status
+            </span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Info className="h-3.5 w-3.5 text-[hsl(var(--portal-text-muted))]" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs">
+                  <p className="text-xs">
+                    SMS attribution uses refcode patterns (txt*, sms*) to identify donations originating from SMS campaigns.
+                    {attributionMetadata?.refcodePatterns && (
+                      <span className="block mt-1 text-[hsl(var(--portal-text-muted))]">
+                        Patterns: {attributionMetadata.refcodePatterns.join(', ')}
+                      </span>
+                    )}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-0.5">
+            {totals.conversions > 0 ? (
+              <>
+                <span className="text-[hsl(var(--portal-success))] font-medium">{totals.conversions} donations</span> attributed to SMS • {formatCurrency(totals.raised)} raised
+              </>
+            ) : totals.sent > 0 ? (
+              <>
+                {formatNumber(totals.sent)} messages sent • No attributed donations yet in this period
+              </>
+            ) : (
+              <>No SMS activity found in this date range</>
+            )}
+          </p>
+        </div>
+      </div>
       {/* V3 KPI Cards with Period Comparison */}
       <motion.div
         className="grid grid-cols-2 md:grid-cols-5 gap-3"

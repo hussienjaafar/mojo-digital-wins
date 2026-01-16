@@ -278,6 +278,8 @@ export interface SMSMetricsData {
     previousStartDate: string;
     previousEndDate: string;
     generatedAt: string;
+    attributionMethod?: string;
+    refcodePatterns?: string[];
   };
 }
 
