@@ -12148,9 +12148,9 @@ export type Database = {
       }
       get_sms_metrics: {
         Args: {
-          p_end_date: string
+          p_end_date?: string
           p_organization_id: string
-          p_start_date: string
+          p_start_date?: string
         }
         Returns: Json
       }
