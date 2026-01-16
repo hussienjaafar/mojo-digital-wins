@@ -187,7 +187,26 @@ export const V3TimeHeatmap: React.FC<V3TimeHeatmapProps> = ({
         show: true,
         trigger: 'item',
         confine: true,
-        position: 'top',
+        position: function (point, params, dom, rect, size) {
+          const [x, y] = point;
+          const [tooltipW, tooltipH] = size.contentSize;
+          const [viewW] = size.viewSize;
+          
+          // Position above cursor with 20px gap
+          let top = y - tooltipH - 20;
+          
+          // If not enough space above, flip to below cursor
+          if (top < 0) {
+            top = y + 20;
+          }
+          
+          // Center horizontally, constrained to chart bounds
+          let left = x - tooltipW / 2;
+          if (left < 8) left = 8;
+          if (left + tooltipW > viewW - 8) left = viewW - tooltipW - 8;
+          
+          return [left, top];
+        },
         backgroundColor: 'hsl(var(--portal-bg-secondary) / 0.98)',
         borderColor: 'hsl(var(--portal-border))',
         borderWidth: 1,
