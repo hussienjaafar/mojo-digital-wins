@@ -5183,6 +5183,73 @@ export type Database = {
           },
         ]
       }
+      meta_capi_config: {
+        Row: {
+          created_at: string
+          events_failed: number
+          events_sent: number
+          id: string
+          is_enabled: boolean
+          last_error: string | null
+          last_event_at: string | null
+          organization_id: string
+          pixel_id: string
+          privacy_mode: string
+          test_event_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          events_failed?: number
+          events_sent?: number
+          id?: string
+          is_enabled?: boolean
+          last_error?: string | null
+          last_event_at?: string | null
+          organization_id: string
+          pixel_id: string
+          privacy_mode?: string
+          test_event_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          events_failed?: number
+          events_sent?: number
+          id?: string
+          is_enabled?: boolean
+          last_error?: string | null
+          last_event_at?: string | null
+          organization_id?: string
+          pixel_id?: string
+          privacy_mode?: string
+          test_event_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_capi_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_capi_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_capi_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       meta_creative_insights: {
         Row: {
           ad_id: string | null
@@ -12619,6 +12686,14 @@ export type Database = {
           topic_name: string
           topic_velocity: number
         }[]
+      }
+      update_capi_health_stats: {
+        Args: {
+          p_error?: string
+          p_organization_id: string
+          p_success: boolean
+        }
+        Returns: undefined
       }
       update_data_freshness: {
         Args: {
