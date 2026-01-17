@@ -1,11 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders, checkRateLimit, validateAuth } from "../_shared/security.ts";
+import { getCorsHeaders, checkRateLimit, validateAuth, decryptCredentials } from "../_shared/security.ts";
+import { META_CAPI_VERSION, buildCAPIEndpoint } from "../_shared/capi-utils.ts";
 
 const corsHeaders = getCorsHeaders();
-const PIXEL_ID = "1344961220416600";
-const API_VERSION = "v22.0";
+// REMOVED: Hardcoded PIXEL_ID - now fetched per-org from meta_capi_config
+// REMOVED: Global META_CONVERSIONS_API_TOKEN - now fetched per-org from client_api_credentials
 
 const META_CUSTOM_DATA_KEYS = new Set([
   'value', 'currency', 'content_type', 'content_ids', 'contents', 'num_items',
@@ -109,15 +110,6 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded' }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const accessToken = Deno.env.get('META_CONVERSIONS_API_TOKEN');
-    if (!accessToken) {
-      console.error('META_CONVERSIONS_API_TOKEN not configured');
-      return new Response(
-        JSON.stringify({ error: 'Conversions API not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -272,14 +264,77 @@ serve(async (req) => {
       conversionEvent.custom_data = metaCustomData;
     }
 
-    const apiUrl = `https://graph.facebook.com/${API_VERSION}/${PIXEL_ID}/events`;
+    // Fetch per-org CAPI configuration
+    let pixelId: string | null = null;
+    let accessToken: string | null = null;
+    let testEventCode: string | null = null;
+
+    if (organizationId) {
+      // Try to get per-org CAPI config
+      const { data: capiConfig } = await supabase
+        .from('meta_capi_config')
+        .select('pixel_id, test_event_code, is_enabled')
+        .eq('organization_id', organizationId)
+        .eq('is_enabled', true)
+        .maybeSingle();
+
+      if (capiConfig?.pixel_id) {
+        pixelId = capiConfig.pixel_id;
+        testEventCode = capiConfig.test_event_code;
+
+        // Fetch and decrypt per-org access token
+        const { data: creds } = await supabase
+          .from('client_api_credentials')
+          .select('encrypted_credentials')
+          .eq('organization_id', organizationId)
+          .eq('platform', 'meta_capi')
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (creds?.encrypted_credentials) {
+          try {
+            const decrypted = await decryptCredentials(creds.encrypted_credentials, organizationId);
+            accessToken = decrypted.access_token || null;
+          } catch (decryptError) {
+            console.warn('[meta-conversions] Failed to decrypt per-org token, falling back to global');
+          }
+        }
+      }
+    }
+
+    // Fallback to global token if per-org not available (backwards compatibility)
+    if (!accessToken) {
+      accessToken = Deno.env.get('META_CONVERSIONS_API_TOKEN') || null;
+    }
+
+    // Fallback to global pixel if per-org not available
+    if (!pixelId) {
+      pixelId = Deno.env.get('META_PIXEL_ID') || null;
+    }
+
+    if (!accessToken || !pixelId) {
+      console.error('[meta-conversions] No CAPI credentials available (per-org or global)');
+      return new Response(
+        JSON.stringify({ error: 'Conversions API not configured for this organization' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const apiUrl = buildCAPIEndpoint(pixelId);
+    const requestBody: Record<string, any> = {
+      data: [conversionEvent],
+      access_token: accessToken,
+    };
+
+    // Include test_event_code if configured
+    if (testEventCode) {
+      requestBody.test_event_code = testEventCode;
+    }
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: [conversionEvent],
-        access_token: accessToken,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     const result = await response.json();
@@ -318,6 +373,13 @@ serve(async (req) => {
         if (queueError) {
           console.error('[meta-conversions] Failed to enqueue retry:', queueError);
         }
+
+        // Update health stats (failure)
+        await supabase.rpc('update_capi_health_stats', {
+          p_organization_id: organizationId,
+          p_success: false,
+          p_error: JSON.stringify(result).substring(0, 500),
+        }).catch((e: any) => console.error('[meta-conversions] Failed to update health:', e.message));
       }
 
       return new Response(
@@ -332,6 +394,7 @@ serve(async (req) => {
         .update({
           status: 'sent',
           delivered_at: new Date().toISOString(),
+          pixel_id: pixelId,
           meta_response: {
             events_received: result.events_received,
             fbtrace_id: result.fbtrace_id,
@@ -341,6 +404,13 @@ serve(async (req) => {
         })
         .eq('organization_id', organizationId)
         .eq('event_id', eventId);
+
+      // Update health stats (success)
+      await supabase.rpc('update_capi_health_stats', {
+        p_organization_id: organizationId,
+        p_success: true,
+        p_error: null,
+      }).catch((e: any) => console.error('[meta-conversions] Failed to update health:', e.message));
     }
 
     if (organizationId && trendEventId) {

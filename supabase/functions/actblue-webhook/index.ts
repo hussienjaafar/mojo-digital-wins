@@ -1,5 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import {
+  generateDedupeKey,
+  hashUserDataForStorage,
+  hashSHA256,
+  calculateMatchScore,
+  getMatchQualityLabel,
+} from "../_shared/capi-utils.ts";
 
 // SECURITY: Restrict CORS to known origins
 const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
@@ -535,7 +542,36 @@ serve(async (req) => {
     }
 
     console.log('[ACTBLUE] Transaction stored successfully:', lineitemId, '| Amount:', amount);
-    
+
+    // === META CAPI OUTBOX ENQUEUE ===
+    // Enqueue conversion event for server-side tracking (non-blocking, non-fatal)
+    try {
+      await enqueueCAPIEvent(supabase, {
+        organization_id,
+        transactionId: String(lineitemId),
+        transactionType,
+        donor: {
+          email: safeString(donor.email) || undefined,
+          firstname: safeString(donor.firstname) || undefined,
+          lastname: safeString(donor.lastname) || undefined,
+          phone: safeString(donor.phone) || undefined,
+          city: safeString(donor.city) || undefined,
+          state: safeString(donor.state) || undefined,
+          zip: safeString(donor.zip) || undefined,
+          country: safeString(donor.country) || undefined,
+        },
+        amount,
+        paidAt,
+        refcode,
+        fbclid,
+        clickId,
+        contributionForm: safeString(contribution.contributionForm) || undefined,
+      });
+    } catch (capiError: any) {
+      // Non-fatal: log but don't fail the webhook
+      console.error('[ACTBLUE] CAPI enqueue failed (non-fatal):', capiError?.message || capiError);
+    }
+
     // Update webhook log with success
     await updateWebhookLog(supabase, webhookLogId, 'success', organization_id, null, {
       transaction_id: String(lineitemId),
@@ -581,7 +617,7 @@ async function updateWebhookLog(
   metadata?: any
 ) {
   if (!logId) return;
-  
+
   await supabase.from('webhook_logs').update({
     processing_status: status,
     organization_id: organizationId,
@@ -591,4 +627,181 @@ async function updateWebhookLog(
   }).eq('id', logId).then(({ error: updateError }: any) => {
     if (updateError) console.error('[ACTBLUE] Failed to update webhook log:', updateError);
   });
+}
+
+// ============= META CAPI OUTBOX ENQUEUE =============
+// Enqueues donation events to Meta Conversions API outbox for server-side tracking
+
+interface EnqueueCAPIParams {
+  organization_id: string;
+  transactionId: string;
+  transactionType: string;
+  donor: {
+    email?: string;
+    firstname?: string;
+    lastname?: string;
+    phone?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
+  amount: number;
+  paidAt: string;
+  refcode?: string | null;
+  fbclid?: string | null;
+  clickId?: string | null;
+  contributionForm?: string | null;
+}
+
+async function enqueueCAPIEvent(
+  supabase: any,
+  params: EnqueueCAPIParams
+): Promise<void> {
+  const {
+    organization_id,
+    transactionId,
+    transactionType,
+    donor,
+    amount,
+    paidAt,
+    refcode,
+    fbclid,
+    clickId,
+    contributionForm,
+  } = params;
+
+  // Only enqueue for donation events (not refunds/cancellations)
+  if (transactionType !== 'donation') {
+    console.log('[CAPI] Skipping non-donation transaction type:', transactionType);
+    return;
+  }
+
+  // Check if CAPI is enabled for this org
+  const { data: capiConfig, error: configError } = await supabase
+    .from('meta_capi_config')
+    .select('is_enabled, actblue_owns_donation_complete, donation_event_name, pixel_id, privacy_mode')
+    .eq('organization_id', organization_id)
+    .maybeSingle();
+
+  if (configError) {
+    console.error('[CAPI] Error fetching config:', configError.message);
+    return;
+  }
+
+  if (!capiConfig || !capiConfig.is_enabled) {
+    // CAPI not configured or not enabled for this org - silent skip
+    return;
+  }
+
+  // Skip if ActBlue owns donation CAPI events (to prevent double-counting)
+  if (capiConfig.actblue_owns_donation_complete) {
+    console.log('[CAPI] ActBlue owns donation CAPI for org:', organization_id);
+    return;
+  }
+
+  const eventName = capiConfig.donation_event_name || 'Purchase';
+  const dedupeKey = generateDedupeKey(eventName, organization_id, transactionId);
+
+  // Generate deterministic event_id from dedupe_key
+  const eventId = crypto.randomUUID();
+
+  // Lookup fbp/fbc from attribution touchpoints if not in payload
+  let fbp: string | null = null;
+  let fbc: string | null = fbclid || clickId || null;
+
+  if (donor.email) {
+    const { data: touchpoint } = await supabase
+      .from('attribution_touchpoints')
+      .select('metadata')
+      .eq('organization_id', organization_id)
+      .eq('donor_email', donor.email)
+      .order('occurred_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (touchpoint?.metadata) {
+      fbp = touchpoint.metadata.fbp || fbp;
+      fbc = touchpoint.metadata.fbc || touchpoint.metadata.fbclid || fbc;
+    }
+  }
+
+  // SECURITY: Pre-hash all PII before storing in database
+  // This ensures NO plaintext PII is stored in meta_conversion_events
+  const userDataHashed = await hashUserDataForStorage({
+    email: donor.email,
+    phone: donor.phone,
+    fn: donor.firstname,
+    ln: donor.lastname,
+    city: donor.city,
+    state: donor.state,
+    zip: donor.zip,
+    country: donor.country,
+  });
+
+  // Generate external_id from email hash (if email exists)
+  let externalId: string | null = null;
+  if (donor.email) {
+    externalId = await hashSHA256(donor.email.toLowerCase().trim());
+  }
+
+  // Calculate match score for debugging (based on field presence)
+  // Note: Score is capped at 40 if neither email nor phone is present
+  const matchScore = calculateMatchScore(userDataHashed, {
+    fbp,
+    fbc,
+    external_id: externalId,
+  });
+  // Pass userDataHashed to enforce safety cap on label
+  const matchQuality = getMatchQualityLabel(matchScore, userDataHashed);
+
+  // Build custom_data for the event
+  const customData = {
+    value: amount,
+    currency: 'USD',
+    content_type: 'donation',
+    order_id: transactionId,
+  };
+
+  // Build event source URL
+  const eventSourceUrl = contributionForm
+    ? `https://secure.actblue.com/donate/${contributionForm}`
+    : null;
+
+  // Insert into meta_conversion_events (the outbox)
+  const { error: insertError } = await supabase
+    .from('meta_conversion_events')
+    .upsert({
+      organization_id,
+      event_id: eventId,
+      event_name: eventName,
+      event_time: paidAt,
+      event_source_url: eventSourceUrl,
+      dedupe_key: dedupeKey,
+      source_type: 'actblue_webhook',
+      source_id: transactionId,
+      user_data_hashed: userDataHashed,
+      custom_data: customData,
+      refcode,
+      fbp,
+      fbc,
+      external_id: externalId,
+      pixel_id: capiConfig.pixel_id,
+      match_score: matchScore,
+      match_quality: matchQuality,
+      status: 'pending',
+      retry_count: 0,
+      max_attempts: 5,
+      next_retry_at: new Date().toISOString(),
+    }, {
+      onConflict: 'organization_id,dedupe_key',
+      ignoreDuplicates: true,  // Skip if already queued (idempotent)
+    });
+
+  if (insertError) {
+    // Log but don't fail the webhook - CAPI is non-critical
+    console.error('[CAPI] Failed to enqueue event:', insertError.message);
+  } else {
+    console.log('[CAPI] Enqueued donation event:', dedupeKey);
+  }
 }
