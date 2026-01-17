@@ -317,6 +317,12 @@ verify_jwt = false
 [functions.test-meta-capi]
 verify_jwt = false
 
+[functions.test-capi-enrichment]
+verify_jwt = false
+
+[functions.backfill-actblue-conversions]
+verify_jwt = false
+
 # DELETED FUNCTIONS (removed as part of attribution hardening):
 # - populate-attribution: Dead code (click_id/fbclid tables don't exist)
 # - backfill-attribution: Circular dependency, reads/writes same table
