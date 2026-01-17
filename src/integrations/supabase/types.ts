@@ -5310,6 +5310,7 @@ export type Database = {
           fbc: string | null
           fbp: string | null
           id: string
+          is_enrichment_only: boolean
           last_error: string | null
           match_quality: string | null
           match_score: number | null
@@ -5345,6 +5346,7 @@ export type Database = {
           fbc?: string | null
           fbp?: string | null
           id?: string
+          is_enrichment_only?: boolean
           last_error?: string | null
           match_quality?: string | null
           match_score?: number | null
@@ -5380,6 +5382,7 @@ export type Database = {
           fbc?: string | null
           fbp?: string | null
           id?: string
+          is_enrichment_only?: boolean
           last_error?: string | null
           match_quality?: string | null
           match_score?: number | null

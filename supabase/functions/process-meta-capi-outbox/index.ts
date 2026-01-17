@@ -42,6 +42,7 @@ interface OutboxEvent {
   external_id: string | null;
   pixel_id: string | null;
   retry_count: number;
+  is_enrichment_only: boolean;  // When true, ActBlue owns primary conversion; we send additional matching data
 }
 
 interface OrgConfig {
@@ -92,7 +93,8 @@ serve(async (req) => {
         fbc,
         external_id,
         pixel_id,
-        retry_count
+        retry_count,
+        is_enrichment_only
       `)
       .in('status', ['pending', 'failed'])
       .lte('next_retry_at', now)
@@ -305,7 +307,8 @@ async function sendEventToMeta(
       // Update org health (success)
       await updateOrgHealth(supabase, orgId, true, null);
 
-      console.log(`[CAPI-OUTBOX] Sent event ${event.event_id} to pixel ${pixelId}`);
+      const eventType = event.is_enrichment_only ? 'enrichment' : 'primary';
+      console.log(`[CAPI-OUTBOX] Sent ${eventType} event ${event.event_id} to pixel ${pixelId}`);
       return true;
     } else {
       // Failure - schedule retry
