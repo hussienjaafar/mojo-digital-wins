@@ -5295,6 +5295,9 @@ export type Database = {
       meta_conversion_events: {
         Row: {
           action_source: string | null
+          ad_id: string | null
+          ad_set_id: string | null
+          campaign_id: string | null
           created_at: string | null
           custom_data: Json | null
           dedupe_key: string | null
@@ -5308,19 +5311,28 @@ export type Database = {
           fbp: string | null
           id: string
           last_error: string | null
+          match_quality: string | null
+          match_score: number | null
+          max_attempts: number | null
           meta_response: Json | null
           next_retry_at: string | null
           organization_id: string
           pixel_id: string
+          refcode: string | null
           retry_count: number | null
           source_id: string | null
           source_type: string | null
           status: string
+          trend_event_id: string | null
           updated_at: string | null
           user_data_hashed: Json | null
+          user_id: string | null
         }
         Insert: {
           action_source?: string | null
+          ad_id?: string | null
+          ad_set_id?: string | null
+          campaign_id?: string | null
           created_at?: string | null
           custom_data?: Json | null
           dedupe_key?: string | null
@@ -5334,19 +5346,28 @@ export type Database = {
           fbp?: string | null
           id?: string
           last_error?: string | null
+          match_quality?: string | null
+          match_score?: number | null
+          max_attempts?: number | null
           meta_response?: Json | null
           next_retry_at?: string | null
           organization_id: string
           pixel_id: string
+          refcode?: string | null
           retry_count?: number | null
           source_id?: string | null
           source_type?: string | null
           status?: string
+          trend_event_id?: string | null
           updated_at?: string | null
           user_data_hashed?: Json | null
+          user_id?: string | null
         }
         Update: {
           action_source?: string | null
+          ad_id?: string | null
+          ad_set_id?: string | null
+          campaign_id?: string | null
           created_at?: string | null
           custom_data?: Json | null
           dedupe_key?: string | null
@@ -5360,16 +5381,22 @@ export type Database = {
           fbp?: string | null
           id?: string
           last_error?: string | null
+          match_quality?: string | null
+          match_score?: number | null
+          max_attempts?: number | null
           meta_response?: Json | null
           next_retry_at?: string | null
           organization_id?: string
           pixel_id?: string
+          refcode?: string | null
           retry_count?: number | null
           source_id?: string | null
           source_type?: string | null
           status?: string
+          trend_event_id?: string | null
           updated_at?: string | null
           user_data_hashed?: Json | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -5388,6 +5415,85 @@ export type Database = {
           },
           {
             foreignKeyName: "meta_conversion_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      meta_conversion_retry_queue: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          custom_data: Json | null
+          event_id: string
+          event_name: string
+          event_source_url: string | null
+          event_time: string
+          id: string
+          last_error: string | null
+          max_attempts: number
+          next_retry_at: string
+          organization_id: string
+          pixel_id: string | null
+          status: string
+          updated_at: string
+          user_data: Json | null
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          custom_data?: Json | null
+          event_id: string
+          event_name: string
+          event_source_url?: string | null
+          event_time?: string
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          next_retry_at?: string
+          organization_id: string
+          pixel_id?: string | null
+          status?: string
+          updated_at?: string
+          user_data?: Json | null
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          custom_data?: Json | null
+          event_id?: string
+          event_name?: string
+          event_source_url?: string | null
+          event_time?: string
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          next_retry_at?: string
+          organization_id?: string
+          pixel_id?: string | null
+          status?: string
+          updated_at?: string
+          user_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_conversion_retry_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_conversion_retry_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_conversion_retry_queue_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_integration_summary"
