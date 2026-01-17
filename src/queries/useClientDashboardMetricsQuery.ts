@@ -6,6 +6,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { logger } from "@/lib/logger";
 import { DEFAULT_ORG_TIMEZONE } from "@/lib/metricDefinitions";
 import type { DailyRollupRow, PeriodSummary } from "./useActBlueDailyRollupQuery";
+import { detectChannelWithConfidence, type AttributionChannel } from "@/utils/channelDetection";
 
 export interface DashboardKPIs {
   totalRaised: number;
@@ -899,24 +900,28 @@ async function fetchDashboardMetrics(
   let unattributedDonations = 0;
 
   if (donationAttributions.length > 0) {
-    // donation_attribution does not provide attributed_platform; infer it.
-    const inferredPlatform = (a: any): 'meta' | 'sms' | null => {
-      const method = String(a.attribution_method || '').toLowerCase();
-      if (method.includes('sms')) return 'sms';
-      if (method.includes('meta')) return 'meta';
-      // Heuristic: if we have Meta IDs, treat as meta
-      if (a.attributed_campaign_id || a.attributed_ad_id || a.attributed_creative_id) return 'meta';
-      // Heuristic: refcodes starting with "TXT" are SMS campaigns
-      const refcode = String(a.refcode || '').toLowerCase();
-      if (refcode.startsWith('txt')) return 'sms';
-      return null;
+    // Use unified channel detection from channelDetection.ts
+    // This implements the 4-tier Attribution Waterfall with consistent pattern matching
+    // GLOBAL RULES - applies to ALL organizations
+    const getAttributionChannel = (a: any): AttributionChannel => {
+      const result = detectChannelWithConfidence({
+        attribution_method: a.attribution_method,
+        attributed_campaign_id: a.attributed_campaign_id,
+        attributed_ad_id: a.attributed_ad_id,
+        attributed_creative_id: a.attributed_creative_id,
+        refcode: a.refcode,
+        // Note: donation_attribution doesn't have click_id/fbclid, those are in transactions
+      });
+      return result.channel;
     };
 
-    metaDonations = donationAttributions.filter((a: any) => inferredPlatform(a) === 'meta').length;
-    smsDonations = donationAttributions.filter((a: any) => inferredPlatform(a) === 'sms').length;
+    metaDonations = donationAttributions.filter((a: any) => getAttributionChannel(a) === 'meta').length;
+    smsDonations = donationAttributions.filter((a: any) => getAttributionChannel(a) === 'sms').length;
+    // Email attribution (new - was previously missed)
+    const emailDonations = donationAttributions.filter((a: any) => getAttributionChannel(a) === 'email').length;
     unattributedDonations = donationAttributions.filter((a: any) => {
-      const p = inferredPlatform(a);
-      return !p || a.attribution_method === 'unattributed';
+      const channel = getAttributionChannel(a);
+      return channel === 'unattributed' || a.attribution_method === 'unattributed';
     }).length;
 
     // Log channel breakdown for observability
@@ -932,22 +937,25 @@ async function fetchDashboardMetrics(
       logger.warn('SMS campaigns found but no SMS-attributed donations - check phone_hash population');
     }
   } else {
-    // Fallback: use transaction-level fields
-    metaDonations = donations.filter((d: any) =>
-      d.click_id || d.fbclid || (d.source_campaign && d.source_campaign.toLowerCase().includes('meta'))
-    ).length;
+    // Fallback: use unified channel detection on transaction-level fields
+    // This ensures consistent pattern matching even when donation_attribution is empty
+    // GLOBAL RULES - applies to ALL organizations
+    const getTransactionChannel = (d: any): AttributionChannel => {
+      const result = detectChannelWithConfidence({
+        refcode: d.refcode,
+        source_campaign: d.source_campaign,
+        click_id: d.click_id,
+        fbclid: d.fbclid,
+        contribution_form: d.contribution_form,
+      });
+      return result.channel;
+    };
 
-    // SMS attribution fallback: check if contribution_form contains "sms" (e.g., mltcosms)
-    smsDonations = donations.filter((d: any) => {
-      const form = String(d.contribution_form || '').toLowerCase();
-      return form.includes('sms');
-    }).length;
+    metaDonations = donations.filter((d: any) => getTransactionChannel(d) === 'meta').length;
+    smsDonations = donations.filter((d: any) => getTransactionChannel(d) === 'sms').length;
+    unattributedDonations = donations.filter((d: any) => getTransactionChannel(d) === 'unattributed').length;
 
-    unattributedDonations = donations.filter((d: any) =>
-      !d.refcode && !d.source_campaign && !d.click_id && !d.fbclid
-    ).length;
-
-    logger.warn('Channel breakdown fallback: using transaction-level fields (SMS inferred via contribution_form)');
+    logger.warn('Channel breakdown fallback: using unified channel detection on transaction fields');
   }
 
   // Anything not in meta/sms/unattributed is "Other" (refcode without platform mapping, etc.)
