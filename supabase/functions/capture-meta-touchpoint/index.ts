@@ -38,7 +38,7 @@ serve(async (req) => {
     const body = await req.json();
     const {
       organization_id,
-      touchpoint_type = 'landing_page',
+      touchpoint_type: rawType,
       email,
       session_id,
       fbp,
@@ -51,6 +51,20 @@ serve(async (req) => {
       landing_url,
       referrer,
     } = body;
+
+    // Map incoming touchpoint_type to allowed values
+    // Allowed: 'meta_ad', 'sms', 'email', 'organic', 'other'
+    const ALLOWED_TYPES = ['meta_ad', 'sms', 'email', 'organic', 'other'];
+    let touchpoint_type = 'meta_ad'; // Default for landing page captures
+    if (rawType && ALLOWED_TYPES.includes(rawType)) {
+      touchpoint_type = rawType;
+    } else if (utm_source?.toLowerCase().includes('facebook') || fbp || fbc || fbclid) {
+      touchpoint_type = 'meta_ad';
+    } else if (utm_source?.toLowerCase().includes('email')) {
+      touchpoint_type = 'email';
+    } else if (utm_source) {
+      touchpoint_type = 'other';
+    }
 
     // Validate organization_id is required
     if (!organization_id) {

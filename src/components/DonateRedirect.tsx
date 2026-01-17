@@ -80,10 +80,11 @@ async function captureMetaIdentifiers(
     });
     
     // Store in attribution touchpoints
+    // touchpoint_type: 'meta_ad' is auto-detected by edge function based on presence of fbp/fbc/fbclid
     const { data, error } = await supabase.functions.invoke('capture-meta-touchpoint', {
       body: {
         organization_id: organizationId,
-        touchpoint_type: 'landing_page',
+        touchpoint_type: 'meta_ad', // Will be validated server-side
         email: params.email || null,
         session_id: sessionId,
         fbp: fbp || null,
