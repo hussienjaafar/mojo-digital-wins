@@ -115,7 +115,47 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
     }
   }, [config, credsExist]);
 
-  // Test connection - calls edge function to properly test with stored credentials
+  /**
+   * Parse Meta API errors into user-friendly messages
+   */
+  const parseMetaError = (errorMessage: string): { message: string; guidance: string } => {
+    const lowerMsg = errorMessage.toLowerCase();
+    
+    if (lowerMsg.includes('missing permission') || lowerMsg.includes('(#100)')) {
+      return {
+        message: 'Missing required permission',
+        guidance: 'The token needs "ads_management" permission. Generate a System User token from Meta Business Manager.',
+      };
+    }
+    
+    if (lowerMsg.includes('invalid oauth access token') || lowerMsg.includes('malformed')) {
+      return {
+        message: 'Invalid or expired token',
+        guidance: 'Generate a new token from Meta Events Manager.',
+      };
+    }
+    
+    if (lowerMsg.includes('invalid pixel_id') || lowerMsg.includes('(#803)')) {
+      return {
+        message: 'Pixel not found',
+        guidance: 'Verify the Pixel ID in Meta Events Manager.',
+      };
+    }
+    
+    if (lowerMsg.includes('expired')) {
+      return {
+        message: 'Token expired',
+        guidance: 'Generate a new long-lived token from Meta Business Manager.',
+      };
+    }
+    
+    return {
+      message: errorMessage,
+      guidance: 'Check token permissions and Pixel ID.',
+    };
+  };
+
+  // Test connection by sending a test event (requires ads_management permission)
   const handleTest = async () => {
     if (!accessToken && !hasExistingToken) {
       toast({ title: 'Missing token', description: 'Please enter an access token', variant: 'destructive' });
@@ -128,21 +168,46 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
 
     setIsTesting(true);
     try {
-      // If user provided a new token, test directly with it
+      // If user provided a new token, test directly by sending a test event
       if (accessToken) {
+        const testEventCode = `TEST_${Date.now()}`;
+        const eventTime = Math.floor(Date.now() / 1000);
+        const eventId = `test_${crypto.randomUUID()}`;
+
+        const testPayload = {
+          data: [{
+            event_name: 'PageView',
+            event_time: eventTime,
+            event_id: eventId,
+            action_source: 'website',
+            user_data: {
+              client_ip_address: '0.0.0.0',
+              client_user_agent: 'CAPI-Test/1.0',
+            },
+          }],
+          test_event_code: testEventCode,
+        };
+
         const response = await fetch(
-          `https://graph.facebook.com/v22.0/${pixelId}?fields=name&access_token=${accessToken}`
+          `https://graph.facebook.com/v22.0/${pixelId}/events?access_token=${accessToken}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(testPayload),
+          }
         );
 
-        if (response.ok) {
-          const data = await response.json();
+        const result = await response.json();
+
+        if (response.ok && result.events_received >= 1) {
           toast({
             title: 'Connection successful',
-            description: `Connected to pixel: ${data.name || pixelId}`,
+            description: `CAPI verified! Test event received by Meta.`,
           });
         } else {
-          const error = await response.json();
-          throw new Error(error.error?.message || 'Connection failed');
+          const rawError = result.error?.message || 'Meta API did not accept the test event';
+          const { message, guidance } = parseMetaError(rawError);
+          throw new Error(`${message}. ${guidance}`);
         }
       } else {
         // Use stored credentials via edge function
@@ -158,16 +223,21 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
         if (data?.success) {
           toast({
             title: 'Connection successful',
-            description: data.message || `Connected to pixel: ${pixelId}`,
+            description: data.message || `CAPI verified for pixel: ${pixelId}`,
           });
         } else {
-          throw new Error(data?.error || 'Connection test failed');
+          // Edge function returns parsed error with guidance
+          const errorMsg = data?.guidance 
+            ? `${data.error}. ${data.guidance}`
+            : data?.error || 'Connection test failed';
+          throw new Error(errorMsg);
         }
       }
     } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
       toast({
         title: 'Connection failed',
-        description: e instanceof Error ? e.message : 'Unknown error',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
