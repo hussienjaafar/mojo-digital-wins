@@ -694,17 +694,27 @@ async function enqueueCAPIEvent(
     return;
   }
 
-  // Skip if ActBlue owns donation CAPI events (to prevent double-counting)
-  if (capiConfig.actblue_owns_donation_complete) {
-    console.log('[CAPI] ActBlue owns donation CAPI for org:', organization_id);
-    return;
-  }
+  // Determine if this is an enrichment-only event (ActBlue owns primary conversion tracking)
+  // When actblue_owns_donation_complete = true, we still send the event to Meta with 
+  // additional matching data (phone, name, address), using a deterministic event_id 
+  // derived from the transaction so Meta can deduplicate via external_id/fbp/fbc.
+  const isEnrichmentOnly = capiConfig.actblue_owns_donation_complete === true;
 
   const eventName = capiConfig.donation_event_name || 'Purchase';
   const dedupeKey = generateDedupeKey(eventName, organization_id, transactionId);
 
-  // Generate deterministic event_id from dedupe_key
-  const eventId = crypto.randomUUID();
+  // Generate event_id:
+  // - For enrichment events: Use deterministic ID from org+transaction so if ActBlue 
+  //   sends the same transaction, Meta can potentially match via external_id/fbp/fbc
+  // - For primary events: Use random UUID (we own the conversion tracking)
+  let eventId: string;
+  if (isEnrichmentOnly) {
+    // Deterministic event_id for potential deduplication
+    eventId = await hashSHA256(`enrichment:${organization_id}:${transactionId}`);
+    console.log('[CAPI] Enrichment mode - sending additional matching data for:', transactionId);
+  } else {
+    eventId = crypto.randomUUID();
+  }
 
   // Lookup fbp/fbc from attribution touchpoints if not in payload
   let fbp: string | null = null;
@@ -789,6 +799,7 @@ async function enqueueCAPIEvent(
       pixel_id: capiConfig.pixel_id,
       match_score: matchScore,
       match_quality: matchQuality,
+      is_enrichment_only: isEnrichmentOnly,
       status: 'pending',
       retry_count: 0,
       max_attempts: 5,
@@ -802,6 +813,7 @@ async function enqueueCAPIEvent(
     // Log but don't fail the webhook - CAPI is non-critical
     console.error('[CAPI] Failed to enqueue event:', insertError.message);
   } else {
-    console.log('[CAPI] Enqueued donation event:', dedupeKey);
+    const eventType = isEnrichmentOnly ? 'enrichment' : 'primary';
+    console.log(`[CAPI] Enqueued ${eventType} donation event:`, dedupeKey);
   }
 }
