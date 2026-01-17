@@ -5185,45 +5185,87 @@ export type Database = {
       }
       meta_capi_config: {
         Row: {
+          actblue_integration_enabled: boolean | null
+          actblue_owns_donation_complete: boolean | null
+          consecutive_failures: number | null
           created_at: string
+          donation_event_name: string | null
           events_failed: number
           events_sent: number
+          hash_address: boolean | null
+          hash_email: boolean | null
+          hash_name: boolean | null
+          hash_phone: boolean | null
           id: string
           is_enabled: boolean
           last_error: string | null
           last_event_at: string | null
+          last_send_at: string | null
+          last_send_status: string | null
+          last_success_at: string | null
           organization_id: string
           pixel_id: string
           privacy_mode: string
+          recurring_event_name: string | null
           test_event_code: string | null
+          total_events_failed: number | null
+          total_events_sent: number | null
           updated_at: string
         }
         Insert: {
+          actblue_integration_enabled?: boolean | null
+          actblue_owns_donation_complete?: boolean | null
+          consecutive_failures?: number | null
           created_at?: string
+          donation_event_name?: string | null
           events_failed?: number
           events_sent?: number
+          hash_address?: boolean | null
+          hash_email?: boolean | null
+          hash_name?: boolean | null
+          hash_phone?: boolean | null
           id?: string
           is_enabled?: boolean
           last_error?: string | null
           last_event_at?: string | null
+          last_send_at?: string | null
+          last_send_status?: string | null
+          last_success_at?: string | null
           organization_id: string
           pixel_id: string
           privacy_mode?: string
+          recurring_event_name?: string | null
           test_event_code?: string | null
+          total_events_failed?: number | null
+          total_events_sent?: number | null
           updated_at?: string
         }
         Update: {
+          actblue_integration_enabled?: boolean | null
+          actblue_owns_donation_complete?: boolean | null
+          consecutive_failures?: number | null
           created_at?: string
+          donation_event_name?: string | null
           events_failed?: number
           events_sent?: number
+          hash_address?: boolean | null
+          hash_email?: boolean | null
+          hash_name?: boolean | null
+          hash_phone?: boolean | null
           id?: string
           is_enabled?: boolean
           last_error?: string | null
           last_event_at?: string | null
+          last_send_at?: string | null
+          last_send_status?: string | null
+          last_success_at?: string | null
           organization_id?: string
           pixel_id?: string
           privacy_mode?: string
+          recurring_event_name?: string | null
           test_event_code?: string | null
+          total_events_failed?: number | null
+          total_events_sent?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -5245,6 +5287,109 @@ export type Database = {
             foreignKeyName: "meta_capi_config_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: true
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      meta_conversion_events: {
+        Row: {
+          action_source: string | null
+          created_at: string | null
+          custom_data: Json | null
+          dedupe_key: string | null
+          delivered_at: string | null
+          event_id: string
+          event_name: string
+          event_source_url: string | null
+          event_time: number
+          external_id: string | null
+          fbc: string | null
+          fbp: string | null
+          id: string
+          last_error: string | null
+          meta_response: Json | null
+          next_retry_at: string | null
+          organization_id: string
+          pixel_id: string
+          retry_count: number | null
+          source_id: string | null
+          source_type: string | null
+          status: string
+          updated_at: string | null
+          user_data_hashed: Json | null
+        }
+        Insert: {
+          action_source?: string | null
+          created_at?: string | null
+          custom_data?: Json | null
+          dedupe_key?: string | null
+          delivered_at?: string | null
+          event_id: string
+          event_name: string
+          event_source_url?: string | null
+          event_time: number
+          external_id?: string | null
+          fbc?: string | null
+          fbp?: string | null
+          id?: string
+          last_error?: string | null
+          meta_response?: Json | null
+          next_retry_at?: string | null
+          organization_id: string
+          pixel_id: string
+          retry_count?: number | null
+          source_id?: string | null
+          source_type?: string | null
+          status?: string
+          updated_at?: string | null
+          user_data_hashed?: Json | null
+        }
+        Update: {
+          action_source?: string | null
+          created_at?: string | null
+          custom_data?: Json | null
+          dedupe_key?: string | null
+          delivered_at?: string | null
+          event_id?: string
+          event_name?: string
+          event_source_url?: string | null
+          event_time?: number
+          external_id?: string | null
+          fbc?: string | null
+          fbp?: string | null
+          id?: string
+          last_error?: string | null
+          meta_response?: Json | null
+          next_retry_at?: string | null
+          organization_id?: string
+          pixel_id?: string
+          retry_count?: number | null
+          source_id?: string | null
+          source_type?: string | null
+          status?: string
+          updated_at?: string | null
+          user_data_hashed?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_conversion_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_conversion_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_conversion_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
             referencedRelation: "v_integration_summary"
             referencedColumns: ["organization_id"]
           },

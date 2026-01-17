@@ -175,6 +175,28 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
     }
   };
 
+  // Helper to parse Supabase errors with actionable messages
+  const getErrorMessage = (error: unknown): string => {
+    if (!error) return 'Unknown error';
+    const err = error as { code?: string; message?: string; details?: string };
+    
+    // Handle specific constraint violations
+    if (err.code === '23514') {
+      if (err.message?.includes('platform_check')) {
+        return 'Database migration required: meta_capi platform not enabled. Please contact support.';
+      }
+      return `Constraint violation: ${err.details || err.message}`;
+    }
+    if (err.code === '23505') {
+      return 'A configuration already exists. Updating instead...';
+    }
+    if (err.code === '42P01') {
+      return 'Required database table not found. Please ensure migrations are applied.';
+    }
+    
+    return err.message || 'Unknown error occurred';
+  };
+
   // Save configuration
   const handleSave = async () => {
     if (!accessToken && !hasExistingToken) {
@@ -187,9 +209,13 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
     }
 
     setIsSaving(true);
+    let credentialsSaved = false;
+    let configSaved = false;
+    
     try {
-      // Save credentials if new token provided
+      // Step 1: Save credentials if new token provided
       if (accessToken) {
+        console.log('[CAPI] Saving credentials for org:', organizationId);
         const { error: credError } = await supabase
           .from('client_api_credentials')
           .upsert({
@@ -206,10 +232,18 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
             last_test_status: 'success',
           }, { onConflict: 'organization_id,platform' });
 
-        if (credError) throw credError;
+        if (credError) {
+          console.error('[CAPI] Credential save error:', credError);
+          throw credError;
+        }
+        credentialsSaved = true;
+        console.log('[CAPI] Credentials saved successfully');
+      } else {
+        credentialsSaved = true; // Using existing credentials
       }
 
-      // Save config - use any to bypass type checking
+      // Step 2: Save config
+      console.log('[CAPI] Saving config for org:', organizationId);
       const { error: configError } = await (supabase as any)
         .from('meta_capi_config')
         .upsert({
@@ -223,32 +257,52 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
           updated_at: new Date().toISOString(),
         }, { onConflict: 'organization_id' });
 
-      if (configError) throw configError;
+      if (configError) {
+        console.error('[CAPI] Config save error:', configError);
+        throw configError;
+      }
+      configSaved = true;
+      console.log('[CAPI] Config saved successfully');
 
-      // Audit log
-      await supabase.rpc('log_admin_action', {
-        _action_type: 'configure_capi',
-        _table_affected: 'meta_capi_config',
-        _record_id: null,
-        _old_value: null,
-        _new_value: {
-          organization_id: organizationId,
-          pixel_id: pixelId,
-          privacy_mode: privacyMode,
-          actblue_owns_donation: actBlueOwnsDonation,
-        },
-      });
+      // Step 3: Audit log (non-blocking)
+      try {
+        await supabase.rpc('log_admin_action', {
+          _action_type: 'configure_capi',
+          _table_affected: 'meta_capi_config',
+          _record_id: null,
+          _old_value: null,
+          _new_value: {
+            organization_id: organizationId,
+            pixel_id: pixelId,
+            privacy_mode: privacyMode,
+            actblue_owns_donation: actBlueOwnsDonation,
+          },
+        });
+      } catch (auditErr) {
+        console.warn('[CAPI] Audit log failed:', auditErr);
+      }
 
-      toast({ title: 'Settings saved', description: 'Meta CAPI is now enabled for this organization.' });
+      toast({ title: 'CAPI Enabled', description: 'Meta Conversions API is now active for this organization.' });
       queryClient.invalidateQueries({ queryKey: ['capi-config', organizationId] });
       queryClient.invalidateQueries({ queryKey: ['capi-creds-exist', organizationId] });
       setHasExistingToken(true);
       setAccessToken(''); // Clear token from memory
       onSave?.();
     } catch (e) {
+      console.error('[CAPI] Save failed:', e);
+      const errorMessage = getErrorMessage(e);
+      
+      // Provide context about what succeeded/failed
+      let description = errorMessage;
+      if (credentialsSaved && !configSaved) {
+        description = `Credentials saved, but config failed: ${errorMessage}`;
+      } else if (!credentialsSaved) {
+        description = `Credentials failed: ${errorMessage}`;
+      }
+      
       toast({
         title: 'Save failed',
-        description: e instanceof Error ? e.message : 'Unknown error',
+        description,
         variant: 'destructive',
       });
     } finally {
