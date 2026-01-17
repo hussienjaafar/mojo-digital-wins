@@ -509,11 +509,17 @@ serve(async (req) => {
             // Handle edge_function job types - invoke the function named in the endpoint field
             if (job.job_type === 'edge_function' && job.endpoint) {
               console.log(`[SCHEDULER] Invoking edge function: ${job.endpoint}`);
-              const payload = job.payload ? JSON.parse(job.payload) : {};
-              const efResponse = await supabase.functions.invoke(job.endpoint, { body: payload });
+              const payload = job.payload ? (typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload) : {};
+              // CRITICAL: Pass cron secret so edge functions can authenticate via validateCronOrAdmin
+              const cronSecretForEdgeFunc = Deno.env.get('CRON_SECRET');
+              const efResponse = await supabase.functions.invoke(job.endpoint, { 
+                body: payload,
+                headers: cronSecretForEdgeFunc ? { 'x-cron-secret': cronSecretForEdgeFunc } : {}
+              });
               if (efResponse.error) throw new Error(efResponse.error.message);
               result = efResponse.data;
-              itemsProcessed = result?.processed || result?.attributions_created || result?.predictions_created || result?.journeys_created || 0;
+              itemsProcessed = result?.processed || result?.sent || result?.attributions_created || result?.predictions_created || result?.journeys_created || 0;
+              itemsCreated = result?.sent || result?.created || 0;
               break;
             }
             // Fallback for legacy 'attribution' job type

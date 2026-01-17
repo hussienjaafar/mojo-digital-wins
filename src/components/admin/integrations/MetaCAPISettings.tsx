@@ -185,6 +185,9 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
       if (err.message?.includes('platform_check')) {
         return 'Database migration required: meta_capi platform not enabled. Please contact support.';
       }
+      if (err.message?.includes('privacy_mode_check')) {
+        return 'Invalid privacy mode value. Please refresh the page and try again.';
+      }
       return `Constraint violation: ${err.details || err.message}`;
     }
     if (err.code === '23505') {
@@ -192,6 +195,9 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
     }
     if (err.code === '42P01') {
       return 'Required database table not found. Please ensure migrations are applied.';
+    }
+    if (err.code === '42501') {
+      return 'Permission denied. You may not have admin access.';
     }
     
     return err.message || 'Unknown error occurred';
