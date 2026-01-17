@@ -321,20 +321,20 @@ serve(async (req) => {
     }
 
     const apiUrl = buildCAPIEndpoint(pixelId);
-    const requestBody: Record<string, any> = {
+    const capiPayload: Record<string, any> = {
       data: [conversionEvent],
       access_token: accessToken,
     };
 
     // Include test_event_code if configured
     if (testEventCode) {
-      requestBody.test_event_code = testEventCode;
+      capiPayload.test_event_code = testEventCode;
     }
 
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify(capiPayload),
     });
 
     const result = await response.json();
@@ -375,11 +375,15 @@ serve(async (req) => {
         }
 
         // Update health stats (failure)
-        await supabase.rpc('update_capi_health_stats', {
-          p_organization_id: organizationId,
-          p_success: false,
-          p_error: JSON.stringify(result).substring(0, 500),
-        }).catch((e: any) => console.error('[meta-conversions] Failed to update health:', e.message));
+        try {
+          await supabase.rpc('update_capi_health_stats', {
+            p_organization_id: organizationId,
+            p_success: false,
+            p_error: JSON.stringify(result).substring(0, 500),
+          });
+        } catch (e: any) {
+          console.error('[meta-conversions] Failed to update health:', e.message);
+        }
       }
 
       return new Response(
@@ -406,11 +410,15 @@ serve(async (req) => {
         .eq('event_id', eventId);
 
       // Update health stats (success)
-      await supabase.rpc('update_capi_health_stats', {
-        p_organization_id: organizationId,
-        p_success: true,
-        p_error: null,
-      }).catch((e: any) => console.error('[meta-conversions] Failed to update health:', e.message));
+      try {
+        await supabase.rpc('update_capi_health_stats', {
+          p_organization_id: organizationId,
+          p_success: true,
+          p_error: null,
+        });
+      } catch (e: any) {
+        console.error('[meta-conversions] Failed to update health:', e.message);
+      }
     }
 
     if (organizationId && trendEventId) {
