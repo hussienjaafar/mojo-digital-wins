@@ -40,6 +40,7 @@ const AccessDenied = lazy(() => import("./pages/AccessDenied"));
 const BillDetail = lazy(() => import("./pages/BillDetail"));
 const MetaOAuthCallback = lazy(() => import("./pages/MetaOAuthCallback"));
 const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
+const Redirect = lazy(() => import("./pages/Redirect"));
 
 // Admin pages (lazy loaded - larger bundle)
 const Admin = lazy(() => import("./pages/Admin"));
@@ -95,6 +96,7 @@ const AppContent = () => {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/r" element={<Redirect />} />
             <Route path="/about" element={<About />} />
             <Route path="/services" element={<Services />} />
             <Route path="/case-studies" element={<CaseStudies />} />

@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
+  Link2,
 } from 'lucide-react';
 import {
   Sheet,
@@ -38,6 +39,7 @@ import {
 } from '@/types/integrations';
 import { IntegrationDetailCard } from './IntegrationDetailCard';
 import { MetaCAPISettings } from './MetaCAPISettings';
+import { CampaignURLGenerator } from './CampaignURLGenerator';
 
 interface IntegrationDetailDrawerProps {
   open: boolean;
@@ -97,6 +99,7 @@ export function IntegrationDetailDrawer({
   onAddIntegration,
 }: IntegrationDetailDrawerProps) {
   const [capiOpen, setCapiOpen] = useState(false);
+  const [urlGenOpen, setUrlGenOpen] = useState(false);
 
   if (!organization) return null;
 
@@ -253,6 +256,43 @@ export function IntegrationDetailDrawer({
                 <div className="rounded-lg border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))] p-4">
                   <MetaCAPISettings
                     organizationId={organization.organization_id}
+                    organizationName={organization.organization_name}
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Campaign URL Generator */}
+            <Collapsible open={urlGenOpen} onOpenChange={setUrlGenOpen}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between gap-2 h-auto py-3 px-4 text-left hover:bg-[hsl(var(--portal-bg-elevated))]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-green-500/10">
+                      <Link2 className="h-4 w-4 text-green-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-[hsl(var(--portal-text-primary))]">
+                        Campaign URL Generator
+                      </p>
+                      <p className="text-xs text-[hsl(var(--portal-text-muted))]">
+                        Generate tracking URLs for Meta ads
+                      </p>
+                    </div>
+                  </div>
+                  {urlGenOpen ? (
+                    <ChevronUp className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <div className="rounded-lg border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))] p-4">
+                  <CampaignURLGenerator
+                    organizationSlug={organization.organization_slug}
                     organizationName={organization.organization_name}
                   />
                 </div>

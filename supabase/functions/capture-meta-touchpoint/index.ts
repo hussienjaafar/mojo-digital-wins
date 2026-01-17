@@ -37,7 +37,8 @@ serve(async (req) => {
 
     const body = await req.json();
     const {
-      organization_id,
+      organization_id: rawOrgId,
+      organization_slug,
       touchpoint_type: rawType,
       email,
       session_id,
@@ -66,26 +67,47 @@ serve(async (req) => {
       touchpoint_type = 'other';
     }
 
-    // Validate organization_id is required
-    if (!organization_id) {
+    // Validate organization_id or organization_slug is required
+    if (!rawOrgId && !organization_slug) {
       return new Response(
-        JSON.stringify({ error: 'organization_id is required' }),
+        JSON.stringify({ error: 'organization_id or organization_slug is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate organization exists and is active
-    const { data: org, error: orgError } = await supabase
-      .from('client_organizations')
-      .select('id, name')
-      .eq('id', organization_id)
-      .eq('is_active', true)
-      .maybeSingle();
+    // Look up organization by ID or slug
+    let org;
+    let orgError;
+
+    if (rawOrgId) {
+      // Lookup by ID
+      const result = await supabase
+        .from('client_organizations')
+        .select('id, name, slug')
+        .eq('id', rawOrgId)
+        .eq('is_active', true)
+        .maybeSingle();
+      org = result.data;
+      orgError = result.error;
+    } else {
+      // Lookup by slug
+      const result = await supabase
+        .from('client_organizations')
+        .select('id, name, slug')
+        .eq('slug', organization_slug)
+        .eq('is_active', true)
+        .maybeSingle();
+      org = result.data;
+      orgError = result.error;
+    }
+
+    const organization_id = org?.id;
 
     if (orgError || !org) {
-      console.error('[CAPTURE] Invalid organization:', organization_id, orgError);
+      const identifier = rawOrgId || organization_slug;
+      console.error('[CAPTURE] Invalid organization:', identifier, orgError);
       return new Response(
-        JSON.stringify({ error: 'Invalid organization' }),
+        JSON.stringify({ error: 'Invalid organization', identifier }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -154,10 +176,15 @@ serve(async (req) => {
         success: true,
         touchpoint_id: touchpoint.id,
         capture_score: captureScore,
-        message: captureScore >= 40 
-          ? 'High-quality capture (fbp cookie found)' 
-          : captureScore >= 20 
-            ? 'Medium-quality capture (fbclid found)' 
+        organization: {
+          id: org.id,
+          name: org.name,
+          slug: org.slug,
+        },
+        message: captureScore >= 40
+          ? 'High-quality capture (fbp cookie found)'
+          : captureScore >= 20
+            ? 'Medium-quality capture (fbclid found)'
             : 'Low-quality capture (no Meta identifiers)',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
