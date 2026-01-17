@@ -998,6 +998,95 @@ export type Database = {
         }
         Relationships: []
       }
+      attributed_donations: {
+        Row: {
+          ad_id: string | null
+          amount: number
+          attributed_platform: string
+          attribution_confidence: number
+          attribution_method: string
+          campaign_id: string | null
+          created_at: string
+          creative_id: string | null
+          donor_email: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string
+          refcode: string | null
+          rule_id: string | null
+          transaction_date: string
+          transaction_id: string
+          updated_at: string
+        }
+        Insert: {
+          ad_id?: string | null
+          amount: number
+          attributed_platform: string
+          attribution_confidence?: number
+          attribution_method: string
+          campaign_id?: string | null
+          created_at?: string
+          creative_id?: string | null
+          donor_email?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id: string
+          refcode?: string | null
+          rule_id?: string | null
+          transaction_date: string
+          transaction_id: string
+          updated_at?: string
+        }
+        Update: {
+          ad_id?: string | null
+          amount?: number
+          attributed_platform?: string
+          attribution_confidence?: number
+          attribution_method?: string
+          campaign_id?: string | null
+          created_at?: string
+          creative_id?: string | null
+          donor_email?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string
+          refcode?: string | null
+          rule_id?: string | null
+          transaction_date?: string
+          transaction_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attributed_donations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attributed_donations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "attributed_donations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "attributed_donations_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "refcode_attribution_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attribution_health_logs: {
         Row: {
           alerts: Json
@@ -1164,6 +1253,70 @@ export type Database = {
           },
           {
             foreignKeyName: "attribution_model_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      attribution_runs: {
+        Row: {
+          by_method: Json | null
+          by_platform: Json | null
+          errors: Json | null
+          finished_at: string | null
+          id: string
+          organization_id: string | null
+          run_type: string
+          started_at: string
+          status: string
+          transactions_attributed: number | null
+          transactions_processed: number | null
+        }
+        Insert: {
+          by_method?: Json | null
+          by_platform?: Json | null
+          errors?: Json | null
+          finished_at?: string | null
+          id?: string
+          organization_id?: string | null
+          run_type: string
+          started_at?: string
+          status?: string
+          transactions_attributed?: number | null
+          transactions_processed?: number | null
+        }
+        Update: {
+          by_method?: Json | null
+          by_platform?: Json | null
+          errors?: Json | null
+          finished_at?: string | null
+          id?: string
+          organization_id?: string | null
+          run_type?: string
+          started_at?: string
+          status?: string
+          transactions_attributed?: number | null
+          transactions_processed?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attribution_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attribution_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "attribution_runs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_integration_summary"
@@ -6888,6 +7041,70 @@ export type Database = {
         }
         Relationships: []
       }
+      refcode_attribution_rules: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_global: boolean
+          match_type: string
+          organization_id: string | null
+          pattern: string
+          platform: string
+          priority: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_global?: boolean
+          match_type?: string
+          organization_id?: string | null
+          pattern: string
+          platform: string
+          priority?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_global?: boolean
+          match_type?: string
+          organization_id?: string | null
+          pattern?: string
+          platform?: string
+          priority?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refcode_attribution_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refcode_attribution_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "refcode_attribution_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       refcode_mapping_history: {
         Row: {
           ad_id: string
@@ -11700,6 +11917,41 @@ export type Database = {
           bluesky_archived: number
         }[]
       }
+      attribute_transaction: {
+        Args: {
+          p_amount: number
+          p_donor_email?: string
+          p_organization_id: string
+          p_refcode: string
+          p_transaction_date: string
+          p_transaction_id: string
+        }
+        Returns: {
+          ad_id: string | null
+          amount: number
+          attributed_platform: string
+          attribution_confidence: number
+          attribution_method: string
+          campaign_id: string | null
+          created_at: string
+          creative_id: string | null
+          donor_email: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string
+          refcode: string | null
+          rule_id: string | null
+          transaction_date: string
+          transaction_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "attributed_donations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       calculate_bluesky_trend_velocity: {
         Args: { topic_name: string }
         Returns: number
@@ -11950,6 +12202,21 @@ export type Database = {
         Returns: {
           new_donors: number
           returning_donors: number
+          unique_donors: number
+        }[]
+      }
+      get_attribution_summary: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+        }
+        Returns: {
+          avg_confidence: number
+          platform: string
+          top_methods: Json
+          total_amount: number
+          total_donations: number
           unique_donors: number
         }[]
       }
@@ -12300,6 +12567,15 @@ export type Database = {
       mask_email: { Args: { email_input: string }; Returns: string }
       mask_name: { Args: { name_input: string }; Returns: string }
       mask_phone: { Args: { phone_input: string }; Returns: string }
+      match_refcode_to_platform: {
+        Args: { p_organization_id?: string; p_refcode: string }
+        Returns: {
+          confidence: number
+          match_type: string
+          platform: string
+          rule_id: string
+        }[]
+      }
       refresh_analytics_views: { Args: never; Returns: undefined }
       refresh_daily_group_sentiment: { Args: never; Returns: undefined }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
@@ -12312,6 +12588,15 @@ export type Database = {
       resolve_job_failure: {
         Args: { p_failure_id: string }
         Returns: undefined
+      }
+      run_attribution_batch: {
+        Args: {
+          p_end_date?: string
+          p_force_reprocess?: boolean
+          p_organization_id: string
+          p_start_date?: string
+        }
+        Returns: string
       }
       unlock_account: {
         Args: { _admin_id: string; _user_id: string }
