@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { CAPIMatchQuality } from './CAPIMatchQuality';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -474,6 +475,11 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
           {config.last_error && (
             <div className="col-span-4 mt-2 p-2 rounded bg-red-500/10 text-red-600 text-xs">
               <strong>Last Error:</strong> {config.last_error.substring(0, 200)}
+            </div>
+          )}
+          {/* Match Quality Dashboard */}
+          <div className="col-span-4 mt-2 p-3 rounded-lg border bg-background">
+            <CAPIMatchQuality organizationId={organizationId} daysBack={30} />
             </div>
           )}
         </div>
