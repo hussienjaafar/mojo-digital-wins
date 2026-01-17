@@ -115,7 +115,7 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
     }
   }, [config, credsExist]);
 
-  // Test connection
+  // Test connection - calls edge function to properly test with stored credentials
   const handleTest = async () => {
     if (!accessToken && !hasExistingToken) {
       toast({ title: 'Missing token', description: 'Please enter an access token', variant: 'destructive' });
@@ -128,21 +128,41 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
 
     setIsTesting(true);
     try {
-      // Simple test: try to get pixel info (doesn't send events)
-      const token = accessToken || 'existing';
-      const response = await fetch(
-        `https://graph.facebook.com/v22.0/${pixelId}?fields=name&access_token=${token}`
-      );
+      // If user provided a new token, test directly with it
+      if (accessToken) {
+        const response = await fetch(
+          `https://graph.facebook.com/v22.0/${pixelId}?fields=name&access_token=${accessToken}`
+        );
 
-      if (response.ok) {
-        const data = await response.json();
-        toast({
-          title: 'Connection successful',
-          description: `Connected to pixel: ${data.name || pixelId}`,
-        });
+        if (response.ok) {
+          const data = await response.json();
+          toast({
+            title: 'Connection successful',
+            description: `Connected to pixel: ${data.name || pixelId}`,
+          });
+        } else {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Connection failed');
+        }
       } else {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Connection failed');
+        // Use stored credentials via edge function
+        const { data, error } = await supabase.functions.invoke('test-meta-capi', {
+          body: {
+            organization_id: organizationId,
+            pixel_id: pixelId,
+          },
+        });
+
+        if (error) throw error;
+
+        if (data?.success) {
+          toast({
+            title: 'Connection successful',
+            description: data.message || `Connected to pixel: ${pixelId}`,
+          });
+        } else {
+          throw new Error(data?.error || 'Connection test failed');
+        }
       }
     } catch (e) {
       toast({
