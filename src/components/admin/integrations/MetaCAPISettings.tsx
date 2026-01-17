@@ -480,8 +480,7 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
           {/* Match Quality Dashboard */}
           <div className="col-span-4 mt-2 p-3 rounded-lg border bg-background">
             <CAPIMatchQuality organizationId={organizationId} daysBack={30} />
-            </div>
-          )}
+          </div>
         </div>
       )}
 

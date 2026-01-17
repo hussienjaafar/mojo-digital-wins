@@ -716,23 +716,60 @@ async function enqueueCAPIEvent(
     eventId = crypto.randomUUID();
   }
 
-  // Lookup fbp/fbc from attribution touchpoints if not in payload
+  // Lookup fbp/fbc from attribution touchpoints
+  // Priority: 1) Email match, 2) Refcode match (for pre-donation captures)
   let fbp: string | null = null;
   let fbc: string | null = fbclid || clickId || null;
 
+  // Try email-based lookup first (most reliable)
   if (donor.email) {
-    const { data: touchpoint } = await supabase
+    const { data: emailTouchpoint } = await supabase
       .from('attribution_touchpoints')
       .select('metadata')
       .eq('organization_id', organization_id)
-      .eq('donor_email', donor.email)
+      .eq('donor_email', donor.email.toLowerCase())
+      .not('metadata', 'is', null)
       .order('occurred_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (touchpoint?.metadata) {
-      fbp = touchpoint.metadata.fbp || fbp;
-      fbc = touchpoint.metadata.fbc || touchpoint.metadata.fbclid || fbc;
+    if (emailTouchpoint?.metadata) {
+      fbp = emailTouchpoint.metadata.fbp || fbp;
+      fbc = emailTouchpoint.metadata.fbc || emailTouchpoint.metadata.fbclid || fbc;
+      console.log('[CAPI] Found Meta identifiers via email lookup:', { hasFbp: !!fbp, hasFbc: !!fbc });
+    }
+  }
+
+  // If no fbp/fbc found via email, try refcode-based lookup
+  // This catches pre-donation landing page captures where email wasn't known yet
+  if (!fbp && !fbc && refcode) {
+    const { data: refcodeTouchpoint } = await supabase
+      .from('attribution_touchpoints')
+      .select('metadata, donor_email')
+      .eq('organization_id', organization_id)
+      .eq('refcode', refcode)
+      .not('metadata', 'is', null)
+      .order('occurred_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (refcodeTouchpoint?.metadata) {
+      fbp = refcodeTouchpoint.metadata.fbp || fbp;
+      fbc = refcodeTouchpoint.metadata.fbc || refcodeTouchpoint.metadata.fbclid || fbc;
+      console.log('[CAPI] Found Meta identifiers via refcode lookup:', { hasFbp: !!fbp, hasFbc: !!fbc, refcode });
+      
+      // Update the touchpoint with this donor's email for future lookups
+      if (donor.email && !refcodeTouchpoint.donor_email) {
+        await supabase
+          .from('attribution_touchpoints')
+          .update({ donor_email: donor.email.toLowerCase() })
+          .eq('organization_id', organization_id)
+          .eq('refcode', refcode)
+          .is('donor_email', null)
+          .order('occurred_at', { ascending: false })
+          .limit(1);
+        console.log('[CAPI] Updated touchpoint with donor email for future lookups');
+      }
     }
   }
 
