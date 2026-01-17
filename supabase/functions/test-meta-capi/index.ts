@@ -2,7 +2,7 @@
  * Test Meta CAPI Connection Edge Function
  * 
  * Tests the Meta Conversions API connection for an organization
- * by validating the stored credentials against the Meta Graph API.
+ * by sending a test event to validate the token has ads_management permission.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -11,6 +11,53 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+/**
+ * Parse Meta API errors into user-friendly messages with actionable guidance
+ */
+function parseMetaError(errorMessage: string): { message: string; guidance: string } {
+  const lowerMsg = errorMessage.toLowerCase();
+  
+  if (lowerMsg.includes('missing permission') || lowerMsg.includes('(#100)')) {
+    return {
+      message: 'Missing required permission',
+      guidance: 'The access token needs "ads_management" permission. Generate a System User token from Meta Business Manager with access to this pixel.',
+    };
+  }
+  
+  if (lowerMsg.includes('invalid oauth access token') || lowerMsg.includes('malformed')) {
+    return {
+      message: 'Invalid or expired token',
+      guidance: 'The access token is invalid or has expired. Generate a new token from Meta Events Manager.',
+    };
+  }
+  
+  if (lowerMsg.includes('invalid pixel_id') || lowerMsg.includes('(#803)')) {
+    return {
+      message: 'Pixel not found',
+      guidance: 'The Pixel ID does not exist or the token does not have access to it. Verify the Pixel ID in Meta Events Manager.',
+    };
+  }
+  
+  if (lowerMsg.includes('rate limit') || lowerMsg.includes('too many calls')) {
+    return {
+      message: 'Rate limited',
+      guidance: 'Too many API calls. Wait a few minutes and try again.',
+    };
+  }
+  
+  if (lowerMsg.includes('expired')) {
+    return {
+      message: 'Token expired',
+      guidance: 'The access token has expired. Generate a new long-lived token from Meta Business Manager.',
+    };
+  }
+  
+  return {
+    message: errorMessage,
+    guidance: 'Check that your access token has the required permissions and the Pixel ID is correct.',
+  };
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -74,7 +121,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[test-meta-capi] Testing connection for org ${organization_id}, pixel ${pixel_id}`);
+    console.log(`[test-meta-capi] Testing CAPI connection for org ${organization_id}, pixel ${pixel_id}`);
 
     // Get stored credentials
     const { data: creds, error: credsError } = await supabase
@@ -103,15 +150,41 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Test connection by querying the pixel
+    // Test connection by sending a test event (requires ads_management permission)
+    // Using test_event_code ensures this doesn't count as a real conversion
+    const testEventCode = `TEST_${Date.now()}`;
+    const eventTime = Math.floor(Date.now() / 1000);
+    const eventId = `test_${crypto.randomUUID()}`;
+
+    const testPayload = {
+      data: [{
+        event_name: 'PageView',
+        event_time: eventTime,
+        event_id: eventId,
+        action_source: 'website',
+        user_data: {
+          client_ip_address: '0.0.0.0',
+          client_user_agent: 'CAPI-Test/1.0',
+        },
+      }],
+      test_event_code: testEventCode,
+    };
+
+    console.log(`[test-meta-capi] Sending test event with code: ${testEventCode}`);
+
     const response = await fetch(
-      `https://graph.facebook.com/v22.0/${pixel_id}?fields=name,id&access_token=${accessToken}`
+      `https://graph.facebook.com/v22.0/${pixel_id}/events?access_token=${accessToken}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testPayload),
+      }
     );
 
     const result = await response.json();
 
-    if (response.ok && result.id) {
-      console.log(`[test-meta-capi] Connection successful: Pixel "${result.name}" (${result.id})`);
+    if (response.ok && result.events_received >= 1) {
+      console.log(`[test-meta-capi] Connection successful: ${result.events_received} event(s) received`);
       
       // Update last tested timestamp
       await supabase
@@ -127,15 +200,18 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: `Connected to pixel: ${result.name || result.id}`,
-          pixel_name: result.name,
-          pixel_id: result.id,
+          message: `CAPI connection verified! Test event received by Meta.`,
+          events_received: result.events_received,
+          test_event_code: testEventCode,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
-      const errorMsg = result.error?.message || 'Unknown error from Meta API';
-      console.error(`[test-meta-capi] Connection failed: ${errorMsg}`);
+      const rawError = result.error?.message || 'Meta API did not accept the test event';
+      const { message, guidance } = parseMetaError(rawError);
+      const fullError = `${message}: ${guidance}`;
+      
+      console.error(`[test-meta-capi] Connection failed: ${rawError}`);
 
       // Update last tested with error
       await supabase
@@ -143,13 +219,18 @@ Deno.serve(async (req) => {
         .update({
           last_tested_at: new Date().toISOString(),
           last_test_status: 'failed',
-          last_test_error: errorMsg.substring(0, 500),
+          last_test_error: fullError.substring(0, 500),
         })
         .eq('organization_id', organization_id)
         .eq('platform', 'meta_capi');
 
       return new Response(
-        JSON.stringify({ success: false, error: errorMsg }),
+        JSON.stringify({ 
+          success: false, 
+          error: message,
+          guidance: guidance,
+          raw_error: rawError,
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
