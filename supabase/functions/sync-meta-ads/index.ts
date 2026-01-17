@@ -645,21 +645,47 @@ serve(async (req) => {
               ) : 'none'
             });
 
-            // Extract refcode from destination URL
+            // Extract refcode from destination URL - ENHANCED to support multiple formats
             if (destinationUrl) {
               try {
                 const url = new URL(destinationUrl);
-                extractedRefcode = url.searchParams.get('refcode') || url.searchParams.get('refCode') || url.searchParams.get('REFCODE');
-                if (extractedRefcode) {
-                  refcodeSource = 'url_param';
-                  console.log(`[REFCODE] Extracted "${extractedRefcode}" from ${destinationUrl}`);
+
+                // Check multiple common refcode parameter names (case-insensitive via loop)
+                const refcodeParams = ['refcode', 'refCode', 'REFCODE', 'ref_code', 'ref', 'source', 'utm_content'];
+                for (const param of refcodeParams) {
+                  const value = url.searchParams.get(param);
+                  if (value) {
+                    extractedRefcode = value;
+                    refcodeSource = `url_param_${param}`;
+                    console.log(`[REFCODE] Extracted "${extractedRefcode}" from param "${param}" in ${destinationUrl}`);
+                    break;
+                  }
+                }
+
+                // If no param found and this is an ActBlue URL, try extracting from path
+                // ActBlue URLs often have format: /donate/campaign-name or /contribute/xxx
+                if (!extractedRefcode && destinationUrl.includes('actblue.com')) {
+                  // Try to get refcode from the final path segment after /donate/ or /contribute/
+                  const pathMatch = url.pathname.match(/\/(donate|contribute)\/([^\/\?]+)/i);
+                  if (pathMatch && pathMatch[2]) {
+                    // This is the page name, not necessarily the refcode
+                    // Only use if it looks like a refcode (alphanumeric with optional numbers)
+                    const potentialRefcode = pathMatch[2];
+                    if (/^[a-z]+\d{2,}$/i.test(potentialRefcode)) {
+                      // Looks like a campaign refcode pattern (e.g., gaza0108, img0108)
+                      extractedRefcode = potentialRefcode;
+                      refcodeSource = 'actblue_path';
+                      console.log(`[REFCODE] Extracted "${extractedRefcode}" from ActBlue path in ${destinationUrl}`);
+                    }
+                  }
                 }
               } catch (urlErr) {
-                // URL parsing failed, try regex
-                const refcodeMatch = destinationUrl.match(/[?&]refcode=([^&]+)/i);
+                // URL parsing failed, try regex for common patterns
+                const refcodeMatch = destinationUrl.match(/[?&](refcode|ref_code|ref|source)=([^&]+)/i);
                 if (refcodeMatch) {
-                  extractedRefcode = refcodeMatch[1];
-                  refcodeSource = 'url_param';
+                  extractedRefcode = refcodeMatch[2];
+                  refcodeSource = 'url_regex';
+                  console.log(`[REFCODE] Extracted "${extractedRefcode}" via regex from ${destinationUrl}`);
                 }
               }
             }
