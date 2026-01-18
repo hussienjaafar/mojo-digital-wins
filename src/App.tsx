@@ -96,6 +96,7 @@ const AppContent = () => {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/r/:org/:form" element={<Redirect />} />
             <Route path="/r" element={<Redirect />} />
             <Route path="/about" element={<About />} />
             <Route path="/services" element={<Services />} />
