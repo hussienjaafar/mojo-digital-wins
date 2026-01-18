@@ -101,31 +101,26 @@ export default function Redirect() {
         referrer: document.referrer || null,
       };
 
-      // Use sendBeacon for fire-and-forget (survives page navigation)
+      // Fire-and-forget: Send touchpoint data without waiting
+      // Use fetch with keepalive to ensure request completes after page unloads
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       
       if (supabaseUrl && supabaseKey) {
-        const beaconUrl = `${supabaseUrl}/functions/v1/capture-meta-touchpoint`;
-        const blob = new Blob([JSON.stringify(captureData)], { type: 'application/json' });
+        const captureUrl = `${supabaseUrl}/functions/v1/capture-meta-touchpoint`;
         
-        // Try sendBeacon first (most reliable for navigation)
-        const beaconSent = navigator.sendBeacon(beaconUrl, blob);
-        
-        // Fallback to fetch with keepalive if sendBeacon fails
-        if (!beaconSent) {
-          fetch(beaconUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': supabaseKey,
-            },
-            body: JSON.stringify(captureData),
-            keepalive: true, // Ensures request completes after page unloads
-          }).catch(() => {
-            // Silently fail - don't block redirect
-          });
-        }
+        // Use fetch with keepalive - survives page navigation and supports headers
+        fetch(captureUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+          },
+          body: JSON.stringify(captureData),
+          keepalive: true, // Ensures request completes after page unloads
+        }).catch(() => {
+          // Silently fail - don't block redirect
+        });
       }
 
       // Redirect immediately - don't wait for capture
