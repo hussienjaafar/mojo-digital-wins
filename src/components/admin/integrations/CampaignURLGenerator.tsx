@@ -38,13 +38,12 @@ export function CampaignURLGenerator({
     return 'https://mojo.digital';
   }, []);
 
-  // Generate the URL reactively
+  // Generate the URL reactively - uses cleaner path-based format
   const generatedUrl = useMemo(() => {
     if (!formName.trim()) return '';
 
-    const url = new URL(`${baseUrl}/r`);
-    url.searchParams.set('org', organizationSlug);
-    url.searchParams.set('form', formName.trim());
+    // Use path-based format: /r/org/form?params
+    const url = new URL(`${baseUrl}/r/${organizationSlug}/${formName.trim()}`);
 
     if (refcode.trim()) {
       url.searchParams.set('refcode', refcode.trim());
@@ -187,7 +186,7 @@ export function CampaignURLGenerator({
         <div className="text-xs text-muted-foreground">
           <strong>Example:</strong>{' '}
           <code className="bg-muted px-1 py-0.5 rounded">
-            {baseUrl}/r?org={organizationSlug}&form=your-form&refcode=meta_jan25
+            {baseUrl}/r/{organizationSlug}/your-form?refcode=meta_jan25
           </code>
         </div>
       )}

@@ -2,31 +2,32 @@
  * Universal Redirect Page
  *
  * A system-wide redirect endpoint that captures Meta cookies and redirects to ActBlue.
- * Works for any organization via URL parameters.
+ * Works for any organization via URL parameters or path segments.
  *
- * URL Format:
- * /r?org=SLUG&form=ACTBLUE_FORM&refcode=REFCODE&amount=AMOUNT
+ * URL Formats:
+ * - Path-based (preferred): /r/ORG_SLUG/ACTBLUE_FORM?refcode=REFCODE
+ * - Query-based (legacy): /r?org=SLUG&form=ACTBLUE_FORM&refcode=REFCODE
  *
- * Example:
- * /r?org=smith-campaign&form=smith-for-senate&refcode=meta_jan25&amount=25
+ * Examples:
+ * - /r/smith-campaign/smith-for-senate?refcode=meta_jan25
+ * - /r?org=smith-campaign&form=smith-for-senate&refcode=meta_jan25
  */
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useSearchParams, useParams } from 'react-router-dom';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 export default function Redirect() {
   const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState<'capturing' | 'redirecting' | 'error'>('capturing');
+  const params = useParams<{ org?: string; form?: string }>();
+  const [status, setStatus] = useState<'redirecting' | 'error'>('redirecting');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [orgName, setOrgName] = useState<string | null>(null);
 
   useEffect(() => {
-    async function captureAndRedirect() {
-      // Get required parameters
-      const orgSlug = searchParams.get('org');
-      const formName = searchParams.get('form');
+    function captureAndRedirect() {
+      // Support both path-based and query-based parameters
+      const orgSlug = params.org || searchParams.get('org');
+      const formName = params.form || searchParams.get('form');
 
       if (!orgSlug) {
         setStatus('error');
@@ -64,81 +65,75 @@ export default function Redirect() {
       // Generate session ID for potential matching
       const sessionId = crypto.randomUUID();
 
+      // Store session ID in localStorage for potential backup matching
       try {
-        // Call edge function to capture touchpoint (also validates org)
-        const { data, error } = await supabase.functions.invoke('capture-meta-touchpoint', {
-          body: {
-            organization_slug: orgSlug,
-            touchpoint_type: fbp || fbc || fbclid ? 'meta_ad' : 'direct',
-            session_id: sessionId,
-            fbp: fbp || null,
-            fbc: fbc || null,
-            fbclid: fbclid || null,
-            refcode: refcode || null,
-            utm_source: searchParams.get('utm_source') || null,
-            utm_medium: searchParams.get('utm_medium') || null,
-            utm_campaign: searchParams.get('utm_campaign') || null,
-            landing_url: window.location.href,
-            referrer: document.referrer || null,
-          },
-        });
-
-        if (error) {
-          console.error('Capture error:', error);
-          setStatus('error');
-          setErrorMessage(`Organization not found: ${orgSlug}`);
-          return;
-        }
-
-        // Check if org was found
-        if (!data?.success) {
-          setStatus('error');
-          setErrorMessage(data?.error || `Organization not found: ${orgSlug}`);
-          return;
-        }
-
-        // Set org name from response
-        if (data.organization?.name) {
-          setOrgName(data.organization.name);
-        }
-
-        // Store session ID in localStorage for potential backup matching
-        try {
-          localStorage.setItem('attribution_session_id', sessionId);
-        } catch {
-          // Ignore localStorage errors
-        }
-
-        setStatus('redirecting');
-
-        // Build ActBlue URL
-        const actblueUrl = new URL(`https://secure.actblue.com/donate/${formName}`);
-
-        if (refcode) actblueUrl.searchParams.set('refcode', refcode);
-        if (amount) actblueUrl.searchParams.set('amount', amount);
-        if (recurring === 'true') actblueUrl.searchParams.set('recurring', 'true');
-
-        // Store fbclid in refcode2 for backup matching (if not already set)
-        if (fbclid && !searchParams.get('refcode2')) {
-          actblueUrl.searchParams.set('refcode2', `fb_${fbclid.substring(0, 20)}`);
-        } else if (searchParams.get('refcode2')) {
-          actblueUrl.searchParams.set('refcode2', searchParams.get('refcode2')!);
-        }
-
-        // Small delay for user to see the redirect message
-        setTimeout(() => {
-          window.location.href = actblueUrl.toString();
-        }, 500);
-
-      } catch (err) {
-        console.error('Redirect error:', err);
-        setStatus('error');
-        setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred');
+        localStorage.setItem('attribution_session_id', sessionId);
+      } catch {
+        // Ignore localStorage errors
       }
+
+      // Build ActBlue URL immediately
+      const actblueUrl = new URL(`https://secure.actblue.com/donate/${formName}`);
+      if (refcode) actblueUrl.searchParams.set('refcode', refcode);
+      if (amount) actblueUrl.searchParams.set('amount', amount);
+      if (recurring === 'true') actblueUrl.searchParams.set('recurring', 'true');
+
+      // Store fbclid in refcode2 for backup matching
+      if (fbclid && !searchParams.get('refcode2')) {
+        actblueUrl.searchParams.set('refcode2', `fb_${fbclid.substring(0, 20)}`);
+      } else if (searchParams.get('refcode2')) {
+        actblueUrl.searchParams.set('refcode2', searchParams.get('refcode2')!);
+      }
+
+      // Fire-and-forget: Send touchpoint data without waiting
+      const captureData = {
+        organization_slug: orgSlug,
+        touchpoint_type: fbp || fbc || fbclid ? 'meta_ad' : 'direct',
+        session_id: sessionId,
+        fbp: fbp || null,
+        fbc: fbc || null,
+        fbclid: fbclid || null,
+        refcode: refcode || null,
+        utm_source: searchParams.get('utm_source') || null,
+        utm_medium: searchParams.get('utm_medium') || null,
+        utm_campaign: searchParams.get('utm_campaign') || null,
+        landing_url: window.location.href,
+        referrer: document.referrer || null,
+      };
+
+      // Use sendBeacon for fire-and-forget (survives page navigation)
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        const beaconUrl = `${supabaseUrl}/functions/v1/capture-meta-touchpoint`;
+        const blob = new Blob([JSON.stringify(captureData)], { type: 'application/json' });
+        
+        // Try sendBeacon first (most reliable for navigation)
+        const beaconSent = navigator.sendBeacon(beaconUrl, blob);
+        
+        // Fallback to fetch with keepalive if sendBeacon fails
+        if (!beaconSent) {
+          fetch(beaconUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': supabaseKey,
+            },
+            body: JSON.stringify(captureData),
+            keepalive: true, // Ensures request completes after page unloads
+          }).catch(() => {
+            // Silently fail - don't block redirect
+          });
+        }
+      }
+
+      // Redirect immediately - don't wait for capture
+      window.location.href = actblueUrl.toString();
     }
 
     captureAndRedirect();
-  }, [searchParams]);
+  }, [searchParams, params]);
 
   // Error state
   if (status === 'error') {
@@ -156,20 +151,12 @@ export default function Redirect() {
     );
   }
 
-  // Loading/capturing/redirecting states
+  // Redirecting state (shown briefly)
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center space-y-4 p-8">
         <Loader2 className="h-12 w-12 animate-spin mx-auto text-blue-600" />
-        <p className="text-lg text-gray-900">
-          {status === 'capturing' && 'Preparing your donation...'}
-          {status === 'redirecting' && 'Redirecting to secure donation page...'}
-        </p>
-        {orgName && (
-          <p className="text-sm text-gray-500">
-            Donation for {orgName}
-          </p>
-        )}
+        <p className="text-lg text-gray-900">Redirecting to secure donation page...</p>
         <p className="text-sm text-gray-400">
           You will be redirected to ActBlue momentarily.
         </p>
