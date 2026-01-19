@@ -77,7 +77,7 @@ export const MAJOR_CITIES: Record<string, string> = {
   'nashville': 'TN', 'memphis': 'TN', 'portland': 'OR', 'oklahoma city': 'OK',
   'las vegas': 'NV', 'louisville': 'KY', 'baltimore': 'MD', 'milwaukee': 'WI',
   'albuquerque': 'NM', 'tucson': 'AZ', 'fresno': 'CA', 'mesa': 'AZ',
-  'sacramento': 'CA', 'atlanta': 'GA', 'kansas city': 'MO', 'colorado springs': 'CO',
+  'sacramento': 'CA', 'kansas city': 'MO', 'colorado springs': 'CO',
   'miami': 'FL', 'raleigh': 'NC', 'omaha': 'NE', 'long beach': 'CA',
   'virginia beach': 'VA', 'oakland': 'CA', 'minneapolis': 'MN', 'tulsa': 'OK',
   'arlington': 'TX', 'new orleans': 'LA', 'wichita': 'KS', 'cleveland': 'OH',
