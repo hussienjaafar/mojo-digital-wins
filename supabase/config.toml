@@ -326,6 +326,9 @@ verify_jwt = false
 [functions.capture-meta-touchpoint]
 verify_jwt = false
 
+[functions.audit-political-intelligence]
+verify_jwt = true
+
 # DELETED FUNCTIONS (removed as part of attribution hardening):
 # - populate-attribution: Dead code (click_id/fbclid tables don't exist)
 # - backfill-attribution: Circular dependency, reads/writes same table
