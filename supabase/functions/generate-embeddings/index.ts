@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateCronSecret } from "../_shared/security.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,25 +9,14 @@ const corsHeaders = {
 
 /**
  * Generate Embeddings for Semantic Matching
- * 
+ *
  * Generates 768-dimensional embeddings for:
  * 1. Organization profiles (mission + focus areas + issues + geos)
  * 2. Trend events (title + top_headline + evidence summaries)
- * 
+ *
  * Uses Lovable AI (Gemini) for text-to-embedding generation.
  * Caches embeddings to avoid recomputation.
  */
-
-// Simple authentication check
-function validateCronSecret(req: Request): boolean {
-  const cronSecret = Deno.env.get('CRON_SECRET');
-  if (!cronSecret) {
-    console.warn('CRON_SECRET not configured - allowing request');
-    return true;
-  }
-  const providedSecret = req.headers.get('x-cron-secret');
-  return providedSecret === cronSecret;
-}
 
 async function validateAuth(req: Request, supabase: any): Promise<{ user: any; isAdmin: boolean } | null> {
   const authHeader = req.headers.get('Authorization');
