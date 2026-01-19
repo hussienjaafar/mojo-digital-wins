@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { 
-  Search, 
-  Clock, 
-  Radio, 
-  Target, 
-  MapPin, 
+import {
+  Search,
+  Clock,
+  Radio,
+  Target,
+  MapPin,
   Tag,
   ChevronDown,
   ChevronRight,
   X,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Sparkles,
+  CheckCircle,
+  Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -29,6 +32,11 @@ export interface FilterState {
   highConfidenceOnly: boolean;
   geography: 'all' | 'federal' | 'state' | 'global';
   topics: string[];
+  // New V2 filters for policy domains and relevance
+  policyDomains: string[];
+  showNewOpportunities: boolean;
+  showProvenTopics: boolean;
+  minRelevance: number; // 0-100
 }
 
 interface TrendsFilterRailProps {
@@ -56,16 +64,24 @@ const GEO_OPTIONS = [
   { value: 'global', label: 'Global' },
 ] as const;
 
-// Placeholder topics - in production these would come from org profile
-const DEFAULT_TOPICS = [
+// All 12 policy domains for filtering
+const POLICY_DOMAINS = [
   'Healthcare',
-  'Climate Policy',
-  'Education',
+  'Environment',
+  'Labor & Workers Rights',
   'Immigration',
   'Civil Rights',
-  'Economy',
+  'Criminal Justice',
+  'Voting Rights',
+  'Education',
+  'Housing',
+  'Economic Justice',
   'Foreign Policy',
-];
+  'Technology',
+] as const;
+
+// Placeholder topics - in production these would come from org profile
+const DEFAULT_TOPICS = POLICY_DOMAINS as unknown as string[];
 
 function FilterSection({ 
   title, 
@@ -125,6 +141,10 @@ export function TrendsFilterRail({
     filters.highConfidenceOnly,
     filters.geography !== 'all',
     filters.topics.length > 0,
+    (filters.policyDomains?.length || 0) > 0,
+    filters.showNewOpportunities,
+    filters.showProvenTopics,
+    (filters.minRelevance || 0) > 0,
   ].filter(Boolean).length;
 
   const handleTopicToggle = (topic: string) => {
@@ -134,6 +154,14 @@ export function TrendsFilterRail({
     updateFilters({ topics: newTopics });
   };
 
+  const handleDomainToggle = (domain: string) => {
+    const currentDomains = filters.policyDomains || [];
+    const newDomains = currentDomains.includes(domain)
+      ? currentDomains.filter(d => d !== domain)
+      : [...currentDomains, domain];
+    updateFilters({ policyDomains: newDomains });
+  };
+
   const clearFilters = () => {
     onFiltersChange({
       timeWindow: '24h',
@@ -141,6 +169,10 @@ export function TrendsFilterRail({
       highConfidenceOnly: false,
       geography: 'all',
       topics: [],
+      policyDomains: [],
+      showNewOpportunities: false,
+      showProvenTopics: false,
+      minRelevance: 0,
     });
     onSearchChange('');
   };
@@ -335,8 +367,8 @@ export function TrendsFilterRail({
                   variant={filters.topics.includes(topic) ? 'default' : 'outline'}
                   className={cn(
                     "text-xs cursor-pointer transition-colors",
-                    filters.topics.includes(topic) 
-                      ? "bg-primary text-primary-foreground" 
+                    filters.topics.includes(topic)
+                      ? "bg-primary text-primary-foreground"
                       : "hover:bg-muted"
                   )}
                   onClick={() => handleTopicToggle(topic)}
@@ -344,6 +376,73 @@ export function TrendsFilterRail({
                   {topic}
                 </Badge>
               ))}
+            </div>
+          </FilterSection>
+
+          {/* Policy Domains */}
+          <FilterSection title="Policy Domains" icon={Layers} defaultOpen={true}>
+            <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
+              {POLICY_DOMAINS.map(domain => (
+                <Badge
+                  key={domain}
+                  variant={(filters.policyDomains || []).includes(domain) ? 'default' : 'outline'}
+                  className={cn(
+                    "text-xs cursor-pointer transition-colors",
+                    (filters.policyDomains || []).includes(domain)
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted"
+                  )}
+                  onClick={() => handleDomainToggle(domain)}
+                >
+                  {domain}
+                </Badge>
+              ))}
+            </div>
+          </FilterSection>
+
+          {/* Relevance Filters */}
+          <FilterSection title="Relevance" icon={Sparkles} defaultOpen={false}>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="new-opportunities"
+                  checked={filters.showNewOpportunities || false}
+                  onCheckedChange={(checked) =>
+                    updateFilters({ showNewOpportunities: !!checked })
+                  }
+                />
+                <Label htmlFor="new-opportunities" className="text-xs cursor-pointer flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3 text-amber-500" />
+                  New opportunities only
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="proven-topics"
+                  checked={filters.showProvenTopics || false}
+                  onCheckedChange={(checked) =>
+                    updateFilters({ showProvenTopics: !!checked })
+                  }
+                />
+                <Label htmlFor="proven-topics" className="text-xs cursor-pointer flex items-center gap-1.5">
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  Proven topics only
+                </Label>
+              </div>
+              <div className="pt-2">
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  Min. relevance: {filters.minRelevance || 0}%
+                </Label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="10"
+                  value={filters.minRelevance || 0}
+                  onChange={(e) => updateFilters({ minRelevance: parseInt(e.target.value) })}
+                  className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer"
+                />
+              </div>
             </div>
           </FilterSection>
         </div>

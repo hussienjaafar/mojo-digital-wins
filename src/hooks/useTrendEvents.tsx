@@ -91,6 +91,25 @@ export interface TrendEvent {
   recency_decay?: number;
   evergreen_penalty?: number;
   burst_score?: number;           // Co-occurrence strength score
+
+  // V2 News Trends Overhaul: Policy domains & geographic tagging
+  policy_domains?: string[];
+  geographies?: string[];
+  geo_level?: 'local' | 'state' | 'national' | 'international';
+  politicians_mentioned?: string[];
+  organizations_mentioned?: string[];
+  legislation_mentioned?: string[];
+  evidence_by_domain?: Record<string, number>;
+
+  // V2: Org-specific relevance (populated by get-trends-for-org)
+  org_relevance_score?: number;
+  org_relevance_reasons?: string[];
+  org_relevance_flags?: string[];
+  isNewOpportunity?: boolean;
+  isProvenTopic?: boolean;
+  matchedDomains?: string[];
+  matchedWatchlist?: string[];
+  priorityBucket?: 'high' | 'medium' | 'low';
 }
 
 /**
