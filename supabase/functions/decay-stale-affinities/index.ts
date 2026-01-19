@@ -107,18 +107,20 @@ serve(async (req) => {
 
     // Log decay run
     if (!dryRun) {
-      await supabase.from('job_executions').insert({
-        job_name: 'decay_stale_affinities',
-        status: 'success',
-        records_processed: decayedCount,
-        metadata: {
-          decay_rate: customDecayRate,
-          min_score: customMinScore,
-          stale_threshold_days: customStaleThreshold,
-          total_checked: staleAffinities?.length || 0,
-        },
-        created_at: new Date().toISOString(),
-      }).catch(() => {}); // Don't fail if logging fails
+      try {
+        await supabase.from('job_executions').insert({
+          job_name: 'decay_stale_affinities',
+          status: 'success',
+          records_processed: decayedCount,
+          metadata: {
+            decay_rate: customDecayRate,
+            min_score: customMinScore,
+            stale_threshold_days: customStaleThreshold,
+            total_checked: staleAffinities?.length || 0,
+          },
+          created_at: new Date().toISOString(),
+        });
+      } catch { /* Don't fail if logging fails */ }
     }
 
     console.log(`✅ ${dryRun ? '[DRY RUN] Would decay' : 'Decayed'} ${decayedCount} affinities`);
