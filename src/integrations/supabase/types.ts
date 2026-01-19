@@ -2054,6 +2054,57 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_analytics: {
+        Row: {
+          campaign_id: string
+          campaign_type: string | null
+          click_rate: number | null
+          clicks: number | null
+          conversion_rate: number | null
+          conversions: number | null
+          created_at: string | null
+          id: string
+          open_rate: number | null
+          opens: number | null
+          organization_id: string
+          revenue: number | null
+          sends: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_id: string
+          campaign_type?: string | null
+          click_rate?: number | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          id?: string
+          open_rate?: number | null
+          opens?: number | null
+          organization_id: string
+          revenue?: number | null
+          sends?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          campaign_type?: string | null
+          click_rate?: number | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          id?: string
+          open_rate?: number | null
+          opens?: number | null
+          organization_id?: string
+          revenue?: number | null
+          sends?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       campaign_attribution: {
         Row: {
           attributed_revenue: number | null
@@ -2129,6 +2180,58 @@ export type Database = {
           },
           {
             foreignKeyName: "campaign_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      campaign_topic_extractions: {
+        Row: {
+          campaign_id: string
+          campaign_type: string
+          extracted_at: string | null
+          extracted_topics: string[] | null
+          id: string
+          organization_id: string | null
+          policy_domains: string[] | null
+        }
+        Insert: {
+          campaign_id: string
+          campaign_type: string
+          extracted_at?: string | null
+          extracted_topics?: string[] | null
+          id?: string
+          organization_id?: string | null
+          policy_domains?: string[] | null
+        }
+        Update: {
+          campaign_id?: string
+          campaign_type?: string
+          extracted_at?: string | null
+          extracted_topics?: string[] | null
+          id?: string
+          organization_id?: string | null
+          policy_domains?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_topic_extractions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_topic_extractions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "campaign_topic_extractions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_integration_summary"
@@ -6327,6 +6430,165 @@ export type Database = {
           },
         ]
       }
+      org_topic_affinities: {
+        Row: {
+          affinity_score: number
+          avg_performance: number | null
+          best_performance: number | null
+          created_at: string | null
+          id: string
+          last_used_at: string | null
+          organization_id: string | null
+          source: string | null
+          times_used: number | null
+          topic: string
+          updated_at: string | null
+        }
+        Insert: {
+          affinity_score?: number
+          avg_performance?: number | null
+          best_performance?: number | null
+          created_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          organization_id?: string | null
+          source?: string | null
+          times_used?: number | null
+          topic: string
+          updated_at?: string | null
+        }
+        Update: {
+          affinity_score?: number
+          avg_performance?: number | null
+          best_performance?: number | null
+          created_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          organization_id?: string | null
+          source?: string | null
+          times_used?: number | null
+          topic?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_topic_affinities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_topic_affinities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_topic_affinities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      org_trend_relevance_cache: {
+        Row: {
+          computed_at: string | null
+          id: string
+          is_new_opportunity: boolean | null
+          is_proven_topic: boolean | null
+          matched_domains: string[] | null
+          matched_watchlist: string[] | null
+          organization_id: string | null
+          priority_bucket: string | null
+          relevance_flags: string[] | null
+          relevance_reasons: Json | null
+          relevance_score: number
+          trend_event_id: string | null
+        }
+        Insert: {
+          computed_at?: string | null
+          id?: string
+          is_new_opportunity?: boolean | null
+          is_proven_topic?: boolean | null
+          matched_domains?: string[] | null
+          matched_watchlist?: string[] | null
+          organization_id?: string | null
+          priority_bucket?: string | null
+          relevance_flags?: string[] | null
+          relevance_reasons?: Json | null
+          relevance_score: number
+          trend_event_id?: string | null
+        }
+        Update: {
+          computed_at?: string | null
+          id?: string
+          is_new_opportunity?: boolean | null
+          is_proven_topic?: boolean | null
+          matched_domains?: string[] | null
+          matched_watchlist?: string[] | null
+          organization_id?: string | null
+          priority_bucket?: string | null
+          relevance_flags?: string[] | null
+          relevance_reasons?: Json | null
+          relevance_score?: number
+          trend_event_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_trend_relevance_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "label_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events_active"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+        ]
+      }
       org_trend_scores: {
         Row: {
           computed_at: string | null
@@ -7674,6 +7936,7 @@ export type Database = {
           last_success_at: string | null
           logo_url: string | null
           name: string
+          policy_domains: string[] | null
           political_leaning: string | null
           source_type: string | null
           state_code: string | null
@@ -7705,6 +7968,7 @@ export type Database = {
           last_success_at?: string | null
           logo_url?: string | null
           name: string
+          policy_domains?: string[] | null
           political_leaning?: string | null
           source_type?: string | null
           state_code?: string | null
@@ -7736,6 +8000,7 @@ export type Database = {
           last_success_at?: string | null
           logo_url?: string | null
           name?: string
+          policy_domains?: string[] | null
           political_leaning?: string | null
           source_type?: string | null
           state_code?: string | null
@@ -8862,6 +9127,36 @@ export type Database = {
           },
         ]
       }
+      system_baselines: {
+        Row: {
+          baseline_value: number
+          calculation_method: string | null
+          created_at: string | null
+          id: string
+          last_calculated_at: string | null
+          metric_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          baseline_value?: number
+          calculation_method?: string | null
+          created_at?: string | null
+          id?: string
+          last_calculated_at?: string | null
+          metric_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          baseline_value?: number
+          calculation_method?: string | null
+          created_at?: string | null
+          id?: string
+          last_calculated_at?: string | null
+          metric_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       system_config: {
         Row: {
           created_at: string | null
@@ -9237,6 +9532,101 @@ export type Database = {
         }
         Relationships: []
       }
+      trend_campaign_correlations: {
+        Row: {
+          campaign_id: string
+          campaign_performance: Json | null
+          correlation_score: number
+          created_at: string | null
+          domain_overlap: string[] | null
+          id: string
+          organization_id: string | null
+          outcome_label: string | null
+          performance_vs_baseline: number | null
+          time_delta_hours: number | null
+          topic_overlap: string[] | null
+          trend_event_id: string | null
+        }
+        Insert: {
+          campaign_id: string
+          campaign_performance?: Json | null
+          correlation_score: number
+          created_at?: string | null
+          domain_overlap?: string[] | null
+          id?: string
+          organization_id?: string | null
+          outcome_label?: string | null
+          performance_vs_baseline?: number | null
+          time_delta_hours?: number | null
+          topic_overlap?: string[] | null
+          trend_event_id?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          campaign_performance?: Json | null
+          correlation_score?: number
+          created_at?: string | null
+          domain_overlap?: string[] | null
+          id?: string
+          organization_id?: string | null
+          outcome_label?: string | null
+          performance_vs_baseline?: number | null
+          time_delta_hours?: number | null
+          topic_overlap?: string[] | null
+          trend_event_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_campaign_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "label_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events_active"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+        ]
+      }
       trend_clusters: {
         Row: {
           acceleration: number | null
@@ -9488,8 +9878,11 @@ export type Database = {
           event_key: string
           event_title: string
           evergreen_penalty: number | null
+          evidence_by_domain: Json | null
           evidence_count: number | null
           first_seen_at: string
+          geo_level: string | null
+          geographies: string[] | null
           has_tier12_corroboration: boolean | null
           id: string
           is_breaking: boolean | null
@@ -9501,10 +9894,15 @@ export type Database = {
           label_quality: string | null
           label_source: string | null
           last_seen_at: string
+          legislation_mentioned: string[] | null
           news_source_count: number | null
           opportunity_tier: string | null
+          organizations_mentioned: string[] | null
           peak_at: string | null
           poisson_surprise: number | null
+          policy_domains: string[] | null
+          politicians_mentioned: string[] | null
+          priority_bucket: string | null
           rank_score: number | null
           recency_decay: number | null
           related_entities: string[] | null
@@ -9559,8 +9957,11 @@ export type Database = {
           event_key: string
           event_title: string
           evergreen_penalty?: number | null
+          evidence_by_domain?: Json | null
           evidence_count?: number | null
           first_seen_at?: string
+          geo_level?: string | null
+          geographies?: string[] | null
           has_tier12_corroboration?: boolean | null
           id?: string
           is_breaking?: boolean | null
@@ -9572,10 +9973,15 @@ export type Database = {
           label_quality?: string | null
           label_source?: string | null
           last_seen_at?: string
+          legislation_mentioned?: string[] | null
           news_source_count?: number | null
           opportunity_tier?: string | null
+          organizations_mentioned?: string[] | null
           peak_at?: string | null
           poisson_surprise?: number | null
+          policy_domains?: string[] | null
+          politicians_mentioned?: string[] | null
+          priority_bucket?: string | null
           rank_score?: number | null
           recency_decay?: number | null
           related_entities?: string[] | null
@@ -9630,8 +10036,11 @@ export type Database = {
           event_key?: string
           event_title?: string
           evergreen_penalty?: number | null
+          evidence_by_domain?: Json | null
           evidence_count?: number | null
           first_seen_at?: string
+          geo_level?: string | null
+          geographies?: string[] | null
           has_tier12_corroboration?: boolean | null
           id?: string
           is_breaking?: boolean | null
@@ -9643,10 +10052,15 @@ export type Database = {
           label_quality?: string | null
           label_source?: string | null
           last_seen_at?: string
+          legislation_mentioned?: string[] | null
           news_source_count?: number | null
           opportunity_tier?: string | null
+          organizations_mentioned?: string[] | null
           peak_at?: string | null
           poisson_surprise?: number | null
+          policy_domains?: string[] | null
+          politicians_mentioned?: string[] | null
+          priority_bucket?: string | null
           rank_score?: number | null
           recency_decay?: number | null
           related_entities?: string[] | null
@@ -9815,6 +10229,67 @@ export type Database = {
           },
           {
             foreignKeyName: "trend_feedback_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      trend_filter_log: {
+        Row: {
+          domains_filtered_out: string[] | null
+          domains_shown: string[] | null
+          filters_applied: Json | null
+          id: string
+          new_opportunity_count: number | null
+          organization_id: string | null
+          request_at: string | null
+          total_trends_available: number | null
+          trends_shown: number | null
+          user_id: string | null
+        }
+        Insert: {
+          domains_filtered_out?: string[] | null
+          domains_shown?: string[] | null
+          filters_applied?: Json | null
+          id?: string
+          new_opportunity_count?: number | null
+          organization_id?: string | null
+          request_at?: string | null
+          total_trends_available?: number | null
+          trends_shown?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          domains_filtered_out?: string[] | null
+          domains_shown?: string[] | null
+          filters_applied?: Json | null
+          id?: string
+          new_opportunity_count?: number | null
+          organization_id?: string | null
+          request_at?: string | null
+          total_trends_available?: number | null
+          trends_shown?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_filter_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_filter_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "trend_filter_log_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_integration_summary"
