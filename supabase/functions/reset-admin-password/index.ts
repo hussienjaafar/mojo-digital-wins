@@ -125,7 +125,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Generating password reset link for ${targetEmail}`);
 
     // Generate password reset link
-    const siteUrl = Deno.env.get("SITE_URL") || "https://mojo-digital-wins.lovable.app";
+    const siteUrl = Deno.env.get("APP_URL") || "https://mojo-digital-wins.lovable.app";
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: "recovery",
       email: targetEmail,

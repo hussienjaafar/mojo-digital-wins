@@ -104,7 +104,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    const inviteUrl = `${req.headers.get("origin") || "https://your-app.com"}/auth?invite=${inviteCode}`;
+    const inviteUrl = `${Deno.env.get("APP_URL") || "https://mojo-digital-wins.lovable.app"}/auth?invite=${inviteCode}`;
 
     const htmlContent = `
       <!DOCTYPE html>
