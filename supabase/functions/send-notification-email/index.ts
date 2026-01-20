@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { Resend } from "https://esm.sh/resend@4.0.0";
 import { parseJsonBody, uuidSchema, z } from "../_shared/validators.ts";
-import { alert } from "../_shared/email-templates/index.ts";
+import { notification } from "../_shared/email-templates/templates/alert.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -186,7 +186,7 @@ serve(async (req) => {
       if (shouldSendEmail) {
         const appUrl = Deno.env.get('APP_URL') || 'https://mojo-digital-wins.lovable.app';
 
-        const emailHtml = alert.notification({
+        const emailHtml = notification({
           title: title,
           message: message,
           type: type,

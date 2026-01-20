@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
 import { getCorsHeaders } from "../_shared/security.ts";
 import { sendEmail, EmailError, isEmailConfigured } from "../_shared/email.ts";
-import { invitation } from "../_shared/email-templates/index.ts";
+import { adminInvite } from "../_shared/email-templates/templates/invitation.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -107,7 +107,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const inviteUrl = `${Deno.env.get("APP_URL") || "https://mojo-digital-wins.lovable.app"}/auth?invite=${inviteCode}`;
 
-    const htmlContent = invitation.adminInvite({
+    const htmlContent = adminInvite({
       email: email,
       inviteUrl: inviteUrl,
       inviteCode: inviteCode,

@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/security.ts";
 import { sendEmail, EmailError, isEmailConfigured } from "../_shared/email.ts";
-import { transactional } from "../_shared/email-templates/index.ts";
+import { passwordReset } from "../_shared/email-templates/templates/transactional.ts";
 
 interface ResetPasswordRequest {
   user_id: string;
@@ -147,7 +147,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Reset link generated successfully");
 
     // Build email HTML using template
-    const emailHtml = transactional.passwordReset({
+    const emailHtml = passwordReset({
       resetUrl: resetLink,
       email: targetEmail,
       expiresIn: '1 hour',

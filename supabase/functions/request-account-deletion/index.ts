@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/security.ts";
 import { sendEmail, isEmailConfigured } from "../_shared/email.ts";
-import { transactional } from "../_shared/email-templates/index.ts";
+import { accountDeletion } from "../_shared/email-templates/templates/transactional.ts";
 
 /**
  * GDPR/CCPA Compliant Account Deletion Request
@@ -119,7 +119,7 @@ serve(async (req) => {
         // Send confirmation email
         if (isEmailConfigured() && user.email) {
           try {
-            const emailHtml = transactional.accountDeletion({
+            const emailHtml = accountDeletion({
               scheduledDate: scheduledFor.toLocaleDateString(),
             });
 

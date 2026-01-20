@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { getCorsHeaders, checkRateLimit } from "../_shared/security.ts";
-import { transactional } from "../_shared/email-templates/index.ts";
+import { contactForm } from "../_shared/email-templates/templates/transactional.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const corsHeaders = getCorsHeaders();
@@ -86,7 +86,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Contact notification:", { name, email, messageLength: message.length });
 
-    const htmlContent = transactional.contactForm({
+    const htmlContent = contactForm({
       name,
       email,
       message,

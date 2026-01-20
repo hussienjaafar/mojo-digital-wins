@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { alert } from "../_shared/email-templates/index.ts";
+import { spikeAlert } from "../_shared/email-templates/templates/alert.ts";
 import type { Severity } from "../_shared/email-templates/tokens.ts";
 
 const corsHeaders = {
@@ -36,7 +36,7 @@ async function sendEmailAlert(alertData: any, adminEmails: string[]): Promise<Al
   });
 
   // Use the new email template
-  const emailHtml = alert.spikeAlert({
+  const emailHtml = spikeAlert({
     entityName: alertData.entity_name,
     severity: alertData.severity as Severity,
     velocityIncrease: `${Math.round(alertData.velocity_increase)}%`,

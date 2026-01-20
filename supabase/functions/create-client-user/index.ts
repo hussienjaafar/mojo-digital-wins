@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
-import { transactional } from "../_shared/email-templates/index.ts";
+import { welcome } from "../_shared/email-templates/templates/transactional.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL");  // Required - no fallback
@@ -206,7 +206,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (RESEND_API_KEY) {
       const resetLink = resetData?.properties?.action_link || loginUrl;
 
-      const htmlContent = transactional.welcome({
+      const htmlContent = welcome({
         fullName: full_name,
         email: email,
         organizationName: org?.name || 'Client Portal',

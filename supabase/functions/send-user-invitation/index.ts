@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, checkRateLimit } from "../_shared/security.ts";
 import { sendEmail, EmailError, isEmailConfigured } from "../_shared/email.ts";
 import { parseJsonBody, userInvitationSchema } from "../_shared/validators.ts";
-import { invitation } from "../_shared/email-templates/index.ts";
+import { userInvite, userInviteReminder } from "../_shared/email-templates/templates/invitation.ts";
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -171,7 +171,7 @@ serve(async (req) => {
           ? 'Reminder: You\'ve been invited as a Platform Admin'
           : `Reminder: You've been invited to join ${organizationName}`;
 
-        const emailHtml = invitation.userInviteReminder({
+        const emailHtml = userInviteReminder({
           email: body.email,
           inviteUrl: inviteUrl,
           invitationType: body.type as 'platform_admin' | 'organization_member',
@@ -335,7 +335,7 @@ serve(async (req) => {
       ? 'You\'ve been invited as a Platform Admin'
       : `You've been invited to join ${organizationName}`;
 
-    const emailHtml = invitation.userInvite({
+    const emailHtml = userInvite({
       email: body.email,
       inviteUrl: inviteUrl,
       invitationType: body.type as 'platform_admin' | 'organization_member',

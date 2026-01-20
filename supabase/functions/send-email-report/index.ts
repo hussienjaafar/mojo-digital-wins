@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { report } from "../_shared/email-templates/index.ts";
+import { campaignReport } from "../_shared/email-templates/templates/report.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -158,7 +158,7 @@ const handler = async (req: Request): Promise<Response> => {
       metrics.smsConversions = totals.smsConversions;
     }
 
-    const html = report.campaignReport({
+    const html = campaignReport({
       organizationName: org.name,
       organizationLogo: showLogo ? org.logo_url : undefined,
       dateRange: {

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
-import { report } from "../_shared/email-templates/index.ts";
+import { dailyBriefing } from "../_shared/email-templates/templates/report.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,7 +40,7 @@ function generateBriefingHTML(briefing: BriefingData, userName: string): string 
     mentions: data.total,
   }));
 
-  return report.dailyBriefing({
+  return dailyBriefing({
     userName: userName || 'there',
     date: new Date(briefing.briefing_date).toLocaleDateString('en-US', {
       weekday: 'long',
