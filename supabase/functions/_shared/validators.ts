@@ -57,8 +57,8 @@ export const resetPasswordRequestSchema = z.object({
 export const userInvitationSchema = z.object({
   email: emailSchema,
   type: invitationTypeSchema,
-  organization_id: uuidSchema.optional(),
-  role: orgRoleSchema.optional(),
+  organization_id: uuidSchema.nullish().transform(val => val ?? undefined),
+  role: orgRoleSchema.nullish().transform(val => val ?? undefined),
 }).refine(
   (data) => {
     // If type is organization_member, organization_id and role are required
