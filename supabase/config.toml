@@ -339,3 +339,13 @@ verify_jwt = true
 # Debug query function (requires CRON_SECRET or admin JWT)
 [functions.debug-query]
 verify_jwt = false
+
+# --- GDPR/CCPA COMPLIANCE FUNCTIONS (Phase 3) ---
+[functions.export-user-data]
+verify_jwt = true
+
+[functions.request-account-deletion]
+verify_jwt = true
+
+[functions.data-retention-cleanup]
+verify_jwt = false  # Uses CRON_SECRET or admin JWT internally
