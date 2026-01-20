@@ -52,6 +52,13 @@ export const resetPasswordRequestSchema = z.object({
 });
 
 /**
+ * Invitation action validation
+ */
+export const invitationActionSchema = z.enum(['send', 'resend'], {
+  errorMap: () => ({ message: "Action must be 'send' or 'resend'" })
+}).default('send');
+
+/**
  * Schema for user invitation requests
  */
 export const userInvitationSchema = z.object({
@@ -59,10 +66,11 @@ export const userInvitationSchema = z.object({
   type: invitationTypeSchema,
   organization_id: uuidSchema.nullish().transform(val => val ?? undefined),
   role: orgRoleSchema.nullish().transform(val => val ?? undefined),
+  action: invitationActionSchema,
 }).refine(
   (data) => {
-    // If type is organization_member, organization_id and role are required
-    if (data.type === 'organization_member') {
+    // If type is organization_member, organization_id and role are required (only for new invitations)
+    if (data.action === 'send' && data.type === 'organization_member') {
       return data.organization_id && data.role;
     }
     return true;
