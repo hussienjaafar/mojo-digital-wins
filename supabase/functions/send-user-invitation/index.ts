@@ -59,8 +59,7 @@ serve(async (req) => {
     }
 
     const body = parseResult.data;
-    const action = body.action || 'send';
-    console.log('Invitation request:', { email: body.email, type: body.type, action, requestedBy: user.id });
+    console.log('Invitation request:', { email: body.email, type: body.type, action: body.action, requestedBy: user.id });
 
     // Check authorization based on invitation type
     if (body.type === 'platform_admin') {
@@ -112,145 +111,165 @@ serve(async (req) => {
     // Check if there's already a pending invitation for this email
     const { data: existingInvite } = await supabase
       .from('user_invitations')
-      .select('id, token, status, invitation_type, organization_id, role')
+      .select('id, status, token, resend_count')
       .eq('email', body.email.toLowerCase())
       .eq('invitation_type', body.type)
       .eq('status', 'pending')
       .maybeSingle();
 
-    // Handle resend action
-    if (action === 'resend') {
-      if (!existingInvite) {
-        return new Response(
-          JSON.stringify({ error: 'No pending invitation found for this email' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    if (existingInvite) {
+      if (body.action === 'resend') {
+        // Handle resend: Generate new token and update expiry
+        const newToken = crypto.randomUUID();
+        const newExpiry = new Date();
+        newExpiry.setDate(newExpiry.getDate() + 7); // 7 days from now
+        const currentResendCount = existingInvite.resend_count || 0;
 
-      // Get organization name for the email
-      let organizationName = '';
-      if (existingInvite.invitation_type === 'organization_member' && existingInvite.organization_id) {
-        const { data: org } = await supabase
-          .from('client_organizations')
-          .select('name')
-          .eq('id', existingInvite.organization_id)
-          .single();
-        organizationName = org?.name || 'the organization';
-      }
+        // Limit resends to prevent abuse
+        if (currentResendCount >= 5) {
+          return new Response(
+            JSON.stringify({ error: 'Maximum resend limit reached. Please revoke and create a new invitation.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
-      // Build the invitation URL with existing token
-      const appUrl = Deno.env.get('APP_URL') || supabaseUrl.replace('.supabase.co', '.lovable.app');
-      const inviteUrl = `${appUrl}/accept-invite?token=${existingInvite.token}`;
+        const { error: updateError } = await supabase
+          .from('user_invitations')
+          .update({
+            token: newToken,
+            expires_at: newExpiry.toISOString(),
+            resend_count: currentResendCount + 1
+          })
+          .eq('id', existingInvite.id);
 
-      // Build email content
-      const emailSubject = existingInvite.invitation_type === 'platform_admin'
-        ? 'Reminder: You\'ve been invited as a Platform Admin'
-        : `Reminder: You've been invited to join ${organizationName}`;
+        if (updateError) {
+          console.error('Error updating invitation:', updateError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to update invitation' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
-      const roleText = existingInvite.invitation_type === 'organization_member'
-        ? `You've been invited to join <strong>${organizationName}</strong> as a <strong>${existingInvite.role}</strong>.`
-        : 'You\'ve been invited to become a <strong>Platform Admin</strong> with full system access.';
+        // Get organization name for email
+        let organizationName = '';
+        if (body.type === 'organization_member' && body.organization_id) {
+          const { data: org } = await supabase
+            .from('client_organizations')
+            .select('name')
+            .eq('id', body.organization_id)
+            .single();
+          organizationName = org?.name || 'the organization';
+        }
 
-      const emailHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px;">
-          <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">Invitation Reminder</h1>
-            <p style="color: #666; font-size: 16px; line-height: 1.6;">${roleText}</p>
-            <p style="color: #666; font-size: 16px; line-height: 1.6;">Click the button below to accept your invitation:</p>
-            <a href="${inviteUrl}" style="display: inline-block; background: #4f46e5; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0;">Accept Invitation</a>
-            <p style="color: #999; font-size: 14px; margin-top: 30px;">This invitation expires in 7 days from the original send date.</p>
-            <p style="color: #999; font-size: 12px;">If the button doesn't work, copy this link: ${inviteUrl}</p>
-          </div>
-        </body>
-        </html>
-      `;
+        // Build the invitation URL with new token
+        const appUrl = Deno.env.get('APP_URL') || supabaseUrl.replace('.supabase.co', '.lovable.app');
+        const inviteUrl = `${appUrl}/accept-invite?token=${newToken}`;
 
-      // Send the email
-      let emailSent = false;
-      let emailError: string | null = null;
+        // Build email content
+        const emailSubject = body.type === 'platform_admin'
+          ? 'Reminder: You\'ve been invited as a Platform Admin'
+          : `Reminder: You've been invited to join ${organizationName}`;
 
-      if (isEmailConfigured()) {
+        const roleText = body.type === 'organization_member'
+          ? `This is a reminder that you've been invited to join <strong>${organizationName}</strong> as a <strong>${body.role}</strong>.`
+          : 'This is a reminder that you\'ve been invited to become a <strong>Platform Admin</strong> with full system access.';
+
+        const emailHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px;">
+            <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">Invitation Reminder</h1>
+              <p style="color: #666; font-size: 16px; line-height: 1.6;">${roleText}</p>
+              <p style="color: #666; font-size: 16px; line-height: 1.6;">Click the button below to accept your invitation:</p>
+              <a href="${inviteUrl}" style="display: inline-block; background: #4f46e5; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0;">Accept Invitation</a>
+              <p style="color: #999; font-size: 14px; margin-top: 30px;">This invitation expires in 7 days.</p>
+              <p style="color: #999; font-size: 12px;">If the button doesn't work, copy this link: ${inviteUrl}</p>
+            </div>
+          </body>
+          </html>
+        `;
+
+        // Send email
+        let emailSent = false;
+        let emailError: string | null = null;
+
+        if (isEmailConfigured()) {
+          try {
+            await sendEmail({
+              to: body.email,
+              subject: emailSubject,
+              html: emailHtml,
+              fromName: body.type === 'platform_admin' ? 'Platform Admin' : organizationName || 'Team',
+            });
+            emailSent = true;
+            console.log('Resend invitation email sent successfully');
+          } catch (err) {
+            console.error('Email resend failed:', err);
+            emailError = err instanceof EmailError ? err.message : 'Failed to send email';
+          }
+        } else {
+          console.log('Email not configured for resend');
+          emailError = 'Email service not configured';
+        }
+
+        // Log the resend action
         try {
-          await sendEmail({
-            to: body.email,
-            subject: emailSubject,
-            html: emailHtml,
-            fromName: existingInvite.invitation_type === 'platform_admin' ? 'Platform Admin' : organizationName || 'Team',
+          await supabase.rpc('log_admin_action', {
+            p_action_type: 'invitation_resent',
+            p_table_affected: 'user_invitations',
+            p_record_id: existingInvite.id,
+            p_new_value: {
+              email: body.email,
+              type: body.type,
+              resend_count: currentResendCount + 1,
+              email_sent: emailSent
+            }
           });
-          emailSent = true;
-          console.log('Invitation reminder email sent successfully');
-        } catch (err) {
-          console.error('Email resend failed:', err);
-          emailError = err instanceof EmailError ? err.message : 'Failed to send email';
+        } catch (logErr) {
+          console.error('Failed to log resend action:', logErr);
+        }
+
+        if (emailSent) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              invitation_id: existingInvite.id,
+              invite_url: inviteUrl,
+              email_sent: true,
+              resend_count: currentResendCount + 1,
+              message: 'Invitation resent successfully'
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              invitation_id: existingInvite.id,
+              invite_url: inviteUrl,
+              email_sent: false,
+              error: emailError || 'Email delivery failed',
+              error_code: 'EMAIL_SEND_FAILED',
+              message: 'Invitation updated but email failed to send. Please share the invite URL manually.'
+            }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
       } else {
-        emailError = 'Email service not configured';
-      }
-
-      // Update the invitation's updated_at timestamp
-      await supabase
-        .from('user_invitations')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', existingInvite.id);
-
-      // Log the action
-      try {
-        await supabase.rpc('log_admin_action', {
-          p_action_type: 'invitation_resent',
-          p_table_affected: 'user_invitations',
-          p_record_id: existingInvite.id,
-          p_new_value: {
-            email: body.email,
-            type: existingInvite.invitation_type,
-            email_sent: emailSent
-          }
-        });
-      } catch (logErr) {
-        console.error('Failed to log action:', logErr);
-      }
-
-      if (emailSent) {
+        // action === 'send' but invitation already exists
         return new Response(
-          JSON.stringify({
-            success: true,
-            invitation_id: existingInvite.id,
-            invite_url: inviteUrl,
-            email_sent: true,
-            message: 'Invitation resent successfully'
+          JSON.stringify({ 
+            error: 'There is already a pending invitation for this email',
+            hint: 'Use action: "resend" to resend the invitation email'
           }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      } else {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            invitation_id: existingInvite.id,
-            invite_url: inviteUrl,
-            email_sent: false,
-            error: emailError || 'Email delivery failed',
-            error_code: 'EMAIL_SEND_FAILED',
-            message: 'Failed to resend invitation email. Please share the invite URL manually.'
-          }),
-          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-    }
-
-    // For 'send' action, check if invitation already exists
-    if (existingInvite) {
-      return new Response(
-        JSON.stringify({
-          error: 'There is already a pending invitation for this email',
-          hint: 'Use action: "resend" to resend the invitation email'
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
     // Check if user already exists with this access
