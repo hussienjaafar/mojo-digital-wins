@@ -567,6 +567,25 @@ const VERB_DETECTION_LIST = [
   'target', 'targets', 'targeted', 'targeting', 'kill', 'kills', 'killed',
   'end', 'ends', 'ended', 'ending', 'begin', 'begins', 'began', 'beginning',
   'start', 'starts', 'started', 'starting', 'stop', 'stops', 'stopped',
+  // FIX: Missing verbs found in audit
+  'escape', 'escapes', 'escaped', 'escaping', 'flee', 'flees', 'fled', 'fleeing',
+  'mull', 'mulls', 'mulled', 'mulling', 'consider', 'considers', 'considered',
+  'weigh', 'weighs', 'weighed', 'weighing', 'eye', 'eyes', 'eyed', 'eyeing',
+  'dig', 'digs', 'dug', 'digging', 'push', 'pushes', 'pushed', 'pushing',
+  'urge', 'urges', 'urged', 'urging', 'call', 'calls', 'called', 'calling',
+  'contest', 'contests', 'contested', 'contesting', 'challenge', 'challenges', 'challenged',
+  'seek', 'seeks', 'sought', 'seeking', 'pursue', 'pursues', 'pursued',
+  // Passive voice helpers (for "is being deported", "are being detained")
+  'being', 'been',
+  // More common headline verbs
+  'report', 'reports', 'reported', 'reporting', 'say', 'says', 'said',
+  'show', 'shows', 'showed', 'shown', 'showing', 'find', 'finds', 'found',
+  'claim', 'claims', 'claimed', 'allege', 'alleges', 'alleged',
+  'accuse', 'accuses', 'accused', 'blame', 'blames', 'blamed',
+  'praise', 'praises', 'praised', 'criticize', 'criticizes', 'criticized',
+  'slam', 'slams', 'slammed', 'blast', 'blasts', 'blasted',
+  'honor', 'honors', 'honored', 'mourn', 'mourns', 'mourned',
+  'celebrate', 'celebrates', 'celebrated', 'mark', 'marks', 'marked',
 ];
 
 // Event nouns that indicate something happened
