@@ -338,3 +338,7 @@ verify_jwt = false
 # DELETED FUNCTIONS (removed as part of attribution hardening):
 # - populate-attribution: Dead code (click_id/fbclid tables don't exist)
 # - backfill-attribution: Circular dependency, reads/writes same table
+
+# Debug query function (requires CRON_SECRET or admin JWT)
+[functions.debug-query]
+verify_jwt = false
