@@ -683,6 +683,7 @@ serve(async (req) => {
             break;
 
           case 'fetch_google_news':
+          case 'fetch_news':  // Alias for fetch_google_news
             console.log('[SCHEDULER] Fetching Google News');
             const googleNewsResponse = await supabase.functions.invoke('fetch-google-news', { 
               body: {},
@@ -693,6 +694,110 @@ serve(async (req) => {
             itemsProcessed = result?.fetched || result?.sources_processed || 0;
             itemsCreated = result?.inserted || 0;
             console.log(`[SCHEDULER] fetch_google_news completed: ${itemsProcessed} fetched, ${itemsCreated} inserted`);
+            break;
+
+          case 'detect_trends':  // Alias for detect_trend_events
+            console.log('[SCHEDULER] Detecting trend events');
+            const detectTrendsResponse = await supabase.functions.invoke('detect-trend-events', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (detectTrendsResponse.error) throw new Error(detectTrendsResponse.error.message);
+            result = detectTrendsResponse.data;
+            itemsProcessed = result?.articles_analyzed || result?.processed || 0;
+            itemsCreated = result?.trends_created || result?.created || 0;
+            console.log(`[SCHEDULER] detect_trends completed: ${itemsProcessed} analyzed, ${itemsCreated} trends created`);
+            break;
+
+          case 'extract_entities':
+            console.log('[SCHEDULER] Running entity extraction');
+            const extractEntitiesResponse = await supabase.functions.invoke('extract-trend-entities', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (extractEntitiesResponse.error) throw new Error(extractEntitiesResponse.error.message);
+            result = extractEntitiesResponse.data;
+            itemsProcessed = result?.articles_processed || 0;
+            itemsCreated = result?.entities_extracted || 0;
+            console.log(`[SCHEDULER] extract_entities completed: ${itemsProcessed} processed, ${itemsCreated} entities`);
+            break;
+
+          case 'tag_domains':
+            console.log('[SCHEDULER] Running policy domain tagging');
+            const tagDomainsResponse = await supabase.functions.invoke('tag-trend-policy-domains', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (tagDomainsResponse.error) throw new Error(tagDomainsResponse.error.message);
+            result = tagDomainsResponse.data;
+            itemsProcessed = result?.trends_processed || 0;
+            itemsCreated = result?.domains_tagged || 0;
+            console.log(`[SCHEDULER] tag_domains completed: ${itemsProcessed} processed, ${itemsCreated} tagged`);
+            break;
+
+          case 'tag_geo':
+            console.log('[SCHEDULER] Running geography tagging');
+            const tagGeoResponse = await supabase.functions.invoke('tag-trend-geographies', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (tagGeoResponse.error) throw new Error(tagGeoResponse.error.message);
+            result = tagGeoResponse.data;
+            itemsProcessed = result?.trends_processed || 0;
+            itemsCreated = result?.geographies_tagged || 0;
+            console.log(`[SCHEDULER] tag_geo completed: ${itemsProcessed} processed, ${itemsCreated} tagged`);
+            break;
+
+          case 'compute_relevance':  // Alias for compute_org_relevance
+            console.log('[SCHEDULER] Computing org relevance');
+            const computeRelevanceResponse = await supabase.functions.invoke('compute-org-relevance', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (computeRelevanceResponse.error) throw new Error(computeRelevanceResponse.error.message);
+            result = computeRelevanceResponse.data;
+            itemsProcessed = result?.orgs_processed || result?.processed || 0;
+            itemsCreated = result?.relevance_scores || result?.scored || 0;
+            console.log(`[SCHEDULER] compute_relevance completed: ${itemsProcessed} orgs, ${itemsCreated} scores`);
+            break;
+
+          case 'learn_affinities':
+            console.log('[SCHEDULER] Learning org affinities');
+            const learnAffinitiesResponse = await supabase.functions.invoke('update-org-affinities', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (learnAffinitiesResponse.error) throw new Error(learnAffinitiesResponse.error.message);
+            result = learnAffinitiesResponse.data;
+            itemsProcessed = result?.correlationsProcessed || 0;
+            itemsCreated = result?.affinitiesUpdated || 0;
+            console.log(`[SCHEDULER] learn_affinities completed: ${itemsProcessed} correlations, ${itemsCreated} affinities`);
+            break;
+
+          case 'decay_affinities':
+            console.log('[SCHEDULER] Decaying stale affinities');
+            const decayAffinitiesResponse = await supabase.functions.invoke('decay-stale-affinities', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (decayAffinitiesResponse.error) throw new Error(decayAffinitiesResponse.error.message);
+            result = decayAffinitiesResponse.data;
+            itemsProcessed = result?.total_stale || 0;
+            itemsCreated = result?.decayed_count || 0;
+            console.log(`[SCHEDULER] decay_affinities completed: ${itemsProcessed} stale, ${itemsCreated} decayed`);
+            break;
+
+          case 'correlate':
+            console.log('[SCHEDULER] Correlating trends with campaigns');
+            const correlateResponse2 = await supabase.functions.invoke('correlate-trends-campaigns', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (correlateResponse2.error) throw new Error(correlateResponse2.error.message);
+            result = correlateResponse2.data;
+            itemsProcessed = result?.trends_analyzed || 0;
+            itemsCreated = result?.correlations_created || 0;
+            console.log(`[SCHEDULER] correlate completed: ${itemsProcessed} analyzed, ${itemsCreated} correlations`);
             break;
 
           default:
