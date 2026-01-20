@@ -656,14 +656,21 @@ function validateEventPhraseLabel(
   topHeadline?: string // NEW: For fallback generation
 ): { is_event_phrase: boolean; label_quality: 'event_phrase' | 'entity_only' | 'fallback_generated'; downgraded: boolean; label_source: string; fallbackLabel?: string } {
   
-  // FIX: If we have metadata hint of fallback_generated and it passes verb check, preserve it
+  // FIX: If we have metadata hint of fallback_generated, check if this topic was the actual fallback phrase
+  // or just an entity from an article where a fallback was generated
   if (labelQualityHint === 'fallback_generated') {
-    const passesVerbCheck = isEventPhrase(topic);
-    if (passesVerbCheck) {
-      return { is_event_phrase: true, label_quality: 'fallback_generated', downgraded: false, label_source: 'fallback_generated' };
+    // Only validate as fallback if the topic was CLAIMED as an event phrase
+    // Entities from fallback-generated articles should not be treated as fallback attempts
+    if (claimedIsEventPhrase) {
+      const passesVerbCheck = isEventPhrase(topic);
+      if (passesVerbCheck) {
+        return { is_event_phrase: true, label_quality: 'fallback_generated', downgraded: false, label_source: 'fallback_generated' };
+      }
+      // Claimed fallback phrase but doesn't pass verb check - downgrade
+      return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true, label_source: 'fallback_downgraded' };
     }
-    // Fallback didn't pass verb check - still mark as fallback_generated but is_event_phrase=false
-    return { is_event_phrase: false, label_quality: 'fallback_generated', downgraded: false, label_source: 'fallback_attempted' };
+    // Entity from a fallback-generated article - treat as entity_only
+    return { is_event_phrase: false, label_quality: 'entity_only', downgraded: false, label_source: 'entity_from_fallback' };
   }
   
   // FIX: If metadata says event_phrase, validate it
