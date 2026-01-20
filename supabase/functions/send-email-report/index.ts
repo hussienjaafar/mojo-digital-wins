@@ -76,7 +76,7 @@ const handler = async (req: Request): Promise<Response> => {
     const endDateStr = end.toISOString().split('T')[0];
 
     // Fetch aggregated metrics
-    const { data: metrics, error: metricsError } = await supabase
+    const { data: dailyMetrics, error: metricsError } = await supabase
       .from("daily_aggregated_metrics")
       .select("*")
       .eq("organization_id", organizationId)
@@ -87,7 +87,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (metricsError) throw metricsError;
 
     // Calculate totals
-    const totals = metrics?.reduce((acc, day) => ({
+    const totals = dailyMetrics?.reduce((acc, day) => ({
       totalRaised: acc.totalRaised + (Number(day.total_funds_raised) || 0),
       totalSpent: acc.totalSpent + (Number(day.total_ad_spend) || 0) + (Number(day.total_sms_cost) || 0),
       totalDonations: acc.totalDonations + (day.total_donations || 0),
