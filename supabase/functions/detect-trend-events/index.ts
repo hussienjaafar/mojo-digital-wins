@@ -1293,8 +1293,8 @@ serve(async (req) => {
     console.log(`[detect-trend-events] Fetched ${googleNews?.length || 0} Google News articles (limit: ${PERF_LIMITS.MAX_GOOGLE_NEWS})`);
     
     for (const item of googleNews || []) {
-      // Look up tier from source_tiers table by domain (Google News articles come from various sources)
-      const gnDomain = extractDomain(item.url);
+      // PHASE 3 FIX: Use canonical_url for domain if available (item.url may be news.google.com redirect)
+      const gnDomain = extractDomain(item.canonical_url || item.url);
       let gnTier: 'tier1' | 'tier2' | 'tier3' | undefined;
       
       // First check canonical source_tiers table
@@ -1319,7 +1319,7 @@ serve(async (req) => {
         sentiment_score: item.ai_sentiment,
         sentiment_label: item.ai_sentiment_label,
         topics: item.ai_topics || [],
-        domain: gnDomain,
+        domain: gnDomain, // PHASE 3 FIX: Uses canonical_url domain (not news.google.com)
         tier: gnTier || 'tier3', // Default to tier3 if no tier found
       };
       
@@ -1354,6 +1354,7 @@ serve(async (req) => {
         sentiment_score: post.ai_sentiment,
         sentiment_label: post.ai_sentiment_label,
         topics: post.ai_topics || [],
+        domain: 'bsky.app', // PHASE 3 FIX: Set domain for Bluesky posts to enable source counting
         tier: 'tier3', // Bluesky is always tier3 (social media)
       };
       
@@ -1364,7 +1365,21 @@ serve(async (req) => {
     }
     
     console.log(`[detect-trend-events] Aggregated ${topicMap.size} unique topics from sources`);
-    
+
+    // PHASE 3 DEBUG: Log domain distribution to diagnose multi-source rate
+    const allDomains = new Map<string, number>();
+    for (const [_, agg] of topicMap) {
+      for (const mention of agg.dedupedMentions.values()) {
+        const domain = mention.domain || 'unknown';
+        allDomains.set(domain, (allDomains.get(domain) || 0) + 1);
+      }
+    }
+    const topDomains = [...allDomains.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(([d, c]) => `${d}:${c}`);
+    console.log(`[detect-trend-events] TOP DOMAINS: ${topDomains.join(', ')}`);
+
     // Calculate authority scores for each topic
     for (const [key, agg] of topicMap) {
       agg.authority_score = calculateAuthorityScore(agg, sourceTiers);

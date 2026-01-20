@@ -1,10 +1,19 @@
 # Trend Quality Fix Plan
 
 **Date:** 2026-01-19
-**Status:** Ready for Implementation
+**Status:** Phase 2 Fixes Applied - Awaiting Rerun
 **Based on:** Phase 1 Audit Results
 
 ---
+
+## Current Status (After Phase 2 Fixes)
+
+| Issue | Before | After | Target | Status |
+|-------|--------|-------|--------|--------|
+| Event Phrase Rate | 0% | 34.6% | >50% | Improved, needs rerun |
+| Multi-Source (3+) | 0% | 2.4% | >70% | Root cause identified & fixed |
+| Single-Word Rate | 19% | 9.2% | <15% | ✅ PASSED |
+| Avg Confidence | 34.2 | TBD | >50 | Pending |
 
 ## Executive Summary
 
@@ -357,6 +366,40 @@ The goal is to achieve >70% multi-source rate (3+ sources per trend).
 | `supabase/functions/batch-analyze-content/index.ts` | 1.1, 1.2 | Agent 24 |
 | `supabase/functions/detect-trend-events/index.ts` | 1.3, 2.1, 3.1, 3.2 | Agent 22, 25 |
 | `src/components/trends/*` | 5.1 | Agent 29 |
+
+---
+
+## Fixes Applied (2026-01-19)
+
+### Phase 1 Fixes (Already Deployed)
+
+In `supabase/functions/batch-analyze-content/index.ts`:
+1. ✅ Enhanced AI prompt with MANDATORY event phrase requirement
+2. ✅ Added 50+ action verbs to ACTION_VERBS list
+3. ✅ Strengthened fallback generation with more patterns
+4. ✅ Added headline truncation fallback
+
+In `supabase/functions/detect-trend-events/index.ts`:
+1. ✅ Tightened single-word thresholds (MIN_MENTIONS: 8→20, MIN_SOURCES: 2→3)
+2. ✅ Reduced ALLOWED_SINGLE_WORD_ENTITIES drastically
+3. ✅ Added ambiguous terms to blocklist (us, uk, eu, mlk, ice)
+4. ✅ Increased single-word evergreen penalty (0.6→0.15)
+
+### Phase 2 Fixes (Committed 2026-01-19)
+
+In `supabase/functions/detect-trend-events/index.ts`:
+1. ✅ **Bluesky domain fix**: Set `domain: 'bsky.app'` for Bluesky mentions (was undefined)
+2. ✅ **Google News domain fix**: Use `canonical_url || url` for domain extraction (was using redirect URL)
+3. ✅ **Debug logging**: Added TOP DOMAINS logging for source distribution diagnosis
+
+In `supabase/functions/audit-trend-quality/index.ts`:
+1. ✅ Fixed TypeScript error handling (`error.message` → proper type guard)
+
+### Pending
+
+- Rerun trend detection job to apply Phase 2 fixes
+- Monitor multi-source rate - if still low, may need data diversity improvements
+- Event phrase rate may improve after reprocessing with fixed domain counting
 
 ---
 
