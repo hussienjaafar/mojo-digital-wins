@@ -194,7 +194,7 @@ serve(async (req) => {
     }
 
     // SECURITY: Rate limiting
-    const rateLimit = await checkRateLimit('fetch-google-news', 10, 60000);
+    const rateLimit = await checkRateLimit('fetch-google-news', 15, 60000);
     if (!rateLimit.allowed) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded', resetAt: rateLimit.resetAt }),
@@ -205,7 +205,7 @@ serve(async (req) => {
     console.log('Fetching Google News sources from database...');
     
     // Limit sources per run to prevent CPU timeout (edge functions have ~30s limit)
-    const MAX_SOURCES_PER_RUN = 6;
+    const MAX_SOURCES_PER_RUN = 15;
     
     // Fetch sources from DB (not hardcoded) - skip those in backoff
     // Order by last_fetched_at to ensure round-robin processing
