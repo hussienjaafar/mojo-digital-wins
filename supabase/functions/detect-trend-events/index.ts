@@ -2090,7 +2090,9 @@ serve(async (req) => {
       if (labelQualityForRanking === 'entity_only' && contextSummary && contextSummary.length > 20) {
         // Use context_summary as the canonical label for better display
         canonicalLabel = contextSummary;
-        console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..."`);
+        // FIX: Also upgrade is_event_phrase since context_summary IS an event phrase
+        canonicalLabelIsEventPhrase = true;
+        console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=true)`);
       }
       
       // PHASE 2/A: labelQuality already computed earlier for ranking - reuse it
@@ -2119,7 +2121,7 @@ serve(async (req) => {
         event_key: key,
         event_title: agg.event_title,
         canonical_label: canonicalLabel, // Best label for display
-        is_event_phrase: validatedIsEventPhrase, // FIX 1: Use validated value, not raw claim
+        is_event_phrase: canonicalLabelIsEventPhrase, // FIX 2: Use final value after fallback/context upgrades
         label_quality: labelQuality,  // PHASE 2: Track label source quality
         label_source: labelSource,  // NEW: Top-level field for audit queries
         related_entities: relatedEntitiesArray,  // PHASE 2: Entities contributing to this phrase
@@ -2155,7 +2157,7 @@ serve(async (req) => {
           baseline_delta_pct: Math.round(baselineDeltaPct * 10) / 10,
           has_historical_baseline: hasHistoricalBaseline,
           meets_volume_gate: meetsVolumeGate,
-          is_event_phrase: validatedIsEventPhrase, // FIX 1: Use validated value
+          is_event_phrase: canonicalLabelIsEventPhrase, // FIX 2: Use final value after fallback/context upgrades
           label_quality: labelQuality,  // PHASE 2: Include in explainability
           label_source: labelSource,  // FIX: Explicit label source for audit
           label_quality_hint: agg.label_quality_hint || null, // FIX: Original hint from extraction

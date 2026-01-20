@@ -216,10 +216,10 @@ serve(async (req) => {
 
     for (let i = 0; i < trends.length; i++) {
       for (let j = i + 1; j < trends.length; j++) {
-        const wordsA = new Set((trends[i].event_title || '').toLowerCase().split(/\s+/));
-        const wordsB = new Set((trends[j].event_title || '').toLowerCase().split(/\s+/));
-        const intersection = [...wordsA].filter(w => wordsB.has(w) && w.length > 2);
-        const union = new Set([...wordsA, ...wordsB]);
+        const wordsA: Set<string> = new Set((trends[i].event_title || '').toLowerCase().split(/\s+/));
+        const wordsB: Set<string> = new Set((trends[j].event_title || '').toLowerCase().split(/\s+/));
+        const intersection = [...wordsA].filter((w: string) => wordsB.has(w) && w.length > 2);
+        const union: Set<string> = new Set([...wordsA, ...wordsB]);
         const overlap = intersection.length / union.size;
 
         if (overlap > 0.6) {
