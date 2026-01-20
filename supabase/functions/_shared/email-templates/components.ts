@@ -2,6 +2,7 @@
  * Reusable Email Components
  *
  * All components return inline-styled HTML strings for email compatibility.
+ * V3 Design System aligned.
  */
 
 import {
@@ -29,7 +30,7 @@ export function escapeHtml(text: string): string {
 }
 
 /**
- * Button component
+ * Button component - fixed for Outlook/MSO compatibility
  */
 export function button(
   text: string,
@@ -56,7 +57,19 @@ export function button(
 
   const style = styles[variant];
 
+  // MSO/Outlook VML button with proper conditional comments OUTSIDE the tag
   return `
+    <!--[if mso]>
+    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"
+      href="${escapeHtml(url)}" style="height:44px;v-text-anchor:middle;width:200px;" arcsize="10%"
+      strokecolor="${style.border}" fillcolor="${style.bg}">
+      <w:anchorlock/>
+      <center style="color:${style.color};font-family:${fonts.primary};font-size:${fontSizes.sm};font-weight:600;">
+        ${escapeHtml(text)}
+      </center>
+    </v:roundrect>
+    <![endif]-->
+    <!--[if !mso]><!-->
     <a href="${escapeHtml(url)}"
        style="display: inline-block;
               background-color: ${style.bg};
@@ -68,14 +81,11 @@ export function button(
               font-size: ${fontSizes.sm};
               font-weight: ${fontWeights.semibold};
               text-decoration: none;
-              text-align: center;
-              mso-padding-alt: 0;
-              <!--[if mso]>
-              <i style="letter-spacing: 24px; mso-font-width: -100%; mso-text-raise: 24pt;">&nbsp;</i>
-              <![endif]-->"
+              text-align: center;"
        target="_blank">
       ${escapeHtml(text)}
     </a>
+    <!--<![endif]-->
   `;
 }
 
@@ -329,10 +339,10 @@ export function noticeBox(
   type: 'warning' | 'info' | 'success' | 'error' = 'info'
 ): string {
   const typeColors = {
-    warning: { bg: '#fef3cd', border: colors.warning, text: '#856404' },
-    info: { bg: '#cce5ff', border: colors.info, text: '#004085' },
-    success: { bg: '#d4edda', border: colors.success, text: '#155724' },
-    error: { bg: '#f8d7da', border: colors.error, text: '#721c24' },
+    warning: { bg: '#FEF3CD', border: colors.warning, text: '#6B5700' },
+    info: { bg: '#E0F2FE', border: colors.info, text: '#005580' },
+    success: { bg: '#DCFCE7', border: colors.success, text: '#166534' },
+    error: { bg: '#FEE2E2', border: colors.error, text: '#991B1B' },
   };
 
   const style = typeColors[type];
@@ -379,5 +389,150 @@ export function smallText(text: string): string {
               margin: ${spacing.md} 0 0 0;">
       ${text}
     </p>
+  `;
+}
+
+/**
+ * Data table component for reports
+ */
+export function dataTable(
+  headers: string[],
+  rows: string[][],
+  options: { striped?: boolean; compact?: boolean } = {}
+): string {
+  const { striped = true, compact = false } = options;
+  const cellPadding = compact ? '8px 12px' : '12px 16px';
+
+  const headerCells = headers.map(h => `
+    <th style="padding: ${cellPadding};
+               text-align: left;
+               font-family: ${fonts.primary};
+               font-size: ${fontSizes.sm};
+               font-weight: ${fontWeights.semibold};
+               color: ${colors.textMuted};
+               background-color: ${colors.background};
+               border-bottom: 2px solid ${colors.border};">
+      ${escapeHtml(h)}
+    </th>
+  `).join('');
+
+  const bodyRows = rows.map((row, rowIndex) => {
+    const bgColor = striped && rowIndex % 2 === 1 ? colors.background : colors.surface;
+    const cells = row.map(cell => `
+      <td style="padding: ${cellPadding};
+                 font-family: ${fonts.primary};
+                 font-size: ${fontSizes.sm};
+                 color: ${colors.textSecondary};
+                 border-bottom: 1px solid ${colors.border};">
+        ${cell}
+      </td>
+    `).join('');
+    return `<tr style="background-color: ${bgColor};">${cells}</tr>`;
+  }).join('');
+
+  return `
+    <table cellpadding="0" cellspacing="0" border="0" width="100%"
+           style="border: 1px solid ${colors.border};
+                  border-radius: ${layout.borderRadius};
+                  border-collapse: separate;
+                  margin: ${spacing.md} 0;">
+      <thead>
+        <tr>${headerCells}</tr>
+      </thead>
+      <tbody>
+        ${bodyRows}
+      </tbody>
+    </table>
+  `;
+}
+
+/**
+ * Timeline/steps component for onboarding flows
+ */
+export function timeline(
+  steps: Array<{ title: string; description?: string; complete?: boolean }>
+): string {
+  const stepItems = steps.map((step, index) => {
+    const isLast = index === steps.length - 1;
+    const circleColor = step.complete ? colors.success : colors.primary;
+    const circleContent = step.complete ? '✓' : (index + 1).toString();
+
+    return `
+      <tr>
+        <td style="width: 40px; vertical-align: top; padding-right: 12px;">
+          <div style="width: 28px;
+                      height: 28px;
+                      border-radius: 50%;
+                      background-color: ${circleColor};
+                      color: #ffffff;
+                      font-family: ${fonts.primary};
+                      font-size: ${fontSizes.sm};
+                      font-weight: ${fontWeights.bold};
+                      line-height: 28px;
+                      text-align: center;">
+            ${circleContent}
+          </div>
+          ${!isLast ? `
+            <div style="width: 2px;
+                        height: 24px;
+                        background-color: ${colors.border};
+                        margin: 4px auto;">
+            </div>
+          ` : ''}
+        </td>
+        <td style="vertical-align: top; padding-bottom: ${isLast ? '0' : spacing.md};">
+          <div style="font-family: ${fonts.primary};
+                      font-size: ${fontSizes.base};
+                      font-weight: ${fontWeights.semibold};
+                      color: ${colors.text};
+                      margin-bottom: 4px;">
+            ${escapeHtml(step.title)}
+          </div>
+          ${step.description ? `
+            <div style="font-family: ${fonts.primary};
+                        font-size: ${fontSizes.sm};
+                        color: ${colors.textMuted};">
+              ${escapeHtml(step.description)}
+            </div>
+          ` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <table cellpadding="0" cellspacing="0" border="0" style="margin: ${spacing.md} 0;">
+      ${stepItems}
+    </table>
+  `;
+}
+
+/**
+ * Quote/testimonial component
+ */
+export function quote(text: string, author?: string): string {
+  return `
+    <div style="border-left: 4px solid ${colors.primary};
+                padding: ${spacing.md};
+                margin: ${spacing.md} 0;
+                background-color: ${colors.background};
+                border-radius: 0 ${layout.buttonRadius} ${layout.buttonRadius} 0;">
+      <p style="color: ${colors.text};
+                font-family: ${fonts.primary};
+                font-size: ${fontSizes.base};
+                font-style: italic;
+                line-height: 1.6;
+                margin: 0;">
+        "${escapeHtml(text)}"
+      </p>
+      ${author ? `
+        <p style="color: ${colors.textMuted};
+                  font-family: ${fonts.primary};
+                  font-size: ${fontSizes.sm};
+                  margin: ${spacing.sm} 0 0 0;">
+          — ${escapeHtml(author)}
+        </p>
+      ` : ''}
+    </div>
   `;
 }

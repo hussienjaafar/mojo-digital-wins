@@ -1,36 +1,36 @@
 /**
  * Email Design Tokens
  *
- * Matches the Molitico. dashboard design system.
+ * Aligned with the MOLITICO. V3 dashboard design system.
  * All values are email-safe (inline CSS compatible).
  */
 
 export const colors = {
-  // Primary
+  // Primary - matches --portal-accent-blue hsl(213 90% 45%)
   primary: '#1570C8',
   primaryDark: '#115a9e',
   secondary: '#8B5CF6',
 
-  // Status
-  success: '#16a34a',
-  warning: '#ca8a04',
-  error: '#dc2626',
-  info: '#0EA5E9',
+  // Status - WCAG AA compliant, darker for email
+  success: '#228B4A',        // hsl(150 60% 35%)
+  warning: '#B87D00',        // hsl(38 92% 40%)
+  error: '#C22727',          // hsl(0 72% 45%)
+  info: '#0077B3',           // hsl(200 90% 40%)
 
-  // Neutrals
-  text: '#1a1a1a',
-  textSecondary: '#525252',
-  textMuted: '#737373',
-  background: '#f8fafc',
-  surface: '#ffffff',
-  border: '#e5e7eb',
+  // Neutrals - aligned with portal text tokens
+  text: '#1E293B',           // --portal-text-primary
+  textSecondary: '#52606D',  // --portal-text-secondary
+  textMuted: '#7A8593',      // --portal-text-muted
+  background: '#F8FAFC',     // --portal-bg-primary
+  surface: '#FFFFFF',        // --portal-bg-secondary
+  border: '#D1D9E0',         // --portal-border
 
   // Severity (for alerts)
   severity: {
-    critical: '#dc2626',
-    high: '#ea580c',
-    medium: '#ca8a04',
-    low: '#0EA5E9',
+    critical: '#C22727',
+    high: '#D85D00',
+    medium: '#B87D00',
+    low: '#0077B3',
   },
 } as const;
 
@@ -74,8 +74,8 @@ export const spacing = {
 
 export const layout = {
   maxWidth: '600px',
-  borderRadius: '8px',
-  buttonRadius: '6px',
+  borderRadius: '12px',       // Match --portal-radius-md (0.75rem)
+  buttonRadius: '8px',        // Match --portal-radius-sm (0.5rem)
   accentBorderWidth: '4px',
 } as const;
 
