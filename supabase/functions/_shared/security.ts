@@ -5,14 +5,36 @@
 
 /**
  * Get CORS headers with allowed origins from env
+ * If a request is provided, validates the origin against the allowlist
+ * If no request provided, returns the first allowed origin
  */
-export function getCorsHeaders(): Record<string, string> {
-  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
-  const origin = allowedOrigins[0] || 'https://lovable.dev';
+export function getCorsHeaders(req?: Request): Record<string, string> {
+  const allowedOriginsEnv = Deno.env.get('ALLOWED_ORIGINS');
+  const allowedOrigins = allowedOriginsEnv?.split(',').map(o => o.trim()).filter(Boolean) || [];
+
+  // Default fallback origins if not configured
+  const defaultOrigins = [
+    'https://mojo-digital-wins.lovable.app',
+    'https://lovable.dev'
+  ];
+
+  const origins = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
+
+  // If request provided, check if origin is allowed
+  let allowedOrigin = origins[0];
+  if (req) {
+    const requestOrigin = req.headers.get('origin');
+    if (requestOrigin && origins.includes(requestOrigin)) {
+      allowedOrigin = requestOrigin;
+    }
+  }
+
   return {
-    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret, x-admin-key',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
   };
 }
 

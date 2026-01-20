@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders } from "../_shared/security.ts";
+import { sendEmail, EmailError, isEmailConfigured } from "../_shared/email.ts";
 
 interface InvitationRequest {
   email: string;
@@ -14,6 +11,8 @@ interface InvitationRequest {
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -198,65 +197,57 @@ serve(async (req) => {
     const appUrl = Deno.env.get('APP_URL') || supabaseUrl.replace('.supabase.co', '.lovable.app');
     const inviteUrl = `${appUrl}/accept-invite?token=${invitation.token}`;
 
-    // Send the invitation email using Resend
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    
-    if (resendApiKey) {
-      const emailSubject = body.type === 'platform_admin' 
-        ? 'You\'ve been invited as a Platform Admin'
-        : `You've been invited to join ${organizationName}`;
+    // Build email content
+    const emailSubject = body.type === 'platform_admin'
+      ? 'You\'ve been invited as a Platform Admin'
+      : `You've been invited to join ${organizationName}`;
 
-      const roleText = body.type === 'organization_member' 
-        ? `You've been invited to join <strong>${organizationName}</strong> as a <strong>${body.role}</strong>.`
-        : 'You\'ve been invited to become a <strong>Platform Admin</strong> with full system access.';
+    const roleText = body.type === 'organization_member'
+      ? `You've been invited to join <strong>${organizationName}</strong> as a <strong>${body.role}</strong>.`
+      : 'You\'ve been invited to become a <strong>Platform Admin</strong> with full system access.';
 
-      const emailHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px;">
-          <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">You're Invited!</h1>
-            <p style="color: #666; font-size: 16px; line-height: 1.6;">${roleText}</p>
-            <p style="color: #666; font-size: 16px; line-height: 1.6;">Click the button below to accept your invitation:</p>
-            <a href="${inviteUrl}" style="display: inline-block; background: #4f46e5; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0;">Accept Invitation</a>
-            <p style="color: #999; font-size: 14px; margin-top: 30px;">This invitation expires in 7 days.</p>
-            <p style="color: #999; font-size: 12px;">If the button doesn't work, copy this link: ${inviteUrl}</p>
-          </div>
-        </body>
-        </html>
-      `;
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px;">
+        <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">You're Invited!</h1>
+          <p style="color: #666; font-size: 16px; line-height: 1.6;">${roleText}</p>
+          <p style="color: #666; font-size: 16px; line-height: 1.6;">Click the button below to accept your invitation:</p>
+          <a href="${inviteUrl}" style="display: inline-block; background: #4f46e5; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0;">Accept Invitation</a>
+          <p style="color: #999; font-size: 14px; margin-top: 30px;">This invitation expires in 7 days.</p>
+          <p style="color: #999; font-size: 12px;">If the button doesn't work, copy this link: ${inviteUrl}</p>
+        </div>
+      </body>
+      </html>
+    `;
 
+    // Check if email is configured and send
+    let emailSent = false;
+    let emailError: string | null = null;
+
+    if (isEmailConfigured()) {
       try {
-        const emailResponse = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: Deno.env.get('FROM_EMAIL') || 'noreply@resend.dev',
-            to: body.email,
-            subject: emailSubject,
-            html: emailHtml,
-          }),
+        await sendEmail({
+          to: body.email,
+          subject: emailSubject,
+          html: emailHtml,
+          fromName: body.type === 'platform_admin' ? 'Platform Admin' : organizationName || 'Team',
         });
-
-        if (!emailResponse.ok) {
-          const emailError = await emailResponse.text();
-          console.error('Email send failed:', emailError);
-        } else {
-          console.log('Invitation email sent successfully');
-        }
-      } catch (emailError) {
-        console.error('Error sending email:', emailError);
-        // Don't fail the request if email fails - invitation is still created
+        emailSent = true;
+        console.log('Invitation email sent successfully');
+      } catch (err) {
+        console.error('Email send failed:', err);
+        emailError = err instanceof EmailError ? err.message : 'Failed to send email';
+        // Invitation was still created, so we'll return partial success
       }
     } else {
-      console.log('RESEND_API_KEY not configured, skipping email send');
+      console.log('Email not configured - SENDER_EMAIL and RESEND_API_KEY required');
+      emailError = 'Email service not configured';
     }
 
     // Log the action
@@ -265,26 +256,45 @@ serve(async (req) => {
         p_action_type: 'invitation_sent',
         p_table_affected: 'user_invitations',
         p_record_id: invitation.id,
-        p_new_value: { 
-          email: body.email, 
+        p_new_value: {
+          email: body.email,
           type: body.type,
           organization_id: body.organization_id,
-          role: body.role 
+          role: body.role,
+          email_sent: emailSent
         }
       });
     } catch (logErr) {
       console.error('Failed to log action:', logErr);
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        invitation_id: invitation.id,
-        invite_url: inviteUrl,
-        message: resendApiKey ? 'Invitation sent successfully' : 'Invitation created (email not configured)'
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // Return appropriate response based on email status
+    if (emailSent) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          invitation_id: invitation.id,
+          invite_url: inviteUrl,
+          email_sent: true,
+          message: 'Invitation sent successfully'
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } else {
+      // Invitation created but email failed - return partial success with warning
+      return new Response(
+        JSON.stringify({
+          success: false,
+          invitation_id: invitation.id,
+          invite_url: inviteUrl,
+          email_sent: false,
+          error: emailError || 'Email delivery failed',
+          error_code: 'EMAIL_SEND_FAILED',
+          message: 'Invitation created but email failed to send. Please share the invite URL manually.'
+        }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
   } catch (error) {
     console.error('Error in send-user-invitation:', error);

@@ -1,17 +1,15 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "https://esm.sh/resend@2.0.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders } from "../_shared/security.ts";
+import { sendEmail, EmailError, isEmailConfigured } from "../_shared/email.ts";
 
 interface ResetPasswordRequest {
   user_id: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  const corsHeaders = getCorsHeaders(req);
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -23,7 +21,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (!authHeader) {
       console.error("No authorization header");
       return new Response(
-        JSON.stringify({ error: "Unauthorized - No auth header" }),
+        JSON.stringify({ error: "Unauthorized - No auth header", success: false }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -147,126 +145,137 @@ const handler = async (req: Request): Promise<Response> => {
     const resetLink = linkData.properties.action_link;
     console.log("Reset link generated successfully");
 
-    // Send email via Resend
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (resendApiKey) {
-      try {
-        const resend = new Resend(resendApiKey);
-        
-        const emailHtml = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-              .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; }
-              .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
-              .footer { text-align: center; margin-top: 20px; color: #6b7280; font-size: 12px; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1 style="margin: 0;">Password Reset</h1>
-              </div>
-              <div class="content">
-                <p>Hello,</p>
-                <p>A password reset has been requested for your admin account by another system administrator.</p>
-                <p>Click the button below to reset your password:</p>
-                <p style="text-align: center;">
-                  <a href="${resetLink}" class="button">Reset Password</a>
-                </p>
-                <p style="font-size: 14px; color: #6b7280;">
-                  This link will expire in 1 hour. If you did not expect this email, please contact your system administrator.
-                </p>
-              </div>
-              <div class="footer">
-                <p>This is an automated message from the admin system.</p>
-              </div>
-            </div>
-          </body>
-          </html>
-        `;
+    // Build email HTML
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; }
+          .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 20px; color: #6b7280; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin: 0;">Password Reset</h1>
+          </div>
+          <div class="content">
+            <p>Hello,</p>
+            <p>A password reset has been requested for your admin account by another system administrator.</p>
+            <p>Click the button below to reset your password:</p>
+            <p style="text-align: center;">
+              <a href="${resetLink}" class="button">Reset Password</a>
+            </p>
+            <p style="font-size: 14px; color: #6b7280;">
+              This link will expire in 1 hour. If you did not expect this email, please contact your system administrator.
+            </p>
+          </div>
+          <div class="footer">
+            <p>This is an automated message from the admin system.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
 
-        const { error: emailError } = await resend.emails.send({
-          from: Deno.env.get("RESEND_FROM_EMAIL") || "Admin System <noreply@resend.dev>",
-          to: [targetEmail],
-          subject: "Password Reset Request - Admin Account",
-          html: emailHtml,
-        });
+    // Check if email is configured
+    if (!isEmailConfigured()) {
+      console.error("Email not configured - SENDER_EMAIL and RESEND_API_KEY required");
 
-        if (emailError) {
-          console.error("Failed to send email:", emailError);
-          // Don't fail the request if email fails - return the link for manual sending
-          return new Response(
-            JSON.stringify({ 
-              success: true, 
-              message: "Password reset link generated but email failed to send",
-              email_sent: false,
-              reset_link: resetLink,
-            }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
+      // Log the action with email not configured
+      await supabaseAdmin.from("admin_audit_logs").insert({
+        user_id: caller.id,
+        action_type: "admin_password_reset",
+        record_id: user_id,
+        new_value: { target_email: targetEmail, email_sent: false, reason: "email_not_configured" },
+      });
 
-        console.log("Password reset email sent successfully");
+      // Return error status - do NOT return success when email can't be sent
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Email service not configured. Please set SENDER_EMAIL and RESEND_API_KEY.",
+          error_code: "EMAIL_NOT_CONFIGURED",
+          reset_link: resetLink,  // Provide link for manual sending
+        }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-        // Log the action
-        await supabaseAdmin.from("admin_audit_logs").insert({
-          user_id: caller.id,
-          action_type: "admin_password_reset",
-          record_id: user_id,
-          new_value: { target_email: targetEmail, email_sent: true },
-        });
+    // Send email via shared utility (throws on failure)
+    try {
+      const emailResult = await sendEmail({
+        to: targetEmail,
+        subject: "Password Reset Request - Admin Account",
+        html: emailHtml,
+        fromName: "Admin System",
+      });
 
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: `Password reset email sent to ${targetEmail}`,
-            email_sent: true,
-          }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch (emailErr) {
-        console.error("Email sending error:", emailErr);
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: "Password reset link generated but email failed",
-            email_sent: false,
-            reset_link: resetLink,
-          }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    } else {
-      console.log("RESEND_API_KEY not configured - returning link only");
-      
+      console.log("Password reset email sent successfully");
+
       // Log the action
       await supabaseAdmin.from("admin_audit_logs").insert({
         user_id: caller.id,
         action_type: "admin_password_reset",
         record_id: user_id,
-        new_value: { target_email: targetEmail, email_sent: false },
+        new_value: { target_email: targetEmail, email_sent: true, message_id: emailResult.messageId },
       });
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "Password reset link generated (email not configured)",
-          email_sent: false,
-          reset_link: resetLink,
+        JSON.stringify({
+          success: true,
+          message: `Password reset email sent to ${targetEmail}`,
+          email_sent: true,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } catch (emailError) {
+      console.error("Email sending failed:", emailError);
+
+      // Log the failure
+      await supabaseAdmin.from("admin_audit_logs").insert({
+        user_id: caller.id,
+        action_type: "admin_password_reset",
+        record_id: user_id,
+        new_value: {
+          target_email: targetEmail,
+          email_sent: false,
+          error: emailError instanceof EmailError ? emailError.code : "unknown"
+        },
+      });
+
+      // Return proper error - do NOT return success when email failed
+      const errorMessage = emailError instanceof EmailError
+        ? emailError.message
+        : "Failed to send email";
+      const errorCode = emailError instanceof EmailError
+        ? emailError.code
+        : "EMAIL_SEND_FAILED";
+      const statusCode = emailError instanceof EmailError
+        ? emailError.statusCode
+        : 502;
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorMessage,
+          error_code: errorCode,
+          reset_link: resetLink,  // Provide link for manual sending as fallback
+        }),
+        { status: statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
   } catch (error: unknown) {
     console.error("Unexpected error:", error);
     const message = error instanceof Error ? error.message : "Internal server error";
+    const corsHeaders = getCorsHeaders(req);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: message, success: false }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -248,13 +248,13 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-admin-invite]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-notification-email]
 verify_jwt = false
 
 [functions.send-user-invitation]
-verify_jwt = false
+verify_jwt = true
 
 # --- OTHER FUNCTIONS ---
 [functions.fetch-bill-text]

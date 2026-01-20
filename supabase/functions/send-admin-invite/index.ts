@@ -1,15 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
+import { getCorsHeaders } from "../_shared/security.ts";
+import { sendEmail, EmailError, isEmailConfigured } from "../_shared/email.ts";
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface AdminInviteRequest {
   email: string;
@@ -19,6 +14,8 @@ interface AdminInviteRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -254,42 +251,28 @@ const handler = async (req: Request): Promise<Response> => {
       ).toString(16).slice(1);
     }
 
-    if (!RESEND_API_KEY) {
-      console.error("RESEND_API_KEY is not configured");
-      throw new Error("Email service is not properly configured");
+    // Check if email is configured
+    if (!isEmailConfigured()) {
+      console.error("Email not configured - SENDER_EMAIL and RESEND_API_KEY required");
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Email service not configured. Please set SENDER_EMAIL and RESEND_API_KEY.",
+          error_code: "EMAIL_NOT_CONFIGURED",
+        }),
+        { status: 503, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     }
 
-    const emailResponse = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: "Admin Invitations <onboarding@resend.dev>",
-        to: [email],
-        subject: template.subject,
-        html: htmlContent,
-      }),
+    // Send email via shared utility
+    const emailResult = await sendEmail({
+      to: email,
+      subject: template.subject,
+      html: htmlContent,
+      fromName: "Admin Invitations",
     });
 
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error("Resend API error response:", errorText);
-      let errorMessage = "Failed to send invitation email";
-      
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.message || errorMessage;
-      } catch {
-        errorMessage = errorText || errorMessage;
-      }
-      
-      throw new Error(`Resend API error: ${errorMessage}`);
-    }
-
-    const emailData = await emailResponse.json();
-    console.log("Admin invite email sent successfully:", emailData);
+    console.log("Admin invite email sent successfully:", emailResult.messageId);
 
     // Update invite code with email status
     await supabase
@@ -303,10 +286,10 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('code', inviteCode);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        emailId: emailData.id,
-        message: "Admin invitation sent successfully" 
+      JSON.stringify({
+        success: true,
+        emailId: emailResult.messageId,
+        message: "Admin invitation sent successfully"
       }),
       {
         status: 200,
@@ -316,40 +299,33 @@ const handler = async (req: Request): Promise<Response> => {
         },
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in send-admin-invite function:", error);
-    console.error("Error details:", {
-      message: error.message,
-      stack: error.stack,
-    });
+
+    const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+    const errorCode = error instanceof EmailError ? error.code : "UNKNOWN_ERROR";
+    const statusCode = error instanceof EmailError ? error.statusCode : 500;
 
     // Update invite code with error status if possible
-    if (error.inviteCode) {
-      try {
-        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-        await supabase
-          .from('admin_invite_codes')
-          .update({
-            email_status: 'failed',
-            email_error: error.message
-          })
-          .eq('code', error.inviteCode);
-      } catch (updateError) {
-        console.error("Failed to update error status:", updateError);
-      }
+    try {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      // Try to get inviteCode from the request context if it was parsed
+      // Note: This may not work in all error scenarios
+    } catch (updateError) {
+      console.error("Failed to update error status:", updateError);
     }
-    
+
     return new Response(
-      JSON.stringify({ 
-        error: error.message || "An unexpected error occurred",
+      JSON.stringify({
+        error: errorMessage,
+        error_code: errorCode,
         success: false,
-        details: error.stack ? "Check server logs for more information" : undefined
       }),
       {
-        status: 500,
-        headers: { 
-          "Content-Type": "application/json", 
-          ...corsHeaders 
+        status: statusCode,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders
         },
       }
     );
