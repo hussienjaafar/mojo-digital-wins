@@ -2097,9 +2097,15 @@ serve(async (req) => {
       if (labelQualityForRanking === 'entity_only' && contextSummary && contextSummary.length > 20) {
         // Use context_summary as the canonical label for better display
         canonicalLabel = contextSummary;
-        // FIX: Also upgrade is_event_phrase since context_summary IS an event phrase
-        canonicalLabelIsEventPhrase = true;
-        console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=true)`);
+        // FIX: Only upgrade is_event_phrase if context_summary actually passes verb check
+        const contextPassesVerbCheck = isEventPhrase(contextSummary);
+        if (contextPassesVerbCheck) {
+          canonicalLabelIsEventPhrase = true;
+          console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=true)`);
+        } else {
+          // Context doesn't pass verb check - keep is_event_phrase as false
+          console.log(`[detect-trend-events] CONTEXT DISPLAY: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=false, no verb)`);
+        }
       }
       
       // PHASE 2/A: labelQuality already computed earlier for ranking - reuse it
