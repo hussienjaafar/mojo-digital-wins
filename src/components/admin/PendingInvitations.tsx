@@ -120,18 +120,23 @@ export function PendingInvitations({
           type: invitation.invitation_type,
           organization_id: invitation.organization_id,
           role: invitation.role,
+          action: "resend",
         },
       });
 
-      if (response.error) throw response.error;
+      if (response.error) {
+        // Check if the error response has details
+        const errorData = response.error as any;
+        throw new Error(errorData?.message || errorData?.error || "Failed to resend invitation");
+      }
 
-      // Delete the old invitation
-      await supabase
-        .from("user_invitations")
-        .update({ status: "revoked" })
-        .eq("id", invitation.id);
+      const data = response.data as any;
+      if (data?.email_sent) {
+        toast.success("Invitation email resent successfully");
+      } else {
+        toast.warning(data?.message || "Invitation exists but email may not have been sent");
+      }
 
-      toast.success("New invitation sent");
       fetchInvitations();
       onInvitationChange?.();
     } catch (err: any) {
