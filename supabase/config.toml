@@ -332,6 +332,9 @@ verify_jwt = true
 [functions.audit-trend-quality]
 verify_jwt = true
 
+[functions.debug-query]
+verify_jwt = false
+
 # DELETED FUNCTIONS (removed as part of attribution hardening):
 # - populate-attribution: Dead code (click_id/fbclid tables don't exist)
 # - backfill-attribution: Circular dependency, reads/writes same table
