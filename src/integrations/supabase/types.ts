@@ -10944,6 +10944,7 @@ export type Database = {
           invitation_type: string
           invited_by: string | null
           organization_id: string | null
+          resend_count: number
           role: string | null
           status: string | null
           token: string
@@ -10957,6 +10958,7 @@ export type Database = {
           invitation_type: string
           invited_by?: string | null
           organization_id?: string | null
+          resend_count?: number
           role?: string | null
           status?: string | null
           token?: string
@@ -10970,6 +10972,7 @@ export type Database = {
           invitation_type?: string
           invited_by?: string | null
           organization_id?: string | null
+          resend_count?: number
           role?: string | null
           status?: string | null
           token?: string
