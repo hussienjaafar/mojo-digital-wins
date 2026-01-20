@@ -105,6 +105,7 @@ export const navigationGroups: NavigationGroup[] = [
       { title: "Organization Members", icon: Users, value: "client-users" },
       { title: "Bulk Operations", icon: Download, value: "bulk-ops", requiredRole: 'admin' },
       { title: "Attribution", icon: GitBranch, value: "attribution" },
+      { title: "Redirect Clicks", icon: TrendingUp, value: "redirect-clicks", requiredRole: 'admin' },
       { title: "Health Monitoring", icon: HeartPulse, value: "client-health", requiredRole: 'admin' },
     ],
   },

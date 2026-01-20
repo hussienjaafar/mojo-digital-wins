@@ -52,6 +52,7 @@ import { IntegrationCenter } from "@/components/admin/integrations/IntegrationCe
 import { AuditActivityCenter } from "@/components/admin/audit/AuditActivityCenter";
 import { BulkOperations } from "@/components/admin/bulk/BulkOperations";
 import { EnvironmentBanner } from "@/components/admin/EnvironmentBanner";
+import { RedirectLinkAnalytics } from "@/components/analytics/RedirectLinkAnalytics";
 
 type ContactSubmission = {
   id: string;
@@ -398,6 +399,8 @@ const Admin = () => {
         return <UsageAnalytics />;
       case "client-health":
         return <ClientHealthOverview />;
+      case "redirect-clicks":
+        return <RedirectLinkAnalytics title="Redirect Link Click Analytics" />;
       case "coverage-governance":
         return <CoverageGovernancePanel />;
       default:
