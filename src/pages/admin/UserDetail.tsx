@@ -277,11 +277,11 @@ export default function UserDetail() {
       <div className="flex items-center gap-4 relative z-10">
         <Button 
           variant="ghost" 
-          size="icon" 
-          onClick={() => navigate(-1)}
-          className="shrink-0"
+          onClick={() => navigate("/admin/users")}
+          className="shrink-0 gap-2"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-4 w-4" />
+          Back
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold flex items-center gap-2">
