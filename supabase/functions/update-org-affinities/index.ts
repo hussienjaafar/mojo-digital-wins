@@ -107,7 +107,8 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const orgId = body.organization_id;
+    // SECURITY FIX: Removed org_id parameter - cron jobs should process all organizations
+    // Accepting org_id from body would allow manipulation if CRON_SECRET is compromised
     const correlations = body.correlations as TrendCampaignCorrelation[] | undefined;
 
     console.log('📈 Starting affinity updates...');
@@ -162,9 +163,8 @@ serve(async (req) => {
         .not('performance_vs_baseline', 'is', null)
         .limit(100);
 
-      if (orgId) {
-        query = query.eq('organization_id', orgId);
-      }
+      // SECURITY FIX: Removed org_id filtering - process all orgs with pending correlations
+      // This ensures the cron job operates system-wide as intended
 
       const { data: dbCorrelations } = await query;
 

@@ -612,6 +612,18 @@ const EVENT_NOUN_LIST = [
   'ceasefire', 'invasion', 'collapse', 'evacuation', 'explosion', 'assassination',
   'sanctions', 'tariffs', 'investigation', 'probe', 'audit', 'deportation',
   'pardon', 'ban', 'order', 'mandate', 'regulation', 'reform',
+  // PHASE 5 FIX: Additional common news nouns for better event phrase detection
+  'report', 'reports', 'reporting',
+  'warning', 'warnings', 'alert', 'alerts',
+  'briefing', 'briefings', 'announcement', 'announcements',
+  'statement', 'statements', 'remarks',
+  'death', 'deaths', 'injury', 'injuries',
+  'disaster', 'emergency',
+  'decision', 'decisions',
+  'agreement', 'deal', 'treaty',
+  'threat', 'threats', 'sanction',
+  'deployment', 'withdrawal',
+  'outbreak', 'surge', 'spike',
 ];
 
 // Known entity-only patterns that should NOT be event phrases
@@ -815,10 +827,27 @@ function tryGenerateFallbackFromHeadline(headline: string, entityName: string): 
     }
   }
 
-  // PHASE 3 FIX: Headline truncation fallback
-  // Use first 4-5 words of headline if it contains the entity
+  // PHASE 5 FIX: Colon pattern for headlines like "Entity: Action description"
   const headlineLower = headline.toLowerCase();
   const entityLower = entityName.toLowerCase();
+  const colonMatch = headline.match(/^([^:]+):\s*(.+)/i);
+  if (colonMatch) {
+    const [, prefix, suffix] = colonMatch;
+    if (prefix.toLowerCase().includes(entityLower) || suffix.toLowerCase().includes(entityLower)) {
+      const truncated = headline.slice(0, 60).trim();
+      if (containsVerbOrEventNoun(truncated)) {
+        const words = truncated.split(/\s+/).slice(0, 6);
+        const result = words.map(w => 
+          w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+        ).join(' ');
+        console.log(`[detect-trend-events] Colon pattern match: "${result}" for "${entityName}"`);
+        return result;
+      }
+    }
+  }
+
+  // PHASE 3 FIX: Headline truncation fallback
+  // Use first 4-5 words of headline if it contains the entity
   if (headlineLower.includes(entityLower.split(' ')[0])) {
     const words = headline.split(/\s+/).filter(w => w.length > 1).slice(0, 5);
     if (words.length >= 3) {
@@ -2154,7 +2183,7 @@ serve(async (req) => {
           canonicalLabelIsEventPhrase = true;
           // FIX: Update labelSource to reflect context upgrade for audit tracking
           labelSource = 'context_upgrade';
-          console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=true, label_source=context_upgrade)`);
+          console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=true, label_quality=context_upgraded)`);
         } else {
           // Context doesn't have verb - keep is_event_phrase as false but still use context for display
           labelSource = 'context_display_only';
@@ -2162,9 +2191,9 @@ serve(async (req) => {
         }
       }
       
-      // PHASE 2/A: labelQuality already computed earlier for ranking - reuse it
-      // Use labelQualityForRanking which was computed before rankScore calculation
-      const labelQuality = labelQualityForRanking;
+      // PHASE 2/A: labelQuality - use labelQualityForRanking, but override for context upgrades
+      // PHASE 5 FIX: Track context_upgraded separately for audit purposes
+      const labelQuality = labelSource === 'context_upgrade' ? 'context_upgraded' : labelQualityForRanking;
       
       // FIX: Track label quality for audit - extended with context upgrades
       if (labelQuality === 'event_phrase') labelAudit.event_phrase++;
