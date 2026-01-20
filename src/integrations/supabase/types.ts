@@ -4911,6 +4911,39 @@ export type Database = {
         }
         Relationships: []
       }
+      login_attempts: {
+        Row: {
+          attempted_at: string
+          created_at: string
+          email: string
+          failure_reason: string | null
+          id: string
+          ip_address: unknown
+          success: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          attempted_at?: string
+          created_at?: string
+          email: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown
+          success?: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          attempted_at?: string
+          created_at?: string
+          email?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown
+          success?: boolean
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       login_history: {
         Row: {
           created_at: string
@@ -12819,6 +12852,14 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: boolean
       }
+      check_account_lockout: {
+        Args: { p_email: string }
+        Returns: {
+          is_locked: boolean
+          reason: string
+          unlock_at: string
+        }[]
+      }
       check_article_duplicate: {
         Args: { p_canonical_url?: string; p_content_hash: string }
         Returns: {
@@ -13394,6 +13435,16 @@ export type Database = {
           rule_id: string
         }[]
       }
+      record_login_attempt: {
+        Args: {
+          p_email: string
+          p_failure_reason?: string
+          p_ip_address: unknown
+          p_success: boolean
+          p_user_agent: string
+        }
+        Returns: undefined
+      }
       refresh_analytics_views: { Args: never; Returns: undefined }
       refresh_daily_group_sentiment: { Args: never; Returns: undefined }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
@@ -13512,9 +13563,25 @@ export type Database = {
         Returns: boolean
       }
       user_needs_mfa: { Args: { _user_id: string }; Returns: Json }
+      validate_password_strength: {
+        Args: { p_password: string }
+        Returns: {
+          is_valid: boolean
+          issues: string[]
+          score: number
+        }[]
+      }
       verify_admin_invite_code: {
         Args: { invite_code: string; user_id: string }
         Returns: boolean
+      }
+      verify_and_use_admin_invite: {
+        Args: { p_code: string; p_user_id: string }
+        Returns: {
+          error_message: string
+          invite_id: string
+          is_valid: boolean
+        }[]
       }
     }
     Enums: {
