@@ -2627,6 +2627,48 @@ export type Database = {
           },
         ]
       }
+      consent_records: {
+        Row: {
+          consent_type: string
+          consent_version: string
+          created_at: string
+          granted: boolean
+          granted_at: string | null
+          id: string
+          ip_address: unknown
+          revoked_at: string | null
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          consent_type: string
+          consent_version?: string
+          created_at?: string
+          granted?: boolean
+          granted_at?: string | null
+          id?: string
+          ip_address?: unknown
+          revoked_at?: string | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          consent_type?: string
+          consent_version?: string
+          created_at?: string
+          granted?: boolean
+          granted_at?: string | null
+          id?: string
+          ip_address?: unknown
+          revoked_at?: string | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       contact_submissions: {
         Row: {
           assigned_to: string | null
@@ -3013,6 +3055,54 @@ export type Database = {
         }
         Relationships: []
       }
+      data_deletion_requests: {
+        Row: {
+          cancelled_at: string | null
+          cancelled_by: string | null
+          completed_at: string | null
+          created_at: string
+          deleted_tables: Json | null
+          error_message: string | null
+          id: string
+          processed_at: string | null
+          reason: string | null
+          requested_at: string
+          scheduled_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          deleted_tables?: Json | null
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          reason?: string | null
+          requested_at?: string
+          scheduled_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          deleted_tables?: Json | null
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          reason?: string | null
+          requested_at?: string
+          scheduled_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       data_export_logs: {
         Row: {
           created_at: string | null
@@ -3070,6 +3160,48 @@ export type Database = {
             referencedColumns: ["organization_id"]
           },
         ]
+      }
+      data_export_requests: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          download_expires_at: string | null
+          download_url: string | null
+          error_message: string | null
+          format: string
+          id: string
+          processed_at: string | null
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          download_expires_at?: string | null
+          download_url?: string | null
+          error_message?: string | null
+          format?: string
+          id?: string
+          processed_at?: string | null
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          download_expires_at?: string | null
+          download_url?: string | null
+          error_message?: string | null
+          format?: string
+          id?: string
+          processed_at?: string | null
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       data_freshness: {
         Row: {
@@ -3210,6 +3342,42 @@ export type Database = {
             referencedColumns: ["organization_id"]
           },
         ]
+      }
+      data_retention_policies: {
+        Row: {
+          archive_before_delete: boolean
+          created_at: string
+          id: string
+          is_active: boolean
+          last_cleanup_at: string | null
+          next_cleanup_at: string | null
+          retention_days: number
+          table_name: string
+          updated_at: string
+        }
+        Insert: {
+          archive_before_delete?: boolean
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_cleanup_at?: string | null
+          next_cleanup_at?: string | null
+          retention_days?: number
+          table_name: string
+          updated_at?: string
+        }
+        Update: {
+          archive_before_delete?: boolean
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_cleanup_at?: string | null
+          next_cleanup_at?: string | null
+          retention_days?: number
+          table_name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       detected_anomalies: {
         Row: {
@@ -7466,6 +7634,42 @@ export type Database = {
           source?: string
           source_url?: string | null
           state?: string | null
+        }
+        Relationships: []
+      }
+      privacy_settings: {
+        Row: {
+          analytics_tracking: boolean
+          created_at: string
+          do_not_sell: boolean
+          id: string
+          marketing_emails: boolean
+          product_updates: boolean
+          third_party_sharing: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analytics_tracking?: boolean
+          created_at?: string
+          do_not_sell?: boolean
+          id?: string
+          marketing_emails?: boolean
+          product_updates?: boolean
+          third_party_sharing?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analytics_tracking?: boolean
+          created_at?: string
+          do_not_sell?: boolean
+          id?: string
+          marketing_emails?: boolean
+          product_updates?: boolean
+          third_party_sharing?: boolean
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -12852,6 +13056,10 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: boolean
       }
+      cancel_deletion_request: {
+        Args: { p_request_id: string }
+        Returns: boolean
+      }
       check_account_lockout: {
         Args: { p_email: string }
         Returns: {
@@ -13453,6 +13661,8 @@ export type Database = {
         Returns: undefined
       }
       refresh_unified_trends: { Args: never; Returns: undefined }
+      request_account_deletion: { Args: { p_reason?: string }; Returns: string }
+      request_data_export: { Args: { p_format?: string }; Returns: string }
       reset_circuit_breaker: { Args: { job_id: string }; Returns: undefined }
       resolve_job_failure: {
         Args: { p_failure_id: string }
@@ -13557,6 +13767,15 @@ export type Database = {
           p_success: boolean
         }
         Returns: undefined
+      }
+      update_user_consent: {
+        Args: {
+          p_consent_type: string
+          p_granted: boolean
+          p_ip_address?: unknown
+          p_user_agent?: string
+        }
+        Returns: string
       }
       user_belongs_to_organization: {
         Args: { _organization_id: string }
