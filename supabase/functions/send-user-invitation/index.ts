@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, checkRateLimit } from "../_shared/security.ts";
 import { sendEmail, EmailError, isEmailConfigured } from "../_shared/email.ts";
 import { parseJsonBody, userInvitationSchema } from "../_shared/validators.ts";
+import { invitation } from "../_shared/email-templates/index.ts";
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -165,34 +166,19 @@ serve(async (req) => {
         const appUrl = Deno.env.get('APP_URL') || 'https://mojo-digital-wins.lovable.app';
         const inviteUrl = `${appUrl}/accept-invite?token=${newToken}`;
 
-        // Build email content
+        // Build email content using template
         const emailSubject = body.type === 'platform_admin'
           ? 'Reminder: You\'ve been invited as a Platform Admin'
           : `Reminder: You've been invited to join ${organizationName}`;
 
-        const roleText = body.type === 'organization_member'
-          ? `This is a reminder that you've been invited to join <strong>${organizationName}</strong> as a <strong>${body.role}</strong>.`
-          : 'This is a reminder that you\'ve been invited to become a <strong>Platform Admin</strong> with full system access.';
-
-        const emailHtml = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          </head>
-          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px;">
-            <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-              <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">Invitation Reminder</h1>
-              <p style="color: #666; font-size: 16px; line-height: 1.6;">${roleText}</p>
-              <p style="color: #666; font-size: 16px; line-height: 1.6;">Click the button below to accept your invitation:</p>
-              <a href="${inviteUrl}" style="display: inline-block; background: #4f46e5; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0;">Accept Invitation</a>
-              <p style="color: #999; font-size: 14px; margin-top: 30px;">This invitation expires in 7 days.</p>
-              <p style="color: #999; font-size: 12px;">If the button doesn't work, copy this link: ${inviteUrl}</p>
-            </div>
-          </body>
-          </html>
-        `;
+        const emailHtml = invitation.userInviteReminder({
+          email: body.email,
+          inviteUrl: inviteUrl,
+          invitationType: body.type as 'platform_admin' | 'organization_member',
+          organizationName: organizationName || undefined,
+          role: body.role || undefined,
+          expiresIn: '7 days',
+        });
 
         // Send email
         let emailSent = false;
@@ -344,34 +330,19 @@ serve(async (req) => {
     const appUrl = Deno.env.get('APP_URL') || 'https://mojo-digital-wins.lovable.app';
     const inviteUrl = `${appUrl}/accept-invite?token=${invitation.token}`;
 
-    // Build email content
+    // Build email content using template
     const emailSubject = body.type === 'platform_admin'
       ? 'You\'ve been invited as a Platform Admin'
       : `You've been invited to join ${organizationName}`;
 
-    const roleText = body.type === 'organization_member'
-      ? `You've been invited to join <strong>${organizationName}</strong> as a <strong>${body.role}</strong>.`
-      : 'You\'ve been invited to become a <strong>Platform Admin</strong> with full system access.';
-
-    const emailHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px;">
-        <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-          <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">You're Invited!</h1>
-          <p style="color: #666; font-size: 16px; line-height: 1.6;">${roleText}</p>
-          <p style="color: #666; font-size: 16px; line-height: 1.6;">Click the button below to accept your invitation:</p>
-          <a href="${inviteUrl}" style="display: inline-block; background: #4f46e5; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0;">Accept Invitation</a>
-          <p style="color: #999; font-size: 14px; margin-top: 30px;">This invitation expires in 7 days.</p>
-          <p style="color: #999; font-size: 12px;">If the button doesn't work, copy this link: ${inviteUrl}</p>
-        </div>
-      </body>
-      </html>
-    `;
+    const emailHtml = invitation.userInvite({
+      email: body.email,
+      inviteUrl: inviteUrl,
+      invitationType: body.type as 'platform_admin' | 'organization_member',
+      organizationName: organizationName || undefined,
+      role: body.role || undefined,
+      expiresIn: '7 days',
+    });
 
     // Check if email is configured and send
     let emailSent = false;

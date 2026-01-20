@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { report } from "../_shared/email-templates/index.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -126,133 +127,48 @@ const handler = async (req: Request): Promise<Response> => {
     ];
 
     // Get branding
-    const primaryColor = customBranding?.primaryColor || "#667eea";
     const showLogo = customBranding?.includeLogo !== false;
-    const footerText = customBranding?.footerText || 
+    const footerText = customBranding?.footerText ||
       "This is an automated report. For more details, please log into your dashboard.";
 
-    // Build HTML sections
-    let metricsHtml = "";
-    
+    const appUrl = Deno.env.get('APP_URL') || 'https://mojo-digital-wins.lovable.app';
+
+    // Build metrics object for template
+    const metrics: Record<string, number | undefined> = {};
+
     if (selectedMetrics.includes("funds_raised")) {
-      metricsHtml += `
-        <div class="metric-card">
-          <div class="metric-label">Total Funds Raised</div>
-          <div class="metric-value">$${totals.totalRaised.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        </div>
-      `;
+      metrics.fundsRaised = totals.totalRaised;
     }
-
-    if (selectedMetrics.includes("total_spend") || selectedMetrics.includes("roi")) {
-      metricsHtml += '<div class="metric-grid">';
-      
-      if (selectedMetrics.includes("total_spend")) {
-        metricsHtml += `
-          <div class="metric-card">
-            <div class="metric-label">Total Spend</div>
-            <div class="metric-value">$${totals.totalSpent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-          </div>
-        `;
-      }
-
-      if (selectedMetrics.includes("roi")) {
-        metricsHtml += `
-          <div class="metric-card">
-            <div class="metric-label">ROI</div>
-            <div class="metric-value ${Number(roi) > 0 ? 'positive' : 'negative'}">${roi}%</div>
-          </div>
-        `;
-      }
-      
-      metricsHtml += '</div>';
+    if (selectedMetrics.includes("total_spend")) {
+      metrics.totalSpend = totals.totalSpent;
     }
-
+    if (selectedMetrics.includes("roi")) {
+      metrics.roi = Number(roi);
+    }
     if (selectedMetrics.includes("donations")) {
-      metricsHtml += `
-        <div class="metric-grid">
-          <div class="metric-card">
-            <div class="metric-label">Total Donations</div>
-            <div class="metric-value">${totals.totalDonations}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Avg Donation</div>
-            <div class="metric-value">$${avgDonation}</div>
-          </div>
-        </div>
-      `;
+      metrics.donations = totals.totalDonations;
+      metrics.avgDonation = Number(avgDonation);
+    }
+    if (selectedMetrics.includes("meta_ads")) {
+      metrics.impressions = totals.metaImpressions;
+      metrics.clicks = totals.metaClicks;
+    }
+    if (selectedMetrics.includes("sms")) {
+      metrics.smsSent = totals.smsSent;
+      metrics.smsConversions = totals.smsConversions;
     }
 
-    let campaignHtml = "";
-    if (selectedMetrics.includes("meta_ads") || selectedMetrics.includes("sms")) {
-      campaignHtml = '<h2 style="margin-top: 30px;">Campaign Performance</h2><div class="metric-grid">';
-      
-      if (selectedMetrics.includes("meta_ads")) {
-        campaignHtml += `
-          <div class="metric-card">
-            <div class="metric-label">Meta Ads Impressions</div>
-            <div class="metric-value">${totals.metaImpressions.toLocaleString()}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Meta Ads Clicks</div>
-            <div class="metric-value">${totals.metaClicks.toLocaleString()}</div>
-          </div>
-        `;
-      }
-
-      if (selectedMetrics.includes("sms")) {
-        campaignHtml += `
-          <div class="metric-card">
-            <div class="metric-label">SMS Messages Sent</div>
-            <div class="metric-value">${totals.smsSent.toLocaleString()}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">SMS Conversions</div>
-            <div class="metric-value">${totals.smsConversions.toLocaleString()}</div>
-          </div>
-        `;
-      }
-
-      campaignHtml += '</div>';
-    }
-
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
-    .header { background: ${primaryColor}; color: white; padding: 30px; text-align: center; }
-    .header h1 { margin: 0; font-size: 24px; }
-    .header img { max-height: 40px; margin-bottom: 10px; }
-    .content { padding: 30px; background: #f9fafb; }
-    .metric-card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .metric-label { color: #6b7280; font-size: 14px; text-transform: uppercase; margin-bottom: 5px; }
-    .metric-value { font-size: ${templateStyle === 'detailed' ? '28px' : '32px'}; font-weight: bold; color: #1f2937; }
-    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-    .footer { background: #1f2937; color: white; padding: 20px; text-align: center; font-size: 12px; }
-    .positive { color: #10b981; }
-    .negative { color: #ef4444; }
-    ${templateStyle === 'minimal' ? '.metric-label { font-size: 12px; }' : ''}
-    ${templateStyle === 'minimal' ? 'h2 { font-size: 18px; }' : ''}
-  </style>
-</head>
-<body>
-  <div class="header">
-    ${showLogo && org.logo_url ? `<img src="${org.logo_url}" alt="${org.name}" />` : ''}
-    <h1>📊 Performance Report</h1>
-    <p>${org.name}</p>
-    <p style="font-size: 14px; opacity: 0.9;">${start.toLocaleDateString()} - ${end.toLocaleDateString()}</p>
-  </div>
-  <div class="content">
-    ${templateStyle !== 'minimal' ? '<h2>Key Metrics</h2>' : ''}
-    ${metricsHtml}
-    ${campaignHtml}
-  </div>
-  <div class="footer">
-    <p>${footerText}</p>
-    <p>&copy; ${new Date().getFullYear()} ${org.name}. All rights reserved.</p>
-  </div>
-</body>
-</html>`;
+    const html = report.campaignReport({
+      organizationName: org.name,
+      organizationLogo: showLogo ? org.logo_url : undefined,
+      dateRange: {
+        start: start.toLocaleDateString(),
+        end: end.toLocaleDateString(),
+      },
+      metrics,
+      customFooter: footerText,
+      dashboardUrl: `${appUrl}/client-dashboard`,
+    });
 
     // Send email
     const senderEmail = Deno.env.get('SENDER_EMAIL');

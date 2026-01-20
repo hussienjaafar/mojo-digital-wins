@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { report } from "../_shared/email-templates/index.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,170 +23,46 @@ interface BriefingData {
 
 function generateBriefingHTML(briefing: BriefingData, userName: string): string {
   const threatScore = Math.min(100, (briefing.critical_count * 25) + (briefing.high_count * 10));
-  const threatColor = threatScore >= 75 ? '#dc2626' : threatScore >= 50 ? '#ea580c' : threatScore >= 25 ? '#ca8a04' : '#16a34a';
   const threatLabel = threatScore >= 75 ? 'SEVERE' : threatScore >= 50 ? 'HIGH' : threatScore >= 25 ? 'MODERATE' : 'LOW';
 
-  const criticalItemsHTML = briefing.top_critical_items?.slice(0, 5).map(item => `
-    <tr>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
-        <div style="font-weight: 600; color: #111827;">${item.title}</div>
-        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
-          ${item.type.replace('_', ' ').toUpperCase()} • ${item.source_name || item.state_code || item.bill_number || ''}
-        </div>
-      </td>
-      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">
-        <span style="background: #dc2626; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
-          ${item.threat_level?.toUpperCase()}
-        </span>
-      </td>
-    </tr>
-  `).join('') || '<tr><td colspan="2" style="padding: 12px; text-align: center; color: #6b7280;">No critical items today</td></tr>';
+  const appUrl = Deno.env.get('PUBLIC_SITE_URL') || Deno.env.get('APP_URL') || 'https://mojo-digital-wins.lovable.app';
 
-  const orgMentionsHTML = Object.entries(briefing.organization_mentions || {}).slice(0, 5).map(([org, data]) => `
-    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6;">
-      <span style="font-weight: 500;">${org}</span>
-      <span style="color: #6b7280;">
-        ${data.total} mention${data.total !== 1 ? 's' : ''}
-        ${data.critical > 0 ? `<span style="color: #dc2626; margin-left: 8px;">${data.critical} critical</span>` : ''}
-      </span>
-    </div>
-  `).join('') || '<div style="text-align: center; color: #6b7280; padding: 12px;">No organization mentions today</div>';
+  // Map top_critical_items to the expected format
+  const topItems = (briefing.top_critical_items || []).slice(0, 5).map(item => ({
+    title: item.title,
+    severity: item.threat_level || 'critical',
+    mentions: 1, // Using 1 as default since we don't have mention count per item
+  }));
 
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daily Intelligence Briefing</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f9fafb;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background: white;">
-    <!-- Header -->
-    <tr>
-      <td style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 32px; text-align: center;">
-        <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 700;">
-          📊 Daily Intelligence Briefing
-        </h1>
-        <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">
-          ${new Date(briefing.briefing_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
-      </td>
-    </tr>
+  // Map organization_mentions to the expected format
+  const topOrganizations = Object.entries(briefing.organization_mentions || {}).slice(0, 5).map(([name, data]) => ({
+    name,
+    mentions: data.total,
+  }));
 
-    <!-- Greeting -->
-    <tr>
-      <td style="padding: 24px 32px 16px;">
-        <p style="margin: 0; color: #374151; font-size: 15px;">
-          Good morning${userName ? `, ${userName}` : ''}. Here's your intelligence summary for today.
-        </p>
-      </td>
-    </tr>
-
-    <!-- Threat Level -->
-    <tr>
-      <td style="padding: 0 32px 24px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-          <tr>
-            <td style="padding: 20px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">
-                    Today's Threat Level
-                  </div>
-                  <div style="font-size: 32px; font-weight: 700; color: ${threatColor}; margin-top: 4px;">
-                    ${threatScore}/100
-                  </div>
-                </div>
-                <div style="background: ${threatColor}; color: white; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 14px;">
-                  ${threatLabel}
-                </div>
-              </div>
-              <div style="background: #e2e8f0; height: 8px; border-radius: 4px; margin-top: 12px; overflow: hidden;">
-                <div style="background: ${threatColor}; height: 100%; width: ${threatScore}%; border-radius: 4px;"></div>
-              </div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-
-    <!-- Quick Stats -->
-    <tr>
-      <td style="padding: 0 32px 24px;">
-        <table width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            <td width="25%" style="text-align: center; padding: 16px 8px; background: #fef2f2; border-radius: 8px 0 0 8px;">
-              <div style="font-size: 24px; font-weight: 700; color: #dc2626;">${briefing.critical_count}</div>
-              <div style="font-size: 11px; color: #991b1b; text-transform: uppercase;">Critical</div>
-            </td>
-            <td width="25%" style="text-align: center; padding: 16px 8px; background: #fff7ed;">
-              <div style="font-size: 24px; font-weight: 700; color: #ea580c;">${briefing.high_count}</div>
-              <div style="font-size: 11px; color: #9a3412; text-transform: uppercase;">High</div>
-            </td>
-            <td width="25%" style="text-align: center; padding: 16px 8px; background: #f0f9ff;">
-              <div style="font-size: 24px; font-weight: 700; color: #0284c7;">${briefing.total_articles}</div>
-              <div style="font-size: 11px; color: #075985; text-transform: uppercase;">Articles</div>
-            </td>
-            <td width="25%" style="text-align: center; padding: 16px 8px; background: #f0fdf4; border-radius: 0 8px 8px 0;">
-              <div style="font-size: 24px; font-weight: 700; color: #16a34a;">${briefing.total_bills}</div>
-              <div style="font-size: 11px; color: #166534; text-transform: uppercase;">Bills</div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-
-    <!-- Critical Items -->
-    <tr>
-      <td style="padding: 0 32px 24px;">
-        <h2 style="margin: 0 0 16px; font-size: 16px; font-weight: 600; color: #111827;">
-          🚨 Critical & High Priority Items
-        </h2>
-        <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-          ${criticalItemsHTML}
-        </table>
-      </td>
-    </tr>
-
-    <!-- Organization Mentions -->
-    <tr>
-      <td style="padding: 0 32px 24px;">
-        <h2 style="margin: 0 0 16px; font-size: 16px; font-weight: 600; color: #111827;">
-          🏛️ Organization Mentions
-        </h2>
-        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;">
-          ${orgMentionsHTML}
-        </div>
-      </td>
-    </tr>
-
-    <!-- CTA -->
-    <tr>
-      <td style="padding: 0 32px 32px; text-align: center;">
-        <a href="${Deno.env.get('PUBLIC_SITE_URL') || 'https://app.example.com'}/admin"
-           style="display: inline-block; background: #2563eb; color: white; padding: 12px 32px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px;">
-          View Full Dashboard →
-        </a>
-      </td>
-    </tr>
-
-    <!-- Footer -->
-    <tr>
-      <td style="background: #f8fafc; padding: 24px 32px; border-top: 1px solid #e5e7eb;">
-        <p style="margin: 0; font-size: 12px; color: #6b7280; text-align: center;">
-          You're receiving this because you have daily briefings enabled.
-          <br>
-          <a href="${Deno.env.get('PUBLIC_SITE_URL') || 'https://app.example.com'}/admin?tab=alert-settings" style="color: #2563eb;">
-            Manage your alert preferences
-          </a>
-        </p>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `;
+  return report.dailyBriefing({
+    userName: userName || 'there',
+    date: new Date(briefing.briefing_date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }),
+    threatLevel: {
+      score: threatScore,
+      label: threatLabel,
+    },
+    stats: {
+      criticalAlerts: briefing.critical_count,
+      highAlerts: briefing.high_count,
+      newArticles: briefing.total_articles,
+      pendingBills: briefing.total_bills,
+    },
+    topItems,
+    topOrganizations,
+    dashboardUrl: `${appUrl}/admin`,
+    preferencesUrl: `${appUrl}/admin?tab=alert-settings`,
+  });
 }
 
 serve(async (req) => {

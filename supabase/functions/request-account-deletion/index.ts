@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/security.ts";
 import { sendEmail, isEmailConfigured } from "../_shared/email.ts";
+import { transactional } from "../_shared/email-templates/index.ts";
 
 /**
  * GDPR/CCPA Compliant Account Deletion Request
@@ -118,31 +119,14 @@ serve(async (req) => {
         // Send confirmation email
         if (isEmailConfigured() && user.email) {
           try {
+            const emailHtml = transactional.accountDeletion({
+              scheduledDate: scheduledFor.toLocaleDateString(),
+            });
+
             await sendEmail({
               to: user.email,
               subject: 'Account Deletion Request Received',
-              html: `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                  <meta charset="utf-8">
-                </head>
-                <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px;">
-                  <div style="max-width: 500px; margin: 0 auto; background: #f9fafb; border-radius: 8px; padding: 30px;">
-                    <h2 style="color: #1a1a1a; margin-bottom: 20px;">Account Deletion Request</h2>
-                    <p>We received a request to delete your account and all associated data.</p>
-                    <p><strong>Scheduled deletion date:</strong> ${scheduledFor.toLocaleDateString()}</p>
-                    <p>Per GDPR regulations, you have 30 days to cancel this request. After this period, your data will be permanently deleted.</p>
-                    <p style="margin-top: 20px; padding: 15px; background: #fef3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
-                      <strong>Important:</strong> To complete the deletion, you must confirm this request by logging into your account.
-                    </p>
-                    <p style="color: #666; font-size: 14px; margin-top: 30px;">
-                      If you did not make this request, please log in immediately to cancel it and secure your account.
-                    </p>
-                  </div>
-                </body>
-                </html>
-              `,
+              html: emailHtml,
               fromName: 'Account Security',
             });
           } catch (emailError) {

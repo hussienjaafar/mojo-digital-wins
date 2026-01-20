@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
+import { transactional } from "../_shared/email-templates/index.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL");  // Required - no fallback
@@ -204,103 +205,15 @@ const handler = async (req: Request): Promise<Response> => {
     // Send welcome email via Resend with secure reset link (no plaintext password)
     if (RESEND_API_KEY) {
       const resetLink = resetData?.properties?.action_link || loginUrl;
-      
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                line-height: 1.6;
-                color: #333;
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 20px;
-                background-color: #f5f5f5;
-              }
-              .container {
-                background-color: white;
-                border-radius: 8px;
-                padding: 40px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-              }
-              .header {
-                text-align: center;
-                margin-bottom: 30px;
-              }
-              h1 {
-                color: #667eea;
-                margin: 0;
-                font-size: 24px;
-              }
-              .info-box {
-                background-color: #f8f9fa;
-                border-radius: 6px;
-                padding: 20px;
-                margin: 20px 0;
-              }
-              .login-button {
-                display: inline-block;
-                padding: 14px 32px;
-                background: linear-gradient(135deg, #667eea 0%, #5568d3 100%);
-                color: white;
-                text-decoration: none;
-                border-radius: 6px;
-                font-weight: 600;
-                margin: 20px 0;
-              }
-              .footer {
-                margin-top: 40px;
-                padding-top: 20px;
-                border-top: 1px solid #e0e0e0;
-                text-align: center;
-                color: #666;
-                font-size: 14px;
-              }
-              .warning {
-                font-size: 12px;
-                color: #888;
-                margin-top: 15px;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>Welcome to ${org?.name || 'the Portal'}</h1>
-              </div>
-              
-              <div class="content">
-                <p>Hello ${full_name},</p>
-                
-                <p>Your client portal account has been created. Click the button below to set your password and access your account:</p>
-                
-                <div class="info-box">
-                  <p><strong>Email:</strong> ${email}</p>
-                  <p><strong>Role:</strong> ${role}</p>
-                </div>
-                
-                <div style="text-align: center;">
-                  <a href="${resetLink}" class="login-button">
-                    Set Your Password
-                  </a>
-                </div>
-                
-                <p class="warning">
-                  This link will expire in 24 hours. If you didn't request this account, please ignore this email.
-                </p>
-              </div>
-              
-              <div class="footer">
-                <p>This is an automated message. Please do not reply to this email.</p>
-              </div>
-            </div>
-          </body>
-        </html>
-      `;
+
+      const htmlContent = transactional.welcome({
+        fullName: full_name,
+        email: email,
+        organizationName: org?.name || 'Client Portal',
+        role: role,
+        resetUrl: resetLink,
+        expiresIn: '24 hours',
+      });
 
       try {
         const emailResponse = await fetch("https://api.resend.com/emails", {

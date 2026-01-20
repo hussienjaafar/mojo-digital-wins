@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
 import { getCorsHeaders } from "../_shared/security.ts";
 import { sendEmail, EmailError, isEmailConfigured } from "../_shared/email.ts";
+import { transactional } from "../_shared/email-templates/index.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -145,101 +146,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     const resetLink = resetData?.properties?.action_link || loginUrl;
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-              background-color: #f5f5f5;
-            }
-            .container {
-              background-color: white;
-              border-radius: 8px;
-              padding: 40px;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            h1 {
-              color: #667eea;
-              margin: 0;
-              font-size: 24px;
-            }
-            .info-box {
-              background-color: #f8f9fa;
-              border-radius: 6px;
-              padding: 20px;
-              margin: 20px 0;
-            }
-            .login-button {
-              display: inline-block;
-              padding: 14px 32px;
-              background: linear-gradient(135deg, #667eea 0%, #5568d3 100%);
-              color: white;
-              text-decoration: none;
-              border-radius: 6px;
-              font-weight: 600;
-              margin: 20px 0;
-            }
-            .footer {
-              margin-top: 40px;
-              padding-top: 20px;
-              border-top: 1px solid #e0e0e0;
-              text-align: center;
-              color: #666;
-              font-size: 14px;
-            }
-            .warning {
-              font-size: 12px;
-              color: #888;
-              margin-top: 15px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>Password Reset - ${org?.name || 'Client Portal'}</h1>
-            </div>
-
-            <div class="content">
-              <p>Hello ${clientUser?.full_name || 'User'},</p>
-
-              <p>A password reset has been requested for your account by an administrator. Click the button below to set a new password:</p>
-
-              <div class="info-box">
-                <p><strong>Email:</strong> ${email}</p>
-              </div>
-
-              <div style="text-align: center;">
-                <a href="${resetLink}" class="login-button">
-                  Reset Your Password
-                </a>
-              </div>
-
-              <p class="warning">
-                This link will expire in 24 hours. If you didn't request this password reset, please contact your administrator immediately.
-              </p>
-            </div>
-
-            <div class="footer">
-              <p>This is an automated message. Please do not reply to this email.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
+    const htmlContent = transactional.passwordReset({
+      resetUrl: resetLink,
+      email: email,
+      expiresIn: '24 hours',
+      organizationName: org?.name,
+    });
 
     // Check if email is configured
     if (!isEmailConfigured()) {

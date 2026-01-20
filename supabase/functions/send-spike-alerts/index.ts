@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { alert } from "../_shared/email-templates/index.ts";
+import type { Severity } from "../_shared/email-templates/tokens.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +18,7 @@ interface AlertResult {
   error?: any;
 }
 
-async function sendEmailAlert(alert: any, adminEmails: string[]): Promise<AlertResult> {
+async function sendEmailAlert(alertData: any, adminEmails: string[]): Promise<AlertResult> {
   if (!RESEND_API_KEY) {
     console.log('[send-spike-alerts] ⚠️ Resend API key not configured');
     return { success: false, reason: 'no_api_key' };
@@ -27,25 +29,35 @@ async function sendEmailAlert(alert: any, adminEmails: string[]): Promise<AlertR
     return { success: false, reason: 'no_recipients' };
   }
 
+  const timestamp = new Date(alertData.detected_at).toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  // Use the new email template
+  const emailHtml = alert.spikeAlert({
+    entityName: alertData.entity_name,
+    severity: alertData.severity as Severity,
+    velocityIncrease: `${Math.round(alertData.velocity_increase)}%`,
+    mentionCount: alertData.current_mentions,
+    timeWindow: alertData.time_window,
+    context: alertData.context_summary,
+    relatedArticles: alertData.related_articles?.length,
+    timestamp: timestamp,
+  });
+
   const severityEmojiMap: Record<string, string> = {
     critical: '🚨',
     high: '⚠️',
     medium: '📊',
     low: 'ℹ️'
   };
-  const severityEmoji = severityEmojiMap[alert.severity] || 'ℹ️';
-
-  const severityColorMap: Record<string, string> = {
-    critical: '#dc2626',
-    high: '#ea580c',
-    medium: '#ca8a04',
-    low: '#2563eb'
-  };
-  const severityColor = severityColorMap[alert.severity] || '#6b7280';
+  const severityEmoji = severityEmojiMap[alertData.severity] || 'ℹ️';
 
   try {
     console.log(`[send-spike-alerts] Sending email from ${SENDER_EMAIL} to ${adminEmails.length} recipients`);
-    
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -53,67 +65,10 @@ async function sendEmailAlert(alert: any, adminEmails: string[]): Promise<AlertR
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: `Digital Strategy Heartbeat <${SENDER_EMAIL}>`,
+        from: `MOLITICO. Alerts <${SENDER_EMAIL}>`,
         to: adminEmails,
-        subject: `${severityEmoji} ${alert.severity.toUpperCase()}: ${alert.entity_name} spike detected`,
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f9fafb; }
-              .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-              .header { background: ${severityColor}; color: white; padding: 20px; }
-              .header h1 { margin: 0; font-size: 20px; }
-              .content { padding: 20px; }
-              .stat { display: inline-block; margin-right: 20px; margin-bottom: 10px; }
-              .stat-value { font-size: 24px; font-weight: bold; color: #111827; }
-              .stat-label { font-size: 12px; color: #6b7280; text-transform: uppercase; }
-              .context { background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 15px 0; }
-              .footer { padding: 15px 20px; background: #f9fafb; font-size: 12px; color: #6b7280; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>${severityEmoji} ${alert.severity.toUpperCase()} ALERT</h1>
-              </div>
-              <div class="content">
-                <h2 style="margin-top: 0; color: #111827;">${alert.entity_name}</h2>
-                <p style="color: #6b7280; margin-bottom: 20px;">Type: ${alert.alert_type.replace('_', ' ')}</p>
-                
-                <div>
-                  <div class="stat">
-                    <div class="stat-value">${Math.round(alert.velocity_increase)}%</div>
-                    <div class="stat-label">Velocity Increase</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-value">${alert.current_mentions}</div>
-                    <div class="stat-label">Mentions (${alert.time_window})</div>
-                  </div>
-                </div>
-
-                <div class="context">
-                  <p style="margin: 0;">${alert.context_summary}</p>
-                </div>
-
-                ${alert.related_articles?.length > 0 ? `
-                  <p style="font-size: 14px; color: #6b7280;">
-                    ${alert.related_articles.length} related article(s) found
-                  </p>
-                ` : ''}
-              </div>
-              <div class="footer">
-                Detected at ${new Date(alert.detected_at).toLocaleString('en-US', { 
-                  timeZone: 'America/New_York',
-                  dateStyle: 'medium',
-                  timeStyle: 'short'
-                })} ET
-              </div>
-            </div>
-          </body>
-          </html>
-        `
+        subject: `${severityEmoji} ${alertData.severity.toUpperCase()}: ${alertData.entity_name} spike detected`,
+        html: emailHtml
       })
     });
 
