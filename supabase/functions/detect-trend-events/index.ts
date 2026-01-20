@@ -586,6 +586,19 @@ const VERB_DETECTION_LIST = [
   'slam', 'slams', 'slammed', 'blast', 'blasts', 'blasted',
   'honor', 'honors', 'honored', 'mourn', 'mourns', 'mourned',
   'celebrate', 'celebrates', 'celebrated', 'mark', 'marks', 'marked',
+  // FIX: Additional verbs from context_display_only audit
+  'attend', 'attends', 'attended', 'attending', 'hand', 'hands', 'handed',
+  'anger', 'angers', 'angered', 'angering', 'rage', 'rages', 'raged',
+  'threaten', 'threatens', 'threatened', 'threatening', 'revive', 'revives', 'revived',
+  'prove', 'proves', 'proved', 'proven', 'proving', 'lock', 'locks', 'locked',
+  'send', 'sends', 'sent', 'sending', 'internationalise', 'internationalises', 'internationalize',
+  // FIX: Additional verbs from second audit pass
+  'issue', 'issues', 'issued', 'issuing', 'seal', 'seals', 'sealed', 'sealing',
+  'channel', 'channels', 'channeled', 'channeling', 'allow', 'allows', 'allowed', 'allowing',
+  'collaborate', 'collaborates', 'collaborated', 'aim', 'aims', 'aimed', 'aiming',
+  'declare', 'declares', 'declared', 'declaring', 'plunge', 'plunges', 'plunged',
+  'restrict', 'restricts', 'restricted', 'restricting', 'promote', 'promotes', 'promoted',
+  'help', 'helps', 'helped', 'helping', 'contend', 'contends', 'contended',
 ];
 
 // Event nouns that indicate something happened
@@ -615,13 +628,16 @@ const ENTITY_ONLY_PATTERNS = [
  */
 function containsVerbOrEventNoun(topic: string): boolean {
   const lower = topic.toLowerCase();
-  const words = lower.split(/\s+/);
   
+  // FIX: Use regex word boundary matching for more accurate verb detection
+  // This catches verb forms that may be hyphenated or adjacent to punctuation
   for (const verb of VERB_DETECTION_LIST) {
-    if (words.includes(verb)) return true;
+    const regex = new RegExp(`\\b${verb}\\b`, 'i');
+    if (regex.test(lower)) return true;
   }
   for (const noun of EVENT_NOUN_LIST) {
-    if (words.includes(noun)) return true;
+    const regex = new RegExp(`\\b${noun}\\b`, 'i');
+    if (regex.test(lower)) return true;
   }
   return false;
 }
@@ -716,6 +732,8 @@ function validateEventPhraseLabel(
           fallbackLabel 
         };
       }
+      // FIX: Fallback was attempted but failed - track this explicitly
+      return { is_event_phrase: false, label_quality: 'entity_only', downgraded: false, label_source: 'fallback_failed' };
     }
     return { is_event_phrase: false, label_quality: 'entity_only', downgraded: false, label_source: 'entity_only' };
   }
@@ -739,6 +757,8 @@ function validateEventPhraseLabel(
           fallbackLabel 
         };
       }
+      // FIX: Fallback was attempted after downgrade but failed
+      return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true, label_source: 'fallback_failed_after_downgrade' };
     }
     return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true, label_source: 'event_phrase_downgraded' };
   }
@@ -1607,12 +1627,14 @@ serve(async (req) => {
     let qualityGateFiltered = 0;
     let labelDowngradedCount = 0; // FIX 1: Count downgrades from event_phrase → entity_only
     
-    // FIX: Label quality audit counters
+    // FIX: Label quality audit counters - extended for context upgrades
     let labelAudit = {
       event_phrase: 0,
       fallback_generated: 0,
       entity_only: 0,
       with_metadata_hint: 0, // Topics that had label_quality_hint from extracted_topics
+      context_upgrade: 0, // NEW: Entities upgraded via headline context
+      fallback_failed: 0, // NEW: Fallback generation attempted but failed
     };
     
     for (const [key, agg] of topicMap) {
@@ -1859,7 +1881,8 @@ serve(async (req) => {
       // Use the validated label quality for ranking
       const labelQualityForRanking = validationResult.label_quality;
       const validatedIsEventPhrase = validationResult.is_event_phrase;
-      const labelSource = validationResult.label_source; // FIX: Track label source for explainability
+      // FIX: Make labelSource mutable so it can be updated during context upgrade
+      let labelSource = validationResult.label_source;
       
       // ========================================
       // PHASE 3: EVERGREEN PENALTY CALCULATION
@@ -2121,10 +2144,13 @@ serve(async (req) => {
         const contextHasVerb = containsVerbOrEventNoun(contextSummary);
         if (contextHasVerb) {
           canonicalLabelIsEventPhrase = true;
-          console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=true)`);
+          // FIX: Update labelSource to reflect context upgrade for audit tracking
+          labelSource = 'context_upgrade';
+          console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=true, label_source=context_upgrade)`);
         } else {
-          // Context doesn't have verb - keep is_event_phrase as false
-          console.log(`[detect-trend-events] CONTEXT DISPLAY: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=false, no verb)`);
+          // Context doesn't have verb - keep is_event_phrase as false but still use context for display
+          labelSource = 'context_display_only';
+          console.log(`[detect-trend-events] CONTEXT DISPLAY: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=false, no verb, label_source=context_display_only)`);
         }
       }
       
@@ -2132,11 +2158,14 @@ serve(async (req) => {
       // Use labelQualityForRanking which was computed before rankScore calculation
       const labelQuality = labelQualityForRanking;
       
-      // FIX: Track label quality for audit
+      // FIX: Track label quality for audit - extended with context upgrades
       if (labelQuality === 'event_phrase') labelAudit.event_phrase++;
       else if (labelQuality === 'fallback_generated') labelAudit.fallback_generated++;
       else labelAudit.entity_only++;
       if (agg.label_quality_hint) labelAudit.with_metadata_hint++;
+      // Track context upgrades and fallback failures via labelSource
+      if (labelSource === 'context_upgrade') labelAudit.context_upgrade++;
+      if (labelSource === 'fallback_failed' || labelSource === 'fallback_failed_after_downgrade') labelAudit.fallback_failed++;
       
       // Build related entities array from the aggregate
       const relatedEntitiesArray = Array.from(agg.related_entities).slice(0, 10);
@@ -2283,8 +2312,8 @@ serve(async (req) => {
       return acc;
     }, {} as Record<string, number>);
     console.log(`[detect-trend-events] Source count distribution: ${JSON.stringify(sourceDistribution)}`);
-    // FIX: Label quality audit log
-    console.log(`[detect-trend-events] LABEL AUDIT: event_phrase=${labelAudit.event_phrase} fallback_generated=${labelAudit.fallback_generated} entity_only=${labelAudit.entity_only} (with_metadata_hint=${labelAudit.with_metadata_hint})`);
+    // FIX: Extended label quality audit log with context upgrades and fallback failures
+    console.log(`[detect-trend-events] LABEL AUDIT: event_phrase=${labelAudit.event_phrase} fallback_generated=${labelAudit.fallback_generated} entity_only=${labelAudit.entity_only} context_upgrade=${labelAudit.context_upgrade} fallback_failed=${labelAudit.fallback_failed} (with_metadata_hint=${labelAudit.with_metadata_hint})`);
     
     // ========================================
     // STEP 4: Upsert trend events and evidence in BATCHES
