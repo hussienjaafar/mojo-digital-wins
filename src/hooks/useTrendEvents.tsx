@@ -278,11 +278,33 @@ export const useTrendEvents = (options: UseTrendEventsOptions = {}) => {
           throw fallbackError;
         }
         
-        setEvents((fallbackData || []) as unknown as TrendEvent[]);
+        // PHASE 2 FIX: Deduplicate by cluster_id, keeping highest rank_score
+        const deduplicatedFallback = Array.from(
+          (fallbackData || []).reduce((map, event) => {
+            const key = (event as any).cluster_id || event.id;
+            const existing = map.get(key);
+            if (!existing || ((event as any).rank_score || 0) > ((existing as any).rank_score || 0)) {
+              map.set(key, event);
+            }
+            return map;
+          }, new Map<string, typeof fallbackData[0]>()).values()
+        );
+        setEvents(deduplicatedFallback as unknown as TrendEvent[]);
         return;
       }
       
-      setEvents((data || []) as unknown as TrendEvent[]);
+      // PHASE 2 FIX: Deduplicate by cluster_id, keeping highest rank_score
+      const deduplicatedEvents = Array.from(
+        (data || []).reduce((map, event) => {
+          const key = (event as any).cluster_id || event.id;
+          const existing = map.get(key);
+          if (!existing || ((event as any).rank_score || 0) > ((existing as any).rank_score || 0)) {
+            map.set(key, event);
+          }
+          return map;
+        }, new Map<string, typeof data[0]>()).values()
+      );
+      setEvents(deduplicatedEvents as unknown as TrendEvent[]);
     } catch (err: any) {
       console.error('Failed to fetch trend events:', err);
       setError(err.message || 'Failed to load trends');

@@ -138,7 +138,8 @@ const TOPIC_BLOCKLIST: Set<string> = new Set([
   // Low-value topics
   'watch', 'video', 'photo', 'image', 'live', 'opinion', 'editorial',
   // PHASE 3 FIX: Ambiguous single-word abbreviations and common words
-  'us', 'uk', 'eu', 'un', 'mlk', 'ice',  // Too ambiguous without context
+  // NOTE: Removed 'un', 'who', 'ice', 'eu', 'uk' to allow UN/WHO/ICE/EU stories (2026-01-20 fix)
+  'us', 'mlk',  // Too ambiguous without context
   'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
   'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
 ]);
@@ -200,18 +201,18 @@ function calculateEvergreenPenalty(
 ): number {
   // PHASE 3 FIX: Single-word entities get SEVERE penalty - they should rarely trend
   // Goal: Force conversion to event phrases like "Trump Announces X" instead of just "Trump"
-  const baseEntityPenalty = isSingleWordEntity ? 0.15 : 1.0;  // Was 0.6, now 0.15
+  const baseEntityPenalty = isSingleWordEntity ? 0.40 : 1.0;  // Was 0.15, now 0.40 - less aggressive
 
   if (!isEvergreen) return baseEntityPenalty;
 
-  // PHASE 3 FIX: Even higher z-score required for evergreen topics
-  if (zScoreVelocity > 8) return 0.80 * baseEntityPenalty;  // Extreme spike (was 6)
-  if (zScoreVelocity > 6) return 0.55 * baseEntityPenalty;  // Very strong spike (was 5)
-  if (zScoreVelocity > 5) return 0.35 * baseEntityPenalty;  // Strong spike (was 4)
-  if (zScoreVelocity > 4) return 0.20 * baseEntityPenalty;  // Moderate spike (was 3)
+  // PHASE 3 FIX: Less aggressive z-score thresholds for evergreen topics
+  if (zScoreVelocity > 6) return 0.95 * baseEntityPenalty;  // Strong spike
+  if (zScoreVelocity > 4) return 0.80 * baseEntityPenalty;  // Moderate spike
+  if (zScoreVelocity > 3) return 0.65 * baseEntityPenalty;  // Light spike
+  if (zScoreVelocity > 2) return 0.50 * baseEntityPenalty;  // Minimal spike
 
-  // Evergreen with no significant spike gets EXTREME penalty
-  return hasHistoricalBaseline ? 0.05 * baseEntityPenalty : 0.08 * baseEntityPenalty;
+  // Evergreen with no significant spike - less aggressive floor penalty
+  return hasHistoricalBaseline ? 0.30 * baseEntityPenalty : 0.35 * baseEntityPenalty;
 }
 
 // ============================================================================
@@ -333,8 +334,8 @@ const QUALITY_THRESHOLDS = {
   MIN_MENTIONS_DEFAULT: 3,
   // PHASE 3 FIX: Single-word topics need EXTREME thresholds to pass
   // Most single-word entities should NOT trend - they need to be converted to event phrases
-  MIN_MENTIONS_SINGLE_WORD: 20,       // INCREASED from 8 - very high bar
-  MIN_SOURCES_SINGLE_WORD: 3,         // INCREASED from 2 - need broad corroboration
+  MIN_MENTIONS_SINGLE_WORD: 8,        // Reduced from 20 to allow legitimate single-word trends
+  MIN_SOURCES_SINGLE_WORD: 2,         // Reduced from 3 - moderate corroboration requirement
   MIN_NEWS_SOURCES_SINGLE_WORD: 3,    // INCREASED from 2 - strong news requirement
   MIN_TIER12_SOURCES_SINGLE_WORD: 2,  // INCREASED from 1 - need multiple authoritative sources
   // Source diversity requirements
@@ -1963,7 +1964,14 @@ serve(async (req) => {
       // Determine trend stage
       const hoursOld = (now.getTime() - agg.first_seen_at.getTime()) / (1000 * 60 * 60);
       let trendStage = 'stable';
-      if (zScoreVelocity > 3 && acceleration > 50 && hoursOld < 3) {
+      // PHASE 4 FIX: High volume override - volume trumps z-score for active stories
+      if (current1h_deduped >= 5) {
+        trendStage = 'surging';  // 5+ mentions in last hour = definitely surging
+      } else if (current24h_deduped >= 20 && sourceCount >= 5) {
+        trendStage = 'surging';  // 20+ mentions from 5+ sources = surging
+      } else if (current24h_deduped >= 15 && current1h_deduped >= 2) {
+        trendStage = 'surging';  // High volume + recent activity = surging
+      } else if (zScoreVelocity > 3 && acceleration > 50 && hoursOld < 3) {
         trendStage = 'emerging';
       } else if (zScoreVelocity > 2 && acceleration > 20) {
         trendStage = 'surging';
@@ -1971,7 +1979,7 @@ serve(async (req) => {
         trendStage = 'peaking';
       } else if (zScoreVelocity < 0 || (zScoreVelocity < 0.5 && acceleration < -30)) {
         trendStage = 'declining';
-      } else if (zScoreVelocity > 0.5) {
+      } else if (zScoreVelocity > 0.3) {
         trendStage = 'surging';
       }
       
@@ -2314,18 +2322,38 @@ serve(async (req) => {
     console.log(`[detect-trend-events] Source count distribution: ${JSON.stringify(sourceDistribution)}`);
     // FIX: Extended label quality audit log with context upgrades and fallback failures
     console.log(`[detect-trend-events] LABEL AUDIT: event_phrase=${labelAudit.event_phrase} fallback_generated=${labelAudit.fallback_generated} entity_only=${labelAudit.entity_only} context_upgrade=${labelAudit.context_upgrade} fallback_failed=${labelAudit.fallback_failed} (with_metadata_hint=${labelAudit.with_metadata_hint})`);
-    
+
+    // PHASE 2 FIX: Consolidate cluster members before upsert
+    // Keep only the highest-scoring member of each cluster
+    const clusterBestMap = new Map<string, typeof eventsToUpsert[0]>();
+    for (const event of eventsToUpsert) {
+      const clusterId = event.cluster_id || event.event_key;
+      const existing = clusterBestMap.get(clusterId);
+      if (!existing || (event.rank_score || 0) > (existing.rank_score || 0)) {
+        // If merging, add evidence counts
+        if (existing) {
+          event.evidence_count = (event.evidence_count || 0) + (existing.evidence_count || 0);
+        }
+        clusterBestMap.set(clusterId, event);
+      } else if (existing) {
+        // Add this event's evidence to the existing best
+        existing.evidence_count = (existing.evidence_count || 0) + (event.evidence_count || 0);
+      }
+    }
+    const consolidatedEvents = Array.from(clusterBestMap.values());
+    console.log(`[detect-trend-events] Consolidated ${eventsToUpsert.length} events to ${consolidatedEvents.length} after cluster merge`);
+
     // ========================================
     // STEP 4: Upsert trend events and evidence in BATCHES
     // ========================================
     currentPhase = 'upsert_events';
     
     // Emergency flush: if near timeout, flush a smaller priority batch (breaking + high rank_score first)
-    let eventsToProcess = eventsToUpsert;
+    let eventsToProcess = consolidatedEvents;
     if (shouldExitEarly()) {
       console.warn(`[detect-trend-events] ⚠️ Near timeout before upsert - triggering emergency flush`);
       // Prioritize breaking events and top rank_score events
-      const priorityEvents = eventsToUpsert
+      const priorityEvents = consolidatedEvents
         .sort((a, b) => {
           // Breaking first
           if (a.is_breaking && !b.is_breaking) return -1;
