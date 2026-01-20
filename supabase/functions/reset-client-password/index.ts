@@ -5,7 +5,7 @@ import { sendEmail, EmailError, isEmailConfigured } from "../_shared/email.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const PUBLIC_SITE_URL = Deno.env.get("PUBLIC_SITE_URL") || "https://mojo-digital-wins.lovable.app";
+const APP_URL = Deno.env.get("APP_URL") || "https://mojo-digital-wins.lovable.app";
 
 interface ResetPasswordRequest {
   user_id: string;
@@ -125,7 +125,7 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('id', clientUser?.organization_id)
       .single();
 
-    const loginUrl = `${req.headers.get("origin") || PUBLIC_SITE_URL}/client-login`;
+    const loginUrl = `${req.headers.get("origin") || APP_URL}/client-login`;
 
     // Generate a secure password reset link using Supabase's built-in functionality
     const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({

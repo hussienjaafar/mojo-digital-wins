@@ -162,7 +162,7 @@ serve(async (req) => {
         }
 
         // Build the invitation URL with new token
-        const appUrl = Deno.env.get('APP_URL') || supabaseUrl.replace('.supabase.co', '.lovable.app');
+        const appUrl = Deno.env.get('APP_URL') || 'https://mojo-digital-wins.lovable.app';
         const inviteUrl = `${appUrl}/accept-invite?token=${newToken}`;
 
         // Build email content
@@ -341,7 +341,7 @@ serve(async (req) => {
     }
 
     // Build the invitation URL
-    const appUrl = Deno.env.get('APP_URL') || supabaseUrl.replace('.supabase.co', '.lovable.app');
+    const appUrl = Deno.env.get('APP_URL') || 'https://mojo-digital-wins.lovable.app';
     const inviteUrl = `${appUrl}/accept-invite?token=${invitation.token}`;
 
     // Build email content
