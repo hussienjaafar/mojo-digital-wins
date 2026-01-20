@@ -137,6 +137,10 @@ const TOPIC_BLOCKLIST: Set<string> = new Set([
   'thread', 'post', 'tweet', 'retweet', 'share', 'like', 'comment',
   // Low-value topics
   'watch', 'video', 'photo', 'image', 'live', 'opinion', 'editorial',
+  // PHASE 3 FIX: Ambiguous single-word abbreviations and common words
+  'us', 'uk', 'eu', 'un', 'mlk', 'ice',  // Too ambiguous without context
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
+  'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
 ]);
 
 // ============================================================================
@@ -186,28 +190,28 @@ function isEvergreenTopic(topicKey: string, baseline7d: number, baseline30d: num
   return false;
 }
 
-// Calculate evergreen penalty (0.15-1.0): lower for evergreen unless spiking
-// PHASE A: Strengthened penalties + single-word entity penalty
+// Calculate evergreen penalty (0.05-1.0): lower for evergreen unless spiking
+// PHASE 3 FIX: DRASTICALLY strengthened single-word penalty to nearly eliminate them
 function calculateEvergreenPenalty(
-  isEvergreen: boolean, 
-  zScoreVelocity: number, 
+  isEvergreen: boolean,
+  zScoreVelocity: number,
   hasHistoricalBaseline: boolean,
   isSingleWordEntity: boolean = false
 ): number {
-  // PHASE A: Single-word entities get base penalty even if not in evergreen list
-  // This suppresses vague single-word labels like "Gaza", "Greenland"
-  const baseEntityPenalty = isSingleWordEntity ? 0.6 : 1.0;
-  
+  // PHASE 3 FIX: Single-word entities get SEVERE penalty - they should rarely trend
+  // Goal: Force conversion to event phrases like "Trump Announces X" instead of just "Trump"
+  const baseEntityPenalty = isSingleWordEntity ? 0.15 : 1.0;  // Was 0.6, now 0.15
+
   if (!isEvergreen) return baseEntityPenalty;
-  
-  // PHASE A: Strengthened - require MUCH higher z-score to overcome penalty
-  if (zScoreVelocity > 6) return 0.85 * baseEntityPenalty;  // Extreme spike
-  if (zScoreVelocity > 5) return 0.65 * baseEntityPenalty;  // Very strong spike  
-  if (zScoreVelocity > 4) return 0.45 * baseEntityPenalty;  // Strong spike
-  if (zScoreVelocity > 3) return 0.30 * baseEntityPenalty;  // Moderate spike
-  
-  // Evergreen with no significant spike gets HEAVY penalty
-  return hasHistoricalBaseline ? 0.15 * baseEntityPenalty : 0.20 * baseEntityPenalty;
+
+  // PHASE 3 FIX: Even higher z-score required for evergreen topics
+  if (zScoreVelocity > 8) return 0.80 * baseEntityPenalty;  // Extreme spike (was 6)
+  if (zScoreVelocity > 6) return 0.55 * baseEntityPenalty;  // Very strong spike (was 5)
+  if (zScoreVelocity > 5) return 0.35 * baseEntityPenalty;  // Strong spike (was 4)
+  if (zScoreVelocity > 4) return 0.20 * baseEntityPenalty;  // Moderate spike (was 3)
+
+  // Evergreen with no significant spike gets EXTREME penalty
+  return hasHistoricalBaseline ? 0.05 * baseEntityPenalty : 0.08 * baseEntityPenalty;
 }
 
 // ============================================================================
@@ -323,15 +327,16 @@ function calculateRankScore(params: {
   return Math.round(finalScore * 10) / 10;
 }
 
-// Quality thresholds - PHASE 2: Strengthened single-word suppression
+// Quality thresholds - PHASE 3 FIX: Drastically strengthened single-word suppression
 const QUALITY_THRESHOLDS = {
   // Minimum deduped mentions for any topic
   MIN_MENTIONS_DEFAULT: 3,
-  // PHASE 2: Single-word topics need MUCH higher thresholds
-  MIN_MENTIONS_SINGLE_WORD: 8,        // Increased from 5
-  MIN_SOURCES_SINGLE_WORD: 2,
-  MIN_NEWS_SOURCES_SINGLE_WORD: 2,    // Increased from 1 - require corroboration
-  MIN_TIER12_SOURCES_SINGLE_WORD: 1,  // NEW: Require at least one tier1/tier2 source
+  // PHASE 3 FIX: Single-word topics need EXTREME thresholds to pass
+  // Most single-word entities should NOT trend - they need to be converted to event phrases
+  MIN_MENTIONS_SINGLE_WORD: 20,       // INCREASED from 8 - very high bar
+  MIN_SOURCES_SINGLE_WORD: 3,         // INCREASED from 2 - need broad corroboration
+  MIN_NEWS_SOURCES_SINGLE_WORD: 3,    // INCREASED from 2 - strong news requirement
+  MIN_TIER12_SOURCES_SINGLE_WORD: 2,  // INCREASED from 1 - need multiple authoritative sources
   // Source diversity requirements
   MIN_SOURCES_FOR_TRENDING: 2,
   MIN_NEWS_FOR_LOW_SOCIAL: 1,
@@ -340,13 +345,16 @@ const QUALITY_THRESHOLDS = {
   MIN_24H_MENTIONS: 5,
 };
 
-// PHASE 2: Single-word entities that are allowed (well-known acronyms, proper nouns)
+// PHASE 3 FIX: DRASTICALLY reduced allowed list - only unambiguous acronyms that have NO other meaning
+// Removed: ice (frozen water), trump/biden/musk (should be event phrases), gaza/ukraine/etc (need context)
+// Single-word person names and geographic locations should NEVER trend alone
 const ALLOWED_SINGLE_WORD_ENTITIES = new Set([
-  'nato', 'fbi', 'cia', 'doj', 'dhs', 'ice', 'doge', 'epa', 'fda', 'cdc',
-  'nsa', 'irs', 'sec', 'ftc', 'fcc', 'fec', 'nlrb', 'osha', 'usps',
-  'scotus', 'potus', 'flotus', 'vpotus', 'hamas', 'hezbollah', 'isis',
-  'gaza', 'ukraine', 'russia', 'china', 'israel', 'taiwan', 'iran',
-  'musk', 'bezos', 'zuckerberg', 'trump', 'biden', 'vance', 'walz',
+  // Only keep US government acronyms that are completely unambiguous
+  'nato', 'fbi', 'cia', 'doj', 'dhs', 'epa', 'fda', 'cdc',
+  'nsa', 'irs', 'sec', 'ftc', 'fcc', 'fec', 'osha',
+  'scotus', 'potus',
+  // Terrorist organizations (no other meaning)
+  'hamas', 'hezbollah', 'isis',
 ]);
 
 /**
@@ -712,21 +720,24 @@ function validateEventPhraseLabel(
 
 /**
  * Try to generate a fallback event phrase from headline when entity is detected
- * CRITICAL: This is the fallback generation that was missing in detect-trend-events
+ * PHASE 3 FIX: Strengthened with more verb patterns and headline truncation fallback
  */
 function tryGenerateFallbackFromHeadline(headline: string, entityName: string): string | null {
   if (!headline || headline.length < 10) return null;
-  
-  // Action verbs to look for in headline
+
+  // Escape special regex characters in entity name
+  const escapedEntity = entityName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // PHASE 3 FIX: Comprehensive action verbs
   const verbPatterns = [
     // Active voice: "Trump Fires FBI Director", "House Passes Bill"
-    new RegExp(`(${entityName})\\s+(passes?|blocks?|rejects?|approves?|signs?|fires?|resigns?|announces?|launches?|bans?|arrests?|indicts?|sues?|orders?|vetoes?|strikes?|rules?|overturns?|upholds?|halts?|suspends?|expands?|cuts?|threatens?|warns?|demands?|proposes?|withdraws?|seizes?|raids?|deports?|detains?|pardons?|revokes?|nominates?|appoints?|dismisses?|grants?|denies?|charges?|convicts?|acquits?|sentences?|attacks?|invades?|bombs?|wins?|loses?|faces?|confirms?|targets?)\\s+(.+)`, 'i'),
+    new RegExp(`(${escapedEntity})\\s+(passes?|blocks?|rejects?|approves?|signs?|fires?|resigns?|announces?|launches?|bans?|arrests?|indicts?|sues?|orders?|vetoes?|strikes?|rules?|overturns?|upholds?|halts?|suspends?|expands?|cuts?|threatens?|warns?|demands?|proposes?|withdraws?|seizes?|raids?|deports?|detains?|pardons?|revokes?|nominates?|appoints?|dismisses?|grants?|denies?|charges?|convicts?|acquits?|sentences?|attacks?|invades?|bombs?|wins?|loses?|faces?|confirms?|targets?|reveals?|claims?|alleges?|slams?|blasts?|praises?|defends?|condemns?|honors?|celebrates?|mourns?|marks?|meets?|visits?|hosts?|addresses?|plans?|considers?|seeks?|urges?|vows?)\\s+(.+)`, 'i'),
     // Subject + Verb pattern anywhere
-    new RegExp(`\\b(${entityName})\\b.*?\\b(passes?|blocks?|fires?|signs?|bans?|wins?|loses?|faces?|arrests?|indicts?|sues?|orders?)\\b`, 'i'),
+    new RegExp(`\\b(${escapedEntity})\\b.*?\\b(passes?|blocks?|fires?|signs?|bans?|wins?|loses?|faces?|arrests?|indicts?|sues?|orders?|announces?|reveals?|confirms?|targets?|slams?|honors?|meets?)\\b`, 'i'),
     // Verb + Subject pattern
-    new RegExp(`\\b(passes?|blocks?|fires?|signs?|bans?|wins?|loses?|arrests?|indicts?|sues?)\\b.*?\\b(${entityName})\\b`, 'i'),
+    new RegExp(`\\b(passes?|blocks?|fires?|signs?|bans?|wins?|loses?|arrests?|indicts?|sues?|honors?|targets?)\\b.*?\\b(${escapedEntity})\\b`, 'i'),
   ];
-  
+
   for (const pattern of verbPatterns) {
     const match = headline.match(pattern);
     if (match) {
@@ -734,7 +745,7 @@ function tryGenerateFallbackFromHeadline(headline: string, entityName: string): 
       let phrase = match[0];
       const words = phrase.split(/\s+/).slice(0, 5);
       if (words.length >= 3) {
-        const result = words.map(w => 
+        const result = words.map(w =>
           w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
         ).join(' ');
         // Validate the generated phrase
@@ -744,19 +755,34 @@ function tryGenerateFallbackFromHeadline(headline: string, entityName: string): 
       }
     }
   }
-  
+
   // Look for event nouns in headline that could form a phrase
-  const eventNounPattern = /\b(vote|bill|ruling|crisis|ban|tariff|policy|probe|investigation|hearing|trial|arrest|firing|resignation|indictment|verdict|conviction|acquittal|sanction|ceasefire|attack|bombing|strike|raid|protest|scandal|impeachment|shutdown|veto|deportation|pardon|order|mandate|summit|election|debate)\b/i;
+  const eventNounPattern = /\b(vote|bill|ruling|crisis|ban|tariff|policy|probe|investigation|hearing|trial|arrest|firing|resignation|indictment|verdict|conviction|acquittal|sanction|ceasefire|attack|bombing|strike|raid|protest|scandal|impeachment|shutdown|veto|deportation|pardon|order|mandate|summit|election|debate|ceremony|holiday|memorial|anniversary|legacy)\b/i;
   const actionMatch = headline.match(eventNounPattern);
-  
+
   if (actionMatch) {
     const action = actionMatch[1];
     const phrase = `${entityName} ${action.charAt(0).toUpperCase() + action.slice(1).toLowerCase()}`;
-    if (phrase.split(/\s+/).length >= 3) {
+    if (phrase.split(/\s+/).length >= 2) {
       return phrase;
     }
   }
-  
+
+  // PHASE 3 FIX: Headline truncation fallback
+  // Use first 4-5 words of headline if it contains the entity
+  const headlineLower = headline.toLowerCase();
+  const entityLower = entityName.toLowerCase();
+  if (headlineLower.includes(entityLower.split(' ')[0])) {
+    const words = headline.split(/\s+/).filter(w => w.length > 1).slice(0, 5);
+    if (words.length >= 3) {
+      const truncated = words.map(w =>
+        w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+      ).join(' ');
+      console.log(`[detect-trend-events] Fallback headline truncation: "${truncated}" for "${entityName}"`);
+      return truncated;
+    }
+  }
+
   return null;
 }
 
@@ -1578,9 +1604,19 @@ serve(async (req) => {
       // Source counts using DEDUPED counts
       const newsCount = agg.by_source_deduped.rss + agg.by_source_deduped.google_news;
       const socialCount = agg.by_source_deduped.bluesky;
-      const sourceCount = (agg.by_source_deduped.rss > 0 ? 1 : 0) + 
-                          (agg.by_source_deduped.google_news > 0 ? 1 : 0) + 
-                          (agg.by_source_deduped.bluesky > 0 ? 1 : 0);
+      const sourceTypeCount = (agg.by_source_deduped.rss > 0 ? 1 : 0) +
+                              (agg.by_source_deduped.google_news > 0 ? 1 : 0) +
+                              (agg.by_source_deduped.bluesky > 0 ? 1 : 0);
+
+      // PHASE 3 FIX: Count distinct source domains for better source diversity measurement
+      // This counts unique publishers/domains, not just source types
+      const distinctDomains = new Set<string>();
+      for (const mention of agg.dedupedMentions.values()) {
+        if (mention.domain) {
+          distinctDomains.add(mention.domain.toLowerCase());
+        }
+      }
+      const sourceCount = Math.max(distinctDomains.size, sourceTypeCount); // At least count source types
       
       // ========================================
       // PHASE 2: Get tier distribution BEFORE quality gates
@@ -2189,6 +2225,14 @@ serve(async (req) => {
     console.log(`[detect-trend-events] Quality gates filtered ${qualityGateFiltered} low-quality topics`);
     console.log(`[detect-trend-events] Deduplication removed ${dedupedSavings} duplicate mentions`);
     console.log(`[detect-trend-events] FIX 1: Downgraded ${labelDowngradedCount} entity-only labels from is_event_phrase=true → false`);
+
+    // PHASE 3 FIX: Log source distribution for debugging
+    const sourceDistribution = eventsToUpsert.reduce((acc, e) => {
+      const sc = e.source_count || 0;
+      acc[sc >= 5 ? '5+' : sc.toString()] = (acc[sc >= 5 ? '5+' : sc.toString()] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log(`[detect-trend-events] Source count distribution: ${JSON.stringify(sourceDistribution)}`);
     // FIX: Label quality audit log
     console.log(`[detect-trend-events] LABEL AUDIT: event_phrase=${labelAudit.event_phrase} fallback_generated=${labelAudit.fallback_generated} entity_only=${labelAudit.entity_only} (with_metadata_hint=${labelAudit.with_metadata_hint})`);
     
