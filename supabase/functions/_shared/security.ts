@@ -12,7 +12,7 @@ export function getCorsHeaders(req?: Request): Record<string, string> {
   const allowedOriginsEnv = Deno.env.get('ALLOWED_ORIGINS');
   const allowedOrigins = allowedOriginsEnv?.split(',').map(o => o.trim()).filter(Boolean) || [];
 
-  // Default fallback origins if not configured
+  // Default fallback origins if not configured - include preview domains
   const defaultOrigins = [
     'https://mojo-digital-wins.lovable.app',
     'https://lovable.dev'
@@ -24,8 +24,14 @@ export function getCorsHeaders(req?: Request): Record<string, string> {
   let allowedOrigin = origins[0];
   if (req) {
     const requestOrigin = req.headers.get('origin');
-    if (requestOrigin && origins.includes(requestOrigin)) {
-      allowedOrigin = requestOrigin;
+    if (requestOrigin) {
+      // Allow origin if explicitly listed OR if it's a Lovable preview/project domain
+      const isLovableDomain = requestOrigin.includes('.lovableproject.com') || 
+                              requestOrigin.includes('.lovable.app') ||
+                              requestOrigin.includes('localhost');
+      if (origins.includes(requestOrigin) || isLovableDomain) {
+        allowedOrigin = requestOrigin;
+      }
     }
   }
 
