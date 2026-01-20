@@ -3,6 +3,7 @@
  *
  * User invitations, admin invitations.
  * Stronger brand presence, welcoming tone, conversion-focused.
+ * V3 Design System aligned.
  */
 
 import { invitationTemplate } from '../base.ts';
@@ -12,6 +13,7 @@ import {
   button,
   infoBox,
   smallText,
+  noticeBox,
   escapeHtml,
 } from '../components.ts';
 import { colors, spacing, fonts, fontSizes, fontWeights } from '../tokens.ts';
@@ -44,19 +46,43 @@ export function userInvite(options: UserInviteOptions): string {
 
   const isPlatformAdmin = invitationType === 'platform_admin';
 
-  const titleText = isReminder ? 'Invitation Reminder' : "You're Invited!";
+  // More personalized greeting based on context
+  const greetingText = inviterName
+    ? `${escapeHtml(inviterName)} has invited you to join`
+    : "You've been invited to join";
 
-  const roleText = isPlatformAdmin
-    ? `You've been invited to become a <strong>Platform Admin</strong> with full system access.`
-    : `You've been invited to join <strong>${escapeHtml(organizationName || 'the organization')}</strong> as a <strong>${escapeHtml(role || 'member')}</strong>.`;
+  const titleText = isReminder ? "Friendly Reminder: You're Invited!" : "You're Invited!";
 
-  const inviterText = inviterName
-    ? `<p style="color: ${colors.textMuted};
-                font-family: ${fonts.primary};
-                font-size: ${fontSizes.sm};
-                margin: ${spacing.md} 0;">
-         Invited by ${escapeHtml(inviterName)}
-       </p>`
+  const roleDescription = isPlatformAdmin
+    ? `the <strong>MOLITICO.</strong> platform as a <strong>Platform Administrator</strong>. You'll have full access to manage users, organizations, and system settings.`
+    : `<strong>${escapeHtml(organizationName || 'the team')}</strong> as a <strong>${escapeHtml(role || 'team member')}</strong>.`;
+
+  const whatToExpect = isPlatformAdmin
+    ? `
+      <div style="background-color: ${colors.background};
+                  border-radius: 8px;
+                  padding: ${spacing.md};
+                  margin: ${spacing.lg} 0;
+                  text-align: left;">
+        <p style="color: ${colors.text};
+                  font-family: ${fonts.primary};
+                  font-size: ${fontSizes.sm};
+                  font-weight: ${fontWeights.semibold};
+                  margin: 0 0 ${spacing.sm} 0;">
+          What you'll get access to:
+        </p>
+        <ul style="color: ${colors.textSecondary};
+                   font-family: ${fonts.primary};
+                   font-size: ${fontSizes.sm};
+                   margin: 0;
+                   padding-left: 20px;">
+          <li style="margin-bottom: 4px;">User and organization management</li>
+          <li style="margin-bottom: 4px;">System-wide analytics and reporting</li>
+          <li style="margin-bottom: 4px;">Security and compliance settings</li>
+          <li style="margin-bottom: 0;">Platform configuration and integrations</li>
+        </ul>
+      </div>
+    `
     : '';
 
   const content = `
@@ -65,17 +91,17 @@ export function userInvite(options: UserInviteOptions): string {
                  font-family: ${fonts.primary};
                  font-size: ${fontSizes['2xl']};
                  font-weight: ${fontWeights.bold};
-                 margin: 0 0 ${spacing.md} 0;">
+                 margin: 0 0 ${spacing.sm} 0;">
         ${titleText}
       </h1>
       <p style="color: ${colors.textSecondary};
                 font-family: ${fonts.primary};
                 font-size: ${fontSizes.base};
-                line-height: 1.5;
-                margin: 0 0 ${spacing.lg} 0;">
-        ${roleText}
+                line-height: 1.6;
+                margin: 0 0 ${spacing.md} 0;">
+        ${greetingText} ${roleDescription}
       </p>
-      ${inviterText}
+      ${whatToExpect}
       <div style="margin: ${spacing.lg} 0;">
         ${button('Accept Invitation', inviteUrl, 'primary')}
       </div>
@@ -83,21 +109,21 @@ export function userInvite(options: UserInviteOptions): string {
                 font-family: ${fonts.primary};
                 font-size: ${fontSizes.sm};
                 margin: ${spacing.lg} 0 0 0;">
-        This invitation expires in ${expiresIn}.
+        This invitation expires in <strong>${expiresIn}</strong>.
       </p>
       <p style="color: ${colors.textMuted};
                 font-family: ${fonts.primary};
                 font-size: ${fontSizes.xs};
                 margin: ${spacing.sm} 0 0 0;">
-        If the button doesn't work, copy this link:<br>
-        <span style="word-break: break-all;">${escapeHtml(inviteUrl)}</span>
+        If the button doesn't work, copy and paste this link into your browser:<br>
+        <span style="word-break: break-all; color: ${colors.primary};">${escapeHtml(inviteUrl)}</span>
       </p>
     </div>
   `;
 
   const previewText = isPlatformAdmin
-    ? "You've been invited as a Platform Admin"
-    : `You've been invited to join ${organizationName || 'an organization'}`;
+    ? `${inviterName ? `${inviterName} invited you` : "You've been invited"} to join MOLITICO. as a Platform Admin`
+    : `${inviterName ? `${inviterName} invited you` : "You've been invited"} to join ${organizationName || 'the team'}`;
 
   return invitationTemplate(content, previewText);
 }
@@ -125,17 +151,34 @@ export function adminInvite(options: AdminInviteOptions): string {
   } = options;
 
   const messageSection = customMessage
-    ? `<p style="color: ${colors.textSecondary};
-                font-family: ${fonts.primary};
-                font-size: ${fontSizes.base};
-                line-height: 1.5;
-                margin: 0 0 ${spacing.lg} 0;
-                font-style: italic;">
-         "${escapeHtml(customMessage)}"
-       </p>`
+    ? `
+      <div style="background-color: ${colors.background};
+                  border-left: 4px solid ${colors.primary};
+                  border-radius: 0 8px 8px 0;
+                  padding: ${spacing.md};
+                  margin: 0 0 ${spacing.lg} 0;
+                  text-align: left;">
+        <p style="color: ${colors.textSecondary};
+                  font-family: ${fonts.primary};
+                  font-size: ${fontSizes.base};
+                  line-height: 1.6;
+                  margin: 0;
+                  font-style: italic;">
+          "${escapeHtml(customMessage)}"
+        </p>
+        ${inviterName ? `
+          <p style="color: ${colors.textMuted};
+                    font-family: ${fonts.primary};
+                    font-size: ${fontSizes.sm};
+                    margin: ${spacing.sm} 0 0 0;">
+            — ${escapeHtml(inviterName)}
+          </p>
+        ` : ''}
+      </div>
+    `
     : '';
 
-  const inviterText = inviterName
+  const inviterText = !customMessage && inviterName
     ? `<p style="color: ${colors.textMuted};
                 font-family: ${fonts.primary};
                 font-size: ${fontSizes.sm};
@@ -151,55 +194,58 @@ export function adminInvite(options: AdminInviteOptions): string {
                  font-size: ${fontSizes['2xl']};
                  font-weight: ${fontWeights.bold};
                  margin: 0 0 ${spacing.md} 0;">
-        You're Invited to Join as an Administrator
+        Welcome to the Admin Team
       </h1>
+      <p style="color: ${colors.textSecondary};
+                font-family: ${fonts.primary};
+                font-size: ${fontSizes.base};
+                line-height: 1.6;
+                margin: 0 0 ${spacing.lg} 0;">
+        You've been selected to join as an <strong>Administrator</strong> with elevated access and responsibilities.
+      </p>
       ${messageSection}
       ${inviterText}
       <div style="background-color: ${colors.background};
-                  border-radius: 8px;
-                  padding: ${spacing.md};
+                  border-radius: 12px;
+                  padding: ${spacing.lg};
                   margin: ${spacing.lg} 0;">
         <p style="color: ${colors.textMuted};
                   font-family: ${fonts.primary};
                   font-size: ${fontSizes.sm};
                   margin: 0 0 8px 0;">
-          Your invitation code:
+          Your secure invitation code:
         </p>
         <p style="color: ${colors.text};
                   font-family: ${fonts.mono};
-                  font-size: ${fontSizes.xl};
+                  font-size: 28px;
                   font-weight: ${fontWeights.bold};
-                  letter-spacing: 2px;
-                  margin: 0;">
+                  letter-spacing: 4px;
+                  margin: 0;
+                  padding: ${spacing.sm} 0;">
           ${escapeHtml(inviteCode)}
         </p>
       </div>
       <div style="margin: ${spacing.lg} 0;">
-        ${button('Accept Invitation', inviteUrl, 'primary')}
+        ${button('Accept & Get Started', inviteUrl, 'primary')}
       </div>
-      <div style="background-color: #fef3cd;
-                  border-left: 4px solid ${colors.warning};
-                  border-radius: 4px;
-                  padding: ${spacing.md};
-                  margin: ${spacing.lg} 0;
-                  text-align: left;">
-        <p style="color: #856404;
-                  font-family: ${fonts.primary};
-                  font-size: ${fontSizes.sm};
-                  margin: 0;">
-          <strong>Security notice:</strong> This is a single-use code. Do not share it with anyone.
-        </p>
-      </div>
+      ${noticeBox(
+        '<strong>🔒 Security Notice:</strong> This is a single-use invitation code. Do not share it with anyone. If you did not expect this invitation, please ignore this email.',
+        'warning'
+      )}
       <p style="color: ${colors.textMuted};
                 font-family: ${fonts.primary};
                 font-size: ${fontSizes.sm};
                 margin: ${spacing.lg} 0 0 0;">
-        This invitation expires in ${expiresIn}.
+        This invitation expires in <strong>${expiresIn}</strong>.
       </p>
     </div>
   `;
 
-  return invitationTemplate(content, "You've been invited as an Administrator");
+  const previewText = inviterName
+    ? `${inviterName} invited you to join MOLITICO. as an Administrator`
+    : "You've been invited to join MOLITICO. as an Administrator";
+
+  return invitationTemplate(content, previewText);
 }
 
 /**

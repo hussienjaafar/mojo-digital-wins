@@ -2,6 +2,7 @@
  * Base Email Template
  *
  * Wraps all emails with consistent structure, header, and footer.
+ * V3 Design System aligned.
  */
 
 import {
@@ -30,18 +31,19 @@ interface BaseTemplateOptions {
 }
 
 /**
- * Generate the MOLITICO. wordmark
+ * Generate the MOLITICO. wordmark with accent dot
  */
 function wordmark(inverted = false): string {
   const textColor = inverted ? '#ffffff' : colors.text;
-  const dotColor = inverted ? '#ffffff' : colors.primary;
+  // Always use primary blue for the accent dot
+  const dotColor = colors.primary;
 
   return `
     <span style="font-family: ${fonts.primary};
-                 font-size: ${fontSizes.xl};
+                 font-size: 22px;
                  font-weight: ${fontWeights.bold};
                  color: ${textColor};
-                 letter-spacing: 1px;">
+                 letter-spacing: 1.5px;">
       ${brand.name}<span style="color: ${dotColor};">.</span>
     </span>
   `;
@@ -65,11 +67,17 @@ function minimalHeader(): string {
  */
 function brandedHeader(): string {
   return `
-    <div style="background-color: ${colors.primary};
-                padding: ${spacing.lg};
+    <div style="background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.primaryDark} 100%);
+                padding: ${spacing.xl};
                 text-align: center;
                 border-radius: ${layout.borderRadius} ${layout.borderRadius} 0 0;">
       ${wordmark(true)}
+      <p style="color: rgba(255, 255, 255, 0.85);
+                font-family: ${fonts.primary};
+                font-size: ${fontSizes.sm};
+                margin: ${spacing.sm} 0 0 0;">
+        ${brand.tagline}
+      </p>
     </div>
   `;
 }
@@ -103,7 +111,7 @@ function getHeader(variant: HeaderVariant, color?: string): string {
 }
 
 /**
- * Footer component
+ * Footer component with legal links
  */
 function footer(showPreferences: boolean, preferencesUrl?: string): string {
   const year = brand.copyrightYear;
@@ -112,7 +120,7 @@ function footer(showPreferences: boolean, preferencesUrl?: string): string {
     ? `<a href="${preferencesUrl}"
           style="color: ${colors.textMuted};
                  text-decoration: underline;">
-         Manage preferences
+         Email preferences
        </a>
        <span style="color: ${colors.textMuted};"> • </span>`
     : '';
@@ -133,10 +141,16 @@ function footer(showPreferences: boolean, preferencesUrl?: string): string {
                 font-size: ${fontSizes.xs};
                 margin: ${spacing.xs} 0 0 0;">
         ${preferencesLink}
+        <a href="https://molitico.com/privacy"
+           style="color: ${colors.textMuted};
+                  text-decoration: underline;">
+          Privacy Policy
+        </a>
+        <span style="color: ${colors.textMuted};"> • </span>
         <a href="mailto:support@molitico.com"
            style="color: ${colors.textMuted};
                   text-decoration: underline;">
-          Contact support
+          Contact Support
         </a>
       </p>
     </div>
@@ -238,7 +252,7 @@ export function baseTemplate(
                       width: 100%;
                       background-color: ${colors.surface};
                       border-radius: ${layout.borderRadius};
-                      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+                      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);">
           <tr>
             <td style="padding: 0;">
 
