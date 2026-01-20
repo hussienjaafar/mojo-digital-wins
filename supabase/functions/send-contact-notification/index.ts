@@ -130,8 +130,8 @@ const handler = async (req: Request): Promise<Response> => {
         "Authorization": `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "Molitico Contact Form <onboarding@resend.dev>",
-        to: ["info@molitico.com", "hussein@ryzeup.io"],
+        from: `Contact Form <${Deno.env.get('SENDER_EMAIL') || 'noreply@example.com'}>`,
+        to: (Deno.env.get('CONTACT_FORM_RECIPIENTS') || '').split(',').filter(Boolean),
         subject: `New Contact Form Submission from ${name}`,
         html: htmlContent,
         reply_to: email,

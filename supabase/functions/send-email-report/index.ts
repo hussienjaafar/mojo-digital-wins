@@ -255,8 +255,12 @@ const handler = async (req: Request): Promise<Response> => {
 </html>`;
 
     // Send email
+    const senderEmail = Deno.env.get('SENDER_EMAIL');
+    if (!senderEmail) {
+      throw new Error('SENDER_EMAIL environment variable not configured');
+    }
     const emailResponse = await resend.emails.send({
-      from: "Campaign Reports <reports@resend.dev>",
+      from: `Campaign Reports <${senderEmail}>`,
       to: recipients,
       subject: `${org.name} - Performance Report (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`,
       html,

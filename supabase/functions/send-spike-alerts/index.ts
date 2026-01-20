@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const SENDER_EMAIL = Deno.env.get('SENDER_EMAIL') || 'alerts@resend.dev';
+const SENDER_EMAIL = Deno.env.get('SENDER_EMAIL');  // Required - no fallback
 const MAX_RETRY_COUNT = 3;
 
 interface AlertResult {

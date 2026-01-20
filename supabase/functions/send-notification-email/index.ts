@@ -214,8 +214,12 @@ serve(async (req) => {
           </html>
         `;
 
+        const senderEmail = Deno.env.get('SENDER_EMAIL');
+        if (!senderEmail) {
+          throw new Error('SENDER_EMAIL not configured');
+        }
         await resend.emails.send({
-          from: 'Mojo Digital <onboarding@resend.dev>',
+          from: `Mojo Digital <${senderEmail}>`,
           to: [userData.email],
           subject: title,
           html: emailHtml,

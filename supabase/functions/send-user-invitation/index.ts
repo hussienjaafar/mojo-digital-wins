@@ -1,14 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders } from "../_shared/security.ts";
+import { getCorsHeaders, checkRateLimit } from "../_shared/security.ts";
 import { sendEmail, EmailError, isEmailConfigured } from "../_shared/email.ts";
-
-interface InvitationRequest {
-  email: string;
-  type: 'platform_admin' | 'organization_member';
-  organization_id?: string;
-  role?: 'admin' | 'manager' | 'viewer';
-}
+import { parseJsonBody, userInvitationSchema } from "../_shared/validators.ts";
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -34,7 +28,7 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Invalid authentication' }),
@@ -42,25 +36,30 @@ serve(async (req) => {
       );
     }
 
-    const body: InvitationRequest = await req.json();
-    console.log('Invitation request:', { ...body, requestedBy: user.id });
-
-    // Validate request
-    if (!body.email || !body.type) {
+    // Rate limiting: 10 invitations per minute per user
+    const rateLimitKey = `invite:${user.id}`;
+    const rateLimit = await checkRateLimit(rateLimitKey, 10, 60000);
+    if (!rateLimit.allowed) {
       return new Response(
-        JSON.stringify({ error: 'Email and type are required' }),
+        JSON.stringify({
+          error: 'Too many invitation requests. Please try again later.',
+          retry_after_seconds: Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate request body with Zod
+    const parseResult = await parseJsonBody(req, userInvitationSchema, { allowEmpty: false });
+    if (!parseResult.ok) {
+      return new Response(
+        JSON.stringify({ error: parseResult.error, details: parseResult.details }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(body.email)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid email format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const body = parseResult.data;
+    console.log('Invitation request:', { email: body.email, type: body.type, requestedBy: user.id });
 
     // Check authorization based on invitation type
     if (body.type === 'platform_admin') {
