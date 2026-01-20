@@ -59,12 +59,16 @@ export function InviteUserDialog({
         },
       });
 
-      if (response.error) {
-        throw new Error(response.error.message || "Failed to send invitation");
-      }
-
+      // Check for error in response data first (edge function error responses)
       if (response.data?.error) {
         throw new Error(response.data.error);
+      }
+
+      // Check for network/invocation errors
+      if (response.error) {
+        // Try to extract error from context if available
+        const errorMessage = response.error.message || "Failed to send invitation";
+        throw new Error(errorMessage);
       }
 
       setInviteUrl(response.data.invite_url);
