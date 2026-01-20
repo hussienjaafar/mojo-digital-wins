@@ -363,3 +363,6 @@ verify_jwt = false  # Uses CRON_SECRET or admin JWT internally
 # --- MONITORING & HEALTH (Phase 4) ---
 [functions.health-check]
 verify_jwt = false  # Public endpoint for uptime monitoring
+
+[functions.accept-invitation-signup]
+verify_jwt = false  # Public endpoint for invited users to create accounts

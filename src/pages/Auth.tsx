@@ -18,10 +18,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { logger } from "@/lib/logger";
 
-// Password strength calculation
+// Password strength calculation - matches database requirements (12 chars min)
 const calculatePasswordStrength = (password: string): { score: number; label: string; color: string } => {
   let score = 0;
-  if (password.length >= 8) score++;
+  if (password.length >= 12) score++;
   if (/[a-z]/.test(password)) score++;
   if (/[A-Z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
@@ -33,7 +33,7 @@ const calculatePasswordStrength = (password: string): { score: number; label: st
 };
 
 const getPasswordRequirements = (password: string) => ({
-  length: password.length >= 8,
+  length: password.length >= 12,
   lowercase: /[a-z]/.test(password),
   uppercase: /[A-Z]/.test(password),
   number: /[0-9]/.test(password),
@@ -58,7 +58,7 @@ const signUpSchema = z.object({
     .max(255, { message: "Email must be less than 255 characters" }),
   password: z
     .string()
-    .min(8, { message: "Password must be at least 8 characters" })
+    .min(12, { message: "Password must be at least 12 characters" })
     .regex(/[a-z]/, { message: "Password must contain at least one lowercase letter" })
     .regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter" })
     .regex(/[0-9]/, { message: "Password must contain at least one number" })
