@@ -2097,13 +2097,14 @@ serve(async (req) => {
       if (labelQualityForRanking === 'entity_only' && contextSummary && contextSummary.length > 20) {
         // Use context_summary as the canonical label for better display
         canonicalLabel = contextSummary;
-        // FIX: Only upgrade is_event_phrase if context_summary actually passes verb check
-        const contextPassesVerbCheck = isEventPhrase(contextSummary);
-        if (contextPassesVerbCheck) {
+        // FIX: For context summaries (full headlines), just check for verb presence without word count limit
+        // Headlines are typically 10+ words but still describe events - isEventPhrase() would fail due to word count
+        const contextHasVerb = containsVerbOrEventNoun(contextSummary);
+        if (contextHasVerb) {
           canonicalLabelIsEventPhrase = true;
           console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=true)`);
         } else {
-          // Context doesn't pass verb check - keep is_event_phrase as false
+          // Context doesn't have verb - keep is_event_phrase as false
           console.log(`[detect-trend-events] CONTEXT DISPLAY: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=false, no verb)`);
         }
       }
