@@ -5,6 +5,7 @@ import { sendEmail, EmailError, isEmailConfigured } from "../_shared/email.ts";
 import { parseJsonBody, userInvitationSchema } from "../_shared/validators.ts";
 import { userInvite, userInviteReminder } from "../_shared/email-templates/templates/invitation.ts";
 
+// Edge function for user invitations - v2
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
