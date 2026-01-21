@@ -78,9 +78,14 @@ export default function Redirect() {
       if (amount) actblueUrl.searchParams.set('amount', amount);
       if (recurring === 'true') actblueUrl.searchParams.set('recurring', 'true');
 
-      // Store fbclid in refcode2 for backup matching
+      // Store fbclid suffix in refcode2 for deterministic 1-to-1 matching
+      // IMPORTANT: Use the UNIQUE _aem_ suffix (last 24 chars) instead of prefix
+      // The prefix is often identical across clicks from the same campaign,
+      // but the suffix contains the unique _aem_ identifier
       if (fbclid && !searchParams.get('refcode2')) {
-        actblueUrl.searchParams.set('refcode2', `fb_${fbclid.substring(0, 20)}`);
+        // Extract unique suffix (last 24 chars) - contains the _aem_ unique identifier
+        const fbclidSuffix = fbclid.length > 24 ? fbclid.slice(-24) : fbclid;
+        actblueUrl.searchParams.set('refcode2', `fb_${fbclidSuffix}`);
       } else if (searchParams.get('refcode2')) {
         actblueUrl.searchParams.set('refcode2', searchParams.get('refcode2')!);
       }

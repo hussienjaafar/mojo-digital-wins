@@ -830,62 +830,111 @@ async function enqueueCAPIEvent(
     }
   }
 
-  // If still no full fbclid, try time-proximity matching with truncated refcode2 prefix
-  // This recovers full fbclid for donations where refcode2 was truncated
+  // If still no full fbclid, try suffix-based matching with refcode2
+  // NEW: Now uses _aem_ suffix (last 24 chars) for deterministic 1-to-1 matching
   if ((!fbc || fbc.length <= 50) && refcode2?.startsWith('fb_')) {
     const truncatedPart = refcode2.substring(3); // Remove 'fb_' prefix
     
-    // Find touchpoints within 30 min before donation
-    const { data: proximityTouchpoints } = await supabase
+    // First, try direct suffix match against touchpoints (most reliable for new flow)
+    // The suffix is the unique _aem_ identifier, so we can match precisely
+    const { data: suffixMatch } = await supabase
       .from('attribution_touchpoints')
-      .select('id, metadata, occurred_at')
+      .select('id, metadata')
       .eq('organization_id', organization_id)
       .not('metadata', 'is', null)
-      .gte('occurred_at', windowStart)
-      .lte('occurred_at', paidAt)
       .order('occurred_at', { ascending: false })
-      .limit(20);
-
-    if (proximityTouchpoints && proximityTouchpoints.length > 0) {
-      // Find touchpoint where fbclid matches the truncated pattern
-      for (const tp of proximityTouchpoints) {
-        const meta = tp.metadata as any;
-        const fullFbclid = meta?.fbclid as string;
-        
-        if (!fullFbclid || fullFbclid.length <= 50) continue;
-
-        // Check if truncated part matches:
-        // 1. Start of fbclid (legacy truncation)
-        // 2. _aem_ suffix (new format)
-        // 3. End of fbclid
-        let isMatch = false;
-        
-        if (fullFbclid.startsWith(truncatedPart)) {
-          isMatch = true;
-        } else {
-          const aemIndex = fullFbclid.lastIndexOf('_aem_');
-          if (aemIndex !== -1) {
-            const suffix = fullFbclid.substring(aemIndex + 5);
-            if (suffix === truncatedPart) isMatch = true;
-          }
-        }
-        
-        if (!isMatch && fullFbclid.slice(-truncatedPart.length) === truncatedPart) {
-          isMatch = true;
-        }
-
-        if (isMatch) {
+      .limit(50);
+    
+    let foundSuffixMatch = false;
+    for (const tp of suffixMatch || []) {
+      const meta = tp.metadata as any;
+      const fullFbclid = meta?.fbclid as string;
+      
+      if (!fullFbclid || fullFbclid.length <= 50) continue;
+      
+      // Check if this fbclid ends with our suffix (deterministic match)
+      if (fullFbclid.endsWith(truncatedPart)) {
+        fbp = meta.fbp || fbp;
+        fbc = fullFbclid;
+        touchpointMatchMethod = 'suffix_deterministic';
+        foundSuffixMatch = true;
+        console.log('[CAPI] Recovered FULL fbclid via SUFFIX match:', {
+          suffix: truncatedPart,
+          fullFbclidLength: fbc.length,
+          touchpointId: tp.id,
+        });
+        break;
+      }
+      
+      // Also check _aem_ pattern explicitly
+      const aemIndex = fullFbclid.lastIndexOf('_aem_');
+      if (aemIndex !== -1) {
+        const aemSuffix = fullFbclid.substring(aemIndex + 5);
+        if (aemSuffix === truncatedPart || fullFbclid.slice(-truncatedPart.length) === truncatedPart) {
           fbp = meta.fbp || fbp;
           fbc = fullFbclid;
-          touchpointMatchMethod = 'time_proximity_prefix';
-          console.log('[CAPI] Recovered FULL fbclid via time-proximity + prefix match:', {
-            truncatedPart,
+          touchpointMatchMethod = 'aem_suffix_match';
+          foundSuffixMatch = true;
+          console.log('[CAPI] Recovered FULL fbclid via _aem_ suffix match:', {
+            suffix: truncatedPart,
             fullFbclidLength: fbc.length,
             touchpointId: tp.id,
           });
           break;
         }
       }
+    }
+
+    // Fallback: time-proximity matching for legacy truncation (prefix-based)
+    if (!foundSuffixMatch) {
+      const { data: proximityTouchpoints } = await supabase
+        .from('attribution_touchpoints')
+        .select('id, metadata, occurred_at')
+        .eq('organization_id', organization_id)
+        .not('metadata', 'is', null)
+        .gte('occurred_at', windowStart)
+        .lte('occurred_at', paidAt)
+        .order('occurred_at', { ascending: false })
+        .limit(20);
+
+      for (const tp of proximityTouchpoints || []) {
+        const meta = tp.metadata as any;
+        const fullFbclid = meta?.fbclid as string;
+        
+        if (!fullFbclid || fullFbclid.length <= 50) continue;
+
+        // Legacy: Check if truncated part matches start of fbclid (old truncation method)
+        if (fullFbclid.startsWith(truncatedPart)) {
+          fbp = meta.fbp || fbp;
+          fbc = fullFbclid;
+          touchpointMatchMethod = 'time_proximity_prefix_legacy';
+          console.log('[CAPI] Recovered FULL fbclid via time-proximity + prefix (legacy):', {
+            truncatedPart: truncatedPart.substring(0, 15) + '...',
+            fullFbclidLength: fbc.length,
+            touchpointId: tp.id,
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // Last resort: Check if actblue_transactions already has full fbclid (from backfill)
+  if ((!fbc || fbc.length <= 50) && transactionId) {
+    const { data: txRecord } = await supabase
+      .from('actblue_transactions')
+      .select('fbclid')
+      .eq('transaction_id', transactionId)
+      .eq('organization_id', organization_id)
+      .maybeSingle();
+    
+    if (txRecord?.fbclid && txRecord.fbclid.length > 50) {
+      fbc = txRecord.fbclid;
+      touchpointMatchMethod = 'transaction_backfill';
+      console.log('[CAPI] Found FULL fbclid from transaction backfill:', {
+        fbcLength: fbc.length,
+        transactionId,
+      });
     }
   }
 

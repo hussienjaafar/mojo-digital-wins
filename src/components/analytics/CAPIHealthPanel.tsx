@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   Info,
   HelpCircle,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CAPIEventsData, MatchQuality, CAPIEvent } from "@/hooks/useCAPIEventsQuery";
@@ -58,7 +59,9 @@ function getMatchQualityColor(quality: MatchQuality | null): string {
   }
 }
 
-function getStatusIcon(status: "pending" | "delivered" | "failed"): React.ReactNode {
+type CAPIEventStatus = "pending" | "delivered" | "failed" | "superseded";
+
+function getStatusIcon(status: CAPIEventStatus): React.ReactNode {
   switch (status) {
     case "delivered":
       return <CheckCircle2 className="h-3 w-3 text-[hsl(var(--portal-success))]" />;
@@ -66,18 +69,22 @@ function getStatusIcon(status: "pending" | "delivered" | "failed"): React.ReactN
       return <Clock className="h-3 w-3 text-[hsl(var(--portal-warning))]" />;
     case "failed":
       return <XCircle className="h-3 w-3 text-[hsl(var(--portal-error))]" />;
+    case "superseded":
+      return <RefreshCw className="h-3 w-3 text-[hsl(var(--portal-text-muted))]" />;
   }
 }
 
-function getStatusBadge(status: "pending" | "delivered" | "failed"): React.ReactNode {
-  const styles = {
+function getStatusBadge(status: CAPIEventStatus): React.ReactNode {
+  const styles: Record<CAPIEventStatus, string> = {
     delivered: "bg-[hsl(var(--portal-success))]/10 text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success))]/20",
     pending: "bg-[hsl(var(--portal-warning))]/10 text-[hsl(var(--portal-warning))] border-[hsl(var(--portal-warning))]/20",
     failed: "bg-[hsl(var(--portal-error))]/10 text-[hsl(var(--portal-error))] border-[hsl(var(--portal-error))]/20",
+    superseded: "bg-[hsl(var(--portal-text-muted))]/10 text-[hsl(var(--portal-text-muted))] border-[hsl(var(--portal-text-muted))]/20",
   };
+  const label = status === 'superseded' ? 'Corrected' : status.charAt(0).toUpperCase() + status.slice(1);
   return (
     <Badge variant="outline" className={cn("text-[9px] border px-1", styles[status])}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {label}
     </Badge>
   );
 }
