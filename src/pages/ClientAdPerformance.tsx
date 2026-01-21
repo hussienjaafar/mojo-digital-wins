@@ -9,7 +9,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, subDays, parseISO } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
+import { useClientOrganization } from '@/hooks/useClientOrganization';
 import { ClientLayout } from '@/components/client/ClientLayout';
 import { AdPerformanceList } from '@/components/client/AdPerformance';
 import { useAdPerformanceQuery } from '@/hooks/useAdPerformanceQuery';
@@ -64,33 +64,9 @@ export default function ClientAdPerformance() {
   const [minSpendFilter, setMinSpendFilter] = useState<number>(0);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [organizationId, setOrganizationId] = useState<string | null>(null);
 
-  // Get organization ID
-  const { data: orgData, isLoading: isLoadingOrg } = useQuery({
-    queryKey: ['client-organization'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data: clientUser, error } = await (supabase as any)
-        .from('client_users')
-        .select('organization_id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!clientUser) throw new Error('Client user not found');
-
-      return { organizationId: clientUser.organization_id };
-    },
-  });
-
-  useEffect(() => {
-    if (orgData?.organizationId) {
-      setOrganizationId(orgData.organizationId);
-    }
-  }, [orgData]);
+  // Get organization ID - respects impersonation context for admins
+  const { organizationId, isLoading: isLoadingOrg } = useClientOrganization();
 
   // DEV-ONLY: Log computed date range passed to hook
   useEffect(() => {
