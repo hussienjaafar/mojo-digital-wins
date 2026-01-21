@@ -102,32 +102,34 @@ const KPICard: React.FC<KPICardProps> = ({
   return (
     <div
       className={cn(
-        "rounded-lg p-3 sm:p-4 border min-w-0",
+        "rounded-lg p-2.5 sm:p-3 border min-w-0",
         "bg-[hsl(var(--portal-bg-elevated))]",
         "border-[hsl(var(--portal-border))]",
         "hover:border-[hsl(var(--portal-border-hover))] hover:shadow-sm",
         "transition-all duration-200"
       )}
     >
-      <div className="flex items-center justify-between gap-1 mb-1.5">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <div className={cn("p-1 sm:p-1.5 rounded shrink-0", styles.iconBg)}>
-            <Icon className={cn("h-3 w-3 sm:h-4 sm:w-4", styles.iconColor)} />
-          </div>
-          <span className="text-[10px] sm:text-xs font-medium text-[hsl(var(--portal-text-muted))] truncate">
+      <div className="flex items-start justify-between gap-1 mb-1">
+        <div className="min-w-0 flex-1">
+          <span className="text-[10px] sm:text-xs font-medium text-[hsl(var(--portal-text-muted))] block leading-tight">
             {label}
           </span>
+          <div className="text-base sm:text-lg font-bold text-[hsl(var(--portal-text-primary))] leading-tight mt-0.5">
+            {value}
+          </div>
+          {subtitle && (
+            <span className="text-[9px] sm:text-[10px] text-[hsl(var(--portal-text-muted))] mt-0.5 block leading-tight">
+              {subtitle}
+            </span>
+          )}
         </div>
-        {badge && <div className="shrink-0">{badge}</div>}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <div className={cn("p-1 sm:p-1.5 rounded", styles.iconBg)}>
+            <Icon className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5", styles.iconColor)} />
+          </div>
+          {badge && <div>{badge}</div>}
+        </div>
       </div>
-      <div className="text-lg sm:text-xl font-bold text-[hsl(var(--portal-text-primary))] truncate">
-        {value}
-      </div>
-      {subtitle && (
-        <span className="text-[10px] sm:text-xs text-[hsl(var(--portal-text-muted))] mt-0.5 block truncate">
-          {subtitle}
-        </span>
-      )}
     </div>
   );
 };
@@ -168,7 +170,7 @@ export const LinkTrackingKPIs: React.FC<LinkTrackingKPIsProps> = ({
 
   if (isLoading) {
     return (
-      <div className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3", className)}>
+      <div className={cn("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3", className)}>
         {Array.from({ length: 6 }).map((_, i) => (
           <KPICardSkeleton key={i} />
         ))}
@@ -178,52 +180,52 @@ export const LinkTrackingKPIs: React.FC<LinkTrackingKPIsProps> = ({
 
   return (
     <motion.div
-      className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3", className)}
+      className={cn("grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3", className)}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
       <KPICard
-        label="Total Clicks"
+        label="Clicks"
         value={formatNumber(summary.totalClicks)}
         icon={MousePointerClick}
         accent="blue"
-        subtitle={`${metaPercent}% from Meta ads`}
+        subtitle={`${metaPercent}% Meta`}
       />
       <KPICard
-        label="Unique Sessions"
+        label="Sessions"
         value={formatNumber(summary.uniqueSessions)}
         icon={Users}
         accent="purple"
         subtitle={`${mobilePercent}% mobile`}
       />
       <KPICard
-        label="Cookie Capture"
+        label="Cookies"
         value={`${summary.cookieCaptureRate}%`}
         icon={Cookie}
         accent="amber"
         badge={getCaptureQualityBadge(summary.cookieCaptureRate)}
       />
       <KPICard
-        label="Conversions"
+        label="Converts"
         value={formatNumber(summary.conversions)}
         icon={TrendingUp}
         accent="green"
-        subtitle={`${summary.conversionRate}% of clicks`}
+        subtitle={`${summary.conversionRate}% rate`}
       />
       <KPICard
         label="Revenue"
         value={formatCurrency(summary.attributedRevenue)}
         icon={DollarSign}
         accent="green"
-        subtitle={avgDonation > 0 ? `$${avgDonation} avg` : "No conversions"}
+        subtitle={avgDonation > 0 ? `$${avgDonation} avg` : "—"}
       />
       <KPICard
-        label="Conversion Rate"
+        label="CVR"
         value={`${summary.conversionRate}%`}
         icon={Percent}
         accent="blue"
-        subtitle="Clicks → Donations"
+        subtitle="Click → Donate"
       />
     </motion.div>
   );

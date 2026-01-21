@@ -123,11 +123,11 @@ const DailyTrendChart: React.FC<{ data: DailyClickData[] }> = ({ data }) => {
 const HourlyPatternChart: React.FC<{ data: HourlyClickData[]; fullWidth?: boolean }> = ({ data, fullWidth }) => {
   const colors = getChartColors();
 
-  // Fill in missing hours with abbreviated labels
+  // Fill in missing hours - only show label every 3 hours for cleaner display
   const fullHourData = Array.from({ length: 24 }, (_, hour) => {
     const existing = data.find((d) => d.hour === hour);
     return {
-      hour: formatHourShort(hour),
+      hour: hour % 3 === 0 ? formatHourShort(hour) : "",
       clicks: existing?.clicks || 0,
       metaClicks: existing?.metaClicks || 0,
     };
@@ -136,16 +136,15 @@ const HourlyPatternChart: React.FC<{ data: HourlyClickData[]; fullWidth?: boolea
   const series = [
     {
       dataKey: "clicks",
-      name: "Total Clicks",
+      name: "Clicks",
       color: colors[0],
     },
     {
       dataKey: "metaClicks",
-      name: "Meta Ad Clicks",
+      name: "Meta",
       color: colors[1],
     },
   ];
-
   return (
     <Card className={cn(
       "bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] min-w-0 overflow-hidden",
@@ -154,7 +153,7 @@ const HourlyPatternChart: React.FC<{ data: HourlyClickData[]; fullWidth?: boolea
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-medium text-[hsl(var(--portal-text-primary))]">
           <Clock className="h-4 w-4 text-[hsl(var(--portal-accent-purple))] shrink-0" />
-          Hourly Click Pattern
+          Clicks by Hour
         </CardTitle>
       </CardHeader>
       <CardContent className="p-2 sm:p-6 pt-0 sm:pt-0">
