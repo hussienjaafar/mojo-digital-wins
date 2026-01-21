@@ -126,6 +126,12 @@ verify_jwt = true
 [functions.backfill-meta-ads]
 verify_jwt = false
 
+[functions.backfill-actblue-csv-orchestrator]
+verify_jwt = false
+
+[functions.process-actblue-chunk]
+verify_jwt = false
+
 [functions.backfill-thumbnails]
 verify_jwt = true
 

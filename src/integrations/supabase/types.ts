@@ -53,6 +53,94 @@ export type Database = {
         }
         Relationships: []
       }
+      actblue_backfill_chunks: {
+        Row: {
+          attempt_count: number | null
+          chunk_index: number
+          completed_at: string | null
+          created_at: string | null
+          end_date: string
+          error_message: string | null
+          id: string
+          inserted_rows: number | null
+          job_id: string
+          max_attempts: number | null
+          next_retry_at: string | null
+          organization_id: string
+          processed_rows: number | null
+          skipped_rows: number | null
+          start_date: string
+          started_at: string | null
+          status: string | null
+          updated_at: string | null
+          updated_rows: number | null
+        }
+        Insert: {
+          attempt_count?: number | null
+          chunk_index: number
+          completed_at?: string | null
+          created_at?: string | null
+          end_date: string
+          error_message?: string | null
+          id?: string
+          inserted_rows?: number | null
+          job_id: string
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          organization_id: string
+          processed_rows?: number | null
+          skipped_rows?: number | null
+          start_date: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          updated_rows?: number | null
+        }
+        Update: {
+          attempt_count?: number | null
+          chunk_index?: number
+          completed_at?: string | null
+          created_at?: string | null
+          end_date?: string
+          error_message?: string | null
+          id?: string
+          inserted_rows?: number | null
+          job_id?: string
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          organization_id?: string
+          processed_rows?: number | null
+          skipped_rows?: number | null
+          start_date?: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          updated_rows?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actblue_backfill_chunks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actblue_backfill_chunks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "actblue_backfill_chunks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       actblue_transactions: {
         Row: {
           ab_test_name: string | null
