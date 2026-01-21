@@ -6330,6 +6330,33 @@ export type Database = {
         }
         Relationships: []
       }
+      occupation_categories: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: number
+          pattern: string
+          sort_order: number | null
+          subcategory: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: number
+          pattern: string
+          sort_order?: number | null
+          subcategory?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: number
+          pattern?: string
+          sort_order?: number | null
+          subcategory?: string | null
+        }
+        Relationships: []
+      }
       opportunity_detector_runs: {
         Row: {
           created_at: string | null
@@ -13530,6 +13557,14 @@ export type Database = {
       }
       get_donor_demographics_summary: {
         Args: { _organization_id: string }
+        Returns: Json
+      }
+      get_donor_demographics_v2: {
+        Args: {
+          _end_date?: string
+          _organization_id: string
+          _start_date?: string
+        }
         Returns: Json
       }
       get_export_data: {
