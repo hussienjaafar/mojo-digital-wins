@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Users, AlertTriangle } from "lucide-react";
+import { Users, AlertTriangle, Gift } from "lucide-react";
 
 interface SeatUsageData {
   seat_limit: number;
@@ -59,19 +59,26 @@ export function SeatUsageDisplay({
     return null;
   }
 
+  const totalEntitled = seatData.total_entitled || (seatData.seat_limit + (seatData.bonus_seats || 0));
   const usagePercentage = Math.min(
-    (seatData.total_used / seatData.seat_limit) * 100,
+    (seatData.total_used / totalEntitled) * 100,
     100
   );
   const isNearLimit = usagePercentage >= 80;
   const isAtLimit = seatData.available_seats <= 0;
+  const hasBonus = (seatData.bonus_seats || 0) > 0;
 
   if (compact) {
     return (
       <div className="flex items-center gap-2 text-sm">
         <Users className="h-4 w-4 text-muted-foreground" />
         <span className="text-muted-foreground">
-          {seatData.total_used} / {seatData.seat_limit} seats
+          {seatData.total_used} / {totalEntitled} seats
+          {hasBonus && (
+            <span className="text-primary ml-1">
+              (+{seatData.bonus_seats} bonus)
+            </span>
+          )}
         </span>
         {isAtLimit && (
           <Badge variant="destructive" className="text-xs">
@@ -112,11 +119,25 @@ export function SeatUsageDisplay({
         <Progress value={usagePercentage} className="h-2" />
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>
-            {seatData.total_used} of {seatData.seat_limit} seats used
+            {seatData.total_used} of {totalEntitled} seats used
           </span>
           <span>{seatData.available_seats} available</span>
         </div>
       </div>
+
+      {/* Seat breakdown */}
+      {hasBonus ? (
+        <div className="flex items-center gap-2 text-xs bg-primary/10 rounded-md p-2">
+          <Gift className="h-3.5 w-3.5 text-primary" />
+          <span className="text-foreground">
+            {seatData.seat_limit} purchased + {seatData.bonus_seats} complimentary = {totalEntitled} total
+          </span>
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground">
+          {seatData.seat_limit} seats allocated
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-2 text-center text-xs">
         <div className="rounded-md bg-muted/50 p-2">

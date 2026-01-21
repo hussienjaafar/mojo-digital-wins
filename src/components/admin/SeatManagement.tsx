@@ -263,7 +263,7 @@ export function SeatManagement() {
   const getChangeTypeBadge = (type: string) => {
     switch (type) {
       case 'bonus_added':
-        return <Badge variant="default" className="bg-green-500">Bonus Added</Badge>;
+        return <Badge variant="default" className="bg-primary">Bonus Added</Badge>;
       case 'bonus_removed':
         return <Badge variant="destructive">Bonus Removed</Badge>;
       case 'bonus_updated':
@@ -349,7 +349,7 @@ export function SeatManagement() {
               </div>
               <div className="bg-muted/50 rounded-lg p-3">
                 <p className="text-sm text-muted-foreground">Bonus Seats</p>
-                <p className="text-2xl font-bold text-green-600">{organizations.reduce((sum, org) => sum + org.bonus_seats, 0)}</p>
+                <p className="text-2xl font-bold text-primary">{organizations.reduce((sum, org) => sum + org.bonus_seats, 0)}</p>
               </div>
               <div className="bg-muted/50 rounded-lg p-3">
                 <p className="text-sm text-muted-foreground">Seats In Use</p>
@@ -530,8 +530,8 @@ export function SeatManagement() {
                 <p className="text-xs text-muted-foreground">Billable seats</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="bonus_seats" className="flex items-center gap-1">
-                  <Gift className="h-3 w-3 text-green-600" />
+              <Label htmlFor="bonus_seats" className="flex items-center gap-1">
+                  <Gift className="h-3 w-3 text-primary" />
                   Bonus Seats
                 </Label>
                 <Input
