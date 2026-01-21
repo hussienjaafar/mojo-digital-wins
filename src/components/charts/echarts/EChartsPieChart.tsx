@@ -42,6 +42,8 @@ export interface EChartsPieChartProps {
   emptyMessage?: string;
   /** Disable hover emphasis to prevent slices from disappearing on hover */
   disableHoverEmphasis?: boolean;
+  /** Enable pattern decals for colorblind accessibility (stripes/dots on each slice) */
+  useDecals?: boolean;
 }
 
 const colorPalette = getChartColors();
@@ -61,6 +63,7 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
   onSliceClick,
   emptyMessage = "No data available",
   disableHoverEmphasis = true,
+  useDecals = false,
 }) => {
   // Handle empty data
   if (!isLoading && (!data || data.length === 0)) {
@@ -114,6 +117,13 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
       animation: true,
       animationDuration: 500,
       animationEasing: "cubicOut",
+      // Accessibility - enable decals (stripes/dots) for colorblind users
+      aria: {
+        enabled: true,
+        decal: {
+          show: useDecals,
+        },
+      },
       // Prevent axis pointer from triggering emphasis on hover
       ...(disableHoverEmphasis && {
         axisPointer: { triggerEmphasis: false },

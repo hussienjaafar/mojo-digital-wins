@@ -50,27 +50,46 @@ The chart colors are specifically chosen to be distinguishable by users with var
 --portal-border-hover: 220 20% 35%;     /* Hover state borders */
 ```
 
-## Chart Color Usage Guidelines
+## Categorical Chart Palette (V3.1)
 
-### Single Series
-- Use **Blue** (`#0EA5E9`) as the default single-series color
+Scientifically validated 10-color colorblind-safe palette based on Okabe-Ito + Tableau research.
+Colors alternate warm/cool for maximum adjacent-slice contrast.
 
-### Two Series Comparison
-- **Blue** + **Amber** for maximum contrast
+| Position | CSS Variable | Hex | Name | Notes |
+|----------|--------------|-----|------|-------|
+| 0 | `--portal-chart-1` | `#0EA5E9` | Sky Blue | Primary (cool) |
+| 1 | `--portal-chart-2` | `#F97316` | Orange | High contrast vs blue (warm) |
+| 2 | `--portal-chart-3` | `#14B8A6` | Teal | Cool |
+| 3 | `--portal-chart-4` | `#F43F5E` | Rose | Warm |
+| 4 | `--portal-chart-5` | `#8B5CF6` | Violet | Purple family |
+| 5 | `--portal-chart-6` | `#F59E0B` | Amber | Warning color |
+| 6 | `--portal-chart-7` | `#10B981` | Emerald | Success color |
+| 7 | `--portal-chart-8` | `#D946EF` | Fuchsia | Distinct pink |
+| 8 | `--portal-chart-9` | `#06B6D4` | Cyan | Cool accent |
+| 9 | `--portal-chart-10` | `#84CC16` | Lime | Distinct green |
+
+### Color Assignment Logic
+
+Pie/donut charts use **index-first assignment**:
+- First 10 slices get colors 0-9 in order (ensures max contrast)
+- Overflow slices (11+) use hash-based assignment for consistency
+- "Other" category always uses muted gray
+
+### Chart Color Usage Guidelines
+
+#### Single Series
+- Use **Sky Blue** (`--portal-chart-1`) as the default
+
+#### Two Series Comparison
+- **Sky Blue** + **Orange** for maximum contrast
 - Example: Current period vs Previous period
 
-### Multi-Series (3+)
-Apply colors in this order for optimal differentiation:
-1. Blue (`#0EA5E9`)
-2. Green (`#10B981`)
-3. Purple (`#8B5CF6`)
-4. Amber (`#F59E0B`)
-5. Red (`#EF4444`)
-6. Gray (`#6B7280`)
+#### Multi-Series (3+)
+Colors are automatically assigned in order for optimal differentiation.
 
 ### Trend Indicators
-- **Positive Trend**: Green (`--portal-success`)
-- **Negative Trend**: Red (`--portal-error`)
+- **Positive Trend**: Emerald (`--portal-chart-7` or `--portal-success`)
+- **Negative Trend**: Rose (`--portal-chart-4` or `--portal-error`)
 - **Neutral Trend**: Gray (muted)
 
 ## Accessibility Notes
@@ -81,11 +100,16 @@ All text colors meet WCAG AA standards:
 - Secondary text on base background: 7.8:1
 - Muted text on base background: 4.7:1
 
+### Adjacent Color Contrast
+The categorical palette alternates warm/cool hues:
+- Blue (cool) → Orange (warm) → Teal (cool) → Rose (warm)
+- Ensures deuteranopia (green-blind) and protanopia (red-blind) safety
+
 ### Additional Indicators
 Never rely on color alone to convey information:
 - Use icons alongside color (↑ for increase, ↓ for decrease)
 - Include text labels with percentages
-- Use pattern fills in charts when possible
+- Enable `useDecals` prop for pattern fills (stripes/dots) in accessibility-critical contexts
 
 ## Testing Resources
 
