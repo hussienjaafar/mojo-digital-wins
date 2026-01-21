@@ -30,15 +30,43 @@ serve(async (req) => {
   };
 
   try {
-    // Validate authorization
+    // Validate authorization - cron secret, service role, or admin user
     const cronSecret = req.headers.get("x-cron-secret");
     const authHeader = req.headers.get("Authorization");
     const expectedCronSecret = Deno.env.get("CRON_SECRET");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const isAuthorized = 
-      cronSecret === expectedCronSecret || 
-      authHeader === `Bearer ${serviceRoleKey}`;
+    let isAuthorized = false;
+    
+    // Check cron secret
+    if (cronSecret && cronSecret === expectedCronSecret) {
+      isAuthorized = true;
+    }
+    
+    // Check service role key
+    if (!isAuthorized && authHeader === `Bearer ${serviceRoleKey}`) {
+      isAuthorized = true;
+    }
+    
+    // Check admin JWT
+    if (!isAuthorized && authHeader?.startsWith("Bearer ")) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (user) {
+        const { data: isAdmin } = await userClient.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
+        if (isAdmin) {
+          isAuthorized = true;
+          console.log("[BACKFILL] Authorized via admin JWT");
+        }
+      }
+    }
 
     if (!isAuthorized) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -47,7 +75,6 @@ serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Parse request body for optional filters
