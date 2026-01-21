@@ -36,6 +36,7 @@ export { V3MetricChip, type V3MetricChipVariant, type V3MetricChipProps } from "
 export { V3FilterPill, type V3FilterPillVariant, type V3FilterPillProps } from "./V3FilterPill";
 export { V3StatsGrid, type V3StatsGridItem, type V3StatsGridProps } from "./V3StatsGrid";
 export { V3DataTable, type V3Column, type V3DataTableProps } from "./V3DataTable";
+export { V3VirtualizedDataTable, type V3VirtualizedDataTableProps } from "./V3VirtualizedDataTable";
 export {
   V3InlineBarCell,
   V3RankCell,
