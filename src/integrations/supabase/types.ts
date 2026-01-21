@@ -6436,6 +6436,64 @@ export type Database = {
           },
         ]
       }
+      org_activity_log: {
+        Row: {
+          action_type: string
+          actor_id: string | null
+          actor_name: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          organization_id: string
+          target_user_id: string | null
+          target_user_name: string | null
+        }
+        Insert: {
+          action_type: string
+          actor_id?: string | null
+          actor_name?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          organization_id: string
+          target_user_id?: string | null
+          target_user_name?: string | null
+        }
+        Update: {
+          action_type?: string
+          actor_id?: string | null
+          actor_name?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          organization_id?: string
+          target_user_id?: string | null
+          target_user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_activity_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_activity_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_activity_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       org_alert_preferences: {
         Row: {
           always_generate_safe_variant: boolean | null
@@ -13214,6 +13272,25 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      bulk_remove_users: {
+        Args: {
+          p_actor_id?: string
+          p_actor_name?: string
+          p_organization_id: string
+          p_user_ids: string[]
+        }
+        Returns: Json
+      }
+      bulk_update_user_roles: {
+        Args: {
+          p_actor_id?: string
+          p_actor_name?: string
+          p_new_role: string
+          p_organization_id: string
+          p_user_ids: string[]
+        }
+        Returns: Json
+      }
       calculate_bluesky_trend_velocity: {
         Args: { topic_name: string }
         Returns: number
@@ -13820,6 +13897,26 @@ export type Database = {
           _user_id: string
         }
         Returns: string
+      }
+      log_member_invited: {
+        Args: {
+          p_actor_id: string
+          p_actor_name: string
+          p_organization_id: string
+          p_role: string
+          p_target_email: string
+          p_target_name: string
+        }
+        Returns: undefined
+      }
+      log_member_joined: {
+        Args: {
+          p_organization_id: string
+          p_role: string
+          p_user_id: string
+          p_user_name: string
+        }
+        Returns: undefined
       }
       log_onboarding_action: {
         Args: {
