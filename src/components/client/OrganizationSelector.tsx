@@ -1,4 +1,4 @@
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check, Building2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,12 +27,15 @@ type Props = {
   organizations: Organization[];
   selectedId: string;
   onSelect: (id: string) => void;
+  /** When true, shows a more prominent admin-style switcher */
+  isAdmin?: boolean;
 };
 
 export const OrganizationSelector = ({
   organizations,
   selectedId,
   onSelect,
+  isAdmin = false,
 }: Props) => {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
@@ -44,7 +47,8 @@ export const OrganizationSelector = ({
     setOpen(false);
   };
 
-  if (organizations.length <= 1) {
+  // Only hide for non-admins with single org
+  if (!isAdmin && organizations.length <= 1) {
     return null;
   }
 
@@ -53,8 +57,18 @@ export const OrganizationSelector = ({
     return (
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          <button className="portal-icon-btn !w-auto !h-auto p-1" aria-label="Switch organization">
-            <ChevronDown className="h-4 w-4 portal-text-muted" />
+          <button 
+            className={cn(
+              "inline-flex items-center gap-1 transition-colors",
+              isAdmin 
+                ? "px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 text-xs font-medium"
+                : "portal-icon-btn !w-auto !h-auto p-1"
+            )}
+            aria-label="Switch organization"
+          >
+            {isAdmin && <Building2 className="h-3 w-3" />}
+            {isAdmin && <span>Switch</span>}
+            <ChevronDown className={cn("h-3.5 w-3.5", !isAdmin && "portal-text-muted")} />
           </button>
         </SheetTrigger>
         <SheetContent side="bottom" className="max-h-[60vh] bg-background border-t">
@@ -102,32 +116,39 @@ export const OrganizationSelector = ({
     );
   }
 
-  // Desktop: Clean dropdown
+  // Desktop: Clean dropdown with admin-aware styling
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button 
-          className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
+          className={cn(
+            "inline-flex items-center gap-1 transition-colors",
+            isAdmin 
+              ? "px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 text-xs font-medium"
+              : "text-muted-foreground hover:text-foreground"
+          )}
           aria-label="Switch organization"
         >
-          <ChevronDown className="h-4 w-4" />
+          {isAdmin && <Building2 className="h-3 w-3" />}
+          {isAdmin && <span>Switch</span>}
+          <ChevronDown className="h-3.5 w-3.5" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="start" 
-        className="w-56 bg-popover border shadow-lg z-50"
+        className="w-64 bg-popover border shadow-lg z-50"
         sideOffset={8}
       >
-        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-          Switch Organization
+        <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b">
+          {isAdmin ? "Admin: Switch Organization" : "Switch Organization"}
         </div>
-        <div className="py-1">
+        <div className="py-1 max-h-[300px] overflow-y-auto">
           {organizations.map((org) => (
             <DropdownMenuItem
               key={org.id}
               onClick={() => handleSelect(org.id)}
               className={cn(
-                "flex items-center gap-2.5 px-2 py-2 cursor-pointer",
+                "flex items-center gap-2.5 px-3 py-2.5 cursor-pointer",
                 selectedId === org.id && "bg-accent"
               )}
             >
@@ -135,16 +156,16 @@ export const OrganizationSelector = ({
                 <img
                   src={org.logo_url}
                   alt=""
-                  className="h-5 w-5 rounded object-contain shrink-0"
+                  className="h-6 w-6 rounded object-contain shrink-0"
                 />
               ) : (
-                <div className="h-5 w-5 rounded bg-muted flex items-center justify-center text-[10px] font-medium shrink-0">
+                <div className="h-6 w-6 rounded bg-muted flex items-center justify-center text-[10px] font-medium shrink-0">
                   {org.name.substring(0, 2).toUpperCase()}
                 </div>
               )}
               <span className="flex-1 truncate text-sm">{org.name}</span>
               {selectedId === org.id && (
-                <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                <Check className="h-4 w-4 text-primary shrink-0" />
               )}
             </DropdownMenuItem>
           ))}
