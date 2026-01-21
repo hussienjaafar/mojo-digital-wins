@@ -165,35 +165,39 @@ async function fetchSmsSummary(
   startDate: string,
   endDate: string
 ): Promise<SmsSummary> {
-  const { data, error } = await supabase
-    .from("sms_campaigns")
-    .select("messages_sent, amount_raised, cost, send_date, status")
-    .eq("organization_id", organizationId)
-    .gte("send_date", startDate)
-    .lte("send_date", `${endDate}T23:59:59`)
-    .neq("status", "draft")
-    .order("send_date", { ascending: false });
+  // Use the get_sms_metrics RPC for accurate attribution-based metrics
+  // This calculates raised/conversions by matching ActBlue transactions to campaigns
+  const { data, error } = await (supabase as any).rpc('get_sms_metrics', {
+    p_organization_id: organizationId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+  });
 
   if (error) {
-    console.error("[useChannelSummariesQuery] SMS fetch error:", error);
+    console.error("[useChannelSummariesQuery] SMS RPC error:", error);
     throw error;
   }
 
-  const campaigns = data || [];
-  const sent = campaigns.reduce((sum, c) => sum + (c.messages_sent || 0), 0);
-  const raised = campaigns.reduce((sum, c) => sum + Number(c.amount_raised || 0), 0);
-  const cost = campaigns.reduce((sum, c) => sum + Number(c.cost || 0), 0);
+  // Extract totals from the RPC response
+  const totals = data?.totals || {};
+  const campaigns = data?.campaigns || [];
+  
+  const sent = totals.totalSent || 0;
+  const raised = totals.totalAmountRaised || 0;
+  const cost = totals.totalCost || 0;
   const roi = cost > 0 ? raised / cost : 0;
-  const lastDataDate = campaigns[0]?.send_date?.split("T")[0] || null;
+  
+  // Get last data date from most recent campaign
+  const lastDataDate = campaigns[0]?.sendDate?.split("T")[0] || null;
 
   return {
     sent,
     raised,
     cost,
     roi,
-    campaignCount: campaigns.length,
+    campaignCount: totals.campaignCount || 0,
     lastDataDate,
-    hasData: campaigns.length > 0,
+    hasData: (totals.campaignCount || 0) > 0,
   };
 }
 
