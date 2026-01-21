@@ -831,65 +831,86 @@ async function enqueueCAPIEvent(
   }
 
   // If still no full fbclid, try suffix-based matching with refcode2
-  // NEW: Now uses _aem_ suffix (last 24 chars) for deterministic 1-to-1 matching
+  // NEW: Requires email validation OR unique suffix to prevent cross-donor attribution
   if ((!fbc || fbc.length <= 50) && refcode2?.startsWith('fb_')) {
     const truncatedPart = refcode2.substring(3); // Remove 'fb_' prefix
+    const donorEmailLower = donor?.email?.toLowerCase();
     
-    // First, try direct suffix match against touchpoints (most reliable for new flow)
-    // The suffix is the unique _aem_ identifier, so we can match precisely
+    // Fetch touchpoints with email info for validation
     const { data: suffixMatch } = await supabase
       .from('attribution_touchpoints')
-      .select('id, metadata')
+      .select('id, metadata, donor_email')
       .eq('organization_id', organization_id)
       .not('metadata', 'is', null)
       .order('occurred_at', { ascending: false })
       .limit(50);
     
-    let foundSuffixMatch = false;
-    for (const tp of suffixMatch || []) {
-      const meta = tp.metadata as any;
-      const fullFbclid = meta?.fbclid as string;
-      
-      if (!fullFbclid || fullFbclid.length <= 50) continue;
-      
-      // Check if this fbclid ends with our suffix (deterministic match)
-      if (fullFbclid.endsWith(truncatedPart)) {
-        fbp = meta.fbp || fbp;
-        fbc = fullFbclid;
-        touchpointMatchMethod = 'suffix_deterministic';
-        foundSuffixMatch = true;
-        console.log('[CAPI] Recovered FULL fbclid via SUFFIX match:', {
-          suffix: truncatedPart,
-          fullFbclidLength: fbc.length,
-          touchpointId: tp.id,
-        });
-        break;
-      }
-      
-      // Also check _aem_ pattern explicitly
-      const aemIndex = fullFbclid.lastIndexOf('_aem_');
-      if (aemIndex !== -1) {
-        const aemSuffix = fullFbclid.substring(aemIndex + 5);
-        if (aemSuffix === truncatedPart || fullFbclid.slice(-truncatedPart.length) === truncatedPart) {
-          fbp = meta.fbp || fbp;
-          fbc = fullFbclid;
-          touchpointMatchMethod = 'aem_suffix_match';
-          foundSuffixMatch = true;
-          console.log('[CAPI] Recovered FULL fbclid via _aem_ suffix match:', {
-            suffix: truncatedPart,
-            fullFbclidLength: fbc.length,
-            touchpointId: tp.id,
-          });
-          break;
+    let foundValidMatch = false;
+    
+    // PRIORITY 1: Email-verified match (most reliable)
+    if (donorEmailLower) {
+      for (const tp of suffixMatch || []) {
+        const meta = tp.metadata as any;
+        const fullFbclid = meta?.fbclid as string;
+        const tpEmailLower = tp.donor_email?.toLowerCase();
+        
+        if (!fullFbclid || fullFbclid.length <= 50) continue;
+        
+        // Only match if SAME DONOR (email verification)
+        if (tpEmailLower && tpEmailLower === donorEmailLower) {
+          const isMatch = fullFbclid.endsWith(truncatedPart) || fullFbclid.startsWith(truncatedPart);
+          if (isMatch) {
+            fbp = meta.fbp || fbp;
+            fbc = fullFbclid;
+            touchpointMatchMethod = 'email_verified_fbclid';
+            foundValidMatch = true;
+            console.log('[CAPI] Recovered FULL fbclid (EMAIL VERIFIED):', {
+              donorEmail: donorEmailLower.substring(0, 5) + '...',
+              fullFbclidLength: fbc.length,
+              touchpointId: tp.id,
+            });
+            break;
+          }
         }
       }
     }
+    
+    // PRIORITY 2: Unique suffix match (only if ONE match exists)
+    if (!foundValidMatch) {
+      const suffixMatches = (suffixMatch || []).filter((tp: any) => {
+        const meta = tp.metadata as any;
+        const fullFbclid = meta?.fbclid as string;
+        return fullFbclid && fullFbclid.length > 50 && fullFbclid.endsWith(truncatedPart);
+      });
+      
+      if (suffixMatches.length === 1) {
+        // Single unique match - deterministic even without email
+        const meta = suffixMatches[0].metadata as any;
+        const recoveredFbc = meta.fbclid as string;
+        fbp = meta.fbp || fbp;
+        fbc = recoveredFbc;
+        touchpointMatchMethod = 'suffix_unique';
+        foundValidMatch = true;
+        console.log('[CAPI] Recovered FULL fbclid (UNIQUE SUFFIX):', {
+          suffix: truncatedPart.substring(0, 10) + '...',
+          fullFbclidLength: recoveredFbc.length,
+          touchpointId: suffixMatches[0].id,
+        });
+      } else if (suffixMatches.length > 1) {
+        // AMBIGUOUS: Multiple matches - skip to avoid cross-donor attribution
+        console.warn('[CAPI] BLOCKED: Ambiguous suffix match - would cause cross-donor attribution', {
+          truncatedPart: truncatedPart.substring(0, 15) + '...',
+          possibleMatches: suffixMatches.length,
+          donorEmail: donorEmailLower?.substring(0, 5) + '...',
+        });
+      }
+    }
 
-    // Fallback: time-proximity matching for legacy truncation (prefix-based)
-    if (!foundSuffixMatch) {
+    // PRIORITY 3: Time-proximity + email verified (legacy prefix flow)
+    if (!foundValidMatch && donorEmailLower) {
       const { data: proximityTouchpoints } = await supabase
         .from('attribution_touchpoints')
-        .select('id, metadata, occurred_at')
+        .select('id, metadata, occurred_at, donor_email')
         .eq('organization_id', organization_id)
         .not('metadata', 'is', null)
         .gte('occurred_at', windowStart)
@@ -900,22 +921,35 @@ async function enqueueCAPIEvent(
       for (const tp of proximityTouchpoints || []) {
         const meta = tp.metadata as any;
         const fullFbclid = meta?.fbclid as string;
+        const tpEmailLower = tp.donor_email?.toLowerCase();
         
         if (!fullFbclid || fullFbclid.length <= 50) continue;
 
-        // Legacy: Check if truncated part matches start of fbclid (old truncation method)
-        if (fullFbclid.startsWith(truncatedPart)) {
-          fbp = meta.fbp || fbp;
-          fbc = fullFbclid;
-          touchpointMatchMethod = 'time_proximity_prefix_legacy';
-          console.log('[CAPI] Recovered FULL fbclid via time-proximity + prefix (legacy):', {
-            truncatedPart: truncatedPart.substring(0, 15) + '...',
-            fullFbclidLength: fbc.length,
-            touchpointId: tp.id,
-          });
-          break;
+        // Only accept if emails match (prevent cross-donor)
+        if (tpEmailLower && tpEmailLower === donorEmailLower) {
+          if (fullFbclid.startsWith(truncatedPart)) {
+            fbp = meta.fbp || fbp;
+            fbc = fullFbclid;
+            touchpointMatchMethod = 'time_proximity_email_verified';
+            foundValidMatch = true;
+            console.log('[CAPI] Recovered FULL fbclid via time-proximity + email verification:', {
+              truncatedPart: truncatedPart.substring(0, 15) + '...',
+              fullFbclidLength: fbc.length,
+              touchpointId: tp.id,
+            });
+            break;
+          }
         }
       }
+    }
+    
+    // BLOCKED: Do NOT use prefix-only matching without email verification
+    // This was causing cross-donor attribution errors
+    if (!foundValidMatch) {
+      console.log('[CAPI] No verified fbclid match found - using truncated to prevent misattribution', {
+        truncatedPart: truncatedPart.substring(0, 15) + '...',
+        hasDonorEmail: !!donorEmailLower,
+      });
     }
   }
 
@@ -929,10 +963,11 @@ async function enqueueCAPIEvent(
       .maybeSingle();
     
     if (txRecord?.fbclid && txRecord.fbclid.length > 50) {
-      fbc = txRecord.fbclid;
+      const backfilledFbc = txRecord.fbclid;
+      fbc = backfilledFbc;
       touchpointMatchMethod = 'transaction_backfill';
       console.log('[CAPI] Found FULL fbclid from transaction backfill:', {
-        fbcLength: fbc.length,
+        fbcLength: backfilledFbc.length,
         transactionId,
       });
     }

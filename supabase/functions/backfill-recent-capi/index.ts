@@ -174,56 +174,97 @@ serve(async (req) => {
           
           // Check if transaction already has full fbclid (from previous backfill)
           if (tx.fbclid && tx.fbclid.length > 50) {
-            fbc = tx.fbclid;
+            const txFbclid = tx.fbclid;
+            fbc = txFbclid;
             logger.info('Using full fbclid from transaction', { 
               transactionId: tx.transaction_id,
-              fbcLength: fbc.length 
+              fbcLength: txFbclid.length 
             });
           } else {
             // Extract truncated fbc from refcode2
             const truncatedFbc = extractFbc(tx.refcode2);
+            const txDonorEmail = tx.donor_email?.toLowerCase();
             
-            // Try to recover full fbclid from attribution_touchpoints
+            // Try to recover full fbclid from attribution_touchpoints WITH VALIDATION
             if (truncatedFbc) {
               const { data: touchpoints } = await supabase
                 .from('attribution_touchpoints')
-                .select('metadata')
+                .select('id, metadata, donor_email, occurred_at')
                 .eq('organization_id', config.organization_id)
                 .not('metadata', 'is', null)
                 .order('occurred_at', { ascending: false })
                 .limit(50);
               
-              for (const tp of touchpoints || []) {
-                const meta = tp.metadata as any;
-                const fullFbclid = meta?.fbclid as string;
-                
-                if (!fullFbclid || fullFbclid.length <= 50) continue;
-                
-                // Match by suffix (new format) or prefix (legacy format)
-                const isMatch = 
-                  fullFbclid.endsWith(truncatedFbc) ||
-                  fullFbclid.startsWith(truncatedFbc) ||
-                  fullFbclid.slice(-truncatedFbc.length) === truncatedFbc;
-                
-                if (isMatch) {
-                  fbc = fullFbclid;
-                  fbp = meta.fbp || null;
-                  logger.info('Recovered full fbclid from touchpoint', {
-                    transactionId: tx.transaction_id,
-                    truncatedLength: truncatedFbc.length,
-                    fullLength: fbc.length
-                  });
-                  break;
+              let matchMethod = 'none';
+              
+              // PRIORITY 1: Email-verified match (deterministic - most reliable)
+              if (txDonorEmail) {
+                for (const tp of touchpoints || []) {
+                  const meta = tp.metadata as any;
+                  const fullFbclid = meta?.fbclid as string;
+                  const tpDonorEmail = tp.donor_email?.toLowerCase();
+                  
+                  if (!fullFbclid || fullFbclid.length <= 50) continue;
+                  
+                  // Only accept if emails match
+                  if (tpDonorEmail && tpDonorEmail === txDonorEmail) {
+                    const isMatch = 
+                      fullFbclid.endsWith(truncatedFbc) ||
+                      fullFbclid.startsWith(truncatedFbc);
+                    
+                    if (isMatch) {
+                      fbc = fullFbclid;
+                      fbp = meta.fbp || null;
+                      matchMethod = 'email_verified';
+                      logger.info('Recovered full fbclid (EMAIL VERIFIED)', {
+                        transactionId: tx.transaction_id,
+                        donorEmail: txDonorEmail.substring(0, 5) + '...',
+                        fullLength: fbc.length
+                      });
+                      break;
+                    }
+                  }
                 }
               }
               
-              // Fallback to truncated if no full found
+              // PRIORITY 2: Unique suffix match (new redirect flow - suffix is unique _aem_)
               if (!fbc) {
-                fbc = truncatedFbc;
-                logger.info('Using truncated fbc (no full fbclid found)', {
-                  transactionId: tx.transaction_id,
-                  fbcLength: fbc?.length
+                const suffixMatches = (touchpoints || []).filter(tp => {
+                  const meta = tp.metadata as any;
+                  const fullFbclid = meta?.fbclid as string;
+                  return fullFbclid && fullFbclid.length > 50 && fullFbclid.endsWith(truncatedFbc);
                 });
+                
+                // Only use suffix match if it's UNIQUE (1 match = deterministic)
+                if (suffixMatches.length === 1) {
+                  const meta = suffixMatches[0].metadata as any;
+                  const recoveredFbc = meta.fbclid as string;
+                  fbc = recoveredFbc;
+                  fbp = meta.fbp || null;
+                  matchMethod = 'suffix_unique';
+                  logger.info('Recovered full fbclid (UNIQUE SUFFIX)', {
+                    transactionId: tx.transaction_id,
+                    fullLength: recoveredFbc.length
+                  });
+                } else if (suffixMatches.length > 1) {
+                  // AMBIGUOUS: Multiple touchpoints with same suffix - don't guess!
+                  logger.warn('Skipping fbclid recovery - AMBIGUOUS suffix match', {
+                    transactionId: tx.transaction_id,
+                    possibleMatches: suffixMatches.length,
+                    suffix: truncatedFbc.substring(0, 10) + '...'
+                  });
+                }
+              }
+              
+              // PRIORITY 3: Skip ambiguous prefix matches (don't guess)
+              // Legacy prefix matches are NOT reliable without email verification
+              if (!fbc) {
+                logger.info('No verified fbclid match found - using truncated', {
+                  transactionId: tx.transaction_id,
+                  hasDonorEmail: !!txDonorEmail,
+                  truncatedFbc: truncatedFbc.substring(0, 10) + '...'
+                });
+                fbc = truncatedFbc; // Fall back to truncated (better than wrong full)
               }
             }
           }
