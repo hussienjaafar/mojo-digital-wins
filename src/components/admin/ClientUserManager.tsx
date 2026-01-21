@@ -1,24 +1,31 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Users, Mail, Eye, Edit, Trash2, Key, MoreVertical, Send, Clock } from "lucide-react";
+import { UserPlus, Users, Mail, Eye, Edit, Trash2, Key, MoreVertical, Send, Search, X, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { AdminPageHeader, AdminLoadingState } from "./v3";
 import { V3Button } from "@/components/v3/V3Button";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { PendingInvitations } from "@/components/admin/PendingInvitations";
+import { UserPagination } from "@/components/admin/UserPagination";
+import { BulkUserActions } from "@/components/admin/BulkUserActions";
+import { SeatManagement } from "@/components/admin/SeatManagement";
+import { MemberRequestQueue } from "@/components/admin/MemberRequestQueue";
 
 type Organization = {
   id: string;
@@ -55,7 +62,21 @@ const ClientUserManager = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ClientUser | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingInviteCount, setPendingInviteCount] = useState(0);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
+
+  // Filter & pagination state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedOrgFilter, setSelectedOrgFilter] = useState("all");
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [orgSearchOpen, setOrgSearchOpen] = useState(false);
+  const [orgSearch, setOrgSearch] = useState("");
+
   const [formData, setFormData] = useState({
     email: "",
     full_name: "",
@@ -70,12 +91,15 @@ const ClientUserManager = () => {
 
   useEffect(() => {
     loadData();
+  }, [currentPage, pageSize, searchQuery, selectedOrgFilter, selectedRoles, selectedStatus]);
+
+  // Load organizations (only once)
+  useEffect(() => {
+    loadOrganizations();
   }, []);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadOrganizations = async () => {
     try {
-      // Load organizations
       const { data: orgsData, error: orgsError } = await (supabase as any)
         .from('client_organizations')
         .select('id, name')
@@ -84,24 +108,67 @@ const ClientUserManager = () => {
 
       if (orgsError) throw orgsError;
       setOrganizations(orgsData || []);
+    } catch (error: any) {
+      console.error('Error loading organizations:', error);
+    }
+  };
 
-      // Load client users
-      const { data: usersData, error: usersError } = await (supabase as any)
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Build the query with filters
+      let query = (supabase as any)
         .from('client_users')
-        .select('*')
+        .select('*', { count: 'exact' });
+
+      // Apply search filter
+      if (searchQuery) {
+        query = query.or(`full_name.ilike.%${searchQuery}%`);
+      }
+
+      // Apply organization filter
+      if (selectedOrgFilter !== 'all') {
+        query = query.eq('organization_id', selectedOrgFilter);
+      }
+
+      // Apply role filter
+      if (selectedRoles.length > 0) {
+        query = query.in('role', selectedRoles);
+      }
+
+      // Apply status filter
+      if (selectedStatus !== 'all') {
+        query = query.eq('status', selectedStatus);
+      }
+
+      // Pagination
+      const offset = (currentPage - 1) * pageSize;
+      query = query
+        .range(offset, offset + pageSize - 1)
         .order('created_at', { ascending: false });
+
+      const { data: usersData, count, error: usersError } = await query;
 
       if (usersError) throw usersError;
       setUsers(usersData || []);
+      setTotalCount(count || 0);
 
       // Load pending invitation count
-      const { data: pendingData } = await supabase
+      const { data: pendingInviteData } = await supabase
         .from('user_invitations')
         .select('id')
         .eq('invitation_type', 'organization_member')
         .eq('status', 'pending');
       
-      setPendingCount(pendingData?.length || 0);
+      setPendingInviteCount(pendingInviteData?.length || 0);
+
+      // Load pending member request count
+      const { data: pendingRequestData } = await (supabase as any)
+        .from('pending_member_requests')
+        .select('id')
+        .eq('status', 'pending');
+      
+      setPendingRequestCount(pendingRequestData?.length || 0);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -111,7 +178,7 @@ const ClientUserManager = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, pageSize, searchQuery, selectedOrgFilter, selectedRoles, selectedStatus, toast]);
 
   const handleInvite = (org: Organization) => {
     setSelectedOrgForInvite(org);
@@ -364,6 +431,42 @@ const ClientUserManager = () => {
     </Card>
   );
 
+  // Selection handlers
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedUserIds.length === users.length) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(users.map(u => u.id));
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedOrgFilter("all");
+    setSelectedRoles([]);
+    setSelectedStatus("all");
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = searchQuery || selectedOrgFilter !== "all" || selectedRoles.length > 0 || selectedStatus !== "all";
+  const totalPages = Math.ceil(totalCount / pageSize);
+
+  const filteredOrganizations = organizations.filter(org =>
+    org.name.toLowerCase().includes(orgSearch.toLowerCase())
+  );
+
+  const selectedOrgName = selectedOrgFilter === "all" 
+    ? "All organizations" 
+    : organizations.find(o => o.id === selectedOrgFilter)?.name || "Select organization";
+
   return (
     <Card>
       <CardHeader>
@@ -374,56 +477,196 @@ const ClientUserManager = () => {
               Organization Members
             </CardTitle>
             <CardDescription>
-              Manage user access within client organizations. Roles: Admin (full access), Manager (edit), Viewer (read-only)
+              Manage user access within client organizations
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            {/* Searchable org dropdown for inviting */}
+            <Popover>
+              <PopoverTrigger asChild>
                 <V3Button variant="primary" className="w-full sm:w-auto" leftIcon={<UserPlus className="w-4 h-4" />}>
                   Invite User
                 </V3Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {organizations.length === 0 ? (
-                  <DropdownMenuItem disabled>
-                    No organizations available
-                  </DropdownMenuItem>
-                ) : (
-                  organizations.slice(0, 8).map((org) => (
-                    <DropdownMenuItem key={org.id} onClick={() => handleInvite(org)}>
-                      <Send className="w-4 h-4 mr-2" />
-                      Invite to {org.name}
-                    </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </PopoverTrigger>
+              <PopoverContent className="w-[250px] p-0" align="end">
+                <Command>
+                  <CommandInput placeholder="Search organizations..." />
+                  <CommandList>
+                    <CommandEmpty>No organizations found.</CommandEmpty>
+                    <CommandGroup>
+                      {organizations.map((org) => (
+                        <CommandItem
+                          key={org.id}
+                          onSelect={() => handleInvite(org)}
+                          className="cursor-pointer"
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          {org.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="users" className="w-full">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="users">
               Active Members
-              <Badge variant="secondary" className="ml-2">{users.length}</Badge>
+              <Badge variant="secondary" className="ml-2">{totalCount}</Badge>
             </TabsTrigger>
             <TabsTrigger value="pending">
               Pending Invites
-              {pendingCount > 0 && (
-                <Badge variant="default" className="ml-2">{pendingCount}</Badge>
+              {pendingInviteCount > 0 && (
+                <Badge variant="default" className="ml-2">{pendingInviteCount}</Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="requests">
+              Member Requests
+              {pendingRequestCount > 0 && (
+                <Badge variant="destructive" className="ml-2">{pendingRequestCount}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="seats">
+              <Settings className="w-4 h-4 mr-1" />
+              Seats
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="users" className="mt-4">
+          <TabsContent value="users" className="mt-4 space-y-4">
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="pl-9"
+                />
+              </div>
+              
+              {/* Organization filter with search */}
+              <Popover open={orgSearchOpen} onOpenChange={setOrgSearchOpen}>
+                <PopoverTrigger asChild>
+                  <V3Button variant="outline" className="justify-between min-w-[180px]">
+                    <span className="truncate">{selectedOrgName}</span>
+                  </V3Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[250px] p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search organizations..." 
+                      value={orgSearch}
+                      onValueChange={setOrgSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No organizations found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={() => {
+                            setSelectedOrgFilter("all");
+                            setOrgSearchOpen(false);
+                            setCurrentPage(1);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          All organizations
+                        </CommandItem>
+                        {filteredOrganizations.map((org) => (
+                          <CommandItem
+                            key={org.id}
+                            onSelect={() => {
+                              setSelectedOrgFilter(org.id);
+                              setOrgSearchOpen(false);
+                              setCurrentPage(1);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            {org.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {/* Status filter */}
+              <Select 
+                value={selectedStatus} 
+                onValueChange={(v) => {
+                  setSelectedStatus(v);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <V3Button variant="ghost" size="sm" onClick={clearFilters}>
+                  <X className="h-4 w-4 mr-1" />
+                  Clear
+                </V3Button>
+              )}
+            </div>
+
+            {/* Role pills */}
+            <div className="flex flex-wrap gap-2">
+              {ORG_ROLES.map(role => (
+                <Badge
+                  key={role}
+                  variant={selectedRoles.includes(role) ? "default" : "outline"}
+                  className="cursor-pointer capitalize"
+                  onClick={() => {
+                    setSelectedRoles(prev => 
+                      prev.includes(role) 
+                        ? prev.filter(r => r !== role)
+                        : [...prev, role]
+                    );
+                    setCurrentPage(1);
+                  }}
+                >
+                  {role}
+                </Badge>
+              ))}
+            </div>
+
+            {/* Bulk Actions */}
+            {selectedUserIds.length > 0 && selectedOrgFilter !== "all" && (
+              <BulkUserActions
+                selectedUserIds={selectedUserIds}
+                organizationId={selectedOrgFilter}
+                onActionComplete={() => {
+                  loadData();
+                  setSelectedUserIds([]);
+                }}
+                onClearSelection={() => setSelectedUserIds([])}
+              />
+            )}
+
             {/* Mobile Card View */}
             {isMobile ? (
               <div className="space-y-3">
                 {users.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">
-                    No users yet. Create your first one!
+                    {hasActiveFilters ? "No users match your filters" : "No users yet. Invite your first member!"}
                   </p>
                 ) : (
                   users.map(renderMobileUserCard)
@@ -434,6 +677,12 @@ const ClientUserManager = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[40px]">
+                      <Checkbox
+                        checked={users.length > 0 && selectedUserIds.length === users.length}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Organization</TableHead>
                     <TableHead>Role</TableHead>
@@ -446,13 +695,19 @@ const ClientUserManager = () => {
                 <TableBody>
                   {users.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground">
-                        No users yet. Invite your first member!
+                      <TableCell colSpan={8} className="text-center text-muted-foreground">
+                        {hasActiveFilters ? "No users match your filters" : "No users yet. Invite your first member!"}
                       </TableCell>
                     </TableRow>
                   ) : (
                     users.map((user) => (
-                      <TableRow key={user.id}>
+                      <TableRow key={user.id} data-state={selectedUserIds.includes(user.id) ? "selected" : undefined}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedUserIds.includes(user.id)}
+                            onCheckedChange={() => toggleUserSelection(user.id)}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">{user.full_name}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {getOrganizationName(user.organization_id)}
@@ -464,10 +719,10 @@ const ClientUserManager = () => {
                           <Badge 
                             variant={user.status === 'active' ? 'default' : 'secondary'}
                             className={
-                              user.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                              user.status === 'suspended' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                              user.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                              'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                              user.status === 'active' ? 'bg-success/20 text-success-foreground border-success/30' :
+                              user.status === 'suspended' ? 'bg-destructive/20 text-destructive border-destructive/30' :
+                              user.status === 'pending' ? 'bg-warning/20 text-warning-foreground border-warning/30' :
+                              ''
                             }
                           >
                             {user.status || 'active'}
@@ -518,6 +773,21 @@ const ClientUserManager = () => {
                 </TableBody>
               </Table>
             )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <UserPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalCount={totalCount}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setCurrentPage(1);
+                }}
+              />
+            )}
           </TabsContent>
           
           <TabsContent value="pending" className="mt-4">
@@ -525,6 +795,14 @@ const ClientUserManager = () => {
               type="organization_member" 
               onInvitationChange={loadData}
             />
+          </TabsContent>
+
+          <TabsContent value="requests" className="mt-4">
+            <MemberRequestQueue onRequestProcessed={loadData} />
+          </TabsContent>
+
+          <TabsContent value="seats" className="mt-4">
+            <SeatManagement />
           </TabsContent>
         </Tabs>
       </CardContent>
