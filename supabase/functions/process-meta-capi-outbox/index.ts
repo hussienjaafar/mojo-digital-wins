@@ -99,7 +99,7 @@ serve(async (req) => {
         is_enrichment_only
       `)
       .in('status', ['pending', 'failed'])
-      .lte('next_retry_at', now)
+      .or(`next_retry_at.lte.${now},next_retry_at.is.null`)
       .lt('retry_count', MAX_ATTEMPTS)
       .order('next_retry_at', { ascending: true })
       .limit(BATCH_SIZE);
