@@ -545,6 +545,7 @@ serve(async (req) => {
 
     // === META CAPI OUTBOX ENQUEUE ===
     // Enqueue conversion event for server-side tracking (non-blocking, non-fatal)
+    console.log('[ACTBLUE] [DEBUG] About to enqueue CAPI event for transaction:', lineitemId, '| org:', organization_id);
     try {
       await enqueueCAPIEvent(supabase, {
         organization_id,
@@ -567,9 +568,10 @@ serve(async (req) => {
         clickId,
         contributionForm: safeString(contribution.contributionForm) || undefined,
       });
+      console.log('[ACTBLUE] [DEBUG] CAPI enqueue completed successfully for:', lineitemId);
     } catch (capiError: any) {
       // Non-fatal: log but don't fail the webhook
-      console.error('[ACTBLUE] CAPI enqueue failed (non-fatal):', capiError?.message || capiError);
+      console.error('[ACTBLUE] [DEBUG] CAPI enqueue FAILED:', capiError?.message || capiError);
     }
 
     // Update webhook log with success
@@ -672,8 +674,9 @@ async function enqueueCAPIEvent(
   } = params;
 
   // Only enqueue for donation events (not refunds/cancellations)
+  console.log('[CAPI] [DEBUG] enqueueCAPIEvent called | transactionId:', transactionId, '| type:', transactionType);
   if (transactionType !== 'donation') {
-    console.log('[CAPI] Skipping non-donation transaction type:', transactionType);
+    console.log('[CAPI] [DEBUG] SKIPPED - non-donation type:', transactionType);
     return;
   }
 
@@ -685,12 +688,19 @@ async function enqueueCAPIEvent(
     .maybeSingle();
 
   if (configError) {
-    console.error('[CAPI] Error fetching config:', configError.message);
+    console.error('[CAPI] [DEBUG] Error fetching config:', configError.message);
     return;
   }
 
+  console.log('[CAPI] [DEBUG] Config lookup result:', { 
+    hasConfig: !!capiConfig, 
+    isEnabled: capiConfig?.is_enabled,
+    pixelId: capiConfig?.pixel_id?.substring(0, 8) + '...',
+    actblueOwns: capiConfig?.actblue_owns_donation_complete
+  });
+
   if (!capiConfig || !capiConfig.is_enabled) {
-    // CAPI not configured or not enabled for this org - silent skip
+    console.log('[CAPI] [DEBUG] SKIPPED - CAPI not configured or not enabled');
     return;
   }
 
@@ -815,6 +825,9 @@ async function enqueueCAPIEvent(
     ? `https://secure.actblue.com/donate/${contributionForm}`
     : null;
 
+  // Convert paidAt to Unix timestamp (seconds) for Meta CAPI
+  const eventTimeUnix = Math.floor(new Date(paidAt).getTime() / 1000);
+
   // Insert into meta_conversion_events (the outbox)
   const { error: insertError } = await supabase
     .from('meta_conversion_events')
@@ -822,7 +835,7 @@ async function enqueueCAPIEvent(
       organization_id,
       event_id: eventId,
       event_name: eventName,
-      event_time: paidAt,
+      event_time: eventTimeUnix,
       event_source_url: eventSourceUrl,
       dedupe_key: dedupeKey,
       source_type: 'actblue_webhook',
@@ -846,11 +859,23 @@ async function enqueueCAPIEvent(
       ignoreDuplicates: true,  // Skip if already queued (idempotent)
     });
 
+  console.log('[CAPI] [DEBUG] Attempting insert with:', {
+    organization_id,
+    event_name: eventName,
+    dedupe_key: dedupeKey,
+    match_score: matchScore,
+    match_quality: matchQuality,
+    has_fbp: !!fbp,
+    has_fbc: !!fbc,
+    has_external_id: !!externalId,
+    is_enrichment_only: isEnrichmentOnly,
+  });
+
   if (insertError) {
     // Log but don't fail the webhook - CAPI is non-critical
-    console.error('[CAPI] Failed to enqueue event:', insertError.message);
+    console.error('[CAPI] [DEBUG] INSERT FAILED:', insertError.message, insertError.details, insertError.hint);
   } else {
     const eventType = isEnrichmentOnly ? 'enrichment' : 'primary';
-    console.log(`[CAPI] Enqueued ${eventType} donation event:`, dedupeKey);
+    console.log(`[CAPI] [DEBUG] INSERT SUCCESS - Enqueued ${eventType} donation event:`, dedupeKey);
   }
 }
