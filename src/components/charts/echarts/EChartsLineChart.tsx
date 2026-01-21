@@ -65,12 +65,18 @@ export interface EChartsLineChartProps {
     splitNumber?: number;
   };
   dualYAxis?: boolean;
-  /** Name label for the left y-axis (only used when dualYAxis is true) */
+  /** Enable triple Y-axis mode (left, middle inset, right) for 3 different scales */
+  tripleYAxis?: boolean;
+  /** Name label for the left y-axis (only used when dualYAxis or tripleYAxis is true) */
   yAxisNameLeft?: string;
-  /** Name label for the right y-axis (only used when dualYAxis is true) */
+  /** Name label for the middle y-axis (only used when tripleYAxis is true) */
+  yAxisNameMiddle?: string;
+  /** Name label for the right y-axis (only used when dualYAxis or tripleYAxis is true) */
   yAxisNameRight?: string;
   /** Value type for left y-axis labels (defaults to valueType) */
   yAxisValueTypeLeft?: ValueFormatType;
+  /** Value type for middle y-axis labels (only used when tripleYAxis is true) */
+  yAxisValueTypeMiddle?: ValueFormatType;
   /** Value type for right y-axis labels (defaults to valueType) */
   yAxisValueTypeRight?: ValueFormatType;
   anomalyMarkers?: AnomalyMarker[];
@@ -123,9 +129,12 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
   xAxisType = "category",
   yAxisConfig,
   dualYAxis = false,
+  tripleYAxis = false,
   yAxisNameLeft,
+  yAxisNameMiddle,
   yAxisNameRight,
   yAxisValueTypeLeft,
+  yAxisValueTypeMiddle,
   yAxisValueTypeRight,
   anomalyMarkers = [],
   showRollingAverage = false,
@@ -200,10 +209,14 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
     return formatNumber(value, true); // compact=true
   }, []);
 
-  // Formatters for left and right axes
+  // Formatters for left, middle, and right axes
   const formatAxisValueLeft = React.useCallback((value: number) => {
     return formatAxisValueByType(value, yAxisValueTypeLeft ?? valueType);
   }, [formatAxisValueByType, yAxisValueTypeLeft, valueType]);
+
+  const formatAxisValueMiddle = React.useCallback((value: number) => {
+    return formatAxisValueByType(value, yAxisValueTypeMiddle ?? valueType);
+  }, [formatAxisValueByType, yAxisValueTypeMiddle, valueType]);
 
   const formatAxisValueRight = React.useCallback((value: number) => {
     return formatAxisValueByType(value, yAxisValueTypeRight ?? valueType);
@@ -332,7 +345,84 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
       return [mainSeries];
     });
 
-    const yAxes = dualYAxis
+    const yAxes = tripleYAxis
+      ? [
+          // Left axis (index 0) - e.g., Messages Sent
+          {
+            type: "value" as const,
+            position: "left" as const,
+            ...(yAxisNameLeft && {
+              name: yAxisNameLeft,
+              nameLocation: "end" as const,
+              nameTextStyle: {
+                color: "hsl(var(--portal-text-muted))",
+                fontSize: 11,
+                padding: [0, 0, 0, 0],
+              },
+            }),
+            axisLabel: {
+              formatter: (value: number) => formatAxisValueLeft(value),
+              color: "hsl(var(--portal-text-muted))",
+            },
+            splitLine: {
+              lineStyle: {
+                color: "hsl(var(--portal-border))",
+                type: "dashed" as const,
+              },
+            },
+            ...yAxisConfig,
+          },
+          // Middle axis (index 1) - e.g., Conversions - positioned at left with offset
+          {
+            type: "value" as const,
+            position: "left" as const,
+            offset: 60,
+            ...(yAxisNameMiddle && {
+              name: yAxisNameMiddle,
+              nameLocation: "end" as const,
+              nameTextStyle: {
+                color: "hsl(var(--portal-text-muted))",
+                fontSize: 11,
+                padding: [0, 0, 0, 0],
+              },
+            }),
+            axisLabel: {
+              formatter: (value: number) => formatAxisValueMiddle(value),
+              color: "hsl(var(--portal-text-muted))",
+            },
+            axisLine: {
+              show: true,
+              lineStyle: {
+                color: "hsl(var(--portal-border))",
+              },
+            },
+            splitLine: {
+              show: false,
+            },
+          },
+          // Right axis (index 2) - e.g., Dollars Raised
+          {
+            type: "value" as const,
+            position: "right" as const,
+            ...(yAxisNameRight && {
+              name: yAxisNameRight,
+              nameLocation: "end" as const,
+              nameTextStyle: {
+                color: "hsl(var(--portal-text-muted))",
+                fontSize: 11,
+                padding: [0, 0, 0, 0],
+              },
+            }),
+            axisLabel: {
+              formatter: (value: number) => formatAxisValueRight(value),
+              color: "hsl(var(--portal-text-muted))",
+            },
+            splitLine: {
+              show: false,
+            },
+          },
+        ]
+      : dualYAxis
       ? [
           {
             type: "value" as const,
@@ -425,9 +515,13 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
               max-width: 280px;
             `,
             axisPointer: {
-              type: "cross",
-              crossStyle: {
-                color: "hsl(var(--portal-text-muted))",
+              type: "line",
+              label: {
+                show: false, // Hide the floating axis labels
+              },
+              lineStyle: {
+                color: "hsl(var(--portal-border))",
+                type: "dashed",
               },
             },
             formatter: (params: any) => {
@@ -522,8 +616,8 @@ export const EChartsLineChart: React.FC<EChartsLineChartProps> = ({
           }
         : undefined,
       grid: {
-        left: 12,
-        right: dualYAxis ? 60 : 12,
+        left: tripleYAxis ? 80 : 12,
+        right: (dualYAxis || tripleYAxis) ? 60 : 12,
         top: 20,
         bottom: showLegend ? 40 : 12,
         containLabel: true,
