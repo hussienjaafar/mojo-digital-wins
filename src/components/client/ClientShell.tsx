@@ -321,11 +321,13 @@ export const ClientShell = ({
                         <h1 className="text-base sm:text-lg font-semibold portal-text-primary truncate">
                           {organization.name}
                         </h1>
-                        {organizations.length > 1 && (
+                        {/* Show org selector for admins (always) or users with multiple orgs */}
+                        {(isAdmin || organizations.length > 1) && organizations.length > 0 && (
                           <OrganizationSelector
                             organizations={organizations}
                             selectedId={organization.id}
                             onSelect={handleOrganizationChange}
+                            isAdmin={isAdmin}
                           />
                         )}
                       </div>
