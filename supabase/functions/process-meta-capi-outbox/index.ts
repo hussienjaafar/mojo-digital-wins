@@ -5,11 +5,13 @@
  * sends them to Meta CAPI, and handles retries with exponential backoff.
  *
  * Features:
- * - Per-org token decryption (no global token)
+ * - Per-org token decryption with global fallback
  * - Privacy mode-based field hashing
  * - Idempotent: uses same event_id on retry
  * - Exponential backoff for failures
  * - Updates health metrics per org
+ * 
+ * Updated: 2026-01-21 - Added global token fallback
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -200,9 +202,16 @@ async function processOrgEvents(
     }
   } catch (e: any) {
     console.error('[CAPI-OUTBOX] Failed to decrypt credentials:', e.message);
-    await markEventsFailed(supabase, events, 'Credential decryption failed');
-    await updateOrgHealth(supabase, orgId, false, 'Credential decryption failed');
-    return { sent: 0, failed: events.length };
+    // Fallback to global token if org-specific decryption fails
+    const globalToken = Deno.env.get('META_CONVERSIONS_API_TOKEN');
+    if (globalToken) {
+      console.log('[CAPI-OUTBOX] Using global META_CONVERSIONS_API_TOKEN fallback');
+      accessToken = globalToken;
+    } else {
+      await markEventsFailed(supabase, events, 'Credential decryption failed');
+      await updateOrgHealth(supabase, orgId, false, 'Credential decryption failed');
+      return { sent: 0, failed: events.length };
+    }
   }
 
   const orgConfig: OrgConfig = {
