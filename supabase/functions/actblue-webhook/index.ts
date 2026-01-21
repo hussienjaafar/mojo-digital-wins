@@ -585,6 +585,7 @@ serve(async (req) => {
         amount,
         paidAt,
         refcode,
+        refcode2: refcode2Value,
         fbclid,
         clickId,
         contributionForm: safeString(contribution.contributionForm) || undefined,
@@ -672,6 +673,7 @@ interface EnqueueCAPIParams {
   amount: number;
   paidAt: string;
   refcode?: string | null;
+  refcode2?: string | null;
   fbclid?: string | null;
   clickId?: string | null;
   contributionForm?: string | null;
@@ -689,6 +691,7 @@ async function enqueueCAPIEvent(
     amount,
     paidAt,
     refcode,
+    refcode2,
     fbclid,
     clickId,
     contributionForm,
@@ -748,9 +751,14 @@ async function enqueueCAPIEvent(
   }
 
   // Lookup fbp/fbc from attribution touchpoints
-  // Priority: 1) Email match, 2) Refcode match (for pre-donation captures)
+  // Priority: 1) Email match, 2) Refcode match, 3) Time-proximity with truncated prefix match
   let fbp: string | null = null;
   let fbc: string | null = fbclid || clickId || null;
+  let touchpointMatchMethod = 'none';
+
+  // Time window for proximity matching (30 minutes before donation)
+  const donationTime = new Date(paidAt);
+  const windowStart = new Date(donationTime.getTime() - 30 * 60 * 1000).toISOString();
 
   // Try email-based lookup first (most reliable)
   if (donor.email) {
@@ -765,9 +773,19 @@ async function enqueueCAPIEvent(
       .maybeSingle();
 
     if (emailTouchpoint?.metadata) {
-      fbp = emailTouchpoint.metadata.fbp || fbp;
-      fbc = emailTouchpoint.metadata.fbc || emailTouchpoint.metadata.fbclid || fbc;
-      console.log('[CAPI] Found Meta identifiers via email lookup:', { hasFbp: !!fbp, hasFbc: !!fbc });
+      const meta = emailTouchpoint.metadata as any;
+      fbp = meta.fbp || fbp;
+      // Prefer full fbclid from touchpoint over truncated refcode2
+      const touchpointFbc = meta.fbc || meta.fbclid;
+      if (touchpointFbc && touchpointFbc.length > 50) {
+        fbc = touchpointFbc;
+        touchpointMatchMethod = 'email_full_fbclid';
+        console.log('[CAPI] Found FULL fbclid via email lookup:', { fbcLength: fbc?.length });
+      } else {
+        fbc = touchpointFbc || fbc;
+        touchpointMatchMethod = 'email';
+      }
+      console.log('[CAPI] Found Meta identifiers via email lookup:', { hasFbp: !!fbp, hasFbc: !!fbc, method: touchpointMatchMethod });
     }
   }
 
@@ -785,9 +803,17 @@ async function enqueueCAPIEvent(
       .maybeSingle();
 
     if (refcodeTouchpoint?.metadata) {
-      fbp = refcodeTouchpoint.metadata.fbp || fbp;
-      fbc = refcodeTouchpoint.metadata.fbc || refcodeTouchpoint.metadata.fbclid || fbc;
-      console.log('[CAPI] Found Meta identifiers via refcode lookup:', { hasFbp: !!fbp, hasFbc: !!fbc, refcode });
+      const meta = refcodeTouchpoint.metadata as any;
+      fbp = meta.fbp || fbp;
+      const touchpointFbc = meta.fbc || meta.fbclid;
+      if (touchpointFbc && touchpointFbc.length > 50) {
+        fbc = touchpointFbc;
+        touchpointMatchMethod = 'refcode_full_fbclid';
+      } else {
+        fbc = touchpointFbc || fbc;
+        touchpointMatchMethod = 'refcode';
+      }
+      console.log('[CAPI] Found Meta identifiers via refcode lookup:', { hasFbp: !!fbp, hasFbc: !!fbc, refcode, method: touchpointMatchMethod });
       
       // Update the touchpoint with this donor's email for future lookups
       if (donor.email && !refcodeTouchpoint.donor_email) {
@@ -803,6 +829,72 @@ async function enqueueCAPIEvent(
       }
     }
   }
+
+  // If still no full fbclid, try time-proximity matching with truncated refcode2 prefix
+  // This recovers full fbclid for donations where refcode2 was truncated
+  if ((!fbc || fbc.length <= 50) && refcode2?.startsWith('fb_')) {
+    const truncatedPart = refcode2.substring(3); // Remove 'fb_' prefix
+    
+    // Find touchpoints within 30 min before donation
+    const { data: proximityTouchpoints } = await supabase
+      .from('attribution_touchpoints')
+      .select('id, metadata, occurred_at')
+      .eq('organization_id', organization_id)
+      .not('metadata', 'is', null)
+      .gte('occurred_at', windowStart)
+      .lte('occurred_at', paidAt)
+      .order('occurred_at', { ascending: false })
+      .limit(20);
+
+    if (proximityTouchpoints && proximityTouchpoints.length > 0) {
+      // Find touchpoint where fbclid matches the truncated pattern
+      for (const tp of proximityTouchpoints) {
+        const meta = tp.metadata as any;
+        const fullFbclid = meta?.fbclid as string;
+        
+        if (!fullFbclid || fullFbclid.length <= 50) continue;
+
+        // Check if truncated part matches:
+        // 1. Start of fbclid (legacy truncation)
+        // 2. _aem_ suffix (new format)
+        // 3. End of fbclid
+        let isMatch = false;
+        
+        if (fullFbclid.startsWith(truncatedPart)) {
+          isMatch = true;
+        } else {
+          const aemIndex = fullFbclid.lastIndexOf('_aem_');
+          if (aemIndex !== -1) {
+            const suffix = fullFbclid.substring(aemIndex + 5);
+            if (suffix === truncatedPart) isMatch = true;
+          }
+        }
+        
+        if (!isMatch && fullFbclid.slice(-truncatedPart.length) === truncatedPart) {
+          isMatch = true;
+        }
+
+        if (isMatch) {
+          fbp = meta.fbp || fbp;
+          fbc = fullFbclid;
+          touchpointMatchMethod = 'time_proximity_prefix';
+          console.log('[CAPI] Recovered FULL fbclid via time-proximity + prefix match:', {
+            truncatedPart,
+            fullFbclidLength: fbc.length,
+            touchpointId: tp.id,
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  console.log('[CAPI] Final touchpoint lookup result:', {
+    hasFbp: !!fbp,
+    hasFbc: !!fbc,
+    fbcLength: fbc?.length,
+    matchMethod: touchpointMatchMethod,
+  });
 
   // SECURITY: Pre-hash all PII before storing in database
   // This ensures NO plaintext PII is stored in meta_conversion_events
