@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -10,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Users, Settings, Edit, Search, AlertTriangle, Gift, History } from "lucide-react";
 import { V3Button } from "@/components/v3/V3Button";
+import { V3Card, V3CardHeader, V3CardTitle, V3CardDescription, V3CardContent } from "@/components/v3/V3Card";
+import { V3Badge } from "@/components/v3/V3Badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -263,15 +263,15 @@ export function SeatManagement() {
   const getChangeTypeBadge = (type: string) => {
     switch (type) {
       case 'bonus_added':
-        return <Badge variant="default" className="bg-primary">Bonus Added</Badge>;
+        return <V3Badge variant="success">Bonus Added</V3Badge>;
       case 'bonus_removed':
-        return <Badge variant="destructive">Bonus Removed</Badge>;
+        return <V3Badge variant="error">Bonus Removed</V3Badge>;
       case 'bonus_updated':
-        return <Badge variant="secondary">Bonus Updated</Badge>;
+        return <V3Badge variant="info">Bonus Updated</V3Badge>;
       case 'limit_update':
-        return <Badge variant="outline">Limit Changed</Badge>;
+        return <V3Badge variant="muted">Limit Changed</V3Badge>;
       default:
-        return <Badge variant="outline">{type}</Badge>;
+        return <V3Badge variant="muted">{type}</V3Badge>;
     }
   };
 
@@ -281,45 +281,49 @@ export function SeatManagement() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Seat Management
-          </CardTitle>
-          <CardDescription>Loading organization seat allocations...</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <V3Card accent="blue">
+        <V3CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-[hsl(var(--portal-accent-blue)/0.1)]">
+              <Settings className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
+            </div>
+            <div>
+              <V3CardTitle>Seat Management</V3CardTitle>
+              <V3CardDescription>Loading organization seat allocations...</V3CardDescription>
+            </div>
+          </div>
+        </V3CardHeader>
+        <V3CardContent>
           <div className="space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
               <Skeleton key={i} className="h-16 w-full" />
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </V3CardContent>
+      </V3Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <V3Card accent="blue">
+      <V3CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-[hsl(var(--portal-accent-blue)/0.1)]">
+            <Settings className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
+          </div>
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              Seat Management
-            </CardTitle>
-            <CardDescription>
-              View and adjust seat allocations for each organization
-            </CardDescription>
+            <V3CardTitle>Seat Management</V3CardTitle>
+            <V3CardDescription>View and adjust seat allocations for each organization</V3CardDescription>
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      </V3CardHeader>
+      <V3CardContent className="space-y-4">
         <Tabs defaultValue="organizations" onValueChange={(v) => v === 'history' && loadChangeLog()}>
-          <TabsList>
-            <TabsTrigger value="organizations">Organizations</TabsTrigger>
-            <TabsTrigger value="history">
+          <TabsList className="bg-[hsl(var(--portal-bg-tertiary))] p-1 rounded-lg border border-[hsl(var(--portal-border))]">
+            <TabsTrigger value="organizations" className="data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:shadow-sm rounded-md">
+              Organizations
+            </TabsTrigger>
+            <TabsTrigger value="history" className="data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:shadow-sm rounded-md">
               <History className="h-4 w-4 mr-1" />
               Change History
             </TabsTrigger>
@@ -339,34 +343,34 @@ export function SeatManagement() {
 
             {/* Summary Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-              <div className="bg-muted/50 rounded-lg p-3">
-                <p className="text-sm text-muted-foreground">Total Orgs</p>
-                <p className="text-2xl font-bold">{organizations.length}</p>
+              <div className="bg-[hsl(var(--portal-bg-tertiary))] rounded-lg p-3 border border-[hsl(var(--portal-border))]">
+                <p className="text-sm text-[hsl(var(--portal-text-secondary))]">Total Orgs</p>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{organizations.length}</p>
               </div>
-              <div className="bg-muted/50 rounded-lg p-3">
-                <p className="text-sm text-muted-foreground">Purchased Seats</p>
-                <p className="text-2xl font-bold">{organizations.reduce((sum, org) => sum + org.seat_limit, 0)}</p>
+              <div className="bg-[hsl(var(--portal-bg-tertiary))] rounded-lg p-3 border border-[hsl(var(--portal-border))]">
+                <p className="text-sm text-[hsl(var(--portal-text-secondary))]">Purchased Seats</p>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{organizations.reduce((sum, org) => sum + org.seat_limit, 0)}</p>
               </div>
-              <div className="bg-muted/50 rounded-lg p-3">
-                <p className="text-sm text-muted-foreground">Bonus Seats</p>
-                <p className="text-2xl font-bold text-primary">{organizations.reduce((sum, org) => sum + org.bonus_seats, 0)}</p>
+              <div className="bg-[hsl(var(--portal-bg-tertiary))] rounded-lg p-3 border border-[hsl(var(--portal-border))]">
+                <p className="text-sm text-[hsl(var(--portal-text-secondary))]">Bonus Seats</p>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-accent-blue))]">{organizations.reduce((sum, org) => sum + org.bonus_seats, 0)}</p>
               </div>
-              <div className="bg-muted/50 rounded-lg p-3">
-                <p className="text-sm text-muted-foreground">Seats In Use</p>
-                <p className="text-2xl font-bold">{organizations.reduce((sum, org) => sum + org.active_members, 0)}</p>
+              <div className="bg-[hsl(var(--portal-bg-tertiary))] rounded-lg p-3 border border-[hsl(var(--portal-border))]">
+                <p className="text-sm text-[hsl(var(--portal-text-secondary))]">Seats In Use</p>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">{organizations.reduce((sum, org) => sum + org.active_members, 0)}</p>
               </div>
-              <div className="bg-muted/50 rounded-lg p-3">
-                <p className="text-sm text-muted-foreground">At Capacity</p>
-                <p className="text-2xl font-bold text-destructive">
+              <div className="bg-[hsl(var(--portal-bg-tertiary))] rounded-lg p-3 border border-[hsl(var(--portal-border))]">
+                <p className="text-sm text-[hsl(var(--portal-text-secondary))]">At Capacity</p>
+                <p className="text-2xl font-bold text-[hsl(var(--portal-error))]">
                   {organizations.filter(org => org.total_used >= org.total_entitled).length}
                 </p>
               </div>
             </div>
 
             {/* Table */}
-            <Table>
+            <Table className="[&_th]:bg-[hsl(var(--portal-bg-tertiary))] [&_th]:text-[hsl(var(--portal-text-secondary))] [&_th]:font-medium [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider">
               <TableHeader>
-                <TableRow>
+                <TableRow className="border-[hsl(var(--portal-border))]">
                   <TableHead>Organization</TableHead>
                   <TableHead className="text-center">Members</TableHead>
                   <TableHead className="text-center">Purchased</TableHead>
@@ -379,43 +383,43 @@ export function SeatManagement() {
               <TableBody>
                 {filteredOrganizations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-[hsl(var(--portal-text-secondary))] py-8">
                       No organizations found
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredOrganizations.map((org) => (
-                    <TableRow key={org.id}>
-                      <TableCell className="font-medium">{org.name}</TableCell>
+                    <TableRow key={org.id} className="hover:bg-[hsl(var(--portal-bg-hover))] transition-colors duration-150 border-[hsl(var(--portal-border))]">
+                      <TableCell className="font-medium text-[hsl(var(--portal-text-primary))]">{org.name}</TableCell>
                       <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Users className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex items-center justify-center gap-1 text-[hsl(var(--portal-text-secondary))]">
+                          <Users className="h-4 w-4" />
                           {org.active_members}
                         </div>
                       </TableCell>
-                      <TableCell className="text-center font-medium">{org.seat_limit}</TableCell>
+                      <TableCell className="text-center font-medium text-[hsl(var(--portal-text-primary))]">{org.seat_limit}</TableCell>
                       <TableCell className="text-center">
                         {org.bonus_seats > 0 ? (
-                          <Badge variant="secondary" className="gap-1">
+                          <V3Badge variant="info" className="gap-1">
                             <Gift className="h-3 w-3" />
                             {org.bonus_seats}
-                          </Badge>
+                          </V3Badge>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-[hsl(var(--portal-text-tertiary))]">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-center font-bold">{org.total_entitled}</TableCell>
+                      <TableCell className="text-center font-bold text-[hsl(var(--portal-text-primary))]">{org.total_entitled}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 min-w-[150px]">
                           <Progress 
                             value={Math.min((org.total_used / org.total_entitled) * 100, 100)} 
                             className={`h-2 flex-1 ${getUsageColor(org.total_used, org.total_entitled)}`}
                           />
-                          <span className="text-sm text-muted-foreground whitespace-nowrap">
+                          <span className="text-sm text-[hsl(var(--portal-text-secondary))] whitespace-nowrap">
                             {org.total_used}/{org.total_entitled}
                           </span>
                           {org.total_used >= org.total_entitled && (
-                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                            <AlertTriangle className="h-4 w-4 text-[hsl(var(--portal-error))]" />
                           )}
                         </div>
                       </TableCell>
@@ -490,7 +494,7 @@ export function SeatManagement() {
             )}
           </TabsContent>
         </Tabs>
-      </CardContent>
+      </V3CardContent>
 
       {/* Edit Seat Allocation Dialog */}
       <Dialog open={!!editingOrg} onOpenChange={(open) => !open && setEditingOrg(null)}>
@@ -593,6 +597,6 @@ export function SeatManagement() {
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </V3Card>
   );
 }

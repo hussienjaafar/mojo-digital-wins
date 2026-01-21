@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,6 +10,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { UserPlus, Search, Check, X, Clock, Loader2, Users, ChevronDown, Gift } from "lucide-react";
 import { V3Button } from "@/components/v3/V3Button";
+import { V3Card, V3CardHeader, V3CardTitle, V3CardDescription, V3CardContent } from "@/components/v3/V3Card";
+import { V3Badge } from "@/components/v3/V3Badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 
@@ -265,12 +265,12 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
     }
   };
 
-  const getRoleBadgeVariant = (role: string) => {
+  const getRoleBadgeVariant = (role: string): "info" | "purple" | "success" | "muted" => {
     switch (role) {
-      case 'admin': return 'default';
-      case 'manager': return 'secondary';
-      case 'editor': return 'outline';
-      default: return 'outline';
+      case 'admin': return 'info';
+      case 'manager': return 'purple';
+      case 'editor': return 'success';
+      default: return 'muted';
     }
   };
 
@@ -287,48 +287,52 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserPlus className="w-5 h-5" />
-            Member Requests
-          </CardTitle>
-          <CardDescription>Loading pending requests...</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <V3Card accent="purple">
+        <V3CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-[hsl(var(--portal-accent-purple)/0.1)]">
+              <UserPlus className="h-5 w-5 text-[hsl(var(--portal-accent-purple))]" />
+            </div>
+            <div>
+              <V3CardTitle>Member Requests</V3CardTitle>
+              <V3CardDescription>Loading pending requests...</V3CardDescription>
+            </div>
+          </div>
+        </V3CardHeader>
+        <V3CardContent>
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-16 w-full" />
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </V3CardContent>
+      </V3Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5" />
-              Member Requests
-              {requests.length > 0 && (
-                <Badge variant="destructive">{requests.length}</Badge>
-              )}
-            </CardTitle>
-            <CardDescription>
-              Review and process member requests from organizations
-            </CardDescription>
+    <V3Card accent="purple">
+      <V3CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-[hsl(var(--portal-accent-purple)/0.1)]">
+            <UserPlus className="h-5 w-5 text-[hsl(var(--portal-accent-purple))]" />
+          </div>
+          <div className="flex items-center gap-3">
+            <div>
+              <V3CardTitle>Member Requests</V3CardTitle>
+              <V3CardDescription>Review and process member requests from organizations</V3CardDescription>
+            </div>
+            {requests.length > 0 && (
+              <V3Badge variant="error">{requests.length} pending</V3Badge>
+            )}
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      </V3CardHeader>
+      <V3CardContent className="space-y-4">
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-tertiary))]" />
             <Input
               placeholder="Search by name, email, or organization..."
               value={searchQuery}
@@ -351,18 +355,18 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
 
         {filteredRequests.length === 0 ? (
           <div className="text-center py-12">
-            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium">No pending requests</h3>
-            <p className="text-muted-foreground">
+            <Users className="h-12 w-12 text-[hsl(var(--portal-text-tertiary))] mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-[hsl(var(--portal-text-primary))]">No pending requests</h3>
+            <p className="text-[hsl(var(--portal-text-secondary))]">
               {requests.length === 0 
                 ? "Organizations haven't submitted any member requests yet"
                 : "No requests match your current filters"}
             </p>
           </div>
         ) : (
-          <Table>
+          <Table className="[&_th]:bg-[hsl(var(--portal-bg-tertiary))] [&_th]:text-[hsl(var(--portal-text-secondary))] [&_th]:font-medium [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider">
             <TableHeader>
-              <TableRow>
+              <TableRow className="border-[hsl(var(--portal-border))]">
                 <TableHead>Requested Member</TableHead>
                 <TableHead>Organization</TableHead>
                 <TableHead>Requested By</TableHead>
@@ -374,36 +378,36 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
             </TableHeader>
             <TableBody>
               {filteredRequests.map((request) => (
-                <TableRow key={request.id}>
+                <TableRow key={request.id} className="hover:bg-[hsl(var(--portal-bg-hover))] transition-colors duration-150 border-[hsl(var(--portal-border))]">
                   <TableCell>
                     <div>
-                      <p className="font-medium">{request.full_name}</p>
-                      <p className="text-sm text-muted-foreground">{request.email}</p>
+                      <p className="font-medium text-[hsl(var(--portal-text-primary))]">{request.full_name}</p>
+                      <p className="text-sm text-[hsl(var(--portal-text-secondary))]">{request.email}</p>
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-[hsl(var(--portal-text-secondary))]">
                     {request.organization_name}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-[hsl(var(--portal-text-secondary))]">
                     {request.requester_name}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getRoleBadgeVariant(request.requested_role)} className="capitalize">
+                    <V3Badge variant={getRoleBadgeVariant(request.requested_role)} className="capitalize">
                       {request.requested_role}
-                    </Badge>
+                    </V3Badge>
                   </TableCell>
                   <TableCell>
                     {request.available_seats > 0 ? (
-                      <Badge variant="outline" className="text-primary border-primary">
+                      <V3Badge variant="success">
                         {request.available_seats} available
-                      </Badge>
+                      </V3Badge>
                     ) : (
-                      <Badge variant="destructive">
+                      <V3Badge variant="error">
                         No seats
-                      </Badge>
+                      </V3Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-[hsl(var(--portal-text-secondary))]">
                     <div className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {formatDistanceToNow(new Date(request.created_at), { addSuffix: true })}
@@ -473,7 +477,7 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
             </TableBody>
           </Table>
         )}
-      </CardContent>
+      </V3CardContent>
 
       {/* Reject Dialog */}
       <Dialog open={!!rejectingRequest} onOpenChange={(open) => !open && setRejectingRequest(null)}>
@@ -515,6 +519,6 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </V3Card>
   );
 }
