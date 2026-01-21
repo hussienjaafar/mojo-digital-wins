@@ -9,6 +9,7 @@ export const useClientOrganization = () => {
 
   useEffect(() => {
     const loadOrganizationId = async () => {
+      // Priority 1: Impersonation context (admin viewing as org or using selector)
       if (isImpersonating && impersonatedOrgId) {
         setOrganizationId(impersonatedOrgId);
         setIsLoading(false);
@@ -22,6 +23,23 @@ export const useClientOrganization = () => {
           return;
         }
 
+        // Check if user is admin
+        const { data: isAdminUser } = await supabase.rpc("has_role", {
+          _user_id: session.user.id,
+          _role: "admin",
+        });
+
+        if (isAdminUser) {
+          // Priority 2: Admin's localStorage selection (from org selector)
+          const savedOrgId = localStorage.getItem("selectedOrganizationId");
+          if (savedOrgId) {
+            setOrganizationId(savedOrgId);
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // Priority 3: Client user's assigned organization
         const { data: clientUser } = await (supabase as any)
           .from('client_users')
           .select('organization_id')
@@ -40,6 +58,18 @@ export const useClientOrganization = () => {
 
     loadOrganizationId();
   }, [impersonatedOrgId, isImpersonating]);
+
+  // Listen for storage changes (when admin switches org via selector)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'selectedOrganizationId' && e.newValue) {
+        setOrganizationId(e.newValue);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   return { organizationId, isLoading, isImpersonating };
 };
