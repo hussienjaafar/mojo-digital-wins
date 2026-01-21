@@ -205,6 +205,6 @@ export function useRedirectClicksQuery(
   return useQuery({
     queryKey: redirectClicksKeys.byOrg(organizationId, daysBack),
     queryFn: () => fetchRedirectClicks(organizationId, daysBack),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 1 * 60 * 1000, // 1 minute
   });
 }
