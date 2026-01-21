@@ -126,12 +126,15 @@ export function useRealtimeMetrics(
           clicks, conversions, amount_raised, cost,
           message_text, phone_list_name, replies, skipped, previously_opted_out, send_date
         `)
-        .eq("organization_id", organizationId);
+        .eq("organization_id", organizationId)
+        .gte("send_date", startDate)
+        .lte("send_date", endDate)
+        .order("send_date", { ascending: false });
 
       if (error) throw error;
       return (data || []) as SMSMetric[];
     },
-    enabled: !!organizationId,
+    enabled: !!organizationId && !!startDate && !!endDate,
     staleTime: 5 * 60 * 1000,
   });
 
