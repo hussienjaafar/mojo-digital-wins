@@ -1,5 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { addDays, format, parseISO } from "date-fns";
+import { fromZonedTime } from "date-fns-tz";
+import { DEFAULT_ORG_TIMEZONE } from "@/lib/metricDefinitions";
 
 // ============================================================================
 // Types
@@ -119,12 +122,18 @@ async function fetchEnhancedRedirectClicks(
 
   const isSingleDay = start === end;
 
+  // Convert local dates to UTC for database queries (timezone-aware)
+  const tz = DEFAULT_ORG_TIMEZONE;
+  const startUtc = fromZonedTime(`${start}T00:00:00`, tz).toISOString();
+  const endExclusiveDay = format(addDays(parseISO(end), 1), "yyyy-MM-dd");
+  const endExclusiveUtc = fromZonedTime(`${endExclusiveDay}T00:00:00`, tz).toISOString();
+
   // Fetch touchpoints
   let touchpointsQuery = supabase
     .from("attribution_touchpoints")
     .select("*")
-    .gte("occurred_at", `${start}T00:00:00`)
-    .lte("occurred_at", `${end}T23:59:59`)
+    .gte("occurred_at", startUtc)
+    .lt("occurred_at", endExclusiveUtc)
     .order("occurred_at", { ascending: false });
 
   if (organizationId) {
@@ -135,8 +144,8 @@ async function fetchEnhancedRedirectClicks(
   let donationsQuery = supabase
     .from("actblue_transactions")
     .select("donor_email, refcode, refcode2, amount, transaction_date")
-    .gte("transaction_date", start)
-    .lte("transaction_date", end);
+    .gte("transaction_date", startUtc)
+    .lt("transaction_date", endExclusiveUtc);
 
   if (organizationId) {
     donationsQuery = donationsQuery.eq("organization_id", organizationId);
@@ -191,22 +200,64 @@ async function fetchEnhancedRedirectClicks(
 
   // Build fbclid prefix lookup from donations with refcode2
   // ActBlue stores fbclid in refcode2 with "fb_" prefix and truncated
-  const donationsByFbclidPrefix = new Map<string, { count: number; revenue: number; emails: Set<string> }>();
+  // Key insight: refcode2 contains the fbclid, and refcode contains the campaign refcode (refcode1)
+  // We need to attribute conversions to refcode1 based on refcode2 matching
+  const donationsByFbclidPrefix = new Map<string, { 
+    refcode: string; // The campaign refcode (refcode1) to attribute to
+    count: number; 
+    revenue: number;
+  }>();
+  
   donations.forEach((d) => {
     if (d.refcode2 && typeof d.refcode2 === 'string' && d.refcode2.startsWith('fb_')) {
       const fbclidPrefix = d.refcode2.replace('fb_', '');
-      const existing = donationsByFbclidPrefix.get(fbclidPrefix) || { count: 0, revenue: 0, emails: new Set() };
-      existing.count += 1;
-      existing.revenue += d.amount || 0;
-      if (d.donor_email) existing.emails.add(d.donor_email.toLowerCase());
-      donationsByFbclidPrefix.set(fbclidPrefix, existing);
+      const campaignRefcode = d.refcode || "(no refcode)";
+      
+      // Group by prefix - if same prefix appears, they should have same refcode
+      const existing = donationsByFbclidPrefix.get(fbclidPrefix);
+      if (existing) {
+        existing.count += 1;
+        existing.revenue += d.amount || 0;
+      } else {
+        donationsByFbclidPrefix.set(fbclidPrefix, {
+          refcode: campaignRefcode,
+          count: 1,
+          revenue: d.amount || 0,
+        });
+      }
+    }
+  });
+
+  // Build a set of all touchpoint fbclids for matching
+  const touchpointFbclids = new Set<string>();
+  touchpoints.forEach((tp) => {
+    const meta = parseMetadata(tp.metadata);
+    const fbclid = meta.fbclid as string;
+    if (fbclid) touchpointFbclids.add(fbclid);
+  });
+
+  // Match donations (via refcode2) to touchpoints and attribute to refcode1
+  // This is the core click ID matching logic
+  const clickIdAttributions = new Map<string, { conversions: number; revenue: number }>();
+  const matchedPrefixes = new Set<string>(); // Track which prefixes we've already matched
+  
+  donationsByFbclidPrefix.forEach((donation, prefix) => {
+    // Check if any touchpoint's fbclid starts with this prefix
+    const hasMatch = Array.from(touchpointFbclids).some(
+      (fbclid) => fbclid.startsWith(prefix)
+    );
+    
+    if (hasMatch && !matchedPrefixes.has(prefix)) {
+      const existing = clickIdAttributions.get(donation.refcode) || { conversions: 0, revenue: 0 };
+      existing.conversions += donation.count;
+      existing.revenue += donation.revenue;
+      clickIdAttributions.set(donation.refcode, existing);
+      matchedPrefixes.add(prefix);
     }
   });
 
   // Track which refcodes we've already attributed (to avoid double-counting)
   const attributedRefcodes = new Set<string>();
-  // Track which fbclid prefixes we've already attributed per refcode
-  const attributedFbclidPrefixes = new Map<string, Set<string>>(); // refcode -> set of prefixes
 
   // Process touchpoints
   const sessionIds = new Set<string>();
@@ -283,25 +334,13 @@ async function fetchEnhancedRedirectClicks(
     if (hasFbc) refEntry.withFbc++;
     if (sessionId) refcodeSessionMap.get(refcode)!.add(sessionId);
 
-    // Check for attributed conversions via fbclid matching
-    // The touchpoint's fbclid should match the prefix stored in donation's refcode2
-    const tpFbclid = (meta.fbclid || meta.fbc_fbclid) as string | undefined;
-    if (tpFbclid && refcode !== "(no refcode)") {
-      // Initialize tracking set for this refcode
-      if (!attributedFbclidPrefixes.has(refcode)) {
-        attributedFbclidPrefixes.set(refcode, new Set());
-      }
-      const refcodeAttributed = attributedFbclidPrefixes.get(refcode)!;
-      
-      // Check if any donation's refcode2 prefix matches the start of this fbclid
-      donationsByFbclidPrefix.forEach((donation, prefix) => {
-        // Only attribute each unique prefix once per refcode
-        if (tpFbclid.startsWith(prefix) && !refcodeAttributed.has(prefix)) {
-          refEntry.attributedConversions += donation.count;
-          refEntry.attributedRevenue += donation.revenue;
-          refcodeAttributed.add(prefix);
-        }
-      });
+    // Apply click ID attributed conversions (calculated above)
+    // This uses the donation's refcode1, not the touchpoint's refcode
+    const clickIdData = clickIdAttributions.get(refcode);
+    if (clickIdData && !attributedRefcodes.has(`clickid_${refcode}`)) {
+      refEntry.attributedConversions = clickIdData.conversions;
+      refEntry.attributedRevenue = clickIdData.revenue;
+      attributedRefcodes.add(`clickid_${refcode}`);
     }
 
     // Attribute total conversions by refcode (only once per refcode to avoid double-counting)
