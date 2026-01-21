@@ -2632,6 +2632,7 @@ export type Database = {
           name: string
           org_timezone: string | null
           primary_contact_email: string | null
+          seat_limit: number
           slug: string
           timezone: string | null
           updated_at: string | null
@@ -2646,6 +2647,7 @@ export type Database = {
           name: string
           org_timezone?: string | null
           primary_contact_email?: string | null
+          seat_limit?: number
           slug: string
           timezone?: string | null
           updated_at?: string | null
@@ -2660,6 +2662,7 @@ export type Database = {
           name?: string
           org_timezone?: string | null
           primary_contact_email?: string | null
+          seat_limit?: number
           slug?: string
           timezone?: string | null
           updated_at?: string | null
@@ -7412,6 +7415,76 @@ export type Database = {
           },
         ]
       }
+      pending_member_requests: {
+        Row: {
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          notes: string | null
+          organization_id: string
+          processed_at: string | null
+          processed_by: string | null
+          rejection_reason: string | null
+          requested_by: string
+          requested_role: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_by: string
+          requested_role?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_by?: string
+          requested_role?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_member_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_member_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "pending_member_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       pipeline_deadman_alerts: {
         Row: {
           acknowledged_at: string | null
@@ -8584,6 +8657,73 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "export_templates"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      seat_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string | null
+          current_seat_limit: number
+          id: string
+          organization_id: string
+          processed_at: string | null
+          processed_by: string | null
+          reason: string | null
+          requested_by: string
+          requested_seats: number
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string | null
+          current_seat_limit: number
+          id?: string
+          organization_id: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          requested_by: string
+          requested_seats: number
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string | null
+          current_seat_limit?: number
+          id?: string
+          organization_id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          requested_by?: string
+          requested_seats?: number
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seat_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seat_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "seat_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -13677,6 +13817,17 @@ export type Database = {
           organization_id: string
           organization_name: string
           sync_priority: string
+        }[]
+      }
+      get_org_seat_usage: {
+        Args: { org_id: string }
+        Returns: {
+          available_seats: number
+          members_count: number
+          pending_invites_count: number
+          pending_requests_count: number
+          seat_limit: number
+          total_used: number
         }[]
       }
       get_org_trend_relevance: {
