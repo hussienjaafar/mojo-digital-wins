@@ -11975,8 +11975,10 @@ export type Database = {
           attributed_ad_id: string | null
           attributed_campaign_id: string | null
           attributed_creative_id: string | null
+          attributed_platform: string | null
           attribution_confidence: number | null
           attribution_method: string | null
+          contribution_form: string | null
           donor_email: string | null
           donor_name: string | null
           is_recurring: boolean | null

@@ -373,11 +373,10 @@ async function fetchDashboardMetrics(
 
   // Helper to build attribution query with filters
   const buildAttrQuery = (start: string, endInc: string) => {
-    // NOTE: donation_attribution schema does NOT include attributed_platform.
-    // We infer platform client-side (meta vs sms) from attribution_method / id fields.
+    // donation_attribution now includes attributed_platform and contribution_form for SMS detection
     let query = (supabase as any)
       .from('donation_attribution')
-      .select('transaction_id, attribution_method, attributed_campaign_id, attributed_creative_id, attributed_ad_id, transaction_type, amount, net_amount, transaction_date')
+      .select('transaction_id, attribution_method, attributed_campaign_id, attributed_creative_id, attributed_ad_id, attributed_platform, contribution_form, refcode, transaction_type, amount, net_amount, transaction_date')
       .eq('organization_id', organizationId)
       .gte('transaction_date', start)
       .lt('transaction_date', endInc);
@@ -464,14 +463,16 @@ async function fetchDashboardMetrics(
       .from('actblue_transactions_secure')
       // NOTE: actblue_transactions_secure intentionally excludes certain PII/derived fields.
       // Do NOT select non-existent columns (e.g. donor_id_hash) or the whole query will fail.
-      .select('id, amount, net_amount, fee, donor_email, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_type, transaction_date, refcode, source_campaign, click_id, fbclid')
+      // IMPORTANT: contribution_form is required for SMS attribution fallback (e.g., moliticosms)
+      .select('id, amount, net_amount, fee, donor_email, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_type, transaction_date, refcode, source_campaign, click_id, fbclid, contribution_form')
       .eq('organization_id', organizationId)
       .gte('transaction_date', startDate)
       .lt('transaction_date', endDateInclusive),
     // Previous period donations
     (supabase as any)
       .from('actblue_transactions_secure')
-      .select('id, amount, net_amount, fee, donor_email, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_type, transaction_date, refcode, source_campaign, click_id, fbclid')
+      // IMPORTANT: contribution_form is required for SMS attribution fallback (e.g., moliticosms)
+      .select('id, amount, net_amount, fee, donor_email, is_recurring, recurring_upsell_shown, recurring_upsell_succeeded, transaction_type, transaction_date, refcode, source_campaign, click_id, fbclid, contribution_form')
       .eq('organization_id', organizationId)
       .gte('transaction_date', prevPeriod.start)
       .lt('transaction_date', prevEndInclusive),
@@ -900,24 +901,29 @@ async function fetchDashboardMetrics(
   let unattributedDonations = 0;
 
   if (donationAttributions.length > 0) {
-    // Use unified channel detection from channelDetection.ts
-    // This implements the 4-tier Attribution Waterfall with consistent pattern matching
-    // GLOBAL RULES - applies to ALL organizations
+    // Use attributed_platform from view when available (most accurate)
+    // Fall back to unified channel detection for legacy records
     const getAttributionChannel = (a: any): AttributionChannel => {
+      // Prefer direct platform from view (computed server-side with latest logic)
+      if (a.attributed_platform) {
+        return a.attributed_platform as AttributionChannel;
+      }
+      
+      // Fallback to client-side detection for records without attributed_platform
       const result = detectChannelWithConfidence({
         attribution_method: a.attribution_method,
         attributed_campaign_id: a.attributed_campaign_id,
         attributed_ad_id: a.attributed_ad_id,
         attributed_creative_id: a.attributed_creative_id,
         refcode: a.refcode,
-        // Note: donation_attribution doesn't have click_id/fbclid, those are in transactions
+        contribution_form: a.contribution_form,
       });
       return result.channel;
     };
 
     metaDonations = donationAttributions.filter((a: any) => getAttributionChannel(a) === 'meta').length;
     smsDonations = donationAttributions.filter((a: any) => getAttributionChannel(a) === 'sms').length;
-    // Email attribution (new - was previously missed)
+    // Email attribution
     const emailDonations = donationAttributions.filter((a: any) => getAttributionChannel(a) === 'email').length;
     unattributedDonations = donationAttributions.filter((a: any) => {
       const channel = getAttributionChannel(a);
@@ -928,14 +934,10 @@ async function fetchDashboardMetrics(
     logger.debug('Channel breakdown from donation_attribution', {
       meta: metaDonations,
       sms: smsDonations,
+      email: emailDonations,
       unattributed: unattributedDonations,
       total: donationAttributions.length,
     });
-
-    // Warn if SMS attribution is lower than expected (might indicate phone_hash issues)
-    if (smsDonations === 0 && smsMetrics.length > 0) {
-      logger.warn('SMS campaigns found but no SMS-attributed donations - check phone_hash population');
-    }
   } else {
     // Fallback: use unified channel detection on transaction-level fields
     // This ensures consistent pattern matching even when donation_attribution is empty
