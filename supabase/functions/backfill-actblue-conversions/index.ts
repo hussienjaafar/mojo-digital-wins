@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, validateCronOrAdmin, checkRateLimit } from "../_shared/security.ts";
+import { calculateMatchScore, getMatchQualityLabel } from "../_shared/capi-utils.ts";
 
 const corsHeaders = getCorsHeaders();
 const API_VERSION = "v22.0";
@@ -297,6 +298,14 @@ serve(async (req) => {
         }
       }
 
+      // Calculate match quality metrics
+      const matchScore = calculateMatchScore(userData, {
+        fbp: userData.fbp || null,
+        fbc: userData.fbc || null,
+        external_id: userData.external_id || null,
+      });
+      const matchQuality = getMatchQualityLabel(matchScore, userData);
+
       const eventTime = Math.floor(new Date(tx.transaction_date).getTime() / 1000);
       const customData = {
         value: Number(tx.amount) || 0,
@@ -370,6 +379,8 @@ serve(async (req) => {
             status: 'sent',
             delivered_at: new Date().toISOString(),
             is_enrichment_only: orgConfig.is_enrichment_only,
+            match_score: matchScore,
+            match_quality: matchQuality,
             meta_response: {
               events_received: result.events_received,
               fbtrace_id: result.fbtrace_id,
