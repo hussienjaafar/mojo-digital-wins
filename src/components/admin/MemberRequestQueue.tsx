@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Search, Check, X, Clock, Loader2, Users } from "lucide-react";
+import { UserPlus, Search, Check, X, Clock, Loader2, Users, ChevronDown, Gift } from "lucide-react";
 import { V3Button } from "@/components/v3/V3Button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
@@ -31,6 +32,7 @@ type MemberRequest = {
   notes: string | null;
   status: string;
   created_at: string;
+  available_seats: number;
 };
 
 interface MemberRequestQueueProps {
@@ -85,7 +87,7 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
 
       if (error) throw error;
 
-      // Get requester names
+      // Get requester names and seat availability
       const requestsWithNames: MemberRequest[] = await Promise.all(
         (requestsData || []).map(async (req: any) => {
           // Get requester name from client_users
@@ -94,6 +96,12 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
             .select('full_name')
             .eq('id', req.requested_by)
             .single();
+
+          // Get seat availability
+          const { data: seatData } = await supabase.rpc('get_org_seat_usage', {
+            org_id: req.organization_id
+          });
+          const seatUsage = Array.isArray(seatData) ? seatData[0] : seatData;
 
           return {
             id: req.id,
@@ -107,6 +115,7 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
             notes: req.notes,
             status: req.status,
             created_at: req.created_at,
+            available_seats: seatUsage?.available_seats || 0,
           };
         })
       );
@@ -124,16 +133,51 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
     }
   };
 
-  const handleApprove = async (request: MemberRequest) => {
+  const handleApprove = async (request: MemberRequest, addBonusSeat: boolean = false) => {
     setProcessingId(request.id);
     try {
       // Get current user info for actor details
       const { data: { session } } = await supabase.auth.getSession();
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', session?.user?.id)
-        .single();
+      const userId = session?.user?.id;
+
+      // If adding bonus seat, update the organization first
+      if (addBonusSeat) {
+        // Get current org data
+        const { data: orgData, error: orgError } = await (supabase as any)
+          .from('client_organizations')
+          .select('bonus_seats, bonus_reason')
+          .eq('id', request.organization_id)
+          .single();
+
+        if (orgError) throw orgError;
+
+        const currentBonus = orgData?.bonus_seats || 0;
+        const newBonus = currentBonus + 1;
+        const reason = orgData?.bonus_reason 
+          ? `${orgData.bonus_reason}; +1 via member request approval`
+          : 'Granted via member request approval';
+
+        // Update bonus seats
+        const { error: updateError } = await (supabase as any)
+          .from('client_organizations')
+          .update({ 
+            bonus_seats: newBonus,
+            bonus_reason: reason 
+          })
+          .eq('id', request.organization_id);
+
+        if (updateError) throw updateError;
+
+        // Log the change
+        await supabase.rpc('log_seat_change', {
+          p_org_id: request.organization_id,
+          p_changed_by: userId,
+          p_change_type: currentBonus === 0 ? 'bonus_added' : 'bonus_updated',
+          p_old_bonus: currentBonus,
+          p_new_bonus: newBonus,
+          p_reason: 'Granted via member request approval',
+        });
+      }
 
       // Send invitation via edge function
       const { data, error } = await supabase.functions.invoke('send-user-invitation', {
@@ -163,7 +207,9 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
 
       toast({
         title: "Request Approved",
-        description: `Invitation sent to ${request.email}`,
+        description: addBonusSeat 
+          ? `Invitation sent to ${request.email} (bonus seat added)`
+          : `Invitation sent to ${request.email}`,
       });
 
       loadData();
@@ -321,6 +367,7 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
                 <TableHead>Organization</TableHead>
                 <TableHead>Requested By</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Seats</TableHead>
                 <TableHead>Submitted</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -345,6 +392,17 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
                       {request.requested_role}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    {request.available_seats > 0 ? (
+                      <Badge variant="outline" className="text-primary border-primary">
+                        {request.available_seats} available
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive">
+                        No seats
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
@@ -353,21 +411,52 @@ export function MemberRequestQueue({ onRequestProcessed }: MemberRequestQueuePro
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <V3Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => handleApprove(request)}
-                        disabled={processingId === request.id}
-                      >
-                        {processingId === request.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <Check className="h-4 w-4 mr-1" />
-                            Approve
-                          </>
-                        )}
-                      </V3Button>
+                      {request.available_seats > 0 ? (
+                        <V3Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => handleApprove(request, false)}
+                          disabled={processingId === request.id}
+                        >
+                          {processingId === request.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Check className="h-4 w-4 mr-1" />
+                              Approve
+                            </>
+                          )}
+                        </V3Button>
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <V3Button
+                              variant="primary"
+                              size="sm"
+                              disabled={processingId === request.id}
+                            >
+                              {processingId === request.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Check className="h-4 w-4 mr-1" />
+                                  Approve
+                                  <ChevronDown className="h-3 w-3 ml-1" />
+                                </>
+                              )}
+                            </V3Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem 
+                              onClick={() => handleApprove(request, true)}
+                              className="gap-2"
+                            >
+                              <Gift className="h-4 w-4 text-primary" />
+                              Approve + Add Bonus Seat
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                       <V3Button
                         variant="outline"
                         size="sm"
