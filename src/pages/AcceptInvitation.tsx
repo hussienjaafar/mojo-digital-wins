@@ -97,7 +97,7 @@ export default function AcceptInvitation() {
     if (invitation?.invitation_type === "platform_admin") {
       navigate("/admin");
     } else if (invitation?.organization_id) {
-      navigate("/client-portal");
+      navigate("/client/dashboard");
     } else {
       navigate("/");
     }

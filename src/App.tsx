@@ -122,6 +122,7 @@ const AppContent = () => {
             <Route path="/client-login" element={<ClientLogin />} />
             <Route path="/client/dashboard" element={<ClientDashboard />} />
             <Route path="/client/portal" element={<Navigate to="/client/dashboard" replace />} />
+            <Route path="/client-portal" element={<Navigate to="/client/dashboard" replace />} />
             {/* Redirect deprecated custom dashboard route */}
             <Route path="/client/dashboard/custom" element={<Navigate to="/client/dashboard" replace />} />
             <Route path="/client/watchlist" element={<ClientWatchlist />} />
