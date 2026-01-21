@@ -2623,10 +2623,13 @@ export type Database = {
       }
       client_organizations: {
         Row: {
+          bonus_reason: string | null
+          bonus_seats: number
           created_at: string | null
           id: string
           is_active: boolean | null
           logo_url: string | null
+          max_concurrent_sessions: number
           mfa_grace_period_days: number | null
           mfa_required: boolean | null
           name: string
@@ -2638,10 +2641,13 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          bonus_reason?: string | null
+          bonus_seats?: number
           created_at?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
+          max_concurrent_sessions?: number
           mfa_grace_period_days?: number | null
           mfa_required?: boolean | null
           name: string
@@ -2653,10 +2659,13 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          bonus_reason?: string | null
+          bonus_seats?: number
           created_at?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
+          max_concurrent_sessions?: number
           mfa_grace_period_days?: number | null
           mfa_required?: boolean | null
           name?: string
@@ -8660,6 +8669,67 @@ export type Database = {
           },
         ]
       }
+      seat_change_log: {
+        Row: {
+          change_type: string
+          changed_by: string
+          created_at: string | null
+          id: string
+          new_bonus: number | null
+          new_limit: number | null
+          old_bonus: number | null
+          old_limit: number | null
+          organization_id: string
+          reason: string | null
+        }
+        Insert: {
+          change_type: string
+          changed_by: string
+          created_at?: string | null
+          id?: string
+          new_bonus?: number | null
+          new_limit?: number | null
+          old_bonus?: number | null
+          old_limit?: number | null
+          organization_id: string
+          reason?: string | null
+        }
+        Update: {
+          change_type?: string
+          changed_by?: string
+          created_at?: string | null
+          id?: string
+          new_bonus?: number | null
+          new_limit?: number | null
+          old_bonus?: number | null
+          old_limit?: number | null
+          organization_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seat_change_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seat_change_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "seat_change_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       seat_requests: {
         Row: {
           admin_notes: string | null
@@ -13823,10 +13893,12 @@ export type Database = {
         Args: { org_id: string }
         Returns: {
           available_seats: number
+          bonus_seats: number
           members_count: number
           pending_invites_count: number
           pending_requests_count: number
           seat_limit: number
+          total_entitled: number
           total_used: number
         }[]
       }
@@ -14090,6 +14162,19 @@ export type Database = {
           p_records_processed?: number
           p_status?: string
           p_triggered_by?: string
+        }
+        Returns: string
+      }
+      log_seat_change: {
+        Args: {
+          p_change_type: string
+          p_changed_by: string
+          p_new_bonus?: number
+          p_new_limit?: number
+          p_old_bonus?: number
+          p_old_limit?: number
+          p_org_id: string
+          p_reason?: string
         }
         Returns: string
       }
