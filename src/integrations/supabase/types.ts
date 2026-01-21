@@ -13624,23 +13624,14 @@ export type Database = {
           upsell_succeeded: number
         }[]
       }
-      get_sms_metrics:
-        | {
-            Args: {
-              p_end_date: string
-              p_organization_id: string
-              p_start_date: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_end_date: string
-              p_organization_id: string
-              p_start_date: string
-            }
-            Returns: Json
-          }
+      get_sms_metrics: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       get_state_city_breakdown: {
         Args: { _organization_id: string; _state_abbr: string }
         Returns: Json
