@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { parseJsonBody, uuidSchema, isoDateSchema, z } from "../_shared/validators.ts";
 import { extractRefcodeFromMessage } from "../_shared/smsRefcodeExtractor.ts";
+import { resolveVanityUrl } from "../_shared/urlResolver.ts";
 
 // Use restricted CORS
 const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
@@ -396,14 +397,39 @@ serve(async (req) => {
     console.log(`Fetched ${allBroadcasts.length} broadcasts across ${pageCount} pages`);
 
     // Extract refcodes from message text for attribution
-    const campaignsToUpsert = allBroadcasts.map(broadcast => {
+    // Also resolve vanity URLs to discover actual ActBlue refcodes
+    const campaignsToUpsert = [];
+    
+    for (const broadcast of allBroadcasts) {
       const extracted = extractRefcodeFromMessage(broadcast.message_text);
       
       if (extracted.refcode) {
         console.log(`[SMS SYNC] Extracted refcode "${extracted.refcode}" from campaign "${broadcast.title}" (pattern: ${extracted.pattern})`);
       }
       
-      return {
+      // Resolve vanity URL to get actual ActBlue refcode
+      let actblueRefcode: string | null = null;
+      if (extracted.url && extracted.pattern === 'sb_link_vanity') {
+        try {
+          console.log(`[SMS SYNC] Resolving vanity URL: ${extracted.url}`);
+          const resolved = await resolveVanityUrl(extracted.url);
+          if (resolved.success && (resolved.actblueRefcode || resolved.actblueForm)) {
+            actblueRefcode = resolved.actblueRefcode || resolved.actblueForm;
+            console.log(`[SMS SYNC] Resolved "${broadcast.title}": ${extracted.refcode} -> ${actblueRefcode}`);
+          } else if (resolved.error) {
+            console.warn(`[SMS SYNC] Could not resolve URL for "${broadcast.title}": ${resolved.error}`);
+          }
+          // Rate limiting: 50ms between URL resolutions
+          await new Promise(resolve => setTimeout(resolve, 50));
+        } catch (error) {
+          console.warn(`[SMS SYNC] URL resolution error for "${broadcast.title}": ${error}`);
+        }
+      } else if (extracted.pattern === 'actblue_param' || extracted.pattern === 'actblue_direct') {
+        // Direct ActBlue URLs already have the refcode
+        actblueRefcode = extracted.refcode;
+      }
+      
+      campaignsToUpsert.push({
         organization_id,
         campaign_id: broadcast.id,
         campaign_name: broadcast.title,
@@ -423,11 +449,12 @@ serve(async (req) => {
         previously_opted_out: broadcast.previously_opted_out,
         send_date: broadcast.created_at,
         created_at: new Date().toISOString(),
-        // NEW: SMS attribution fields
+        // SMS attribution fields
         extracted_refcode: extracted.refcode,
         destination_url: extracted.url,
-      };
-    });
+        actblue_refcode: actblueRefcode,
+      });
+    }
 
     if (campaignsToUpsert.length > 0) {
       const { error: upsertError } = await supabase

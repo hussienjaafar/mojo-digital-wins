@@ -43,6 +43,12 @@ interface MatchResult {
 /**
  * Calculate match score between a campaign and transaction
  * Uses tiered matching logic based on refcode patterns
+ * 
+ * PRIORITY ORDER:
+ * 1. Exact actblue_refcode match (resolved from vanity URL) - Score 200
+ * 2. Direct extracted_refcode match - Score 180
+ * 3. Date-coded refcode pattern matching - Score 150/100
+ * 4. Form-based attribution (fallback) - Score 50
  */
 function calculateMatchScore(campaign: Campaign, transaction: Transaction): number {
   const txRefcode = transaction.refcode?.toLowerCase() || "";
@@ -50,16 +56,28 @@ function calculateMatchScore(campaign: Campaign, transaction: Transaction): numb
   const actblueRefcode = campaign.actblue_refcode?.toLowerCase() || "";
   const formName = transaction.contribution_form?.toLowerCase() || "";
   
+  if (!txRefcode && !formName.includes('sms') && !formName.includes('text')) {
+    return 0; // No refcode and not SMS form - no match possible
+  }
+  
   const campaignDate = new Date(campaign.send_date);
   const txDate = new Date(transaction.transaction_date);
   const daysDiff = Math.abs((txDate.getTime() - campaignDate.getTime()) / (1000 * 60 * 60 * 24));
   
-  // Tier 1: Explicit actblue_refcode match (highest priority)
-  if (actblueRefcode && txRefcode === actblueRefcode) {
-    return 200;
+  // Tier 1: Explicit actblue_refcode match (highest priority - deterministic)
+  // This is the resolved refcode from following vanity URL redirects
+  if (actblueRefcode && txRefcode) {
+    if (txRefcode === actblueRefcode) {
+      return 200;
+    }
+    // Also match if transaction refcode contains the actblue refcode or vice versa
+    // This handles cases like "20250115AAMA" matching "aama" (the form name)
+    if (txRefcode.endsWith(actblueRefcode) || actblueRefcode.includes(txRefcode)) {
+      return 195;
+    }
   }
   
-  // Tier 2: Direct extracted_refcode match
+  // Tier 2: Direct extracted_refcode match (vanity path match)
   if (extractedRefcode && txRefcode) {
     if (txRefcode === extractedRefcode) return 180;
     if (txRefcode.startsWith(extractedRefcode) || extractedRefcode.startsWith(txRefcode)) return 175;
@@ -68,7 +86,7 @@ function calculateMatchScore(campaign: Campaign, transaction: Transaction): numb
   // Tier 3: Date-coded refcode with token match
   // E.g., '20250115AAMA' matches campaign with send_date 2025-01-15 and extracted_refcode containing 'aama'
   const dateCodedMatch = txRefcode.match(/^(20\d{6})([a-z]+)$/i);
-  if (dateCodedMatch && extractedRefcode) {
+  if (dateCodedMatch && (extractedRefcode || actblueRefcode)) {
     const [, dateStr, token] = dateCodedMatch;
     try {
       const refcodeDate = new Date(
@@ -79,14 +97,20 @@ function calculateMatchScore(campaign: Campaign, transaction: Transaction): numb
       const refcodeDaysDiff = Math.abs((refcodeDate.getTime() - campaignDate.getTime()) / (1000 * 60 * 60 * 24));
       
       if (refcodeDaysDiff <= 1) {
-        // Check if token matches extracted refcode
         const tokenLower = token.toLowerCase();
-        const extractedClean = extractedRefcode.replace(/[0-9]/g, '');
         
+        // Check against actblue_refcode first (more reliable)
+        if (actblueRefcode && (actblueRefcode.includes(tokenLower) || tokenLower.includes(actblueRefcode))) {
+          return 160; // Higher score for actblue_refcode match
+        }
+        
+        // Fallback to extracted refcode
+        const extractedClean = extractedRefcode.replace(/[0-9]/g, '');
         if (extractedRefcode.includes(tokenLower) || tokenLower.includes(extractedClean)) {
           return 150;
         }
-        // Date matches but token doesn't - still a potential match
+        
+        // Date matches but token doesn't - lower confidence match
         return 100;
       }
     } catch {
