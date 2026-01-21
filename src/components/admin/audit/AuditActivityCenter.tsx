@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { 
   Search, 
@@ -352,57 +351,61 @@ export function AuditActivityCenter() {
                 </TableHeader>
                 <TableBody>
                   {filteredLogs.map(log => (
-                    <Collapsible key={log.id} asChild open={expandedRows.has(log.id)}>
-                      <>
-                        <TableRow 
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => toggleRowExpansion(log.id)}
-                        >
-                          <TableCell>
-                            <CollapsibleTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                {expandedRows.has(log.id) ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </CollapsibleTrigger>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {format(new Date(log.created_at), "MMM d, HH:mm:ss")}
-                          </TableCell>
-                          <TableCell className="max-w-[150px] truncate">
-                            {log.user_email}
-                          </TableCell>
-                          <TableCell>{getActionBadge(log.action_type)}</TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {log.table_affected || "-"}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs max-w-[100px] truncate">
-                            {log.record_id || "-"}
+                    <React.Fragment key={log.id}>
+                      <TableRow 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => toggleRowExpansion(log.id)}
+                      >
+                        <TableCell>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 w-6 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleRowExpansion(log.id);
+                            }}
+                          >
+                            {expandedRows.has(log.id) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {format(new Date(log.created_at), "MMM d, HH:mm:ss")}
+                        </TableCell>
+                        <TableCell className="max-w-[150px] truncate">
+                          {log.user_email}
+                        </TableCell>
+                        <TableCell>{getActionBadge(log.action_type)}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {log.table_affected || "-"}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs max-w-[100px] truncate">
+                          {log.record_id || "-"}
+                        </TableCell>
+                      </TableRow>
+                      {expandedRows.has(log.id) && (
+                        <TableRow className="bg-muted/30">
+                          <TableCell colSpan={6} className="p-4">
+                            <div className="space-y-4">
+                              {log.ip_address && (
+                                <div className="text-sm">
+                                  <span className="text-muted-foreground">IP: </span>
+                                  <span className="font-mono">{log.ip_address}</span>
+                                </div>
+                              )}
+                              <div>
+                                <h4 className="text-sm font-medium mb-2">Changes</h4>
+                                {renderDiff(log.old_value, log.new_value)}
+                              </div>
+                            </div>
                           </TableCell>
                         </TableRow>
-                        <CollapsibleContent asChild>
-                          <TableRow className="bg-muted/30">
-                            <TableCell colSpan={6} className="p-4">
-                              <div className="space-y-4">
-                                {log.ip_address && (
-                                  <div className="text-sm">
-                                    <span className="text-muted-foreground">IP: </span>
-                                    <span className="font-mono">{log.ip_address}</span>
-                                  </div>
-                                )}
-                                <div>
-                                  <h4 className="text-sm font-medium mb-2">Changes</h4>
-                                  {renderDiff(log.old_value, log.new_value)}
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        </CollapsibleContent>
-                      </>
-                    </Collapsible>
+                      )}
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>
