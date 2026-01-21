@@ -25,9 +25,34 @@ function normalizePhone(phone: string | null): string | null {
   return digits.length >= 10 ? digits : null;
 }
 
+/**
+ * Validates if a refcode2 value is a valid Facebook Click ID
+ * Valid formats:
+ * - fb_IwY... or fb_IwZXh0bg... (prefixed fbc from our redirect flow)
+ * - IwY... or IwZXh0bg... (raw fbc format)
+ * 
+ * Invalid formats (ActBlue internal tracking):
+ * - ab_thanks_social_facebook, ab_mobile_*, etc.
+ */
+function isValidFacebookClickId(refcode2: string | null): boolean {
+  if (!refcode2) return false;
+  
+  // Must start with 'fb_' (our redirect flow) or look like a raw fbc
+  if (refcode2.startsWith('fb_')) {
+    const fbc = refcode2.substring(3);
+    // Valid fbc format: fb.{version}.{timestamp}.{fbclid} where fbclid typically starts with IwY, IwZXh0, PAZXh0, etc.
+    return fbc.startsWith('fb.') || fbc.startsWith('IwY') || fbc.startsWith('IwZ') || fbc.startsWith('PAZ') || fbc.length > 30;
+  }
+  
+  // Skip ActBlue internal tracking codes
+  if (refcode2.startsWith('ab_')) return false;
+  
+  return false;
+}
+
 // Extract fbc from refcode2 (strip 'fb_' prefix if present)
 function extractFbc(refcode2: string | null): string | null {
-  if (!refcode2) return null;
+  if (!refcode2 || !isValidFacebookClickId(refcode2)) return null;
   if (refcode2.startsWith('fb_')) {
     return refcode2.substring(3);
   }
@@ -80,44 +105,52 @@ serve(async (req) => {
     const results: any[] = [];
 
     for (const config of configs) {
-      // Find recent transactions with fbclid that aren't yet in meta_conversion_events
-      const { data: transactions, error: txError } = await supabase
-        .from('actblue_transactions')
-        .select('*')
-        .eq('organization_id', config.organization_id)
-        .gte('transaction_date', new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString())
-        .not('refcode2', 'is', null)
-        .order('transaction_date', { ascending: false })
-        .limit(limit);
+    // Find recent transactions with refcode2 that aren't yet in meta_conversion_events
+    // Note: We fetch all with refcode2, then filter in code to validate Click ID format
+    const { data: transactions, error: txError } = await supabase
+      .from('actblue_transactions')
+      .select('*')
+      .eq('organization_id', config.organization_id)
+      .gte('transaction_date', new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString())
+      .not('refcode2', 'is', null)
+      .order('transaction_date', { ascending: false })
+      .limit(limit * 2); // Fetch extra to account for filtering
 
-      if (txError) {
-        logger.error('Failed to query transactions', { error: txError.message, org: config.organization_id });
-        results.push({ org: config.organization_id, error: txError.message, queued: 0 });
-        continue;
-      }
+    if (txError) {
+      logger.error('Failed to query transactions', { error: txError.message, org: config.organization_id });
+      results.push({ org: config.organization_id, error: txError.message, queued: 0 });
+      continue;
+    }
 
-      if (!transactions?.length) {
-        logger.info('No transactions to backfill', { org: config.organization_id });
-        results.push({ org: config.organization_id, queued: 0, message: 'No transactions with Click ID found' });
-        continue;
-      }
+    // Filter to only valid Facebook Click IDs (skip ActBlue internal codes like ab_thanks_social_*)
+    const validClickIdTransactions = transactions?.filter(t => isValidFacebookClickId(t.refcode2)) || [];
+    
+    if (!validClickIdTransactions.length) {
+      logger.info('No transactions with valid Facebook Click IDs to backfill', { 
+        org: config.organization_id,
+        totalWithRefcode2: transactions?.length || 0,
+        filteredOut: (transactions?.length || 0) - validClickIdTransactions.length
+      });
+      results.push({ org: config.organization_id, queued: 0, message: 'No transactions with valid Facebook Click ID found' });
+      continue;
+    }
 
-      // Check which are already in meta_conversion_events
-      const transactionIds = transactions.map(t => t.transaction_id);
-      const { data: existingEvents } = await supabase
-        .from('meta_conversion_events')
-        .select('source_id')
-        .eq('organization_id', config.organization_id)
-        .in('source_id', transactionIds);
+    // Check which are already in meta_conversion_events
+    const transactionIds = validClickIdTransactions.map(t => t.transaction_id);
+    const { data: existingEvents } = await supabase
+      .from('meta_conversion_events')
+      .select('source_id')
+      .eq('organization_id', config.organization_id)
+      .in('source_id', transactionIds);
 
-      const existingSourceIds = new Set(existingEvents?.map(e => e.source_id) || []);
-      const newTransactions = transactions.filter(t => !existingSourceIds.has(t.transaction_id));
+    const existingSourceIds = new Set(existingEvents?.map(e => e.source_id) || []);
+    const newTransactions = validClickIdTransactions.filter(t => !existingSourceIds.has(t.transaction_id)).slice(0, limit);
 
-      if (!newTransactions.length) {
-        logger.info('All transactions already queued', { org: config.organization_id });
-        results.push({ org: config.organization_id, queued: 0, message: 'All transactions already in queue' });
-        continue;
-      }
+    if (!newTransactions.length) {
+      logger.info('All transactions with valid Click IDs already queued', { org: config.organization_id });
+      results.push({ org: config.organization_id, queued: 0, message: 'All transactions already in queue' });
+      continue;
+    }
 
       // Queue each new transaction
       let orgQueued = 0;

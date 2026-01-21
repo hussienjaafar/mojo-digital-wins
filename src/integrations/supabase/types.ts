@@ -5516,6 +5516,7 @@ export type Database = {
         Row: {
           actblue_integration_enabled: boolean | null
           actblue_owns_donation_complete: boolean | null
+          avg_match_score: number | null
           consecutive_failures: number | null
           created_at: string
           donation_event_name: string | null
@@ -5528,7 +5529,9 @@ export type Database = {
           id: string
           is_enabled: boolean
           last_error: string | null
+          last_error_message: string | null
           last_event_at: string | null
+          last_event_sent_at: string | null
           last_send_at: string | null
           last_send_status: string | null
           last_success_at: string | null
@@ -5544,6 +5547,7 @@ export type Database = {
         Insert: {
           actblue_integration_enabled?: boolean | null
           actblue_owns_donation_complete?: boolean | null
+          avg_match_score?: number | null
           consecutive_failures?: number | null
           created_at?: string
           donation_event_name?: string | null
@@ -5556,7 +5560,9 @@ export type Database = {
           id?: string
           is_enabled?: boolean
           last_error?: string | null
+          last_error_message?: string | null
           last_event_at?: string | null
+          last_event_sent_at?: string | null
           last_send_at?: string | null
           last_send_status?: string | null
           last_success_at?: string | null
@@ -5572,6 +5578,7 @@ export type Database = {
         Update: {
           actblue_integration_enabled?: boolean | null
           actblue_owns_donation_complete?: boolean | null
+          avg_match_score?: number | null
           consecutive_failures?: number | null
           created_at?: string
           donation_event_name?: string | null
@@ -5584,7 +5591,9 @@ export type Database = {
           id?: string
           is_enabled?: boolean
           last_error?: string | null
+          last_error_message?: string | null
           last_event_at?: string | null
+          last_event_sent_at?: string | null
           last_send_at?: string | null
           last_send_status?: string | null
           last_success_at?: string | null
