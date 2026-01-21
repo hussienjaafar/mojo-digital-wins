@@ -194,23 +194,40 @@ async function processOrgEvents(
   }
 
   let accessToken: string;
-  try {
-    const decrypted = await decryptCredentials(creds.encrypted_credentials, orgId);
-    accessToken = decrypted.access_token;
-    if (!accessToken) {
-      throw new Error('access_token not found in decrypted credentials');
-    }
-  } catch (e: any) {
-    console.error('[CAPI-OUTBOX] Failed to decrypt credentials:', e.message);
-    // Fallback to global token if org-specific decryption fails
-    const globalToken = Deno.env.get('META_CONVERSIONS_API_TOKEN');
-    if (globalToken) {
-      console.log('[CAPI-OUTBOX] Using global META_CONVERSIONS_API_TOKEN fallback');
-      accessToken = globalToken;
-    } else {
-      await markEventsFailed(supabase, events, 'Credential decryption failed');
-      await updateOrgHealth(supabase, orgId, false, 'Credential decryption failed');
-      return { sent: 0, failed: events.length };
+  
+  // First, try reading token directly from JSON (unencrypted storage format)
+  const plainCredentials = creds.encrypted_credentials as { access_token?: string };
+  console.log('[CAPI-OUTBOX] V2 Checking credentials format:', {
+    hasEncryptedCreds: !!creds.encrypted_credentials,
+    credType: typeof creds.encrypted_credentials,
+    hasAccessToken: !!plainCredentials?.access_token,
+    accessTokenType: typeof plainCredentials?.access_token,
+    tokenPreview: plainCredentials?.access_token?.substring(0, 20) + '...',
+  });
+  
+  if (plainCredentials?.access_token && typeof plainCredentials.access_token === 'string') {
+    console.log('[CAPI-OUTBOX] V2 Using token from plain JSON credentials');
+    accessToken = plainCredentials.access_token;
+  } else {
+    // Try decryption if it's not plain JSON
+    try {
+      const decrypted = await decryptCredentials(creds.encrypted_credentials, orgId);
+      accessToken = decrypted.access_token;
+      if (!accessToken) {
+        throw new Error('access_token not found in decrypted credentials');
+      }
+    } catch (e: any) {
+      console.error('[CAPI-OUTBOX] Failed to decrypt credentials:', e.message);
+      // Fallback to global token if org-specific decryption fails
+      const globalToken = Deno.env.get('META_CONVERSIONS_API_TOKEN');
+      if (globalToken) {
+        console.log('[CAPI-OUTBOX] Using global META_CONVERSIONS_API_TOKEN fallback');
+        accessToken = globalToken;
+      } else {
+        await markEventsFailed(supabase, events, 'Credential decryption failed');
+        await updateOrgHealth(supabase, orgId, false, 'Credential decryption failed');
+        return { sent: 0, failed: events.length };
+      }
     }
   }
 
