@@ -177,6 +177,7 @@ export type Database = {
           organization_id: string
           payment_method: string | null
           phone: string | null
+          phone_hash: string | null
           receipt_id: string | null
           recurring_duration: number | null
           recurring_period: string | null
@@ -230,6 +231,7 @@ export type Database = {
           organization_id: string
           payment_method?: string | null
           phone?: string | null
+          phone_hash?: string | null
           receipt_id?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
@@ -283,6 +285,7 @@ export type Database = {
           organization_id?: string
           payment_method?: string | null
           phone?: string | null
+          phone_hash?: string | null
           receipt_id?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
@@ -8130,6 +8133,7 @@ export type Database = {
           organization_id: string | null
           platform: string | null
           refcode: string
+          sms_campaign_id: string | null
           updated_at: string | null
           utm_campaign: string | null
           utm_medium: string | null
@@ -8150,6 +8154,7 @@ export type Database = {
           organization_id?: string | null
           platform?: string | null
           refcode: string
+          sms_campaign_id?: string | null
           updated_at?: string | null
           utm_campaign?: string | null
           utm_medium?: string | null
@@ -8170,6 +8175,7 @@ export type Database = {
           organization_id?: string | null
           platform?: string | null
           refcode?: string
+          sms_campaign_id?: string | null
           updated_at?: string | null
           utm_campaign?: string | null
           utm_medium?: string | null
@@ -8774,6 +8780,8 @@ export type Database = {
           conversions: number | null
           cost: number | null
           created_at: string | null
+          destination_url: string | null
+          extracted_refcode: string | null
           id: string
           message_text: string | null
           messages_delivered: number | null
@@ -8797,6 +8805,8 @@ export type Database = {
           conversions?: number | null
           cost?: number | null
           created_at?: string | null
+          destination_url?: string | null
+          extracted_refcode?: string | null
           id?: string
           message_text?: string | null
           messages_delivered?: number | null
@@ -8820,6 +8830,8 @@ export type Database = {
           conversions?: number | null
           cost?: number | null
           created_at?: string | null
+          destination_url?: string | null
+          extracted_refcode?: string | null
           id?: string
           message_text?: string | null
           messages_delivered?: number | null
