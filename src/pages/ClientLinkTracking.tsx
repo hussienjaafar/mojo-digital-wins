@@ -101,7 +101,7 @@ export default function ClientLinkTracking() {
   // CAPI configured - show full dashboard
   return (
     <ClientShell pageTitle="Link Tracking" showDateControls={false}>
-      <div className="space-y-6 overflow-hidden">
+      <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 space-y-6 overflow-hidden">
         {/* Header with Date Selector */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
