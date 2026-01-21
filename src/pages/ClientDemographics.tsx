@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
-import { Download, MapPin, Briefcase, Users, Clock, Share2, ArrowLeft, Tag } from "lucide-react";
+import { Download, MapPin, Briefcase, Users, Clock, Share2, ArrowLeft, Tag, ChevronDown, ChevronUp } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import {
   V3PageContainer,
@@ -12,6 +12,7 @@ import {
   V3EmptyState,
   V3Button,
   V3DataTable,
+  V3VirtualizedDataTable,
   V3InlineBarCell,
   V3PrimaryCell,
   type V3Column,
@@ -90,6 +91,7 @@ const ClientDemographics = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [mapMetricMode, setMapMetricMode] = useState<MapMetricMode>("revenue");
+  const [showAllStates, setShowAllStates] = useState(false);
   
   // City data caching for drilldown
   const [cityCache, setCityCache] = useState<Map<string, CityStats[]>>(new Map());
@@ -553,18 +555,53 @@ const ClientDemographics = () => {
           icon={MapPin}
           ariaLabel="Table showing top donor statistics by state"
           className="mb-6"
+          actions={
+            <V3Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAllStates(!showAllStates)}
+              className="gap-1.5"
+            >
+              {showAllStates ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Show Top 15
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  View All States
+                </>
+              )}
+            </V3Button>
+          }
         >
-          <V3DataTable
-            data={summary.state_stats.slice(0, 15)}
-            columns={locationColumns}
-            getRowKey={(row) => row.state_abbr}
-            compact
-            maxHeight="400px"
-            showRowNumbers
-            highlightTopN={3}
-            defaultSortKey="revenue"
-            defaultSortDirection="desc"
-          />
+          {showAllStates ? (
+            <V3VirtualizedDataTable
+              data={summary.state_stats}
+              columns={locationColumns}
+              getRowKey={(row) => row.state_abbr}
+              compact
+              maxHeight="500px"
+              showRowNumbers
+              highlightTopN={3}
+              defaultSortKey="revenue"
+              defaultSortDirection="desc"
+              overscan={10}
+            />
+          ) : (
+            <V3DataTable
+              data={summary.state_stats.slice(0, 15)}
+              columns={locationColumns}
+              getRowKey={(row) => row.state_abbr}
+              compact
+              maxHeight="400px"
+              showRowNumbers
+              highlightTopN={3}
+              defaultSortKey="revenue"
+              defaultSortDirection="desc"
+            />
+          )}
         </V3ChartWrapper>
       </V3PageContainer>
     </ClientShell>
