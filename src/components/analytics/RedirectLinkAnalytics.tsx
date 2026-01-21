@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRedirectClicksQuery } from "@/hooks/useRedirectClicksQuery";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EChartsLineChart } from "@/components/charts/echarts/EChartsLineChart";
 import {
@@ -18,8 +19,10 @@ import {
   Facebook, 
   Cookie, 
   TrendingUp,
-  Loader2 
+  Loader2,
+  RefreshCw 
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface RedirectLinkAnalyticsProps {
   organizationId?: string;
@@ -31,7 +34,7 @@ export function RedirectLinkAnalytics({
   title = "Redirect Link Performance" 
 }: RedirectLinkAnalyticsProps) {
   const [daysBack, setDaysBack] = useState(30);
-  const { data, isLoading, error } = useRedirectClicksQuery(organizationId, daysBack);
+  const { data, isLoading, error, refetch, isFetching } = useRedirectClicksQuery(organizationId, daysBack);
 
   if (isLoading) {
     return (
@@ -122,17 +125,28 @@ export function RedirectLinkAnalytics({
             <MousePointerClick className="h-5 w-5" />
             {title}
           </CardTitle>
-          <Select value={String(daysBack)} onValueChange={(v) => setDaysBack(Number(v))}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="14">Last 14 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-              <SelectItem value="90">Last 90 days</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              title="Refresh data"
+            >
+              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+            </Button>
+            <Select value={String(daysBack)} onValueChange={(v) => setDaysBack(Number(v))}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="14">Last 14 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
