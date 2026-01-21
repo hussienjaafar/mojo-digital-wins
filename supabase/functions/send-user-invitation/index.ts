@@ -86,27 +86,38 @@ serve(async (req) => {
         );
       }
 
-      // Check if user is platform admin OR org admin for this organization
+      // SEAT-BASED BILLING: Only platform admins can invite organization members
+      // Organizations must request members through pending_member_requests
       const { data: hasRole } = await supabase.rpc('has_role', { 
         _user_id: user.id, 
         _role: 'admin' 
       });
 
       if (!hasRole) {
-        // Check if user is org admin
-        const { data: orgUser } = await supabase
-          .from('client_users')
-          .select('role')
-          .eq('id', user.id)
-          .eq('organization_id', body.organization_id)
-          .single();
+        return new Response(
+          JSON.stringify({ 
+            error: 'Only platform administrators can invite organization members. Please submit a member request instead.',
+            code: 'SEAT_BILLING_RESTRICTION'
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-        if (!orgUser || orgUser.role !== 'admin') {
-          return new Response(
-            JSON.stringify({ error: 'You must be a platform admin or organization admin to send invitations' }),
-            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+      // Validate seat availability before allowing invitation
+      const { data: seatUsage } = await supabase.rpc('get_org_seat_usage', {
+        org_id: body.organization_id
+      });
+
+      if (seatUsage && seatUsage.length > 0 && seatUsage[0].available_seats <= 0) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Organization has reached its seat limit. Please increase the seat limit before inviting new members.',
+            code: 'SEAT_LIMIT_REACHED',
+            seat_limit: seatUsage[0].seat_limit,
+            total_used: seatUsage[0].total_used
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     }
 

@@ -90,30 +90,36 @@ const handler = async (req: Request): Promise<Response> => {
         );
       }
     } else {
-      // Caller is a client user - verify they can create users in target org
-      const canManageUsers = ['admin', 'manager'].includes(callerClientUser.role);
-      const sameOrg = callerClientUser.organization_id === organization_id;
+      // SEAT-BASED BILLING: Only platform admins can create organization members directly
+      // Organizations must request members through pending_member_requests
+      console.error("Unauthorized: Only platform admins can create organization members (seat-based billing)");
+      return new Response(
+        JSON.stringify({ 
+          error: "Only platform administrators can add organization members. Please submit a member request instead.",
+          code: "SEAT_BILLING_RESTRICTION",
+          success: false 
+        }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
-      if (!canManageUsers || !sameOrg) {
-        console.error("Unauthorized: caller cannot create users in this organization");
-        return new Response(
-          JSON.stringify({ error: "You can only create users in your own organization with admin/manager role", success: false }),
-          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
+    // Validate seat availability before creating user
+    const { data: seatUsage } = await supabaseAdmin.rpc("get_org_seat_usage", {
+      org_id: organization_id
+    });
 
-      // Prevent privilege escalation - can't create users with higher role than yourself
-      const roleHierarchy = { 'viewer': 1, 'editor': 2, 'manager': 3, 'admin': 4 };
-      const callerLevel = roleHierarchy[callerClientUser.role as keyof typeof roleHierarchy] || 0;
-      const newUserLevel = roleHierarchy[role as keyof typeof roleHierarchy] || 0;
-
-      if (newUserLevel > callerLevel) {
-        console.error("Privilege escalation attempt blocked");
-        return new Response(
-          JSON.stringify({ error: "You cannot create users with a higher role than your own", success: false }),
-          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
+    if (seatUsage && seatUsage.length > 0 && seatUsage[0].available_seats <= 0) {
+      console.error("Seat limit reached for organization:", organization_id);
+      return new Response(
+        JSON.stringify({
+          error: "Organization has reached its seat limit. Please increase the seat limit before adding new members.",
+          code: "SEAT_LIMIT_REACHED",
+          seat_limit: seatUsage[0].seat_limit,
+          total_used: seatUsage[0].total_used,
+          success: false
+        }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     }
 
     // Check if user already exists

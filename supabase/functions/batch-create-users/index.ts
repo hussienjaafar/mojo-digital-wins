@@ -78,24 +78,42 @@ serve(async (req: Request) => {
       );
     }
 
-    // Verify caller has permission to add to this org (must be platform admin or org admin/manager)
+    // SEAT-BASED BILLING: Only platform admins can batch create organization members
     const { data: callerRole } = await supabaseClient.rpc("has_role", { _role: "admin" });
     const isPlatformAdmin = callerRole === true;
 
     if (!isPlatformAdmin) {
-      const { data: callerOrgUser } = await supabaseClient
-        .from("client_users")
-        .select("organization_id, role")
-        .eq("id", caller.id)
-        .maybeSingle();
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Only platform administrators can batch create organization members.",
+          code: "SEAT_BILLING_RESTRICTION"
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-      if (!callerOrgUser || callerOrgUser.organization_id !== organization_id || 
-          !["admin", "manager"].includes(callerOrgUser.role)) {
-        return new Response(
-          JSON.stringify({ success: false, error: "Permission denied" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    // Validate seat availability before processing batch
+    const { data: seatUsage } = await supabaseAdmin.rpc("get_org_seat_usage", {
+      org_id: organization_id
+    });
+
+    const requestedCount = users.length;
+    const availableSeats = seatUsage?.[0]?.available_seats ?? 999;
+    
+    if (seatUsage && seatUsage.length > 0 && requestedCount > availableSeats) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Cannot add ${requestedCount} users. Only ${availableSeats} seats available.`,
+          code: "SEAT_LIMIT_EXCEEDED",
+          seat_limit: seatUsage[0].seat_limit,
+          total_used: seatUsage[0].total_used,
+          available_seats: availableSeats,
+          requested_count: requestedCount
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Fetch organization name
