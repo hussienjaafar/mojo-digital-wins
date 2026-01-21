@@ -1,5 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { addDays, format, parseISO } from "date-fns";
+import { fromZonedTime } from "date-fns-tz";
+import { DEFAULT_ORG_TIMEZONE } from "@/lib/metricDefinitions";
 
 // ============================================================================
 // Types
@@ -59,18 +62,26 @@ async function fetchCAPIEvents(
   startDate?: string,
   endDate?: string
 ): Promise<CAPIEventsData> {
-  const end = endDate || new Date().toISOString().split("T")[0];
+  // Treat date ranges as organization-timezone days (ActBlue typically operates in ET)
+  const tz = DEFAULT_ORG_TIMEZONE;
+
+  const end = endDate || format(new Date(), "yyyy-MM-dd");
   const start = startDate || (() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
-    return d.toISOString().split("T")[0];
+    return format(d, "yyyy-MM-dd");
   })();
+
+  // Use half-open interval: [start_day, end_day_exclusive) in org timezone
+  const startUtc = fromZonedTime(`${start}T00:00:00`, tz).toISOString();
+  const endExclusiveDay = format(addDays(parseISO(end), 1), "yyyy-MM-dd");
+  const endExclusiveUtc = fromZonedTime(`${endExclusiveDay}T00:00:00`, tz).toISOString();
 
   let query = supabase
     .from("meta_conversion_events")
     .select("*")
-    .gte("created_at", `${start}T00:00:00`)
-    .lte("created_at", `${end}T23:59:59`)
+    .gte("created_at", startUtc)
+    .lt("created_at", endExclusiveUtc)
     .order("created_at", { ascending: false });
 
   if (organizationId) {
