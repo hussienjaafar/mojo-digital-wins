@@ -15,7 +15,9 @@ export interface RefcodePerformance {
   cookieCaptureRate: number;
   avgCaptureScore: number;
   conversions: number;
+  attributedConversions: number; // Matched via fbclid/refcode2
   revenue: number;
+  attributedRevenue: number; // Revenue from attributed conversions
   conversionRate: number;
 }
 
@@ -129,10 +131,10 @@ async function fetchEnhancedRedirectClicks(
     touchpointsQuery = touchpointsQuery.eq("organization_id", organizationId);
   }
 
-  // Fetch donations for conversion matching
+  // Fetch donations for conversion matching (include refcode2 for fbclid matching)
   let donationsQuery = supabase
     .from("actblue_transactions")
-    .select("donor_email, refcode, amount, transaction_date")
+    .select("donor_email, refcode, refcode2, amount, transaction_date")
     .gte("transaction_date", start)
     .lte("transaction_date", end);
 
@@ -187,8 +189,24 @@ async function fetchEnhancedRedirectClicks(
     });
   });
 
+  // Build fbclid prefix lookup from donations with refcode2
+  // ActBlue stores fbclid in refcode2 with "fb_" prefix and truncated
+  const donationsByFbclidPrefix = new Map<string, { count: number; revenue: number; emails: Set<string> }>();
+  donations.forEach((d) => {
+    if (d.refcode2 && typeof d.refcode2 === 'string' && d.refcode2.startsWith('fb_')) {
+      const fbclidPrefix = d.refcode2.replace('fb_', '');
+      const existing = donationsByFbclidPrefix.get(fbclidPrefix) || { count: 0, revenue: 0, emails: new Set() };
+      existing.count += 1;
+      existing.revenue += d.amount || 0;
+      if (d.donor_email) existing.emails.add(d.donor_email.toLowerCase());
+      donationsByFbclidPrefix.set(fbclidPrefix, existing);
+    }
+  });
+
   // Track which refcodes we've already attributed (to avoid double-counting)
   const attributedRefcodes = new Set<string>();
+  // Track which fbclid prefixes we've already attributed per refcode
+  const attributedFbclidPrefixes = new Map<string, Set<string>>(); // refcode -> set of prefixes
 
   // Process touchpoints
   const sessionIds = new Set<string>();
@@ -251,7 +269,9 @@ async function fetchEnhancedRedirectClicks(
         cookieCaptureRate: 0,
         avgCaptureScore: 0,
         conversions: 0,
+        attributedConversions: 0,
         revenue: 0,
+        attributedRevenue: 0,
         conversionRate: 0,
       });
       refcodeSessionMap.set(refcode, new Set());
@@ -263,7 +283,28 @@ async function fetchEnhancedRedirectClicks(
     if (hasFbc) refEntry.withFbc++;
     if (sessionId) refcodeSessionMap.get(refcode)!.add(sessionId);
 
-    // Attribute conversions by refcode (only once per refcode to avoid double-counting)
+    // Check for attributed conversions via fbclid matching
+    // The touchpoint's fbclid should match the prefix stored in donation's refcode2
+    const tpFbclid = (meta.fbclid || meta.fbc_fbclid) as string | undefined;
+    if (tpFbclid && refcode !== "(no refcode)") {
+      // Initialize tracking set for this refcode
+      if (!attributedFbclidPrefixes.has(refcode)) {
+        attributedFbclidPrefixes.set(refcode, new Set());
+      }
+      const refcodeAttributed = attributedFbclidPrefixes.get(refcode)!;
+      
+      // Check if any donation's refcode2 prefix matches the start of this fbclid
+      donationsByFbclidPrefix.forEach((donation, prefix) => {
+        // Only attribute each unique prefix once per refcode
+        if (tpFbclid.startsWith(prefix) && !refcodeAttributed.has(prefix)) {
+          refEntry.attributedConversions += donation.count;
+          refEntry.attributedRevenue += donation.revenue;
+          refcodeAttributed.add(prefix);
+        }
+      });
+    }
+
+    // Attribute total conversions by refcode (only once per refcode to avoid double-counting)
     if (!attributedRefcodes.has(refcode) && refcode !== "(no refcode)") {
       const refcodeDonations = donationsByRefcode.get(refcode);
       if (refcodeDonations) {
