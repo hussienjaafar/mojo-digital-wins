@@ -3,12 +3,10 @@ import { motion } from "framer-motion";
 import {
   MousePointerClick,
   Users,
-  Target,
   Cookie,
   TrendingUp,
   DollarSign,
-  Smartphone,
-  Monitor,
+  Percent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EnhancedClicksSummary, TrafficSourceBreakdown } from "@/hooks/useEnhancedRedirectClicksQuery";
@@ -30,7 +28,7 @@ interface KPICardProps {
   label: string;
   value: string;
   icon: React.ElementType;
-  accent: "blue" | "green" | "purple" | "amber" | "red";
+  accent: "blue" | "green" | "purple" | "amber";
   subtitle?: string;
   badge?: React.ReactNode;
 }
@@ -56,14 +54,10 @@ const accentStyles = {
     iconBg: "bg-[hsl(var(--portal-warning))]/10",
     iconColor: "text-[hsl(var(--portal-warning))]",
   },
-  red: {
-    iconBg: "bg-[hsl(var(--portal-error))]/10",
-    iconColor: "text-[hsl(var(--portal-error))]",
-  },
 };
 
 // ============================================================================
-// Helper
+// Helpers
 // ============================================================================
 
 function formatCurrency(value: number): string {
@@ -79,19 +73,15 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
-function formatPercent(value: number): string {
-  return `${value.toFixed(1)}%`;
-}
-
 function getCaptureQualityBadge(rate: number): React.ReactNode {
   if (rate >= 70) {
-    return <Badge variant="default" className="bg-[hsl(var(--portal-success))] text-white">Excellent</Badge>;
+    return <Badge variant="default" className="bg-[hsl(var(--portal-success))] text-white text-[10px] px-1.5">Excellent</Badge>;
   } else if (rate >= 50) {
-    return <Badge variant="default" className="bg-[hsl(var(--portal-accent-blue))] text-white">Good</Badge>;
+    return <Badge variant="default" className="bg-[hsl(var(--portal-accent-blue))] text-white text-[10px] px-1.5">Good</Badge>;
   } else if (rate >= 30) {
-    return <Badge variant="default" className="bg-[hsl(var(--portal-warning))] text-white">Fair</Badge>;
+    return <Badge variant="default" className="bg-[hsl(var(--portal-warning))] text-white text-[10px] px-1.5">Fair</Badge>;
   } else {
-    return <Badge variant="default" className="bg-[hsl(var(--portal-error))] text-white">Low</Badge>;
+    return <Badge variant="default" className="bg-[hsl(var(--portal-error))] text-white text-[10px] px-1.5">Low</Badge>;
   }
 }
 
@@ -112,29 +102,29 @@ const KPICard: React.FC<KPICardProps> = ({
   return (
     <div
       className={cn(
-        "rounded-lg p-4 border",
+        "rounded-lg p-3 sm:p-4 border min-w-0",
         "bg-[hsl(var(--portal-bg-elevated))]",
         "border-[hsl(var(--portal-border))]",
         "hover:border-[hsl(var(--portal-border-hover))] hover:shadow-sm",
         "transition-all duration-200"
       )}
     >
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2">
-          <div className={cn("p-1.5 rounded", styles.iconBg)}>
-            <Icon className={cn("h-4 w-4", styles.iconColor)} />
+      <div className="flex items-center justify-between gap-1 mb-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className={cn("p-1 sm:p-1.5 rounded shrink-0", styles.iconBg)}>
+            <Icon className={cn("h-3 w-3 sm:h-4 sm:w-4", styles.iconColor)} />
           </div>
-          <span className="text-xs font-medium text-[hsl(var(--portal-text-muted))]">
+          <span className="text-[10px] sm:text-xs font-medium text-[hsl(var(--portal-text-muted))] truncate">
             {label}
           </span>
         </div>
-        {badge}
+        {badge && <div className="shrink-0">{badge}</div>}
       </div>
-      <div className="text-xl font-bold text-[hsl(var(--portal-text-primary))]">
+      <div className="text-lg sm:text-xl font-bold text-[hsl(var(--portal-text-primary))] truncate">
         {value}
       </div>
       {subtitle && (
-        <span className="text-xs text-[hsl(var(--portal-text-muted))] mt-1 block">
+        <span className="text-[10px] sm:text-xs text-[hsl(var(--portal-text-muted))] mt-0.5 block truncate">
           {subtitle}
         </span>
       )}
@@ -147,13 +137,13 @@ const KPICard: React.FC<KPICardProps> = ({
 // ============================================================================
 
 const KPICardSkeleton: React.FC = () => (
-  <div className="rounded-lg p-4 border bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+  <div className="rounded-lg p-3 sm:p-4 border bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
     <div className="flex items-center gap-2 mb-2">
-      <Skeleton className="h-7 w-7 rounded" />
-      <Skeleton className="h-3 w-20" />
+      <Skeleton className="h-6 w-6 rounded" />
+      <Skeleton className="h-3 w-16" />
     </div>
-    <Skeleton className="h-7 w-24 mb-1" />
-    <Skeleton className="h-3 w-16" />
+    <Skeleton className="h-6 w-20 mb-1" />
+    <Skeleton className="h-3 w-14" />
   </div>
 );
 
@@ -169,11 +159,17 @@ export const LinkTrackingKPIs: React.FC<LinkTrackingKPIsProps> = ({
 }) => {
   const totalTraffic = trafficSource.mobile + trafficSource.desktop + trafficSource.other;
   const mobilePercent = totalTraffic > 0 ? Math.round((trafficSource.mobile / totalTraffic) * 100) : 0;
+  const metaPercent = summary.totalClicks > 0 
+    ? Math.round((summary.metaAdClicks / summary.totalClicks) * 100) 
+    : 0;
+  const avgDonation = summary.conversions > 0 
+    ? Math.round(summary.attributedRevenue / summary.conversions) 
+    : 0;
 
   if (isLoading) {
     return (
-      <div className={cn("grid grid-cols-2 md:grid-cols-4 gap-4", className)}>
-        {Array.from({ length: 8 }).map((_, i) => (
+      <div className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3", className)}>
+        {Array.from({ length: 6 }).map((_, i) => (
           <KPICardSkeleton key={i} />
         ))}
       </div>
@@ -182,7 +178,7 @@ export const LinkTrackingKPIs: React.FC<LinkTrackingKPIsProps> = ({
 
   return (
     <motion.div
-      className={cn("grid grid-cols-2 md:grid-cols-4 gap-4", className)}
+      className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3", className)}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
@@ -192,21 +188,14 @@ export const LinkTrackingKPIs: React.FC<LinkTrackingKPIsProps> = ({
         value={formatNumber(summary.totalClicks)}
         icon={MousePointerClick}
         accent="blue"
-        subtitle="All redirect clicks"
+        subtitle={`${metaPercent}% from Meta ads`}
       />
       <KPICard
         label="Unique Sessions"
         value={formatNumber(summary.uniqueSessions)}
         icon={Users}
         accent="purple"
-        subtitle="By session ID"
-      />
-      <KPICard
-        label="Meta Ad Clicks"
-        value={formatNumber(summary.metaAdClicks)}
-        icon={Target}
-        accent="blue"
-        subtitle={`${summary.totalClicks > 0 ? Math.round((summary.metaAdClicks / summary.totalClicks) * 100) : 0}% of total`}
+        subtitle={`${mobilePercent}% mobile`}
       />
       <KPICard
         label="Cookie Capture"
@@ -220,28 +209,21 @@ export const LinkTrackingKPIs: React.FC<LinkTrackingKPIsProps> = ({
         value={formatNumber(summary.conversions)}
         icon={TrendingUp}
         accent="green"
-        subtitle={`${formatPercent(summary.conversionRate)} CVR`}
+        subtitle={`${summary.conversionRate}% of clicks`}
       />
       <KPICard
-        label="Attributed Revenue"
+        label="Revenue"
         value={formatCurrency(summary.attributedRevenue)}
         icon={DollarSign}
         accent="green"
-        subtitle="Matched donations"
+        subtitle={avgDonation > 0 ? `$${avgDonation} avg` : "No conversions"}
       />
       <KPICard
-        label="Mobile Traffic"
-        value={`${mobilePercent}%`}
-        icon={Smartphone}
-        accent="purple"
-        subtitle={`${formatNumber(trafficSource.mobile)} clicks`}
-      />
-      <KPICard
-        label="Desktop Traffic"
-        value={`${100 - mobilePercent - Math.round((trafficSource.other / totalTraffic) * 100 || 0)}%`}
-        icon={Monitor}
+        label="Conversion Rate"
+        value={`${summary.conversionRate}%`}
+        icon={Percent}
         accent="blue"
-        subtitle={`${formatNumber(trafficSource.desktop)} clicks`}
+        subtitle="Clicks → Donations"
       />
     </motion.div>
   );

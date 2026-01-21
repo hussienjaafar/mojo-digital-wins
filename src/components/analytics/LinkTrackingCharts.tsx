@@ -26,8 +26,10 @@ interface LinkTrackingChartsProps {
 // Helpers
 // ============================================================================
 
-function formatHour(hour: number): string {
-  const ampm = hour >= 12 ? "PM" : "AM";
+function formatHourShort(hour: number): string {
+  if (hour === 0) return "12a";
+  if (hour === 12) return "12p";
+  const ampm = hour >= 12 ? "p" : "a";
   const h = hour % 12 || 12;
   return `${h}${ampm}`;
 }
@@ -36,13 +38,13 @@ function formatHour(hour: number): string {
 // Loading State
 // ============================================================================
 
-const ChartSkeleton: React.FC = () => (
+const ChartSkeleton: React.FC<{ height?: string }> = ({ height = "h-[200px] sm:h-[250px]" }) => (
   <Card className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
     <CardHeader className="pb-2">
       <Skeleton className="h-5 w-32" />
     </CardHeader>
     <CardContent>
-      <Skeleton className="h-[250px] w-full" />
+      <Skeleton className={cn("w-full", height)} />
     </CardContent>
   </Card>
 );
@@ -88,14 +90,14 @@ const DailyTrendChart: React.FC<{ data: DailyClickData[] }> = ({ data }) => {
   ];
 
   return (
-    <Card className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+    <Card className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] min-w-0 overflow-hidden">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base font-medium text-[hsl(var(--portal-text-primary))]">
-          <TrendingUp className="h-4 w-4 text-[hsl(var(--portal-accent-blue))]" />
+        <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-medium text-[hsl(var(--portal-text-primary))]">
+          <TrendingUp className="h-4 w-4 text-[hsl(var(--portal-accent-blue))] shrink-0" />
           Daily Click Trend
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-2 sm:p-6 pt-0 sm:pt-0">
         <V3ChartWrapper
           title="Daily Click Trend"
           ariaLabel="Line chart showing daily click trend"
@@ -105,7 +107,7 @@ const DailyTrendChart: React.FC<{ data: DailyClickData[] }> = ({ data }) => {
             data={chartData}
             xAxisKey="date"
             series={series}
-            height={250}
+            height={200}
             showLegend
           />
         </V3ChartWrapper>
@@ -118,14 +120,14 @@ const DailyTrendChart: React.FC<{ data: DailyClickData[] }> = ({ data }) => {
 // Hourly Pattern Chart
 // ============================================================================
 
-const HourlyPatternChart: React.FC<{ data: HourlyClickData[] }> = ({ data }) => {
+const HourlyPatternChart: React.FC<{ data: HourlyClickData[]; fullWidth?: boolean }> = ({ data, fullWidth }) => {
   const colors = getChartColors();
 
-  // Fill in missing hours
+  // Fill in missing hours with abbreviated labels
   const fullHourData = Array.from({ length: 24 }, (_, hour) => {
     const existing = data.find((d) => d.hour === hour);
     return {
-      hour: formatHour(hour),
+      hour: formatHourShort(hour),
       clicks: existing?.clicks || 0,
       metaClicks: existing?.metaClicks || 0,
     };
@@ -145,14 +147,17 @@ const HourlyPatternChart: React.FC<{ data: HourlyClickData[] }> = ({ data }) => 
   ];
 
   return (
-    <Card className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+    <Card className={cn(
+      "bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] min-w-0 overflow-hidden",
+      fullWidth && "lg:col-span-2"
+    )}>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base font-medium text-[hsl(var(--portal-text-primary))]">
-          <Clock className="h-4 w-4 text-[hsl(var(--portal-accent-purple))]" />
+        <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-medium text-[hsl(var(--portal-text-primary))]">
+          <Clock className="h-4 w-4 text-[hsl(var(--portal-accent-purple))] shrink-0" />
           Hourly Click Pattern
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-2 sm:p-6 pt-0 sm:pt-0">
         <V3ChartWrapper
           title="Hourly Click Pattern"
           ariaLabel="Bar chart showing hourly click distribution"
@@ -162,7 +167,7 @@ const HourlyPatternChart: React.FC<{ data: HourlyClickData[] }> = ({ data }) => 
             data={fullHourData}
             xAxisKey="hour"
             series={series}
-            height={250}
+            height={fullWidth ? 280 : 200}
             showLegend
           />
         </V3ChartWrapper>
@@ -184,32 +189,37 @@ export const LinkTrackingCharts: React.FC<LinkTrackingChartsProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-6", className)}>
+      <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-4", className)}>
         <ChartSkeleton />
         <ChartSkeleton />
       </div>
     );
   }
 
-  // Show both charts, prioritize hourly for single day
+  // Single day view: show hourly chart full width
+  if (isSingleDay) {
+    return (
+      <motion.div
+        className={cn("grid grid-cols-1 gap-4", className)}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+      >
+        <HourlyPatternChart data={hourlyTrend} fullWidth />
+      </motion.div>
+    );
+  }
+
+  // Multi-day view: show both charts
   return (
     <motion.div
-      className={cn("grid grid-cols-1 lg:grid-cols-2 gap-6", className)}
+      className={cn("grid grid-cols-1 lg:grid-cols-2 gap-4", className)}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.1 }}
     >
-      {isSingleDay ? (
-        <>
-          <HourlyPatternChart data={hourlyTrend} />
-          {dailyTrend.length > 0 && <DailyTrendChart data={dailyTrend} />}
-        </>
-      ) : (
-        <>
-          <DailyTrendChart data={dailyTrend} />
-          <HourlyPatternChart data={hourlyTrend} />
-        </>
-      )}
+      <DailyTrendChart data={dailyTrend} />
+      <HourlyPatternChart data={hourlyTrend} />
     </motion.div>
   );
 };

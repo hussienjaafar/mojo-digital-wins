@@ -16,6 +16,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ============================================================================
 // Types
@@ -50,13 +56,13 @@ function formatNumber(value: number): string {
 
 function getCookieRateBadge(rate: number): React.ReactNode {
   if (rate >= 70) {
-    return <Badge variant="default" className="bg-[hsl(var(--portal-success))] text-white text-[10px]">Excellent</Badge>;
+    return <Badge variant="default" className="bg-[hsl(var(--portal-success))] text-white text-[10px] px-1">Ex</Badge>;
   } else if (rate >= 50) {
-    return <Badge variant="default" className="bg-[hsl(var(--portal-accent-blue))] text-white text-[10px]">Good</Badge>;
+    return <Badge variant="default" className="bg-[hsl(var(--portal-accent-blue))] text-white text-[10px] px-1">Gd</Badge>;
   } else if (rate >= 30) {
-    return <Badge variant="default" className="bg-[hsl(var(--portal-warning))] text-white text-[10px]">Fair</Badge>;
+    return <Badge variant="default" className="bg-[hsl(var(--portal-warning))] text-white text-[10px] px-1">Fr</Badge>;
   } else {
-    return <Badge variant="default" className="bg-[hsl(var(--portal-error))] text-white text-[10px]">Low</Badge>;
+    return <Badge variant="default" className="bg-[hsl(var(--portal-error))] text-white text-[10px] px-1">Lo</Badge>;
   }
 }
 
@@ -81,7 +87,7 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({
 }) => (
   <button
     onClick={() => onSort(field)}
-    className="flex items-center gap-1 hover:text-[hsl(var(--portal-text-primary))] transition-colors"
+    className="flex items-center gap-0.5 hover:text-[hsl(var(--portal-text-primary))] transition-colors whitespace-nowrap"
   >
     {label}
     {currentSort === field && (
@@ -111,6 +117,23 @@ const TableSkeleton: React.FC = () => (
       </div>
     </CardContent>
   </Card>
+);
+
+// ============================================================================
+// Truncated Cell with Tooltip
+// ============================================================================
+
+const TruncatedCell: React.FC<{ value: string; maxWidth?: string }> = ({ value, maxWidth = "max-w-[120px] sm:max-w-[180px]" }) => (
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn("block truncate", maxWidth)}>{value}</span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[300px]">
+        <p className="text-xs break-all">{value}</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
 );
 
 // ============================================================================
@@ -159,75 +182,71 @@ const RefcodeTable: React.FC<{ data: RefcodePerformance[] }> = ({ data }) => {
 
   return (
     <div>
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-[hsl(var(--portal-border))]">
-              <TableHead className="text-[hsl(var(--portal-text-muted))]">Refcode</TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-right">
-                <SortableHeader label="Clicks" field="clicks" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-right">
-                <SortableHeader label="Sessions" field="sessions" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-right">
-                <SortableHeader label="Meta %" field="metaClicks" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-center">
-                <SortableHeader label="Cookie" field="cookieRate" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-right">
-                <SortableHeader label="Conv." field="conversions" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-right">
-                <SortableHeader label="Revenue" field="revenue" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
-              </TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-right">
-                <SortableHeader label="CVR" field="cvr" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedData.map((row) => (
-              <TableRow key={row.refcode} className="border-[hsl(var(--portal-border))]">
-                <TableCell className="font-medium text-[hsl(var(--portal-text-primary))] max-w-[200px] truncate">
-                  {row.refcode}
-                </TableCell>
-                <TableCell className="text-right text-[hsl(var(--portal-text-secondary))]">
-                  {formatNumber(row.totalClicks)}
-                </TableCell>
-                <TableCell className="text-right text-[hsl(var(--portal-text-secondary))]">
-                  {formatNumber(row.uniqueSessions)}
-                </TableCell>
-                <TableCell className="text-right text-[hsl(var(--portal-text-secondary))]">
-                  {row.totalClicks > 0 ? Math.round((row.metaAdClicks / row.totalClicks) * 100) : 0}%
-                </TableCell>
-                <TableCell className="text-center">
-                  {getCookieRateBadge(row.cookieCaptureRate)}
-                </TableCell>
-                <TableCell className="text-right text-[hsl(var(--portal-text-secondary))]">
-                  {formatNumber(row.conversions)}
-                </TableCell>
-                <TableCell className="text-right text-[hsl(var(--portal-success))] font-medium">
-                  {formatCurrency(row.revenue)}
-                </TableCell>
-                <TableCell className="text-right text-[hsl(var(--portal-text-secondary))]">
-                  {row.conversionRate}%
-                </TableCell>
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="min-w-[600px] px-4 sm:px-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-[hsl(var(--portal-border))]">
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-xs">Refcode</TableHead>
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-right text-xs">
+                  <SortableHeader label="Clicks" field="clicks" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-right text-xs hidden sm:table-cell">
+                  <SortableHeader label="Sessions" field="sessions" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-center text-xs hidden md:table-cell">
+                  <SortableHeader label="Cookie" field="cookieRate" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-right text-xs">
+                  <SortableHeader label="Conv" field="conversions" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-right text-xs">
+                  <SortableHeader label="Revenue" field="revenue" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
+                </TableHead>
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-right text-xs">
+                  <SortableHeader label="CVR" field="cvr" currentSort={sortField} direction={sortDirection} onSort={handleSort} />
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {sortedData.map((row) => (
+                <TableRow key={row.refcode} className="border-[hsl(var(--portal-border))]">
+                  <TableCell className="font-medium text-[hsl(var(--portal-text-primary))] text-xs sm:text-sm py-2">
+                    <TruncatedCell value={row.refcode} />
+                  </TableCell>
+                  <TableCell className="text-right text-[hsl(var(--portal-text-secondary))] text-xs sm:text-sm py-2">
+                    {formatNumber(row.totalClicks)}
+                  </TableCell>
+                  <TableCell className="text-right text-[hsl(var(--portal-text-secondary))] text-xs sm:text-sm py-2 hidden sm:table-cell">
+                    {formatNumber(row.uniqueSessions)}
+                  </TableCell>
+                  <TableCell className="text-center py-2 hidden md:table-cell">
+                    {getCookieRateBadge(row.cookieCaptureRate)}
+                  </TableCell>
+                  <TableCell className="text-right text-[hsl(var(--portal-text-secondary))] text-xs sm:text-sm py-2">
+                    {formatNumber(row.conversions)}
+                  </TableCell>
+                  <TableCell className="text-right text-[hsl(var(--portal-success))] font-medium text-xs sm:text-sm py-2">
+                    {formatCurrency(row.revenue)}
+                  </TableCell>
+                  <TableCell className="text-right text-[hsl(var(--portal-text-secondary))] text-xs sm:text-sm py-2">
+                    {row.conversionRate}%
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
       {data.length > 10 && (
-        <div className="mt-4 text-center">
+        <div className="mt-3 text-center">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setShowAll(!showAll)}
-            className="text-[hsl(var(--portal-accent-blue))]"
+            className="text-[hsl(var(--portal-accent-blue))] text-xs"
           >
-            {showAll ? "Show Less" : `Show All ${data.length} Refcodes`}
+            {showAll ? "Show Less" : `Show All ${data.length}`}
           </Button>
         </div>
       )}
@@ -253,53 +272,51 @@ const CampaignTable: React.FC<{ data: CampaignPerformance[] }> = ({ data }) => {
 
   return (
     <div>
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-[hsl(var(--portal-border))]">
-              <TableHead className="text-[hsl(var(--portal-text-muted))]">Campaign</TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-right">Clicks</TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-right">Sessions</TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-right">Meta %</TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-right">Conversions</TableHead>
-              <TableHead className="text-[hsl(var(--portal-text-muted))] text-right">Revenue</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {displayData.map((row) => (
-              <TableRow key={row.campaign} className="border-[hsl(var(--portal-border))]">
-                <TableCell className="font-medium text-[hsl(var(--portal-text-primary))] max-w-[250px] truncate">
-                  {row.campaign}
-                </TableCell>
-                <TableCell className="text-right text-[hsl(var(--portal-text-secondary))]">
-                  {formatNumber(row.totalClicks)}
-                </TableCell>
-                <TableCell className="text-right text-[hsl(var(--portal-text-secondary))]">
-                  {formatNumber(row.uniqueSessions)}
-                </TableCell>
-                <TableCell className="text-right text-[hsl(var(--portal-text-secondary))]">
-                  {row.totalClicks > 0 ? Math.round((row.metaAdClicks / row.totalClicks) * 100) : 0}%
-                </TableCell>
-                <TableCell className="text-right text-[hsl(var(--portal-text-secondary))]">
-                  {formatNumber(row.conversions)}
-                </TableCell>
-                <TableCell className="text-right text-[hsl(var(--portal-success))] font-medium">
-                  {formatCurrency(row.revenue)}
-                </TableCell>
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="min-w-[500px] px-4 sm:px-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-[hsl(var(--portal-border))]">
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-xs">Campaign</TableHead>
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-right text-xs">Clicks</TableHead>
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-right text-xs hidden sm:table-cell">Sessions</TableHead>
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-right text-xs">Conv</TableHead>
+                <TableHead className="text-[hsl(var(--portal-text-muted))] text-right text-xs">Revenue</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {displayData.map((row) => (
+                <TableRow key={row.campaign} className="border-[hsl(var(--portal-border))]">
+                  <TableCell className="font-medium text-[hsl(var(--portal-text-primary))] text-xs sm:text-sm py-2">
+                    <TruncatedCell value={row.campaign} maxWidth="max-w-[150px] sm:max-w-[220px]" />
+                  </TableCell>
+                  <TableCell className="text-right text-[hsl(var(--portal-text-secondary))] text-xs sm:text-sm py-2">
+                    {formatNumber(row.totalClicks)}
+                  </TableCell>
+                  <TableCell className="text-right text-[hsl(var(--portal-text-secondary))] text-xs sm:text-sm py-2 hidden sm:table-cell">
+                    {formatNumber(row.uniqueSessions)}
+                  </TableCell>
+                  <TableCell className="text-right text-[hsl(var(--portal-text-secondary))] text-xs sm:text-sm py-2">
+                    {formatNumber(row.conversions)}
+                  </TableCell>
+                  <TableCell className="text-right text-[hsl(var(--portal-success))] font-medium text-xs sm:text-sm py-2">
+                    {formatCurrency(row.revenue)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
       {data.length > 10 && (
-        <div className="mt-4 text-center">
+        <div className="mt-3 text-center">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setShowAll(!showAll)}
-            className="text-[hsl(var(--portal-accent-blue))]"
+            className="text-[hsl(var(--portal-accent-blue))] text-xs"
           >
-            {showAll ? "Show Less" : `Show All ${data.length} Campaigns`}
+            {showAll ? "Show Less" : `Show All ${data.length}`}
           </Button>
         </div>
       )}
@@ -328,27 +345,27 @@ export const LinkTrackingTables: React.FC<LinkTrackingTablesProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.2 }}
     >
-      <Card className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+      <Card className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] overflow-hidden">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium text-[hsl(var(--portal-text-primary))]">
+          <CardTitle className="text-sm sm:text-base font-medium text-[hsl(var(--portal-text-primary))]">
             Performance Breakdown
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 sm:p-6 pt-0">
           <Tabs defaultValue="refcode" className="w-full">
-            <TabsList className="mb-4 bg-[hsl(var(--portal-bg-tertiary))]">
+            <TabsList className="mb-3 bg-[hsl(var(--portal-bg-tertiary))] h-8">
               <TabsTrigger
                 value="refcode"
-                className="data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white"
+                className="text-xs data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white h-7"
               >
-                <Link2 className="h-3.5 w-3.5 mr-1.5" />
+                <Link2 className="h-3 w-3 mr-1" />
                 By Refcode
               </TabsTrigger>
               <TabsTrigger
                 value="campaign"
-                className="data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white"
+                className="text-xs data-[state=active]:bg-[hsl(var(--portal-accent-blue))] data-[state=active]:text-white h-7"
               >
-                <Megaphone className="h-3.5 w-3.5 mr-1.5" />
+                <Megaphone className="h-3 w-3 mr-1" />
                 By Campaign
               </TabsTrigger>
             </TabsList>
