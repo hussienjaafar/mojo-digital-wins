@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { computePhoneHash, computeEmailHash } from "../_shared/phoneHash.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,33 +17,10 @@ const corsHeaders = {
  * 
  * IMPORTANT: This only handles DETERMINISTIC matching. We do not create
  * fake per-donor touchpoints from aggregated data (e.g., Meta impressions).
+ * 
+ * CRITICAL: Uses standardized phone/email hashing from _shared/phoneHash.ts
+ * to ensure consistency with sync-switchboard-sms and other functions.
  */
-
-// SHA-256 hash for phone normalization (cryptographically secure)
-async function hashPhone(phone: string): Promise<string> {
-  const normalized = phone.replace(/\D/g, '').slice(-10);
-  if (normalized.length < 10) return ''; // Invalid phone
-  
-  const encoder = new TextEncoder();
-  const data = encoder.encode(normalized);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return `ph_${hashHex.substring(0, 16)}`; // Truncate for storage efficiency
-}
-
-// SHA-256 hash for email
-async function hashEmail(email: string): Promise<string> {
-  const normalized = email.toLowerCase().trim();
-  if (!normalized || !normalized.includes('@')) return '';
-  
-  const encoder = new TextEncoder();
-  const data = encoder.encode(normalized);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return `em_${hashHex.substring(0, 16)}`;
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -148,7 +126,8 @@ serve(async (req) => {
         console.error('[MATCH TOUCHPOINTS] Error fetching transactions with phone:', phoneError);
       }
 
-      // Create identity links with proper SHA-256 hashing
+      // Create identity links with STANDARDIZED SHA-256 hashing
+      // Uses shared phoneHash.ts utility for consistency with sms_events
       const identityLinks: Array<{
         organization_id: string;
         email_hash: string;
@@ -161,8 +140,9 @@ serve(async (req) => {
       const seenLinks = new Set<string>();
       for (const tx of (transactionsWithPhone || [])) {
         if (tx.phone && tx.donor_email) {
-          const emailHash = await hashEmail(tx.donor_email);
-          const phoneHash = await hashPhone(tx.phone);
+          // Use standardized hash functions from _shared/phoneHash.ts
+          const emailHash = await computeEmailHash(tx.donor_email);
+          const phoneHash = await computePhoneHash(tx.phone);
           
           if (!emailHash || !phoneHash) {
             skippedInvalidPhone++;
@@ -176,7 +156,7 @@ serve(async (req) => {
             identityLinks.push({
               organization_id,
               email_hash: emailHash,
-              phone_hash: phoneHash,
+              phone_hash: phoneHash,  // Now matches sms_events.phone_hash format
               donor_email: tx.donor_email,
               source: 'actblue',
               confidence: 1.0, // ActBlue provides both - high confidence
