@@ -376,6 +376,19 @@ const ClientDashboard = () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
 
+    // Check if user was invited (has client_users record)
+    // Invited users should skip onboarding - they don't need to set up the org
+    const { data: clientUser } = await supabase
+      .from("client_users")
+      .select("id")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (clientUser) {
+      // User was invited to an org, skip onboarding wizard
+      return;
+    }
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("onboarding_completed")
