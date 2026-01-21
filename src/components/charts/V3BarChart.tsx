@@ -201,7 +201,7 @@ export const V3BarChart: React.FC<V3BarChartProps> = ({
       },
     };
 
-    // Value axis config
+    // Value axis config with anti-overlap settings
     const valueAxisConfig = {
       type: 'value' as const,
       axisLine: { show: false },
@@ -210,7 +210,9 @@ export const V3BarChart: React.FC<V3BarChartProps> = ({
         color: 'hsl(var(--portal-text-muted))',
         fontSize: 10,
         formatter: (value: number) => formatValue(value, true),
+        hideOverlap: true,
       },
+      splitNumber: 4,
       splitLine: {
         lineStyle: {
           color: 'hsl(var(--portal-border) / 0.5)',
@@ -232,6 +234,9 @@ export const V3BarChart: React.FC<V3BarChartProps> = ({
       tooltip: {
         trigger: 'item',
         confine: true,
+        showDelay: 50,
+        hideDelay: 100,
+        transitionDuration: 0.2,
         backgroundColor: 'hsl(var(--portal-bg-secondary) / 0.98)',
         borderColor: 'hsl(var(--portal-border))',
         borderWidth: 1,
@@ -279,10 +284,10 @@ export const V3BarChart: React.FC<V3BarChartProps> = ({
         },
       },
       grid: {
-        left: horizontal ? 120 : 12,
-        right: 16,
+        left: horizontal ? Math.max(120, maxLabelLength * 7) : 12,
+        right: 24,
         top: 16,
-        bottom: 16,
+        bottom: 20,
         containLabel: !horizontal,
       },
       xAxis: horizontal ? valueAxisConfig : categoryAxisConfig,
@@ -296,9 +301,11 @@ export const V3BarChart: React.FC<V3BarChartProps> = ({
           emphasis: {
             focus: 'self',
             itemStyle: {
-              shadowBlur: 10,
-              shadowColor: 'rgba(0, 0, 0, 0.2)',
+              shadowBlur: 12,
+              shadowColor: 'hsl(var(--portal-accent-blue) / 0.4)',
             },
+            scale: true,
+            scaleSize: 3,
           },
           label: showValueLabels ? {
             show: true,
