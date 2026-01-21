@@ -80,3 +80,20 @@ export const useImpersonation = () => {
   }
   return context;
 };
+
+// Safe version that returns defaults instead of throwing when outside provider
+export const useImpersonationSafe = () => {
+  const context = useContext(ImpersonationContext);
+  if (context === undefined) {
+    return {
+      impersonatedUserId: null,
+      impersonatedUserName: null,
+      impersonatedOrgId: null,
+      impersonatedOrgName: null,
+      setImpersonation: () => {},
+      clearImpersonation: () => {},
+      isImpersonating: false,
+    };
+  }
+  return context;
+};
