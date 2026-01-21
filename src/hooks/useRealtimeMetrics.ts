@@ -118,6 +118,8 @@ export function useRealtimeMetrics(
   const smsQuery = useQuery({
     queryKey: ["realtime-metrics", "sms", organizationId, startDate, endDate],
     queryFn: async () => {
+      // Note: We use .or() with date casting for proper timestamp comparison
+      // since send_date is timestamptz and startDate/endDate are date strings
       const { data, error } = await supabase
         .from("sms_campaigns")
         .select(`
@@ -127,8 +129,8 @@ export function useRealtimeMetrics(
           message_text, phone_list_name, replies, skipped, previously_opted_out, send_date
         `)
         .eq("organization_id", organizationId)
-        .gte("send_date", startDate)
-        .lte("send_date", endDate)
+        .gte("send_date", `${startDate}T00:00:00Z`)
+        .lte("send_date", `${endDate}T23:59:59Z`)
         .order("send_date", { ascending: false });
 
       if (error) throw error;
