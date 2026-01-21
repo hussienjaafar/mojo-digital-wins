@@ -93,23 +93,28 @@ serve(async (req) => {
       dry_run,
     });
 
-    // Fetch transactions with truncated/missing fbclid
-    // These have refcode2 starting with fb_ but fbclid is either null, short, or matches refcode2
-    const { data: transactions, error: txError } = await supabase
+    // Fetch transactions with refcode2 starting with fb_
+    // We'll filter for truncated fbclid client-side since Supabase doesn't support length() filter
+    const { data: allTransactions, error: txError } = await supabase
       .from('actblue_transactions')
       .select('id, transaction_id, donor_email, refcode, refcode2, fbclid, created_at, transaction_date')
       .eq('organization_id', organization_id)
       .like('refcode2', 'fb_%')
-      .or('fbclid.is.null,fbclid.lt.50')
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .limit(limit * 2); // Fetch more since we'll filter
 
     if (txError) {
       console.error('[BACKFILL] Error fetching transactions:', txError);
       throw txError;
     }
 
-    if (!transactions || transactions.length === 0) {
+    // Filter for transactions with truncated or missing fbclid (length <= 50)
+    const transactions = (allTransactions || [])
+      .filter(tx => !tx.fbclid || tx.fbclid.length <= 50)
+      .slice(0, limit);
+
+
+    if (transactions.length === 0) {
       return new Response(JSON.stringify({
         success: true,
         message: 'No transactions need backfill',
