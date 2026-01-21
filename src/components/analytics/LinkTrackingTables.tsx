@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronUp, Link2, Megaphone } from "lucide-react";
+import { ChevronDown, ChevronUp, Link2, Megaphone, CheckCircle2, Tag, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { RefcodePerformance, CampaignPerformance } from "@/hooks/useEnhancedRedirectClicksQuery";
+import { RefcodePerformance, CampaignPerformance, AttributionType } from "@/hooks/useEnhancedRedirectClicksQuery";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +64,43 @@ function getCookieRateBadge(rate: number): React.ReactNode {
   } else {
     return <Badge variant="default" className="bg-[hsl(var(--portal-error))] text-white text-[10px] px-1">Lo</Badge>;
   }
+}
+
+function getAttributionBadge(type: AttributionType): React.ReactNode {
+  if (type === 'click_id') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="default" className="bg-[hsl(var(--portal-success))] text-white text-[10px] px-1 ml-1">
+              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+              ID
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[200px]">
+            <p className="text-xs">Verified via Click ID matching (deterministic)</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  } else if (type === 'refcode') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="outline" className="text-[hsl(var(--portal-warning))] border-[hsl(var(--portal-warning))] text-[10px] px-1 ml-1">
+              <Tag className="h-2.5 w-2.5 mr-0.5" />
+              Ref
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[200px]">
+            <p className="text-xs">Matched by refcode only (includes all traffic sources)</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  return null;
 }
 
 // ============================================================================
@@ -224,7 +261,10 @@ const RefcodeTable: React.FC<{ data: RefcodePerformance[] }> = ({ data }) => {
                     {getCookieRateBadge(row.cookieCaptureRate)}
                   </TableCell>
                   <TableCell className="text-right text-[hsl(var(--portal-text-secondary))] text-xs sm:text-sm py-2">
-                    {formatNumber(row.conversions)}
+                    <div className="flex items-center justify-end">
+                      {formatNumber(row.conversions)}
+                      {getAttributionBadge(row.attributionType)}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right text-[hsl(var(--portal-success))] font-medium text-xs sm:text-sm py-2">
                     {formatCurrency(row.revenue)}
