@@ -333,8 +333,29 @@ serve(async (req) => {
       ? `${donor.firstname} ${donor.lastname}`.trim() 
       : null;
     const customFields = contribution.customFields || [];
-    const clickId = getCustomFieldValue(customFields, 'click_id') || getCustomFieldValue(customFields, 'fbclid');
-    const fbclid = getCustomFieldValue(customFields, 'fbclid');
+    
+    // Extract fbclid from multiple sources:
+    // 1. customFields (direct fbclid field from ActBlue)
+    // 2. refcode2 with fb_ prefix (common pattern: fb_IwZXh0bgNhZW0...)
+    const customFieldFbclid = getCustomFieldValue(customFields, 'fbclid');
+    const customFieldClickId = getCustomFieldValue(customFields, 'click_id');
+    const refcode2Value = safeString(refcodes.refcode2);
+    
+    // Check if refcode2 contains a Facebook click ID (starts with fb_)
+    const refcode2Fbclid = refcode2Value?.startsWith('fb_') ? refcode2Value.substring(3) : null;
+    
+    // Priority: customField fbclid > refcode2 fbclid > customField click_id
+    const fbclid = customFieldFbclid || refcode2Fbclid;
+    const clickId = customFieldClickId || fbclid;
+    
+    console.log('[ACTBLUE] [DEBUG] Click ID extraction:', {
+      customFieldFbclid,
+      customFieldClickId,
+      refcode2Value,
+      refcode2Fbclid,
+      finalFbclid: fbclid,
+      finalClickId: clickId,
+    });
 
     // Recurring state derivation (best-effort with available payload fields)
     let recurringState: string | null = null;
