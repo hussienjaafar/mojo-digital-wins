@@ -240,11 +240,15 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
             xAxisKey="name"
             series={[
               { dataKey: "Sent", name: "Messages Sent", color: "hsl(var(--portal-accent-purple))", yAxisIndex: 0 },
-              { dataKey: "Conversions", name: "Conversions", color: "hsl(var(--portal-success))", yAxisIndex: 0 },
-              { dataKey: "Raised", name: "Dollars Raised", color: "hsl(var(--portal-accent-amber))", yAxisIndex: 1, valueType: "currency" },
+              { dataKey: "Conversions", name: "Conversions", color: "hsl(var(--portal-success))", yAxisIndex: 1 },
+              { dataKey: "Raised", name: "Dollars Raised", color: "hsl(var(--portal-accent-amber))", yAxisIndex: 2, valueType: "currency" },
             ]}
-            dualYAxis
+            tripleYAxis
+            yAxisNameLeft="Sent"
+            yAxisNameMiddle="Conv"
+            yAxisNameRight="Raised"
             yAxisValueTypeLeft="number"
+            yAxisValueTypeMiddle="number"
             yAxisValueTypeRight="currency"
             height={320}
           />
