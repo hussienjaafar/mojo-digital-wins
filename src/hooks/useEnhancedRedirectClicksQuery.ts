@@ -417,10 +417,13 @@ async function fetchEnhancedRedirectClicks(
       entry.totalClicks > 0
         ? Math.round(((entry.withFbp + entry.withFbc) / entry.totalClicks) * 50)
         : 0;
-    entry.conversionRate =
-      entry.totalClicks > 0
-        ? Math.round((entry.conversions / entry.totalClicks) * 100 * 100) / 100
-        : 0;
+    // Only calculate CVR for Click ID attribution (where we can accurately link clicks to conversions)
+    // For refcode-only attribution, CVR is meaningless since conversions may come from non-tracked sources
+    if (entry.attributionType === 'click_id' && entry.totalClicks > 0) {
+      entry.conversionRate = Math.round((entry.conversions / entry.totalClicks) * 100 * 100) / 100;
+    } else {
+      entry.conversionRate = -1; // Sentinel value to indicate N/A
+    }
   });
 
   // Calculate rates for campaigns and aggregate conversions from refcodes

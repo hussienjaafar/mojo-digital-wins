@@ -270,7 +270,18 @@ const RefcodeTable: React.FC<{ data: RefcodePerformance[] }> = ({ data }) => {
                     {formatCurrency(row.revenue)}
                   </TableCell>
                   <TableCell className="text-right text-[hsl(var(--portal-text-secondary))] text-xs sm:text-sm py-2">
-                    {row.conversionRate}%
+                    {row.conversionRate >= 0 ? `${row.conversionRate}%` : (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-[hsl(var(--portal-text-muted))]">--</span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[200px]">
+                            <p className="text-xs">CVR not available for refcode-only attribution (conversions may include non-tracked traffic)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
