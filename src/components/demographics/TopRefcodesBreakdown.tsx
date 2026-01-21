@@ -143,11 +143,12 @@ export function TopRefcodesBreakdown({
         nameKey="name"
         valueKey="value"
         valueName="Revenue"
-        height={300}
+        height={350}
         valueType="currency"
         horizontal
         topN={10}
         showRankBadges
+        maxLabelLength={24}
       />
     );
   }
