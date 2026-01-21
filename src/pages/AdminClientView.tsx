@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, TrendingUp, DollarSign, Users, Target, Calendar } from "lucide-react";
+import { ArrowLeft, TrendingUp, DollarSign, Users, Target, MousePointerClick } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { Session } from "@supabase/supabase-js";
 import ClientMetricsOverview from "@/components/client/ClientMetricsOverview";
@@ -14,6 +14,7 @@ import SMSMetrics from "@/components/client/SMSMetrics";
 import DonationMetrics from "@/components/client/DonationMetrics";
 import SyncControls from "@/components/client/SyncControls";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
+import { RedirectLinkAnalytics } from "@/components/analytics/RedirectLinkAnalytics";
 
 type Organization = {
   id: string;
@@ -191,6 +192,10 @@ const AdminClientView = () => {
               <Users className="h-4 w-4 mr-2" />
               SMS
             </TabsTrigger>
+            <TabsTrigger value="link-clicks">
+              <MousePointerClick className="h-4 w-4 mr-2" />
+              Link Clicks
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -222,6 +227,13 @@ const AdminClientView = () => {
               organizationId={organization.id}
               startDate={startDate}
               endDate={endDate}
+            />
+          </TabsContent>
+
+          <TabsContent value="link-clicks">
+            <RedirectLinkAnalytics
+              organizationId={organization.id}
+              title="Redirect Link Performance"
             />
           </TabsContent>
         </Tabs>
