@@ -1,0 +1,262 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createLogger } from "../_shared/logger.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Hash function for PII (matches actblue-webhook)
+async function hashValue(value: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(value.toLowerCase().trim());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Normalize phone number
+function normalizePhone(phone: string | null): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) return '1' + digits;
+  if (digits.length === 11 && digits.startsWith('1')) return digits;
+  return digits.length >= 10 ? digits : null;
+}
+
+// Extract fbc from refcode2 (strip 'fb_' prefix if present)
+function extractFbc(refcode2: string | null): string | null {
+  if (!refcode2) return null;
+  if (refcode2.startsWith('fb_')) {
+    return refcode2.substring(3);
+  }
+  return refcode2;
+}
+
+serve(async (req) => {
+  const logger = createLogger('backfill-recent-capi');
+  
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const body = await req.json().catch(() => ({}));
+    const hoursBack = body.hours_back || 24;
+    const limit = body.limit || 10;
+    const organizationId = body.organization_id;
+
+    logger.info('Starting backfill', { hoursBack, limit, organizationId });
+
+    // Get CAPI config for the organization
+    let configQuery = supabase
+      .from('meta_capi_config')
+      .select('*')
+      .eq('is_enabled', true);
+    
+    if (organizationId) {
+      configQuery = configQuery.eq('organization_id', organizationId);
+    }
+
+    const { data: configs, error: configError } = await configQuery;
+    
+    if (configError || !configs?.length) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'No CAPI config found',
+        details: configError?.message 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    let totalQueued = 0;
+    const results: any[] = [];
+
+    for (const config of configs) {
+      // Find recent transactions with fbclid that aren't yet in meta_conversion_events
+      const { data: transactions, error: txError } = await supabase
+        .from('actblue_transactions')
+        .select('*')
+        .eq('organization_id', config.organization_id)
+        .gte('transaction_date', new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString())
+        .not('refcode2', 'is', null)
+        .order('transaction_date', { ascending: false })
+        .limit(limit);
+
+      if (txError) {
+        logger.error('Failed to query transactions', { error: txError.message, org: config.organization_id });
+        results.push({ org: config.organization_id, error: txError.message, queued: 0 });
+        continue;
+      }
+
+      if (!transactions?.length) {
+        logger.info('No transactions to backfill', { org: config.organization_id });
+        results.push({ org: config.organization_id, queued: 0, message: 'No transactions with Click ID found' });
+        continue;
+      }
+
+      // Check which are already in meta_conversion_events
+      const transactionIds = transactions.map(t => t.transaction_id);
+      const { data: existingEvents } = await supabase
+        .from('meta_conversion_events')
+        .select('source_id')
+        .eq('organization_id', config.organization_id)
+        .in('source_id', transactionIds);
+
+      const existingSourceIds = new Set(existingEvents?.map(e => e.source_id) || []);
+      const newTransactions = transactions.filter(t => !existingSourceIds.has(t.transaction_id));
+
+      if (!newTransactions.length) {
+        logger.info('All transactions already queued', { org: config.organization_id });
+        results.push({ org: config.organization_id, queued: 0, message: 'All transactions already in queue' });
+        continue;
+      }
+
+      // Queue each new transaction
+      let orgQueued = 0;
+      for (const tx of newTransactions) {
+        try {
+          const fbc = extractFbc(tx.refcode2);
+          const eventTime = Math.floor(new Date(tx.transaction_date).getTime() / 1000);
+          const eventId = `actblue_${tx.transaction_id}_${eventTime}`;
+          const dedupeKey = `purchase_${tx.transaction_id}`;
+
+          // Build user data with proper hashing
+          const userData: any = {};
+          
+          if (tx.donor_email) {
+            userData.em = [await hashValue(tx.donor_email)];
+          }
+          if (tx.phone) {
+            const normalizedPhone = normalizePhone(tx.phone);
+            if (normalizedPhone) {
+              userData.ph = [await hashValue(normalizedPhone)];
+            }
+          }
+          if (tx.first_name) {
+            userData.fn = [await hashValue(tx.first_name)];
+          }
+          if (tx.last_name) {
+            userData.ln = [await hashValue(tx.last_name)];
+          }
+          if (tx.city) {
+            userData.ct = [await hashValue(tx.city)];
+          }
+          if (tx.state) {
+            userData.st = [await hashValue(tx.state)];
+          }
+          if (tx.zip) {
+            const zip5 = tx.zip.substring(0, 5);
+            userData.zp = [await hashValue(zip5)];
+          }
+          if (tx.country) {
+            userData.country = [await hashValue(tx.country.toLowerCase())];
+          }
+          if (fbc) {
+            userData.fbc = fbc;
+          }
+
+          // Calculate match quality
+          let matchScore = 0;
+          if (userData.em) matchScore += 40;
+          if (userData.ph) matchScore += 30;
+          if (userData.fn && userData.ln) matchScore += 15;
+          if (userData.ct && userData.st && userData.zp) matchScore += 15;
+          if (userData.fbc) matchScore += 50;
+
+          const matchQuality = matchScore >= 70 ? 'excellent' : matchScore >= 50 ? 'good' : matchScore >= 30 ? 'fair' : 'poor';
+
+          // Insert into outbox using direct insert (not upsert) to avoid ON CONFLICT issues
+          const { error: insertError } = await supabase
+            .from('meta_conversion_events')
+            .insert({
+              organization_id: config.organization_id,
+              pixel_id: config.pixel_id,
+              event_id: eventId,
+              event_name: 'Purchase',
+              event_time: eventTime,
+              event_source_url: 'https://secure.actblue.com',
+              action_source: 'website',
+              user_data_hashed: userData,
+              custom_data: {
+                currency: 'USD',
+                value: tx.amount,
+                content_name: 'Donation',
+                content_category: tx.is_recurring ? 'recurring_donation' : 'one_time_donation'
+              },
+              status: 'pending',
+              source_type: 'actblue_backfill',
+              source_id: tx.transaction_id,
+              dedupe_key: dedupeKey,
+              fbc: fbc,
+              match_score: matchScore,
+              match_quality: matchQuality,
+              is_enrichment_only: config.actblue_owns_donation_complete || false
+            });
+
+          if (insertError) {
+            // Check if it's a duplicate key error (already exists)
+            if (insertError.code === '23505') {
+              logger.info('Transaction already queued (duplicate)', { transactionId: tx.transaction_id });
+            } else {
+              logger.error('Failed to insert event', { 
+                error: insertError.message, 
+                code: insertError.code,
+                transactionId: tx.transaction_id 
+              });
+            }
+          } else {
+            orgQueued++;
+            logger.info('Queued event for CAPI', { 
+              transactionId: tx.transaction_id, 
+              eventId, 
+              matchQuality,
+              hasFbc: !!fbc
+            });
+          }
+        } catch (err: unknown) {
+          logger.error('Error processing transaction', { 
+            transactionId: tx.transaction_id, 
+            error: err instanceof Error ? err.message : String(err) 
+          });
+        }
+      }
+
+      totalQueued += orgQueued;
+      results.push({ 
+        org: config.organization_id, 
+        queued: orgQueued, 
+        found: transactions.length,
+        alreadyQueued: existingSourceIds.size
+      });
+    }
+
+    logger.info('Backfill complete', { totalQueued, results });
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      total_queued: totalQueued,
+      results 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('Backfill failed', { error: errorMessage });
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: errorMessage 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+});
