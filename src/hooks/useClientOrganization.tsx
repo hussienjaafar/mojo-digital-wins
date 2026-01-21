@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useImpersonation } from '@/contexts/ImpersonationContext';
+import { useImpersonationSafe } from '@/contexts/ImpersonationContext';
 
 export const useClientOrganization = () => {
-  const { impersonatedOrgId, isImpersonating } = useImpersonation();
+  const { impersonatedOrgId, isImpersonating } = useImpersonationSafe();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
