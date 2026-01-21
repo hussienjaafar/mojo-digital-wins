@@ -8,6 +8,8 @@ import { DEFAULT_ORG_TIMEZONE } from "@/lib/metricDefinitions";
 // Types
 // ============================================================================
 
+export type AttributionType = 'click_id' | 'refcode' | 'none';
+
 export interface RefcodePerformance {
   refcode: string;
   totalClicks: number;
@@ -22,6 +24,7 @@ export interface RefcodePerformance {
   revenue: number;
   attributedRevenue: number; // Revenue from attributed conversions
   conversionRate: number;
+  attributionType: AttributionType; // Track how attribution was determined
 }
 
 export interface CampaignPerformance {
@@ -324,6 +327,7 @@ async function fetchEnhancedRedirectClicks(
         revenue: 0,
         attributedRevenue: 0,
         conversionRate: 0,
+        attributionType: 'none' as AttributionType,
       });
       refcodeSessionMap.set(refcode, new Set());
     }
@@ -340,15 +344,21 @@ async function fetchEnhancedRedirectClicks(
     if (clickIdData && !attributedRefcodes.has(`clickid_${refcode}`)) {
       refEntry.attributedConversions = clickIdData.conversions;
       refEntry.attributedRevenue = clickIdData.revenue;
+      refEntry.conversions = clickIdData.conversions;
+      refEntry.revenue = clickIdData.revenue;
+      refEntry.attributionType = 'click_id';
       attributedRefcodes.add(`clickid_${refcode}`);
+      attributedRefcodes.add(refcode); // Also mark to prevent refcode-only fallback
     }
 
-    // Attribute total conversions by refcode (only once per refcode to avoid double-counting)
+    // Fallback: Attribute by refcode only for campaigns not using redirect links
+    // Only apply if no click ID attribution was done
     if (!attributedRefcodes.has(refcode) && refcode !== "(no refcode)") {
       const refcodeDonations = donationsByRefcode.get(refcode);
-      if (refcodeDonations) {
+      if (refcodeDonations && refcodeDonations.count > 0) {
         refEntry.conversions = refcodeDonations.count;
         refEntry.revenue = refcodeDonations.revenue;
+        refEntry.attributionType = 'refcode';
         attributedRefcodes.add(refcode);
       }
     }
