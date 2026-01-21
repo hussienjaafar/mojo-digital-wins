@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { Download, MapPin, Briefcase, Users, DollarSign, TrendingUp, Share2, ArrowLeft } from "lucide-react";
-import { Session } from "@supabase/supabase-js";
 import { ClientShell } from "@/components/client/ClientShell";
 import {
   V3PageContainer,
@@ -73,7 +73,7 @@ type DemographicsSummary = {
 const ClientDemographics = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [session, setSession] = useState<Session | null>(null);
+  const { organizationId, isLoading: orgLoading } = useClientOrganization();
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [summary, setSummary] = useState<DemographicsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -85,53 +85,28 @@ const ClientDemographics = () => {
   const [cityCache, setCityCache] = useState<Map<string, CityStats[]>>(new Map());
   const [isCityLoading, setIsCityLoading] = useState(false);
 
+  // Load data when organizationId is available
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (!session) {
-        navigate("/client-login");
-      }
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (!session) {
-        navigate("/client-login");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  useEffect(() => {
-    if (session?.user) {
-      loadData();
+    if (organizationId) {
+      loadData(organizationId);
     }
-  }, [session]);
+  }, [organizationId]);
 
   // Load city data on-demand when state is selected
   useEffect(() => {
-    if (selectedState && organization && !cityCache.has(selectedState)) {
+    if (selectedState && organizationId && !cityCache.has(selectedState)) {
       loadCityData(selectedState);
     }
-  }, [selectedState, organization]);
+  }, [selectedState, organizationId]);
 
-  const loadData = async () => {
+  const loadData = async (orgId: string) => {
     try {
       setIsLoading(true);
       
-      const { data: clientUser } = await (supabase as any)
-        .from('client_users')
-        .select('organization_id')
-        .eq('id', session?.user?.id)
-        .maybeSingle();
-
-      if (!clientUser) throw new Error("Organization not found");
-
       const { data: org } = await (supabase as any)
         .from('client_organizations')
         .select('*')
-        .eq('id', clientUser.organization_id)
+        .eq('id', orgId)
         .maybeSingle();
 
       setOrganization(org);
@@ -139,7 +114,7 @@ const ClientDemographics = () => {
       // Use server-side aggregation RPC
       const { data: summaryData, error } = await supabase.rpc(
         'get_donor_demographics_summary',
-        { _organization_id: clientUser.organization_id }
+        { _organization_id: orgId }
       );
 
       if (error) throw error;
@@ -157,7 +132,7 @@ const ClientDemographics = () => {
   };
 
   const loadCityData = async (stateAbbr: string) => {
-    if (!organization) return;
+    if (!organizationId) return;
     
     try {
       setIsCityLoading(true);
@@ -165,7 +140,7 @@ const ClientDemographics = () => {
       const { data, error } = await supabase.rpc(
         'get_state_city_breakdown',
         { 
-          _organization_id: organization.id,
+          _organization_id: organizationId,
           _state_abbr: stateAbbr 
         }
       );
@@ -417,7 +392,7 @@ const ClientDemographics = () => {
   ];
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || orgLoading) {
     return (
       <ClientShell showDateControls={false}>
         <div className="p-6">
