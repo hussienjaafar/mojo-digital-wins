@@ -99,21 +99,58 @@ export const ClientShell = ({
 
   const loadUserOrganizations = async () => {
     try {
-      // If impersonating, load the impersonated org
+      // If impersonating, check if user is admin to load all orgs
       if (isImpersonating && impersonatedOrgId) {
-        const { data: org, error: orgError } = await (supabase as any)
-          .from("client_organizations")
-          .select("id, name, logo_url")
-          .eq("id", impersonatedOrgId)
-          .maybeSingle();
+        // Get current session to check admin status
+        const { data: sessionData } = await supabase.auth.getSession();
+        const currentUserId = sessionData?.session?.user?.id;
 
-        if (orgError) throw orgError;
-        if (org) {
-          setOrganization(org);
-          setOrganizations([org]);
+        const { data: isAdminUser } = await supabase.rpc("has_role", {
+          _user_id: currentUserId,
+          _role: "admin",
+        });
+
+        if (isAdminUser) {
+          // Admin impersonating: load ALL organizations for switching
+          const { data: allOrgs, error: orgError } = await supabase
+            .from("client_organizations")
+            .select("id, name, logo_url")
+            .eq("is_active", true)
+            .order("name");
+
+          if (orgError) throw orgError;
+
+          if (allOrgs && allOrgs.length > 0) {
+            const orgs: Organization[] = allOrgs.map((org) => ({
+              id: org.id,
+              name: org.name,
+              logo_url: org.logo_url,
+              role: "admin",
+            }));
+
+            setOrganizations(orgs);
+            // Set the impersonated org as selected
+            const selectedOrg = orgs.find((o) => o.id === impersonatedOrgId) || orgs[0];
+            setOrganization(selectedOrg);
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          // Non-admin impersonating (fallback): load only the impersonated org
+          const { data: org, error: orgError } = await (supabase as any)
+            .from("client_organizations")
+            .select("id, name, logo_url")
+            .eq("id", impersonatedOrgId)
+            .maybeSingle();
+
+          if (orgError) throw orgError;
+          if (org) {
+            setOrganization(org);
+            setOrganizations([org]);
+          }
+          setIsLoading(false);
+          return;
         }
-        setIsLoading(false);
-        return;
       }
 
       // Check if user is admin
