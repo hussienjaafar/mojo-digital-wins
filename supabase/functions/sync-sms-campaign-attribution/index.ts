@@ -14,6 +14,94 @@ interface SyncResult {
   errors: string[];
 }
 
+interface Campaign {
+  id: string;
+  campaign_id: string;
+  organization_id: string;
+  extracted_refcode: string | null;
+  actblue_refcode: string | null;
+  campaign_name: string | null;
+  send_date: string;
+}
+
+interface Transaction {
+  id: string;
+  refcode: string | null;
+  amount: number;
+  contribution_form: string | null;
+  transaction_date: string;
+  donor_email: string | null;
+}
+
+interface MatchResult {
+  campaign_id: string;
+  transaction_id: string;
+  amount: number;
+  score: number;
+}
+
+/**
+ * Calculate match score between a campaign and transaction
+ * Uses tiered matching logic based on refcode patterns
+ */
+function calculateMatchScore(campaign: Campaign, transaction: Transaction): number {
+  const txRefcode = transaction.refcode?.toLowerCase() || "";
+  const extractedRefcode = campaign.extracted_refcode?.toLowerCase() || "";
+  const actblueRefcode = campaign.actblue_refcode?.toLowerCase() || "";
+  const formName = transaction.contribution_form?.toLowerCase() || "";
+  
+  const campaignDate = new Date(campaign.send_date);
+  const txDate = new Date(transaction.transaction_date);
+  const daysDiff = Math.abs((txDate.getTime() - campaignDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  // Tier 1: Explicit actblue_refcode match (highest priority)
+  if (actblueRefcode && txRefcode === actblueRefcode) {
+    return 200;
+  }
+  
+  // Tier 2: Direct extracted_refcode match
+  if (extractedRefcode && txRefcode) {
+    if (txRefcode === extractedRefcode) return 180;
+    if (txRefcode.startsWith(extractedRefcode) || extractedRefcode.startsWith(txRefcode)) return 175;
+  }
+  
+  // Tier 3: Date-coded refcode with token match
+  // E.g., '20250115AAMA' matches campaign with send_date 2025-01-15 and extracted_refcode containing 'aama'
+  const dateCodedMatch = txRefcode.match(/^(20\d{6})([a-z]+)$/i);
+  if (dateCodedMatch && extractedRefcode) {
+    const [, dateStr, token] = dateCodedMatch;
+    try {
+      const refcodeDate = new Date(
+        parseInt(dateStr.substring(0, 4)),
+        parseInt(dateStr.substring(4, 6)) - 1,
+        parseInt(dateStr.substring(6, 8))
+      );
+      const refcodeDaysDiff = Math.abs((refcodeDate.getTime() - campaignDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (refcodeDaysDiff <= 1) {
+        // Check if token matches extracted refcode
+        const tokenLower = token.toLowerCase();
+        const extractedClean = extractedRefcode.replace(/[0-9]/g, '');
+        
+        if (extractedRefcode.includes(tokenLower) || tokenLower.includes(extractedClean)) {
+          return 150;
+        }
+        // Date matches but token doesn't - still a potential match
+        return 100;
+      }
+    } catch {
+      // Invalid date parsing, skip this tier
+    }
+  }
+  
+  // Tier 4: Form-based attribution within 3 days of campaign
+  if ((formName.includes('sms') || formName.includes('text')) && daysDiff <= 3) {
+    return 50;
+  }
+  
+  return 0;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -58,7 +146,7 @@ serve(async (req) => {
     // Get all SMS campaigns with extracted refcodes
     let campaignsQuery = supabase
       .from("sms_campaigns")
-      .select("id, campaign_id, organization_id, extracted_refcode, campaign_name, send_date")
+      .select("id, campaign_id, organization_id, extracted_refcode, actblue_refcode, campaign_name, send_date")
       .not("extracted_refcode", "is", null);
 
     if (organizationId) {
@@ -85,12 +173,12 @@ serve(async (req) => {
     }
 
     // Group campaigns by organization for efficient processing
-    const campaignsByOrg: Record<string, typeof smsCampaigns> = {};
+    const campaignsByOrg: Record<string, Campaign[]> = {};
     for (const campaign of smsCampaigns) {
       if (!campaignsByOrg[campaign.organization_id]) {
         campaignsByOrg[campaign.organization_id] = [];
       }
-      campaignsByOrg[campaign.organization_id].push(campaign);
+      campaignsByOrg[campaign.organization_id].push(campaign as Campaign);
     }
 
     // Process each organization
@@ -101,7 +189,7 @@ serve(async (req) => {
         // Get all transactions for this organization
         const { data: transactions, error: txError } = await supabase
           .from("actblue_transactions")
-          .select("id, refcode, amount, contribution_form, transaction_date")
+          .select("id, refcode, amount, contribution_form, transaction_date, donor_email")
           .eq("organization_id", orgId);
 
         if (txError) {
@@ -113,66 +201,65 @@ serve(async (req) => {
           continue;
         }
 
-        // For each campaign, find matching transactions
+        // Build match results for all campaign-transaction pairs
+        const allMatches: MatchResult[] = [];
+        
         for (const campaign of campaigns) {
+          for (const tx of transactions) {
+            const score = calculateMatchScore(campaign, tx as Transaction);
+            if (score > 0) {
+              allMatches.push({
+                campaign_id: campaign.id,
+                transaction_id: tx.id,
+                amount: tx.amount || 0,
+                score,
+              });
+            }
+          }
+        }
+
+        // For each transaction, keep only the best match
+        const txBestMatch: Record<string, MatchResult> = {};
+        for (const match of allMatches) {
+          const existing = txBestMatch[match.transaction_id];
+          if (!existing || match.score > existing.score) {
+            txBestMatch[match.transaction_id] = match;
+          }
+        }
+
+        // Aggregate by campaign
+        const campaignStats: Record<string, { conversions: number; amount_raised: number }> = {};
+        for (const match of Object.values(txBestMatch)) {
+          if (!campaignStats[match.campaign_id]) {
+            campaignStats[match.campaign_id] = { conversions: 0, amount_raised: 0 };
+          }
+          campaignStats[match.campaign_id].conversions++;
+          campaignStats[match.campaign_id].amount_raised += match.amount;
+        }
+
+        // Update each campaign with attribution data
+        for (const [campaignId, stats] of Object.entries(campaignStats)) {
           try {
-            const refcode = campaign.extracted_refcode?.toLowerCase();
-            if (!refcode) continue;
+            const { error: updateError } = await supabase
+              .from("sms_campaigns")
+              .update({
+                conversions: stats.conversions,
+                amount_raised: stats.amount_raised,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", campaignId);
 
-            // Match transactions by:
-            // 1. Direct refcode match (case-insensitive)
-            // 2. Contribution form containing 'sms' + matching patterns
-            // 3. Date proximity for campaigns with similar naming
-            const matchingTx = transactions.filter(tx => {
-              const txRefcode = tx.refcode?.toLowerCase() || "";
-              const formName = tx.contribution_form?.toLowerCase() || "";
-              
-              // Direct match
-              if (txRefcode.includes(refcode) || refcode.includes(txRefcode)) {
-                return true;
-              }
-              
-              // Form-based SMS attribution (e.g., "moliticosms")
-              if (formName.includes("sms") || formName.includes("text")) {
-                // Check if the refcode contains campaign identifiers
-                const campaignName = campaign.campaign_name?.toLowerCase() || "";
-                if (campaignName && txRefcode && (
-                  campaignName.includes(txRefcode) || 
-                  txRefcode.includes(campaignName.substring(0, 4))
-                )) {
-                  return true;
-                }
-              }
-              
-              return false;
-            });
-
-            const conversions = matchingTx.length;
-            const amountRaised = matchingTx.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-
-            if (conversions > 0) {
-              // Update the campaign with attribution data
-              const { error: updateError } = await supabase
-                .from("sms_campaigns")
-                .update({
-                  conversions,
-                  amount_raised: amountRaised,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("id", campaign.id);
-
-              if (updateError) {
-                result.errors.push(`Campaign ${campaign.campaign_id}: Update failed - ${updateError.message}`);
-              } else {
-                result.campaigns_updated++;
-                result.total_conversions += conversions;
-                result.total_amount_raised += amountRaised;
-                console.log(`Updated campaign ${campaign.campaign_id}: ${conversions} conversions, $${amountRaised.toFixed(2)}`);
-              }
+            if (updateError) {
+              result.errors.push(`Campaign ${campaignId}: Update failed - ${updateError.message}`);
+            } else {
+              result.campaigns_updated++;
+              result.total_conversions += stats.conversions;
+              result.total_amount_raised += stats.amount_raised;
+              console.log(`Updated campaign ${campaignId}: ${stats.conversions} conversions, $${stats.amount_raised.toFixed(2)}`);
             }
           } catch (campaignError) {
             const errMsg = campaignError instanceof Error ? campaignError.message : String(campaignError);
-            result.errors.push(`Campaign ${campaign.campaign_id}: ${errMsg}`);
+            result.errors.push(`Campaign ${campaignId}: ${errMsg}`);
           }
         }
       } catch (orgError) {

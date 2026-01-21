@@ -8773,6 +8773,7 @@ export type Database = {
       }
       sms_campaigns: {
         Row: {
+          actblue_refcode: string | null
           amount_raised: number | null
           campaign_id: string
           campaign_name: string | null
@@ -8798,6 +8799,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          actblue_refcode?: string | null
           amount_raised?: number | null
           campaign_id: string
           campaign_name?: string | null
@@ -8823,6 +8825,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          actblue_refcode?: string | null
           amount_raised?: number | null
           campaign_id?: string
           campaign_name?: string | null
@@ -13602,9 +13605,9 @@ export type Database = {
       }
       get_sms_metrics: {
         Args: {
-          p_end_date?: string
+          p_end_date: string
           p_organization_id: string
-          p_start_date?: string
+          p_start_date: string
         }
         Returns: Json
       }
