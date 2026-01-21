@@ -16,7 +16,8 @@ import {
 import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, parseISO } from "date-fns";
-import { EChartsBarChart, EChartsCombinationChart } from "@/components/charts/echarts";
+import { EChartsBarChart } from "@/components/charts/echarts";
+import { SmallMultiplesChart } from "@/components/charts";
 import { useSMSMetricsUnified } from "@/hooks/useActBlueMetrics";
 import { formatRatio, formatCurrency, formatNumber } from "@/lib/chart-formatters";
 
@@ -226,51 +227,42 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
       </motion.div>
 
-      {/* Combined Performance & Revenue Chart */}
+      {/* Small Multiples Performance Chart - Each metric auto-scales */}
       {trendChartData.length > 0 && (
         <V3ChartWrapper
           title="SMS Performance & Revenue"
           icon={TrendingUp}
           ariaLabel="SMS campaign performance showing messages sent, conversions, and dollars raised"
-          description="Combined view of messaging activity and fundraising results"
+          description="Each metric auto-scales to show trends clearly"
           accent="purple"
         >
-          <EChartsCombinationChart
+          <SmallMultiplesChart
             data={trendChartData}
             xAxisKey="name"
-            series={[
+            panels={[
               { 
+                label: "Messages Sent", 
                 dataKey: "Sent", 
-                name: "Messages Sent", 
-                type: "bar",
                 color: "#A855F7",
-                yAxisIndex: 0,
                 valueType: "number",
-                barOpacity: 0.6,
+                icon: MessageSquare,
               },
               { 
+                label: "Conversions", 
                 dataKey: "Conversions", 
-                name: "Conversions", 
-                type: "line",
                 color: "#22C55E",
-                yAxisIndex: 0,
                 valueType: "number",
+                icon: Target,
               },
               { 
+                label: "Dollars Raised", 
                 dataKey: "Raised", 
-                name: "Dollars Raised", 
-                type: "line",
                 color: "#F59E0B",
-                yAxisIndex: 1,
                 valueType: "currency",
+                icon: DollarSign,
               },
             ]}
-            dualYAxis
-            yAxisNameLeft="Activity"
-            yAxisNameRight="Revenue"
-            yAxisValueTypeLeft="number"
-            yAxisValueTypeRight="currency"
-            height={340}
+            panelHeight={80}
           />
         </V3ChartWrapper>
       )}
