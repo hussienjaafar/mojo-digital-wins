@@ -401,22 +401,22 @@ const ClientUserManager = () => {
 
   // Mobile card renderer for users
   const renderMobileUserCard = (user: ClientUser) => (
-    <Card key={user.id} className="overflow-hidden">
-      <CardContent className="p-4 space-y-3">
+    <V3Card key={user.id} className="overflow-hidden">
+      <V3CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-medium">{user.full_name}</p>
-            <p className="text-xs text-muted-foreground">{getOrganizationName(user.organization_id)}</p>
+            <p className="font-medium text-[hsl(var(--portal-text-primary))]">{user.full_name}</p>
+            <p className="text-xs text-[hsl(var(--portal-text-secondary))]">{getOrganizationName(user.organization_id)}</p>
           </div>
-          <Badge variant="outline">{user.role}</Badge>
+          <V3Badge variant={getRoleBadgeVariant(user.role)} className="capitalize">{user.role}</V3Badge>
         </div>
         
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center justify-between text-xs text-[hsl(var(--portal-text-secondary))]">
           <span>Last login: {user.last_login_at ? new Date(user.last_login_at).toLocaleDateString() : 'Never'}</span>
           <span>Created: {new Date(user.created_at).toLocaleDateString()}</span>
         </div>
         
-        <div className="flex items-center justify-between pt-2 border-t">
+        <div className="flex items-center justify-between pt-2 border-t border-[hsl(var(--portal-border))]">
           <V3Button
             variant="ghost"
             size="sm"
@@ -431,7 +431,7 @@ const ClientUserManager = () => {
                 <MoreVertical className="h-4 w-4" />
               </V3Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
               <DropdownMenuItem onClick={() => handleEditClick(user)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit User
@@ -443,7 +443,7 @@ const ClientUserManager = () => {
               <DropdownMenuSeparator />
               <DropdownMenuItem 
                 onClick={() => handleDeleteClick(user)}
-                className="text-destructive focus:text-destructive"
+                className="text-[hsl(var(--portal-error))] focus:text-[hsl(var(--portal-error))]"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete User
@@ -451,8 +451,8 @@ const ClientUserManager = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </CardContent>
-    </Card>
+      </V3CardContent>
+    </V3Card>
   );
 
   // Selection handlers
@@ -492,17 +492,17 @@ const ClientUserManager = () => {
     : organizations.find(o => o.id === selectedOrgFilter)?.name || "Select organization";
 
   return (
-    <Card>
-      <CardHeader>
+    <V3Card accent="blue">
+      <V3CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Organization Members
-            </CardTitle>
-            <CardDescription>
-              Manage user access within client organizations
-            </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-[hsl(var(--portal-accent-blue)/0.1)]">
+              <Users className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
+            </div>
+            <div>
+              <V3CardTitle>Organization Members</V3CardTitle>
+              <V3CardDescription>Manage user access within client organizations</V3CardDescription>
+            </div>
           </div>
           <div className="flex gap-2">
             {/* Searchable org dropdown for inviting */}
@@ -512,7 +512,7 @@ const ClientUserManager = () => {
                   Invite User
                 </V3Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[250px] p-0" align="end">
+              <PopoverContent className="w-[250px] p-0 bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]" align="end">
                 <Command>
                   <CommandInput placeholder="Search organizations..." />
                   <CommandList>
@@ -535,27 +535,27 @@ const ClientUserManager = () => {
             </Popover>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
+      </V3CardHeader>
+      <V3CardContent>
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="flex-wrap h-auto gap-1">
-            <TabsTrigger value="users">
+          <TabsList className="flex-wrap h-auto gap-1 bg-[hsl(var(--portal-bg-tertiary))] p-1 rounded-lg border border-[hsl(var(--portal-border))]">
+            <TabsTrigger value="users" className="data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:shadow-sm rounded-md">
               Active Members
-              <Badge variant="secondary" className="ml-2">{totalCount}</Badge>
+              <V3Badge variant="muted" className="ml-2">{totalCount}</V3Badge>
             </TabsTrigger>
-            <TabsTrigger value="pending">
+            <TabsTrigger value="pending" className="data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:shadow-sm rounded-md">
               Pending Invites
               {pendingInviteCount > 0 && (
-                <Badge variant="default" className="ml-2">{pendingInviteCount}</Badge>
+                <V3Badge variant="info" className="ml-2">{pendingInviteCount}</V3Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="requests">
+            <TabsTrigger value="requests" className="data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:shadow-sm rounded-md">
               Member Requests
               {pendingRequestCount > 0 && (
-                <Badge variant="destructive" className="ml-2">{pendingRequestCount}</Badge>
+                <V3Badge variant="error" className="ml-2">{pendingRequestCount}</V3Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="seats">
+            <TabsTrigger value="seats" className="data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:shadow-sm rounded-md">
               <Settings className="w-4 h-4 mr-1" />
               Seats
             </TabsTrigger>
@@ -654,10 +654,11 @@ const ClientUserManager = () => {
             {/* Role pills */}
             <div className="flex flex-wrap gap-2">
               {ORG_ROLES.map(role => (
-                <Badge
+                <V3FilterPill
                   key={role}
-                  variant={selectedRoles.includes(role) ? "default" : "outline"}
-                  className="cursor-pointer capitalize"
+                  label={role}
+                  isActive={selectedRoles.includes(role)}
+                  className="capitalize"
                   onClick={() => {
                     setSelectedRoles(prev => 
                       prev.includes(role) 
@@ -666,9 +667,7 @@ const ClientUserManager = () => {
                     );
                     setCurrentPage(1);
                   }}
-                >
-                  {role}
-                </Badge>
+                />
               ))}
             </div>
 
@@ -821,7 +820,7 @@ const ClientUserManager = () => {
             <SeatManagement />
           </TabsContent>
         </Tabs>
-      </CardContent>
+      </V3CardContent>
 
       {/* Create User Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -1024,7 +1023,7 @@ const ClientUserManager = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </V3Card>
   );
 };
 
