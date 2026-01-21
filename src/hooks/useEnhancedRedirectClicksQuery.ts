@@ -175,16 +175,20 @@ async function fetchEnhancedRedirectClicks(
     };
   }
 
-  // Build donation lookup by email+refcode
-  const donationLookup = new Map<string, { count: number; revenue: number }>();
+  // Build donation lookup by refcode only (for aggregate metrics)
+  // This captures ALL donations for a refcode, not just those from tracked visitors
+  const donationsByRefcode = new Map<string, { count: number; revenue: number }>();
   donations.forEach((d) => {
-    const key = `${(d.donor_email || "").toLowerCase()}-${d.refcode || ""}`;
-    const existing = donationLookup.get(key) || { count: 0, revenue: 0 };
-    donationLookup.set(key, {
+    const refcode = d.refcode || "";
+    const existing = donationsByRefcode.get(refcode) || { count: 0, revenue: 0 };
+    donationsByRefcode.set(refcode, {
       count: existing.count + 1,
       revenue: existing.revenue + (d.amount || 0),
     });
   });
+
+  // Track which refcodes we've already attributed (to avoid double-counting)
+  const attributedRefcodes = new Set<string>();
 
   // Process touchpoints
   const sessionIds = new Set<string>();
@@ -195,6 +199,7 @@ async function fetchEnhancedRedirectClicks(
   const trafficSource: TrafficSourceBreakdown = { mobile: 0, desktop: 0, other: 0 };
   const refcodeSessionMap = new Map<string, Set<string>>();
   const campaignSessionMap = new Map<string, Set<string>>();
+  const refcodeToCampaign = new Map<string, string>(); // Track which campaign each refcode belongs to
 
   let totalCaptureScore = 0;
   let captureScoreCount = 0;
@@ -234,11 +239,6 @@ async function fetchEnhancedRedirectClicks(
     // Traffic source
     trafficSource[source]++;
 
-    // Check for conversion
-    const donorEmail = tp.donor_email?.toLowerCase() || "";
-    const lookupKey = `${donorEmail}-${tp.refcode || ""}`;
-    const donationMatch = donorEmail ? donationLookup.get(lookupKey) : null;
-
     // Aggregate by refcode
     if (!refcodeMap.has(refcode)) {
       refcodeMap.set(refcode, {
@@ -262,9 +262,20 @@ async function fetchEnhancedRedirectClicks(
     if (hasFbp) refEntry.withFbp++;
     if (hasFbc) refEntry.withFbc++;
     if (sessionId) refcodeSessionMap.get(refcode)!.add(sessionId);
-    if (donationMatch) {
-      refEntry.conversions += donationMatch.count;
-      refEntry.revenue += donationMatch.revenue;
+
+    // Attribute conversions by refcode (only once per refcode to avoid double-counting)
+    if (!attributedRefcodes.has(refcode) && refcode !== "(no refcode)") {
+      const refcodeDonations = donationsByRefcode.get(refcode);
+      if (refcodeDonations) {
+        refEntry.conversions = refcodeDonations.count;
+        refEntry.revenue = refcodeDonations.revenue;
+        attributedRefcodes.add(refcode);
+      }
+    }
+
+    // Track refcode-to-campaign mapping
+    if (refcode !== "(no refcode)" && campaign !== "(no campaign)") {
+      refcodeToCampaign.set(refcode, campaign);
     }
 
     // Aggregate by campaign
@@ -284,10 +295,6 @@ async function fetchEnhancedRedirectClicks(
     campEntry.totalClicks++;
     if (hasFbclid) campEntry.metaAdClicks++;
     if (sessionId) campaignSessionMap.get(campaign)!.add(sessionId);
-    if (donationMatch) {
-      campEntry.conversions += donationMatch.count;
-      campEntry.revenue += donationMatch.revenue;
-    }
 
     // Daily trend
     if (!dailyMap.has(date)) {
@@ -326,7 +333,7 @@ async function fetchEnhancedRedirectClicks(
         : 0;
   });
 
-  // Calculate rates for campaigns
+  // Calculate rates for campaigns and aggregate conversions from refcodes
   campaignMap.forEach((entry, campaign) => {
     const sessions = campaignSessionMap.get(campaign);
     entry.uniqueSessions = sessions ? sessions.size : entry.totalClicks;
@@ -334,6 +341,16 @@ async function fetchEnhancedRedirectClicks(
       entry.totalClicks > 0
         ? Math.round(((totalWithCookies / touchpoints.length) * 100))
         : 0;
+  });
+
+  // Aggregate campaign-level conversions from refcodes belonging to each campaign
+  refcodeToCampaign.forEach((campaign, refcode) => {
+    const refcodeDonations = donationsByRefcode.get(refcode);
+    if (refcodeDonations && campaignMap.has(campaign)) {
+      const campEntry = campaignMap.get(campaign)!;
+      campEntry.conversions += refcodeDonations.count;
+      campEntry.revenue += refcodeDonations.revenue;
+    }
   });
 
   // Calculate daily sessions
