@@ -1,6 +1,6 @@
-import { Users, Repeat, UserPlus, Smartphone, Monitor } from "lucide-react";
+import { Users, Repeat, UserPlus, Smartphone, Monitor, DollarSign, TrendingUp } from "lucide-react";
 import { V3KPICard } from "@/components/v3";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
+import { formatCurrency, formatNumber } from "@/lib/chart-formatters";
 
 export interface DonorBehaviorTotals {
   unique_donor_count: number;
@@ -54,12 +54,13 @@ export function DonorBehaviorKPIs({
         <V3KPICard
           label="Total Revenue"
           value={formatCurrency(totals.total_revenue)}
-          icon={Repeat}
+          icon={DollarSign}
           accent="green"
         />
         <V3KPICard
           label="Avg. Donation"
           value={formatCurrency(avgDonation)}
+          icon={TrendingUp}
           accent="purple"
         />
       </div>
@@ -70,30 +71,27 @@ export function DonorBehaviorKPIs({
         <V3KPICard
           label="Recurring Donors"
           value={`${totals.recurring_percentage.toFixed(1)}%`}
-          sublabel={`${formatNumber(totals.recurring_donors)} of ${formatNumber(totals.unique_donor_count)}`}
+          subtitle={`${formatNumber(totals.recurring_donors)} of ${formatNumber(totals.unique_donor_count)}`}
           icon={Repeat}
           accent="blue"
-          tooltip="Percentage of donors who have made recurring (monthly) donations"
         />
         
         {/* Repeat Donor Rate */}
         <V3KPICard
           label="Repeat Donor Rate"
           value={`${repeatStats.repeat_rate.toFixed(1)}%`}
-          sublabel={`${formatNumber(repeatStats.repeat_donors)} repeat donors`}
+          subtitle={`${formatNumber(repeatStats.repeat_donors)} repeat donors`}
           icon={UserPlus}
           accent="green"
-          tooltip="Percentage of donors who have given 2+ times"
         />
         
         {/* New Donor Revenue */}
         <V3KPICard
           label="New Donor Revenue"
           value={formatCurrency(repeatStats.new_donor_revenue)}
-          sublabel={`${formatNumber(repeatStats.new_donors)} new donors`}
-          icon={UserPlus}
+          subtitle={`${formatNumber(repeatStats.new_donors)} new donors`}
+          icon={Users}
           accent="purple"
-          tooltip="Revenue from first-time donors in this period"
         />
       </div>
 

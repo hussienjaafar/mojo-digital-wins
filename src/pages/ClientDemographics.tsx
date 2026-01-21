@@ -3,11 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
-import { Download, MapPin, Briefcase, Users, DollarSign, TrendingUp, Share2, ArrowLeft } from "lucide-react";
+import { Download, MapPin, Briefcase, Users, Clock, Share2, ArrowLeft, Tag } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import {
   V3PageContainer,
-  V3KPICard,
   V3ChartWrapper,
   V3LoadingState,
   V3EmptyState,
@@ -22,6 +21,16 @@ import { V3BarChart, USChoroplethMap, type ChoroplethDataItem, type MapMetricMod
 import { getStateName } from "@/lib/us-states";
 import { formatCurrency, formatNumber } from "@/lib/chart-formatters";
 import { escapeCSVValue, downloadCSV } from "@/lib/csv-utils";
+import {
+  DonorBehaviorKPIs,
+  GivingTimeHeatmap,
+  OccupationBreakdown,
+  TopRefcodesBreakdown,
+  type DonorBehaviorTotals,
+  type RepeatStats,
+  type OccupationStat,
+  type RefcodeStat,
+} from "@/components/demographics";
 
 type Organization = {
   id: string;
@@ -29,25 +38,21 @@ type Organization = {
   logo_url: string | null;
 };
 
-// Types for RPC response
+// Types for V2 RPC response
 type StateStats = {
   state_abbr: string;
   unique_donors: number;
   transaction_count: number;
   revenue: number;
-};
-
-type OccupationStats = {
-  occupation: string;
-  unique_donors: number;
-  count: number;
-  revenue: number;
+  avg_gift: number;
 };
 
 type ChannelStats = {
   channel: string;
   count: number;
   revenue: number;
+  unique_donors: number;
+  avg_gift: number;
 };
 
 type CityStats = {
@@ -57,17 +62,22 @@ type CityStats = {
   revenue: number;
 };
 
-type DemographicsTotals = {
-  unique_donor_count: number;
-  transaction_count: number;
-  total_revenue: number;
+type TimeHeatmapData = {
+  day_of_week: number;
+  hour: number;
+  donation_count: number;
+  revenue: number;
+  avg_donation: number;
 };
 
-type DemographicsSummary = {
-  totals: DemographicsTotals;
+type DemographicsSummaryV2 = {
+  totals: DonorBehaviorTotals;
+  repeat_stats: RepeatStats;
   state_stats: StateStats[];
-  occupation_stats: OccupationStats[];
+  occupation_stats: OccupationStat[];
   channel_stats: ChannelStats[];
+  time_heatmap: TimeHeatmapData[];
+  top_refcodes: RefcodeStat[];
 };
 
 const ClientDemographics = () => {
@@ -75,11 +85,11 @@ const ClientDemographics = () => {
   const { toast } = useToast();
   const { organizationId, isLoading: orgLoading } = useClientOrganization();
   const [organization, setOrganization] = useState<Organization | null>(null);
-  const [summary, setSummary] = useState<DemographicsSummary | null>(null);
+  const [summary, setSummary] = useState<DemographicsSummaryV2 | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedState, setSelectedState] = useState<string | null>(null);
-  const [mapMetricMode, setMapMetricMode] = useState<MapMetricMode>("donations");
+  const [mapMetricMode, setMapMetricMode] = useState<MapMetricMode>("revenue");
   
   // City data caching for drilldown
   const [cityCache, setCityCache] = useState<Map<string, CityStats[]>>(new Map());
@@ -111,15 +121,15 @@ const ClientDemographics = () => {
 
       setOrganization(org);
 
-      // Use server-side aggregation RPC
+      // Use the new V2 RPC with normalized occupations
       const { data: summaryData, error } = await supabase.rpc(
-        'get_donor_demographics_summary',
+        'get_donor_demographics_v2',
         { _organization_id: orgId }
       );
 
       if (error) throw error;
 
-      setSummary(summaryData as DemographicsSummary);
+      setSummary(summaryData as unknown as DemographicsSummaryV2);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -166,12 +176,13 @@ const ClientDemographics = () => {
     setIsExporting(true);
     try {
       // Export aggregated summary (safe, no PII)
-      const headers = ['State', 'Unique Donors', 'Donations', 'Revenue'];
+      const headers = ['State', 'Unique Donors', 'Donations', 'Revenue', 'Avg Gift'];
       const rows = summary.state_stats.map(s => [
         escapeCSVValue(s.state_abbr),
         escapeCSVValue(s.unique_donors),
         escapeCSVValue(s.transaction_count),
         escapeCSVValue(s.revenue),
+        escapeCSVValue(s.avg_gift),
       ]);
 
       const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -191,20 +202,6 @@ const ClientDemographics = () => {
       setIsExporting(false);
     }
   };
-
-  // Calculate derived values
-  const totals = useMemo(() => {
-    if (!summary?.totals) return null;
-    const { unique_donor_count, transaction_count, total_revenue } = summary.totals;
-    // Average donation per transaction (correct formula with guard)
-    const avgDonation = transaction_count > 0 ? total_revenue / transaction_count : 0;
-    return {
-      uniqueDonors: unique_donor_count,
-      transactionCount: transaction_count,
-      totalRevenue: total_revenue,
-      avgDonation,
-    };
-  }, [summary]);
 
   // Prepare map data with all metrics
   const mapData: ChoroplethDataItem[] = useMemo(() => {
@@ -266,59 +263,17 @@ const ClientDemographics = () => {
       sortFn: (a, b) => a.revenue - b.revenue,
     },
     {
-      key: "unique_donors",
-      header: "Donors",
+      key: "avg_gift",
+      header: "Avg Gift",
       render: (row) => (
         <span className="text-[hsl(var(--portal-text-secondary))] tabular-nums">
-          {formatNumber(row.unique_donors)}
+          {formatCurrency(row.avg_gift)}
         </span>
       ),
       align: "right",
       sortable: true,
-      sortFn: (a, b) => a.unique_donors - b.unique_donors,
+      sortFn: (a, b) => a.avg_gift - b.avg_gift,
       hideOnMobile: true,
-    },
-  ];
-
-  // Calculate max values for occupation inline bars
-  const maxOccupationRevenue = useMemo(() => 
-    Math.max(...(summary?.occupation_stats || []).map(s => s.revenue), 1),
-    [summary]
-  );
-  const totalOccupationRevenue = useMemo(() => 
-    (summary?.occupation_stats || []).reduce((sum, s) => sum + s.revenue, 0),
-    [summary]
-  );
-
-  const occupationColumns: V3Column<OccupationStats>[] = [
-    {
-      key: "occupation",
-      header: "Occupation",
-      primary: true,
-      render: (row, index) => (
-        <V3PrimaryCell
-          label={row.occupation}
-          isTopRank={index < 3}
-        />
-      ),
-      sortable: true,
-      sortFn: (a, b) => a.occupation.localeCompare(b.occupation),
-    },
-    {
-      key: "revenue",
-      header: "Revenue",
-      render: (row) => (
-        <V3InlineBarCell
-          value={row.revenue}
-          maxValue={maxOccupationRevenue}
-          valueType="currency"
-          variant="success"
-          percentOfTotal={(row.revenue / totalOccupationRevenue) * 100}
-        />
-      ),
-      align: "right",
-      sortable: true,
-      sortFn: (a, b) => a.revenue - b.revenue,
     },
     {
       key: "unique_donors",
@@ -396,7 +351,7 @@ const ClientDemographics = () => {
     return (
       <ClientShell showDateControls={false}>
         <div className="p-6">
-          <V3LoadingState variant="kpi-grid" count={3} />
+          <V3LoadingState variant="kpi-grid" count={6} />
           <div className="mt-6">
             <V3LoadingState variant="chart" />
           </div>
@@ -406,7 +361,7 @@ const ClientDemographics = () => {
   }
 
   // Empty state
-  if (!organization || !summary || !totals) {
+  if (!organization || !summary) {
     return (
       <ClientShell showDateControls={false}>
         <V3EmptyState
@@ -423,12 +378,7 @@ const ClientDemographics = () => {
     setSelectedState(stateAbbr);
   };
 
-  // Prepare pie chart data
-  const occupationPieData = summary.occupation_stats.slice(0, 6).map(item => ({
-    name: item.occupation.length > 20 ? item.occupation.slice(0, 20) + '...' : item.occupation,
-    value: item.count,
-  }));
-
+  // Prepare channel chart data
   const channelPieData = summary.channel_stats.map(item => ({
     name: item.channel,
     value: item.revenue,
@@ -438,7 +388,7 @@ const ClientDemographics = () => {
     <ClientShell showDateControls={false}>
       <V3PageContainer
         title="Donor Demographics"
-        description="Analyze your donor base by location, occupation, and acquisition channel"
+        description="Analyze your donor base by behavior, location, occupation, and acquisition channel"
         actions={
           <V3Button
             variant="secondary"
@@ -451,150 +401,121 @@ const ClientDemographics = () => {
           </V3Button>
         }
       >
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <V3KPICard
-            label="Unique Donors"
-            value={formatNumber(totals.uniqueDonors)}
-            icon={Users}
-            accent="blue"
-          />
-          <V3KPICard
-            label="Total Revenue"
-            value={formatCurrency(totals.totalRevenue)}
-            icon={DollarSign}
-            accent="green"
-          />
-          <V3KPICard
-            label="Avg. Donation"
-            value={formatCurrency(totals.avgDonation)}
-            icon={TrendingUp}
-            accent="purple"
-          />
-        </div>
-
-        {/* Donor Locations - US Heat Map */}
-        <V3ChartWrapper
-          title="Donor Locations"
-          icon={MapPin}
-          ariaLabel="Heat map of the United States showing donor distribution by state"
-          description="Click on a state to see city-level breakdown"
+        {/* Enhanced KPI Cards with Behavior Metrics */}
+        <DonorBehaviorKPIs
+          totals={summary.totals}
+          repeatStats={summary.repeat_stats}
           className="mb-6"
-        >
-          <div className="space-y-4">
-            {selectedState && (
-              <div className="flex items-center gap-3 pb-4 border-b border-[hsl(var(--portal-border))]">
-                <V3Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedState(null)}
-                  className="gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to US Map
-                </V3Button>
-                <span className="text-[hsl(var(--portal-text-secondary))]">
-                  Viewing: <span className="font-semibold text-[hsl(var(--portal-text-primary))]">{getStateName(selectedState)}</span>
-                </span>
-              </div>
-            )}
-            
-            {!selectedState ? (
-              <USChoroplethMap
-                data={mapData}
-                height={420}
-                metricMode={mapMetricMode}
-                onMetricModeChange={setMapMetricMode}
-                showMetricToggle
-                onStateClick={handleStateClick}
-                selectedState={selectedState}
-              />
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* City Bar Chart */}
-                <div>
-                  <h4 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-3">
-                    Top Cities in {getStateName(selectedState)}
-                  </h4>
-                  {isCityLoading ? (
-                    <V3LoadingState variant="chart" className="h-[300px]" />
-                  ) : selectedStateCities.length > 0 ? (
-                    <V3BarChart
-                      data={[...selectedStateCities]
-                        .sort((a, b) => b.unique_donors - a.unique_donors)
-                        .slice(0, 10)
-                        .map(c => ({
-                          name: c.city,
-                          value: c.unique_donors,
-                        }))}
-                      nameKey="name"
-                      valueKey="value"
-                      valueName="Donors"
-                      height={300}
-                      valueType="number"
-                      horizontal
-                      topN={10}
-                      showRankBadges={false}
-                    />
-                  ) : (
-                    <V3EmptyState
-                      title="No City Data"
-                      description={`No city-level data available for ${getStateName(selectedState)}`}
-                      className="h-[300px]"
-                    />
-                  )}
-                </div>
-                
-                {/* City Table */}
-                <div>
-                  <h4 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-3">
-                    City Details
-                  </h4>
-                  {isCityLoading ? (
-                    <V3LoadingState variant="table" className="h-[300px]" />
-                  ) : selectedStateCities.length > 0 ? (
-                    <V3DataTable
-                      data={selectedStateCities}
-                      columns={cityColumns}
-                      getRowKey={(row) => row.city}
-                      compact
-                      maxHeight="300px"
-                      showRowNumbers
-                      highlightTopN={3}
-                      defaultSortKey="revenue"
-                      defaultSortDirection="desc"
-                    />
-                  ) : (
-                    <V3EmptyState
-                      title="No Data"
-                      description="No city data available"
-                      className="h-[300px]"
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </V3ChartWrapper>
+        />
 
-        {/* Pie Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Occupation Breakdown - Pie Chart */}
+        {/* Two-Column Layout: Map + Time Heatmap */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+          {/* Donor Locations - US Heat Map */}
           <V3ChartWrapper
-            title="Top Occupations"
-            icon={Briefcase}
-            ariaLabel="Pie chart showing donor distribution by occupation"
+            title="Donor Locations"
+            icon={MapPin}
+            ariaLabel="Heat map of the United States showing donor distribution by state"
+            description="Click on a state to see city-level breakdown"
           >
-            <V3DonutChart
-              data={occupationPieData}
-              height={300}
-              valueType="number"
-              centerLabel="Total Donors"
-              topN={8}
-              legendPosition="bottom"
-            />
+            <div className="space-y-4">
+              {selectedState && (
+                <div className="flex items-center gap-3 pb-4 border-b border-[hsl(var(--portal-border))]">
+                  <V3Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedState(null)}
+                    className="gap-2"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to US Map
+                  </V3Button>
+                  <span className="text-[hsl(var(--portal-text-secondary))]">
+                    Viewing: <span className="font-semibold text-[hsl(var(--portal-text-primary))]">{getStateName(selectedState)}</span>
+                  </span>
+                </div>
+              )}
+              
+              {!selectedState ? (
+                <USChoroplethMap
+                  data={mapData}
+                  height={380}
+                  metricMode={mapMetricMode}
+                  onMetricModeChange={setMapMetricMode}
+                  showMetricToggle
+                  onStateClick={handleStateClick}
+                  selectedState={selectedState}
+                />
+              ) : (
+                <div className="space-y-4">
+                  {/* City Bar Chart */}
+                  <div>
+                    <h4 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-3">
+                      Top Cities in {getStateName(selectedState)}
+                    </h4>
+                    {isCityLoading ? (
+                      <V3LoadingState variant="chart" className="h-[260px]" />
+                    ) : selectedStateCities.length > 0 ? (
+                      <V3BarChart
+                        data={[...selectedStateCities]
+                          .sort((a, b) => b.revenue - a.revenue)
+                          .slice(0, 8)
+                          .map(c => ({
+                            name: c.city,
+                            value: c.revenue,
+                          }))}
+                        nameKey="name"
+                        valueKey="value"
+                        valueName="Revenue"
+                        height={260}
+                        valueType="currency"
+                        horizontal
+                        topN={8}
+                        showRankBadges={false}
+                      />
+                    ) : (
+                      <V3EmptyState
+                        title="No City Data"
+                        description={`No city-level data available for ${getStateName(selectedState)}`}
+                        className="h-[260px]"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </V3ChartWrapper>
 
+          {/* Giving Time Heatmap */}
+          <V3ChartWrapper
+            title="Best Times to Give"
+            icon={Clock}
+            ariaLabel="Heatmap showing donation patterns by day and hour"
+            description="Identify peak donation windows for outreach timing"
+          >
+            <GivingTimeHeatmap
+              data={summary.time_heatmap}
+              height={320}
+              isLoading={false}
+            />
+          </V3ChartWrapper>
+        </div>
+
+        {/* Occupation Breakdown - Full Width */}
+        <V3ChartWrapper
+          title="Donor Occupations"
+          icon={Briefcase}
+          ariaLabel="Bar chart showing donor distribution by normalized occupation category"
+          description="Occupations are automatically categorized for better insights"
+          className="mb-6"
+        >
+          <OccupationBreakdown
+            data={summary.occupation_stats}
+            isLoading={false}
+          />
+        </V3ChartWrapper>
+
+        {/* Two-Column: Channels + Top Campaigns */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Channel Breakdown - Pie Chart */}
           <V3ChartWrapper
             title="Acquisition Channels"
@@ -610,46 +531,41 @@ const ClientDemographics = () => {
               legendPosition="bottom"
             />
           </V3ChartWrapper>
-        </div>
 
-        {/* Detailed Tables */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Top Campaigns/Refcodes */}
           <V3ChartWrapper
-            title="Top States by Revenue"
-            icon={MapPin}
-            ariaLabel="Table showing top donor statistics by state"
+            title="Top Campaigns"
+            icon={Tag}
+            ariaLabel="Bar chart showing top performing campaigns by revenue"
+            description="Revenue breakdown by refcode/campaign source"
           >
-            <V3DataTable
-              data={summary.state_stats.slice(0, 10)}
-              columns={locationColumns}
-              getRowKey={(row) => row.state_abbr}
-              compact
-              maxHeight="400px"
-              showRowNumbers
-              highlightTopN={3}
-              defaultSortKey="revenue"
-              defaultSortDirection="desc"
-            />
-          </V3ChartWrapper>
-
-          <V3ChartWrapper
-            title="Occupation Details"
-            icon={Briefcase}
-            ariaLabel="Table showing detailed donor statistics by occupation"
-          >
-            <V3DataTable
-              data={summary.occupation_stats.slice(0, 15)}
-              columns={occupationColumns}
-              getRowKey={(row) => row.occupation}
-              compact
-              maxHeight="400px"
-              showRowNumbers
-              highlightTopN={3}
-              defaultSortKey="revenue"
-              defaultSortDirection="desc"
+            <TopRefcodesBreakdown
+              data={summary.top_refcodes}
+              isLoading={false}
+              variant="chart"
             />
           </V3ChartWrapper>
         </div>
+
+        {/* Detailed State Table */}
+        <V3ChartWrapper
+          title="States by Revenue"
+          icon={MapPin}
+          ariaLabel="Table showing top donor statistics by state"
+          className="mb-6"
+        >
+          <V3DataTable
+            data={summary.state_stats.slice(0, 15)}
+            columns={locationColumns}
+            getRowKey={(row) => row.state_abbr}
+            compact
+            maxHeight="400px"
+            showRowNumbers
+            highlightTopN={3}
+            defaultSortKey="revenue"
+            defaultSortDirection="desc"
+          />
+        </V3ChartWrapper>
       </V3PageContainer>
     </ClientShell>
   );

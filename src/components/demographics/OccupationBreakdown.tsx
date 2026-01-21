@@ -3,7 +3,7 @@ import { V3BarChart } from "@/components/charts";
 import { V3LoadingState, V3EmptyState } from "@/components/v3";
 import { DemographicsInsightCard } from "./DemographicsInsightCard";
 import { formatCurrency, formatPercent } from "@/lib/chart-formatters";
-import { Briefcase, Users, TrendingUp } from "lucide-react";
+import { Briefcase } from "lucide-react";
 
 export interface OccupationStat {
   occupation_category: string;
@@ -31,7 +31,6 @@ export function OccupationBreakdown({
     }
 
     const totalRev = data.reduce((sum, d) => sum + d.revenue, 0);
-    const totalDonors = data.reduce((sum, d) => sum + d.unique_donors, 0);
 
     // Sort by revenue and prepare chart data
     const sorted = [...data].sort((a, b) => b.revenue - a.revenue);
@@ -119,16 +118,7 @@ export function OccupationBreakdown({
         horizontal
         topN={12}
         showRankBadges
-        tooltipFormatter={(item) => {
-          const d = item as typeof chartData[0];
-          return [
-            `Revenue: ${formatCurrency(d.value)}`,
-            `Donors: ${d.donors.toLocaleString()}`,
-            `Avg Gift: ${formatCurrency(d.avgGift)}`,
-            `Share: ${formatPercent(d.percentOfTotal)}`,
-          ].join("\n");
-        }}
-        onBarClick={onCategoryClick ? (name) => onCategoryClick(name as string) : undefined}
+        onCategorySelect={onCategoryClick ? (name) => { if (name) onCategoryClick(name); } : undefined}
       />
 
       {/* Summary stats row */}
