@@ -838,12 +838,12 @@ const ClientUserManager = () => {
                 required
               />
             </div>
-            <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="space-y-2 p-3 bg-primary/10 rounded-lg border border-primary/20">
               <div className="flex items-start gap-2">
-                <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-                <div className="text-xs text-blue-900 dark:text-blue-100">
+                <Mail className="w-4 h-4 text-primary mt-0.5" />
+                <div className="text-xs text-foreground">
                   <p className="font-medium mb-1">Automated Setup</p>
-                  <p>A temporary password will be auto-generated and sent to the user via email with login instructions.</p>
+                  <p className="text-muted-foreground">A temporary password will be auto-generated and sent to the user via email with login instructions.</p>
                 </div>
               </div>
             </div>
