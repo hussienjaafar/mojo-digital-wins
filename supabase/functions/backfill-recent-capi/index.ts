@@ -167,7 +167,67 @@ serve(async (req) => {
       let orgQueued = 0;
       for (const tx of newTransactions) {
         try {
-          const fbc = extractFbc(tx.refcode2);
+          // PRIORITY: Use full fbclid from transaction if available (from backfill)
+          // Otherwise, extract from refcode2 and try touchpoint lookup
+          let fbc: string | null = null;
+          let fbp: string | null = null;
+          
+          // Check if transaction already has full fbclid (from previous backfill)
+          if (tx.fbclid && tx.fbclid.length > 50) {
+            fbc = tx.fbclid;
+            logger.info('Using full fbclid from transaction', { 
+              transactionId: tx.transaction_id,
+              fbcLength: fbc.length 
+            });
+          } else {
+            // Extract truncated fbc from refcode2
+            const truncatedFbc = extractFbc(tx.refcode2);
+            
+            // Try to recover full fbclid from attribution_touchpoints
+            if (truncatedFbc) {
+              const { data: touchpoints } = await supabase
+                .from('attribution_touchpoints')
+                .select('metadata')
+                .eq('organization_id', config.organization_id)
+                .not('metadata', 'is', null)
+                .order('occurred_at', { ascending: false })
+                .limit(50);
+              
+              for (const tp of touchpoints || []) {
+                const meta = tp.metadata as any;
+                const fullFbclid = meta?.fbclid as string;
+                
+                if (!fullFbclid || fullFbclid.length <= 50) continue;
+                
+                // Match by suffix (new format) or prefix (legacy format)
+                const isMatch = 
+                  fullFbclid.endsWith(truncatedFbc) ||
+                  fullFbclid.startsWith(truncatedFbc) ||
+                  fullFbclid.slice(-truncatedFbc.length) === truncatedFbc;
+                
+                if (isMatch) {
+                  fbc = fullFbclid;
+                  fbp = meta.fbp || null;
+                  logger.info('Recovered full fbclid from touchpoint', {
+                    transactionId: tx.transaction_id,
+                    truncatedLength: truncatedFbc.length,
+                    fullLength: fbc.length
+                  });
+                  break;
+                }
+              }
+              
+              // Fallback to truncated if no full found
+              if (!fbc) {
+                fbc = truncatedFbc;
+                logger.info('Using truncated fbc (no full fbclid found)', {
+                  transactionId: tx.transaction_id,
+                  fbcLength: fbc?.length
+                });
+              }
+            }
+          }
+          
           const eventTime = Math.floor(new Date(tx.transaction_date).getTime() / 1000);
           const eventId = `actblue_${tx.transaction_id}_${eventTime}`;
           const dedupeKey = `purchase_${tx.transaction_id}`;
@@ -205,6 +265,9 @@ serve(async (req) => {
           }
           if (fbc) {
             userData.fbc = fbc;
+          }
+          if (fbp) {
+            userData.fbp = fbp;
           }
 
           // Calculate match quality

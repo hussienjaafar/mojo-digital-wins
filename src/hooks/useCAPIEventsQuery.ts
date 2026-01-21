@@ -14,13 +14,16 @@ export interface CAPIEvent {
   id: string;
   eventName: string;
   eventTime: string;
-  status: "pending" | "delivered" | "failed";
+  status: "pending" | "delivered" | "failed" | "superseded";
   refcode: string | null;
   matchScore: number | null;
   matchQuality: MatchQuality | null;
   donationAmount: number | null;
   fbp: string | null;
   fbc: string | null;
+  fbcLength: number; // NEW: Track fbc length for debugging
+  isTruncated: boolean; // NEW: Flag if fbc is truncated
+  sourceType: string | null; // NEW: Track source (webhook, backfill, enrichment_resend)
   deliveredAt: string | null;
   error: string | null;
 }
@@ -164,19 +167,27 @@ async function fetchCAPIEvents(
   const recentEvents: CAPIEvent[] = events.slice(0, 20).map((event) => {
     const customData = event.custom_data as Record<string, unknown> | null;
     const lastError = (event as Record<string, unknown>).last_error as string | undefined;
+    const sourceType = (event as Record<string, unknown>).source_type as string | null;
     // Normalize 'sent' status to 'delivered' for UI consistency
-    const normalizedStatus = event.status === 'sent' ? 'delivered' : event.status;
+    let normalizedStatus: "pending" | "delivered" | "failed" | "superseded" = 
+      event.status === 'sent' ? 'delivered' : 
+      (event.status as "pending" | "delivered" | "failed" | "superseded");
+    const fbcValue = event.fbc || null;
+    const fbcLength = fbcValue?.length || 0;
     return {
       id: event.id,
       eventName: event.event_name,
       eventTime: new Date(event.event_time * 1000).toISOString(),
-      status: normalizedStatus as "pending" | "delivered" | "failed",
+      status: normalizedStatus,
       refcode: event.refcode,
       matchScore: event.match_score,
       matchQuality: event.match_quality as MatchQuality | null,
       donationAmount: customData?.value as number | null,
       fbp: event.fbp,
-      fbc: event.fbc,
+      fbc: fbcValue,
+      fbcLength, // NEW: Track fbc length
+      isTruncated: fbcLength > 0 && fbcLength <= 50, // NEW: Flag truncated fbc
+      sourceType, // NEW: Track source type
       deliveredAt: event.delivered_at,
       error: lastError || null,
     };
