@@ -125,16 +125,12 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     })), [campaigns]);
 
   // Trend chart data - correctly map sent and conversions
+  // Combined chart data with activity metrics + revenue
   const trendChartData = useMemo(() => (dailyMetrics as any[]).map((d: any) => ({
     name: format(parseISO(d.date), 'MMM d'),
     Sent: d.sent || 0,
     Conversions: d.donations || 0,
-  })), [dailyMetrics]);
-
-  // Dollars raised trend chart data
-  const raisedTrendData = useMemo(() => (dailyMetrics as any[]).map((d: any) => ({
-    name: format(parseISO(d.date), 'MMM d'),
-    Raised: d.raised || 0,
+    Raised: d.amountRaised || 0,
   })), [dailyMetrics]);
 
   // Show loading state
@@ -230,45 +226,27 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
       </motion.div>
 
-      {/* Performance Trend Chart */}
+      {/* Combined Performance & Revenue Chart */}
       {trendChartData.length > 0 && (
         <V3ChartWrapper
-          title="Performance Trend"
+          title="SMS Performance & Revenue"
           icon={TrendingUp}
-          ariaLabel="SMS campaign performance trend chart showing messages sent and conversions over time"
-          description="Line chart displaying daily SMS send volume and conversion trends"
+          ariaLabel="SMS campaign performance showing messages sent, conversions, and dollars raised"
+          description="Combined view of messaging activity and fundraising results"
           accent="purple"
         >
           <EChartsLineChart
             data={trendChartData}
             xAxisKey="name"
             series={[
-              { dataKey: "Sent", name: "Messages Sent", color: "hsl(var(--portal-accent-purple))" },
-              { dataKey: "Conversions", name: "Conversions", color: "hsl(var(--portal-success))" },
+              { dataKey: "Sent", name: "Messages Sent", color: "hsl(var(--portal-accent-purple))", yAxisIndex: 0 },
+              { dataKey: "Conversions", name: "Conversions", color: "hsl(var(--portal-success))", yAxisIndex: 0 },
+              { dataKey: "Raised", name: "Dollars Raised", color: "hsl(var(--portal-accent-amber))", yAxisIndex: 1, valueType: "currency" },
             ]}
-            valueType="number"
-            height={280}
-          />
-        </V3ChartWrapper>
-      )}
-
-      {/* Dollars Raised Over Time Chart */}
-      {raisedTrendData.length > 0 && (
-        <V3ChartWrapper
-          title="Dollars Raised Over Time"
-          icon={DollarSign}
-          ariaLabel="SMS campaign dollars raised trend chart showing fundraising over time"
-          description="Line chart displaying daily dollars raised from SMS campaigns"
-          accent="green"
-        >
-          <EChartsLineChart
-            data={raisedTrendData}
-            xAxisKey="name"
-            series={[
-              { dataKey: "Raised", name: "Dollars Raised", color: "hsl(var(--portal-success))" },
-            ]}
-            valueType="currency"
-            height={280}
+            dualYAxis
+            yAxisValueTypeLeft="number"
+            yAxisValueTypeRight="currency"
+            height={320}
           />
         </V3ChartWrapper>
       )}
