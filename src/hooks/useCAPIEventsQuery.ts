@@ -120,12 +120,13 @@ async function fetchCAPIEvents(
   };
 
   events.forEach((event) => {
-    // Status counts
+    // Status counts - handle both 'delivered' and 'sent' as delivered
     switch (event.status) {
       case "pending":
         pending++;
         break;
       case "delivered":
+      case "sent":
         delivered++;
         break;
       case "failed":
@@ -152,11 +153,13 @@ async function fetchCAPIEvents(
   const recentEvents: CAPIEvent[] = events.slice(0, 20).map((event) => {
     const customData = event.custom_data as Record<string, unknown> | null;
     const lastError = (event as Record<string, unknown>).last_error as string | undefined;
+    // Normalize 'sent' status to 'delivered' for UI consistency
+    const normalizedStatus = event.status === 'sent' ? 'delivered' : event.status;
     return {
       id: event.id,
       eventName: event.event_name,
       eventTime: new Date(event.event_time * 1000).toISOString(),
-      status: event.status as "pending" | "delivered" | "failed",
+      status: normalizedStatus as "pending" | "delivered" | "failed",
       refcode: event.refcode,
       matchScore: event.match_score,
       matchQuality: event.match_quality as MatchQuality | null,
