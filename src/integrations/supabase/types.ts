@@ -1326,6 +1326,7 @@ export type Database = {
       }
       attribution_touchpoints: {
         Row: {
+          ad_id: string | null
           campaign_id: string | null
           created_at: string | null
           donor_email: string | null
@@ -1340,6 +1341,7 @@ export type Database = {
           utm_source: string | null
         }
         Insert: {
+          ad_id?: string | null
           campaign_id?: string | null
           created_at?: string | null
           donor_email?: string | null
@@ -1354,6 +1356,7 @@ export type Database = {
           utm_source?: string | null
         }
         Update: {
+          ad_id?: string | null
           campaign_id?: string | null
           created_at?: string | null
           donor_email?: string | null
@@ -11164,6 +11167,7 @@ export type Database = {
           event_type: string | null
           headers: Json | null
           id: string
+          metadata: Json | null
           organization_id: string | null
           payload: Json | null
           platform: string
@@ -11179,6 +11183,7 @@ export type Database = {
           event_type?: string | null
           headers?: Json | null
           id?: string
+          metadata?: Json | null
           organization_id?: string | null
           payload?: Json | null
           platform: string
@@ -11194,6 +11199,7 @@ export type Database = {
           event_type?: string | null
           headers?: Json | null
           id?: string
+          metadata?: Json | null
           organization_id?: string | null
           payload?: Json | null
           platform?: string
