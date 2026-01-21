@@ -101,23 +101,23 @@ export default function ClientLinkTracking() {
   // CAPI configured - show full dashboard
   return (
     <ClientShell pageTitle="Link Tracking" showDateControls={false}>
-      <div className="space-y-6">
+      <div className="space-y-6 overflow-hidden">
         {/* Header with Date Selector */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10">
+            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue))]/10 shrink-0">
               <MousePointerClick className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
             </div>
-            <div>
-              <h1 className="text-xl font-semibold text-[hsl(var(--portal-text-primary))]">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-semibold text-[hsl(var(--portal-text-primary))] truncate">
                 Campaign Link Performance
               </h1>
-              <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+              <p className="text-xs sm:text-sm text-[hsl(var(--portal-text-muted))] truncate">
                 Track clicks, sessions, and conversions from your redirect URLs
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <DateRangeSelector
               startDate={dateRange.start}
               endDate={dateRange.end}
@@ -159,26 +159,26 @@ export default function ClientLinkTracking() {
           isLoading={clicksLoading}
         />
 
-        {/* Tables and CAPI Panel */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <LinkTrackingTables
-            byRefcode={clicksData?.byRefcode || []}
-            byCampaign={clicksData?.byCampaign || []}
-            isLoading={clicksLoading}
-          />
-          <CAPIHealthPanel
-            data={capiData || {
-              totalSent: 0,
-              pending: 0,
-              delivered: 0,
-              failed: 0,
-              matchQualityDistribution: { excellent: 0, good: 0, fair: 0, poor: 0, unknown: 0 },
-              recentEvents: [],
-              avgMatchScore: 0,
-            }}
-            isLoading={capiEventsLoading}
-          />
-        </div>
+        {/* Tables */}
+        <LinkTrackingTables
+          byRefcode={clicksData?.byRefcode || []}
+          byCampaign={clicksData?.byCampaign || []}
+          isLoading={clicksLoading}
+        />
+
+        {/* CAPI Panel - Full Width */}
+        <CAPIHealthPanel
+          data={capiData || {
+            totalSent: 0,
+            pending: 0,
+            delivered: 0,
+            failed: 0,
+            matchQualityDistribution: { excellent: 0, good: 0, fair: 0, poor: 0, unknown: 0 },
+            recentEvents: [],
+            avgMatchScore: 0,
+          }}
+          isLoading={capiEventsLoading}
+        />
       </div>
     </ClientShell>
   );
