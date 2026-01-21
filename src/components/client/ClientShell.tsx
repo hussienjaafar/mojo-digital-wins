@@ -53,7 +53,7 @@ export const ClientShell = ({
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { theme, setTheme } = useTheme();
-  const { impersonatedOrgId, isImpersonating } = useImpersonation();
+  const { impersonatedOrgId, isImpersonating, setImpersonation } = useImpersonation();
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
 
   const [session, setSession] = useState<Session | null>(null);
@@ -209,6 +209,18 @@ export const ClientShell = ({
     if (newOrg) {
       setOrganization(newOrg);
       localStorage.setItem("selectedOrganizationId", newOrgId);
+      
+      // Sync to impersonation context so child pages using useClientOrganization
+      // automatically pick up the new organization
+      if (isAdmin) {
+        setImpersonation(
+          session?.user?.id || '',
+          'System Admin',
+          newOrg.id,
+          newOrg.name
+        );
+      }
+      
       toast({
         title: "Organization switched",
         description: `Now viewing ${newOrg.name}`,
