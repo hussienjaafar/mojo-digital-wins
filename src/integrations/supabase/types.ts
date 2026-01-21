@@ -11799,6 +11799,42 @@ export type Database = {
         }
         Relationships: []
       }
+      attribution_quality_metrics: {
+        Row: {
+          date: string | null
+          deterministic_revenue: number | null
+          full_clickid_count: number | null
+          full_clickid_pct: number | null
+          organization_id: string | null
+          probabilistic_revenue: number | null
+          total_fb_donations: number | null
+          total_fb_revenue: number | null
+          truncated_clickid_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       attribution_touchpoints_secure: {
         Row: {
           campaign_id: string | null
