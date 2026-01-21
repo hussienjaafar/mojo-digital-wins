@@ -28,7 +28,8 @@ function normalizePhone(phone: string | null): string | null {
 /**
  * Validates if a refcode2 value is a valid Facebook Click ID
  * Valid formats:
- * - fb_IwY... or fb_IwZXh0bg... (prefixed fbc from our redirect flow)
+ * - fb_IwY... or fb_IwZXh0bg... (legacy prefixed fbc from old redirect flow)
+ * - fb_tvMPYAxP2Ya... (new format: unique _aem_ suffix extracted)
  * - IwY... or IwZXh0bg... (raw fbc format)
  * 
  * Invalid formats (ActBlue internal tracking):
@@ -40,8 +41,18 @@ function isValidFacebookClickId(refcode2: string | null): boolean {
   // Must start with 'fb_' (our redirect flow) or look like a raw fbc
   if (refcode2.startsWith('fb_')) {
     const fbc = refcode2.substring(3);
-    // Valid fbc format: fb.{version}.{timestamp}.{fbclid} where fbclid typically starts with IwY, IwZXh0, PAZXh0, etc.
-    return fbc.startsWith('fb.') || fbc.startsWith('IwY') || fbc.startsWith('IwZ') || fbc.startsWith('PAZ') || fbc.length > 30;
+    // Valid formats:
+    // 1. Legacy: fb.{version}.{timestamp}.{fbclid} or raw fbclid starting with IwY, IwZ, PAZ
+    // 2. New: unique _aem_ suffix (typically 20-30 alphanumeric chars)
+    if (fbc.startsWith('fb.') || fbc.startsWith('IwY') || fbc.startsWith('IwZ') || fbc.startsWith('PAZ')) {
+      return true;
+    }
+    // New format: _aem_ suffix is typically base64-like (alphanumeric with - and _)
+    // Must be at least 15 chars to be a valid unique identifier
+    if (fbc.length >= 15 && /^[A-Za-z0-9_-]+$/.test(fbc)) {
+      return true;
+    }
+    return false;
   }
   
   // Skip ActBlue internal tracking codes
