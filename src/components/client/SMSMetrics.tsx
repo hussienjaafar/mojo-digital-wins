@@ -16,7 +16,7 @@ import {
 import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, parseISO } from "date-fns";
-import { EChartsBarChart } from "@/components/charts/echarts";
+import { EChartsBarChart, EChartsCombinationChart } from "@/components/charts/echarts";
 import { SmallMultiplesChart } from "@/components/charts";
 import { useSMSMetricsUnified } from "@/hooks/useActBlueMetrics";
 import { formatRatio, formatCurrency, formatNumber } from "@/lib/chart-formatters";
@@ -227,26 +227,63 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
       </motion.div>
 
-      {/* Small Multiples Performance Chart - Each metric auto-scales */}
+      {/* Main Combo Chart - Messages Sent (bars) + Dollars Raised (line) with visible dates */}
       {trendChartData.length > 0 && (
         <V3ChartWrapper
-          title="SMS Performance & Revenue"
+          title="SMS Activity & Revenue"
           icon={TrendingUp}
-          ariaLabel="SMS campaign performance showing messages sent, conversions, and dollars raised"
-          description="Each metric auto-scales to show trends clearly"
+          ariaLabel="SMS messages sent and revenue trends over time"
+          description="Messages sent as bars, dollars raised as line"
           accent="purple"
+        >
+          <EChartsCombinationChart
+            data={trendChartData}
+            xAxisKey="name"
+            series={[
+              { 
+                dataKey: "Sent", 
+                name: "Messages Sent", 
+                type: "bar",
+                color: "#A855F7",
+                yAxisIndex: 0,
+                valueType: "number",
+                barOpacity: 0.6,
+              },
+              { 
+                dataKey: "Raised", 
+                name: "Dollars Raised", 
+                type: "line",
+                color: "#F59E0B",
+                yAxisIndex: 1,
+                valueType: "currency",
+                smooth: true,
+                lineWidth: 2,
+              },
+            ]}
+            dualYAxis
+            yAxisNameLeft="Sent"
+            yAxisNameRight="Raised"
+            yAxisValueTypeLeft="number"
+            yAxisValueTypeRight="currency"
+            height={280}
+            showLegend
+          />
+        </V3ChartWrapper>
+      )}
+
+      {/* Conversions Trend - Auto-scaling sparkline for the metric that needs independent scale */}
+      {trendChartData.length > 0 && (
+        <V3ChartWrapper
+          title="Conversion Trend"
+          icon={Target}
+          ariaLabel="SMS conversion trend over time"
+          description="Auto-scaled to show conversion patterns clearly"
+          accent="green"
         >
           <SmallMultiplesChart
             data={trendChartData}
             xAxisKey="name"
             panels={[
-              { 
-                label: "Messages Sent", 
-                dataKey: "Sent", 
-                color: "#A855F7",
-                valueType: "number",
-                icon: MessageSquare,
-              },
               { 
                 label: "Conversions", 
                 dataKey: "Conversions", 
@@ -254,15 +291,8 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
                 valueType: "number",
                 icon: Target,
               },
-              { 
-                label: "Dollars Raised", 
-                dataKey: "Raised", 
-                color: "#F59E0B",
-                valueType: "currency",
-                icon: DollarSign,
-              },
             ]}
-            panelHeight={80}
+            panelHeight={72}
           />
         </V3ChartWrapper>
       )}
