@@ -16,7 +16,7 @@ import {
 import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, parseISO } from "date-fns";
-import { EChartsLineChart, EChartsBarChart } from "@/components/charts/echarts";
+import { EChartsBarChart, EChartsCombinationChart } from "@/components/charts/echarts";
 import { useSMSMetricsUnified } from "@/hooks/useActBlueMetrics";
 import { formatRatio, formatCurrency, formatNumber } from "@/lib/chart-formatters";
 
@@ -235,22 +235,42 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
           description="Combined view of messaging activity and fundraising results"
           accent="purple"
         >
-          <EChartsLineChart
+          <EChartsCombinationChart
             data={trendChartData}
             xAxisKey="name"
             series={[
-              { dataKey: "Sent", name: "Messages Sent", color: "hsl(var(--portal-accent-purple))", yAxisIndex: 0 },
-              { dataKey: "Conversions", name: "Conversions", color: "hsl(var(--portal-success))", yAxisIndex: 1 },
-              { dataKey: "Raised", name: "Dollars Raised", color: "hsl(var(--portal-accent-amber))", yAxisIndex: 2, valueType: "currency" },
+              { 
+                dataKey: "Sent", 
+                name: "Messages Sent", 
+                type: "bar",
+                color: "#A855F7",
+                yAxisIndex: 0,
+                valueType: "number",
+                barOpacity: 0.6,
+              },
+              { 
+                dataKey: "Conversions", 
+                name: "Conversions", 
+                type: "line",
+                color: "#22C55E",
+                yAxisIndex: 0,
+                valueType: "number",
+              },
+              { 
+                dataKey: "Raised", 
+                name: "Dollars Raised", 
+                type: "line",
+                color: "#F59E0B",
+                yAxisIndex: 1,
+                valueType: "currency",
+              },
             ]}
-            tripleYAxis
-            yAxisNameLeft="Sent"
-            yAxisNameMiddle="Conv"
-            yAxisNameRight="Raised"
+            dualYAxis
+            yAxisNameLeft="Activity"
+            yAxisNameRight="Revenue"
             yAxisValueTypeLeft="number"
-            yAxisValueTypeMiddle="number"
             yAxisValueTypeRight="currency"
-            height={320}
+            height={340}
           />
         </V3ChartWrapper>
       )}
