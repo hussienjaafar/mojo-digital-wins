@@ -39,8 +39,8 @@ export function useRealtimeMetrics(organizationId: string, startDate: string, en
             .from('sms_campaigns')
             .select('*')
             .eq('organization_id', organizationId)
-            .gte('send_date', startDate)
-            .lt('send_date', endDateInclusive) // Inclusive of end date
+            .gte('send_date', `${startDate}T00:00:00Z`)
+            .lte('send_date', `${endDate}T23:59:59.999Z`)
             .order('send_date', { ascending: false }),
 
           // Using secure view for defense-in-depth PII protection
