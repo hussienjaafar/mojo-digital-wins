@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
@@ -20,12 +18,38 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { AdminPageHeader, AdminLoadingState } from "./v3";
 import { V3Button } from "@/components/v3/V3Button";
+import { V3Card, V3CardHeader, V3CardTitle, V3CardDescription, V3CardContent } from "@/components/v3/V3Card";
+import { V3Badge, type V3BadgeVariant } from "@/components/v3/V3Badge";
+import { V3FilterPill } from "@/components/v3/V3FilterPill";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { PendingInvitations } from "@/components/admin/PendingInvitations";
 import { UserPagination } from "@/components/admin/UserPagination";
 import { BulkUserActions } from "@/components/admin/BulkUserActions";
 import { SeatManagement } from "@/components/admin/SeatManagement";
 import { MemberRequestQueue } from "@/components/admin/MemberRequestQueue";
+import { motion } from "framer-motion";
+
+// Role badge variant helper
+const getRoleBadgeVariant = (role: string): V3BadgeVariant => {
+  switch (role) {
+    case 'admin': return 'info';
+    case 'manager': return 'purple';
+    case 'editor': return 'success';
+    case 'viewer': return 'muted';
+    default: return 'muted';
+  }
+};
+
+// Status badge variant helper
+const getStatusBadgeVariant = (status: string): V3BadgeVariant => {
+  switch (status) {
+    case 'active': return 'success';
+    case 'pending': return 'warning';
+    case 'suspended': return 'error';
+    case 'inactive': return 'muted';
+    default: return 'muted';
+  }
+};
 
 type Organization = {
   id: string;
@@ -674,9 +698,9 @@ const ClientUserManager = () => {
               </div>
             ) : (
               /* Desktop Table View */
-              <Table>
+              <Table className="[&_th]:bg-[hsl(var(--portal-bg-tertiary))] [&_th]:text-[hsl(var(--portal-text-secondary))] [&_th]:font-medium [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider">
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="border-[hsl(var(--portal-border))]">
                     <TableHead className="w-[40px]">
                       <Checkbox
                         checked={users.length > 0 && selectedUserIds.length === users.length}
@@ -695,45 +719,37 @@ const ClientUserManager = () => {
                 <TableBody>
                   {users.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center text-[hsl(var(--portal-text-secondary))]">
                         {hasActiveFilters ? "No users match your filters" : "No users yet. Invite your first member!"}
                       </TableCell>
                     </TableRow>
                   ) : (
                     users.map((user) => (
-                      <TableRow key={user.id} data-state={selectedUserIds.includes(user.id) ? "selected" : undefined}>
+                      <TableRow key={user.id} className="hover:bg-[hsl(var(--portal-bg-hover))] transition-colors duration-150 border-[hsl(var(--portal-border))]" data-state={selectedUserIds.includes(user.id) ? "selected" : undefined}>
                         <TableCell>
                           <Checkbox
                             checked={selectedUserIds.includes(user.id)}
                             onCheckedChange={() => toggleUserSelection(user.id)}
                           />
                         </TableCell>
-                        <TableCell className="font-medium">{user.full_name}</TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="font-medium text-[hsl(var(--portal-text-primary))]">{user.full_name}</TableCell>
+                        <TableCell className="text-[hsl(var(--portal-text-secondary))]">
                           {getOrganizationName(user.organization_id)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="capitalize">{user.role}</Badge>
+                          <V3Badge variant={getRoleBadgeVariant(user.role)} className="capitalize">{user.role}</V3Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge 
-                            variant={user.status === 'active' ? 'default' : 'secondary'}
-                            className={
-                              user.status === 'active' ? 'bg-success/20 text-success-foreground border-success/30' :
-                              user.status === 'suspended' ? 'bg-destructive/20 text-destructive border-destructive/30' :
-                              user.status === 'pending' ? 'bg-warning/20 text-warning-foreground border-warning/30' :
-                              ''
-                            }
-                          >
+                          <V3Badge variant={getStatusBadgeVariant(user.status)}>
                             {user.status || 'active'}
-                          </Badge>
+                          </V3Badge>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="text-[hsl(var(--portal-text-secondary))]">
                           {user.last_login_at
                             ? new Date(user.last_login_at).toLocaleDateString()
                             : 'Never'}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="text-[hsl(var(--portal-text-secondary))]">
                           {new Date(user.created_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-right">
@@ -743,7 +759,7 @@ const ClientUserManager = () => {
                                 <MoreVertical className="h-4 w-4" />
                               </V3Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                            <DropdownMenuContent align="end" className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
                               <DropdownMenuItem onClick={() => handleViewPortal(user)}>
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Portal
@@ -759,7 +775,7 @@ const ClientUserManager = () => {
                               <DropdownMenuSeparator />
                               <DropdownMenuItem 
                                 onClick={() => handleDeleteClick(user)}
-                                className="text-destructive focus:text-destructive"
+                                className="text-[hsl(var(--portal-error))] focus:text-[hsl(var(--portal-error))]"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete User
