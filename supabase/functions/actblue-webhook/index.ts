@@ -735,14 +735,14 @@ async function enqueueCAPIEvent(
   const dedupeKey = generateDedupeKey(eventName, organization_id, transactionId);
 
   // Generate event_id:
-  // - For enrichment events: Use deterministic ID from org+transaction so if ActBlue 
-  //   sends the same transaction, Meta can potentially match via external_id/fbp/fbc
+  // - For enrichment events: Use lineitem_id directly to match ActBlue's pixel event_id
+  //   This enables Meta's deduplication to merge our enriched user_data with ActBlue's event
   // - For primary events: Use random UUID (we own the conversion tracking)
   let eventId: string;
   if (isEnrichmentOnly) {
-    // Deterministic event_id for potential deduplication
-    eventId = await hashSHA256(`enrichment:${organization_id}:${transactionId}`);
-    console.log('[CAPI] Enrichment mode - sending additional matching data for:', transactionId);
+    // Use lineitem_id directly - ActBlue's pixel uses this as event_id
+    eventId = String(transactionId);
+    console.log('[CAPI] Enrichment mode - using lineitem_id as event_id:', eventId);
   } else {
     eventId = crypto.randomUUID();
   }

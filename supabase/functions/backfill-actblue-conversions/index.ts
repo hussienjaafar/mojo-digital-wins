@@ -137,7 +137,7 @@ serve(async (req) => {
       .from('client_api_credentials')
       .select('organization_id, encrypted_credentials')
       .in('organization_id', orgIds)
-      .eq('platform', 'meta')
+      .eq('platform', 'meta_capi')
       .eq('is_active', true);
 
     // Get access tokens - try decrypt first, fallback to plain JSON
@@ -215,9 +215,9 @@ serve(async (req) => {
       const attributionKey = `${tx.organization_id}|${tx.refcode}`;
       const campaignId = attributionMap.get(attributionKey) || tx.source_campaign || null;
 
-      // Generate event_id - deterministic for enrichment mode
+      // Generate event_id - use lineitem_id directly for enrichment mode to match ActBlue's pixel
       const eventId = orgConfig.is_enrichment_only
-        ? await hashSHA256(`enrichment:${tx.organization_id}:${tx.transaction_id}`)
+        ? String(tx.transaction_id)  // Match ActBlue's pixel event_id for deduplication
         : `backfill_${tx.transaction_id}`;
 
       // Build user_data with full PII (hashed)
