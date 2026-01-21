@@ -6,20 +6,39 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Settings, Edit, Search, AlertTriangle } from "lucide-react";
+import { Users, Settings, Edit, Search, AlertTriangle, Gift, History } from "lucide-react";
 import { V3Button } from "@/components/v3/V3Button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatDistanceToNow } from "date-fns";
 
 type OrganizationSeatInfo = {
   id: string;
   name: string;
   seat_limit: number;
+  bonus_seats: number;
+  total_entitled: number;
   active_members: number;
   pending_invites: number;
   pending_requests: number;
   total_used: number;
+  bonus_reason: string | null;
+};
+
+type SeatChangeLog = {
+  id: string;
+  organization_id: string;
+  organization_name: string;
+  change_type: string;
+  old_limit: number | null;
+  new_limit: number | null;
+  old_bonus: number | null;
+  new_bonus: number | null;
+  reason: string | null;
+  created_at: string;
 };
 
 export function SeatManagement() {
@@ -29,7 +48,11 @@ export function SeatManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingOrg, setEditingOrg] = useState<OrganizationSeatInfo | null>(null);
   const [newSeatLimit, setNewSeatLimit] = useState("");
+  const [newBonusSeats, setNewBonusSeats] = useState("");
+  const [bonusReason, setBonusReason] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [changeLog, setChangeLog] = useState<SeatChangeLog[]>([]);
+  const [isLoadingLog, setIsLoadingLog] = useState(false);
 
   useEffect(() => {
     loadOrganizations();
@@ -38,10 +61,10 @@ export function SeatManagement() {
   const loadOrganizations = async () => {
     setIsLoading(true);
     try {
-      // Get all active organizations with seat limits
+      // Get all active organizations with seat limits and bonus_seats
       const { data: orgsData, error: orgsError } = await (supabase as any)
         .from('client_organizations')
-        .select('id, name, seat_limit')
+        .select('id, name, seat_limit, bonus_seats, bonus_reason')
         .eq('is_active', true)
         .order('name');
 
@@ -60,11 +83,14 @@ export function SeatManagement() {
           return {
             id: org.id,
             name: org.name,
-            seat_limit: org.seat_limit || 5,
+            seat_limit: org.seat_limit || 2,
+            bonus_seats: org.bonus_seats || 0,
+            total_entitled: (org.seat_limit || 2) + (org.bonus_seats || 0),
             active_members: usage?.members_count || 0,
             pending_invites: usage?.pending_invites_count || 0,
             pending_requests: usage?.pending_requests_count || 0,
             total_used: usage?.total_used || 0,
+            bonus_reason: org.bonus_reason,
           };
         })
       );
@@ -82,15 +108,54 @@ export function SeatManagement() {
     }
   };
 
+  const loadChangeLog = async () => {
+    setIsLoadingLog(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('seat_change_log')
+        .select(`
+          id,
+          organization_id,
+          change_type,
+          old_limit,
+          new_limit,
+          old_bonus,
+          new_bonus,
+          reason,
+          created_at,
+          client_organizations(name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      const logs: SeatChangeLog[] = (data || []).map((log: any) => ({
+        ...log,
+        organization_name: log.client_organizations?.name || 'Unknown',
+      }));
+
+      setChangeLog(logs);
+    } catch (error: any) {
+      console.error('Error loading change log:', error);
+    } finally {
+      setIsLoadingLog(false);
+    }
+  };
+
   const handleEditClick = (org: OrganizationSeatInfo) => {
     setEditingOrg(org);
     setNewSeatLimit(org.seat_limit.toString());
+    setNewBonusSeats(org.bonus_seats.toString());
+    setBonusReason(org.bonus_reason || "");
   };
 
-  const handleUpdateSeatLimit = async () => {
+  const handleUpdateSeats = async () => {
     if (!editingOrg) return;
 
     const limit = parseInt(newSeatLimit);
+    const bonus = parseInt(newBonusSeats) || 0;
+    
     if (isNaN(limit) || limit < 1) {
       toast({
         title: "Invalid limit",
@@ -100,10 +165,30 @@ export function SeatManagement() {
       return;
     }
 
-    if (limit < editingOrg.total_used) {
+    if (bonus < 0) {
       toast({
-        title: "Limit too low",
-        description: `Cannot set limit below current usage (${editingOrg.total_used} seats in use)`,
+        title: "Invalid bonus",
+        description: "Bonus seats cannot be negative",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const totalEntitled = limit + bonus;
+    if (totalEntitled < editingOrg.total_used) {
+      toast({
+        title: "Total too low",
+        description: `Cannot set total seats below current usage (${editingOrg.total_used} seats in use)`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Require reason if adding bonus seats
+    if (bonus > 0 && !bonusReason.trim()) {
+      toast({
+        title: "Reason required",
+        description: "Please provide a reason for the bonus seats",
         variant: "destructive",
       });
       return;
@@ -111,16 +196,48 @@ export function SeatManagement() {
 
     setIsUpdating(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+
+      // Determine change type
+      let changeType = 'limit_update';
+      if (bonus !== editingOrg.bonus_seats) {
+        if (bonus > editingOrg.bonus_seats) {
+          changeType = editingOrg.bonus_seats === 0 ? 'bonus_added' : 'bonus_updated';
+        } else if (bonus === 0) {
+          changeType = 'bonus_removed';
+        } else {
+          changeType = 'bonus_updated';
+        }
+      }
+
+      // Update organization
       const { error } = await (supabase as any)
         .from('client_organizations')
-        .update({ seat_limit: limit })
+        .update({ 
+          seat_limit: limit,
+          bonus_seats: bonus,
+          bonus_reason: bonus > 0 ? bonusReason : null,
+        })
         .eq('id', editingOrg.id);
 
       if (error) throw error;
 
+      // Log the change
+      await supabase.rpc('log_seat_change', {
+        p_org_id: editingOrg.id,
+        p_changed_by: userId,
+        p_change_type: changeType,
+        p_old_limit: editingOrg.seat_limit,
+        p_new_limit: limit,
+        p_old_bonus: editingOrg.bonus_seats,
+        p_new_bonus: bonus,
+        p_reason: bonusReason || null,
+      });
+
       toast({
         title: "Success",
-        description: `Seat limit updated to ${limit} for ${editingOrg.name}`,
+        description: `Seat allocation updated for ${editingOrg.name}`,
       });
 
       setEditingOrg(null);
@@ -128,7 +245,7 @@ export function SeatManagement() {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to update seat limit",
+        description: error.message || "Failed to update seats",
         variant: "destructive",
       });
     } finally {
@@ -136,18 +253,26 @@ export function SeatManagement() {
     }
   };
 
-  const getUsageVariant = (used: number, limit: number) => {
-    const percentage = (used / limit) * 100;
-    if (percentage >= 100) return "destructive";
-    if (percentage >= 80) return "warning";
-    return "default";
-  };
-
-  const getUsageColor = (used: number, limit: number) => {
-    const percentage = (used / limit) * 100;
+  const getUsageColor = (used: number, total: number) => {
+    const percentage = (used / total) * 100;
     if (percentage >= 100) return "bg-destructive";
     if (percentage >= 80) return "bg-yellow-500";
     return "bg-primary";
+  };
+
+  const getChangeTypeBadge = (type: string) => {
+    switch (type) {
+      case 'bonus_added':
+        return <Badge variant="default" className="bg-green-500">Bonus Added</Badge>;
+      case 'bonus_removed':
+        return <Badge variant="destructive">Bonus Removed</Badge>;
+      case 'bonus_updated':
+        return <Badge variant="secondary">Bonus Updated</Badge>;
+      case 'limit_update':
+        return <Badge variant="outline">Limit Changed</Badge>;
+      default:
+        return <Badge variant="outline">{type}</Badge>;
+    }
   };
 
   const filteredOrganizations = organizations.filter(org =>
@@ -191,121 +316,187 @@ export function SeatManagement() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search organizations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <Tabs defaultValue="organizations" onValueChange={(v) => v === 'history' && loadChangeLog()}>
+          <TabsList>
+            <TabsTrigger value="organizations">Organizations</TabsTrigger>
+            <TabsTrigger value="history">
+              <History className="h-4 w-4 mr-1" />
+              Change History
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-muted/50 rounded-lg p-3">
-            <p className="text-sm text-muted-foreground">Total Organizations</p>
-            <p className="text-2xl font-bold">{organizations.length}</p>
-          </div>
-          <div className="bg-muted/50 rounded-lg p-3">
-            <p className="text-sm text-muted-foreground">Total Seats Allocated</p>
-            <p className="text-2xl font-bold">{organizations.reduce((sum, org) => sum + org.seat_limit, 0)}</p>
-          </div>
-          <div className="bg-muted/50 rounded-lg p-3">
-            <p className="text-sm text-muted-foreground">Seats In Use</p>
-            <p className="text-2xl font-bold">{organizations.reduce((sum, org) => sum + org.active_members, 0)}</p>
-          </div>
-          <div className="bg-muted/50 rounded-lg p-3">
-            <p className="text-sm text-muted-foreground">At Capacity</p>
-            <p className="text-2xl font-bold text-destructive">
-              {organizations.filter(org => org.total_used >= org.seat_limit).length}
-            </p>
-          </div>
-        </div>
+          <TabsContent value="organizations" className="space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search organizations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
 
-        {/* Table */}
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Organization</TableHead>
-              <TableHead className="text-center">Active Members</TableHead>
-              <TableHead className="text-center">Pending</TableHead>
-              <TableHead className="text-center">Seat Limit</TableHead>
-              <TableHead>Usage</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredOrganizations.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  No organizations found
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredOrganizations.map((org) => (
-                <TableRow key={org.id}>
-                  <TableCell className="font-medium">{org.name}</TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      {org.active_members}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      {org.pending_invites > 0 && (
-                        <Badge variant="secondary" className="text-xs">
-                          {org.pending_invites} invites
-                        </Badge>
-                      )}
-                      {org.pending_requests > 0 && (
-                        <Badge variant="outline" className="text-xs">
-                          {org.pending_requests} requests
-                        </Badge>
-                      )}
-                      {org.pending_invites === 0 && org.pending_requests === 0 && (
-                        <span className="text-muted-foreground text-sm">—</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center font-medium">{org.seat_limit}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 min-w-[150px]">
-                      <Progress 
-                        value={Math.min((org.total_used / org.seat_limit) * 100, 100)} 
-                        className={`h-2 flex-1 ${getUsageColor(org.total_used, org.seat_limit)}`}
-                      />
-                      <span className="text-sm text-muted-foreground whitespace-nowrap">
-                        {org.total_used}/{org.seat_limit}
-                      </span>
-                      {org.total_used >= org.seat_limit && (
-                        <AlertTriangle className="h-4 w-4 text-destructive" />
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <V3Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleEditClick(org)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </V3Button>
-                  </TableCell>
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+              <div className="bg-muted/50 rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">Total Orgs</p>
+                <p className="text-2xl font-bold">{organizations.length}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">Purchased Seats</p>
+                <p className="text-2xl font-bold">{organizations.reduce((sum, org) => sum + org.seat_limit, 0)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">Bonus Seats</p>
+                <p className="text-2xl font-bold text-green-600">{organizations.reduce((sum, org) => sum + org.bonus_seats, 0)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">Seats In Use</p>
+                <p className="text-2xl font-bold">{organizations.reduce((sum, org) => sum + org.active_members, 0)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">At Capacity</p>
+                <p className="text-2xl font-bold text-destructive">
+                  {organizations.filter(org => org.total_used >= org.total_entitled).length}
+                </p>
+              </div>
+            </div>
+
+            {/* Table */}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Organization</TableHead>
+                  <TableHead className="text-center">Members</TableHead>
+                  <TableHead className="text-center">Purchased</TableHead>
+                  <TableHead className="text-center">Bonus</TableHead>
+                  <TableHead className="text-center">Total</TableHead>
+                  <TableHead>Usage</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))
+              </TableHeader>
+              <TableBody>
+                {filteredOrganizations.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      No organizations found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredOrganizations.map((org) => (
+                    <TableRow key={org.id}>
+                      <TableCell className="font-medium">{org.name}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          {org.active_members}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center font-medium">{org.seat_limit}</TableCell>
+                      <TableCell className="text-center">
+                        {org.bonus_seats > 0 ? (
+                          <Badge variant="secondary" className="gap-1">
+                            <Gift className="h-3 w-3" />
+                            {org.bonus_seats}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center font-bold">{org.total_entitled}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 min-w-[150px]">
+                          <Progress 
+                            value={Math.min((org.total_used / org.total_entitled) * 100, 100)} 
+                            className={`h-2 flex-1 ${getUsageColor(org.total_used, org.total_entitled)}`}
+                          />
+                          <span className="text-sm text-muted-foreground whitespace-nowrap">
+                            {org.total_used}/{org.total_entitled}
+                          </span>
+                          {org.total_used >= org.total_entitled && (
+                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <V3Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => handleEditClick(org)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </V3Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-4">
+            {isLoadingLog ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : changeLog.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No seat changes recorded yet
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Organization</TableHead>
+                    <TableHead>Change Type</TableHead>
+                    <TableHead>Limit</TableHead>
+                    <TableHead>Bonus</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead>When</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {changeLog.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell className="font-medium">{log.organization_name}</TableCell>
+                      <TableCell>{getChangeTypeBadge(log.change_type)}</TableCell>
+                      <TableCell>
+                        {log.old_limit !== log.new_limit ? (
+                          <span>{log.old_limit} → {log.new_limit}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {log.old_bonus !== log.new_bonus ? (
+                          <span>{log.old_bonus} → {log.new_bonus}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                        {log.reason || '—'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
-          </TableBody>
-        </Table>
+          </TabsContent>
+        </Tabs>
       </CardContent>
 
-      {/* Edit Seat Limit Dialog */}
+      {/* Edit Seat Allocation Dialog */}
       <Dialog open={!!editingOrg} onOpenChange={(open) => !open && setEditingOrg(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Seat Limit</DialogTitle>
+            <DialogTitle>Edit Seat Allocation</DialogTitle>
             <DialogDescription>
               Adjust the seat allocation for {editingOrg?.name}
             </DialogDescription>
@@ -320,31 +511,68 @@ export function SeatManagement() {
                 <span className="text-muted-foreground">Pending invites:</span>
                 <span className="font-medium">{editingOrg?.pending_invites}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Pending requests:</span>
-                <span className="font-medium">{editingOrg?.pending_requests}</span>
-              </div>
               <div className="flex justify-between text-sm border-t pt-2">
                 <span className="text-muted-foreground">Total in use:</span>
                 <span className="font-bold">{editingOrg?.total_used}</span>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="seat_limit">New Seat Limit</Label>
-              <Input
-                id="seat_limit"
-                type="number"
-                min={editingOrg?.total_used || 1}
-                value={newSeatLimit}
-                onChange={(e) => setNewSeatLimit(e.target.value)}
-              />
-              {editingOrg && parseInt(newSeatLimit) < editingOrg.total_used && (
-                <p className="text-xs text-destructive">
-                  Limit cannot be less than current usage ({editingOrg.total_used})
-                </p>
-              )}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="seat_limit">Purchased Seats</Label>
+                <Input
+                  id="seat_limit"
+                  type="number"
+                  min={1}
+                  value={newSeatLimit}
+                  onChange={(e) => setNewSeatLimit(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Billable seats</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bonus_seats" className="flex items-center gap-1">
+                  <Gift className="h-3 w-3 text-green-600" />
+                  Bonus Seats
+                </Label>
+                <Input
+                  id="bonus_seats"
+                  type="number"
+                  min={0}
+                  value={newBonusSeats}
+                  onChange={(e) => setNewBonusSeats(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Complimentary</p>
+              </div>
             </div>
+
+            {parseInt(newBonusSeats) > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="bonus_reason">Reason for Bonus Seats *</Label>
+                <Textarea
+                  id="bonus_reason"
+                  placeholder="e.g., Early adopter promotion, customer support accommodation..."
+                  value={bonusReason}
+                  onChange={(e) => setBonusReason(e.target.value)}
+                  rows={2}
+                />
+              </div>
+            )}
+
+            <div className="bg-primary/10 rounded-lg p-3">
+              <p className="text-sm">
+                <span className="text-muted-foreground">Total entitled seats: </span>
+                <span className="font-bold">
+                  {(parseInt(newSeatLimit) || 0) + (parseInt(newBonusSeats) || 0)}
+                </span>
+                <span className="text-muted-foreground"> ({newSeatLimit} purchased + {newBonusSeats || 0} bonus)</span>
+              </p>
+            </div>
+
+            {editingOrg && ((parseInt(newSeatLimit) || 0) + (parseInt(newBonusSeats) || 0)) < editingOrg.total_used && (
+              <p className="text-xs text-destructive">
+                Total cannot be less than current usage ({editingOrg.total_used})
+              </p>
+            )}
 
             <div className="flex gap-2 justify-end">
               <V3Button
@@ -355,11 +583,11 @@ export function SeatManagement() {
                 Cancel
               </V3Button>
               <V3Button
-                onClick={handleUpdateSeatLimit}
+                onClick={handleUpdateSeats}
                 isLoading={isUpdating}
                 loadingText="Updating..."
               >
-                Update Limit
+                Update Allocation
               </V3Button>
             </div>
           </div>

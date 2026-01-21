@@ -6,6 +6,8 @@ import { Users, AlertTriangle } from "lucide-react";
 
 interface SeatUsageData {
   seat_limit: number;
+  bonus_seats: number;
+  total_entitled: number;
   members_count: number;
   pending_invites_count: number;
   pending_requests_count: number;
