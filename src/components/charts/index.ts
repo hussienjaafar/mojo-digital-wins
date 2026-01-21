@@ -89,6 +89,9 @@ export {
 export { USChoroplethMap, type USChoroplethMapProps, type ChoroplethDataItem, type MapMetricMode } from "./USChoroplethMap";
 export { USMapLegend, type USMapLegendProps, type LegendBucket } from "./USMapLegend";
 
+// Small Multiples Chart (stacked sparklines for multi-metric comparison)
+export { SmallMultiplesChart, type SmallMultiplesChartProps, type SmallMultiplesPanel } from "./SmallMultiplesChart";
+
 // Tooltip utilities
 export { ResponsiveChartTooltip, CurrencyTooltip, PercentTooltip, NumberTooltip } from "./ResponsiveChartTooltip";
 
