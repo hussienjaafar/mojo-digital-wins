@@ -58,6 +58,8 @@ export interface V3DonutChartProps {
   emptyDescription?: string;
   /** Enable ARIA accessibility descriptions */
   enableAccessibility?: boolean;
+  /** Enable pattern decals for colorblind accessibility (stripes/dots on each slice) */
+  useDecals?: boolean;
   /** Custom data processing options */
   dataOptions?: ProcessDonutDataOptions;
   /** Disable hover emphasis to prevent visual glitches */
@@ -79,6 +81,7 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
   emptyMessage = "No data available",
   emptyDescription = "There is no data to display in this chart.",
   enableAccessibility = true,
+  useDecals = false,
   dataOptions,
   disableHoverEmphasis = true,
 }) => {
@@ -229,12 +232,12 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
       animation: true,
       animationDuration: 600,
       animationEasing: "cubicOut",
-      // Accessibility
+      // Accessibility - enable decals (stripes/dots) for colorblind users
       ...(enableAccessibility && {
         aria: {
           enabled: true,
           decal: {
-            show: false, // Can enable for colorblind support
+            show: useDecals, // Enable pattern fills for colorblind accessibility
           },
         },
       }),
