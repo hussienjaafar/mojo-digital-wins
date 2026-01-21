@@ -143,17 +143,6 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
     const outerRadius = isRightLegend ? "75%" : "80%";
     const centerX = isRightLegend ? "30%" : "50%";
 
-    // Build legend data with formatted values
-    const legendData = processedData.items.map((item, index) => {
-      const percent = processedData.total > 0 
-        ? ((item.value / processedData.total) * 100).toFixed(1) 
-        : '0';
-      return {
-        name: item.name,
-        displayName: `${item.name}  ${formatValue(item.value, true)}  (${percent}%)`,
-      };
-    });
-
     // Chart data with styling
     const chartData = processedData.items.map((item, index) => ({
       name: item.name,
@@ -387,6 +376,8 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
     centerLabel, 
     displaySlice, 
     enableAccessibility,
+    useDecals,
+    disableHoverEmphasis,
   ]);
 
   // Event handlers

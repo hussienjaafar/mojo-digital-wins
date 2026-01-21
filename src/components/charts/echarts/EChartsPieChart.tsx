@@ -230,7 +230,7 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
         },
       ],
     };
-  }, [chartData, variant, showLabels, labelThreshold, showLegend, legendPosition, total, formatValue, showPercentage, disableHoverEmphasis]);
+  }, [chartData, variant, showLabels, labelThreshold, showLegend, legendPosition, total, formatValue, showPercentage, disableHoverEmphasis, useDecals]);
 
   const handleEvents = React.useMemo(() => {
     if (!onSliceClick) return undefined;
