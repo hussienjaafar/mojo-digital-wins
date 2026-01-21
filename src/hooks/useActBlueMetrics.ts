@@ -259,6 +259,15 @@ export interface SMSMetricsData {
     optOuts: number;
     first_donation: string;
     last_donation: string;
+    send_date?: string;
+    // AI analysis fields
+    topic?: string | null;
+    topic_summary?: string | null;
+    tone?: string | null;
+    urgency_level?: string | null;
+    call_to_action?: string | null;
+    key_themes?: string[] | null;
+    analyzed_at?: string | null;
   }>;
   dailyMetrics: Array<{
     date: string;

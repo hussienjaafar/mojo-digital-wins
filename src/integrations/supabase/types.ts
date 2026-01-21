@@ -8775,6 +8775,8 @@ export type Database = {
         Row: {
           actblue_refcode: string | null
           amount_raised: number | null
+          analyzed_at: string | null
+          call_to_action: string | null
           campaign_id: string
           campaign_name: string | null
           clicks: number | null
@@ -8784,6 +8786,7 @@ export type Database = {
           destination_url: string | null
           extracted_refcode: string | null
           id: string
+          key_themes: string[] | null
           message_text: string | null
           messages_delivered: number | null
           messages_failed: number | null
@@ -8796,11 +8799,17 @@ export type Database = {
           send_date: string | null
           skipped: number | null
           status: string | null
+          tone: string | null
+          topic: string | null
+          topic_summary: string | null
           updated_at: string | null
+          urgency_level: string | null
         }
         Insert: {
           actblue_refcode?: string | null
           amount_raised?: number | null
+          analyzed_at?: string | null
+          call_to_action?: string | null
           campaign_id: string
           campaign_name?: string | null
           clicks?: number | null
@@ -8810,6 +8819,7 @@ export type Database = {
           destination_url?: string | null
           extracted_refcode?: string | null
           id?: string
+          key_themes?: string[] | null
           message_text?: string | null
           messages_delivered?: number | null
           messages_failed?: number | null
@@ -8822,11 +8832,17 @@ export type Database = {
           send_date?: string | null
           skipped?: number | null
           status?: string | null
+          tone?: string | null
+          topic?: string | null
+          topic_summary?: string | null
           updated_at?: string | null
+          urgency_level?: string | null
         }
         Update: {
           actblue_refcode?: string | null
           amount_raised?: number | null
+          analyzed_at?: string | null
+          call_to_action?: string | null
           campaign_id?: string
           campaign_name?: string | null
           clicks?: number | null
@@ -8836,6 +8852,7 @@ export type Database = {
           destination_url?: string | null
           extracted_refcode?: string | null
           id?: string
+          key_themes?: string[] | null
           message_text?: string | null
           messages_delivered?: number | null
           messages_failed?: number | null
@@ -8848,7 +8865,11 @@ export type Database = {
           send_date?: string | null
           skipped?: number | null
           status?: string | null
+          tone?: string | null
+          topic?: string | null
+          topic_summary?: string | null
           updated_at?: string | null
+          urgency_level?: string | null
         }
         Relationships: [
           {
@@ -13603,14 +13624,23 @@ export type Database = {
           upsell_succeeded: number
         }[]
       }
-      get_sms_metrics: {
-        Args: {
-          p_end_date: string
-          p_organization_id: string
-          p_start_date: string
-        }
-        Returns: Json
-      }
+      get_sms_metrics:
+        | {
+            Args: {
+              p_end_date: string
+              p_organization_id: string
+              p_start_date: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_end_date: string
+              p_organization_id: string
+              p_start_date: string
+            }
+            Returns: Json
+          }
       get_state_city_breakdown: {
         Args: { _organization_id: string; _state_abbr: string }
         Returns: Json
