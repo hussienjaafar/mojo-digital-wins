@@ -213,6 +213,29 @@ const APICredentialsManager = () => {
 
       if (error) throw error;
 
+      // Auto-trigger historical backfill for ActBlue when credentials are saved
+      if (selectedPlatform === 'actblue') {
+        try {
+          const { error: backfillError } = await supabase.functions.invoke('backfill-actblue-csv-orchestrator', {
+            body: {
+              organization_id: selectedOrg,
+              days_back: 365,
+              start_immediately: true
+            }
+          });
+          
+          if (!backfillError) {
+            toast({
+              title: "Historical Import Started",
+              description: "ActBlue transaction history is being imported in the background. This may take 30-45 minutes.",
+            });
+          }
+        } catch (e) {
+          console.error('Failed to trigger ActBlue backfill:', e);
+          // Non-blocking - don't fail the credential save
+        }
+      }
+
       toast({
         title: "Success",
         description: editingCredential ? "API credentials updated" : "API credentials saved securely",
@@ -406,7 +429,7 @@ const APICredentialsManager = () => {
     }
   };
 
-  const toggleActive = async (id: string, currentStatus: boolean) => {
+  const toggleActive = async (id: string, currentStatus: boolean, credential?: APICredential) => {
     try {
       const { error } = await (supabase as any)
         .from('client_api_credentials')
@@ -414,6 +437,28 @@ const APICredentialsManager = () => {
         .eq('id', id);
 
       if (error) throw error;
+
+      // Auto-trigger historical backfill when ActBlue is activated
+      if (!currentStatus && credential?.platform === 'actblue') {
+        try {
+          const { error: backfillError } = await supabase.functions.invoke('backfill-actblue-csv-orchestrator', {
+            body: {
+              organization_id: credential.organization_id,
+              days_back: 365,
+              start_immediately: true
+            }
+          });
+          
+          if (!backfillError) {
+            toast({
+              title: "Historical Import Started",
+              description: "ActBlue transaction history is being imported in the background.",
+            });
+          }
+        } catch (e) {
+          console.error('Failed to trigger ActBlue backfill:', e);
+        }
+      }
 
       toast({
         title: "Success",
@@ -578,7 +623,7 @@ const APICredentialsManager = () => {
                 <Pencil className="mr-2 h-4 w-4" />
                 Update Credentials
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toggleActive(cred.id, cred.is_active)}>
+              <DropdownMenuItem onClick={() => toggleActive(cred.id, cred.is_active, cred)}>
                 {cred.is_active ? (
                   <>
                     <XCircle className="mr-2 h-4 w-4" />

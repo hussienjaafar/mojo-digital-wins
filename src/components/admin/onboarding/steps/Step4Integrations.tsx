@@ -257,6 +257,29 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
         [platform]: { ...prev[platform], is_enabled: true }
       }));
 
+      // Auto-trigger historical backfill for ActBlue when credentials are saved
+      if (platform === 'actblue') {
+        try {
+          const { error: backfillError } = await supabase.functions.invoke('backfill-actblue-csv-orchestrator', {
+            body: {
+              organization_id: organizationId,
+              days_back: 365,
+              start_immediately: true
+            }
+          });
+          
+          if (!backfillError) {
+            toast({
+              title: 'Historical import started',
+              description: 'ActBlue transaction history is being imported in the background. This may take 30-45 minutes.'
+            });
+          }
+        } catch (e) {
+          console.error('Failed to trigger ActBlue backfill:', e);
+          // Non-blocking - don't fail the credential save
+        }
+      }
+
       if (platform === 'meta') {
         updateFormState('meta', { access_token: '', isOpen: false });
       } else if (platform === 'switchboard') {
