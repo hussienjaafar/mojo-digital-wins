@@ -122,6 +122,7 @@ const acceptInvitationSignupSchema = z.object({
   token: z.string().min(1, "Invitation token is required"),
   email: emailSchema,
   password: strongPasswordSchema,
+  confirm_password: z.string().min(1, "Password confirmation is required"),
   full_name: z
     .string()
     .min(1, "Full name is required")
@@ -160,7 +161,25 @@ serve(async (req: Request) => {
       );
     }
 
-    const { token, email, password, full_name } = parsed.data;
+    const { token, email, password, confirm_password, full_name } = parsed.data;
+    
+    // Validate password confirmation BEFORE any other processing
+    // Note: confirm_password is intentionally NOT logged or stored
+    if (password !== confirm_password) {
+      log.warn("Password confirmation mismatch");
+      return new Response(
+        JSON.stringify({
+          error: "Passwords do not match",
+          code: "PASSWORD_MISMATCH",
+          requestId,
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+    
     log.setContext({ email, step: "validated" });
     log.info("Request validated", { tokenPrefix: token.substring(0, 8) + "..." });
 
