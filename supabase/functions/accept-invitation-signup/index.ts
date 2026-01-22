@@ -159,21 +159,113 @@ serve(async (req: Request) => {
     if (createError) {
       console.error("Error creating user:", createError);
 
-      // Handle duplicate user error
+      // Handle duplicate user error - existing user wants to join new org
       if (
         createError.message.includes("already been registered") ||
         createError.message.includes("already exists")
       ) {
+        console.log("User already exists, attempting to add to organization...");
+        
+        // Get the existing user by email
+        const { data: existingUserData, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+        
+        if (listError) {
+          console.error("Error listing users:", listError);
+          return new Response(
+            JSON.stringify({ error: "Failed to find existing user" }),
+            { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          );
+        }
+        
+        const existingUser = existingUserData.users.find(
+          (u) => u.email?.toLowerCase() === email.toLowerCase()
+        );
+        
+        if (!existingUser) {
+          return new Response(
+            JSON.stringify({ error: "User exists but could not be found" }),
+            { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          );
+        }
+        
+        // Update the user's password (they just set a new one) and full_name
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+          existingUser.id,
+          { 
+            password: password,
+            user_metadata: { full_name: full_name }
+          }
+        );
+        
+        if (updateError) {
+          console.error("Error updating user password:", updateError);
+          // Continue anyway - password update is nice-to-have
+        }
+        
+        // Accept the invitation for the existing user
+        const { data: acceptResult, error: acceptError } = await supabaseAdmin.rpc(
+          "accept_invitation",
+          {
+            p_token: token,
+            p_user_id: existingUser.id,
+          }
+        );
+        
+        if (acceptError) {
+          console.error("Error accepting invitation for existing user:", acceptError);
+          return new Response(
+            JSON.stringify({ error: "Failed to accept invitation" }),
+            { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          );
+        }
+        
+        const result = acceptResult as {
+          success: boolean;
+          error?: string;
+          invitation_type?: string;
+          organization_id?: string;
+        };
+        
+        if (!result.success) {
+          return new Response(
+            JSON.stringify({ error: result.error || "Failed to accept invitation" }),
+            { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          );
+        }
+        
+        // Sign in the existing user
+        const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+          email: email,
+          password: password,
+        });
+        
+        if (signInError) {
+          console.error("Error signing in existing user:", signInError);
+          return new Response(
+            JSON.stringify({
+              success: true,
+              user_id: existingUser.id,
+              invitation_type: result.invitation_type,
+              organization_id: result.organization_id,
+              session: null,
+              message: "Invitation accepted. Please log in with your credentials.",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          );
+        }
+        
+        // Return success with session
         return new Response(
           JSON.stringify({
-            error:
-              "An account with this email already exists. Please log in instead.",
-            code: "USER_EXISTS",
+            success: true,
+            user_id: existingUser.id,
+            invitation_type: result.invitation_type,
+            organization_id: result.organization_id,
+            session: signInData.session,
+            access_token: signInData.session?.access_token,
+            refresh_token: signInData.session?.refresh_token,
           }),
-          {
-            status: 409,
-            headers: { "Content-Type": "application/json", ...corsHeaders },
-          }
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
 
