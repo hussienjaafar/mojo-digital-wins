@@ -2680,6 +2680,7 @@ export type Database = {
       }
       client_users: {
         Row: {
+          active_organization_id: string | null
           created_at: string | null
           full_name: string
           id: string
@@ -2690,6 +2691,7 @@ export type Database = {
           status: Database["public"]["Enums"]["user_status"]
         }
         Insert: {
+          active_organization_id?: string | null
           created_at?: string | null
           full_name: string
           id: string
@@ -2700,6 +2702,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["user_status"]
         }
         Update: {
+          active_organization_id?: string | null
           created_at?: string | null
           full_name?: string
           id?: string
@@ -2710,6 +2713,27 @@ export type Database = {
           status?: Database["public"]["Enums"]["user_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "client_users_active_organization_id_fkey"
+            columns: ["active_organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_users_active_organization_id_fkey"
+            columns: ["active_organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "client_users_active_organization_id_fkey"
+            columns: ["active_organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
           {
             foreignKeyName: "client_users_organization_id_fkey"
             columns: ["organization_id"]
@@ -7300,6 +7324,73 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "trend_quality_flags"
             referencedColumns: ["trend_id"]
+          },
+        ]
+      }
+      organization_memberships: {
+        Row: {
+          created_at: string | null
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          is_primary: boolean | null
+          joined_at: string | null
+          metadata: Json | null
+          organization_id: string
+          role: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_primary?: boolean | null
+          joined_at?: string | null
+          metadata?: Json | null
+          organization_id: string
+          role?: string
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_primary?: boolean | null
+          joined_at?: string | null
+          metadata?: Json | null
+          organization_id?: string
+          role?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_memberships_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_memberships_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "organization_memberships_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -13657,6 +13748,10 @@ export type Database = {
         Args: { p_token: string; p_user_id: string }
         Returns: Json
       }
+      accept_organization_invitation: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       archive_old_data: {
         Args: never
         Returns: {
@@ -13983,6 +14078,7 @@ export type Database = {
           unique_donors: number
         }[]
       }
+      get_active_organization_id: { Args: never; Returns: string }
       get_attribution_summary: {
         Args: {
           p_end_date: string
@@ -14139,6 +14235,18 @@ export type Database = {
           urgency_score: number
         }[]
       }
+      get_organization_members: {
+        Args: { p_organization_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          joined_at: string
+          membership_id: string
+          role: string
+          status: string
+          user_id: string
+        }[]
+      }
       get_pending_invitations: {
         Args: { p_organization_id?: string; p_type?: string }
         Returns: {
@@ -14261,6 +14369,18 @@ export type Database = {
       }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_organization_id_safe: { Args: never; Returns: string }
+      get_user_organizations: {
+        Args: { p_user_id?: string }
+        Returns: {
+          is_primary: boolean
+          joined_at: string
+          membership_id: string
+          organization_id: string
+          organization_name: string
+          role: string
+          status: string
+        }[]
+      }
       get_users_with_roles: {
         Args: never
         Returns: {
@@ -14284,6 +14404,10 @@ export type Database = {
           roles: string[]
         }[]
       }
+      has_org_role: {
+        Args: { p_organization_id: string; p_roles: string[] }
+        Returns: boolean
+      }
       has_pii_access:
         | { Args: never; Returns: boolean }
         | { Args: { _organization_id: string }; Returns: boolean }
@@ -14301,6 +14425,10 @@ export type Database = {
       increment_invitation_failed_attempts: {
         Args: { p_invitation_id: string }
         Returns: undefined
+      }
+      invite_to_organization: {
+        Args: { p_organization_id: string; p_role?: string; p_user_id: string }
+        Returns: Json
       }
       is_account_locked: { Args: { _user_id: string }; Returns: boolean }
       is_client_admin: { Args: never; Returns: boolean }
@@ -14463,6 +14591,14 @@ export type Database = {
           p_start_date?: string
         }
         Returns: string
+      }
+      switch_organization: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      transfer_organization_ownership: {
+        Args: { p_new_owner_id: string; p_organization_id: string }
+        Returns: Json
       }
       unlock_account: {
         Args: { _admin_id: string; _user_id: string }
