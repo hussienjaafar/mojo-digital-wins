@@ -10,12 +10,24 @@ export type ChannelFilter = 'all' | 'meta' | 'sms' | 'donations';
 export type ViewMode = 'overview' | 'detailed';
 
 export type KpiKey =
+  // Dashboard KPIs
   | 'netRevenue'
   | 'netRoi'
   | 'refundRate'
   | 'currentMrr'
   | 'newMrr'
-  | 'uniqueDonors';
+  | 'uniqueDonors'
+  // Creative Intelligence KPIs
+  | 'totalCreatives'
+  | 'activeVariations'
+  | 'avgRoas'
+  | 'topPerformers'
+  | 'needsWork'
+  | 'aiAnalyzed'
+  | 'videos'
+  | 'images'
+  | 'total'
+  | 'variations';
 
 export type SeriesKey =
   | 'donations'
@@ -49,12 +61,24 @@ interface DateRange {
  * - uniqueDonors → [] (no donor count series in chart today)
  */
 export const KPI_TO_SERIES_MAP: Record<KpiKey, SeriesKey[]> = {
+  // Dashboard KPIs
   netRevenue: ['netDonations'],
   netRoi: [], // Derived metric - highlighting spend series would be misleading
   refundRate: ['refunds', 'donations'],
   currentMrr: [], // No recurring-specific series in Fundraising chart
   newMrr: [], // No recurring-specific series in Fundraising chart
   uniqueDonors: [], // No donor count series in Fundraising chart
+  // Creative Intelligence KPIs (no chart series associations)
+  totalCreatives: [],
+  activeVariations: [],
+  avgRoas: [],
+  topPerformers: [],
+  needsWork: [],
+  aiAnalyzed: [],
+  videos: [],
+  images: [],
+  total: [],
+  variations: [],
 };
 
 /**
