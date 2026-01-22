@@ -208,11 +208,25 @@ serve(async (req) => {
         continue;
       }
 
+      // Fix event_id format if it was wrong in the original
+      // For enrichment mode, event_id should be raw lineitem_id (source_id) to match ActBlue pixel
+      const correctedEventId = event.is_enrichment_only && event.event_id.startsWith('actblue_')
+        ? event.source_id  // Use raw lineitem_id for enrichment mode
+        : event.event_id;
+      
+      if (correctedEventId !== event.event_id) {
+        console.log('[RESEND-CAPI] Correcting event_id format:', {
+          old: event.event_id,
+          new: correctedEventId,
+          reason: 'enrichment mode requires raw lineitem_id'
+        });
+      }
+
       // Create corrected event (or preview)
       const correctedEventData = {
         organization_id,
         pixel_id: event.pixel_id,
-        event_id: event.event_id, // Same event_id for Meta deduplication
+        event_id: correctedEventId, // Corrected event_id for proper Meta deduplication
         event_name: event.event_name,
         event_time: event.event_time,
         event_source_url: event.event_source_url,
