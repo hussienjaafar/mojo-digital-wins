@@ -138,7 +138,14 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  log.info("Invitation signup request started");
+  // Extract request metadata for security logging
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || req.headers.get('x-real-ip')
+    || req.headers.get('cf-connecting-ip')
+    || 'unknown';
+  const userAgent = req.headers.get('user-agent') || 'unknown';
+
+  log.info("Invitation signup request started", { clientIp });
 
   try {
     // Parse and validate request body
@@ -249,6 +256,53 @@ serve(async (req: Request) => {
       expiresAt: invitation.expires_at,
     });
 
+    // Security: Check if token has already been used (single-use enforcement)
+    if (invitation.used_at) {
+      log.warn("Invitation already used", { usedAt: invitation.used_at });
+      await logAuditEvent(supabaseAdmin, {
+        invitationId: invitation.id,
+        eventType: "token_reuse_attempt",
+        email,
+        organizationId: invitation.organization_id,
+        invitationType: invitation.invitation_type,
+        errorMessage: "This invitation has already been used",
+        metadata: { requestId, clientIp, userAgent, usedAt: invitation.used_at },
+      });
+      return new Response(
+        JSON.stringify({ error: "This invitation has already been used", requestId }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
+    // Security: Check for too many failed attempts (rate limiting)
+    const MAX_FAILED_ATTEMPTS = 5;
+    const failedAttempts = invitation.failed_attempts || 0;
+    if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+      log.warn("Invitation blocked due to failed attempts", { failedAttempts });
+      await logAuditEvent(supabaseAdmin, {
+        invitationId: invitation.id,
+        eventType: "invitation_blocked",
+        email,
+        organizationId: invitation.organization_id,
+        invitationType: invitation.invitation_type,
+        errorMessage: "Invitation blocked due to too many failed attempts",
+        metadata: { requestId, clientIp, userAgent, failedAttempts },
+      });
+      return new Response(
+        JSON.stringify({ 
+          error: "This invitation link has been blocked due to too many failed attempts", 
+          requestId 
+        }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
     // Check invitation status
     if (invitation.status === "accepted") {
       log.warn("Invitation already accepted");
@@ -259,7 +313,7 @@ serve(async (req: Request) => {
         organizationId: invitation.organization_id,
         invitationType: invitation.invitation_type,
         status: "accepted",
-        metadata: { requestId },
+        metadata: { requestId, clientIp, userAgent },
       });
       return new Response(
         JSON.stringify({ error: "This invitation has already been accepted", requestId }),
@@ -279,7 +333,7 @@ serve(async (req: Request) => {
         organizationId: invitation.organization_id,
         invitationType: invitation.invitation_type,
         status: "revoked",
-        metadata: { requestId },
+        metadata: { requestId, clientIp, userAgent },
       });
       return new Response(
         JSON.stringify({ error: "This invitation has been revoked", requestId }),
@@ -299,7 +353,7 @@ serve(async (req: Request) => {
         organizationId: invitation.organization_id,
         invitationType: invitation.invitation_type,
         status: "expired",
-        metadata: { requestId, expiresAt: invitation.expires_at },
+        metadata: { requestId, clientIp, userAgent, expiresAt: invitation.expires_at },
       });
       return new Response(
         JSON.stringify({ error: "This invitation has expired", requestId }),
@@ -313,6 +367,12 @@ serve(async (req: Request) => {
     // Verify email matches invitation
     if (email.toLowerCase() !== invitation.email.toLowerCase()) {
       log.warn("Email mismatch", { invitationEmail: invitation.email });
+      
+      // Increment failed attempts for email mismatch
+      await supabaseAdmin.rpc('increment_invitation_failed_attempts', {
+        p_invitation_id: invitation.id
+      });
+      
       await logAuditEvent(supabaseAdmin, {
         invitationId: invitation.id,
         eventType: "email_mismatch",
@@ -320,7 +380,7 @@ serve(async (req: Request) => {
         organizationId: invitation.organization_id,
         invitationType: invitation.invitation_type,
         errorMessage: "Email address does not match the invitation",
-        metadata: { requestId, invitationEmail: invitation.email },
+        metadata: { requestId, clientIp, userAgent, invitationEmail: invitation.email },
       });
       return new Response(
         JSON.stringify({
@@ -363,7 +423,7 @@ serve(async (req: Request) => {
           email,
           organizationId: invitation.organization_id,
           invitationType: invitation.invitation_type,
-          metadata: { requestId },
+          metadata: { requestId, clientIp, userAgent },
         });
         
         // Get the existing user by email
@@ -378,7 +438,7 @@ serve(async (req: Request) => {
             email,
             organizationId: invitation.organization_id,
             errorMessage: listError.message,
-            metadata: { requestId },
+            metadata: { requestId, clientIp, userAgent },
           });
           return new Response(
             JSON.stringify({ error: "Failed to find existing user", requestId }),
@@ -398,7 +458,7 @@ serve(async (req: Request) => {
             email,
             organizationId: invitation.organization_id,
             errorMessage: "User exists but could not be found",
-            metadata: { requestId },
+            metadata: { requestId, clientIp, userAgent },
           });
           return new Response(
             JSON.stringify({ error: "User exists but could not be found", requestId }),
@@ -427,7 +487,7 @@ serve(async (req: Request) => {
             userId: existingUser.id,
             organizationId: invitation.organization_id,
             errorMessage: updateError.message,
-            metadata: { requestId },
+            metadata: { requestId, clientIp, userAgent },
           });
         } else {
           log.info("Updated user password and metadata");
@@ -454,7 +514,7 @@ serve(async (req: Request) => {
             userId: existingUser.id,
             organizationId: invitation.organization_id,
             errorMessage: acceptError.message,
-            metadata: { requestId },
+            metadata: { requestId, clientIp, userAgent },
           });
           return new Response(
             JSON.stringify({ error: "Failed to accept invitation", requestId }),
@@ -480,7 +540,7 @@ serve(async (req: Request) => {
             userId: existingUser.id,
             organizationId: invitation.organization_id,
             errorMessage: result.error,
-            metadata: { requestId },
+            metadata: { requestId, clientIp, userAgent },
           });
           return new Response(
             JSON.stringify({ error: result.error || "Failed to accept invitation", requestId }),
@@ -508,7 +568,7 @@ serve(async (req: Request) => {
             invitationType: result.invitation_type,
             status: "accepted",
             errorMessage: signInError.message,
-            metadata: { requestId },
+            metadata: { requestId, clientIp, userAgent },
           });
           return new Response(
             JSON.stringify({
@@ -533,7 +593,7 @@ serve(async (req: Request) => {
           organizationId: result.organization_id,
           invitationType: result.invitation_type,
           status: "accepted",
-          metadata: { requestId },
+          metadata: { requestId, clientIp, userAgent },
         });
         
         return new Response(
@@ -559,7 +619,7 @@ serve(async (req: Request) => {
         organizationId: invitation.organization_id,
         invitationType: invitation.invitation_type,
         errorMessage: createError.message,
-        metadata: { requestId },
+        metadata: { requestId, clientIp, userAgent },
       });
       return new Response(
         JSON.stringify({
@@ -584,7 +644,7 @@ serve(async (req: Request) => {
         organizationId: invitation.organization_id,
         invitationType: invitation.invitation_type,
         errorMessage: "User creation returned null",
-        metadata: { requestId },
+        metadata: { requestId, clientIp, userAgent },
       });
       return new Response(
         JSON.stringify({ error: "Failed to create user account", requestId }),
@@ -604,7 +664,7 @@ serve(async (req: Request) => {
       userId: user.id,
       organizationId: invitation.organization_id,
       invitationType: invitation.invitation_type,
-      metadata: { requestId, fullName: full_name },
+      metadata: { requestId, clientIp, userAgent, fullName: full_name },
     });
 
     // Step 3: Accept the invitation
@@ -627,7 +687,7 @@ serve(async (req: Request) => {
         organizationId: invitation.organization_id,
         invitationType: invitation.invitation_type,
         errorMessage: acceptError.message,
-        metadata: { requestId },
+        metadata: { requestId, clientIp, userAgent },
       });
 
       // Clean up the created user
@@ -662,7 +722,7 @@ serve(async (req: Request) => {
         organizationId: invitation.organization_id,
         invitationType: invitation.invitation_type,
         errorMessage: result.error,
-        metadata: { requestId },
+        metadata: { requestId, clientIp, userAgent },
       });
 
       // Clean up user
@@ -701,7 +761,7 @@ serve(async (req: Request) => {
         invitationType: result.invitation_type,
         status: "accepted",
         errorMessage: signInError.message,
-        metadata: { requestId },
+        metadata: { requestId, clientIp, userAgent },
       });
       
       return new Response(
@@ -731,7 +791,7 @@ serve(async (req: Request) => {
       organizationId: result.organization_id,
       invitationType: result.invitation_type,
       status: "accepted",
-      metadata: { requestId },
+      metadata: { requestId, clientIp, userAgent },
     });
 
     // Return success with session for immediate login

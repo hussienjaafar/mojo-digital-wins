@@ -135,7 +135,7 @@ serve(async (req) => {
         // Handle resend: Generate new token and update expiry
         const newToken = crypto.randomUUID();
         const newExpiry = new Date();
-        newExpiry.setDate(newExpiry.getDate() + 7); // 7 days from now
+        newExpiry.setTime(newExpiry.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
         const currentResendCount = existingInvite.resend_count || 0;
 
         // Limit resends to prevent abuse
@@ -189,7 +189,7 @@ serve(async (req) => {
           invitationType: body.type as 'platform_admin' | 'organization_member',
           organizationName: organizationName || undefined,
           role: body.role || undefined,
-          expiresIn: '7 days',
+          expiresIn: '48 hours',
         });
 
         // Send email
@@ -353,7 +353,7 @@ serve(async (req) => {
       invitationType: body.type as 'platform_admin' | 'organization_member',
       organizationName: organizationName || undefined,
       role: body.role || undefined,
-      expiresIn: '7 days',
+      expiresIn: '48 hours',
     });
 
     // Check if email is configured and send
