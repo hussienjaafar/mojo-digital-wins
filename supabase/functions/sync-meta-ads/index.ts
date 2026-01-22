@@ -1516,35 +1516,55 @@ serve(async (req) => {
     }
 
     // ========== ASSET-LEVEL BREAKDOWN: Fetch performance by text variation ==========
+    // ENHANCED: Follows Gemini Pro's Meta API best practices:
+    // - Separate API calls for each breakdown type (combining often fails)
+    // - CPA-first ranking with CTR fallback
+    // - Minimum 500 impressions threshold for reliable data
+    // - Include reach and inline_link_clicks fields
+    
+    const MIN_IMPRESSIONS_THRESHOLD = 500; // Assets below this are excluded from ranking
     let variationBreakdownsProcessed = 0;
     
     try {
       console.log(`[ASSET BREAKDOWNS] Fetching asset-level performance breakdowns...`);
+      console.log(`[ASSET BREAKDOWNS] Using minimum impressions threshold: ${MIN_IMPRESSIONS_THRESHOLD}`);
       
       // Meta supports breakdowns by body_asset, title_asset, description_asset for DCO ads
+      // CRITICAL: Separate API calls per Gemini guidance (combining breakdowns often fails)
       const breakdownTypes = ['body_asset', 'title_asset', 'description_asset'] as const;
       
       for (const breakdownType of breakdownTypes) {
         try {
+          // ENHANCED API FIELDS: Include reach and inline_link_clicks per Gemini guidance
           const assetBreakdownUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/insights?` +
             `level=ad&` +
             `breakdowns=${breakdownType}&` +
-            `fields=ad_id,impressions,clicks,spend,actions,action_values,outbound_clicks,inline_link_click_ctr&` +
+            `fields=ad_id,impressions,spend,inline_link_clicks,actions,action_values,reach&` +
             `time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&` +
             `filtering=[{"field":"ad.effective_status","operator":"IN","value":["ACTIVE","PAUSED","ARCHIVED"]}]&` +
             `limit=500&` +
             `access_token=${access_token}`;
           
+          console.log(`[ASSET BREAKDOWNS][${breakdownType}] Fetching...`);
           const breakdownRes = await fetch(assetBreakdownUrl);
           const breakdownData = await breakdownRes.json();
           
+          // ENHANCED LOGGING: Log raw API response for debugging
+          console.log(`[ASSET BREAKDOWNS][${breakdownType}] Raw API response:`, 
+            JSON.stringify(breakdownData, null, 2).substring(0, 1500));
+          
           if (breakdownData.error) {
+            console.log(`[ASSET BREAKDOWNS][${breakdownType}] Error code: ${breakdownData.error.code}`);
+            console.log(`[ASSET BREAKDOWNS][${breakdownType}] Error message: ${breakdownData.error.message}`);
+            console.log(`[ASSET BREAKDOWNS][${breakdownType}] Error subcode: ${breakdownData.error.error_subcode || 'none'}`);
             console.log(`[ASSET BREAKDOWNS] Note: ${breakdownType} breakdown not available (may not have DCO ads)`);
             continue;
           }
           
           const breakdowns = breakdownData.data || [];
-          console.log(`[ASSET BREAKDOWNS] Processing ${breakdowns.length} ${breakdownType} records`);
+          console.log(`[ASSET BREAKDOWNS][${breakdownType}] Processing ${breakdowns.length} records`);
+          
+          let skippedLowImpressions = 0;
           
           for (const breakdown of breakdowns) {
             if (!breakdown.ad_id) continue;
@@ -1558,39 +1578,32 @@ serve(async (req) => {
               : breakdownType === 'title_asset' ? 'title' 
               : 'description';
             
-            // Extract metrics
+            // Extract metrics - ENHANCED with reach and inline_link_clicks
             const impressions = parseInt(breakdown.impressions) || 0;
-            const clicks = parseInt(breakdown.clicks) || 0;
             const spend = parseFloat(breakdown.spend) || 0;
+            const reach = parseInt(breakdown.reach) || 0;
+            const inlineLinkClicks = parseInt(breakdown.inline_link_clicks) || 0;
             
-            // Extract link clicks
-            let linkClicks = 0;
-            if (breakdown.outbound_clicks) {
-              const outboundAction = breakdown.outbound_clicks.find((a: any) => 
-                a.action_type === 'outbound_click'
-              );
-              if (outboundAction) linkClicks = parseInt(outboundAction.value) || 0;
+            // ENHANCED: Check minimum impressions threshold
+            if (impressions < MIN_IMPRESSIONS_THRESHOLD) {
+              skippedLowImpressions++;
+              continue; // Skip assets with insufficient data for reliable ranking
             }
             
-            // Link CTR
-            const linkCtr = breakdown.inline_link_click_ctr 
-              ? parseFloat(breakdown.inline_link_click_ctr) / 100 
-              : (impressions > 0 ? linkClicks / impressions : null);
-            
-            // CTR
-            const ctr = impressions > 0 ? clicks / impressions : null;
-            
-            // Extract conversions
-            let conversions = 0;
-            let conversionValue = 0;
-            
+            // Extract purchases (conversions) - ENHANCED per Gemini guidance
+            let purchases = 0;
             if (breakdown.actions) {
-              const convAction = breakdown.actions.find((a: any) => 
-                a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+              // Check multiple action types for purchases
+              const purchaseAction = breakdown.actions.find((a: any) => 
+                a.action_type === 'purchase' || 
+                a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
+                a.action_type === 'lead' // Fallback for lead-gen campaigns
               );
-              if (convAction) conversions = parseInt(convAction.value) || 0;
+              if (purchaseAction) purchases = parseInt(purchaseAction.value) || 0;
             }
             
+            // Extract conversion value
+            let conversionValue = 0;
             if (breakdown.action_values) {
               const valueAction = breakdown.action_values.find((a: any) => 
                 a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
@@ -1598,7 +1611,22 @@ serve(async (req) => {
               if (valueAction) conversionValue = parseFloat(valueAction.value) || 0;
             }
             
+            // ENHANCED CALCULATIONS per Gemini guidance
+            // CPA = spend / purchases (primary ranking metric, lower is better)
+            const cpa = purchases > 0 ? spend / purchases : null;
+            
+            // CTR = inline_link_clicks / impressions * 100 (fallback metric, higher is better)
+            const ctr = impressions > 0 ? inlineLinkClicks / impressions : null;
+            
+            // ROAS for reference
             const roas = spend > 0 ? conversionValue / spend : null;
+            
+            // Determine ranking method
+            const rankingMethod = cpa !== null && cpa > 0 ? 'cpa' : 'ctr';
+            
+            // Legacy fields for backward compatibility
+            const clicks = inlineLinkClicks; // Use link clicks as primary click metric
+            const conversions = purchases;
             
             // Normalize asset text for matching (handle whitespace, encoding differences)
             const normalizedAssetText = assetText.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -1644,7 +1672,7 @@ serve(async (req) => {
             }
             
             if (matchedVariation) {
-              // Update by ID (more reliable than text matching)
+              // ENHANCED: Update with new CPA/ranking fields
               const { error: updateError } = await supabase
                 .from('meta_creative_variations')
                 .update({
@@ -1654,9 +1682,15 @@ serve(async (req) => {
                   conversions,
                   conversion_value: conversionValue,
                   ctr,
-                  link_clicks: linkClicks,
-                  link_ctr: linkCtr,
+                  link_clicks: inlineLinkClicks,
+                  link_ctr: ctr, // Link CTR is same as our calculated CTR
                   roas,
+                  // NEW FIELDS for CPA-first ranking
+                  cpa,
+                  purchases,
+                  reach,
+                  inline_link_clicks: inlineLinkClicks,
+                  ranking_method: rankingMethod,
                   is_estimated: false, // This is actual Meta data
                   synced_at: new Date().toISOString(),
                 })
@@ -1664,11 +1698,15 @@ serve(async (req) => {
               
               if (!updateError) {
                 variationBreakdownsProcessed++;
-                console.log(`[ASSET BREAKDOWNS] ✓ Matched ${assetType} for ad ${breakdown.ad_id}: ${impressions} imp, $${spend.toFixed(2)} spend`);
+                console.log(`[ASSET BREAKDOWNS] ✓ Matched ${assetType} for ad ${breakdown.ad_id}: ${impressions} imp, ${purchases} purchases, CPA=${cpa ? '$' + cpa.toFixed(2) : 'N/A'}, ranking by ${rankingMethod}`);
               }
             } else {
               console.log(`[ASSET BREAKDOWNS] ✗ No match for ${assetType} in ad ${breakdown.ad_id}: "${assetText.slice(0, 50)}..."`);
             }
+          }
+          
+          if (skippedLowImpressions > 0) {
+            console.log(`[ASSET BREAKDOWNS][${breakdownType}] Skipped ${skippedLowImpressions} assets below ${MIN_IMPRESSIONS_THRESHOLD} impressions threshold`);
           }
         } catch (breakdownErr) {
           console.error(`[ASSET BREAKDOWNS] Error fetching ${breakdownType}:`, breakdownErr);
@@ -1699,16 +1737,16 @@ serve(async (req) => {
         }
       }
       
-      // Calculate and update performance rankings per ad/asset_type
+      // ENHANCED RANKING: CPA-first with CTR fallback
       if (variationBreakdownsProcessed > 0) {
-        console.log(`[ASSET BREAKDOWNS] Updating performance rankings...`);
+        console.log(`[ASSET BREAKDOWNS] Updating performance rankings with CPA-first algorithm...`);
         
-        // Get all variations for this org grouped by ad_id and asset_type
+        // Get all variations for this org that meet the minimum threshold
         const { data: allVariations } = await supabase
           .from('meta_creative_variations')
-          .select('id, ad_id, asset_type, roas, impressions')
+          .select('id, ad_id, asset_type, cpa, ctr, impressions, purchases')
           .eq('organization_id', organization_id)
-          .order('roas', { ascending: false, nullsFirst: false });
+          .gte('impressions', MIN_IMPRESSIONS_THRESHOLD);
         
         if (allVariations) {
           // Group by ad_id + asset_type
@@ -1719,16 +1757,47 @@ serve(async (req) => {
             groups[key].push(v);
           }
           
-          // Update rank for each group
+          // ENHANCED RANKING per Gemini guidance:
+          // Primary: CPA ascending (lower = better, more cost-efficient)
+          // Fallback: CTR descending (higher = better engagement)
           for (const group of Object.values(groups)) {
+            group.sort((a, b) => {
+              // If both have CPA, compare CPA (lower wins)
+              if (a.cpa && a.cpa > 0 && b.cpa && b.cpa > 0) {
+                return a.cpa - b.cpa;
+              }
+              // If only one has CPA, that one wins (has actual conversion data)
+              if (a.cpa && a.cpa > 0 && (!b.cpa || b.cpa === 0)) return -1;
+              if ((!a.cpa || a.cpa === 0) && b.cpa && b.cpa > 0) return 1;
+              // Fallback to CTR (higher wins)
+              return (b.ctr || 0) - (a.ctr || 0);
+            });
+
+            // Update ranks
             for (let i = 0; i < group.length; i++) {
+              const rankingMethod = group[i].cpa && group[i].cpa > 0 ? 'cpa' : 'ctr';
               await supabase
                 .from('meta_creative_variations')
-                .update({ performance_rank: i + 1 })
+                .update({ 
+                  performance_rank: i + 1,
+                  ranking_method: rankingMethod
+                })
                 .eq('id', group[i].id);
             }
           }
-          console.log(`[ASSET BREAKDOWNS] Rankings updated for ${Object.keys(groups).length} variation groups`);
+          console.log(`[ASSET BREAKDOWNS] CPA-first rankings updated for ${Object.keys(groups).length} variation groups`);
+        }
+        
+        // Mark low-impression variations with null rank (insufficient data)
+        const { error: lowImpError } = await supabase
+          .from('meta_creative_variations')
+          .update({ performance_rank: null, ranking_method: null })
+          .eq('organization_id', organization_id)
+          .lt('impressions', MIN_IMPRESSIONS_THRESHOLD)
+          .gt('impressions', 0);
+        
+        if (!lowImpError) {
+          console.log(`[ASSET BREAKDOWNS] Cleared rankings for low-impression variations (below ${MIN_IMPRESSIONS_THRESHOLD})`);
         }
       }
       

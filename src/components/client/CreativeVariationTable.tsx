@@ -26,6 +26,12 @@ export interface CreativeVariation {
   roas: number | null;
   performance_rank: number | null;
   is_estimated?: boolean;
+  // NEW: Enhanced ranking fields per Gemini Pro guidance
+  cpa?: number | null;
+  purchases?: number;
+  reach?: number;
+  ranking_method?: string | null;
+  inline_link_clicks?: number;
 }
 
 interface CreativeVariationTableProps {
@@ -89,6 +95,13 @@ const formatRoas = (n: number | null | undefined): string => {
   return `${n.toFixed(2)}x`;
 };
 
+const formatCpa = (n: number | null | undefined): string => {
+  if (n === null || n === undefined || n === 0) return "—";
+  return `$${n.toFixed(2)}`;
+};
+
+const MIN_IMPRESSIONS_THRESHOLD = 500;
+
 export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
   variations,
   isLoading = false,
@@ -109,17 +122,46 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
       }
       grouped[v.asset_type].push(v);
     }
-    // Sort each group by ROAS descending, then impressions
+    // Sort each group using CPA-first algorithm per Gemini Pro guidance:
+    // Primary: CPA ascending (lower = better, more cost-efficient)
+    // Fallback: CTR descending (higher = better engagement)
     for (const type of Object.keys(grouped)) {
       grouped[type].sort((a, b) => {
-        const roasA = a.roas ?? 0;
-        const roasB = b.roas ?? 0;
-        if (roasB !== roasA) return roasB - roasA;
+        // Filter out low-impression variations for ranking purposes
+        const aHasEnoughData = a.impressions >= MIN_IMPRESSIONS_THRESHOLD;
+        const bHasEnoughData = b.impressions >= MIN_IMPRESSIONS_THRESHOLD;
+        
+        // Variations with enough data rank above those without
+        if (aHasEnoughData && !bHasEnoughData) return -1;
+        if (!aHasEnoughData && bHasEnoughData) return 1;
+        
+        // If both have CPA > 0, compare CPA (lower wins)
+        const cpaA = a.cpa ?? 0;
+        const cpaB = b.cpa ?? 0;
+        if (cpaA > 0 && cpaB > 0) {
+          if (cpaA !== cpaB) return cpaA - cpaB;
+        }
+        // If only one has CPA, that one wins
+        if (cpaA > 0 && cpaB === 0) return -1;
+        if (cpaA === 0 && cpaB > 0) return 1;
+        
+        // Fallback to CTR (higher wins)
+        const ctrA = a.ctr ?? 0;
+        const ctrB = b.ctr ?? 0;
+        if (ctrB !== ctrA) return ctrB - ctrA;
+        
+        // Final fallback to impressions
         return b.impressions - a.impressions;
       });
-      // Assign ranks
-      grouped[type].forEach((v, idx) => {
-        v.performance_rank = idx + 1;
+      // Assign ranks (only to variations with sufficient data)
+      let rank = 0;
+      grouped[type].forEach((v) => {
+        if (v.impressions >= MIN_IMPRESSIONS_THRESHOLD) {
+          rank++;
+          v.performance_rank = rank;
+        } else {
+          v.performance_rank = null; // Insufficient data
+        }
       });
     }
     return grouped;
@@ -215,6 +257,19 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
                               <TableHead className="text-right">Link CTR</TableHead>
                               <TableHead className="text-right">Spend</TableHead>
                               <TableHead className="text-right">Conv</TableHead>
+                              <TableHead className="text-right">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger className="flex items-center gap-1 justify-end">
+                                      CPA
+                                      <Info className="h-3 w-3 text-[hsl(var(--portal-text-muted))]" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Cost Per Acquisition (primary ranking metric)</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </TableHead>
                               <TableHead className="text-right">ROAS</TableHead>
                             </>
                           )}
@@ -234,7 +289,38 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
                           >
                             <TableCell className="text-center">
                               {hasRealMetrics ? (
-                                <RankIcon rank={variation.performance_rank || idx + 1} />
+                                variation.performance_rank ? (
+                                  <div className="flex items-center justify-center gap-1">
+                                    <RankIcon rank={variation.performance_rank} />
+                                    {variation.ranking_method && (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger>
+                                            <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                              {variation.ranking_method.toUpperCase()}
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            Ranked by {variation.ranking_method === 'cpa' ? 'Cost Per Acquisition' : 'Click-Through Rate'}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )}
+                                  </div>
+                                ) : variation.impressions > 0 && variation.impressions < MIN_IMPRESSIONS_THRESHOLD ? (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <AlertCircle className="h-4 w-4 text-[hsl(var(--portal-accent-amber))]" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        Insufficient data ({variation.impressions} impressions, need {MIN_IMPRESSIONS_THRESHOLD}+)
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                ) : (
+                                  <span className="text-[hsl(var(--portal-text-muted))]">—</span>
+                                )
                               ) : (
                                 <span className="text-[hsl(var(--portal-text-muted))]">{idx + 1}</span>
                               )}
@@ -268,6 +354,18 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">
                                   {formatNumber(variation.conversions)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <span
+                                    className={cn(
+                                      "font-mono text-sm",
+                                      variation.cpa && variation.cpa > 0
+                                        ? "text-[hsl(var(--portal-text-primary))] font-semibold"
+                                        : "text-[hsl(var(--portal-text-muted))]"
+                                    )}
+                                  >
+                                    {formatCpa(variation.cpa)}
+                                  </span>
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex items-center justify-end gap-1">
