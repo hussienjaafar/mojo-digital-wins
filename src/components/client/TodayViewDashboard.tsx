@@ -1,5 +1,5 @@
 import React from "react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { 
   Clock, 
   TrendingUp, 
@@ -22,6 +22,7 @@ import {
   type TodayMetricsData,
   type ComparisonMetrics 
 } from "@/hooks/useHourlyMetrics";
+import { useDateRange } from "@/stores/dashboardStore";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 
 // ============================================================================
@@ -143,11 +144,16 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
 }) => {
   const { data, isLoading, error } = useTodayMetrics(organizationId);
   const isTodayView = useIsTodayView();
+  const dateRange = useDateRange();
 
+  // Format the selected date for display
+  const selectedDate = parseISO(dateRange.startDate);
   const currentTimeLabel = isTodayView 
     ? `as of ${format(new Date(), "h:mm a")}`
-    : format(new Date(), "MMMM d, yyyy");
-
+    : format(selectedDate, "EEEE, MMMM d, yyyy");
+  
+  // Comparison label changes based on whether we're viewing today or a historical date
+  const comparisonLabel = isTodayView ? "vs yesterday" : "vs day before";
   if (isLoading) {
     return (
       <div className={cn("space-y-6", className)}>
@@ -209,7 +215,7 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
           value={today?.gross_amount ?? 0}
           format="currency"
           comparisonValue={yesterday?.gross_amount}
-          comparisonLabel="vs yesterday"
+          comparisonLabel={comparisonLabel}
           icon={DollarSign}
           accent="blue"
         />
@@ -218,7 +224,7 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
           value={today?.donation_count ?? 0}
           format="number"
           comparisonValue={yesterday?.donation_count}
-          comparisonLabel="vs yesterday"
+          comparisonLabel={comparisonLabel}
           icon={TrendingUp}
           accent="green"
         />
@@ -227,7 +233,7 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
           value={today?.unique_donors ?? 0}
           format="number"
           comparisonValue={yesterday?.unique_donors}
-          comparisonLabel="vs yesterday"
+          comparisonLabel={comparisonLabel}
           icon={Users}
           accent="purple"
         />
@@ -236,7 +242,7 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
           value={recurringPercent}
           format="percent"
           comparisonValue={yesterdayRecurringPercent}
-          comparisonLabel="vs yesterday"
+          comparisonLabel={comparisonLabel}
           icon={Repeat}
           accent="amber"
         />
@@ -270,7 +276,7 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
         <motion.div variants={itemVariants}>
           <V3Card className="p-4 sm:p-6">
             <h3 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-4">
-              Same Day Last Week
+              {isTodayView ? "Same Day Last Week" : "Same Weekday Last Week"}
             </h3>
             <div className="space-y-4">
               <ComparisonRow

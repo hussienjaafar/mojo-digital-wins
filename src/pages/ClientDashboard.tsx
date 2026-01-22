@@ -31,6 +31,7 @@ import { toast } from "sonner";
 import { ActBlueMetricsDebug } from "@/components/debug/ActBlueMetricsDebug";
 import { TodayViewDashboard } from "@/components/client/TodayViewDashboard";
 import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
+import { useInactivityReset } from "@/hooks/useInactivityReset";
 
 // Lazy load Heatmap for performance
 const DonationHeatmap = lazy(() => import("@/components/client/DonationHeatmap"));
@@ -249,6 +250,9 @@ const ClientDashboard = () => {
   const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useClientDashboardMetricsQuery(organizationId);
   const { data: recurringHealthData } = useRecurringHealthQuery(organizationId);
   const isSingleDayView = useIsSingleDayView();
+
+  // Reset date range to "today" after 30 minutes of inactivity
+  useInactivityReset({ enabled: true, timeoutMs: 30 * 60 * 1000 });
 
   // Handler for refresh button - invalidates cache and forces fresh fetch
   const handleRefresh = useCallback(async () => {
