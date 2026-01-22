@@ -129,7 +129,7 @@ export async function hasPermission(
   permission: Permission | string
 ): Promise<boolean> {
   try {
-    const { data, error } = await supabase.rpc('user_has_permission', {
+    const { data, error } = await (supabase.rpc as any)('user_has_permission', {
       _user_id: userId,
       _organization_id: organizationId,
       _permission_name: permission,
@@ -159,7 +159,7 @@ export async function hasPermission(
  */
 export async function checkPermission(permission: Permission | string): Promise<boolean> {
   try {
-    const { data, error } = await supabase.rpc('check_permission', {
+    const { data, error } = await (supabase.rpc as any)('check_permission', {
       _permission_name: permission,
     });
 
@@ -190,7 +190,7 @@ export async function getAllPermissions(): Promise<Map<string, boolean>> {
   const permissionsMap = new Map<string, boolean>();
 
   try {
-    const { data, error } = await supabase.rpc('get_user_permissions');
+    const { data, error } = await (supabase.rpc as any)('get_user_permissions');
 
     if (error) {
       console.error('Error fetching permissions:', error);
@@ -198,7 +198,7 @@ export async function getAllPermissions(): Promise<Map<string, boolean>> {
     }
 
     if (data && Array.isArray(data)) {
-      data.forEach((p: UserPermission) => {
+      (data as UserPermission[]).forEach((p) => {
         permissionsMap.set(p.permission_name, p.granted);
       });
     }
