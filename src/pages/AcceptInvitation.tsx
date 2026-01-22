@@ -94,7 +94,10 @@ export default function AcceptInvitation() {
     return () => clearInterval(timer);
   }, [viewMode]);
 
-  const handleRedirect = useCallback(() => {
+  const handleRedirect = useCallback(async () => {
+    // Small delay to ensure session is fully propagated across tabs/storage
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
     if (invitation?.invitation_type === "platform_admin") {
       navigate("/admin");
     } else if (invitation?.organization_id) {
