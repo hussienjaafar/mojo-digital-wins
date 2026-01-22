@@ -5048,6 +5048,59 @@ export type Database = {
           },
         ]
       }
+      invitation_audit_logs: {
+        Row: {
+          created_at: string
+          email: string | null
+          error_message: string | null
+          event_type: string
+          id: string
+          invitation_id: string | null
+          invitation_type: string | null
+          metadata: Json | null
+          organization_id: string | null
+          source: string
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          error_message?: string | null
+          event_type: string
+          id?: string
+          invitation_id?: string | null
+          invitation_type?: string | null
+          metadata?: Json | null
+          organization_id?: string | null
+          source?: string
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          invitation_id?: string | null
+          invitation_type?: string | null
+          metadata?: Json | null
+          organization_id?: string | null
+          source?: string
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitation_audit_logs_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: false
+            referencedRelation: "user_invitations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_executions: {
         Row: {
           completed_at: string | null
@@ -14213,6 +14266,21 @@ export type Database = {
           _old_value?: Json
           _record_id?: string
           _table_affected?: string
+        }
+        Returns: string
+      }
+      log_invitation_event: {
+        Args: {
+          p_email?: string
+          p_error_message?: string
+          p_event_type: string
+          p_invitation_id: string
+          p_invitation_type?: string
+          p_metadata?: Json
+          p_organization_id?: string
+          p_source?: string
+          p_status?: string
+          p_user_id?: string
         }
         Returns: string
       }
