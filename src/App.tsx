@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -89,15 +89,21 @@ const DomainRouter = () => {
   const location = useLocation();
   const hostname = window.location.hostname;
   
-  const isPortalDomain = hostname === 'portal.molitico.com' || 
-                         hostname.includes('preview') || 
-                         hostname.includes('lovable.app') ||
-                         hostname === 'localhost';
+  const isPortalDomain = hostname === 'portal.molitico.com';
   const isMarketingDomain = hostname === 'molitico.com' || 
                             hostname === 'www.molitico.com';
   
-  // Marketing routes (public pages)
-  const marketingRoutes = ['/', '/about', '/services', '/case-studies', 
+  // For preview/localhost, allow all routes without redirects
+  const isDevelopment = hostname.includes('preview') || 
+                        hostname.includes('lovable.app') ||
+                        hostname === 'localhost';
+  
+  if (isDevelopment) {
+    return null; // No redirects in development/preview
+  }
+  
+  // Marketing routes (public pages) - note: '/' handled separately on portal
+  const marketingRoutes = ['/about', '/services', '/case-studies', 
     '/blog', '/contact', '/privacy-policy', '/creative-showcase', '/bills'];
   
   // Portal route prefixes (app pages)
@@ -115,25 +121,28 @@ const DomainRouter = () => {
     location.pathname.startsWith(prefix)
   );
 
-  useEffect(() => {
-    // If on portal domain and hitting root, redirect to client login
-    if (isPortalDomain && !isMarketingDomain && location.pathname === '/') {
-      window.location.replace('/client-login');
-      return;
+  // PORTAL DOMAIN LOGIC - synchronous redirects
+  if (isPortalDomain) {
+    // Root path → redirect to client login immediately
+    if (location.pathname === '/') {
+      return <Navigate to="/client-login" replace />;
     }
     
-    // If on marketing domain and trying to access portal routes, redirect to portal subdomain
-    if (isMarketingDomain && isPortalRoute) {
-      window.location.replace(`https://portal.molitico.com${location.pathname}${location.search}`);
-      return;
-    }
-    
-    // If on portal domain and trying to access marketing routes (except root), redirect to marketing domain
-    if (isPortalDomain && !isMarketingDomain && isMarketingRoute && location.pathname !== '/') {
+    // Marketing routes on portal → redirect to marketing domain
+    if (isMarketingRoute) {
       window.location.replace(`https://molitico.com${location.pathname}`);
-      return;
+      return null;
     }
-  }, [location.pathname, location.search, isPortalDomain, isMarketingDomain, isMarketingRoute, isPortalRoute]);
+  }
+  
+  // MARKETING DOMAIN LOGIC
+  if (isMarketingDomain) {
+    // Portal routes on marketing → redirect to portal subdomain
+    if (isPortalRoute) {
+      window.location.replace(`https://portal.molitico.com${location.pathname}${location.search}`);
+      return null;
+    }
+  }
 
   return null;
 };
