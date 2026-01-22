@@ -35,7 +35,7 @@ interface InvitationDetails {
   expires_at: string;
 }
 
-type ViewMode = 'choice' | 'signup' | 'login' | 'accepted';
+type ViewMode = 'signup' | 'login' | 'accepted';
 
 export default function AcceptInvitation() {
   const [searchParams] = useSearchParams();
@@ -48,7 +48,7 @@ export default function AcceptInvitation() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ id: string; email: string } | null>(null);
   const [accepting, setAccepting] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('choice');
+  const [viewMode, setViewMode] = useState<ViewMode>('signup');
   const [redirectCountdown, setRedirectCountdown] = useState(3);
 
   // Signup form state
@@ -555,7 +555,7 @@ export default function AcceptInvitation() {
                       </>
                     ) : (
                       <>
-                        Create Account & Accept
+                        Accept Invitation
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     )}
@@ -666,27 +666,6 @@ export default function AcceptInvitation() {
                     Don't have an account? Sign up
                   </Button>
                 </motion.form>
-              ) : (
-                <motion.div
-                  key="choice"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-4"
-                >
-                  <Button onClick={() => setViewMode('signup')} className="w-full gap-2">
-                    <User className="h-4 w-4" />
-                    Create New Account
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setViewMode('login')}
-                    className="w-full gap-2"
-                  >
-                    <LogIn className="h-4 w-4" />
-                    I Already Have an Account
-                  </Button>
-                </motion.div>
               )}
             </AnimatePresence>
           </CardContent>

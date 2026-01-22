@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, BarChart3 } from "lucide-react";
+import { Eye, EyeOff, BarChart3, Mail, Lock } from "lucide-react";
 
 const ClientLogin = () => {
   const navigate = useNavigate();
@@ -90,20 +90,24 @@ const ClientLogin = () => {
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-[hsl(var(--portal-text-primary))]">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-                className="bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] placeholder:text-[hsl(var(--portal-text-muted))]"
-              />
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="pl-10 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] placeholder:text-[hsl(var(--portal-text-muted))]"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password" className="text-[hsl(var(--portal-text-primary))]">Password</Label>
               <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -112,27 +116,40 @@ const ClientLogin = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isLoading}
-                  className="bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] placeholder:text-[hsl(var(--portal-text-muted))]"
+                  className="pl-10 pr-10 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))] placeholder:text-[hsl(var(--portal-text-muted))]"
                 />
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-text-primary))] transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+                    <EyeOff className="h-4 w-4" />
                   ) : (
-                    <Eye className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+                    <Eye className="h-4 w-4" />
                   )}
-                </Button>
+                </button>
               </div>
             </div>
+            
+            <div className="flex justify-end">
+              <Link
+                to="/forgot-password"
+                className="text-sm text-[hsl(var(--portal-text-secondary))] hover:text-[hsl(var(--portal-accent-blue))] transition-colors"
+              >
+                Forgot your password?
+              </Link>
+            </div>
+            
             <Button type="submit" className="w-full bg-[hsl(var(--portal-accent-blue))] hover:bg-[hsl(var(--portal-accent-blue-hover))] text-white" disabled={isLoading}>
               {isLoading ? "Logging in..." : "Log In"}
             </Button>
           </form>
+          
+          <p className="mt-6 text-center text-sm text-[hsl(var(--portal-text-muted))]">
+            Access is by invitation only.
+          </p>
         </CardContent>
       </Card>
     </div>

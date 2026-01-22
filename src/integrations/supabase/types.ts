@@ -7590,6 +7590,33 @@ export type Database = {
           },
         ]
       }
+      password_reset_requests: {
+        Row: {
+          email_hash: string
+          id: string
+          ip_address: unknown
+          requested_at: string
+          success: boolean | null
+          user_agent: string | null
+        }
+        Insert: {
+          email_hash: string
+          id?: string
+          ip_address?: unknown
+          requested_at?: string
+          success?: boolean | null
+          user_agent?: string | null
+        }
+        Update: {
+          email_hash?: string
+          id?: string
+          ip_address?: unknown
+          requested_at?: string
+          success?: boolean | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       pending_member_requests: {
         Row: {
           created_at: string | null
