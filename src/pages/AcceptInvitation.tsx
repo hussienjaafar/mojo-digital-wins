@@ -240,8 +240,8 @@ export default function AcceptInvitation() {
           // Accept the invitation immediately
           await acceptInvitation(authData.user.id);
         } else {
-          // Email doesn't match - let user confirm
-          setViewMode('choice');
+          // Email doesn't match - just accept anyway since they're logged in
+          await acceptInvitation(authData.user.id);
           toast.success("Logged in successfully");
         }
       }
@@ -666,7 +666,7 @@ export default function AcceptInvitation() {
                     Don't have an account? Sign up
                   </Button>
                 </motion.form>
-              )}
+              ) : null}
             </AnimatePresence>
           </CardContent>
         </Card>

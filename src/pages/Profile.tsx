@@ -56,7 +56,6 @@ export default function Profile() {
   const [passwordChanged, setPasswordChanged] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [passwordChanged, setPasswordChanged] = useState(false);
 
   useEffect(() => {
     loadProfile();
