@@ -185,12 +185,13 @@ export default function AcceptInvitation() {
             "Content-Type": "application/json",
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
-          body: JSON.stringify({
-            token: token!,
-            email: invitation!.email,
-            password: password,
-            full_name: fullName.trim(),
-          }),
+        body: JSON.stringify({
+          token: token!,
+          email: invitation!.email,
+          password: password,
+          confirm_password: confirmPassword,
+          full_name: fullName.trim(),
+        }),
         }
       );
 

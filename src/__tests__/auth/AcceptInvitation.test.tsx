@@ -400,7 +400,7 @@ describe('AcceptInvitation Component', () => {
           expect.stringContaining('/functions/v1/accept-invitation-signup'),
           expect.objectContaining({
             method: 'POST',
-            body: expect.stringContaining('invited@example.com'),
+            body: expect.stringMatching(/confirm_password.*ValidPass123!/),
           })
         );
       });
