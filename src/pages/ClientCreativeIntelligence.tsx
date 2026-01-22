@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { ClientShell } from "@/components/client/ClientShell";
 import { ProductionGate } from "@/components/client/ProductionGate";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
@@ -36,6 +37,35 @@ import {
   V3Button,
 } from "@/components/v3";
 import { Skeleton } from "@/components/ui/skeleton";
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.05 }
+  }
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: { duration: 0.25 }
+  }
+};
+
+const tabContentVariants = {
+  hidden: { opacity: 0, x: -8 },
+  visible: { 
+    opacity: 1, 
+    x: 0,
+    transition: { duration: 0.2 }
+  },
+  exit: { opacity: 0, x: 8, transition: { duration: 0.15 } }
+};
 
 type Creative = {
   id: string;
@@ -433,20 +463,34 @@ export default function ClientCreativeIntelligence() {
               </div>
             </div>
 
-            {/* Creative Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredCreatives.map((creative) => (
-                <CreativeCard key={creative.id} creative={creative} />
+            {/* Creative Grid with animations */}
+            <motion.div 
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              key={`gallery-${channelFilter}-${tierFilter}-${searchQuery}`}
+            >
+              {filteredCreatives.map((creative, index) => (
+                <motion.div key={creative.id} variants={cardVariants}>
+                  <CreativeCard creative={creative} />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
 
             {filteredCreatives.length === 0 && (
-              <V3EmptyState
-                icon={Search}
-                title="No Matches"
-                description="No creatives match your current filters"
-                accent="blue"
-              />
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <V3EmptyState
+                  icon={Search}
+                  title="No Matches"
+                  description="No creatives match your current filters"
+                  accent="blue"
+                />
+              </motion.div>
             )}
           </TabsContent>
 
