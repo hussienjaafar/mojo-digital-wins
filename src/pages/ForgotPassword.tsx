@@ -7,7 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Mail, Loader2, ArrowLeft, CheckCircle, KeyRound } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
+
+
+const getLoginRoute = () => {
+  return sessionStorage.getItem('login_entry_point') || '/client-login';
+};
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -124,7 +128,7 @@ export default function ForgotPassword() {
                       >
                         Try a different email
                       </Button>
-                      <Link to="/login" className="w-full">
+                      <Link to={getLoginRoute()} className="w-full">
                         <Button variant="ghost" className="w-full gap-2">
                           <ArrowLeft className="h-4 w-4" />
                           Back to Login
@@ -185,7 +189,7 @@ export default function ForgotPassword() {
 
                   <div className="text-center pt-2">
                     <Link 
-                      to="/login" 
+                      to={getLoginRoute()} 
                       className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
                     >
                       <ArrowLeft className="h-3 w-3" />
