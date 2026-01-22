@@ -6204,6 +6204,101 @@ export type Database = {
           },
         ]
       }
+      meta_creative_variations: {
+        Row: {
+          ad_id: string
+          asset_hash: string | null
+          asset_index: number
+          asset_text: string | null
+          asset_type: string
+          clicks: number | null
+          conversion_value: number | null
+          conversions: number | null
+          created_at: string | null
+          creative_insight_id: string | null
+          ctr: number | null
+          id: string
+          impressions: number | null
+          organization_id: string
+          performance_rank: number | null
+          roas: number | null
+          spend: number | null
+          synced_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ad_id: string
+          asset_hash?: string | null
+          asset_index?: number
+          asset_text?: string | null
+          asset_type: string
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          creative_insight_id?: string | null
+          ctr?: number | null
+          id?: string
+          impressions?: number | null
+          organization_id: string
+          performance_rank?: number | null
+          roas?: number | null
+          spend?: number | null
+          synced_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ad_id?: string
+          asset_hash?: string | null
+          asset_index?: number
+          asset_text?: string | null
+          asset_type?: string
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          creative_insight_id?: string | null
+          ctr?: number | null
+          id?: string
+          impressions?: number | null
+          organization_id?: string
+          performance_rank?: number | null
+          roas?: number | null
+          spend?: number | null
+          synced_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_creative_variations_creative_insight_id_fkey"
+            columns: ["creative_insight_id"]
+            isOneToOne: false
+            referencedRelation: "meta_creative_insights"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_creative_variations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_creative_variations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_creative_variations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       meta_sync_config: {
         Row: {
           created_at: string | null
