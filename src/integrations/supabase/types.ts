@@ -14083,14 +14083,17 @@ export type Database = {
       get_invitation_by_token: {
         Args: { p_token: string }
         Returns: {
+          created_at: string
           email: string
           expires_at: string
+          failed_attempts: number
           id: string
           invitation_type: string
           organization_id: string
           organization_name: string
           role: string
           status: string
+          used_at: string
         }[]
       }
       get_meta_accounts_due_for_sync: {

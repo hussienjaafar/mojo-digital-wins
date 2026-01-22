@@ -12,26 +12,29 @@ import type { User, Session, AuthError, AuthChangeEvent } from '@supabase/supaba
 // Types
 // ============================================================================
 
-export interface MockUser extends Partial<User> {
+export interface MockUser {
   id: string;
   email: string;
   email_confirmed_at?: string | null;
   phone?: string | null;
-  created_at?: string;
+  created_at: string;
   updated_at?: string;
   last_sign_in_at?: string | null;
   role?: string;
-  aud?: string;
-  app_metadata?: Record<string, unknown>;
-  user_metadata?: Record<string, unknown>;
+  aud: string;
+  app_metadata: Record<string, unknown>;
+  user_metadata: Record<string, unknown>;
+  identities?: any[];
+  factors?: any[];
+  is_anonymous?: boolean;
 }
 
-export interface MockSession extends Partial<Session> {
+export interface MockSession {
   access_token: string;
   refresh_token: string;
   expires_in: number;
   expires_at?: number;
-  token_type: string;
+  token_type: 'bearer';
   user: MockUser;
 }
 

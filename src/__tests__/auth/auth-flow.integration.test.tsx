@@ -469,10 +469,10 @@ describe('Authentication Flow Integration Tests', () => {
       });
 
       // Execute signOut
-      await mockClient.auth.signOut();
+      await (mockClient.auth.signOut as any)();
 
       // Session should now be null
-      const { data } = await mockClient.auth.getSession();
+      const { data } = await (mockClient.auth.getSession as any)();
       expect(data.session).toBeNull();
     });
   });
