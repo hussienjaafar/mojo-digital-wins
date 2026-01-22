@@ -40,6 +40,9 @@ verify_jwt = false
 [functions.aggregate-sentiment]
 verify_jwt = false
 
+[functions.aggregate-variation-metrics]
+verify_jwt = false
+
 [functions.extract-trending-topics]
 verify_jwt = false
 

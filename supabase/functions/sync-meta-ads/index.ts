@@ -1600,28 +1600,74 @@ serve(async (req) => {
             
             const roas = spend > 0 ? conversionValue / spend : null;
             
-            // Update the variation record by matching ad_id, asset_type, and asset_text
-            const { error: updateError } = await supabase
+            // Normalize asset text for matching (handle whitespace, encoding differences)
+            const normalizedAssetText = assetText.trim().replace(/\s+/g, ' ').toLowerCase();
+            
+            // First try exact match
+            let { data: matchedVariation, error: matchError } = await supabase
               .from('meta_creative_variations')
-              .update({
-                impressions,
-                clicks,
-                spend,
-                conversions,
-                conversion_value: conversionValue,
-                ctr,
-                link_clicks: linkClicks,
-                link_ctr: linkCtr,
-                roas,
-                synced_at: new Date().toISOString(),
-              })
+              .select('id, asset_text')
               .eq('organization_id', organization_id)
               .eq('ad_id', breakdown.ad_id)
               .eq('asset_type', assetType)
-              .eq('asset_text', assetText);
+              .eq('asset_text', assetText)
+              .single();
             
-            if (!updateError) {
-              variationBreakdownsProcessed++;
+            // If exact match fails, try normalized text matching
+            if (!matchedVariation && !matchError) {
+              // Get all variations for this ad/type and find best match
+              const { data: allVariations } = await supabase
+                .from('meta_creative_variations')
+                .select('id, asset_text')
+                .eq('organization_id', organization_id)
+                .eq('ad_id', breakdown.ad_id)
+                .eq('asset_type', assetType);
+              
+              if (allVariations && allVariations.length > 0) {
+                // Try normalized match
+                matchedVariation = allVariations.find(v => {
+                  if (!v.asset_text) return false;
+                  const normalizedStored = v.asset_text.trim().replace(/\s+/g, ' ').toLowerCase();
+                  return normalizedStored === normalizedAssetText;
+                }) || null;
+                
+                // If still no match, try prefix matching (first 100 chars)
+                if (!matchedVariation && normalizedAssetText.length > 50) {
+                  const prefix = normalizedAssetText.slice(0, 100);
+                  matchedVariation = allVariations.find(v => {
+                    if (!v.asset_text) return false;
+                    const normalizedStored = v.asset_text.trim().replace(/\s+/g, ' ').toLowerCase();
+                    return normalizedStored.startsWith(prefix) || prefix.startsWith(normalizedStored.slice(0, 100));
+                  }) || null;
+                }
+              }
+            }
+            
+            if (matchedVariation) {
+              // Update by ID (more reliable than text matching)
+              const { error: updateError } = await supabase
+                .from('meta_creative_variations')
+                .update({
+                  impressions,
+                  clicks,
+                  spend,
+                  conversions,
+                  conversion_value: conversionValue,
+                  ctr,
+                  link_clicks: linkClicks,
+                  link_ctr: linkCtr,
+                  roas,
+                  is_estimated: false, // This is actual Meta data
+                  synced_at: new Date().toISOString(),
+                })
+                .eq('id', matchedVariation.id);
+              
+              if (!updateError) {
+                variationBreakdownsProcessed++;
+                console.log(`[ASSET BREAKDOWNS] ✓ Matched ${assetType} for ad ${breakdown.ad_id}: ${impressions} imp, $${spend.toFixed(2)} spend`);
+              }
+            } else {
+              console.log(`[ASSET BREAKDOWNS] ✗ No match for ${assetType} in ad ${breakdown.ad_id}: "${assetText.slice(0, 50)}..."`);
             }
           }
         } catch (breakdownErr) {
@@ -1630,6 +1676,28 @@ serve(async (req) => {
       }
       
       console.log(`[ASSET BREAKDOWNS] Updated ${variationBreakdownsProcessed} variation records with performance data`);
+      
+      // Trigger variation aggregation for any remaining zero-metric variations
+      if (variationBreakdownsProcessed === 0) {
+        console.log(`[ASSET BREAKDOWNS] No direct matches - triggering fallback aggregation...`);
+        try {
+          const aggregateResponse = await fetch(
+            `${supabaseUrl}/functions/v1/aggregate-variation-metrics`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseKey}`,
+              },
+              body: JSON.stringify({ organization_id }),
+            }
+          );
+          const aggResult = await aggregateResponse.json();
+          console.log(`[ASSET BREAKDOWNS] Fallback aggregation result:`, aggResult);
+        } catch (aggError) {
+          console.error(`[ASSET BREAKDOWNS] Fallback aggregation failed:`, aggError);
+        }
+      }
       
       // Calculate and update performance rankings per ad/asset_type
       if (variationBreakdownsProcessed > 0) {

@@ -6284,6 +6284,7 @@ export type Database = {
           ctr: number | null
           id: string
           impressions: number | null
+          is_estimated: boolean | null
           link_clicks: number | null
           link_ctr: number | null
           organization_id: string
@@ -6307,6 +6308,7 @@ export type Database = {
           ctr?: number | null
           id?: string
           impressions?: number | null
+          is_estimated?: boolean | null
           link_clicks?: number | null
           link_ctr?: number | null
           organization_id: string
@@ -6330,6 +6332,7 @@ export type Database = {
           ctr?: number | null
           id?: string
           impressions?: number | null
+          is_estimated?: boolean | null
           link_clicks?: number | null
           link_ctr?: number | null
           organization_id?: string

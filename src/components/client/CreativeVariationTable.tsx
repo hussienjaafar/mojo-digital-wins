@@ -1,11 +1,15 @@
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Trophy, Medal, Award, ArrowUp, ArrowDown, Minus, Layers } from "lucide-react";
+import { Trophy, Medal, Award, ArrowUp, ArrowDown, Minus, Layers, RefreshCw, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { V3Card, V3CardContent, V3SectionHeader, V3EmptyState } from "@/components/v3";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export interface CreativeVariation {
   id: string;
@@ -23,11 +27,14 @@ export interface CreativeVariation {
   link_ctr: number | null;
   roas: number | null;
   performance_rank: number | null;
+  is_estimated?: boolean;
 }
 
 interface CreativeVariationTableProps {
   variations: CreativeVariation[];
   isLoading?: boolean;
+  organizationId?: string;
+  onRefresh?: () => void;
 }
 
 const assetTypeLabels: Record<string, string> = {
@@ -87,8 +94,45 @@ const formatRoas = (n: number | null | undefined): string => {
 export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
   variations,
   isLoading = false,
+  organizationId,
+  onRefresh,
 }) => {
   const [activeTab, setActiveTab] = React.useState<string>("body");
+  const [isSyncing, setIsSyncing] = React.useState(false);
+
+  // Check if any variations have estimated data
+  const hasEstimatedData = React.useMemo(() => 
+    variations.some(v => v.is_estimated), [variations]
+  );
+
+  // Check if all variations have zero metrics (need sync)
+  const needsSync = React.useMemo(() => 
+    variations.length > 0 && variations.every(v => !v.impressions && !v.spend), [variations]
+  );
+
+  const handleSyncVariations = async () => {
+    if (!organizationId) {
+      toast.error("Organization ID required for sync");
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const { error } = await supabase.functions.invoke("aggregate-variation-metrics", {
+        body: { organization_id: organizationId },
+      });
+
+      if (error) throw error;
+      
+      toast.success("Variation metrics synced successfully");
+      onRefresh?.();
+    } catch (err) {
+      console.error("Sync error:", err);
+      toast.error("Failed to sync variation metrics");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Group variations by asset type
   const variationsByType = React.useMemo(() => {
@@ -138,12 +182,50 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
   return (
     <V3Card>
       <V3CardContent>
-        <V3SectionHeader
-          title="Creative Variations Performance"
-          subtitle={`${variations.length} variations across ${availableTypes.length} asset types`}
-          icon={Layers}
-          className="mb-4"
-        />
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1">
+            <V3SectionHeader
+              title="Creative Variations Performance"
+              subtitle={`${variations.length} variations across ${availableTypes.length} asset types`}
+              icon={Layers}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            {hasEstimatedData && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge 
+                      variant="outline" 
+                      className="gap-1 border-[hsl(var(--portal-accent-amber))] text-[hsl(var(--portal-accent-amber))]"
+                    >
+                      <Info className="h-3 w-3" />
+                      Estimated
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">
+                      Some metrics are estimated from parent ad data because Meta's 
+                      asset-level breakdown API didn't return detailed performance data.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {(needsSync || hasEstimatedData) && organizationId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSyncVariations}
+                disabled={isSyncing}
+                className="gap-2"
+              >
+                <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+                {isSyncing ? "Syncing..." : "Sync Metrics"}
+              </Button>
+            )}
+          </div>
+        </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4 bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))]">
