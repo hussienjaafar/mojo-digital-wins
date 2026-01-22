@@ -56,6 +56,12 @@ const ClientLogin = () => {
           .update({ last_login_at: new Date().toISOString() })
           .eq('id', data.user.id);
 
+        // Wait for session to be persisted to localStorage before navigating
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('Session not established after login');
+        }
+
         toast({
           title: "Success",
           description: "Logged in successfully",

@@ -54,6 +54,7 @@ export default function AcceptInvitation() {
   // Signup form state
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [signingUp, setSigningUp] = useState(false);
   const [signupError, setSignupError] = useState<string | null>(null);
@@ -155,6 +156,12 @@ export default function AcceptInvitation() {
     e.preventDefault();
     setSignupError(null);
 
+    // Validate password confirmation
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
     // Validate password
     const validation = validatePassword(password);
     if (!validation.valid) {
@@ -205,9 +212,16 @@ export default function AcceptInvitation() {
           access_token: result.access_token,
           refresh_token: result.refresh_token,
         });
+
+        // Confirm session was persisted before proceeding
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('Session not established after signup');
+        }
       }
 
       setViewMode('accepted');
+      setConfirmPassword("");
       toast.success("Welcome aboard! Your account has been created.");
     } catch (err: any) {
       console.error("Signup error:", err);
@@ -230,10 +244,16 @@ export default function AcceptInvitation() {
 
       if (loginError) throw loginError;
 
+      // Wait for session to be persisted before proceeding
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Session not established after login');
+      }
+
       if (authData.user) {
         setIsLoggedIn(true);
         setCurrentUser({ id: authData.user.id, email: authData.user.email || "" });
-        
+
         // Auto-accept invitation if logged-in email matches invitation email
         if (invitation && authData.user.email?.toLowerCase() === invitation.email.toLowerCase()) {
           toast.success("Logged in successfully. Accepting invitation...");
@@ -543,10 +563,30 @@ export default function AcceptInvitation() {
                     <PasswordStrengthMeter password={password} />
                   </div>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
-                    disabled={signingUp || !isPasswordValid(password)}
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm your password"
+                        className={`pl-10 ${confirmPassword && password !== confirmPassword ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                        autoComplete="new-password"
+                        required
+                      />
+                    </div>
+                    {confirmPassword && password !== confirmPassword && (
+                      <p className="text-xs text-destructive">Passwords do not match</p>
+                    )}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={signingUp || !isPasswordValid(password) || password !== confirmPassword}
                   >
                     {signingUp ? (
                       <>

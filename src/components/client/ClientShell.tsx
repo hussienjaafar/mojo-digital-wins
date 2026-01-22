@@ -1,14 +1,14 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Session } from "@supabase/supabase-js";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { useTheme } from "@/components/ThemeProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useToast } from "@/hooks/use-toast";
+import { useSessionManager, formatTimeRemaining } from "@/hooks/useSessionManager";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/client/AppSidebar";
@@ -17,6 +17,8 @@ import { SkipNavigation } from "@/components/accessibility/SkipNavigation";
 import { OrganizationSelector } from "@/components/client/OrganizationSelector";
 import { ClientHeaderControls } from "@/components/client/ClientHeaderControls";
 import { cn } from "@/lib/utils";
+import { AlertTriangle, RefreshCw, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // ============================================================================
 // Types
@@ -40,6 +42,74 @@ export interface ClientShellProps {
 }
 
 // ============================================================================
+// Session Expiry Banner Component
+// ============================================================================
+
+interface SessionExpiryBannerProps {
+  timeUntilExpiry: number | null;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  onDismiss: () => void;
+}
+
+const SessionExpiryBanner = ({
+  timeUntilExpiry,
+  isRefreshing,
+  onRefresh,
+  onDismiss,
+}: SessionExpiryBannerProps) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="bg-amber-500/90 dark:bg-amber-600/90 text-white px-4 py-2"
+      role="alert"
+      aria-live="polite"
+    >
+      <div className="max-w-[1800px] mx-auto flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="text-sm font-medium">
+            Session expiring in {formatTimeRemaining(timeUntilExpiry)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="h-7 text-xs bg-white/20 hover:bg-white/30 border-0"
+          >
+            {isRefreshing ? (
+              <>
+                <RefreshCw className="h-3 w-3 mr-1 animate-spin" aria-hidden="true" />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-3 w-3 mr-1" aria-hidden="true" />
+                Extend Session
+              </>
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onDismiss}
+            className="h-7 w-7 p-0 hover:bg-white/20"
+            aria-label="Dismiss session warning"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// ============================================================================
 // Component
 // ============================================================================
 
@@ -56,36 +126,92 @@ export const ClientShell = ({
   const { impersonatedOrgId, isImpersonating, setImpersonation } = useImpersonation();
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
 
-  const [session, setSession] = useState<Session | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingOrgs, setIsLoadingOrgs] = useState(true);
+  const [showExpiryBanner, setShowExpiryBanner] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Track if expiry warning toast was shown to prevent duplicates
+  const expiryToastShown = useRef(false);
 
   // ============================================================================
-  // Auth Effect
+  // Session Manager - Single source of truth for auth state
+  // ============================================================================
+
+  const handleSessionExpiring = useCallback(() => {
+    setShowExpiryBanner(true);
+    if (!expiryToastShown.current) {
+      expiryToastShown.current = true;
+      toast({
+        title: "Session expiring soon",
+        description: "Your session will expire in less than 5 minutes. Click refresh to extend.",
+        variant: "default",
+      });
+    }
+  }, [toast]);
+
+  const handleSessionExpired = useCallback(() => {
+    toast({
+      title: "Session expired",
+      description: "Please log in again to continue.",
+      variant: "destructive",
+    });
+    navigate("/client-login");
+  }, [toast, navigate]);
+
+  const handleSessionRefreshed = useCallback(() => {
+    setShowExpiryBanner(false);
+    setIsRefreshing(false);
+    expiryToastShown.current = false;
+  }, []);
+
+  const handleRefreshError = useCallback((error: Error) => {
+    setIsRefreshing(false);
+    toast({
+      title: "Session refresh failed",
+      description: error.message || "Please log in again.",
+      variant: "destructive",
+    });
+  }, [toast]);
+
+  const {
+    session,
+    isLoading: isSessionLoading,
+    isExpiring,
+    timeUntilExpiry,
+    refreshSession,
+    signOut,
+  } = useSessionManager({
+    warningThreshold: 300, // 5 minutes
+    onSessionExpiring: handleSessionExpiring,
+    onSessionExpired: handleSessionExpired,
+    onSessionRefreshed: handleSessionRefreshed,
+    onRefreshError: handleRefreshError,
+  });
+
+  // ============================================================================
+  // Redirect if no session
   // ============================================================================
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      // Allow access if impersonating (admin is logged in)
-      if (!session && !isImpersonating) {
-        navigate("/client-login");
-      }
-    });
+    if (!isSessionLoading && !session && !isImpersonating) {
+      navigate("/client-login");
+    }
+  }, [isSessionLoading, session, isImpersonating, navigate]);
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      // Allow access if impersonating (admin is logged in)
-      if (!session && !isImpersonating) {
-        navigate("/client-login");
-      }
-    });
+  // ============================================================================
+  // Session Refresh Handler
+  // ============================================================================
 
-    return () => subscription.unsubscribe();
-  }, [navigate, isImpersonating]);
+  const handleRefreshSession = async () => {
+    setIsRefreshing(true);
+    await refreshSession();
+  };
+
+  const handleDismissExpiryBanner = () => {
+    setShowExpiryBanner(false);
+  };
 
   // ============================================================================
   // Load Organizations Effect
@@ -132,7 +258,7 @@ export const ClientShell = ({
             // Set the impersonated org as selected
             const selectedOrg = orgs.find((o) => o.id === impersonatedOrgId) || orgs[0];
             setOrganization(selectedOrg);
-            setIsLoading(false);
+            setIsLoadingOrgs(false);
             return;
           }
         } else {
@@ -148,7 +274,7 @@ export const ClientShell = ({
             setOrganization(org);
             setOrganizations([org]);
           }
-          setIsLoading(false);
+          setIsLoadingOrgs(false);
           return;
         }
       }
@@ -233,7 +359,7 @@ export const ClientShell = ({
       });
       navigate("/");
     } finally {
-      setIsLoading(false);
+      setIsLoadingOrgs(false);
     }
   };
 
@@ -246,7 +372,7 @@ export const ClientShell = ({
     if (newOrg) {
       setOrganization(newOrg);
       localStorage.setItem("selectedOrganizationId", newOrgId);
-      
+
       // Sync to impersonation context so child pages using useClientOrganization
       // automatically pick up the new organization
       if (isAdmin) {
@@ -257,7 +383,7 @@ export const ClientShell = ({
           newOrg.name
         );
       }
-      
+
       toast({
         title: "Organization switched",
         description: `Now viewing ${newOrg.name}`,
@@ -266,7 +392,7 @@ export const ClientShell = ({
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     navigate("/client-login");
   };
 
@@ -280,6 +406,9 @@ export const ClientShell = ({
 
   // Show "Back to Admin" button when impersonating OR when user is admin
   const showBackToAdmin = isImpersonating || (!isAdminLoading && isAdmin);
+
+  // Combined loading state
+  const isLoading = isSessionLoading || isLoadingOrgs;
 
   // ============================================================================
   // Loading State
@@ -324,12 +453,24 @@ export const ClientShell = ({
         <div className="portal-theme min-h-screen w-full flex portal-bg">
           <AppSidebar organizationId={organization.id} />
           <div className="flex-1 flex flex-col min-w-0">
+            {/* Session Expiry Banner */}
+            <AnimatePresence>
+              {showExpiryBanner && isExpiring && (
+                <SessionExpiryBanner
+                  timeUntilExpiry={timeUntilExpiry}
+                  isRefreshing={isRefreshing}
+                  onRefresh={handleRefreshSession}
+                  onDismiss={handleDismissExpiryBanner}
+                />
+              )}
+            </AnimatePresence>
+
             {/* Impersonation Banner */}
             <ImpersonationBanner />
 
             {/* Header */}
-            <header 
-              className="portal-header-clean" 
+            <header
+              className="portal-header-clean"
               role="banner"
             >
               <div className="max-w-[1800px] mx-auto px-3 sm:px-4 lg:px-6 py-2 sm:py-3">
