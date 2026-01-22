@@ -98,6 +98,8 @@ export default function AcceptInvitation() {
     if (invitation?.invitation_type === "platform_admin") {
       navigate("/admin");
     } else if (invitation?.organization_id) {
+      // Set org context so user lands on correct organization dashboard
+      localStorage.setItem('selectedOrganizationId', invitation.organization_id);
       navigate("/client/dashboard");
     } else {
       navigate("/");
@@ -220,6 +222,11 @@ export default function AcceptInvitation() {
           throw new Error('Session not established after signup');
         }
         
+        // Set org context so user lands on correct organization dashboard
+        if (invitation?.organization_id) {
+          localStorage.setItem('selectedOrganizationId', invitation.organization_id);
+        }
+        
         setViewMode('accepted');
         setConfirmPassword("");
         toast.success("Welcome aboard! Your account has been created.");
@@ -293,6 +300,11 @@ export default function AcceptInvitation() {
 
       if (!result.success) {
         throw new Error(result.error || "Failed to accept invitation");
+      }
+
+      // Set org context so user lands on correct organization dashboard
+      if (invitation?.organization_id) {
+        localStorage.setItem('selectedOrganizationId', invitation.organization_id);
       }
 
       setViewMode('accepted');
