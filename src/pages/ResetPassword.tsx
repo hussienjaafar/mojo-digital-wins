@@ -85,7 +85,8 @@ export default function ResetPassword() {
       setRedirectCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigate("/login");
+          const loginRoute = sessionStorage.getItem('login_entry_point') || '/client-login';
+          navigate(loginRoute);
           return 0;
         }
         return prev - 1;
@@ -207,7 +208,10 @@ export default function ResetPassword() {
                   <p className="text-sm text-muted-foreground">
                     Redirecting to login in {redirectCountdown} seconds...
                   </p>
-                  <Button onClick={() => navigate("/login")} className="gap-2">
+                  <Button onClick={() => {
+                    const loginRoute = sessionStorage.getItem('login_entry_point') || '/client-login';
+                    navigate(loginRoute);
+                  }} className="gap-2">
                     Go to Login
                     <ArrowRight className="h-4 w-4" />
                   </Button>
