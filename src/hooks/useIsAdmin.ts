@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { proxyRpc } from '@/lib/supabaseProxy';
 
 interface UseIsAdminResult {
   isAdmin: boolean;
@@ -8,7 +9,7 @@ interface UseIsAdminResult {
 
 /**
  * Hook to check if the current user has admin role.
- * Uses Supabase RPC to check role, with caching to prevent repeated calls.
+ * Uses proxyRpc to check role (CORS-safe for portal.molitico.com).
  *
  * @returns {UseIsAdminResult} Object containing isAdmin boolean and loading state
  *
@@ -37,7 +38,8 @@ export const useIsAdmin = (): UseIsAdminResult => {
           return;
         }
 
-        const { data: hasAdminRole, error } = await supabase.rpc('has_role', {
+        // Use proxyRpc for CORS-safe RPC call on portal.molitico.com
+        const { data: hasAdminRole, error } = await proxyRpc<boolean>('has_role', {
           _user_id: session.user.id,
           _role: 'admin',
         });

@@ -108,7 +108,8 @@ const DomainRouter = () => {
   
   // Portal route prefixes (app pages)
   const portalPrefixes = ['/client', '/admin', '/accept-invite', 
-    '/reset-password', '/forgot-password', '/login', '/auth', '/profile', '/settings'];
+    '/reset-password', '/forgot-password', '/login', '/auth', '/profile', '/settings',
+    '/access-denied', '/client-login'];
   
   const isMarketingRoute = marketingRoutes.some(route => 
     location.pathname === route || 
