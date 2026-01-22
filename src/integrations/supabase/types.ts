@@ -11582,6 +11582,7 @@ export type Database = {
           created_at: string | null
           email: string
           expires_at: string | null
+          failed_attempts: number | null
           id: string
           invitation_type: string
           invited_by: string | null
@@ -11590,12 +11591,14 @@ export type Database = {
           role: string | null
           status: string | null
           token: string
+          used_at: string | null
         }
         Insert: {
           accepted_at?: string | null
           created_at?: string | null
           email: string
           expires_at?: string | null
+          failed_attempts?: number | null
           id?: string
           invitation_type: string
           invited_by?: string | null
@@ -11604,12 +11607,14 @@ export type Database = {
           role?: string | null
           status?: string | null
           token?: string
+          used_at?: string | null
         }
         Update: {
           accepted_at?: string | null
           created_at?: string | null
           email?: string
           expires_at?: string | null
+          failed_attempts?: number | null
           id?: string
           invitation_type?: string
           invited_by?: string | null
@@ -11618,6 +11623,7 @@ export type Database = {
           role?: string | null
           status?: string | null
           token?: string
+          used_at?: string | null
         }
         Relationships: [
           {
@@ -14287,6 +14293,10 @@ export type Database = {
       }
       increment_cache_hit: {
         Args: { content_hash_param: string }
+        Returns: undefined
+      }
+      increment_invitation_failed_attempts: {
+        Args: { p_invitation_id: string }
         Returns: undefined
       }
       is_account_locked: { Args: { _user_id: string }; Returns: boolean }
