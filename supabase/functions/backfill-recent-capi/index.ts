@@ -270,7 +270,18 @@ serve(async (req) => {
           }
           
           const eventTime = Math.floor(new Date(tx.transaction_date).getTime() / 1000);
-          const eventId = `actblue_${tx.transaction_id}_${eventTime}`;
+          // CRITICAL: When actblue_owns_donation_complete = true, use raw lineitem_id
+          // to match ActBlue's pixel event_id for proper Meta deduplication
+          const isEnrichmentMode = config.actblue_owns_donation_complete || false;
+          const eventId = isEnrichmentMode 
+            ? String(tx.transaction_id)  // Raw ID for enrichment mode - matches ActBlue pixel
+            : `actblue_${tx.transaction_id}_${eventTime}`;  // Prefixed for primary mode
+          
+          // Warn if format looks wrong (defensive check)
+          if (isEnrichmentMode && eventId.includes('_')) {
+            logger.warn('Enrichment event_id should be raw lineitem_id', { eventId, transactionId: tx.transaction_id });
+          }
+          
           const dedupeKey = `purchase_${tx.transaction_id}`;
 
           // Build user data with proper hashing
