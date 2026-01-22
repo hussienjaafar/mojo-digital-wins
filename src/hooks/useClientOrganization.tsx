@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useImpersonationSafe } from '@/contexts/ImpersonationContext';
+import { proxyQuery, proxyRpc } from '@/lib/supabaseProxy';
 
 export const useClientOrganization = () => {
   const { impersonatedOrgId, isImpersonating } = useImpersonationSafe();
@@ -23,8 +24,8 @@ export const useClientOrganization = () => {
           return;
         }
 
-        // Check if user is admin
-        const { data: isAdminUser } = await supabase.rpc("has_role", {
+        // Check if user is admin (using proxy for CORS compatibility)
+        const { data: isAdminUser } = await proxyRpc("has_role", {
           _user_id: session.user.id,
           _role: "admin",
         });
@@ -39,12 +40,13 @@ export const useClientOrganization = () => {
           }
         }
 
-        // Priority 3: Client user's assigned organization
-        const { data: clientUser } = await (supabase as any)
-          .from('client_users')
-          .select('organization_id')
-          .eq('id', session.user.id)
-          .maybeSingle();
+        // Priority 3: Client user's assigned organization (using proxy for CORS)
+        const { data: clientUser } = await proxyQuery<{ organization_id: string }>({
+          table: 'client_users',
+          select: 'organization_id',
+          filters: { id: session.user.id },
+          single: true,
+        });
 
         if (clientUser) {
           setOrganizationId(clientUser.organization_id);

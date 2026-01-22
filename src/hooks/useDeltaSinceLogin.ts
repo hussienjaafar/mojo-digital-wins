@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { proxyQuery } from "@/lib/supabaseProxy";
 
 interface DeltaStats {
   newArticles: number;
@@ -23,12 +24,13 @@ export function useDeltaSinceLogin() {
 
     const fetchDelta = async () => {
       try {
-        // Get user's last login time
-        const { data: userData } = await supabase
-          .from("client_users")
-          .select("last_login_at")
-          .eq("id", user.id)
-          .single();
+        // Get user's last login time (via proxy for CORS compatibility)
+        const { data: userData } = await proxyQuery<{ last_login_at: string | null }>({
+          table: "client_users",
+          select: "last_login_at",
+          filters: { id: user.id },
+          single: true,
+        });
 
         const lastLoginAt = userData?.last_login_at;
         
@@ -41,7 +43,9 @@ export function useDeltaSinceLogin() {
         const loginDate = new Date(lastLoginAt);
         const hoursSinceLogin = Math.floor((Date.now() - loginDate.getTime()) / (1000 * 60 * 60));
 
-        // Fetch counts since last login
+        // For the count queries, we need to use direct supabase since the proxy
+        // doesn't support count queries with gte filters yet.
+        // These run after auth is confirmed, so they should work.
         const [articlesResult, alertsResult, trendsResult] = await Promise.all([
           supabase
             .from("articles")
