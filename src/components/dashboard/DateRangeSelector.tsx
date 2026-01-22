@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { format, subDays, parseISO, differenceInDays } from "date-fns";
 import { DateRange, DayPicker } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -17,12 +17,48 @@ interface DateRangeSelectorProps {
   className?: string;
 }
 
-const presets = [
-  { label: "Today", days: 0 },
+interface PresetConfig {
+  label: string;
+  days: number;
+  single?: boolean;
+  offset?: number; // days offset from today (negative for past)
+}
+
+const presets: PresetConfig[] = [
+  { label: "Today", days: 0, single: true },
+  { label: "Yesterday", days: 0, single: true, offset: -1 },
   { label: "7D", days: 7 },
   { label: "30D", days: 30 },
   { label: "90D", days: 90 },
 ];
+
+/**
+ * Detects which preset matches the current date range
+ */
+function detectPreset(startDate: string, endDate: string): number | "custom" {
+  const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
+  const yesterdayStr = format(subDays(today, 1), "yyyy-MM-dd");
+  
+  // Check for single-day selections
+  if (startDate === endDate) {
+    if (startDate === todayStr) return 0; // Today
+    if (startDate === yesterdayStr) return -1; // Yesterday (offset)
+    return "custom";
+  }
+  
+  // Multi-day ranges must end today
+  if (endDate !== todayStr) return "custom";
+  
+  const daysDiff = differenceInDays(parseISO(endDate), parseISO(startDate));
+  
+  // Match known presets
+  if (daysDiff >= 6 && daysDiff <= 8) return 7;
+  if (daysDiff >= 29 && daysDiff <= 31) return 30;
+  if (daysDiff >= 89 && daysDiff <= 91) return 90;
+  
+  return "custom";
+}
 
 export function DateRangeSelector({
   startDate,
@@ -31,15 +67,37 @@ export function DateRangeSelector({
   className,
 }: DateRangeSelectorProps) {
   const isMobile = useIsMobile();
-  const [selectedPreset, setSelectedPreset] = useState<number | "custom">(0);
+  // Detect initial preset from props
+  const [selectedPreset, setSelectedPreset] = useState<number | "custom">(() => 
+    detectPreset(startDate, endDate)
+  );
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-  const handlePresetClick = (days: number) => {
-    setSelectedPreset(days);
-    const end = new Date();
-    const start = days === 0 ? new Date() : subDays(end, days);
-    onDateChange(format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd"));
+  // Sync preset state when props change (e.g., from store rehydration)
+  useEffect(() => {
+    const detected = detectPreset(startDate, endDate);
+    if (detected !== selectedPreset) {
+      setSelectedPreset(detected);
+    }
+  }, [startDate, endDate]);
+
+  const handlePresetClick = (preset: PresetConfig) => {
+    const today = new Date();
+    
+    if (preset.single) {
+      // Single-day preset (Today or Yesterday)
+      const targetDate = preset.offset ? subDays(today, Math.abs(preset.offset)) : today;
+      const dateStr = format(targetDate, "yyyy-MM-dd");
+      setSelectedPreset(preset.offset ?? 0);
+      onDateChange(dateStr, dateStr);
+    } else {
+      // Multi-day range preset
+      setSelectedPreset(preset.days);
+      const end = today;
+      const start = subDays(end, preset.days);
+      onDateChange(format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd"));
+    }
   };
 
   const handleCustomClick = () => {
@@ -65,6 +123,17 @@ export function DateRangeSelector({
     return "Custom";
   };
 
+  // Check if a preset is selected
+  const isPresetSelected = (preset: PresetConfig): boolean => {
+    if (preset.single && preset.offset) {
+      return selectedPreset === preset.offset;
+    }
+    if (preset.single) {
+      return selectedPreset === 0;
+    }
+    return selectedPreset === preset.days;
+  };
+
   return (
     <div className={cn("flex items-center gap-1.5 max-w-full", className)}>
       {/* Preset Buttons - Portal Style with mobile scroll */}
@@ -75,10 +144,10 @@ export function DateRangeSelector({
         {presets.map((preset) => (
           <button
             key={preset.label}
-            onClick={() => handlePresetClick(preset.days)}
+            onClick={() => handlePresetClick(preset)}
             className={cn(
               "px-2 sm:px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap flex-shrink-0",
-              selectedPreset === preset.days
+              isPresetSelected(preset)
                 ? "bg-[hsl(var(--portal-accent-blue))] text-white shadow-sm"
                 : "text-[hsl(var(--portal-text-secondary))] hover:text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-tertiary))]"
             )}

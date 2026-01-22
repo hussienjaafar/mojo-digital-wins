@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { subDays, format } from 'date-fns';
+import { format } from 'date-fns';
 
 // ============================================================================
 // Types
@@ -97,6 +97,13 @@ export const SERIES_TO_KPI_MAP: Record<SeriesKey, KpiKey[]> = {
 };
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** Session staleness threshold: 24 hours in milliseconds */
+const STALENESS_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+
+// ============================================================================
 // Store Interface
 // ============================================================================
 
@@ -104,6 +111,9 @@ interface DashboardState {
   // Date range
   dateRange: DateRange;
   setDateRange: (startDate: string, endDate: string) => void;
+
+  // Last accessed timestamp (for session freshness check)
+  lastAccessedAt: number | null;
 
   // Channel filter
   selectedChannel: ChannelFilter;
@@ -168,10 +178,16 @@ const getDefaultDateRange = (): DateRange => ({
 export const useDashboardStore = create<DashboardState>()(
   persist(
     (set) => ({
-      // Date range
+      // Date range - defaults to today
       dateRange: getDefaultDateRange(),
       setDateRange: (startDate, endDate) =>
-        set({ dateRange: { startDate, endDate } }),
+        set({ 
+          dateRange: { startDate, endDate },
+          lastAccessedAt: Date.now(), // Update access timestamp on date change
+        }),
+
+      // Last accessed timestamp
+      lastAccessedAt: null,
 
       // Channel filter
       selectedChannel: 'all',
@@ -235,6 +251,7 @@ export const useDashboardStore = create<DashboardState>()(
           highlightedKpiKey: null,
           highlightedDate: null,
           isDrilldownOpen: false,
+          lastAccessedAt: Date.now(),
         }),
     }),
     {
@@ -247,7 +264,23 @@ export const useDashboardStore = create<DashboardState>()(
         selectedCreativeId: state.selectedCreativeId,
         viewMode: state.viewMode,
         comparisonEnabled: state.comparisonEnabled,
+        lastAccessedAt: state.lastAccessedAt,
       }),
+      // Handle session freshness on rehydration
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const now = Date.now();
+          const lastAccess = state.lastAccessedAt;
+          
+          // If session is stale (>24 hours) or no previous access, reset to today
+          if (!lastAccess || (now - lastAccess) > STALENESS_THRESHOLD_MS) {
+            state.dateRange = getDefaultDateRange();
+          }
+          
+          // Update last accessed timestamp
+          state.lastAccessedAt = now;
+        }
+      },
     }
   )
 );
