@@ -185,7 +185,7 @@ export function DateRangeSelector({
               selected={customRange}
               onSelect={handleCustomRangeSelect}
               numberOfMonths={1}
-              defaultMonth={customRange?.from}
+              defaultMonth={new Date()}
               showOutsideDays
               disabled={(date) => date > new Date()}
               className={cn(

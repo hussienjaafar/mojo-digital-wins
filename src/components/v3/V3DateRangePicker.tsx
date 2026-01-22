@@ -229,10 +229,16 @@ export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
           >
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
-            {Object.entries(presets).map(([key, preset]) => (
-              <SelectItem key={key} value={key}>
-                {preset.label}
+          <SelectContent 
+            className="!bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] rounded-lg shadow-lg z-[200]"
+          >
+            {(['today', 'yesterday', '7d', '14d', '30d', '90d', 'mtd', 'last-month', 'custom'] as const).map((key) => (
+              <SelectItem 
+                key={key} 
+                value={key}
+                className="text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-hover))] focus:bg-[hsl(var(--portal-bg-hover))] cursor-pointer"
+              >
+                {presets[key].label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -281,7 +287,7 @@ export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
             selected={{ from: startDate, to: endDate }}
             onSelect={handleDateSelect}
             numberOfMonths={2}
-            defaultMonth={subDays(new Date(), 30)}
+            defaultMonth={new Date()}
             className="p-3 pointer-events-auto"
           />
         </PopoverContent>
