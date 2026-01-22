@@ -963,6 +963,71 @@ serve(async (req) => {
               } else {
                 creativesProcessed++;
                 
+                // === NEW: Store individual creative variations ===
+                // Parse and store individual text variations from asset_feed_spec
+                if (creative.asset_feed_spec) {
+                  const feedSpec = creative.asset_feed_spec;
+                  const variationsToInsert: any[] = [];
+                  const syncedAt = new Date().toISOString();
+                  
+                  // Store body (primary text) variations
+                  if (feedSpec.bodies && feedSpec.bodies.length > 0) {
+                    for (let i = 0; i < feedSpec.bodies.length; i++) {
+                      variationsToInsert.push({
+                        organization_id,
+                        ad_id: ad.id,
+                        asset_type: 'body',
+                        asset_index: i,
+                        asset_text: feedSpec.bodies[i].text || null,
+                        synced_at: syncedAt,
+                      });
+                    }
+                  }
+                  
+                  // Store title (headline) variations
+                  if (feedSpec.titles && feedSpec.titles.length > 0) {
+                    for (let i = 0; i < feedSpec.titles.length; i++) {
+                      variationsToInsert.push({
+                        organization_id,
+                        ad_id: ad.id,
+                        asset_type: 'title',
+                        asset_index: i,
+                        asset_text: feedSpec.titles[i].text || null,
+                        synced_at: syncedAt,
+                      });
+                    }
+                  }
+                  
+                  // Store description variations
+                  if (feedSpec.descriptions && feedSpec.descriptions.length > 0) {
+                    for (let i = 0; i < feedSpec.descriptions.length; i++) {
+                      variationsToInsert.push({
+                        organization_id,
+                        ad_id: ad.id,
+                        asset_type: 'description',
+                        asset_index: i,
+                        asset_text: feedSpec.descriptions[i].text || null,
+                        synced_at: syncedAt,
+                      });
+                    }
+                  }
+                  
+                  if (variationsToInsert.length > 0) {
+                    console.log(`[VARIATIONS] Storing ${variationsToInsert.length} text variations for ad ${ad.id}`);
+                    const { error: varError } = await supabase
+                      .from('meta_creative_variations')
+                      .upsert(variationsToInsert, {
+                        onConflict: 'organization_id,ad_id,asset_type,asset_index'
+                      });
+                    
+                    if (varError) {
+                      console.error(`[VARIATIONS] Error storing variations for ad ${ad.id}:`, varError);
+                    } else {
+                      console.log(`[VARIATIONS] Stored ${variationsToInsert.length} variations successfully`);
+                    }
+                  }
+                }
+                
                 // Store refcode mapping for deterministic attribution
                 if (extractedRefcode) {
                   const now = new Date().toISOString();
