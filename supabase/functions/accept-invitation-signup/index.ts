@@ -12,6 +12,99 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Structured logging helper
+interface LogContext {
+  requestId: string;
+  email?: string;
+  invitationId?: string;
+  userId?: string;
+  organizationId?: string;
+  step?: string;
+}
+
+function createLogger(requestId: string) {
+  const baseContext: LogContext = { requestId };
+  
+  return {
+    setContext(ctx: Partial<LogContext>) {
+      Object.assign(baseContext, ctx);
+    },
+    
+    info(message: string, data?: Record<string, unknown>) {
+      console.log(JSON.stringify({
+        level: "INFO",
+        timestamp: new Date().toISOString(),
+        ...baseContext,
+        message,
+        ...data,
+      }));
+    },
+    
+    warn(message: string, data?: Record<string, unknown>) {
+      console.warn(JSON.stringify({
+        level: "WARN",
+        timestamp: new Date().toISOString(),
+        ...baseContext,
+        message,
+        ...data,
+      }));
+    },
+    
+    error(message: string, error?: unknown, data?: Record<string, unknown>) {
+      console.error(JSON.stringify({
+        level: "ERROR",
+        timestamp: new Date().toISOString(),
+        ...baseContext,
+        message,
+        error: error instanceof Error 
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : error,
+        ...data,
+      }));
+    },
+  };
+}
+
+// Generate a request ID for tracing
+function generateRequestId(): string {
+  return `inv-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+}
+
+// Audit log helper - writes to invitation_audit_logs table
+// deno-lint-ignore no-explicit-any
+async function logAuditEvent(
+  supabase: any,
+  event: {
+    invitationId?: string;
+    eventType: string;
+    email?: string;
+    userId?: string;
+    organizationId?: string;
+    invitationType?: string;
+    status?: string;
+    errorMessage?: string;
+    metadata?: Record<string, unknown>;
+  }
+) {
+  try {
+    await supabase.rpc("log_invitation_event", {
+      p_invitation_id: event.invitationId || null,
+      p_event_type: event.eventType,
+      p_email: event.email || null,
+      p_user_id: event.userId || null,
+      p_organization_id: event.organizationId || null,
+      p_invitation_type: event.invitationType || null,
+      p_status: event.status || null,
+      p_error_message: event.errorMessage || null,
+      p_metadata: event.metadata || {},
+      p_source: "edge_function",
+    });
+  } catch (err) {
+    // Don't fail the request if audit logging fails
+    console.error("Failed to write audit log:", err);
+  }
+}
+
 // Password validation matching database requirements
 const strongPasswordSchema = z
   .string()
@@ -36,10 +129,15 @@ const acceptInvitationSignupSchema = z.object({
 });
 
 serve(async (req: Request) => {
+  const requestId = generateRequestId();
+  const log = createLogger(requestId);
+  
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  log.info("Invitation signup request started");
 
   try {
     // Parse and validate request body
@@ -48,10 +146,12 @@ serve(async (req: Request) => {
     });
 
     if (!parsed.ok) {
+      log.warn("Validation failed", { error: parsed.error, details: parsed.details });
       return new Response(
         JSON.stringify({
           error: parsed.error,
           details: parsed.details,
+          requestId,
         }),
         {
           status: 400,
@@ -61,6 +161,8 @@ serve(async (req: Request) => {
     }
 
     const { token, email, password, full_name } = parsed.data;
+    log.setContext({ email, step: "validated" });
+    log.info("Request validated", { tokenPrefix: token.substring(0, 8) + "..." });
 
     // Create Supabase admin client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -73,15 +175,24 @@ serve(async (req: Request) => {
     });
 
     // Step 1: Validate the invitation token
+    log.setContext({ step: "fetch_invitation" });
+    log.info("Fetching invitation by token");
+    
     const { data: invitations, error: invError } = await supabaseAdmin.rpc(
       "get_invitation_by_token",
       { p_token: token }
     );
 
     if (invError) {
-      console.error("Error fetching invitation:", invError);
+      log.error("Failed to fetch invitation", invError);
+      await logAuditEvent(supabaseAdmin, {
+        eventType: "fetch_invitation_error",
+        email,
+        errorMessage: invError.message,
+        metadata: { requestId },
+      });
       return new Response(
-        JSON.stringify({ error: "Failed to validate invitation" }),
+        JSON.stringify({ error: "Failed to validate invitation", requestId }),
         {
           status: 500,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -90,8 +201,15 @@ serve(async (req: Request) => {
     }
 
     if (!invitations || invitations.length === 0) {
+      log.warn("Invitation not found or expired");
+      await logAuditEvent(supabaseAdmin, {
+        eventType: "invitation_not_found",
+        email,
+        errorMessage: "Invitation not found or has expired",
+        metadata: { requestId },
+      });
       return new Response(
-        JSON.stringify({ error: "Invitation not found or has expired" }),
+        JSON.stringify({ error: "Invitation not found or has expired", requestId }),
         {
           status: 404,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -100,11 +218,32 @@ serve(async (req: Request) => {
     }
 
     const invitation = invitations[0];
+    log.setContext({ 
+      invitationId: invitation.id, 
+      organizationId: invitation.organization_id,
+      step: "validate_status" 
+    });
+    log.info("Invitation found", { 
+      status: invitation.status, 
+      type: invitation.invitation_type,
+      role: invitation.role,
+      expiresAt: invitation.expires_at,
+    });
 
     // Check invitation status
     if (invitation.status === "accepted") {
+      log.warn("Invitation already accepted");
+      await logAuditEvent(supabaseAdmin, {
+        invitationId: invitation.id,
+        eventType: "already_accepted",
+        email,
+        organizationId: invitation.organization_id,
+        invitationType: invitation.invitation_type,
+        status: "accepted",
+        metadata: { requestId },
+      });
       return new Response(
-        JSON.stringify({ error: "This invitation has already been accepted" }),
+        JSON.stringify({ error: "This invitation has already been accepted", requestId }),
         {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -113,8 +252,18 @@ serve(async (req: Request) => {
     }
 
     if (invitation.status === "revoked") {
+      log.warn("Invitation was revoked");
+      await logAuditEvent(supabaseAdmin, {
+        invitationId: invitation.id,
+        eventType: "revoked_attempt",
+        email,
+        organizationId: invitation.organization_id,
+        invitationType: invitation.invitation_type,
+        status: "revoked",
+        metadata: { requestId },
+      });
       return new Response(
-        JSON.stringify({ error: "This invitation has been revoked" }),
+        JSON.stringify({ error: "This invitation has been revoked", requestId }),
         {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -123,8 +272,18 @@ serve(async (req: Request) => {
     }
 
     if (new Date(invitation.expires_at) < new Date()) {
+      log.warn("Invitation expired", { expiresAt: invitation.expires_at });
+      await logAuditEvent(supabaseAdmin, {
+        invitationId: invitation.id,
+        eventType: "expired_attempt",
+        email,
+        organizationId: invitation.organization_id,
+        invitationType: invitation.invitation_type,
+        status: "expired",
+        metadata: { requestId, expiresAt: invitation.expires_at },
+      });
       return new Response(
-        JSON.stringify({ error: "This invitation has expired" }),
+        JSON.stringify({ error: "This invitation has expired", requestId }),
         {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -134,9 +293,20 @@ serve(async (req: Request) => {
 
     // Verify email matches invitation
     if (email.toLowerCase() !== invitation.email.toLowerCase()) {
+      log.warn("Email mismatch", { invitationEmail: invitation.email });
+      await logAuditEvent(supabaseAdmin, {
+        invitationId: invitation.id,
+        eventType: "email_mismatch",
+        email,
+        organizationId: invitation.organization_id,
+        invitationType: invitation.invitation_type,
+        errorMessage: "Email address does not match the invitation",
+        metadata: { requestId, invitationEmail: invitation.email },
+      });
       return new Response(
         JSON.stringify({
           error: "Email address does not match the invitation",
+          requestId,
         }),
         {
           status: 400,
@@ -146,33 +316,53 @@ serve(async (req: Request) => {
     }
 
     // Step 2: Create user with auto-confirmed email using admin API
+    log.setContext({ step: "create_user" });
+    log.info("Attempting to create user account");
+    
     const { data: createData, error: createError } =
       await supabaseAdmin.auth.admin.createUser({
         email: email,
         password: password,
-        email_confirm: true, // Auto-confirm since invitation acts as verification
+        email_confirm: true,
         user_metadata: {
           full_name: full_name,
         },
       });
 
     if (createError) {
-      console.error("Error creating user:", createError);
+      log.warn("User creation error", { errorMessage: createError.message });
 
       // Handle duplicate user error - existing user wants to join new org
       if (
         createError.message.includes("already been registered") ||
         createError.message.includes("already exists")
       ) {
-        console.log("User already exists, attempting to add to organization...");
+        log.info("User already exists, handling existing user flow");
+        await logAuditEvent(supabaseAdmin, {
+          invitationId: invitation.id,
+          eventType: "existing_user_detected",
+          email,
+          organizationId: invitation.organization_id,
+          invitationType: invitation.invitation_type,
+          metadata: { requestId },
+        });
         
         // Get the existing user by email
+        log.setContext({ step: "find_existing_user" });
         const { data: existingUserData, error: listError } = await supabaseAdmin.auth.admin.listUsers();
         
         if (listError) {
-          console.error("Error listing users:", listError);
+          log.error("Failed to list users", listError);
+          await logAuditEvent(supabaseAdmin, {
+            invitationId: invitation.id,
+            eventType: "list_users_error",
+            email,
+            organizationId: invitation.organization_id,
+            errorMessage: listError.message,
+            metadata: { requestId },
+          });
           return new Response(
-            JSON.stringify({ error: "Failed to find existing user" }),
+            JSON.stringify({ error: "Failed to find existing user", requestId }),
             { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
           );
         }
@@ -182,13 +372,25 @@ serve(async (req: Request) => {
         );
         
         if (!existingUser) {
+          log.error("User exists but not found in list", null, { email });
+          await logAuditEvent(supabaseAdmin, {
+            invitationId: invitation.id,
+            eventType: "user_not_found_in_list",
+            email,
+            organizationId: invitation.organization_id,
+            errorMessage: "User exists but could not be found",
+            metadata: { requestId },
+          });
           return new Response(
-            JSON.stringify({ error: "User exists but could not be found" }),
+            JSON.stringify({ error: "User exists but could not be found", requestId }),
             { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
           );
         }
         
-        // Update the user's password (they just set a new one) and full_name
+        log.setContext({ userId: existingUser.id, step: "update_existing_user" });
+        log.info("Found existing user", { userId: existingUser.id });
+        
+        // Update the user's password and full_name
         const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
           existingUser.id,
           { 
@@ -198,11 +400,24 @@ serve(async (req: Request) => {
         );
         
         if (updateError) {
-          console.error("Error updating user password:", updateError);
-          // Continue anyway - password update is nice-to-have
+          log.warn("Failed to update user password (continuing)", { errorMessage: updateError.message });
+          await logAuditEvent(supabaseAdmin, {
+            invitationId: invitation.id,
+            eventType: "password_update_failed",
+            email,
+            userId: existingUser.id,
+            organizationId: invitation.organization_id,
+            errorMessage: updateError.message,
+            metadata: { requestId },
+          });
+        } else {
+          log.info("Updated user password and metadata");
         }
         
         // Accept the invitation for the existing user
+        log.setContext({ step: "accept_invitation_existing" });
+        log.info("Calling accept_invitation RPC for existing user");
+        
         const { data: acceptResult, error: acceptError } = await supabaseAdmin.rpc(
           "accept_invitation",
           {
@@ -212,9 +427,18 @@ serve(async (req: Request) => {
         );
         
         if (acceptError) {
-          console.error("Error accepting invitation for existing user:", acceptError);
+          log.error("Failed to accept invitation for existing user", acceptError);
+          await logAuditEvent(supabaseAdmin, {
+            invitationId: invitation.id,
+            eventType: "accept_rpc_error_existing",
+            email,
+            userId: existingUser.id,
+            organizationId: invitation.organization_id,
+            errorMessage: acceptError.message,
+            metadata: { requestId },
+          });
           return new Response(
-            JSON.stringify({ error: "Failed to accept invitation" }),
+            JSON.stringify({ error: "Failed to accept invitation", requestId }),
             { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
           );
         }
@@ -226,21 +450,47 @@ serve(async (req: Request) => {
           organization_id?: string;
         };
         
+        log.info("Accept invitation RPC result", { success: result.success, error: result.error });
+        
         if (!result.success) {
+          log.error("Invitation acceptance failed", null, { error: result.error });
+          await logAuditEvent(supabaseAdmin, {
+            invitationId: invitation.id,
+            eventType: "accept_failed_existing",
+            email,
+            userId: existingUser.id,
+            organizationId: invitation.organization_id,
+            errorMessage: result.error,
+            metadata: { requestId },
+          });
           return new Response(
-            JSON.stringify({ error: result.error || "Failed to accept invitation" }),
+            JSON.stringify({ error: result.error || "Failed to accept invitation", requestId }),
             { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
           );
         }
         
         // Sign in the existing user
+        log.setContext({ step: "signin_existing" });
+        log.info("Signing in existing user");
+        
         const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
           email: email,
           password: password,
         });
         
         if (signInError) {
-          console.error("Error signing in existing user:", signInError);
+          log.warn("Failed to sign in existing user", { errorMessage: signInError.message });
+          await logAuditEvent(supabaseAdmin, {
+            invitationId: invitation.id,
+            eventType: "signin_failed_existing",
+            email,
+            userId: existingUser.id,
+            organizationId: result.organization_id,
+            invitationType: result.invitation_type,
+            status: "accepted",
+            errorMessage: signInError.message,
+            metadata: { requestId },
+          });
           return new Response(
             JSON.stringify({
               success: true,
@@ -249,12 +499,24 @@ serve(async (req: Request) => {
               organization_id: result.organization_id,
               session: null,
               message: "Invitation accepted. Please log in with your credentials.",
+              requestId,
             }),
             { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
           );
         }
         
-        // Return success with session
+        log.info("Existing user flow completed successfully");
+        await logAuditEvent(supabaseAdmin, {
+          invitationId: invitation.id,
+          eventType: "signup_success_existing",
+          email,
+          userId: existingUser.id,
+          organizationId: result.organization_id,
+          invitationType: result.invitation_type,
+          status: "accepted",
+          metadata: { requestId },
+        });
+        
         return new Response(
           JSON.stringify({
             success: true,
@@ -264,14 +526,26 @@ serve(async (req: Request) => {
             session: signInData.session,
             access_token: signInData.session?.access_token,
             refresh_token: signInData.session?.refresh_token,
+            requestId,
           }),
           { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
 
+      log.error("Unexpected user creation error", createError);
+      await logAuditEvent(supabaseAdmin, {
+        invitationId: invitation.id,
+        eventType: "create_user_error",
+        email,
+        organizationId: invitation.organization_id,
+        invitationType: invitation.invitation_type,
+        errorMessage: createError.message,
+        metadata: { requestId },
+      });
       return new Response(
         JSON.stringify({
           error: createError.message || "Failed to create account",
+          requestId,
         }),
         {
           status: 500,
@@ -283,8 +557,18 @@ serve(async (req: Request) => {
     const user = createData.user;
 
     if (!user) {
+      log.error("User creation returned null user", null);
+      await logAuditEvent(supabaseAdmin, {
+        invitationId: invitation.id,
+        eventType: "create_user_null",
+        email,
+        organizationId: invitation.organization_id,
+        invitationType: invitation.invitation_type,
+        errorMessage: "User creation returned null",
+        metadata: { requestId },
+      });
       return new Response(
-        JSON.stringify({ error: "Failed to create user account" }),
+        JSON.stringify({ error: "Failed to create user account", requestId }),
         {
           status: 500,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -292,7 +576,20 @@ serve(async (req: Request) => {
       );
     }
 
+    log.setContext({ userId: user.id, step: "accept_invitation" });
+    log.info("User created successfully", { userId: user.id });
+    await logAuditEvent(supabaseAdmin, {
+      invitationId: invitation.id,
+      eventType: "user_created",
+      email,
+      userId: user.id,
+      organizationId: invitation.organization_id,
+      invitationType: invitation.invitation_type,
+      metadata: { requestId, fullName: full_name },
+    });
+
     // Step 3: Accept the invitation
+    log.info("Calling accept_invitation RPC");
     const { data: acceptResult, error: acceptError } = await supabaseAdmin.rpc(
       "accept_invitation",
       {
@@ -302,13 +599,24 @@ serve(async (req: Request) => {
     );
 
     if (acceptError) {
-      console.error("Error accepting invitation:", acceptError);
+      log.error("Failed to accept invitation, cleaning up user", acceptError);
+      await logAuditEvent(supabaseAdmin, {
+        invitationId: invitation.id,
+        eventType: "accept_rpc_error",
+        email,
+        userId: user.id,
+        organizationId: invitation.organization_id,
+        invitationType: invitation.invitation_type,
+        errorMessage: acceptError.message,
+        metadata: { requestId },
+      });
 
-      // Try to clean up the created user if invitation acceptance fails
+      // Clean up the created user
       await supabaseAdmin.auth.admin.deleteUser(user.id);
+      log.info("Deleted user after acceptance failure");
 
       return new Response(
-        JSON.stringify({ error: "Failed to accept invitation" }),
+        JSON.stringify({ error: "Failed to accept invitation", requestId }),
         {
           status: 500,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -323,13 +631,28 @@ serve(async (req: Request) => {
       organization_id?: string;
     };
 
+    log.info("Accept invitation RPC result", { success: result.success, error: result.error });
+
     if (!result.success) {
-      // Clean up user if invitation acceptance fails
+      log.error("Invitation acceptance failed, cleaning up user", null, { error: result.error });
+      await logAuditEvent(supabaseAdmin, {
+        invitationId: invitation.id,
+        eventType: "accept_failed",
+        email,
+        userId: user.id,
+        organizationId: invitation.organization_id,
+        invitationType: invitation.invitation_type,
+        errorMessage: result.error,
+        metadata: { requestId },
+      });
+
+      // Clean up user
       await supabaseAdmin.auth.admin.deleteUser(user.id);
 
       return new Response(
         JSON.stringify({
           error: result.error || "Failed to accept invitation",
+          requestId,
         }),
         {
           status: 400,
@@ -339,7 +662,9 @@ serve(async (req: Request) => {
     }
 
     // Step 4: Create a session for immediate login
-    // Use signInWithPassword since we just created the user with a known password
+    log.setContext({ step: "signin" });
+    log.info("Signing in new user");
+    
     const { data: signInData, error: signInError } =
       await supabaseAdmin.auth.signInWithPassword({
         email: email,
@@ -347,9 +672,19 @@ serve(async (req: Request) => {
       });
 
     if (signInError) {
-      console.error("Error signing in user:", signInError);
-      // User is created and invitation accepted, but session creation failed
-      // Return success but indicate they need to log in manually
+      log.warn("Failed to create session (user created successfully)", { errorMessage: signInError.message });
+      await logAuditEvent(supabaseAdmin, {
+        invitationId: invitation.id,
+        eventType: "signin_failed",
+        email,
+        userId: user.id,
+        organizationId: result.organization_id,
+        invitationType: result.invitation_type,
+        status: "accepted",
+        errorMessage: signInError.message,
+        metadata: { requestId },
+      });
+      
       return new Response(
         JSON.stringify({
           success: true,
@@ -359,6 +694,7 @@ serve(async (req: Request) => {
           session: null,
           message:
             "Account created successfully. Please log in with your credentials.",
+          requestId,
         }),
         {
           status: 200,
@@ -366,6 +702,18 @@ serve(async (req: Request) => {
         }
       );
     }
+
+    log.info("Invitation signup completed successfully");
+    await logAuditEvent(supabaseAdmin, {
+      invitationId: invitation.id,
+      eventType: "signup_success",
+      email,
+      userId: user.id,
+      organizationId: result.organization_id,
+      invitationType: result.invitation_type,
+      status: "accepted",
+      metadata: { requestId },
+    });
 
     // Return success with session for immediate login
     return new Response(
@@ -377,6 +725,7 @@ serve(async (req: Request) => {
         session: signInData.session,
         access_token: signInData.session?.access_token,
         refresh_token: signInData.session?.refresh_token,
+        requestId,
       }),
       {
         status: 200,
@@ -384,11 +733,12 @@ serve(async (req: Request) => {
       }
     );
   } catch (error) {
-    console.error("Unexpected error in accept-invitation-signup:", error);
+    log.error("Unexpected error in accept-invitation-signup", error);
     return new Response(
       JSON.stringify({
         error:
           error instanceof Error ? error.message : "An unexpected error occurred",
+        requestId,
       }),
       {
         status: 500,
