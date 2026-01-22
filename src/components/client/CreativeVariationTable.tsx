@@ -1,15 +1,13 @@
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Trophy, Medal, Award, ArrowUp, ArrowDown, Minus, Layers, RefreshCw, Info } from "lucide-react";
+import { Trophy, Medal, Award, ArrowUp, ArrowDown, Minus, Layers, Info, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { V3Card, V3CardContent, V3SectionHeader, V3EmptyState } from "@/components/v3";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export interface CreativeVariation {
   id: string;
@@ -94,45 +92,13 @@ const formatRoas = (n: number | null | undefined): string => {
 export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
   variations,
   isLoading = false,
-  organizationId,
-  onRefresh,
 }) => {
   const [activeTab, setActiveTab] = React.useState<string>("body");
-  const [isSyncing, setIsSyncing] = React.useState(false);
 
-  // Check if any variations have estimated data
-  const hasEstimatedData = React.useMemo(() => 
-    variations.some(v => v.is_estimated), [variations]
+  // Check if we have REAL metrics (not estimated) - only show metrics table when we have actual data
+  const hasRealMetrics = React.useMemo(() => 
+    variations.some(v => !v.is_estimated && v.impressions && v.impressions > 0), [variations]
   );
-
-  // Check if all variations have zero metrics (need sync)
-  const needsSync = React.useMemo(() => 
-    variations.length > 0 && variations.every(v => !v.impressions && !v.spend), [variations]
-  );
-
-  const handleSyncVariations = async () => {
-    if (!organizationId) {
-      toast.error("Organization ID required for sync");
-      return;
-    }
-
-    setIsSyncing(true);
-    try {
-      const { error } = await supabase.functions.invoke("aggregate-variation-metrics", {
-        body: { organization_id: organizationId },
-      });
-
-      if (error) throw error;
-      
-      toast.success("Variation metrics synced successfully");
-      onRefresh?.();
-    } catch (err) {
-      console.error("Sync error:", err);
-      toast.error("Failed to sync variation metrics");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   // Group variations by asset type
   const variationsByType = React.useMemo(() => {
@@ -185,47 +151,28 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <V3SectionHeader
-              title="Creative Variations Performance"
+              title="Creative Variations"
               subtitle={`${variations.length} variations across ${availableTypes.length} asset types`}
               icon={Layers}
             />
           </div>
-          <div className="flex items-center gap-2">
-            {hasEstimatedData && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge 
-                      variant="outline" 
-                      className="gap-1 border-[hsl(var(--portal-accent-amber))] text-[hsl(var(--portal-accent-amber))]"
-                    >
-                      <Info className="h-3 w-3" />
-                      Estimated
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs text-sm">
-                      Some metrics are estimated from parent ad data because Meta's 
-                      asset-level breakdown API didn't return detailed performance data.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            {(needsSync || hasEstimatedData) && organizationId && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSyncVariations}
-                disabled={isSyncing}
-                className="gap-2"
-              >
-                <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-                {isSyncing ? "Syncing..." : "Sync Metrics"}
-              </Button>
-            )}
-          </div>
         </div>
+
+        {/* Show info alert when we don't have real metrics */}
+        {!hasRealMetrics && variations.length > 0 && (
+          <Alert className="mb-4 border-[hsl(var(--portal-accent-amber)/0.5)] bg-[hsl(var(--portal-accent-amber)/0.1)]">
+            <AlertCircle className="h-4 w-4 text-[hsl(var(--portal-accent-amber))]" />
+            <AlertTitle className="text-[hsl(var(--portal-text-primary))]">
+              Individual Variation Metrics Not Available
+            </AlertTitle>
+            <AlertDescription className="text-[hsl(var(--portal-text-secondary))]">
+              Meta only provides per-variation performance data for Dynamic Creative (DCO) ads with sufficient 
+              impression volume. Your ad copy variations are shown below for reference, but individual performance 
+              metrics cannot be determined. To get variation-level data, consider using Meta's Dynamic Creative 
+              feature when setting up your ads.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4 bg-[hsl(var(--portal-bg-elevated))] border border-[hsl(var(--portal-border))]">
@@ -261,12 +208,16 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
                         <TableRow className="bg-[hsl(var(--portal-bg-elevated))]">
                           <TableHead className="w-12 text-center">#</TableHead>
                           <TableHead className="min-w-[300px]">Copy</TableHead>
-                          <TableHead className="text-right">Impressions</TableHead>
-                          <TableHead className="text-right">Clicks</TableHead>
-                          <TableHead className="text-right">Link CTR</TableHead>
-                          <TableHead className="text-right">Spend</TableHead>
-                          <TableHead className="text-right">Conv</TableHead>
-                          <TableHead className="text-right">ROAS</TableHead>
+                          {hasRealMetrics && (
+                            <>
+                              <TableHead className="text-right">Impressions</TableHead>
+                              <TableHead className="text-right">Clicks</TableHead>
+                              <TableHead className="text-right">Link CTR</TableHead>
+                              <TableHead className="text-right">Spend</TableHead>
+                              <TableHead className="text-right">Conv</TableHead>
+                              <TableHead className="text-right">ROAS</TableHead>
+                            </>
+                          )}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -275,92 +226,102 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
                             key={variation.id}
                             className={cn(
                               "transition-colors",
-                              idx === 0 && "bg-[hsl(var(--portal-accent-green)/0.08)]",
-                              idx === typeVariations.length - 1 &&
+                              hasRealMetrics && idx === 0 && "bg-[hsl(var(--portal-accent-green)/0.08)]",
+                              hasRealMetrics && idx === typeVariations.length - 1 &&
                                 typeVariations.length > 1 &&
                                 "bg-[hsl(var(--portal-accent-red)/0.05)]"
                             )}
                           >
                             <TableCell className="text-center">
-                              <RankIcon rank={variation.performance_rank || idx + 1} />
+                              {hasRealMetrics ? (
+                                <RankIcon rank={variation.performance_rank || idx + 1} />
+                              ) : (
+                                <span className="text-[hsl(var(--portal-text-muted))]">{idx + 1}</span>
+                              )}
                             </TableCell>
                             <TableCell className="font-medium max-w-[400px]">
                               <p className="line-clamp-2 text-sm text-[hsl(var(--portal-text-primary))]">
                                 {variation.asset_text || "—"}
                               </p>
                             </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {formatNumber(variation.impressions)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {formatNumber(variation.clicks)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <span className="font-mono text-sm">
-                                  {formatPercent(variation.link_ctr)}
-                                </span>
-                                <TrendIndicator
-                                  current={variation.link_ctr ?? 0}
-                                  baseline={avgLinkCtr}
-                                />
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {formatCurrency(variation.spend)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {formatNumber(variation.conversions)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <span
-                                  className={cn(
-                                    "font-mono text-sm font-semibold",
-                                    (variation.roas ?? 0) > avgRoas * 1.1
-                                      ? "text-[hsl(var(--portal-accent-green))]"
-                                      : (variation.roas ?? 0) < avgRoas * 0.9
-                                      ? "text-[hsl(var(--portal-accent-red))]"
-                                      : "text-[hsl(var(--portal-text-primary))]"
-                                  )}
-                                >
-                                  {formatRoas(variation.roas)}
-                                </span>
-                                <TrendIndicator
-                                  current={variation.roas ?? 0}
-                                  baseline={avgRoas}
-                                />
-                              </div>
-                            </TableCell>
+                            {hasRealMetrics && (
+                              <>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {formatNumber(variation.impressions)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {formatNumber(variation.clicks)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span className="font-mono text-sm">
+                                      {formatPercent(variation.link_ctr)}
+                                    </span>
+                                    <TrendIndicator
+                                      current={variation.link_ctr ?? 0}
+                                      baseline={avgLinkCtr}
+                                    />
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {formatCurrency(variation.spend)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {formatNumber(variation.conversions)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span
+                                      className={cn(
+                                        "font-mono text-sm font-semibold",
+                                        (variation.roas ?? 0) > avgRoas * 1.1
+                                          ? "text-[hsl(var(--portal-accent-green))]"
+                                          : (variation.roas ?? 0) < avgRoas * 0.9
+                                          ? "text-[hsl(var(--portal-accent-red))]"
+                                          : "text-[hsl(var(--portal-text-primary))]"
+                                      )}
+                                    >
+                                      {formatRoas(variation.roas)}
+                                    </span>
+                                    <TrendIndicator
+                                      current={variation.roas ?? 0}
+                                      baseline={avgRoas}
+                                    />
+                                  </div>
+                                </TableCell>
+                              </>
+                            )}
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
 
-                  {/* Summary stats */}
-                  <div className="mt-4 flex gap-4 text-sm text-[hsl(var(--portal-text-muted))]">
-                    <span>
-                      Avg Link CTR:{" "}
-                      <strong className="text-[hsl(var(--portal-text-primary))]">
-                        {formatPercent(avgLinkCtr)}
-                      </strong>
-                    </span>
-                    <span>
-                      Avg ROAS:{" "}
-                      <strong className="text-[hsl(var(--portal-text-primary))]">
-                        {formatRoas(avgRoas)}
-                      </strong>
-                    </span>
-                    <span>
-                      Top performer:{" "}
-                      <strong className="text-[hsl(var(--portal-accent-green))]">
-                        {typeVariations[0]?.roas
-                          ? `${((typeVariations[0].roas / avgRoas - 1) * 100).toFixed(0)}% above avg`
-                          : "—"}
-                      </strong>
-                    </span>
-                  </div>
+                  {/* Summary stats - only show when we have real metrics */}
+                  {hasRealMetrics && (
+                    <div className="mt-4 flex gap-4 text-sm text-[hsl(var(--portal-text-muted))]">
+                      <span>
+                        Avg Link CTR:{" "}
+                        <strong className="text-[hsl(var(--portal-text-primary))]">
+                          {formatPercent(avgLinkCtr)}
+                        </strong>
+                      </span>
+                      <span>
+                        Avg ROAS:{" "}
+                        <strong className="text-[hsl(var(--portal-text-primary))]">
+                          {formatRoas(avgRoas)}
+                        </strong>
+                      </span>
+                      <span>
+                        Top performer:{" "}
+                        <strong className="text-[hsl(var(--portal-accent-green))]">
+                          {typeVariations[0]?.roas
+                            ? `${((typeVariations[0].roas / avgRoas - 1) * 100).toFixed(0)}% above avg`
+                            : "—"}
+                        </strong>
+                      </span>
+                    </div>
+                  )}
                 </motion.div>
               </TabsContent>
             );
