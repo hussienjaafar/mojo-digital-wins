@@ -6279,16 +6279,21 @@ export type Database = {
           clicks: number | null
           conversion_value: number | null
           conversions: number | null
+          cpa: number | null
           created_at: string | null
           creative_insight_id: string | null
           ctr: number | null
           id: string
           impressions: number | null
+          inline_link_clicks: number | null
           is_estimated: boolean | null
           link_clicks: number | null
           link_ctr: number | null
           organization_id: string
           performance_rank: number | null
+          purchases: number | null
+          ranking_method: string | null
+          reach: number | null
           roas: number | null
           spend: number | null
           synced_at: string | null
@@ -6303,16 +6308,21 @@ export type Database = {
           clicks?: number | null
           conversion_value?: number | null
           conversions?: number | null
+          cpa?: number | null
           created_at?: string | null
           creative_insight_id?: string | null
           ctr?: number | null
           id?: string
           impressions?: number | null
+          inline_link_clicks?: number | null
           is_estimated?: boolean | null
           link_clicks?: number | null
           link_ctr?: number | null
           organization_id: string
           performance_rank?: number | null
+          purchases?: number | null
+          ranking_method?: string | null
+          reach?: number | null
           roas?: number | null
           spend?: number | null
           synced_at?: string | null
@@ -6327,16 +6337,21 @@ export type Database = {
           clicks?: number | null
           conversion_value?: number | null
           conversions?: number | null
+          cpa?: number | null
           created_at?: string | null
           creative_insight_id?: string | null
           ctr?: number | null
           id?: string
           impressions?: number | null
+          inline_link_clicks?: number | null
           is_estimated?: boolean | null
           link_clicks?: number | null
           link_ctr?: number | null
           organization_id?: string
           performance_rank?: number | null
+          purchases?: number | null
+          ranking_method?: string | null
+          reach?: number | null
           roas?: number | null
           spend?: number | null
           synced_at?: string | null
