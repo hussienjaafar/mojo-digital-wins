@@ -219,11 +219,15 @@ export default function AcceptInvitation() {
         if (!session) {
           throw new Error('Session not established after signup');
         }
+        
+        setViewMode('accepted');
+        setConfirmPassword("");
+        toast.success("Welcome aboard! Your account has been created.");
+      } else {
+        // Account created but no session returned - redirect to login
+        toast.success("Account created! Please log in with your new password.");
+        navigate("/client-login");
       }
-
-      setViewMode('accepted');
-      setConfirmPassword("");
-      toast.success("Welcome aboard! Your account has been created.");
     } catch (err: any) {
       console.error("Signup error:", err);
       setSignupError(err.message || "Failed to create account");
