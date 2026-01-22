@@ -380,3 +380,6 @@ verify_jwt = false  # Uses CRON_SECRET or service role key internally
 # --- BATCH USER OPERATIONS ---
 [functions.batch-create-users]
 verify_jwt = true
+
+[functions.request-password-reset]
+verify_jwt = false

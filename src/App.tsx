@@ -41,6 +41,8 @@ const BillDetail = lazy(() => import("./pages/BillDetail"));
 const MetaOAuthCallback = lazy(() => import("./pages/MetaOAuthCallback"));
 const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
 const Redirect = lazy(() => import("./pages/Redirect"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 // Admin pages (lazy loaded - larger bundle)
 const Admin = lazy(() => import("./pages/Admin"));
@@ -113,6 +115,8 @@ const AppContent = () => {
             <Route path="/settings" element={<Settings />} />
             <Route path="/install" element={<Install />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/accept-invite" element={<AcceptInvitation />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/users/:userId" element={<UserDetail />} />
