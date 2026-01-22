@@ -11761,6 +11761,60 @@ export type Database = {
         }
         Relationships: []
       }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          device_info: Json | null
+          ended_at: string | null
+          expires_at: string
+          id: string
+          ip_address: string | null
+          is_current: boolean | null
+          is_valid: boolean | null
+          last_active_at: string | null
+          last_refresh_at: string | null
+          refresh_count: number | null
+          started_at: string | null
+          updated_at: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          device_info?: Json | null
+          ended_at?: string | null
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          is_current?: boolean | null
+          is_valid?: boolean | null
+          last_active_at?: string | null
+          last_refresh_at?: string | null
+          refresh_count?: number | null
+          started_at?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          device_info?: Json | null
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          is_current?: boolean | null
+          is_valid?: boolean | null
+          last_active_at?: string | null
+          last_refresh_at?: string | null
+          refresh_count?: number | null
+          started_at?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       watchlist_usage_log: {
         Row: {
           action: string
@@ -13910,6 +13964,7 @@ export type Database = {
         }[]
       }
       cleanup_expired_invite_codes: { Args: never; Returns: undefined }
+      cleanup_expired_sessions: { Args: never; Returns: number }
       cleanup_old_cache: { Args: never; Returns: number }
       complete_pipeline_run: {
         Args: {
@@ -13935,6 +13990,16 @@ export type Database = {
       count_posts_with_topic: {
         Args: { time_window?: unknown; topic_name: string }
         Returns: number
+      }
+      create_user_session: {
+        Args: {
+          p_device_info?: Json
+          p_expires_at?: string
+          p_ip_address?: string
+          p_user_agent?: string
+          p_user_id: string
+        }
+        Returns: string
       }
       debug_timezone_totals: {
         Args: { p_date: string; p_org_id: string }
@@ -13979,6 +14044,11 @@ export type Database = {
           source_type: string
         }[]
       }
+      end_all_user_sessions: {
+        Args: { p_except_current?: boolean }
+        Returns: number
+      }
+      end_user_session: { Args: { p_session_id: string }; Returns: boolean }
       get_actblue_daily_rollup: {
         Args: {
           p_end_date: string
@@ -14367,6 +14437,18 @@ export type Database = {
           unique_donors: number
         }[]
       }
+      get_user_active_sessions: {
+        Args: never
+        Returns: {
+          device_info: Json
+          expires_at: string
+          id: string
+          ip_address: string
+          is_current: boolean
+          last_active_at: string
+          started_at: string
+        }[]
+      }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_organization_id_safe: { Args: never; Returns: string }
       get_user_organizations: {
@@ -14576,6 +14658,10 @@ export type Database = {
         Returns: undefined
       }
       refresh_unified_trends: { Args: never; Returns: undefined }
+      refresh_user_session: {
+        Args: { p_new_expires_at?: string; p_session_id: string }
+        Returns: boolean
+      }
       request_account_deletion: { Args: { p_reason?: string }; Returns: string }
       request_data_export: { Args: { p_format?: string }; Returns: string }
       reset_circuit_breaker: { Args: { job_id: string }; Returns: undefined }
@@ -14680,6 +14766,10 @@ export type Database = {
           p_records_processed?: number
         }
         Returns: undefined
+      }
+      update_session_activity: {
+        Args: { p_session_id: string }
+        Returns: boolean
       }
       update_source_health: {
         Args: {
