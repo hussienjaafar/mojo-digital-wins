@@ -469,11 +469,12 @@ serve(async (req: Request) => {
         log.setContext({ userId: existingUser.id, step: "update_existing_user" });
         log.info("Found existing user", { userId: existingUser.id });
         
-        // Update the user's password and full_name
+        // Update the user's password, confirm email, and full_name
         const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
           existingUser.id,
           { 
             password: password,
+            email_confirm: true,
             user_metadata: { full_name: full_name }
           }
         );
