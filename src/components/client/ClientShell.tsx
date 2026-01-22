@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { proxyQuery, proxyRpc } from "@/lib/supabaseProxy";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { useTheme } from "@/components/ThemeProvider";
@@ -231,23 +232,25 @@ export const ClientShell = ({
         const { data: sessionData } = await supabase.auth.getSession();
         const currentUserId = sessionData?.session?.user?.id;
 
-        const { data: isAdminUser } = await supabase.rpc("has_role", {
+        const { data: isAdminUser } = await proxyRpc<boolean>("has_role", {
           _user_id: currentUserId,
           _role: "admin",
         });
 
         if (isAdminUser) {
           // Admin impersonating: load ALL organizations for switching
-          const { data: allOrgs, error: orgError } = await supabase
-            .from("client_organizations")
-            .select("id, name, logo_url")
-            .eq("is_active", true)
-            .order("name");
+          const { data: allOrgs, error: orgError } = await proxyQuery<Array<{id: string; name: string; logo_url: string | null}>>({
+            table: "client_organizations",
+            select: "id, name, logo_url",
+            filters: { is_active: true },
+          });
 
           if (orgError) throw orgError;
 
           if (allOrgs && allOrgs.length > 0) {
-            const orgs: Organization[] = allOrgs.map((org) => ({
+            // Sort by name client-side since proxy doesn't support order
+            const sortedOrgs = [...allOrgs].sort((a, b) => a.name.localeCompare(b.name));
+            const orgs: Organization[] = sortedOrgs.map((org) => ({
               id: org.id,
               name: org.name,
               logo_url: org.logo_url,
@@ -263,11 +266,12 @@ export const ClientShell = ({
           }
         } else {
           // Non-admin impersonating (fallback): load only the impersonated org
-          const { data: org, error: orgError } = await (supabase as any)
-            .from("client_organizations")
-            .select("id, name, logo_url")
-            .eq("id", impersonatedOrgId)
-            .maybeSingle();
+          const { data: org, error: orgError } = await proxyQuery<{id: string; name: string; logo_url: string | null}>({
+            table: "client_organizations",
+            select: "id, name, logo_url",
+            filters: { id: impersonatedOrgId },
+            single: true,
+          });
 
           if (orgError) throw orgError;
           if (org) {
@@ -280,18 +284,18 @@ export const ClientShell = ({
       }
 
       // Check if user is admin
-      const { data: isAdminUser } = await supabase.rpc("has_role", {
+      const { data: isAdminUser } = await proxyRpc<boolean>("has_role", {
         _user_id: session?.user?.id,
         _role: "admin",
       });
 
       if (isAdminUser) {
         // Admin: load all organizations
-        const { data: allOrgs, error: orgError } = await supabase
-          .from("client_organizations")
-          .select("id, name, logo_url")
-          .eq("is_active", true)
-          .order("name");
+        const { data: allOrgs, error: orgError } = await proxyQuery<Array<{id: string; name: string; logo_url: string | null}>>({
+          table: "client_organizations",
+          select: "id, name, logo_url",
+          filters: { is_active: true },
+        });
 
         if (orgError) throw orgError;
 
@@ -305,7 +309,9 @@ export const ClientShell = ({
           return;
         }
 
-        const orgs: Organization[] = allOrgs.map((org) => ({
+        // Sort by name client-side since proxy doesn't support order
+        const sortedOrgs = [...allOrgs].sort((a, b) => a.name.localeCompare(b.name));
+        const orgs: Organization[] = sortedOrgs.map((org) => ({
           id: org.id,
           name: org.name,
           logo_url: org.logo_url,
@@ -317,47 +323,56 @@ export const ClientShell = ({
         const savedOrg = orgs.find((org) => org.id === savedOrgId);
         setOrganization(savedOrg || orgs[0]);
       } else {
-        // Regular client user: load their organizations
-        const { data: clientUserData, error: userError } = await (supabase as any)
-          .from("client_users")
-          .select(
-            `
-            organization_id,
-            role,
-            client_organizations (
-              id,
-              name,
-              logo_url
-            )
-          `
-          )
-          .eq("id", session?.user?.id);
+        // Regular client user: load their organization via client_users
+        // Note: proxy doesn't support joins, so we do two queries
+        const { data: clientUserData, error: userError } = await proxyQuery<{organization_id: string; role: string}>({
+          table: "client_users",
+          select: "organization_id, role",
+          filters: { id: session?.user?.id },
+          single: true,
+        });
 
         if (userError) throw userError;
-        if (!clientUserData || clientUserData.length === 0) {
+        if (!clientUserData) {
+          console.error("No client_users record found for user:", session?.user?.id);
           navigate("/access-denied?from=client");
           return;
         }
 
-        const orgs: Organization[] = clientUserData.map((item: any) => ({
-          id: item.client_organizations.id,
-          name: item.client_organizations.name,
-          logo_url: item.client_organizations.logo_url,
-          role: item.role,
-        }));
+        // Now fetch the organization details
+        const { data: orgData, error: orgError } = await proxyQuery<{id: string; name: string; logo_url: string | null}>({
+          table: "client_organizations",
+          select: "id, name, logo_url",
+          filters: { id: clientUserData.organization_id },
+          single: true,
+        });
 
-        setOrganizations(orgs);
-        const savedOrgId = localStorage.getItem("selectedOrganizationId");
-        const savedOrg = orgs.find((org) => org.id === savedOrgId);
-        setOrganization(savedOrg || orgs[0]);
+        if (orgError) throw orgError;
+        if (!orgData) {
+          console.error("Organization not found:", clientUserData.organization_id);
+          navigate("/access-denied?from=client");
+          return;
+        }
+
+        const org: Organization = {
+          id: orgData.id,
+          name: orgData.name,
+          logo_url: orgData.logo_url,
+          role: clientUserData.role,
+        };
+
+        setOrganizations([org]);
+        setOrganization(org);
       }
     } catch (error: any) {
+      console.error("Error loading organizations:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to load organizations",
         variant: "destructive",
       });
-      navigate("/");
+      // Don't redirect on error - stay on loading state and let user retry
+      // This prevents redirect loops when there's a temporary network issue
     } finally {
       setIsLoadingOrgs(false);
     }

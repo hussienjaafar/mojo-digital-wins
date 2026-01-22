@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { proxyQuery } from "@/lib/supabaseProxy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,11 +27,12 @@ const ClientLogin = () => {
   }, []);
 
   const checkClientUser = async (userId: string) => {
-    const { data } = await (supabase as any)
-      .from('client_users')
-      .select('organization_id')
-      .eq('id', userId)
-      .maybeSingle();
+    const { data } = await proxyQuery<{ organization_id: string }>({
+      table: 'client_users',
+      select: 'organization_id',
+      filters: { id: userId },
+      single: true,
+    });
 
     if (data) {
       navigate('/client/dashboard');
@@ -50,11 +52,17 @@ const ClientLogin = () => {
       if (error) throw error;
 
       if (data.user) {
-        // Update last login
-        await (supabase as any)
-          .from('client_users')
-          .update({ last_login_at: new Date().toISOString() })
-          .eq('id', data.user.id);
+        // Update last login - use direct supabase for writes (proxy only supports reads)
+        // This is fine because auth requests work from any domain
+        try {
+          await (supabase as any)
+            .from('client_users')
+            .update({ last_login_at: new Date().toISOString() })
+            .eq('id', data.user.id);
+        } catch (e) {
+          // Non-critical - continue even if last_login update fails
+          console.warn('Failed to update last_login_at:', e);
+        }
 
         // Wait for session to be persisted to localStorage before navigating
         const { data: { session } } = await supabase.auth.getSession();
