@@ -24,7 +24,9 @@ import {
   BarChart3,
   Lightbulb,
   Play,
-  Target
+  Target,
+  RefreshCw,
+  AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -120,6 +122,7 @@ export default function ClientCreativeIntelligence() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isSyncingPerformance, setIsSyncingPerformance] = useState(false);
   const [activeTab, setActiveTab] = useState("gallery");
   const [channelFilter, setChannelFilter] = useState("all");
   const [tierFilter, setTierFilter] = useState("all");
@@ -236,6 +239,47 @@ export default function ClientCreativeIntelligence() {
     }
   };
 
+  const handleSyncPerformanceData = async () => {
+    if (!organizationId) return;
+    
+    setIsSyncingPerformance(true);
+    try {
+      toast.info('Syncing performance data from Meta Ads...', {
+        description: 'This may take a moment'
+      });
+
+      // First sync fresh data from Meta
+      const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-meta-ads', {
+        body: { organization_id: organizationId }
+      });
+
+      if (syncError) throw syncError;
+
+      // Then run aggregation to backfill any missing metrics
+      const { data: aggData, error: aggError } = await supabase.functions.invoke('aggregate-creative-metrics', {
+        body: { organization_id: organizationId }
+      });
+
+      if (aggError) {
+        console.error('Aggregation error (non-fatal):', aggError);
+      }
+
+      const creativesUpdated = aggData?.updated || 0;
+      const insightRecords = syncData?.insight_records || 0;
+
+      toast.success('Performance data synced!', {
+        description: `${insightRecords} metrics synced, ${creativesUpdated} creatives updated`
+      });
+      
+      await loadCreatives();
+    } catch (error) {
+      console.error('Sync error:', error);
+      toast.error('Failed to sync performance data');
+    } finally {
+      setIsSyncingPerformance(false);
+    }
+  };
+
   const filteredCreatives = creatives.filter(c => {
     const matchesChannel = channelFilter === 'all' || 
       (channelFilter === 'video' && c.creative_type === 'video') ||
@@ -316,6 +360,15 @@ export default function ClientCreativeIntelligence() {
         description="AI-powered analysis of your ad creatives"
         actions={
           <div className="flex flex-wrap gap-2">
+            <V3Button 
+              variant="secondary" 
+              onClick={handleSyncPerformanceData}
+              disabled={isSyncingPerformance}
+              size="sm"
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", isSyncingPerformance && "animate-spin")} />
+              {isSyncingPerformance ? 'Syncing...' : 'Sync Performance'}
+            </V3Button>
             {stats?.pendingTranscription && stats.pendingTranscription > 0 && (
               <V3Button 
                 variant="secondary" 
@@ -347,6 +400,30 @@ export default function ClientCreativeIntelligence() {
           </div>
         }
       >
+        {/* Performance Data Warning */}
+        {stats && stats.total > 0 && stats.avgRoas === 0 && (
+          <V3Card className="mb-6 border-[hsl(var(--portal-accent-amber))]">
+            <V3CardContent className="flex items-center gap-3 py-3">
+              <AlertTriangle className="h-5 w-5 text-[hsl(var(--portal-accent-amber))] shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-[hsl(var(--portal-text-primary))]">Performance data not yet populated</p>
+                <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+                  Meta Ads metrics are synced every 4 hours. Click "Sync Performance" to fetch the latest data now.
+                </p>
+              </div>
+              <V3Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={handleSyncPerformanceData}
+                disabled={isSyncingPerformance}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-1", isSyncingPerformance && "animate-spin")} />
+                Sync Now
+              </V3Button>
+            </V3CardContent>
+          </V3Card>
+        )}
+
         {/* Stats Overview */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
