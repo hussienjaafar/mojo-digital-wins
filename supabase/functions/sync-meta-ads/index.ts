@@ -886,62 +886,75 @@ serve(async (req) => {
               const creativeRoas = spend > 0 ? conversionValue / spend : 0;
               
               // Store creative insight with enhanced fields including video/social engagement metrics
+              // PIPELINE FIX: Only include performance metrics if we actually received data (avoid overwriting with zeros)
+              const hasPerformanceData = impressions > 0 || clicks > 0 || spend > 0;
+              
+              const baseCreativeData: Record<string, any> = {
+                organization_id,
+                campaign_id: campaign.id,
+                ad_id: ad.id,
+                creative_id: creative.id,
+                primary_text: primaryText || null,
+                headline: headline || null,
+                description: description || null,
+                call_to_action_type: callToActionType || null,
+                video_url: videoId ? `https://www.facebook.com/video.php?v=${videoId}` : null,
+                thumbnail_url: highResThumbnail, // High-res thumbnail
+                creative_type: creativeType,
+                // PHASE 2: Store media identifiers for video/image pipeline
+                meta_video_id: videoId || null,
+                meta_image_hash: imageHash,
+                media_type: mediaType,
+                // PHASE 3: Store actual playable video source URL
+                media_source_url: mediaSourceUrl,
+                // NEW: Store destination URL and extracted refcode for attribution matching
+                destination_url: destinationUrl,
+                extracted_refcode: extractedRefcode,
+                refcode_source: refcodeSource,
+                // PHASE 3: Track first seen for time-aware model
+                first_seen_at: new Date().toISOString(),
+              };
+              
+              // Only include performance metrics if we have actual data from Meta API
+              // This prevents overwriting existing metrics with zeros when Meta returns empty insights
+              if (hasPerformanceData) {
+                baseCreativeData.impressions = impressions;
+                baseCreativeData.clicks = clicks;
+                baseCreativeData.spend = spend;
+                baseCreativeData.conversions = conversions;
+                baseCreativeData.conversion_value = conversionValue;
+                baseCreativeData.ctr = ctr; // Stored as decimal (0.025 = 2.5%)
+                baseCreativeData.roas = creativeRoas; // Uses conversion_value which may come from purchase_roas
+                // Video engagement metrics
+                baseCreativeData.video_plays = videoPlays;
+                baseCreativeData.video_thruplay = videoThruplay;
+                baseCreativeData.video_p25 = videoP25;
+                baseCreativeData.video_p50 = videoP50;
+                baseCreativeData.video_p75 = videoP75;
+                baseCreativeData.video_p100 = videoP100;
+                baseCreativeData.video_avg_watch_time_seconds = videoAvgWatchTime;
+                // Social engagement metrics
+                baseCreativeData.reactions_total = reactionsTotal;
+                baseCreativeData.reactions_like = reactionsLike;
+                baseCreativeData.reactions_love = reactionsLove;
+                baseCreativeData.reactions_other = reactionsOther;
+                baseCreativeData.comments = commentsCount;
+                baseCreativeData.shares = sharesCount;
+                baseCreativeData.post_engagement = postEngagement;
+                // Quality rankings
+                baseCreativeData.frequency = frequency;
+                baseCreativeData.quality_ranking = qualityRanking;
+                baseCreativeData.engagement_rate_ranking = engagementRanking;
+                baseCreativeData.conversion_rate_ranking = conversionRanking;
+                
+                console.log(`[CREATIVE ${ad.id}] Storing performance: ${impressions} imp, ${clicks} clicks, $${spend.toFixed(2)} spend`);
+              } else {
+                console.log(`[CREATIVE ${ad.id}] No performance data from Meta - preserving existing metrics`);
+              }
+              
               const { error: creativeError } = await supabase
                 .from('meta_creative_insights')
-                .upsert({
-                  organization_id,
-                  campaign_id: campaign.id,
-                  ad_id: ad.id,
-                  creative_id: creative.id,
-                  primary_text: primaryText || null,
-                  headline: headline || null,
-                  description: description || null,
-                  call_to_action_type: callToActionType || null,
-                  video_url: videoId ? `https://www.facebook.com/video.php?v=${videoId}` : null,
-                  thumbnail_url: highResThumbnail, // High-res thumbnail
-                  creative_type: creativeType,
-                  // PHASE 2: Store media identifiers for video/image pipeline
-                  meta_video_id: videoId || null,
-                  meta_image_hash: imageHash,
-                  media_type: mediaType,
-                  // PHASE 3: Store actual playable video source URL
-                  media_source_url: mediaSourceUrl,
-                  // NEW: Store destination URL and extracted refcode for attribution matching
-                  destination_url: destinationUrl,
-                  extracted_refcode: extractedRefcode,
-                  refcode_source: refcodeSource,
-                  // Performance metrics
-                  impressions,
-                  clicks,
-                  spend,
-                  conversions,
-                  conversion_value: conversionValue,
-                  ctr, // Stored as decimal (0.025 = 2.5%)
-                  roas: creativeRoas, // Uses conversion_value which may come from purchase_roas
-                  // Video engagement metrics
-                  video_plays: videoPlays,
-                  video_thruplay: videoThruplay,
-                  video_p25: videoP25,
-                  video_p50: videoP50,
-                  video_p75: videoP75,
-                  video_p100: videoP100,
-                  video_avg_watch_time_seconds: videoAvgWatchTime,
-                  // Social engagement metrics
-                  reactions_total: reactionsTotal,
-                  reactions_like: reactionsLike,
-                  reactions_love: reactionsLove,
-                  reactions_other: reactionsOther,
-                  comments: commentsCount,
-                  shares: sharesCount,
-                  post_engagement: postEngagement,
-                  // Quality rankings
-                  frequency,
-                  quality_ranking: qualityRanking,
-                  engagement_rate_ranking: engagementRanking,
-                  conversion_rate_ranking: conversionRanking,
-                  // PHASE 3: Track first seen for time-aware model
-                  first_seen_at: new Date().toISOString(),
-                }, {
+                .upsert(baseCreativeData, {
                   onConflict: 'organization_id,campaign_id,ad_id'
                 });
               
@@ -1461,6 +1474,28 @@ serve(async (req) => {
     console.log(`Placement breakdowns captured: ${placementRecords}`);
     console.log(`Actual data range: ${earliestDataDate || 'none'} to ${latestDataDate || 'none'}`);
     console.log(`Data freshness: ${freshnessInfo.dataLagReason}`);
+    
+    // PIPELINE FIX: Trigger creative metrics aggregation to backfill from campaign-level data
+    let aggregationResult = null;
+    try {
+      console.log(`[SYNC-META-ADS] Triggering creative metrics aggregation...`);
+      const aggregateResponse = await fetch(
+        `${Deno.env.get('SUPABASE_URL')}/functions/v1/aggregate-creative-metrics`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({ organization_id }),
+        }
+      );
+      aggregationResult = await aggregateResponse.json();
+      console.log(`[SYNC-META-ADS] Aggregation result:`, aggregationResult);
+    } catch (aggError) {
+      console.error(`[SYNC-META-ADS] Aggregation failed (non-fatal):`, aggError);
+    }
+    
     console.log(`=== END SYNC ===`);
 
     return new Response(
@@ -1472,6 +1507,7 @@ serve(async (req) => {
         ad_level_daily_records: adLevelRecords,
         demographic_breakdowns: demographicRecords,
         placement_breakdowns: placementRecords,
+        aggregation: aggregationResult,
         data_freshness: {
           latest_data_date: latestDataDate,
           earliest_data_date: earliestDataDate,
