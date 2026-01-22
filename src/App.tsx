@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -83,6 +83,61 @@ const PageLoader = () => (
   </div>
 );
 
+// Domain-aware router for subdomain architecture
+// Handles redirects between molitico.com (marketing) and portal.molitico.com (app)
+const DomainRouter = () => {
+  const location = useLocation();
+  const hostname = window.location.hostname;
+  
+  const isPortalDomain = hostname === 'portal.molitico.com' || 
+                         hostname.includes('preview') || 
+                         hostname.includes('lovable.app') ||
+                         hostname === 'localhost';
+  const isMarketingDomain = hostname === 'molitico.com' || 
+                            hostname === 'www.molitico.com';
+  
+  // Marketing routes (public pages)
+  const marketingRoutes = ['/', '/about', '/services', '/case-studies', 
+    '/blog', '/contact', '/privacy-policy', '/creative-showcase', '/bills'];
+  
+  // Portal route prefixes (app pages)
+  const portalPrefixes = ['/client', '/admin', '/accept-invite', 
+    '/reset-password', '/forgot-password', '/login', '/auth', '/profile', '/settings'];
+  
+  const isMarketingRoute = marketingRoutes.some(route => 
+    location.pathname === route || 
+    location.pathname.startsWith('/case-studies/') ||
+    location.pathname.startsWith('/blog/') ||
+    location.pathname.startsWith('/bills/')
+  );
+  
+  const isPortalRoute = portalPrefixes.some(prefix => 
+    location.pathname.startsWith(prefix)
+  );
+
+  useEffect(() => {
+    // If on portal domain and hitting root, redirect to client login
+    if (isPortalDomain && !isMarketingDomain && location.pathname === '/') {
+      window.location.replace('/client-login');
+      return;
+    }
+    
+    // If on marketing domain and trying to access portal routes, redirect to portal subdomain
+    if (isMarketingDomain && isPortalRoute) {
+      window.location.replace(`https://portal.molitico.com${location.pathname}${location.search}`);
+      return;
+    }
+    
+    // If on portal domain and trying to access marketing routes (except root), redirect to marketing domain
+    if (isPortalDomain && !isMarketingDomain && isMarketingRoute && location.pathname !== '/') {
+      window.location.replace(`https://molitico.com${location.pathname}`);
+      return;
+    }
+  }, [location.pathname, location.search, isPortalDomain, isMarketingDomain, isMarketingRoute, isPortalRoute]);
+
+  return null;
+};
+
 const AppContent = () => {
   useSmoothScroll();
   const location = useLocation();
@@ -90,6 +145,7 @@ const AppContent = () => {
   
   return (
     <>
+      <DomainRouter />
       <ScrollProgressIndicator />
       <ScrollToTop />
       <BackToTop />
