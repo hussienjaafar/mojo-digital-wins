@@ -1364,9 +1364,11 @@ serve(async (req) => {
 
     try {
       // Fetch account-level insights broken down by ad with daily granularity
+      // UPDATED: Added outbound_clicks and inline_link_click_ctr for Link CTR metrics
       const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/insights?` +
         `level=ad&` +
         `fields=ad_id,ad_name,campaign_id,adset_id,impressions,clicks,spend,reach,cpc,cpm,ctr,frequency,` +
+        `outbound_clicks,inline_link_click_ctr,` + // Link CTR metrics
         `actions,action_values,cost_per_action_type,purchase_roas,quality_ranking,engagement_rate_ranking,conversion_rate_ranking&` +
         `time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&` +
         `time_increment=1&` + // Daily granularity
@@ -1429,6 +1431,22 @@ serve(async (req) => {
           // Normalize CTR to decimal (Meta returns as percentage)
           const normalizedCtr = (parseFloat(insight.ctr) || 0) / 100;
 
+          // Extract Link CTR metrics (clicks that go to the destination URL)
+          let linkClicks = 0;
+          if (insight.outbound_clicks) {
+            const outboundAction = insight.outbound_clicks.find((a: any) => 
+              a.action_type === 'outbound_click'
+            );
+            if (outboundAction) linkClicks = parseInt(outboundAction.value) || 0;
+          }
+
+          // Meta's inline_link_click_ctr is returned as percentage (e.g., 2.5 for 2.5%)
+          const linkCtr = insight.inline_link_click_ctr 
+            ? parseFloat(insight.inline_link_click_ctr) / 100 
+            : (parseInt(insight.impressions) > 0 
+              ? linkClicks / parseInt(insight.impressions) 
+              : null);
+
           // Look up creative_id from meta_creative_insights if we have it
           let creativeId: string | null = null;
           const { data: creativeMapping } = await supabase
@@ -1443,7 +1461,7 @@ serve(async (req) => {
             creativeId = creativeMapping.creative_id;
           }
 
-          // Upsert to meta_ad_metrics_daily
+          // Upsert to meta_ad_metrics_daily with link CTR metrics
           const { error: dailyError } = await supabase
             .from('meta_ad_metrics_daily')
             .upsert({
@@ -1462,6 +1480,8 @@ serve(async (req) => {
               cpc: parseFloat(insight.cpc) || null,
               cpm: parseFloat(insight.cpm) || null,
               ctr: normalizedCtr || null,
+              link_clicks: linkClicks, // NEW: Link clicks
+              link_ctr: linkCtr, // NEW: Link CTR
               frequency: parseFloat(insight.frequency) || null,
               conversions,
               conversion_value: conversionValue,
@@ -1493,6 +1513,159 @@ serve(async (req) => {
 
     } catch (adLevelError) {
       console.error(`[AD-LEVEL METRICS] Error fetching ad-level insights:`, adLevelError);
+    }
+
+    // ========== ASSET-LEVEL BREAKDOWN: Fetch performance by text variation ==========
+    let variationBreakdownsProcessed = 0;
+    
+    try {
+      console.log(`[ASSET BREAKDOWNS] Fetching asset-level performance breakdowns...`);
+      
+      // Meta supports breakdowns by body_asset, title_asset, description_asset for DCO ads
+      const breakdownTypes = ['body_asset', 'title_asset', 'description_asset'] as const;
+      
+      for (const breakdownType of breakdownTypes) {
+        try {
+          const assetBreakdownUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/insights?` +
+            `level=ad&` +
+            `breakdowns=${breakdownType}&` +
+            `fields=ad_id,impressions,clicks,spend,actions,action_values,outbound_clicks,inline_link_click_ctr&` +
+            `time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&` +
+            `filtering=[{"field":"ad.effective_status","operator":"IN","value":["ACTIVE","PAUSED","ARCHIVED"]}]&` +
+            `limit=500&` +
+            `access_token=${access_token}`;
+          
+          const breakdownRes = await fetch(assetBreakdownUrl);
+          const breakdownData = await breakdownRes.json();
+          
+          if (breakdownData.error) {
+            console.log(`[ASSET BREAKDOWNS] Note: ${breakdownType} breakdown not available (may not have DCO ads)`);
+            continue;
+          }
+          
+          const breakdowns = breakdownData.data || [];
+          console.log(`[ASSET BREAKDOWNS] Processing ${breakdowns.length} ${breakdownType} records`);
+          
+          for (const breakdown of breakdowns) {
+            if (!breakdown.ad_id) continue;
+            
+            // The asset text is returned in the breakdown field name (e.g., body_asset, title_asset)
+            const assetText = breakdown[breakdownType];
+            if (!assetText) continue;
+            
+            // Map breakdown type to our asset_type
+            const assetType = breakdownType === 'body_asset' ? 'body' 
+              : breakdownType === 'title_asset' ? 'title' 
+              : 'description';
+            
+            // Extract metrics
+            const impressions = parseInt(breakdown.impressions) || 0;
+            const clicks = parseInt(breakdown.clicks) || 0;
+            const spend = parseFloat(breakdown.spend) || 0;
+            
+            // Extract link clicks
+            let linkClicks = 0;
+            if (breakdown.outbound_clicks) {
+              const outboundAction = breakdown.outbound_clicks.find((a: any) => 
+                a.action_type === 'outbound_click'
+              );
+              if (outboundAction) linkClicks = parseInt(outboundAction.value) || 0;
+            }
+            
+            // Link CTR
+            const linkCtr = breakdown.inline_link_click_ctr 
+              ? parseFloat(breakdown.inline_link_click_ctr) / 100 
+              : (impressions > 0 ? linkClicks / impressions : null);
+            
+            // CTR
+            const ctr = impressions > 0 ? clicks / impressions : null;
+            
+            // Extract conversions
+            let conversions = 0;
+            let conversionValue = 0;
+            
+            if (breakdown.actions) {
+              const convAction = breakdown.actions.find((a: any) => 
+                a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+              );
+              if (convAction) conversions = parseInt(convAction.value) || 0;
+            }
+            
+            if (breakdown.action_values) {
+              const valueAction = breakdown.action_values.find((a: any) => 
+                a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+              );
+              if (valueAction) conversionValue = parseFloat(valueAction.value) || 0;
+            }
+            
+            const roas = spend > 0 ? conversionValue / spend : null;
+            
+            // Update the variation record by matching ad_id, asset_type, and asset_text
+            const { error: updateError } = await supabase
+              .from('meta_creative_variations')
+              .update({
+                impressions,
+                clicks,
+                spend,
+                conversions,
+                conversion_value: conversionValue,
+                ctr,
+                link_clicks: linkClicks,
+                link_ctr: linkCtr,
+                roas,
+                synced_at: new Date().toISOString(),
+              })
+              .eq('organization_id', organization_id)
+              .eq('ad_id', breakdown.ad_id)
+              .eq('asset_type', assetType)
+              .eq('asset_text', assetText);
+            
+            if (!updateError) {
+              variationBreakdownsProcessed++;
+            }
+          }
+        } catch (breakdownErr) {
+          console.error(`[ASSET BREAKDOWNS] Error fetching ${breakdownType}:`, breakdownErr);
+        }
+      }
+      
+      console.log(`[ASSET BREAKDOWNS] Updated ${variationBreakdownsProcessed} variation records with performance data`);
+      
+      // Calculate and update performance rankings per ad/asset_type
+      if (variationBreakdownsProcessed > 0) {
+        console.log(`[ASSET BREAKDOWNS] Updating performance rankings...`);
+        
+        // Get all variations for this org grouped by ad_id and asset_type
+        const { data: allVariations } = await supabase
+          .from('meta_creative_variations')
+          .select('id, ad_id, asset_type, roas, impressions')
+          .eq('organization_id', organization_id)
+          .order('roas', { ascending: false, nullsFirst: false });
+        
+        if (allVariations) {
+          // Group by ad_id + asset_type
+          const groups: Record<string, typeof allVariations> = {};
+          for (const v of allVariations) {
+            const key = `${v.ad_id}:${v.asset_type}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(v);
+          }
+          
+          // Update rank for each group
+          for (const group of Object.values(groups)) {
+            for (let i = 0; i < group.length; i++) {
+              await supabase
+                .from('meta_creative_variations')
+                .update({ performance_rank: i + 1 })
+                .eq('id', group[i].id);
+            }
+          }
+          console.log(`[ASSET BREAKDOWNS] Rankings updated for ${Object.keys(groups).length} variation groups`);
+        }
+      }
+      
+    } catch (assetBreakdownError) {
+      console.error(`[ASSET BREAKDOWNS] Error:`, assetBreakdownError);
     }
 
     // Update freshness info

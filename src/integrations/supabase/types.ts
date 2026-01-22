@@ -5464,6 +5464,8 @@ export type Database = {
           frequency: number | null
           id: string
           impressions: number | null
+          link_clicks: number | null
+          link_ctr: number | null
           meta_roas: number | null
           organization_id: string
           quality_ranking: string | null
@@ -5492,6 +5494,8 @@ export type Database = {
           frequency?: number | null
           id?: string
           impressions?: number | null
+          link_clicks?: number | null
+          link_ctr?: number | null
           meta_roas?: number | null
           organization_id: string
           quality_ranking?: string | null
@@ -5520,6 +5524,8 @@ export type Database = {
           frequency?: number | null
           id?: string
           impressions?: number | null
+          link_clicks?: number | null
+          link_ctr?: number | null
           meta_roas?: number | null
           organization_id?: string
           quality_ranking?: string | null
@@ -5982,6 +5988,8 @@ export type Database = {
           impressions: number | null
           key_quotes: Json | null
           key_themes: string[] | null
+          link_clicks: number | null
+          link_ctr: number | null
           media_source_url: string | null
           media_type: string | null
           meta_image_hash: string | null
@@ -6060,6 +6068,8 @@ export type Database = {
           impressions?: number | null
           key_quotes?: Json | null
           key_themes?: string[] | null
+          link_clicks?: number | null
+          link_ctr?: number | null
           media_source_url?: string | null
           media_type?: string | null
           meta_image_hash?: string | null
@@ -6138,6 +6148,8 @@ export type Database = {
           impressions?: number | null
           key_quotes?: Json | null
           key_themes?: string[] | null
+          link_clicks?: number | null
+          link_ctr?: number | null
           media_source_url?: string | null
           media_type?: string | null
           meta_image_hash?: string | null
@@ -6219,6 +6231,8 @@ export type Database = {
           ctr: number | null
           id: string
           impressions: number | null
+          link_clicks: number | null
+          link_ctr: number | null
           organization_id: string
           performance_rank: number | null
           roas: number | null
@@ -6240,6 +6254,8 @@ export type Database = {
           ctr?: number | null
           id?: string
           impressions?: number | null
+          link_clicks?: number | null
+          link_ctr?: number | null
           organization_id: string
           performance_rank?: number | null
           roas?: number | null
@@ -6261,6 +6277,8 @@ export type Database = {
           ctr?: number | null
           id?: string
           impressions?: number | null
+          link_clicks?: number | null
+          link_ctr?: number | null
           organization_id?: string
           performance_rank?: number | null
           roas?: number | null

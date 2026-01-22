@@ -19,6 +19,8 @@ export interface CreativeVariation {
   conversions: number;
   conversion_value: number;
   ctr: number | null;
+  link_clicks: number | null;
+  link_ctr: number | null;
   roas: number | null;
   performance_rank: number | null;
 }
@@ -118,8 +120,8 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
     (type) => variationsByType[type].length > 0
   );
 
-  // Calculate averages for baseline comparison
-  const getTypeAverage = (type: string, metric: "roas" | "ctr") => {
+  // Calculate averages for baseline comparison - using link_ctr instead of ctr
+  const getTypeAverage = (type: string, metric: "roas" | "link_ctr") => {
     const vars = variationsByType[type] || [];
     if (vars.length === 0) return 0;
     const values = vars.map((v) => v[metric] ?? 0);
@@ -162,7 +164,7 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
           {availableTypes.map((type) => {
             const typeVariations = variationsByType[type] || [];
             const avgRoas = getTypeAverage(type, "roas");
-            const avgCtr = getTypeAverage(type, "ctr");
+            const avgLinkCtr = getTypeAverage(type, "link_ctr");
 
             return (
               <TabsContent key={type} value={type}>
@@ -179,7 +181,7 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
                           <TableHead className="min-w-[300px]">Copy</TableHead>
                           <TableHead className="text-right">Impressions</TableHead>
                           <TableHead className="text-right">Clicks</TableHead>
-                          <TableHead className="text-right">CTR</TableHead>
+                          <TableHead className="text-right">Link CTR</TableHead>
                           <TableHead className="text-right">Spend</TableHead>
                           <TableHead className="text-right">Conv</TableHead>
                           <TableHead className="text-right">ROAS</TableHead>
@@ -214,11 +216,11 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
                                 <span className="font-mono text-sm">
-                                  {formatPercent(variation.ctr)}
+                                  {formatPercent(variation.link_ctr)}
                                 </span>
                                 <TrendIndicator
-                                  current={variation.ctr ?? 0}
-                                  baseline={avgCtr}
+                                  current={variation.link_ctr ?? 0}
+                                  baseline={avgLinkCtr}
                                 />
                               </div>
                             </TableCell>
@@ -257,9 +259,9 @@ export const CreativeVariationTable: React.FC<CreativeVariationTableProps> = ({
                   {/* Summary stats */}
                   <div className="mt-4 flex gap-4 text-sm text-[hsl(var(--portal-text-muted))]">
                     <span>
-                      Avg CTR:{" "}
+                      Avg Link CTR:{" "}
                       <strong className="text-[hsl(var(--portal-text-primary))]">
-                        {formatPercent(avgCtr)}
+                        {formatPercent(avgLinkCtr)}
                       </strong>
                     </span>
                     <span>
