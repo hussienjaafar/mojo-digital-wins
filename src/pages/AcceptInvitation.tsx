@@ -233,8 +233,17 @@ export default function AcceptInvitation() {
       if (authData.user) {
         setIsLoggedIn(true);
         setCurrentUser({ id: authData.user.id, email: authData.user.email || "" });
-        setViewMode('choice');
-        toast.success("Logged in successfully");
+        
+        // Auto-accept invitation if logged-in email matches invitation email
+        if (invitation && authData.user.email?.toLowerCase() === invitation.email.toLowerCase()) {
+          toast.success("Logged in successfully. Accepting invitation...");
+          // Accept the invitation immediately
+          await acceptInvitation(authData.user.id);
+        } else {
+          // Email doesn't match - let user confirm
+          setViewMode('choice');
+          toast.success("Logged in successfully");
+        }
       }
     } catch (err: any) {
       console.error("Login error:", err);
