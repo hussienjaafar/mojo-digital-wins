@@ -518,7 +518,7 @@ serve(async (req) => {
         if (error) console.error('[ACTBLUE] Error tracking touchpoint:', error);
       });
 
-      // Update donor demographics
+      // Update donor demographics with proper aggregate calculation
       await supabase.from('donor_demographics')
         .upsert({
           organization_id,
@@ -544,17 +544,27 @@ serve(async (req) => {
           if (!error && data) {
             const { data: txData } = await supabase
               .from('actblue_transactions')
-              .select('amount')
+              .select('amount, recurring_period, transaction_type, transaction_date')
               .eq('organization_id', organization_id)
-              .eq('donor_email', donor.email);
+              .ilike('donor_email', donor.email);
             
-            if (txData) {
-              const total = txData.reduce((sum, tx) => sum + tx.amount, 0);
+            if (txData && txData.length > 0) {
+              const donations = txData.filter(t => t.transaction_type === 'donation');
+              const totalDonated = donations.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+              const donationCount = donations.length;
+              const dates = donations.map(t => t.transaction_date).filter(Boolean).sort();
+              // Fixed: recurring if ANY transaction has recurring_period != 'once'
+              const isRecurring = txData.some(tx => 
+                tx.recurring_period && tx.recurring_period !== 'once' && tx.recurring_period !== ''
+              );
+              
               await supabase.from('donor_demographics')
                 .update({
-                  total_donated: total,
-                  donation_count: txData.length,
-                  first_donation_date: data.first_donation_date || paidAt,
+                  total_donated: totalDonated,
+                  donation_count: donationCount,
+                  first_donation_date: dates[0] || data.first_donation_date || paidAt,
+                  last_donation_date: dates[dates.length - 1] || paidAt,
+                  is_recurring: isRecurring,
                 })
                 .eq('id', data.id);
             }

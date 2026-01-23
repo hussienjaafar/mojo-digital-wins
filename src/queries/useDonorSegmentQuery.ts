@@ -196,11 +196,39 @@ function transformToDonor(row: any, ltvData: any): SegmentDonor {
   };
 }
 
-// Main fetch function with two-query strategy
+// Fetch all records with pagination to bypass Supabase 1000 row limit
+async function fetchAllWithPagination(
+  baseQuery: any,
+  batchSize: number = 1000
+): Promise<any[]> {
+  let allData: any[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await baseQuery.range(from, from + batchSize - 1);
+    
+    if (error) {
+      console.error('Pagination fetch error:', error);
+      throw error;
+    }
+
+    if (data && data.length > 0) {
+      allData = [...allData, ...data];
+      hasMore = data.length === batchSize;
+      from += batchSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allData;
+}
+
+// Main fetch function with two-query strategy and pagination
 async function fetchSegmentDonors(
   organizationId: string,
-  filters: FilterCondition[],
-  limit: number = 5000
+  filters: FilterCondition[]
 ): Promise<SegmentQueryResult> {
   // Step 1: Build demographics query with correct column names
   let query = supabase
@@ -229,12 +257,8 @@ async function fetchSegmentDonors(
     query = applyServerFilter(query, filter);
   }
 
-  const { data: demographics, error: demoError } = await query.limit(limit);
-
-  if (demoError) {
-    console.error('Error fetching donor demographics:', demoError);
-    throw demoError;
-  }
+  // Fetch ALL records using pagination
+  const demographics = await fetchAllWithPagination(query);
 
   if (!demographics || demographics.length === 0) {
     return { 
