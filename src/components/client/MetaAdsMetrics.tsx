@@ -28,6 +28,7 @@ import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
 import { formatRatio, formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 import { SingleDayMetricGrid, type SingleDayMetric } from "./SingleDayMetricGrid";
 import { TopCreativesSection } from "./TopCreativesSection";
+import { getOrgToday } from "@/lib/timezone";
 
 type Props = {
   organizationId: string;
@@ -116,9 +117,10 @@ const MetaAdsMetrics = ({
   }), [data]);
 
   // Check if showing stale data (selected date has no data yet)
+  // Uses org timezone for accurate "today" detection
   const isShowingStaleData = useMemo(() => {
     if (!latestDataDate) return false;
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = getOrgToday();
     return startDate === today && latestDataDate !== today;
   }, [latestDataDate, startDate]);
 
