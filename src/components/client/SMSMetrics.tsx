@@ -18,6 +18,7 @@ import { format, parseISO } from "date-fns";
 import { EChartsBarChart, EChartsCombinationChart } from "@/components/charts/echarts";
 import { SmallMultiplesChart } from "@/components/charts";
 import { useSMSMetricsUnified } from "@/hooks/useActBlueMetrics";
+import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
 import { formatRatio, formatCurrency, formatNumber } from "@/lib/chart-formatters";
 import { SMSCampaignCard, type SMSCampaignData } from "./SMSCampaignCard";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +48,9 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [performanceFilter, setPerformanceFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Detect single-day view
+  const isSingleDay = useIsSingleDayView();
 
   // Use unified SMS metrics hook with explicit date range (fixes date mismatch issue)
   const { data, isLoading, error, refetch } = useSMSMetricsUnified(organizationId, startDate, endDate);
@@ -279,8 +283,8 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
       </motion.div>
 
-      {/* Main Combo Chart - Messages Sent (bars) + Dollars Raised (line) with visible dates */}
-      {trendChartData.length > 0 && (
+      {/* Multi-Day View: Main Combo Chart - Messages Sent (bars) + Dollars Raised (line) */}
+      {!isSingleDay && trendChartData.length > 0 && (
         <V3ChartWrapper
           title="SMS Activity & Revenue"
           icon={TrendingUp}
@@ -323,8 +327,8 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </V3ChartWrapper>
       )}
 
-      {/* Conversions Trend - Auto-scaling sparkline for the metric that needs independent scale */}
-      {trendChartData.length > 0 && (
+      {/* Multi-Day View: Conversions Trend - Auto-scaling sparkline */}
+      {!isSingleDay && trendChartData.length > 0 && (
         <V3ChartWrapper
           title="Conversion Trend"
           icon={Target}
