@@ -14,9 +14,10 @@ import {
   ChevronDown,
   Database,
   Settings2,
+  Calendar,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
-import { formatDistanceToNow, differenceInHours, parseISO, format, differenceInDays } from "date-fns";
+import { formatDistanceToNow, differenceInHours, parseISO, format, differenceInDays, subDays } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   V3Card,
@@ -41,6 +42,15 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ActBlueBackfillDatePicker } from "./ActBlueBackfillDatePicker";
 
 type Props = {
   organizationId: string;
@@ -581,16 +591,37 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
               animate={{ opacity: 1 }}
               className="flex flex-wrap gap-2 pt-3"
             >
-              <V3Button
-                variant="ghost"
-                size="sm"
-                onClick={() => syncActBlue({ backfill: true })}
-                disabled={syncing.actblue || syncing.actblueBackfill}
-                className="text-xs"
-              >
-                <History className="h-3.5 w-3.5 mr-1.5" />
-                {syncing.actblueBackfill ? "Importing..." : "Import ActBlue History"}
-              </V3Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <V3Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={syncing.actblue || syncing.actblueBackfill}
+                    className="text-xs"
+                  >
+                    <History className="h-3.5 w-3.5 mr-1.5" />
+                    {syncing.actblueBackfill ? "Importing..." : "Import ActBlue History"}
+                  </V3Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Import ActBlue History</DialogTitle>
+                    <DialogDescription>
+                      Select a date range to import historical donation data from ActBlue.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ActBlueBackfillDatePicker
+                    onStartBackfill={async (dateRange) => {
+                      await syncActBlue({ 
+                        backfill: true, 
+                        startDate: dateRange.startDate, 
+                        endDate: dateRange.endDate 
+                      });
+                    }}
+                    isStarting={syncing.actblueBackfill}
+                  />
+                </DialogContent>
+              </Dialog>
               <V3Button
                 variant="ghost"
                 size="sm"
