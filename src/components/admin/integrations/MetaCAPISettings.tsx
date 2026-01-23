@@ -16,6 +16,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Eye,
   EyeOff,
@@ -27,6 +28,7 @@ import {
   XCircle,
   Info,
   ExternalLink,
+  Ban,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -601,14 +603,27 @@ export function MetaCAPISettings({ organizationId, organizationName, onSave }: M
         />
         <div className="flex-1">
           <Label htmlFor="actblue-owns" className="font-medium flex items-center gap-2 cursor-pointer">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
             ActBlue sends donation events to Meta
           </Label>
           <p className="text-xs text-muted-foreground mt-1">
-            Enable if ActBlue&apos;s CAPI integration is configured. We&apos;ll skip donation events to avoid double-counting.
+            Enable if ActBlue&apos;s CAPI or browser pixel is sending Purchase events to Meta. 
+            <strong> We will NOT send any Purchase events</strong> to avoid duplicate conversions.
           </p>
         </div>
       </div>
+
+      {/* Enrichment-Only Mode Alert */}
+      {actBlueOwnsDonation && config?.is_enabled && (
+        <Alert className="border-emerald-500/30 bg-emerald-500/5">
+          <Ban className="h-4 w-4 text-emerald-600" />
+          <AlertTitle className="text-emerald-600">Enrichment-Only Mode Active</AlertTitle>
+          <AlertDescription className="text-xs">
+            ActBlue&apos;s pixel handles conversion tracking. This platform will <strong>NOT send any Purchase events</strong> via CAPI 
+            to avoid double-counting donations in Meta Ads Manager. This is the correct configuration when ActBlue has CAPI enabled.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Actions */}
       <div className="flex justify-between gap-2 pt-4 border-t">
