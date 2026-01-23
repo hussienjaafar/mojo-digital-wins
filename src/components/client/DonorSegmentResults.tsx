@@ -1,5 +1,5 @@
 import React from "react";
-import { Users, DollarSign, TrendingUp, RefreshCw, AlertTriangle, MapPin, BarChart3 } from "lucide-react";
+import { Users, DollarSign, TrendingUp, RefreshCw, AlertTriangle, MapPin, BarChart3, Megaphone } from "lucide-react";
 import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3KPICard, V3LoadingState, V3EmptyState } from "@/components/v3";
 import { V3DonutChart } from "@/components/charts/echarts";
 import { V3BarChart } from "@/components/charts/V3BarChart";
@@ -235,6 +235,31 @@ function AggregateView({ aggregates }: { aggregates: SegmentAggregates }) {
                 valueType="number"
                 horizontal={true}
                 topN={10}
+              />
+            </V3CardContent>
+          </V3Card>
+        )}
+
+        {/* Attribution Channel Distribution */}
+        {aggregates.byChannel.length > 0 && aggregates.byChannel.some(c => c.name !== 'Unknown') && (
+          <V3Card>
+            <V3CardHeader className="pb-2">
+              <V3CardTitle className="text-sm flex items-center gap-2">
+                <Megaphone className="h-4 w-4" />
+                Donation Channels
+              </V3CardTitle>
+              <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-0.5">
+                Which channels drove these donations
+              </p>
+            </V3CardHeader>
+            <V3CardContent>
+              <V3DonutChart
+                data={aggregates.byChannel.filter(c => c.name !== 'Unknown')}
+                height={220}
+                valueType="number"
+                centerLabel="Channels"
+                legendPosition="bottom"
+                topN={5}
               />
             </V3CardContent>
           </V3Card>

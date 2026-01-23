@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { Filter, Download, Save, RotateCcw, List, BarChart3 } from "lucide-react";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { Filter, Download, Save, RotateCcw, List, BarChart3, Play, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3Button } from "@/components/v3";
 import { DonorSegmentFilters } from "./DonorSegmentFilters";
@@ -29,20 +28,25 @@ interface DonorSegmentBuilderProps {
 }
 
 export function DonorSegmentBuilder({ organizationId }: DonorSegmentBuilderProps) {
-  const [filters, setFilters] = useState<FilterCondition[]>([]);
+  // Pending filters (unapplied changes) vs Applied filters (what's currently queried)
+  const [pendingFilters, setPendingFilters] = useState<FilterCondition[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState<FilterCondition[]>([]);
   const [viewMode, setViewMode] = useState<'aggregate' | 'table'>('aggregate');
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [selectedSavedSegment, setSelectedSavedSegment] = useState<string | null>(null);
 
-  // Debounce filters to prevent excessive queries
-  const debouncedFilters = useDebouncedValue(filters, 300);
+  // Check if there are unapplied changes
+  const hasUnappliedChanges = useMemo(() => 
+    JSON.stringify(pendingFilters) !== JSON.stringify(appliedFilters),
+    [pendingFilters, appliedFilters]
+  );
 
-  // Query hooks
+  // Query hooks - now uses APPLIED filters only (no debounce needed)
   const { 
     data: segmentData, 
     isLoading: isLoadingSegment,
     isFetching: isFetchingSegment,
-  } = useDonorSegmentQuery(organizationId, debouncedFilters, true);
+  } = useDonorSegmentQuery(organizationId, appliedFilters, true);
 
   const { 
     data: savedSegments, 
@@ -54,19 +58,25 @@ export function DonorSegmentBuilder({ organizationId }: DonorSegmentBuilderProps
 
   // Handlers
   const handleFiltersChange = useCallback((newFilters: FilterCondition[]) => {
-    setFilters(newFilters);
+    setPendingFilters(newFilters);
     setSelectedSavedSegment(null); // Clear saved segment selection when filters change
   }, []);
 
+  const handleApplyFilters = useCallback(() => {
+    setAppliedFilters(pendingFilters);
+  }, [pendingFilters]);
+
   const handleClearFilters = useCallback(() => {
-    setFilters([]);
+    setPendingFilters([]);
+    setAppliedFilters([]);
     setSelectedSavedSegment(null);
   }, []);
 
   const handleLoadSavedSegment = useCallback((segmentId: string) => {
     const segment = savedSegments?.find(s => s.id === segmentId);
     if (segment) {
-      setFilters(segment.filters);
+      setPendingFilters(segment.filters);
+      setAppliedFilters(segment.filters); // Apply immediately when loading saved
       setSelectedSavedSegment(segmentId);
       toast.success(`Loaded segment: ${segment.name}`);
     }
@@ -80,7 +90,7 @@ export function DonorSegmentBuilder({ organizationId }: DonorSegmentBuilderProps
         organizationId,
         name,
         description,
-        filters,
+        filters: appliedFilters,
         donorCount: segmentData.totalCount,
         totalValue: segmentData.aggregates.totalLifetimeValue,
       });
@@ -90,7 +100,7 @@ export function DonorSegmentBuilder({ organizationId }: DonorSegmentBuilderProps
       console.error('Error saving segment:', error);
       toast.error('Failed to save segment');
     }
-  }, [organizationId, filters, segmentData, saveSegmentMutation]);
+  }, [organizationId, appliedFilters, segmentData, saveSegmentMutation]);
 
   const handleDeleteSavedSegment = useCallback(async (segmentId: string) => {
     try {
@@ -121,7 +131,8 @@ export function DonorSegmentBuilder({ organizationId }: DonorSegmentBuilderProps
   }, [segmentData]);
 
   // Memoized values
-  const activeFilterCount = useMemo(() => filters.length, [filters]);
+  const activeFilterCount = useMemo(() => appliedFilters.length, [appliedFilters]);
+  const pendingFilterCount = useMemo(() => pendingFilters.length, [pendingFilters]);
   const isQuerying = isLoadingSegment || isFetchingSegment;
 
   return (
@@ -203,12 +214,31 @@ export function DonorSegmentBuilder({ organizationId }: DonorSegmentBuilderProps
                 </button>
               </div>
 
+              {/* Apply Filters button with pending indicator */}
+              <div className="flex items-center gap-2">
+                {hasUnappliedChanges && pendingFilterCount > 0 && (
+                  <span className="text-xs text-[hsl(var(--portal-warning))] flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Unapplied
+                  </span>
+                )}
+                <V3Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleApplyFilters}
+                  disabled={!hasUnappliedChanges || pendingFilterCount === 0}
+                >
+                  <Play className="h-4 w-4 mr-1.5" />
+                  Apply Filters
+                </V3Button>
+              </div>
+
               {/* Action buttons */}
               <V3Button
                 variant="outline"
                 size="sm"
                 onClick={() => setIsSaveDialogOpen(true)}
-                disabled={filters.length === 0 || !segmentData?.totalCount}
+                disabled={appliedFilters.length === 0 || !segmentData?.totalCount}
               >
                 <Save className="h-4 w-4 mr-1.5" />
                 Save
@@ -222,7 +252,7 @@ export function DonorSegmentBuilder({ organizationId }: DonorSegmentBuilderProps
                 <Download className="h-4 w-4 mr-1.5" />
                 Export
               </V3Button>
-              {filters.length > 0 && (
+              {(pendingFilterCount > 0 || activeFilterCount > 0) && (
                 <V3Button
                   variant="ghost"
                   size="sm"
@@ -242,8 +272,9 @@ export function DonorSegmentBuilder({ organizationId }: DonorSegmentBuilderProps
         {/* Filters Panel */}
         <div className="lg:col-span-4 xl:col-span-3">
           <DonorSegmentFilters
-            filters={filters}
+            filters={pendingFilters}
             onFiltersChange={handleFiltersChange}
+            onApply={handleApplyFilters}
             isLoading={isQuerying}
           />
         </div>

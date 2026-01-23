@@ -23,6 +23,7 @@ import { SEGMENT_FILTER_FIELDS, OPERATOR_LABELS } from "@/types/donorSegment";
 interface DonorSegmentFiltersProps {
   filters: FilterCondition[];
   onFiltersChange: (filters: FilterCondition[]) => void;
+  onApply: () => void;
   isLoading?: boolean;
 }
 
@@ -34,6 +35,7 @@ const FILTER_CATEGORIES = Array.from(
 export function DonorSegmentFilters({
   filters,
   onFiltersChange,
+  onApply,
   isLoading,
 }: DonorSegmentFiltersProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
@@ -123,6 +125,7 @@ export function DonorSegmentFilters({
                   fieldDef={fieldDef}
                   onUpdate={(updates) => updateFilter(filter.id, updates)}
                   onRemove={() => removeFilter(filter.id)}
+                  onApply={onApply}
                   disabled={isLoading}
                 />
               );
@@ -185,6 +188,7 @@ interface ActiveFilterCardProps {
   fieldDef: FilterField;
   onUpdate: (updates: Partial<FilterCondition>) => void;
   onRemove: () => void;
+  onApply: () => void;
   disabled?: boolean;
 }
 
@@ -193,6 +197,7 @@ function ActiveFilterCard({
   fieldDef,
   onUpdate,
   onRemove,
+  onApply,
   disabled,
 }: ActiveFilterCardProps) {
   return (
@@ -233,6 +238,7 @@ function ActiveFilterCard({
         filter={filter}
         fieldDef={fieldDef}
         onUpdate={onUpdate}
+        onApply={onApply}
         disabled={disabled}
       />
     </div>
@@ -244,14 +250,23 @@ interface FilterValueInputProps {
   filter: FilterCondition;
   fieldDef: FilterField;
   onUpdate: (updates: Partial<FilterCondition>) => void;
+  onApply: () => void;
   disabled?: boolean;
 }
 
-function FilterValueInput({ filter, fieldDef, onUpdate, disabled }: FilterValueInputProps) {
+function FilterValueInput({ filter, fieldDef, onUpdate, onApply, disabled }: FilterValueInputProps) {
   // No value needed for null operators
   if (filter.operator === 'is_null' || filter.operator === 'is_not_null') {
     return null;
   }
+
+  // Handle Enter key to apply filters
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onApply();
+    }
+  };
 
   // Between operator needs two values
   if (filter.operator === 'between') {
@@ -264,6 +279,7 @@ function FilterValueInput({ filter, fieldDef, onUpdate, disabled }: FilterValueI
           type="number"
           value={min}
           onChange={(e) => onUpdate({ value: [Number(e.target.value), max] as [number, number] })}
+          onKeyDown={handleKeyDown}
           className="h-8 text-xs"
           placeholder="Min"
           disabled={disabled}
@@ -273,6 +289,7 @@ function FilterValueInput({ filter, fieldDef, onUpdate, disabled }: FilterValueI
           type="number"
           value={max}
           onChange={(e) => onUpdate({ value: [min, Number(e.target.value)] as [number, number] })}
+          onKeyDown={handleKeyDown}
           className="h-8 text-xs"
           placeholder="Max"
           disabled={disabled}
@@ -295,6 +312,7 @@ function FilterValueInput({ filter, fieldDef, onUpdate, disabled }: FilterValueI
             type="number"
             value={filter.value as number}
             onChange={(e) => onUpdate({ value: Number(e.target.value) })}
+            onKeyDown={handleKeyDown}
             className={cn("h-8 text-xs", fieldDef.type === 'currency' && "pl-6")}
             disabled={disabled}
           />
@@ -322,8 +340,9 @@ function FilterValueInput({ filter, fieldDef, onUpdate, disabled }: FilterValueI
           type="text"
           value={filter.value as string}
           onChange={(e) => onUpdate({ value: e.target.value })}
+          onKeyDown={handleKeyDown}
           className="h-8 text-xs"
-          placeholder="Enter value..."
+          placeholder="Enter value... (press Enter to apply)"
           disabled={disabled}
         />
       );
@@ -334,6 +353,7 @@ function FilterValueInput({ filter, fieldDef, onUpdate, disabled }: FilterValueI
           type="date"
           value={filter.value as string}
           onChange={(e) => onUpdate({ value: e.target.value })}
+          onKeyDown={handleKeyDown}
           className="h-8 text-xs"
           disabled={disabled}
         />

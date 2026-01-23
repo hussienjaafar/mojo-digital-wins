@@ -86,6 +86,7 @@ export interface SegmentAggregates {
   bySegment: { name: string; value: number }[];
   byChurnRisk: { name: string; value: number }[];
   byTier: { name: string; value: number }[];
+  byChannel: { name: string; value: number }[];
 }
 
 // Available filter fields for the segment builder
@@ -285,11 +286,33 @@ export const SEGMENT_FILTER_FIELDS: FilterField[] = [
     type: 'multi-select',
     operators: ['in', 'nin'],
     options: [
+      // Monetary-based tiers
       { value: 'major', label: 'Major ($1,000+)' },
       { value: 'mid', label: 'Mid-Level ($250-999)' },
       { value: 'grassroots', label: 'Grassroots (<$250)' },
+      // Engagement-based tiers
+      { value: 'repeat', label: 'Repeat (5+ donations)' },
+      { value: 'active', label: 'Active (donated in 90 days)' },
+      { value: 'lapsing', label: 'Lapsing (90-180 days ago)' },
+      { value: 'lapsed', label: 'Lapsed (180+ days ago)' },
+      { value: 'one_time', label: 'One-Time Donor' },
     ],
-    description: 'Donor tier based on lifetime giving',
+    description: 'Donor tier based on giving level and engagement',
+  },
+  // Attribution-based classification
+  {
+    key: 'attributed_channel',
+    label: 'Donation Channel',
+    category: 'Attribution',
+    type: 'multi-select',
+    operators: ['in', 'nin'],
+    options: [
+      { value: 'meta', label: 'Meta Ads' },
+      { value: 'sms', label: 'SMS' },
+      { value: 'email', label: 'Email' },
+      { value: 'direct', label: 'Direct/Organic' },
+    ],
+    description: 'Marketing channel that drove the donation',
   },
 ];
 
