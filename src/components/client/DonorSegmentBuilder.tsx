@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { Filter, Users, Download, Save, Trash2, RotateCcw, List, BarChart3 } from "lucide-react";
+import { Filter, Download, Save, RotateCcw, List, BarChart3 } from "lucide-react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { toast } from "sonner";
 import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3Button } from "@/components/v3";
 import { DonorSegmentFilters } from "./DonorSegmentFilters";
@@ -33,12 +34,15 @@ export function DonorSegmentBuilder({ organizationId }: DonorSegmentBuilderProps
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [selectedSavedSegment, setSelectedSavedSegment] = useState<string | null>(null);
 
+  // Debounce filters to prevent excessive queries
+  const debouncedFilters = useDebouncedValue(filters, 300);
+
   // Query hooks
   const { 
     data: segmentData, 
     isLoading: isLoadingSegment,
     isFetching: isFetchingSegment,
-  } = useDonorSegmentQuery(organizationId, filters, true);
+  } = useDonorSegmentQuery(organizationId, debouncedFilters, true);
 
   const { 
     data: savedSegments, 

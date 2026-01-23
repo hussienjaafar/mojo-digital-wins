@@ -3571,6 +3571,7 @@ export type Database = {
           created_at: string | null
           donation_count: number | null
           donor_email: string
+          donor_key: string | null
           employer: string | null
           first_donation_date: string | null
           first_name: string | null
@@ -3601,6 +3602,7 @@ export type Database = {
           created_at?: string | null
           donation_count?: number | null
           donor_email: string
+          donor_key?: string | null
           employer?: string | null
           first_donation_date?: string | null
           first_name?: string | null
@@ -3631,6 +3633,7 @@ export type Database = {
           created_at?: string | null
           donation_count?: number | null
           donor_email?: string
+          donor_key?: string | null
           employer?: string | null
           first_donation_date?: string | null
           first_name?: string | null

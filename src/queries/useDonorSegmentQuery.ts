@@ -16,22 +16,201 @@ interface SegmentQueryResult {
   totalCount: number;
 }
 
-// Build dynamic query based on filter conditions
+// Map filter fields to actual database column names
+const FIELD_MAPPING: Record<string, string> = {
+  'email': 'donor_email',
+  'name': 'first_name',
+  'total_donated': 'total_donated',
+  'total_lifetime_value': 'total_donated',
+  'donation_count': 'donation_count',
+  'state': 'state',
+  'city': 'city',
+  'is_recurring': 'is_recurring',
+  'is_recurring_donor': 'is_recurring',
+  'employer': 'employer',
+  'occupation': 'occupation',
+  'first_donation_date': 'first_donation_date',
+  'last_donation_date': 'last_donation_date',
+};
+
+// Fields that require client-side filtering
+const CLIENT_SIDE_FIELDS = [
+  'segment', 'churn_risk_label', 'predicted_ltv_90', 'predicted_ltv_180',
+  'days_since_donation', 'avg_donation', 'rfm_score', 'recency_score',
+  'frequency_score', 'monetary_score', 'donor_tier'
+];
+
+// Apply a single filter to the Supabase query
+function applyServerFilter(query: any, filter: FilterCondition): any {
+  const { field, operator, value } = filter;
+  
+  // Skip client-side fields
+  if (CLIENT_SIDE_FIELDS.includes(field)) {
+    return query;
+  }
+
+  const dbField = FIELD_MAPPING[field] || field;
+
+  switch (operator) {
+    case 'eq':
+      return query.eq(dbField, value);
+    case 'neq':
+      return query.neq(dbField, value);
+    case 'gt':
+      return query.gt(dbField, value);
+    case 'gte':
+      return query.gte(dbField, value);
+    case 'lt':
+      return query.lt(dbField, value);
+    case 'lte':
+      return query.lte(dbField, value);
+    case 'in':
+      return query.in(dbField, Array.isArray(value) ? value : [value]);
+    case 'nin':
+      if (Array.isArray(value)) {
+        return query.not(dbField, 'in', `(${value.join(',')})`);
+      }
+      return query;
+    case 'between':
+      if (Array.isArray(value) && value.length === 2) {
+        return query.gte(dbField, value[0]).lte(dbField, value[1]);
+      }
+      return query;
+    case 'contains':
+      return query.ilike(dbField, `%${value}%`);
+    case 'not_contains':
+      return query.not(dbField, 'ilike', `%${value}%`);
+    case 'is_null':
+      return query.is(dbField, null);
+    case 'is_not_null':
+      return query.not(dbField, 'is', null);
+    default:
+      return query;
+  }
+}
+
+// Apply client-side filter for computed/LTV fields
+function applyClientFilter(donor: SegmentDonor, filter: FilterCondition): boolean {
+  const { field, operator, value } = filter;
+  
+  // Skip fields handled server-side
+  if (!CLIENT_SIDE_FIELDS.includes(field)) {
+    return true;
+  }
+
+  let fieldValue: any;
+  
+  switch (field) {
+    case 'segment':
+      fieldValue = donor.segment;
+      break;
+    case 'churn_risk_label':
+      fieldValue = donor.churn_risk_label;
+      break;
+    case 'predicted_ltv_90':
+      fieldValue = donor.predicted_ltv_90;
+      break;
+    case 'predicted_ltv_180':
+      fieldValue = donor.predicted_ltv_180;
+      break;
+    case 'days_since_donation':
+      fieldValue = donor.days_since_donation;
+      break;
+    case 'avg_donation':
+      fieldValue = donor.donation_count > 0 ? donor.total_donated / donor.donation_count : 0;
+      break;
+    case 'donor_tier':
+      fieldValue = donor.total_donated >= 1000 ? 'major' 
+        : donor.total_donated >= 250 ? 'mid' 
+        : 'grassroots';
+      break;
+    default:
+      return true;
+  }
+
+  // Handle null comparisons
+  if (operator === 'is_null') return fieldValue === null || fieldValue === undefined;
+  if (operator === 'is_not_null') return fieldValue !== null && fieldValue !== undefined;
+  if (fieldValue === null || fieldValue === undefined) return false;
+
+  switch (operator) {
+    case 'eq':
+      return fieldValue === value;
+    case 'neq':
+      return fieldValue !== value;
+    case 'gt':
+      return typeof fieldValue === 'number' && fieldValue > (value as number);
+    case 'gte':
+      return typeof fieldValue === 'number' && fieldValue >= (value as number);
+    case 'lt':
+      return typeof fieldValue === 'number' && fieldValue < (value as number);
+    case 'lte':
+      return typeof fieldValue === 'number' && fieldValue <= (value as number);
+    case 'in':
+      return Array.isArray(value) && (value as (string | number)[]).includes(fieldValue);
+    case 'nin':
+      return Array.isArray(value) && !(value as (string | number)[]).includes(fieldValue);
+    case 'between':
+      if (Array.isArray(value) && value.length === 2 && typeof fieldValue === 'number') {
+        const [minVal, maxVal] = value as [number, number];
+        return fieldValue >= minVal && fieldValue <= maxVal;
+      }
+      return true;
+    case 'contains':
+      return String(fieldValue).toLowerCase().includes(String(value).toLowerCase());
+    case 'not_contains':
+      return !String(fieldValue).toLowerCase().includes(String(value).toLowerCase());
+    default:
+      return true;
+  }
+}
+
+// Transform raw database row to SegmentDonor
+function transformToDonor(row: any, ltvData: any): SegmentDonor {
+  const now = Date.now();
+  const daysSince = row.last_donation_date 
+    ? Math.floor((now - new Date(row.last_donation_date).getTime()) / (1000 * 60 * 60 * 24))
+    : 999;
+
+  return {
+    id: row.id,
+    donor_key: row.donor_key,
+    email: row.donor_email,
+    name: [row.first_name, row.last_name].filter(Boolean).join(' ') || null,
+    state: row.state,
+    city: row.city,
+    zip: row.zip,
+    total_donated: row.total_donated || 0,
+    donation_count: row.donation_count || 0,
+    first_donation_date: row.first_donation_date,
+    last_donation_date: row.last_donation_date,
+    is_recurring: row.is_recurring || false,
+    employer: row.employer,
+    occupation: row.occupation,
+    segment: ltvData?.segment || null,
+    churn_risk_label: ltvData?.churn_risk_label || null,
+    predicted_ltv_90: ltvData?.predicted_ltv_90 || null,
+    predicted_ltv_180: ltvData?.predicted_ltv_180 || null,
+    days_since_donation: daysSince,
+    is_multi_channel: false,
+  };
+}
+
+// Main fetch function with two-query strategy
 async function fetchSegmentDonors(
   organizationId: string,
   filters: FilterCondition[],
-  limit: number = 1000
+  limit: number = 5000
 ): Promise<SegmentQueryResult> {
-  const sb = supabase as any;
-
-  // First, fetch donor demographics with LTV predictions
-  let query = sb
+  // Step 1: Build demographics query with correct column names
+  let query = supabase
     .from('donor_demographics')
     .select(`
       id,
       donor_key,
-      email,
-      full_name,
+      donor_email,
+      first_name,
+      last_name,
       state,
       city,
       zip,
@@ -41,193 +220,77 @@ async function fetchSegmentDonors(
       last_donation_date,
       is_recurring,
       employer,
-      occupation,
-      donor_ltv_predictions!left(
-        segment,
-        churn_risk_label,
-        predicted_ltv_90,
-        predicted_ltv_180
-      )
+      occupation
     `)
     .eq('organization_id', organizationId);
 
-  // Apply filters to the query
+  // Apply server-side filters
   for (const filter of filters) {
-    const { field, operator, value } = filter;
-    
-    // Handle LTV prediction fields separately (they're in a joined table)
-    const ltvFields = ['segment', 'churn_risk_label', 'predicted_ltv_90', 'predicted_ltv_180'];
-    const isLtvField = ltvFields.includes(field);
-    
-    // Skip LTV fields for now - we'll filter client-side
-    // This is because Supabase doesn't support filtering on joined table columns in the same way
-    if (isLtvField) continue;
-    
-    // Handle computed fields client-side
-    if (field === 'days_since_donation' || field === 'avg_donation' || field === 'donor_tier') {
-      continue;
-    }
-
-    switch (operator) {
-      case 'eq':
-        query = query.eq(field, value);
-        break;
-      case 'neq':
-        query = query.neq(field, value);
-        break;
-      case 'gt':
-        query = query.gt(field, value);
-        break;
-      case 'gte':
-        query = query.gte(field, value);
-        break;
-      case 'lt':
-        query = query.lt(field, value);
-        break;
-      case 'lte':
-        query = query.lte(field, value);
-        break;
-      case 'in':
-        if (Array.isArray(value)) {
-          query = query.in(field, value);
-        }
-        break;
-      case 'nin':
-        if (Array.isArray(value)) {
-          // Supabase doesn't have nin directly, use not.in
-          query = query.not(field, 'in', `(${value.join(',')})`);
-        }
-        break;
-      case 'between':
-        if (Array.isArray(value) && value.length === 2) {
-          query = query.gte(field, value[0]).lte(field, value[1]);
-        }
-        break;
-      case 'contains':
-        query = query.ilike(field, `%${value}%`);
-        break;
-      case 'not_contains':
-        query = query.not(field, 'ilike', `%${value}%`);
-        break;
-      case 'is_null':
-        query = query.is(field, null);
-        break;
-      case 'is_not_null':
-        query = query.not(field, 'is', null);
-        break;
-    }
+    query = applyServerFilter(query, filter);
   }
 
-  // Limit results
-  query = query.limit(limit);
+  const { data: demographics, error: demoError } = await query.limit(limit);
 
-  const { data: rawDonors, error } = await query;
-
-  if (error) {
-    console.error('Segment query error:', error);
-    throw error;
+  if (demoError) {
+    console.error('Error fetching donor demographics:', demoError);
+    throw demoError;
   }
 
-  const now = Date.now();
-  
-  // Transform to SegmentDonor format and apply client-side filters
-  let donors: SegmentDonor[] = (rawDonors || []).map((d: any) => {
-    const ltvPrediction = d.donor_ltv_predictions?.[0] || d.donor_ltv_predictions || {};
-    const daysSince = d.last_donation_date 
-      ? Math.floor((now - new Date(d.last_donation_date).getTime()) / (1000 * 60 * 60 * 24))
-      : 999;
-    
-    return {
-      id: d.id,
-      donor_key: d.donor_key,
-      email: d.email,
-      name: d.full_name,
-      state: d.state,
-      city: d.city,
-      zip: d.zip,
-      total_donated: d.total_donated || 0,
-      donation_count: d.donation_count || 0,
-      first_donation_date: d.first_donation_date,
-      last_donation_date: d.last_donation_date,
-      is_recurring: d.is_recurring || false,
-      employer: d.employer,
-      occupation: d.occupation,
-      segment: ltvPrediction.segment || null,
-      churn_risk_label: ltvPrediction.churn_risk_label || null,
-      predicted_ltv_90: ltvPrediction.predicted_ltv_90 || null,
-      predicted_ltv_180: ltvPrediction.predicted_ltv_180 || null,
-      days_since_donation: daysSince,
-      is_multi_channel: false, // TODO: implement multi-channel detection
+  if (!demographics || demographics.length === 0) {
+    return { 
+      donors: [], 
+      aggregates: calculateAggregates([]), 
+      totalCount: 0 
     };
-  });
-
-  // Apply client-side filters for computed/joined fields
-  for (const filter of filters) {
-    const { field, operator, value } = filter;
-    
-    donors = donors.filter(donor => {
-      let fieldValue: any;
-      
-      // Map field to donor property
-      switch (field) {
-        case 'days_since_donation':
-          fieldValue = donor.days_since_donation;
-          break;
-        case 'avg_donation':
-          fieldValue = donor.donation_count > 0 ? donor.total_donated / donor.donation_count : 0;
-          break;
-        case 'donor_tier':
-          fieldValue = donor.total_donated >= 1000 ? 'major' 
-            : donor.total_donated >= 250 ? 'mid' 
-            : 'grassroots';
-          break;
-        case 'segment':
-          fieldValue = donor.segment;
-          break;
-        case 'churn_risk_label':
-          fieldValue = donor.churn_risk_label;
-          break;
-        case 'predicted_ltv_90':
-          fieldValue = donor.predicted_ltv_90;
-          break;
-        case 'predicted_ltv_180':
-          fieldValue = donor.predicted_ltv_180;
-          break;
-        default:
-          return true; // Already filtered server-side
-      }
-
-      // Apply operator
-      switch (operator) {
-        case 'eq':
-          return fieldValue === value;
-        case 'neq':
-          return fieldValue !== value;
-        case 'gt':
-          return typeof fieldValue === 'number' && fieldValue > (value as number);
-        case 'gte':
-          return typeof fieldValue === 'number' && fieldValue >= (value as number);
-        case 'lt':
-          return typeof fieldValue === 'number' && fieldValue < (value as number);
-        case 'lte':
-          return typeof fieldValue === 'number' && fieldValue <= (value as number);
-        case 'in':
-          return Array.isArray(value) && (value as string[]).includes(fieldValue);
-        case 'nin':
-          return Array.isArray(value) && !(value as string[]).includes(fieldValue);
-        case 'between':
-          if (Array.isArray(value) && value.length === 2 && typeof fieldValue === 'number') {
-            const [minVal, maxVal] = value as [number, number];
-            return fieldValue >= minVal && fieldValue <= maxVal;
-          }
-          return true;
-        default:
-          return true;
-      }
-    });
   }
 
-  // Calculate aggregates
+  // Step 2: Get LTV predictions for matched donors
+  const donorKeys = demographics
+    .map(d => d.donor_key)
+    .filter((k): k is string => k !== null && k !== undefined);
+
+  let ltvMap = new Map<string, any>();
+
+  if (donorKeys.length > 0) {
+    // Batch in chunks of 1000 to avoid query limits
+    const chunks = [];
+    for (let i = 0; i < donorKeys.length; i += 1000) {
+      chunks.push(donorKeys.slice(i, i + 1000));
+    }
+
+    const ltvResults = await Promise.all(
+      chunks.map(chunk => 
+        supabase
+          .from('donor_ltv_predictions')
+          .select('donor_key, segment, churn_risk_label, predicted_ltv_90, predicted_ltv_180')
+          .eq('organization_id', organizationId)
+          .in('donor_key', chunk)
+      )
+    );
+
+    for (const result of ltvResults) {
+      if (result.data) {
+        for (const ltv of result.data) {
+          ltvMap.set(ltv.donor_key, ltv);
+        }
+      }
+    }
+  }
+
+  // Step 3: Transform and enrich donors
+  let donors = demographics.map(row => 
+    transformToDonor(row, ltvMap.get(row.donor_key || ''))
+  );
+
+  // Step 4: Apply client-side filters
+  const clientFilters = filters.filter(f => CLIENT_SIDE_FIELDS.includes(f.field));
+  if (clientFilters.length > 0) {
+    donors = donors.filter(donor => 
+      clientFilters.every(filter => applyClientFilter(donor, filter))
+    );
+  }
+
+  // Step 5: Calculate aggregates
   const aggregates = calculateAggregates(donors);
 
   return {
@@ -260,7 +323,7 @@ function calculateAggregates(donors: SegmentDonor[]): SegmentAggregates {
   const recurringDonors = donors.filter(d => d.is_recurring).length;
   const totalDaysSince = donors.reduce((sum, d) => sum + (d.days_since_donation || 0), 0);
 
-  // State distribution
+  // State distribution (top 10)
   const stateMap = new Map<string, number>();
   donors.forEach(d => {
     if (d.state) {
@@ -335,10 +398,12 @@ export function useDonorSegmentQuery(
   enabled: boolean = true
 ) {
   return useQuery({
-    queryKey: [SEGMENT_QUERY_KEY, organizationId, filters],
+    queryKey: [SEGMENT_QUERY_KEY, organizationId, JSON.stringify(filters)],
     queryFn: () => fetchSegmentDonors(organizationId, filters),
     enabled: enabled && !!organizationId,
     staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev,
   });
 }
 
