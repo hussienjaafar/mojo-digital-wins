@@ -504,6 +504,44 @@ serve(async (req) => {
       );
     }
 
+    // Check if any parent jobs are cancelled - skip those chunks
+    const jobIds = [...new Set(chunks.map(c => c.job_id))];
+    const { data: jobs } = await supabase
+      .from('backfill_status')
+      .select('id, status')
+      .in('id', jobIds);
+
+    const cancelledJobIds = new Set(
+      (jobs || []).filter((j: any) => j.status === 'cancelled').map((j: any) => j.id)
+    );
+
+    // If any jobs are cancelled, mark their chunks as cancelled
+    if (cancelledJobIds.size > 0) {
+      for (const chunk of chunks) {
+        if (cancelledJobIds.has(chunk.job_id)) {
+          await supabase
+            .from('actblue_backfill_chunks')
+            .update({
+              status: 'cancelled',
+              error_message: 'Job was cancelled by user',
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', chunk.id);
+        }
+      }
+      // Filter out cancelled chunks
+      const activeChunks = chunks.filter(c => !cancelledJobIds.has(c.job_id));
+      if (activeChunks.length === 0) {
+        logger.info('All chunks belong to cancelled jobs');
+        return new Response(
+          JSON.stringify({ message: 'All pending chunks cancelled', processed: false }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      chunks.length = 0;
+      chunks.push(...activeChunks);
+    }
+
     logger.info(`Found ${chunks.length} chunks to process in parallel`);
 
     // Group chunks by organization to get credentials once per org
@@ -603,8 +641,8 @@ serve(async (req) => {
     }
 
     // Update job progress for all affected jobs
-    const jobIds = new Set(chunks.map(c => c.job_id));
-    for (const jobId of jobIds) {
+    const affectedJobIds = new Set(chunks.map(c => c.job_id));
+    for (const jobId of affectedJobIds) {
       await updateJobProgress(supabase, jobId, logger);
     }
 

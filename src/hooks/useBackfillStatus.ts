@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -14,7 +14,7 @@ export const backfillKeys = {
 export interface BackfillJob {
   id: string;
   task_name: string;
-  status: "pending" | "running" | "completed" | "completed_with_errors" | "failed";
+  status: "pending" | "running" | "completed" | "completed_with_errors" | "failed" | "cancelled";
   total_items: number | null;
   processed_items: number | null;
   failed_items: number | null;
@@ -31,7 +31,7 @@ export interface BackfillChunk {
   chunk_index: number;
   start_date: string;
   end_date: string;
-  status: "pending" | "processing" | "completed" | "failed" | "retrying";
+  status: "pending" | "processing" | "completed" | "failed" | "retrying" | "cancelled";
   attempt_count: number | null;
   max_attempts: number | null;
   processed_rows: number | null;
@@ -50,6 +50,7 @@ export interface ChunkSummary {
   completed: number;
   failed: number;
   retrying: number;
+  cancelled: number;
   total: number;
   totalRows: number;
 }
@@ -99,7 +100,7 @@ export function useBackfillStatus({
         return {
           job: null,
           chunks: [],
-          summary: { pending: 0, processing: 0, completed: 0, failed: 0, retrying: 0, total: 0, totalRows: 0 },
+          summary: { pending: 0, processing: 0, completed: 0, failed: 0, retrying: 0, cancelled: 0, total: 0, totalRows: 0 },
           isActive: false,
           progressPercent: 0,
           estimatedMinutesRemaining: null,
@@ -126,6 +127,7 @@ export function useBackfillStatus({
         completed: 0,
         failed: 0,
         retrying: 0,
+        cancelled: 0,
         total: chunks.length,
         totalRows: 0,
       };
@@ -147,12 +149,15 @@ export function useBackfillStatus({
           case "retrying":
             summary.retrying++;
             break;
+          case "cancelled":
+            summary.cancelled++;
+            break;
         }
         summary.totalRows += (chunk.inserted_rows || 0) + (chunk.updated_rows || 0);
       });
 
       const isActive = job.status === "running" || job.status === "pending";
-      const completedChunks = summary.completed + summary.failed;
+      const completedChunks = summary.completed + summary.failed + summary.cancelled;
       const progressPercent = summary.total > 0 
         ? Math.round((completedChunks / summary.total) * 100) 
         : 0;
@@ -179,6 +184,107 @@ export function useBackfillStatus({
       return data?.isActive ? 10_000 : 60_000;
     },
     staleTime: 5_000,
+  });
+
+  // Cancel backfill mutation
+  const cancelMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      // Update job status to cancelled
+      const { error: jobError } = await supabase
+        .from("backfill_status")
+        .update({
+          status: "cancelled",
+          completed_at: new Date().toISOString(),
+          error_message: "Cancelled by user",
+        })
+        .eq("id", jobId);
+
+      if (jobError) throw jobError;
+
+      // Cancel all pending/retrying chunks
+      const { error: chunkError } = await supabase
+        .from("actblue_backfill_chunks")
+        .update({
+          status: "cancelled",
+          error_message: "Job was cancelled by user",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("job_id", jobId)
+        .in("status", ["pending", "retrying"]);
+
+      if (chunkError) throw chunkError;
+
+      return jobId;
+    },
+    onSuccess: () => {
+      if (enableToasts) {
+        toast({
+          title: "Import Cancelled",
+          description: "The backfill has been cancelled. Completed chunks will be retained.",
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: backfillKeys.status(organizationId) });
+    },
+    onError: (error: any) => {
+      if (enableToasts) {
+        toast({
+          title: "Failed to Cancel",
+          description: error.message || "Could not cancel the import",
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  // Retry failed chunks mutation
+  const retryFailedMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      // Reset job status to running
+      const { error: jobError } = await supabase
+        .from("backfill_status")
+        .update({
+          status: "running",
+          completed_at: null,
+          error_message: null,
+        })
+        .eq("id", jobId);
+
+      if (jobError) throw jobError;
+
+      // Reset failed chunks to pending
+      const { error: chunkError } = await supabase
+        .from("actblue_backfill_chunks")
+        .update({
+          status: "pending",
+          attempt_count: 0,
+          error_message: null,
+          next_retry_at: null,
+        })
+        .eq("job_id", jobId)
+        .eq("status", "failed");
+
+      if (chunkError) throw chunkError;
+
+      return jobId;
+    },
+    onSuccess: () => {
+      if (enableToasts) {
+        toast({
+          title: "Retrying Failed Chunks",
+          description: "Failed chunks have been queued for retry.",
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: backfillKeys.status(organizationId) });
+    },
+    onError: (error: any) => {
+      if (enableToasts) {
+        toast({
+          title: "Failed to Retry",
+          description: error.message || "Could not retry failed chunks",
+          variant: "destructive",
+        });
+      }
+    },
   });
 
   // Handle status transitions and show toasts
@@ -218,6 +324,8 @@ export function useBackfillStatus({
           variant: "destructive",
         });
         onError?.(errorMessage);
+      } else if (currentStatus === "cancelled") {
+        // Toast already shown by mutation
       }
     }
 
@@ -228,10 +336,14 @@ export function useBackfillStatus({
     ...query,
     job: query.data?.job || null,
     chunks: query.data?.chunks || [],
-    summary: query.data?.summary || { pending: 0, processing: 0, completed: 0, failed: 0, retrying: 0, total: 0, totalRows: 0 },
+    summary: query.data?.summary || { pending: 0, processing: 0, completed: 0, failed: 0, retrying: 0, cancelled: 0, total: 0, totalRows: 0 },
     isActive: query.data?.isActive || false,
     progressPercent: query.data?.progressPercent || 0,
     estimatedMinutesRemaining: query.data?.estimatedMinutesRemaining || null,
+    cancelBackfill: cancelMutation.mutate,
+    isCancelling: cancelMutation.isPending,
+    retryFailed: retryFailedMutation.mutate,
+    isRetrying: retryFailedMutation.isPending,
   };
 }
 
@@ -239,7 +351,10 @@ export function useBackfillStatus({
  * Hook for admins to monitor all backfill jobs across organizations
  */
 export function useAllBackfillJobs() {
-  return useQuery({
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
     queryKey: backfillKeys.allJobs(),
     queryFn: async () => {
       // Get all recent backfill jobs
@@ -274,13 +389,16 @@ export function useAllBackfillJobs() {
                 completed: 0,
                 failed: 0,
                 retrying: 0,
+                cancelled: 0,
                 total: 0,
                 totalRows: 0,
               };
             }
             const summary = chunksByJob[chunk.job_id];
             summary.total++;
-            summary[chunk.status as keyof Pick<ChunkSummary, "pending" | "processing" | "completed" | "failed" | "retrying">]++;
+            if (chunk.status in summary) {
+              (summary as any)[chunk.status]++;
+            }
             summary.totalRows += (chunk.inserted_rows || 0) + (chunk.updated_rows || 0);
           });
         }
@@ -294,4 +412,54 @@ export function useAllBackfillJobs() {
     refetchInterval: 30_000,
     staleTime: 10_000,
   });
+
+  // Cancel job mutation for admin
+  const cancelJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const { error: jobError } = await supabase
+        .from("backfill_status")
+        .update({
+          status: "cancelled",
+          completed_at: new Date().toISOString(),
+          error_message: "Cancelled by admin",
+        })
+        .eq("id", jobId);
+
+      if (jobError) throw jobError;
+
+      const { error: chunkError } = await supabase
+        .from("actblue_backfill_chunks")
+        .update({
+          status: "cancelled",
+          error_message: "Job was cancelled by admin",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("job_id", jobId)
+        .in("status", ["pending", "retrying"]);
+
+      if (chunkError) throw chunkError;
+
+      return jobId;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Job Cancelled",
+        description: "The backfill job has been cancelled.",
+      });
+      queryClient.invalidateQueries({ queryKey: backfillKeys.allJobs() });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Cancel",
+        description: error.message || "Could not cancel the job",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return {
+    ...query,
+    cancelJob: cancelJobMutation.mutate,
+    isCancellingJob: cancelJobMutation.isPending,
+  };
 }

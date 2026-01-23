@@ -16,7 +16,8 @@ import {
   XCircle,
   Loader2,
   Play,
-  RotateCcw
+  RotateCcw,
+  Ban
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const statusConfig = {
   pending: { 
@@ -54,6 +66,11 @@ const statusConfig = {
     variant: "error" as const,
     icon: XCircle,
   },
+  cancelled: { 
+    label: "Cancelled", 
+    variant: "muted" as const,
+    icon: Ban,
+  },
 };
 
 function extractOrgId(taskName: string): string {
@@ -67,13 +84,17 @@ function JobCard({
   chunkSummary,
   onTriggerProcess,
   onResetChunks,
+  onCancelJob,
   isProcessing,
+  isCancelling,
 }: { 
   job: BackfillJob; 
   chunkSummary?: { pending: number; completed: number; failed: number; total: number; totalRows: number };
   onTriggerProcess: (jobId: string) => void;
   onResetChunks: (jobId: string) => void;
+  onCancelJob: (jobId: string) => void;
   isProcessing: boolean;
+  isCancelling: boolean;
 }) {
   const config = statusConfig[job.status] || statusConfig.pending;
   const StatusIcon = config.icon;
@@ -149,7 +170,7 @@ function JobCard({
             size="sm"
             variant="ghost"
             onClick={() => onTriggerProcess(job.id)}
-            disabled={isProcessing}
+            disabled={isProcessing || isCancelling}
             className="text-xs"
           >
             <Play className="h-3 w-3 mr-1" />
@@ -159,12 +180,46 @@ function JobCard({
             size="sm"
             variant="ghost"
             onClick={() => onResetChunks(job.id)}
-            disabled={isProcessing}
+            disabled={isProcessing || isCancelling}
             className="text-xs"
           >
             <RotateCcw className="h-3 w-3 mr-1" />
             Reset Stuck
           </V3Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <V3Button
+                size="sm"
+                variant="ghost"
+                disabled={isCancelling}
+                className="text-xs text-[hsl(var(--portal-error))] hover:text-[hsl(var(--portal-error))] hover:bg-[hsl(var(--portal-error)/0.1)]"
+              >
+                {isCancelling ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Ban className="h-3 w-3 mr-1" />
+                )}
+                Cancel
+              </V3Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Cancel This Import?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will stop the import process. Chunks that have already been processed will be kept.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep Running</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => onCancelJob(job.id)}
+                  className="bg-[hsl(var(--portal-error))] hover:bg-[hsl(var(--portal-error)/0.9)]"
+                >
+                  Cancel Import
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       )}
     </div>
@@ -174,7 +229,7 @@ function JobCard({
 export function BackfillMonitorPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data, isLoading, refetch } = useAllBackfillJobs();
+  const { data, isLoading, refetch, cancelJob, isCancellingJob } = useAllBackfillJobs();
   const [processing, setProcessing] = useState<string | null>(null);
 
   const runningJobs = data?.jobs.filter(j => j.status === "running") || [];
@@ -288,7 +343,9 @@ export function BackfillMonitorPanel() {
                   chunkSummary={data?.chunksByJob[job.id]}
                   onTriggerProcess={triggerChunkProcessing}
                   onResetChunks={resetStuckChunks}
+                  onCancelJob={cancelJob}
                   isProcessing={processing === job.id}
+                  isCancelling={isCancellingJob}
                 />
               ))}
             </div>
