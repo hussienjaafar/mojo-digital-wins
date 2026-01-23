@@ -93,9 +93,10 @@ export function DateRangeSelector({
       onDateChange(dateStr, dateStr);
     } else {
       // Multi-day range preset
+      // For "7D" we want 7 days inclusive, so: today + 6 previous days
       setSelectedPreset(preset.days);
       const end = today;
-      const start = subDays(end, preset.days);
+      const start = subDays(end, preset.days - 1);
       onDateChange(format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd"));
     }
   };
